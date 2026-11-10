@@ -104,6 +104,8 @@ export function seatConfig(x: SeatConfigInput): SeatConfig {
     ...(pp.sessions && !twin ? { sessions: pp.sessions } : {}), ...(twin ? { exactBack: true } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
     // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
     ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, ks]) => chans.filter((c) => c.path === id || c.path.endsWith(`/${id}`)).map((c) => [c.path, ks] as [string, string[]]))) } : {}),
-    ...(pp.prompt_max ? { promptMax: pp.prompt_max } : {}) } as LlmParticipantConfig;
+    ...(pp.prompt_max ? { promptMax: pp.prompt_max } : {}),
+    // (Papers it keeps and is not shown as a list, set out with the matters that name them: a desk's clients' remits.)
+    ...(Array.isArray(pp.with_matters) ? { withMatters: (pp.with_matters as string[]).flatMap((s) => chans.filter((c) => c.path === s || c.path.endsWith(`/${s}`)).map((c) => c.path)) } : {}) } as LlmParticipantConfig;
   return { config, ...(office ? { office } : {}), entity, ...(entityName ? { entityName } : {}), standingIds, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), dayBook };
 }

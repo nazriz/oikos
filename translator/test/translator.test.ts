@@ -48,7 +48,7 @@ test("a draft carries the call, the resolver, a mechanical preview, the dry run 
   expect(r.draft.check).toEqual({ ok: false, refusal: { code: "insufficient_funds" }, warnings: ['This appears to go against law-planning: "No building without a permit."'] });
   expect(r.hash).toBe(draftHash(r.draft));
   const text = draftText(r.draft);
-  expect(text).toContain('Draft d1, drawn up from what you asked: "We\'ll build a park on p1 ourselves.". If you say yes, this is exactly what will happen:');
+  expect(text).toContain('d1: what you asked for ("We\'ll build a park on p1 ourselves."), set out. If you say yes, this is exactly what will happen:');
   expect(text).toContain("To say yes: Confirm d1. To say no: Decline d1");
   // What the request named that the draft does nothing with is said (an id it uses, in its call or preview, is not).
   expect(notInDraft({ proposal: "Pay rec.52 from acc-1 to acc-9, and file a report on rec.60.", call: "money(to=acc-9, amount=\"310\", from=acc-1, settles=rec.52)", summary: "" })).toEqual(["rec.60"]);

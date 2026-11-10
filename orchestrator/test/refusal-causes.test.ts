@@ -30,13 +30,13 @@ test("the wave's five, each with its cause, and none of them the sentence with n
     asks('statement(basis=["rec.44","rec.45"], kind=law, on=schedule-tenancy, text="the amendment of the law on ending a tenancy")'),
     asks('agreement(basis=["rec.44","rec.45"], template=employment, text="employment as works crew", with=greenco)'),
   ].map((x) => String((x as string[])[0]));
-  expect(said[0]).toStartWith("draft.finance.7 is the name a draft went by before it was confirmed, not a paper on record.");
+  expect(said[0]).toStartWith("draft.finance.7 is the reference of something you asked for, set out for your yes or no, not a paper on record.");
   expect(said[1]).toStartWith('"rec.msg.4132" (for re) is not the id of anything on record');
   expect(said[2]).toStartWith("A paper is put up at a place on the ground: a lot, or a cell of one. schedule-tenancy is neither");
   expect(said[3]).toStartWith("An agreement says what each side is to do or pay, and this one says nothing either side commits to.");
   for (const s of said) expect(s).not.toContain("may not help");
   expect(NOT_CHECKED).not.toContain("may not help");
-  expect(NOT_CHECKED).toBe("The draft could not be drawn up, and the fault is not in what you asked: it has been noted. Please ask for it again; if it fails again, ask for it in smaller steps.");
+  expect(NOT_CHECKED).toBe("It could not be set out, and the fault is not in what you asked: it has been noted. Please ask for it again; if it fails again, ask for it in smaller steps.");
 });
 
 test("a paper put up on a lot of one cell goes on that cell, which the contract takes; on a lot of several, which is asked", () => {
@@ -77,6 +77,6 @@ test("a draft the log will not take: a fault on record with the engine's words, 
   expect(notes[0].invalid[0].length).toBeGreaterThan("platform fault: the draft breaks the contract and couldn't be recorded: ".length + 5);
   // What the seat was told, in the same sitting (the log's record of what its model was sent).
   const log = readFileSync(s.logPath, "utf8");
-  expect(log).toContain("nothing was filed or done. The draft could not be drawn up, and the fault is not in what you asked: it has been noted. Please ask for it again; if it fails again, ask for it in smaller steps.");
+  expect(log).toContain("nothing was filed or done. It could not be set out, and the fault is not in what you asked: it has been noted. Please ask for it again; if it fails again, ask for it in smaller steps.");
   expect(log).not.toContain("may not help");
 }, 600_000);

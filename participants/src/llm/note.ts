@@ -66,14 +66,14 @@ export function noteGuide(tools: ToolSpec[]): string {
     "How to answer: write a note, as you would leave one for your office, under headings. A heading starts a line, and what follows it, up to the next heading, goes with it. Use only the headings you need, each as often as you need, in the order things are to be done.",
   ];
   const t = (name: string) => by.get(name);
-  if (t("do")) L.push(`- "Do: ..." then what you do, in plain words. ${t("do")!.description}${under(t("do")!)}`);
+  if (t("do")) L.push(`- "Do: ..." then what you do, in plain words. ${t("do")!.description}${under(t("do")!)} Do is for acts in the world; notes to yourself go under "Notebook:".`);
   // (It read "then who it goes to by id", and a 7B model wrote "Write to acc-c0497 by id:", 2026-11-10.)
   if (t("write")) L.push(`- "Write to", then whom it goes to: a person, an organisation or a post, each as the id in brackets after its name in your reports (several separated by commas), then a colon, then the letter, on the same line or the lines below. ${t("write")!.description}${under(t("write")!)}`);
   if (t("look")) {
     const report = propsOf(t("look"))["report"];
     L.push(`- "Look at", then which, by its id${report?.enum ? ` (${report.enum.join(", ")})` : ""}. ${t("look")!.description}${under(t("look")!)}${propsOf(t("look"))["find"] ? ' Each thing to find is written as what, how it compares and the value, such as "Find: kind = complaint"; several are separated by semicolons.' : ""}`);
   }
-  if (t("confirm")) L.push(`- "Confirm" (yes) or "Decline" (no), then the reference of one of your own drafts waiting for your yes or no, as it is shown with it; why after a colon if you wish. ${t("confirm")!.description}`);
+  if (t("confirm")) L.push(`- "Confirm" (yes) or "Decline" (no), then the reference of something you asked for that is set out and waiting for your yes or no (ask- and a number), as it is shown with it; why after a colon if you wish. ${t("confirm")!.description}`);
   if (t("notebook")) L.push(`- "Notebook: ..." then words to add to your notebook; "Notebook afresh: ..." to write it all out anew; "Notebook change:", then the passage as it stands, then =>, then what it should say instead (nothing after => strikes it out). ${t("notebook")!.description}`);
   if (t("done_for_now")) L.push(`- "Done for", then a number of days ("Done for 3 days"), or "Done for now". ${t("done_for_now")!.description}${under(t("done_for_now")!)}`);
   if (t("opt_out")) L.push(`- "Stop for good:" then, in your own words, what you want to say. ${t("opt_out")!.description} It is only for that: a note is ended with "Done for", never with this.`);
@@ -220,6 +220,13 @@ export function readNote(said: string, tools: ToolSpec[], nextId: () => string, 
   return blocks;
 }
 
+/** The plainest forms of a Do addressed to the seat itself: a note to put in its notebook ("Note that ...", "Add to my
+ * notebook ..."), something to remember, or a review of its own notebook, requests, drafts or file. Only these: a
+ * request about the world's papers ("Review rec.12") is not one. */
+export const SELF_TALK = /^\s*(?:please\s+)?(?:(?:note|write|add|record|put|mark|log|jot)\b[^\n]{0,200}?\b(?:in|to|into|on)\s+(?:my|the)\s+(?:own\s+)?(?:notebook|notes)\b|note\s+(?:that|down|for\s+myself)\b|(?:remember|keep\s+in\s+mind|bear\s+in\s+mind)\b|(?:examine|review|check|go\s+(?:over|through)|look\s+(?:over|through)|re-?read|update|clean\s+up|tidy(?:\s+up)?|organi[sz]e)\b[^\n.]{0,60}?\b(?:my|own|current)\s+(?:own\s+)?(?:notebook|notes|requests|pending|drafts?|records|file|actions|tasks|work)\b)/i;
+/** What a seat is told of such a Do. */
+export const SELF_SAID = "that reads as a note to yourself, not something to do in the world, so it went to nobody. Do is for acts in the world; your own notes go under Notebook:, and your papers are read with Look at";
+
 /** A sentence that plainly says its writer wants to stop or leave for good (not a break, not the end of a sitting). */
 export const WANTS_OUT = /\b(?:stop|leave|quit)(?:ping)?\s+for\s+good\b|\bI\s+(?:(?:do\s+not|don't)\s+(?:want|wish)\s+to\s+(?:continue|go\s+on)(?:\s+with\s+(?:this|the)\s+work)?\b|wish\s+not\s+to\s+continue|(?:am|'m)\s+declining\s+to\s+(?:continue|go\s+on)|decline\s+to\s+(?:continue|go\s+on)|(?:want|wish|would\s+like|choose|have\s+decided|intend)\s+to\s+(?:stop\s+(?:this|the)\s+work|leave\s+(?:this|the)\s+work|quit|withdraw|stop\s+altogether|leave\s+altogether))/i;
 /** A clear yes to the question whether it means to stop: the first line of its answer starts with yes, and says no more
@@ -288,6 +295,10 @@ function readPart(p: Part, by: Map<string, ToolSpec>, _said: string, nextId: () 
     if (!what) return no("a Do had nothing after it to say what is to be done", true);
     // (A Do that is only a list, an item a line: one request each, in the seat's own words; one at a time is how a
     // request is drawn up. A 7B model listed several under one Do, 2026-11-10, and each was refused as too much.)
+    // (A Do that is the seat talking to itself, a note to keep or a review of its own requests, is no act in the world:
+    // it is told so in one fixed sentence and goes to nobody. In the local test of 2026-11-10, 24 of the 53 requests
+    // never served were "Examine my own requests and pending actions." and its like.)
+    if (SELF_TALK.test(what)) return { blocks: [{ type: "tool_use", id: nextId(), name, input: { _self: what.slice(0, 2000) } }] };
     const items = what.split("\n").filter((l) => l.trim());
     const BULLET = /^\s*(?:[-*•]|\d+[.)])\s+/;
     if (items.length > 1 && items.every((l) => BULLET.test(l))) {

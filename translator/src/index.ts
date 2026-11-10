@@ -358,7 +358,7 @@ export type ResolveFn = (req: TranslateRequest, program: calls.Program) => Promi
  */
 export const NOT_PUT = "That couldn't be put into effect as it was said, and nothing was done. You could say it again, or another way.";
 /** The acts were worked out, and checking them failed (not a refusal: the check itself). */
-export const NOT_CHECKED = "The draft could not be drawn up, and the fault is not in what you asked: it has been noted. Please ask for it again; if it fails again, ask for it in smaller steps.";
+export const NOT_CHECKED = "It could not be set out, and the fault is not in what you asked: it has been noted. Please ask for it again; if it fails again, ask for it in smaller steps.";
 
 /** Resolver answers that are about how the call was put together (an argument of the wrong shape), not about anything
  * the participant said or knows: the call is at fault, so it's tried again, and the participant never reads these. */
@@ -565,9 +565,9 @@ export function draftText(d: Draft): string {
   const asked = String(d.proposal ?? "").replace(/\s+/g, " ").trim();
   const missing = notInDraft(d);
   return [
-    `Draft ${d.id}, drawn up${asked ? ` from what you asked: "${asked.length > 160 ? `${asked.slice(0, 159).trimEnd()}…` : asked}"` : ""}. If you say yes, this is exactly what will happen:`,
+    `${d.id}: ${asked ? `what you asked for ("${asked.length > 160 ? `${asked.slice(0, 159).trimEnd()}…` : asked}"), set out` : "what you asked for, set out"}. If you say yes, this is exactly what will happen:`,
     d.summary,
-    ...(missing.length ? [`Not in this draft: ${missing.join(", ")}. You named ${missing.length === 1 ? "it" : "them"}, and this draft does nothing with ${missing.length === 1 ? "it" : "them"}: whatever you meant to be done with ${missing.length === 1 ? "it" : "them"} is not done by saying yes.`] : []),
+    ...(missing.length ? [`Not in this: ${missing.join(", ")}. You named ${missing.length === 1 ? "it" : "them"}, and what is set out here does nothing with ${missing.length === 1 ? "it" : "them"}: whatever you meant to be done with ${missing.length === 1 ? "it" : "them"} is not done by saying yes.`] : []),
     d.check.ok ? (d.summary.includes(" The office will not follow it: ") ? "Nothing stops it being filed, and filed it would change nothing, as said above." : "Nothing stands in the way right now.") : `This can't be done right now: ${refusalText(d.check.refusal?.code)}.`,
     ...(d.check.warnings?.length ? [`Legal note: ${d.check.warnings.join(" ")}`] : []),
     `To say yes: Confirm ${d.id}. To say no: Decline ${d.id} (and why, if you wish).`,

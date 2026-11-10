@@ -79,7 +79,7 @@ const WRITTEN_ID = /^([a-z][a-z0-9_-]{0,63}|(ent|acc|str|rec|act|msg|par|pos|cnd
 const BOUND_NAME = /^[a-z][a-z0-9_]{0,31}$/;
 const ID_SHAPE = { test: (x: string): boolean => (x.startsWith("$") ? BOUND_NAME.test(x.slice(1)) : WRITTEN_ID.test(x)) };
 /** What is said of something written where an id goes that is no id (a draft's name; a made-up id). */
-export const notAnId = (x: string, what: string): string => (x.startsWith("draft.") ? `${x} is the name a draft went by before it was confirmed, not a paper on record. Once confirmed it is on record under an id of its own (rec. and a number): look it up in your papers and name that.` : `"${x}" (for ${what}) is not the id of anything on record: an id is written exactly as your papers show it, like rec.412. Look it up and name it so.`);
+export const notAnId = (x: string, what: string): string => (x.startsWith("draft.") || /^ask-[0-9]+$/.test(x) ? `${x} is the reference of something you asked for, set out for your yes or no, not a paper on record. What it made, once you said yes, is on record under an id of its own (rec. and a number): look it up in your papers and name that.` : `"${x}" (for ${what}) is not the id of anything on record: an id is written exactly as your papers show it, like rec.412. Look it up and name it so.`);
 /** Said of work in an agreement that names someone other than the side committing to it (the call's fault). */
 export const WORK_IS_ITS_OWN = "In an agreement each side commits itself: the work a side commits to is its own to do, and nobody else is named for it.";
 /** Said of an agreement with nothing on either side. */

@@ -1574,8 +1574,8 @@ fn id_shape(s: &str) -> bool {
 }
 /// What is said of something written where an id goes that is no id. (The other resolver's `notAnId`.)
 fn not_an_id(x: &str, what: &str) -> String {
-    if x.starts_with("draft.") {
-        format!("{x} is the name a draft went by before it was confirmed, not a paper on record. Once confirmed it is on record under an id of its own (rec. and a number): look it up in your papers and name that.")
+    if x.starts_with("draft.") || (x.starts_with("ask-") && x.len() > 4 && x[4..].bytes().all(|b| b.is_ascii_digit())) {
+        format!("{x} is the reference of something you asked for, set out for your yes or no, not a paper on record. What it made, once you said yes, is on record under an id of its own (rec. and a number): look it up in your papers and name that.")
     } else {
         format!("\"{x}\" (for {what}) is not the id of anything on record: an id is written exactly as your papers show it, like rec.412. Look it up and name it so.")
     }

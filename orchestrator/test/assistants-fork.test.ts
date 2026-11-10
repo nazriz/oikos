@@ -123,10 +123,20 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
       expect(at, `a seat was shown ${what}: …${told.slice(Math.max(0, at - 120), at + 120)}…`).toBe(-1);
     }
     expect(saysWhatTheTownIs(told).slice(0, 3)).toEqual([]);
+    // The desk is handed over what it is sent, not what it reads only when it asks (its file, the laws, its agreements),
+    // and is not shown its clients' remits as a list: a remit a matter names comes with it (2026-11-11: it opened on
+    // 80,000 characters with 265 clients).
+    const desk = shown.filter((e) => e.body.subject === "provider-a-desk-system").map((e) => flat(e.body.data.input)).join("\n");
+    expect(desk).not.toContain("## Your service agreements with your clients");
+    expect(desk).not.toMatch(/## The town's laws and charter[^\n]*\(\d+ new\)/);
+    expect(desk).not.toMatch(/## The service you work under: its delivery, briefs and remits \(\d+ new\)/);
+    if (/\(kind: [a-z_]+; remit: rec\.[0-9]+/.test(desk)) expect(desk).toContain("## What the matters above come under: the remits and briefs they name");
     // Who it is, once, and its own drafts in one place headed as its own, with the way to answer each.
     expect(told).toContain("Who you are here: you hold the post ");
-    if (/\bDraft draft\./.test(told)) expect(told).toContain("## Waiting for your yes or no: your own requests, drawn up\nEach is something you asked for");
-    if (/\bDraft draft\./.test(told)) expect(told).toMatch(/To say yes: Confirm draft\.[^ ]+\. To say no: Decline draft\./);
+    if (/\bask-[0-9]+: what you asked for/.test(told)) expect(told).toContain("## Waiting for your yes or no: what you asked for, set out\nEach is something you asked for");
+    if (/\bask-[0-9]+: what you asked for/.test(told)) expect(told).toMatch(/To say yes: Confirm ask-[0-9]+\. To say no: Decline ask-[0-9]+/);
+    // (The platform's preview is never called a draft, nor referred to as one: a draft for sign-off is the world's paper.)
+    expect(told).not.toMatch(/\bdraft\.[a-z0-9-]+\.[0-9]+\b/);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
