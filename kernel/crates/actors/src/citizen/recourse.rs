@@ -21,7 +21,7 @@ use super::mind::{ConductAsk, Event, GrievanceView, Intent, Opening, Openings, O
 use super::params::Params;
 #[allow(unused_imports)]
 use super::person::{Person, Todo, Week};
-use crate::common::{addressed_to, data, kind, money_words, when_words, ClaimKey, Fields, DAY, MONTH};
+use crate::common::{addressed_to, data, kind, money_words, when_words, ClaimKey, Fields, DAY};
 use crate::steps::{because, pay, say, Pay, Say, Visible};
 use crate::Cx;
 use oikos_sight::{Record, RecordBody};
@@ -896,48 +896,15 @@ impl Person {
             Intent::AskLandlord { about, rise } => {
                 let Some(h) = self.s.home.clone().filter(|h| !h.owned) else { return };
                 self.s.asked_party.insert(format!("{}:{about}", h.agreement), t);
-                let was = Self::usd_of(w, h.rent);
-                let (reason, words, would) = if *rise {
-                    (
-                        format!("Our landlord means to raise the rent: asking them to hold it at {was} a month."),
-                        format!("Request: please hold the rent for {} at {was} a month.", h.space),
-                        crate::papers::citizen::Would { who: me.clone(), does: json!({ "outcome": { "money": { "amount": h.rent.to_string() } } }), every: Some(MONTH) },
-                    )
-                } else {
-                    (
-                        "Our landlord has given us notice: asking to stay on.".to_string(),
-                        format!("Request: please let us stay on at {}.", h.space),
-                        crate::papers::citizen::Would { who: h.landlord.clone(), does: json!({ "outcome": { "occupancy": { "who": me, "in": h.space } } }), every: None },
-                    )
-                };
-                let v = crate::papers::citizen::VariationRequest { agreement: h.agreement.clone(), about: about.clone(), would };
-                w.push(because(
-                    reason,
-                    vec![say(
-                        "variation_request",
-                        &words,
-                        Say { to: Some(vec![h.landlord.clone()]), visible: Some(Visible::Only(vec![me.clone(), h.landlord.clone()])), basis: Some(about.clone()), data: Some(crate::papers::data(&v)), ..Default::default() },
-                    )],
-                ));
+                let l = oikos_rules::recourse::Lease { me: &me, landlord: &h.landlord, agreement: &h.agreement, space: &h.space, rent: h.rent };
+                let p = oikos_rules::recourse::ask_landlord(&l, about, *rise, &|n| Self::usd_of(w, n));
+                w.push(sent(p));
             }
             Intent::AskRise { agreement, wage } => {
                 let Some(j) = self.s.job.clone() else { return };
                 self.s.asked_party.insert(agreement.clone(), t);
-                let days = div_round(j.period, DAY);
-                let pay_words = Self::usd_of(w, *wage);
-                let v = crate::papers::citizen::VariationRequest {
-                    agreement: agreement.clone(),
-                    about: agreement.clone(),
-                    would: crate::papers::citizen::Would { who: j.employer.clone(), does: json!({ "outcome": { "money": { "amount": wage.to_string() } } }), every: Some(j.period) },
-                };
-                w.push(because(
-                    format!("Asking our employer for a rise, to {pay_words} every {days} days."),
-                    vec![say(
-                        "variation_request",
-                        &format!("Request: a rise in my pay, to {pay_words} every {days} days."),
-                        Say { to: Some(vec![j.employer.clone()]), visible: Some(Visible::Only(vec![me.clone(), j.employer.clone()])), basis: Some(agreement.clone()), data: Some(crate::papers::data(&v)), ..Default::default() },
-                    )],
-                ));
+                let p = oikos_rules::recourse::ask_rise(&me, &j.employer, agreement, j.period, *wage, &|n| Self::usd_of(w, n));
+                w.push(sent(p));
             }
             Intent::ChallengeRent { notice } => {
                 let (Some(tr), Some(n)) = (self.p.tribunal.clone(), self.book.get(notice).cloned()) else { return };
@@ -945,20 +912,7 @@ impl Person {
                 if self.housing.is_challenged(notice) || !self.recourse.challenged.insert(notice.clone()) {
                     return;
                 }
-                w.push(because(
-                    "A notice of rent increase that breaks the law: taking it to the tribunal, and paying the rent as it was meanwhile.",
-                    vec![say(
-                        "tribunal_application",
-                        &format!("Application: the notice of rent increase {notice} from {by} breaks the law; we ask that it be found invalid."),
-                        Say {
-                            to: Some(vec![tr.entity.clone()]),
-                            visible: Some(Visible::Only(vec![me.clone(), tr.entity.clone(), by.to_string()])),
-                            basis: Some(notice.clone()),
-                            data: Some(json!({ "kind": "rent_increase", "against": by, "notice": notice, "evidence": serde_json::to_value(&*n).unwrap_or(Value::Null) })),
-                            ..Default::default()
-                        },
-                    )],
-                ));
+                w.push(sent(oikos_rules::recourse::challenge_rent(&me, &tr.entity, &by, notice, serde_json::to_value(&*n).unwrap_or(Value::Null))));
             }
             Intent::ApplyDebt { claim } => {
                 self.s.apply_debt_now.insert(claim.clone());
@@ -969,32 +923,8 @@ impl Person {
                 let Some(g) = self.recourse.grievances.get_mut(grievance) else { return };
                 g.asked = Some(t);
                 let g = g.clone();
-                let words = g.matter.replace('_', " ");
-                let amt = g.amount.filter(|a| *a != 0).map(|a| Self::usd_of(w, a));
-                let req = crate::papers::finance::ReviewRequest {
-                    matter: g.matter.clone(),
-                    against: Some(g.party.clone()),
-                    about: g.about.clone(),
-                    amount: g.amount,
-                    account: g.amount.map(|_| acc.account.clone()),
-                    structure: g.structure.clone(),
-                    request: None,
-                    seeks: g.seeks.clone(),
-                    particulars: None,
-                    brought_forward: None,
-                };
-                w.push(because(
-                    format!("Asking {} to put it right ({words}{}).", g.party, amt.as_ref().map_or(String::new(), |a| format!(", {a}"))),
-                    vec![say(
-                        paper::REQUEST,
-                        &format!(
-                            "Request: please put this right ({words}{}{}).",
-                            amt.as_ref().map_or(String::new(), |a| format!(": {a} is owed to us")),
-                            g.structure.as_ref().map_or(String::new(), |s| format!(" at {s}"))
-                        ),
-                        Say { to: Some(vec![g.party.clone()]), visible: Some(Visible::Only(vec![me.clone(), g.party.clone()])), basis: g.about.clone(), data: Some(crate::papers::data(&req)), ..Default::default() },
-                    )],
-                ));
+                let p = oikos_rules::recourse::ask_put_right(&me, &matter_of(&g), &acc.account, &|n| Self::usd_of(w, n));
+                w.push(sent(p));
             }
             Intent::Venue { grievance, venue, hearing, cost } => {
                 let Some(acc) = w.acc.clone() else { return };
@@ -1004,54 +934,22 @@ impl Person {
                     x.applied.insert(venue.clone(), Applied { t, finding: None });
                 }
                 let offer = offer_of(&h).cloned().unwrap_or_default();
-                let form = offer.get("hears").and_then(|x| x.as_array()).and_then(|a| a.iter().find(|x| x.s("about") == Some(g.matter.as_str()))).and_then(|x| x.s("form")).unwrap_or(paper::APPLICATION).to_string();
-                let fee_to = venue_fee(&offer).map(|f| f.0);
-                let words = g.matter.replace('_', " ");
-                let decided_at = self.decided_at(&g);
-                let amt = g.amount.filter(|a| *a != 0).map(|a| Self::usd_of(w, a));
-                let asked_words = g.asked.map_or(String::new(), |a| {
-                    format!(
-                        "; we asked them {} days ago{}",
-                        (t - a).div_euclid(DAY),
-                        match g.answer.as_deref() {
-                            Some("refused") => " and they refused",
-                            Some("ignored") => " and had no answer",
-                            _ => "",
-                        }
-                    )
-                });
-                let app = crate::papers::finance::Application {
-                    kind: Some(g.matter.clone()),
-                    matter: g.matter.clone(),
-                    against: Some(g.party.clone()),
-                    about: g.about.clone(),
-                    amount: g.amount,
-                    account: g.amount.map(|_| acc.account.clone()),
-                    structure: g.structure.clone(),
-                    request: g.asked.map(|a| format!("asked on day {}", a.div_euclid(DAY))),
-                    seeks: g.seeks.clone(),
-                    particulars: Some(json!(particulars_of(&g, t, &w.cx.ctx.world))),
+                let a = oikos_rules::recourse::Applying {
+                    venue: venue.clone(),
+                    hearing: hearing.clone(),
+                    form: form_for(&offer, &g.matter),
+                    cost: *cost,
+                    asked: g.asked,
+                    answer: g.answer.clone(),
+                    particulars: json!(particulars_of(&g, t, &w.cx.ctx.world)),
                     evidence: g.evidence.clone(),
-                    decided_on: decided_at,
+                    decided_on: self.decided_at(&g),
                     reviewed_on: g.answered_at,
                     review_asked_on: g.asked.filter(|_| g.answered_at.is_none() && g.matter == "claim_refused"),
-                    brought_forward: None,
                 };
-                let mut calls = vec![say(
-                    &form,
-                    &format!(
-                        "Application: {words} against {}{}{}{asked_words}.",
-                        g.party,
-                        amt.as_ref().map_or(String::new(), |a| format!("; {a} is owed to us")),
-                        g.structure.as_ref().map_or(String::new(), |s| format!("; at {s}"))
-                    ),
-                    Say { to: Some(vec![venue.clone()]), visible: Some(Visible::Only(vec![me.clone(), venue.clone(), g.party.clone()])), basis: Some(hearing.clone()), data: Some(crate::papers::data(&app)), ..Default::default() },
-                )];
-                if let (true, Some(to)) = (*cost > 0, fee_to) {
-                    calls.push(pay(&to, *cost, Pay { from: Some(acc.account.clone()), for_: Some("Application fee.".into()), ..Default::default() }, w.cx));
-                }
-                let fee_words = if *cost > 0 { format!(", with its fee of {}", Self::usd_of(w, *cost)) } else { String::new() };
-                w.push(because(format!("Taking it to {venue}, which hears such things ({words} against {}){fee_words}.", g.party), calls));
+                let p = oikos_rules::recourse::apply(&me, &matter_of(&g), &acc.account, &a, t, &|n| Self::usd_of(w, n));
+                let fee = venue_fee(&offer).map(|f| f.0).filter(|_| *cost > 0);
+                w.push(sent_with_fee(p, fee.map(|to| pay(&to, *cost, Pay { from: Some(acc.account.clone()), for_: Some("Application fee.".into()), ..Default::default() }, w.cx))));
             }
             Intent::TellWronged { grievance, whom } => {
                 let Some(g) = self.recourse.grievances.get_mut(grievance) else { return };
@@ -1100,6 +998,33 @@ fn venue_fee(offer: &Frozen) -> Option<(String, i64)> {
         .filter_map(|c| c.get("does").and_then(|d| d.get("outcome")).and_then(|o| o.get("money")))
         .find(|m| m.get("to").is_some())
         .map(|m| (m.s("to").unwrap_or_default().to_string(), m.i("amount").unwrap_or(0)))
+}
+
+/// The form a body's notice of what it hears names for a matter (none named: an application).
+pub fn form_for(offer: &Frozen, matter: &str) -> String {
+    offer.get("hears").and_then(|x| x.as_array()).and_then(|a| a.iter().find(|x| x.s("about") == Some(matter))).and_then(|x| x.s("form")).unwrap_or(paper::APPLICATION).to_string()
+}
+
+/// A grievance as the paperwork shared with a clerk reads it (`oikos_rules::recourse::Matter`).
+pub fn matter_of(g: &Grievance) -> oikos_rules::recourse::Matter {
+    oikos_rules::recourse::Matter { matter: g.matter.clone(), party: g.party.clone(), about: g.about.clone(), amount: g.amount, structure: g.structure.clone(), seeks: g.seeks.clone() }
+}
+
+/// A paper of the shared paperwork as the call that sends it.
+pub fn call_of(p: &oikos_rules::recourse::Paper) -> oikos_sight::calls::Call {
+    say(&p.kind, &p.words, Say { to: Some(p.to.clone()), visible: Some(Visible::Only(p.visible.clone())), basis: p.basis.clone(), data: Some(p.data.clone()), ..Default::default() })
+}
+
+/// A paper of the shared paperwork as the step that sends it, with its reason.
+pub fn sent<T>(p: oikos_rules::recourse::Paper) -> crate::steps::Step<T> {
+    sent_with_fee(p, None)
+}
+
+/// The same, with the payment of its fee after it.
+pub fn sent_with_fee<T>(p: oikos_rules::recourse::Paper, fee: Option<oikos_sight::calls::Call>) -> crate::steps::Step<T> {
+    let mut calls = vec![call_of(&p)];
+    calls.extend(fee);
+    because(p.reason, calls)
 }
 
 // ------------------------------------------------------------------ life's openings for a want (citizen.ts 2119-2298)

@@ -12274,3 +12274,24 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   pilot's month-long hold stays a freeze. `build.ts` takes `depth` (`matter`, the default, or `act`) for the screen's
   comparison.
 - **Revisit if:** a principal's act mixes kinds whose papers are counted unevenly.
+
+## 2026-11-11 · H4a: a person's recourse paperwork moved to the rules crate, byte-identical (docs/design/handing-over.md H4)
+
+- **Decision.** The paperwork of the ways a person's mind chooses for a grievance or a paper in their way (asking the
+  landlord to hold the rent or let them stay, asking for a rise, asking a party to put something right, challenging a
+  notice of rent increase, applying to a body that hears the matter) is one set of pure functions,
+  `oikos_rules::recourse` (`ask_landlord`, `ask_rise`, `challenge_rent`, `ask_put_right`, `apply`), each returning the
+  paper as it is to go (kind, words, the step's reason, to, visible, basis, data). `citizen/recourse.rs` calls them
+  (`sent`, `call_of`, `matter_of`, `form_for`), so the code assistant at a provider's desk (H4c) writes a want's papers
+  with the same functions, to the letter. The clerk's fixed order (`next`: ask first; after a refusal, or the days to
+  answer gone by, apply to a body that hears the matter within the limit; else wait) is there too, used from H4c.
+- **Why.** Design 4.3: the code assistant may not use the person's own choice rule (a god's view of its client), but
+  its papers must be the person's own papers; one copy of each.
+- **Byte-identical, checked:** same-results' towns (200 and 1,000 people, au-vic, gb-eng and us-oh), a 1,000-person
+  au-vic town with `assistants=true`, and the study's town (`experiments/scope-pilot/study.ts`, seed 7: living,
+  friction and initiative at 10,000, the opening caseload), 45 days each, on the base commit's kernel and this one's:
+  the same state hash and the same log digest (build tag and hash chain aside) for all eight; and the assistants town,
+  the au-vic town and the study's town to day 150 likewise. The study's town wrote 870 review requests, 108 tribunal
+  applications, 18 applications and a variation request in its 150 days, so the moved paperwork was exercised.
+- **Revisit if:** a paper of the shared set needs something only the person knows that a clerk would not (then it is
+  a fact the person gives, never read by the clerk).

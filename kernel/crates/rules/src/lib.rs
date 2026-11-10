@@ -34,6 +34,7 @@ pub mod household;
 pub mod identity;
 pub mod labour;
 pub mod law;
+pub mod recourse;
 pub mod rent;
 pub mod returns;
 pub mod slip;
