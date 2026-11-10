@@ -14,7 +14,7 @@
 //! the principal did not: the referral says what to do. A model in the seat is what decides otherwise.
 
 use crate::common::{addressed_to, Book, DAY};
-use crate::papers::delegation::{Advice, ApprovalRequest, Brief, Declined, Draft, GoAhead, Level, Referral, Remit, Report, ServiceDelivery, SignOff};
+use crate::papers::delegation::{Advice, ApprovalRequest, Brief, Declined, Depth, Draft, GoAhead, Level, Referral, Remit, Report, ServiceDelivery, SignOff};
 use crate::papers::{self, Paper};
 use crate::steps::{because, say, Done, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
@@ -48,7 +48,7 @@ impl Kind for Assistant {
         DAY
     }
     fn create(&self, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
-        Ok(Box::new(Stepper::new(Assisting { me: ctx.entity.clone(), sys: ctx.participant.clone(), book: Book::new(), mine: vec![], matters: BTreeMap::new(), handled: BTreeSet::new() })))
+        Ok(Box::new(Stepper::new(Assisting { me: ctx.entity.clone(), sys: ctx.participant.clone(), book: Book::new(), mine: vec![], matters: BTreeMap::new(), handled: BTreeSet::new(), ways: BTreeMap::new() })))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
         Ok(Box::new(Stepper::<Assisting>::restore(saved)?))
@@ -108,6 +108,9 @@ struct Assisting {
     matters: BTreeMap<String, InHand>,
     /// Papers it has acted on.
     handled: BTreeSet<String>,
+    /// At want depth, the way it took on each matter (the paper it sent and to whom), for its report.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    ways: BTreeMap<String, String>,
 }
 
 impl Assisting {
@@ -134,7 +137,7 @@ impl Assisting {
     }
 
     fn report(&self, m: &Mine, referral: &str, done: bool, created: BTreeMap<String, String>, why: Option<String>) -> Step<Then> {
-        let r = Report { referral: referral.to_string(), done, created, why: why.clone() };
+        let r = Report { referral: referral.to_string(), done, created, why: why.clone(), way: self.ways.get(referral).cloned() };
         let words = if done { format!("Done: {referral}.") } else { format!("Not done: {referral} ({}).", why.as_deref().unwrap_or("")) };
         because(words.clone(), vec![self.say_to(m, Report::KIND, &words, referral, papers::data(&r))])
     }
@@ -172,6 +175,61 @@ impl Assisting {
     }
 }
 
+impl Assisting {
+    /// A want handed over, worked by a clerk's procedure (`oikos_rules::recourse::next`, docs/design/handing-over.md
+    /// section 4.3): from the want's fields and the facts its client gave, the bodies on its board that say they hear
+    /// the matter, and its brief's limit. The act it would send (in the call language) and its way in words, or why it
+    /// can do nothing now. It never reads its client's trust, fear or what they have learned: it has no sight of them.
+    fn clerk(&self, x: &Referral, m: &Mine, t: i64, cx: &Cx) -> Result<(String, String), String> {
+        use oikos_rules::recourse::{next, Case, Matter as M, Next};
+        let w = x.want.as_ref().ok_or_else(|| "it was handed no want".to_string())?;
+        let d = x.facts.as_ref().map(|f| f["data"].clone()).unwrap_or(Value::Null);
+        let st = |v: &Value| v.as_str().map(String::from);
+        let lease = d.get("lease").filter(|l| l.is_object()).and_then(|l| Some((st(&l["landlord"])?, st(&l["agreement"])?, st(&l["space"])?, crate::papers::lenient::whole(&l["rent"])?)));
+        let matter = d.get("matter").filter(|l| l.is_object()).and_then(|g| {
+            Some(M { matter: st(&g["matter"])?, party: st(&g["party"])?, about: st(&g["about"]), amount: crate::papers::lenient::whole(&g["amount"]), structure: st(&g["structure"]), seeks: st(&g["seeks"]) })
+        });
+        // (The bodies on its board that say they hear the matter: what it can find for itself, as anyone can.)
+        let heard = matter.as_ref().map_or(w.about.clone(), |g| g.matter.clone());
+        let mut venues = vec![];
+        for h in self.book.hearings() {
+            let oikos_sight::RecordBody::Statement { offer: Some(o), .. } = &h.body else { continue };
+            if !o.get("hears").and_then(|x| x.as_array()).is_some_and(|a| a.iter().any(|e| e.get("about").and_then(|v| v.as_str()) == Some(heard.as_str()))) {
+                continue;
+            }
+            let venue = h.speaks_for.map(|x| x.to_string()).unwrap_or_else(|| h.author.to_string());
+            let fee = crate::citizen::recourse::venue_fee(o);
+            venues.push((venue, h.id.to_string(), crate::citizen::recourse::form_for(o, &heard), fee.as_ref().map_or(0, |f| f.1), fee.map(|f| f.0)));
+        }
+        let case = Case {
+            about: w.about.clone(),
+            against: w.against.as_ref().map(|a| (a.record.clone(), a.by.clone())),
+            lease,
+            matter,
+            asked: crate::papers::lenient::whole(&d["asked"]),
+            answer: st(&d["answer"]),
+            account: st(&d["account"]),
+            venues,
+            limit: m.limit,
+            applied: d["applied"].as_array().map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default(),
+        };
+        let days = crate::papers::lenient::whole(&d["answer_days"]).ok_or_else(|| "it was not told how long the other side has to answer".to_string())?;
+        let money = |n: i64| crate::common::money_words(n, &cx.ctx.world);
+        let (paper, fee) = match next(&case, &m.client, t, days, &money) {
+            Next::Ask(p) => (p, None),
+            Next::Apply(p, fee) => (p, fee),
+            Next::Wait(until) => return Err(format!("asked already: their answer is awaited until {}", crate::common::when_words(until, &cx.ctx.world))),
+            Next::Nothing(why) => return Err(why),
+        };
+        let way = format!("{} to {}", paper.kind, paper.to.join(", "));
+        let mut lines = vec![Line { bind: None, call: crate::citizen::recourse::call_of(&paper) }];
+        if let (Some((to, cost)), Some(acc)) = (fee, case.account.clone()) {
+            lines.push(Line { bind: None, call: crate::steps::pay(&to, cost, crate::steps::Pay { from: Some(acc), for_: Some("Application fee.".into()), ..Default::default() }, cx) });
+        }
+        Ok((oikos_sight::calls::program_text(&Program::Lines(lines)), way))
+    }
+}
+
 impl Plan for Assisting {
     type Then = Then;
 
@@ -179,7 +237,7 @@ impl Plan for Assisting {
         self.book.absorb(pic);
     }
 
-    fn plan(&mut self, _pic: &Picture, cx: &mut Cx) -> Vec<Step<Then>> {
+    fn plan(&mut self, pic: &Picture, cx: &mut Cx) -> Vec<Step<Then>> {
         let mut steps = vec![];
         // Which services it is in: each delivery that names it, and the agreement its client's brief gives.
         for r in self.book.all(ServiceDelivery::KIND) {
@@ -242,8 +300,21 @@ impl Plan for Assisting {
         for (id, x) in referrals {
             self.handled.insert(id.clone());
             let m = self.service(&x.agreement).cloned().expect("filtered above");
+            // (Handed a want: a clerk's procedure says which paper, to whom.)
+            if x.depth == Depth::Want && !m.stop.contains(&x.kind) && x.wants != Level::None {
+                match self.clerk(&x, &m, pic.t, cx) {
+                    Ok((_, way)) => {
+                        self.ways.insert(id.clone(), way);
+                    }
+                    Err(why) => {
+                        steps.push(self.report(&m, &id, false, BTreeMap::new(), Some(why)));
+                        continue;
+                    }
+                }
+            }
             // (Handed what happened: it works the paper out from the facts, as its principal's code would have.)
             let calls = match (&x.calls, &x.facts) {
+                _ if x.depth == Depth::Want => self.clerk(&x, &m, pic.t, cx).map(|c| c.0).unwrap_or_default(),
                 (Some(c), _) => c.clone(),
                 (None, Some(f)) => super::compose::compose(&x.kind, f, &m.client, &|n| crate::common::money_words(n, &cx.ctx.world)).unwrap_or_default(),
                 _ => String::new(),

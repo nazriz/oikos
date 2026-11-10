@@ -12313,3 +12313,42 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   study's town, by these eight forms).
 - **Revisit if:** the citizen's own papers gain fields (the forms follow them), or a seat files a claim for a payment
   its client is not eligible for often enough to need the law's conditions on the form.
+
+## 2026-11-11 · H4c–e: a person hands over a want; the desk's clerk; the readout's wants; the screen (docs/design/handing-over.md H4)
+
+- **Decision.** Want depth for persons, as designed (sections 2 to 5): `Depth::Want`, kinds `want-<about>` for
+  `claim_refused`, `disrepair`, `notice`, `rent_increase` and `underpaid`. The way `assistant` in the mind's choice is
+  offered while a remit of the person's own hands that kind over at want depth. It is weighed as a desk is: trust in
+  the provider plus agency (a placeholder weighing, WM-1: the desk's, recorded here). The person's code hands the want over
+  as one `want-<about>` line with the want's fields and the facts it gives, which its wrapper always replaces with a
+  referral (`Referral.want`, `facts`, no calls, priced as a referral alone). The desk's code is the clerk of
+  `oikos_rules::recourse::next`. The person signs a draft off by `wants::meets` on its typed fields, its addressee, and
+  a fee within the limit. What the desk sent in the person's name is theirs (`sent_for_us`). The other side's answer
+  is learned as the assistant's way. A declined draft, a report "not done" or a take-back redoes nothing. The
+  generator gives all this only under the spec's `assistant_wants`, and the study sets it, assigning the cohort the
+  want kinds at draft; `study(..., "act")` is the control without wants. Behaviour: docs/behaviour/assistants.md, "A
+  want, not a paper".
+- **`want-`, not `want:`** (design 3.1 said `want:<about>`): a config key may not hold a colon (the contracts' Opaque
+  key pattern), and law 11's figure paths split on a dot, so `want.` failed too; a hyphen is neither.
+- **Each step is a hand-over.** The clerk takes one step a hand-over. The person hands the want over again when their
+  mind next chooses to, once the other side has had its days to answer. The person's facts carry what they know of the
+  earlier steps (asked when, the answer, the bodies already applied to), so the clerk goes on from there. The clerk
+  cannot see the other side's answer, which goes to the person.
+- **The readout** (`oikos-kernel delegation`, table `wants`; `experiments/scope-pilot/readout.ts`, `countWants`): each
+  want handed over, with its fate. `served`: met by the person's own want event after the desk's first paper and
+  before any giving up. `given_up`: a paper sent, then given up. `dropped`: no paper. Otherwise `open`. Beside the fate:
+  the way taken (`ask`, writing to the other side, or `desk`, a body) against the person's own most-weighted of those
+  two in their `want` decision at the hand-over (`redirected`), and the seconds charged to each side, read from the
+  acts that made the chain's records. The desk's papers for a want are sorted against the want's remit (class as
+  ever, `depth: want`). A scope request against what its matter needed reads the referral as before; at want depth
+  "needed" is the want's kind.
+- **The screen** (`bun experiments/scope-pilot/screen.ts`, study.ts, seed 7, the code arm, 180 days from the fork, 251
+  clients): see the report in the H4 hand-off for the table. Wants handed over were few (disrepair only, about 1 to 3
+  a month), as the hand-off notes expected (0.04 wants an adult-month, many of them slights).
+- **Byte-identical, checked** at 45 days, base kernel against this one: same-results' six towns, the 1,000-person
+  au-vic town with `assistants=true` (providers, no want remits), and the study's act-depth control town (providers,
+  the cohort, no want remits). All eight have the same state hash and log digest. The non-want configs are unchanged
+  JSON.
+- **Revisit if:** wants handed over stay too few to measure (then more kinds of want, or persons' wants of a firm's);
+  the clerk's single step per hand-over makes a seat look idle (then follow-ups from its own file); or a model's
+  drafts that are right on their fields but useless in words turn out to matter (a code principal cannot read).

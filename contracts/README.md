@@ -856,6 +856,13 @@ without providers of assistants is unchanged to the byte.
   (the kinds an offer takes as what happened); `Remit.depth` and `Referral.depth` (absent: `act`), a referral at
   `matter` carrying `facts` and no `calls`; `Remit.at_least` (a floor kept until `hold_until`; absent: a freeze);
   `Commit.hold` (`floor` | `freeze`) and `Commit.depths`; the reason `below_floor`.
+- **Want depth** (2026-11-11, step H4; docs/decisions.md, "H4c"): `Depth` gains `want`; kinds of matter `want-<about>`
+  (a person's want, `about` the mind's word); `Referral.want` (`WantHanded`: `about`, `seeks`, `against` {record, kind,
+  by}, `whom`, `since`; no weight), a referral at `want` carrying `want` and `facts` (`records`, `data`: `lease`,
+  `matter`, `asked`, `answer`, `account`, `answer_days`) and no `calls`; `Report.way` (the paper sent and to whom). A
+  person's code hands a want over as one line `statement(kind="want-<about>", data={want, facts})`, which its wrapper
+  always replaces with the referral (never an act of the world's). The citizen's `Intent::HandOver`. The world spec's
+  `assistant_wants` (generator only). All additions with defaults: every record on file reads as before.
 
 
 ## One right call: what code sets, a payment's memo, refusals told alike (2026-11-10; docs/decisions.md, "One right call"; under the owner's blanket approval of contract changes, 2026-10-11)

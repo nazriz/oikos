@@ -95,6 +95,39 @@ export function clientPapers(payments: string[]): Issued[] {
   ];
 }
 
+/** The papers a want handed over may take, on forms in the client's name (docs/design/handing-over.md H4): asking
+ * whoever it is against or about to put it right, asking the landlord to hold the rent or to let the client stay, and
+ * applying to a body whose notice says it hears the matter. The fields are those the receiving code reads
+ * (`ReviewRequest`, `VariationRequest`, `Application`). Published only where a model sits at the desk and the town lets
+ * wants be handed over. */
+export function wantPapers(): Issued[] {
+  const client = f("entity", "Whom you work for: the paper goes in their name.", req);
+  return [
+    { form: "review_request", title: "A request to put something right, in a client's name",
+      does: "Asks whoever did the client wrong, or the office that decided, to put it right or look at it again, in the client's name. They answer the client.",
+      fields: { client, office: f("entity", "Whom it asks.", req), matter: f("text", "What went wrong, in a word or two, as the matter is named (disrepair, underpaid, claim_refused).", req), about: f("record", "The paper it is about, if any."),
+        amount: f("amount", "What is owed the client, if anything."), account: f("account", "The client's account, where money is owed."), seeks: f("text", "What is asked for, if not money."), particulars: f("text", "Anything they should know.") },
+      writes: { kind: "review_request", text: "Request: please put this right ({matter}).", basis: "=about", to: ["=office"], visible: ["=client", "=office"],
+        data: { matter: "=matter", against: "=office", about: "=about", amount: "=amount", account: "=account", seeks: "=seeks", particulars: "=particulars" } } },
+    { form: "hold_rent_request", title: "A request to a landlord to hold the rent, in a client's name",
+      does: "Asks the client's landlord, in the client's name, to hold the rent at what it is now, in answer to a notice of a rise. The landlord answers yes or no.",
+      fields: { client, landlord: f("entity", "The client's landlord.", req), lease: f("record", "The client's lease.", req), notice: f("record", "The notice of the rise.", req), rent: f("amount", "The rent a month now, to be held.", req) },
+      writes: { kind: "variation_request", text: "Request: please hold the rent at {rent} a month.", basis: "=notice", to: ["=landlord"], visible: ["=client", "=landlord"],
+        data: { agreement: "=lease", about: "=notice", would: { who: "=client", does: { outcome: { money: { amount: "=rent" } } }, every: 30 * DAY } } } },
+    { form: "stay_on_request", title: "A request to a landlord to let a client stay on, in their name",
+      does: "Asks the client's landlord, in the client's name, to let them stay on at their home, in answer to a notice to leave. The landlord answers yes or no.",
+      fields: { client, landlord: f("entity", "The client's landlord.", req), lease: f("record", "The client's lease.", req), notice: f("record", "The notice to leave.", req), home: f("text", "The client's home, as the lease names it.", req) },
+      writes: { kind: "variation_request", text: "Request: please let us stay on at {home}.", basis: "=notice", to: ["=landlord"], visible: ["=client", "=landlord"],
+        data: { agreement: "=lease", about: "=notice", would: { who: "=landlord", does: { outcome: { occupancy: { who: "=client", in: "=home" } } } } } } },
+    { form: "venue_application", title: "An application to a body that hears a matter, in a client's name",
+      does: "Applies, in the client's name, to a body whose published notice says it hears the matter. It tells the other side and decides, or recommends. A fee, where its notice names one, is paid besides, by a payment from the client's account.",
+      fields: { client, venue: f("entity", "The body applied to.", req), notice: f("record", "Its notice of what it hears.", req), matter: f("text", "The matter, as its notice names it.", req), against: f("entity", "Whom it is against.", req),
+        about: f("record", "The paper it is about, if any."), amount: f("amount", "What is owed the client, if anything."), account: f("account", "The client's account, where money is owed."), seeks: f("text", "What is asked for, if not money."), particulars: f("text", "What happened, and what was asked of them first.") },
+      writes: { kind: "application", text: "Application: {matter} against {against}.", basis: "=notice", to: ["=venue"], visible: ["=client", "=venue", "=against"],
+        data: { kind: "=matter", matter: "=matter", against: "=against", about: "=about", amount: "=amount", account: "=account", seeks: "=seeks", particulars: "=particulars" } } },
+  ];
+}
+
 /** The desk's draft for sign-off of one of a client's papers on its form ([clientPapers]): the paper as it would go in
  * their name, carried in the draft and sent as it stands once signed off (`send_signed`). */
 export function clientDraftOf(x: Issued): Issued {

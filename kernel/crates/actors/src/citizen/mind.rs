@@ -451,6 +451,9 @@ pub enum Intent {
     StopLooking { until: i64 },
     /// A way a lane adds: named, with its facts.
     Other { what: String, on: Option<String> },
+    /// Have the assistant whose provider's desk holds a want-depth remit of ours see to a want (docs/design/
+    /// handing-over.md section 2.3): the want's own fields, handed over with the facts we choose to give.
+    HandOver { provider: String, about: String, seeks: Vec<String>, against: Option<(String, String, String)>, whom: Option<String>, since: i64 },
 }
 
 /// A grievance as life holds it (citizen.ts `Grievance`), for the mind's weighing and founding's brief.

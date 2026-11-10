@@ -582,6 +582,9 @@ impl CitizenMind {
                 "petition" => ag - o.bears.first().map_or(0, |b| fear_of(b)),
                 "stand" => ag + round(k.own as f64 * (self.z_value(Value::Achievement) + self.z_value(Value::Power)) / 2.0) - 4 * k.own,
                 "tell" => round(k.own as f64 * self.z_value(Value::Benevolence)) - k.own,
+                // (Having one's assistant see to it: weighed as a desk is, by trust in whoever provides it and our sense
+                // that what we do counts; what it brought is learned from the want's fate, as every way's is.)
+                "assistant" => trust_of(by) + ag,
                 _ => 0,
             }
         };

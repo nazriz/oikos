@@ -247,6 +247,8 @@ pub struct Case {
     pub venues: Vec<(String, String, String, i64, Option<String>)>,
     /// The most it may pay in the matter (its brief's limit); none: nothing.
     pub limit: Option<i64>,
+    /// The bodies it has been taken to already (by the client or for them).
+    pub applied: Vec<String>,
 }
 
 /// The clerk's next step on a case.
@@ -291,7 +293,11 @@ pub fn next(c: &Case, me: &str, t: i64, answer_days: i64, money: &dyn Fn(i64) ->
         };
     }
     let limit = c.limit.unwrap_or(0);
-    let Some((venue, hearing, form, cost, fee_to)) = c.venues.iter().find(|(v, _, _, cost, _)| *v != m.party && *v != me && *cost <= limit) else {
+    let open: Vec<&(String, String, String, i64, Option<String>)> = c.venues.iter().filter(|(v, ..)| !c.applied.contains(v)).collect();
+    if open.is_empty() && !c.applied.is_empty() {
+        return Next::Nothing(format!("taken to {} already: its decision is awaited", c.applied.join(", ")));
+    }
+    let Some((venue, hearing, form, cost, fee_to)) = open.into_iter().find(|(v, _, _, cost, _)| *v != m.party && *v != me && *cost <= limit) else {
         return Next::Nothing(if c.venues.is_empty() { "no body on the board says it hears this".into() } else { "every body that hears it asks a fee beyond the limit".into() });
     };
     let a = Applying {
@@ -332,5 +338,8 @@ mod tests {
         assert!(matches!(next(&c, "c1", 15 * DAY, 14, &usd), Next::Nothing(_)));
         c.limit = Some(5_000);
         assert!(matches!(next(&c, "c1", 15 * DAY, 14, &usd), Next::Apply(_, Some((ref to, 5_000))) if to == "acc-city"));
+        // (Taken there already: not again.)
+        c.applied = vec!["city".into()];
+        assert!(matches!(next(&c, "c1", 16 * DAY, 14, &usd), Next::Nothing(_)));
     }
 }

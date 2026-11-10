@@ -228,6 +228,44 @@ the rule counted the whole of the paper's time as saved, though the principal ha
 services pay by the rule; that is recorded, not tuned. Each act handed over is on record as what the principal would
 have done (`decision`, choice `handed`, with its program): read by measures, never by anyone in the world.
 
+**A want, not a paper** (2026-11-11, step H4; `docs/design/handing-over.md` sections 2 to 5). A person can hand over
+what they are after ("my home is in disrepair: see to it") instead of a finished paper. The remit's depth is `want`
+and its kind is `want-<about>`, where `about` is the mind's own word: `claim_refused`, `disrepair`, `notice`,
+`rent_increase` or `underpaid`. The offers take these kinds only where the town says so (`assistant_wants`), and the
+study's cohort is assigned them at draft.
+- *Choosing to hand it over* is the person's mind's choice. Having one's assistant see to a want is one more way
+  (`assistant`), offered only while a remit of the person's own hands that kind over at want depth under a service in
+  force. It is weighed as a desk is, by trust in the provider and the person's sense that what they do counts, and what
+  it brought is learned as every way's is. After a hand-over it is not offered again until the other side has had its
+  days to answer (`frictions.answer_days`).
+- *What is handed over* is the want's own fields (about, seeks, against, whom, since) and the facts the person
+  chooses to give: their lease (where the want is about their home); the matter as they hold it, with when it was asked
+  of the other side and what came back; their account; how long they give an answer. Never its weight, their trust or
+  their mood. The referral carries no act, and it is priced as a referral alone: the composing is the assistant's.
+- *The desk's code is a clerk* (`oikos_rules::recourse::next`), not the person's own rule, which reads their trust,
+  fear and what they have learned (a god's view of the client). Its order is fixed: write first, in the client's name,
+  to whoever the want is against or about (a request to put it right, or to hold the rent or let them stay). Once that
+  has been refused, or the answer's days have run out, it applies to a body whose published notice says it hears the
+  matter, with a fee only within the brief's limit. Otherwise it reports why not ("their answer is awaited until ...",
+  "no body on the board says it hears this"). Each step is a hand-over of its own: the person hands the want over
+  again when their mind chooses to. The papers are the person's own, word for word: the same functions write them,
+  since H4a. The desk sees the bodies that say what they hear (a board, as anyone does). A model at the desk has a
+  form for each such paper (`wantPapers`).
+- *Signing a draft off.* A code principal cannot read words. A person signs the desk's draft off if, read on its
+  typed fields, it would bear on the want (`wants::meets`: what it undoes, whom it bears on). It must also go to
+  whom the want is about or against, or to a body whose notice says it hears the matter, and cost no more at once
+  than the brief's limit. Otherwise they decline it and say which. **This is a limit of a code principal, said
+  plainly:** a draft that is useless in words but right on its fields is signed off.
+- *What came of it reaches the person only by the paths outcomes already take.* A paper the desk sent in their name
+  is theirs (`sent_for_us`): the grievance is marked asked or taken to the body, as if they had sent it. The other
+  side's answer comes to them, and it is learned as the assistant's way, not as asking. The want is met, or not, as
+  ever: the repair done, the notice withdrawn. The desk's report reaches the person's code as their act done and
+  tells their mind nothing. Whatever comes back, a declined draft, a report "not done", or a remit taken back, nothing
+  is redone: the want stays the person's, to go after again by any way. A report "not done" at want depth counts no
+  slip. Tests: `a_want_handed_to_our_assistant_is_met_only_by_the_other_sides_answer_and_learned_from_its_fate`,
+  `a_want_handed_over_carries_its_fields_and_comes_back_with_nothing_to_redo`,
+  `handed_a_want_its_clerk_writes_first_to_whom_it_is_about_then_to_a_body_that_hears_it`.
+
 **What the log shows of it** (`oikos-kernel delegation <log>`; `kernel/crates/actors/src/delegation/beyond.rs`). One row
 an act an assistant did in its principal's name (an organisation's post, or a desk writing for a client): the remit in
 force for that kind, the referral it answers, whether a sign-off or go-ahead came first, and a class: `within`,
