@@ -60,6 +60,8 @@ export class Knowledge {
   readonly signed = new Map<string, { [k: string]: unknown }>();
   /** Laws and claims the participant has seen: what law warnings are judged against (§10). */
   readonly laws = new Map<string, StatementRecord>();
+  /** Every record the participant has been shown, by id: what a request may cite (translator/src/rules.ts, `ruled`). */
+  readonly records = new Set<string>();
   readonly claims: Record[] = [];
   private readonly claimIds = new Set<string>();
   private readonly directionRules = new Map<string, StatementRecord>();
@@ -160,6 +162,7 @@ export class Knowledge {
   }
 
   private add(r: Record): void {
+    this.records.add(r.id);
     if (r.record === "statement" && r.kind !== "form" && this.own(r.speaks_for ?? undefined)) this.papers.set(r.id, { kind: r.kind, text: r.text.length > 300 ? `${r.text.slice(0, 300)}…` : r.text, ...(r.addressed_to?.length ? { to: r.addressed_to } : {}), ...(Number.isSafeInteger(r.data?.every) && r.data.every > 0 ? { standing: true } : {}) });
     if (r.record === "agreement" && (r.terms?.parties ?? []).some((p) => this.own(p))) this.papers.set(r.id, { kind: "agreement", text: "", agreement: { ...(r.terms.template ? { template: r.terms.template } : {}), parties: r.terms.parties } });
     if (r.record === "statement" && r.kind === "procedure" && Array.isArray(r.data?.routines)) this.procedures.set(r.id, r.text);

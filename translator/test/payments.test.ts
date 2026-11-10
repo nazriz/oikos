@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { calls, canonical } from "@oikos/participants";
 import { MockAdapter } from "@oikos/participants/llm";
 import TABLE from "../../contracts/test/payments.json";
-import { createTranslator, LABEL_TEXT, NOT_PUT } from "../src/index";
+import { createTranslator, LABEL_TEXT, NOT_PUT, ON_ITS_FORM, recordTest, ruled } from "../src/index";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
 import { PER_REQUEST_IS_THE_KEEPERS, resolve } from "../src/resolver";
@@ -119,6 +119,29 @@ test("an amount that has to be worked out is said to the seat at once: the trans
   expect(asked).toHaveLength(1);
 });
 
+test("what code sets, a translator does not choose: the records cited by rule, no for=, a payment's purpose its memo, no composed data (one right call, 2026-11-10)", async () => {
+  // The request cites the agreement and a law the seat has been shown, and the invoice the payment settles; the
+  // translator wrote a basis of its own and a for=. What goes is the rule's: every record cited that no argument takes,
+  // in the order written, and the purpose as memo=.
+  const law = { id: "law-income-tax", record: "statement", kind: "law", author: "genesis", at: 0, text: "Tax on pay.", visible_to: "public" };
+  const k = knowing([agreement("rec.1225"), law], TABLE.currency);
+  const proposal = "Pay acc-c0003 XYZ 10 from acc-city for wages, under agreement rec.1225 and law-income-tax, settling rec.7.";
+  const r = await createTranslator(scripted(['money(amount="XYZ 10", basis=rec.99, for="wages", from=acc-city, settles=rec.7, to=acc-c0003)']), ok, () => undefined).translate({ draftId: "d1", participant: "finance-system", as: "finance", proposal, knowledge: k });
+  expect(r.ok && r.draft.call).toBe('money(amount="XYZ 10", basis=["rec.1225","law-income-tax"], from=acc-city, memo="wages", settles=rec.7, to=acc-c0003)');
+  expect(r.paper_words).toBeUndefined();
+  // Whether a letter's words were quoted is on the translation, for the run's note (the quote rule's ask-back waits on it).
+  const said = await createTranslator(scripted(['message(text="Your pay goes in on Friday.", to=acc-c0003)']), ok, () => undefined).translate({ draftId: "d2", participant: "finance-system", as: "finance", proposal: 'Write to acc-c0003: "Your pay goes in on Friday."', knowledge: k });
+  expect(said.ok && said.paper_words).toEqual({ quoted: 1, unquoted: 0 });
+  // A record no argument takes and the seat was never shown, written as no minted record is, is not cited; nor is
+  // anything on a line that cites nothing (a letter), and nobody's name is written as whose behalf it is.
+  const p = (program: string, request: string) => { const x = ruled(calls.parseProgram(program), request, recordTest(k)); return x.ok ? calls.programText(x.program) : x.ask; };
+  expect(p('statement(for=c0003, kind=decision, text="granted", to=c0003)', "Grant c0003's application rec.12 under job-c0003, as said in rec.13.")).toBe('statement(basis=["rec.12","rec.13"], kind=decision, text="granted", to=c0003)');
+  expect(p('message(re=rec.5, text="see rec.6", to=c0003)', "Write to c0003 about rec.5: see rec.6.")).toBe('message(re=rec.5, text="see rec.6", to=c0003)');
+  expect(p("statement(hold=rec.44)", "Hold rec.44 until rec.45 is settled.")).toBe("statement(hold=rec.44)");
+  // A paper whose data code reads is never composed from words: asked back, on its form.
+  expect(p('statement(data={"account":"acc-c0003","posting":"rec.8"}, kind=job_application, to=shop-1)', "Apply to shop-1 for posting rec.8, pay into acc-c0003.")).toBe(ON_ITS_FORM);
+});
+
 test("so is something that has to be found out first; a request that is only unclear is still tried once more", async () => {
   const asked: any[] = [];
   const first = await createTranslator(scripted(["none(look_first)", "statement(withdraw=job-c0004)"], asked), ok, () => undefined).translate({ draftId: "d1", participant: "finance-system", as: "finance", proposal: "Withdraw the standing wage payment to acc-c0004 that rests on job-c0004.", knowledge: seat("finance") });
@@ -147,13 +170,13 @@ test("a call that fills per_request with words is the call's fault: tried again,
 test("prompt 0.9.3: a figure named with something to be taken off it is an amount to be worked out; a direction with no form is a message; what per_request is", () => {
   const { translatorSystem, TRANSLATOR_VERSION } = require("../src/index");
   const s: string = translatorSystem();
-  expect(TRANSLATOR_VERSION).toBe("0.9.5");
+  expect(TRANSLATOR_VERSION).toBe("0.10.0");
   for (const said of [
     "So is an amount given only as a figure with something to be taken off it or added to it that the request doesn't state as a figure",
     "the figure named is what the amount is worked out from, and is never written as the amount.",
     '(Where the request states the result itself, "1,640, being 2,000 less 360", the result is the amount.)',
     "Pay c0042 their wage of 2,000 from acc-1 every 14 days, less what the tax law says to withhold.  ->  none(needs_calculation)",
-    'Pay c0042 1,640 from acc-1 every 14 days for wages (2,000 less 360 withheld).  ->  money(to=c0042, amount="1,640", from=acc-1, every="every 14 days", for="wages")',
+    'Pay c0042 1,640 from acc-1 every 14 days for wages (2,000 less 360 withheld).  ->  money(to=c0042, amount="1,640", from=acc-1, every="every 14 days", memo="wages")',
     "one that addresses an office, a post or a person and tells them to do, stop or change something is a message to them where no form is listed for that direction, never no_such_act.",
     '(Where no form is listed for it.) Direct the depot to take in no new applications from now on.  ->  message(to="the depot", text="take in no new applications from now on")',
     "per_request only where the person keeps the account the money leaves and is carrying out a request to pay: that request's id",
@@ -178,7 +201,7 @@ test("prompt 0.9.4: the rulings are there in general words, each with a worked e
   const { translatorSystem, TRANSLATOR_VERSION } = require("../src/index");
   const { CASES } = require("../eval/cases");
   const s: string = translatorSystem();
-  expect(TRANSLATOR_VERSION).toBe("0.9.5");
+  expect(TRANSLATOR_VERSION).toBe("0.10.0");
   for (const said of [
     "What the payment settles, named by its record",
     "The text ends where what they are told ends",

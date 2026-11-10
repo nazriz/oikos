@@ -25,7 +25,7 @@ const isEntry = (g: Gold) => /visible=own/.test(g.program);
 
 test("the translator's instructions say the three things, and nothing of any world", () => {
   const s = translatorSystem();
-  expect(TRANSLATOR_VERSION).toBe("0.9.5");
+  expect(TRANSLATOR_VERSION).toBe("0.10.0");
   expect(s).toContain("is statement(hold=<it>), one statement for several");
   expect(s).toContain("Resuming it is withdrawing the hold: statement(withdraw=<the hold>).");
   expect(s).toContain("is statement(kind=entry, visible=own, text=");
@@ -198,7 +198,7 @@ test("a model trained before the language gained these still loads: it is known 
   const input = "Put standing payment rec.44 on hold until I say to resume it.";
   const ps = pieces(input);
   expect(programOf(input, ps, ["none:no_such_act", "eos"])).toBe("none(no_such_act)");
-  expect(LABEL_TEXT.no_such_act).toBe("Nothing here does that as such. If it is something to look up or read, look at your reports and papers, or write to whoever keeps it; if it is for someone else to see to, direct them in writing, on their form for it if they have one.");
+  expect(LABEL_TEXT.no_such_act).toBe("Nothing was done. If it is something to look up or read, look at your reports and papers, or write to whoever keeps it; if it is for someone else to settle or see to, write to them, on their form for it if they have one; if it is several things, ask for each by itself.");
   expect(LABEL_TEXT.not_an_act).toBe(LABEL_TEXT.no_such_act);
   // The other way round (a model whose set has what this language doesn't: a label since retired, an argument no
   // function takes): no such program is passed on. It asks back.

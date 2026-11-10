@@ -40,7 +40,7 @@ test("the harness: a model answering with the accepted call passes; one answerin
 test("the name a program gives what it makes is no part of the answer", () => {
   const c: Case = { id: "b", request: "…", expect: ['t = entity(kind=trust, name="River Land Trust")\nstatement(kind=charter, for=t, text="It holds land.")'] };
   expect(passes(c, 'trust = entity(kind=trust, name="River Land Trust")\nstatement(kind=charter, for=trust, text="It holds land.")')).toBe(true);
-  expect(passes(c, 'trust = entity(kind=trust, name="River Land Trust")\nstatement(kind=charter, for=city, text="It holds land.")')).toBe(false);
+  expect(passes(c, 'trust = entity(kind=trust, name="River Land Trust")\nstatement(kind=notice, for=trust, text="It holds land.")')).toBe(false);
 });
 
 test("what's reported of a held-out case never includes its wording", async () => {

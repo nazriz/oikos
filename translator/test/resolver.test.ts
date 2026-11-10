@@ -10,7 +10,7 @@ import BLOCKS from "../../contracts/blocks.schema.json";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
-import { asLabel, resolve, type StructureTypeInfo } from "../src/resolver";
+import { asLabel, LABEL_TEXT, resolve, type StructureTypeInfo } from "../src/resolver";
 
 /** The town's money: its profile's (the platform has none of its own). */
 const TOWN_MONEY: Currency = PROFILE.values.currency;
@@ -159,7 +159,7 @@ test("4.5: a missing decision comes back as a question; the resolver never choos
   // "We'll build it ourselves" is also the participant's choice, and physics may allow it.
   const self = run("structure(type=park, on=lot-00, by=city)"); // one account, so which pays is a single answer; one cell, so where too
   expect(self.ok && self.blocks).toEqual([{ block: "construct", at: "cell.1.0", structure_type: "park" }]);
-  expect(run("none(not_yours)")).toEqual({ ok: false, questions: ["That's for someone else to decide. You could write to them, or propose something."] });
+  expect(run("none(not_yours)")).toEqual({ ok: false, questions: [LABEL_TEXT.no_such_act] });
 });
 
 test("names the participant knows become ids; ambiguity or ignorance becomes a question, phrased from its side", () => {

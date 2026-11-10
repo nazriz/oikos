@@ -5,7 +5,7 @@
 
 import { calls, canonical as canonicalJson, type Currency } from "@oikos/participants";
 import { PRICES, type Budget, type LlmAdapter, type LlmIO, type Price } from "@oikos/participants/llm";
-import { createTranslator, Knowledge, LABEL_TEXT, resolve } from "../src/index";
+import { createTranslator, Knowledge, LABEL_TEXT, recordTest, resolve, ruled } from "../src/index";
 import { translatorSystem } from "../src/index";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { CASES, type Case } from "./cases";
@@ -136,13 +136,27 @@ const actsOf = (program: string, as = "mayor"): string | undefined => {
 };
 
 /** Whether an answer passes a case: one of the accepted programs, or the same acts as one. */
-export function passes(c: Case, got: string): boolean {
+export function passes(c0: Case, got: string): boolean {
+  // (An accepted answer as the host serves it: what code sets is set by rule, `ruled`, as it is on the answer. The
+  // cases were written before 2026-11-10 with basis= and for= in them.)
+  const c = { ...c0, expect: c0.expect.map((e) => asServed(e, c0)) };
+  got = asServed(got, c0);
   if (c.ignore?.length) {
     const strip = (p: string) => c.ignore!.reduce((x, k) => x.replace(new RegExp(`(, )?\\b${k}=("(?:[^"\\\\]|\\\\.)*"|[^,)]*)`, "g"), ""), canonical(p)).replace(/\(, /g, "(");
     return c.expect.map(strip).includes(strip(got));
   }
   const acts = actsOf(got, c.as);
   return c.expect.map(canonical).includes(canonical(got)) || (acts !== undefined && c.expect.some((e) => actsOf(e, c.as) === acts)) || sameRefusal(c, got);
+}
+
+/** An accepted answer as the host serves it (translator/src/rules.ts): basis by rule, no for= (a payment's is its memo). */
+function asServed(e: string, c: Case): string {
+  try {
+    const r = ruled(calls.parseProgram(e), c.request, recordTest(fixture(c.as)), { keepData: true });
+    return r.ok ? calls.programText(r.program) : e;
+  } catch {
+    return e;
+  }
 }
 
 /** Where a refusal is wanted: a call that the resolver answers with that same refusal's words comes to the same thing

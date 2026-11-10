@@ -4,6 +4,8 @@
   "reads": [
     {"text":"year 1, day 22","at":1814400},
     {"text":"year 1 day 22","at":1814400},
+    {"text":"day 22 of year 1","at":1814400},
+    {"text":"from day 45, of year 1","at":3801600},
     {"text":"Year 1, Day 45","at":3801600},
     {"text":"year 2, day 1","at":31536000},
     {"text":"year 2","at":31536000},

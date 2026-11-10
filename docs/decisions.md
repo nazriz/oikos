@@ -11966,6 +11966,79 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   437,402), the build tag aside. A town with providers changes (99b17295... at 30 days).
 - **Revisit if:** a principal is asked for a record older than its 64 kept (then the principal's files are a channel it
   looks into); the compose share gets a source; a seat reads an answer's words as a refusal of what was granted.
+
+## 2026-11-10 · One right call: basis and for by rule, a payment's memo, no composed data, quotes, refusals told alike (no model called)
+
+The method of VISION section 5, used: four rounds of translator failures were answered with more data and serving
+rules, and none changed the call language. An audit of 1,280 real seat requests (the served-style model, round 3 seed
+2, wrong on 143) and of the scope pilot's two blind readers (442 requests they split over) sorted the failures by
+what in the language let one request have two right calls. This change removes those causes in the language and in
+code, and re-measures by code on the same data. No model was called and nothing was trained.
+
+- **A. `basis` by rule.** The host sets it on every translated program (`translator/src/rules.ts` `ruled`, before
+  either resolver sees it): every record the request cites that no other argument of the program takes, in the order
+  written, on each line that can cite one (money, structure, claim, agreement, statement; not a hold, a signature or a
+  notice). A record is a minted `rec.` id or one the seat has been shown (`Knowledge.records`), never a form. Whatever a
+  translator wrote there is replaced. It reads ids, not intentions: a record named only to say it is not acted on is
+  cited too (the prompt used to ask the translator to leave it out; readers split on exactly this). Alternatives: a
+  rule in each resolver (rejected: the engine's resolver has no request text and no list of records seen, and adding
+  one to every code unit's knowledge costs every town; the rule runs once, upstream of both, so they cannot diverge).
+- **B. `for` split.** On whose behalf is the capacity the act is made in (`as`), never the translator's: a translated
+  `for` is dropped. A payment's purpose is a new argument, `money(memo=...)` (contract: calls.schema.json); `for` on money
+  is still read where `memo` is absent, so code's calls are unchanged. A translated `for` on a payment becomes its memo.
+- **C. No JSON composed by the translator.** A translated program with `statement(data=...)` is asked back ("A paper that
+  is read for its figures and ids is made on the form of whoever takes it in. ..."). The kinds code reads from a
+  statement's data that seats sent: `withholding_report` (form `withholding_return`, exists, and its draft),
+  `review_request` (form `review_request`, exists), `job_application`, `loan_application`, `benefit_claim` and
+  `benefit_change` (no form: a person's papers, written by citizen code). Proposed forms, published by whoever reads
+  them: an employer's `job_application` (posting: record, account: account, trade: text), the bank's
+  `loan_application` (amount, months: count, account, purpose: text), the support office's `benefit_claim` (payment:
+  choice of the law's payments, account, born_at: date) and `benefit_change` (claim: record, stop: yes or no). Not
+  built here: the only model seats that make these papers are the assistants' desks, whose draft (`clientDraft`,
+  `participants/src/kinds/assistants.ts`, another worker's file) carries words only, so the forms need that draft to
+  carry fields (a `draftOf` of each such form in place of `clientDraft`'s words for those kinds); and published in
+  every town they would move code-only towns, so they go only where a model sits, as stationery does. Until then
+  these are served only by asking back, and the prompt says `no_such_act` where no form is listed.
+- **D. The quote rule** (serving, `serve-rules.ts` `quoteRule`, withheld `unquoted`): a paper's words the request quotes
+  are copied exactly as quoted; words longer than 25 characters that it quotes nowhere are asked back with the fixed
+  "Put them in quotation marks.". The seat's `do` tool says to quote them (its own commit). **Cost, measured on the
+  1,280 rows, where no seat had been told:** 292 keys have unquoted paper words over 25 characters, so a model that
+  answered every request as its key would have 292 asked back (23%); the rule catches 18 of the 32 copied-text errors.
+  A higher threshold barely helps (100 characters: 262 and 17; 300: 55 and 7): unquoted paper words in real requests
+  are long. **So the ask-back is off by default** (the coordinator, the same day): a serving setting turns it on
+  (`DecideOptions.askUnquoted`, or `OIKOS_DECIDE_ASK_UNQUOTED=1`); the exact copy of a quoted span stands. Each draft
+  records whether its paper words were quoted (a `paper_words` note, `{ draft, quoted, unquoted }`, from
+  `translator/src/rules.ts` `paperWords`), so a run's report can give the share quoted by seat model; the ask-back is
+  decided after the first pilot.
+- **E. Refusals.** `not_yours` and `too_much` are told in the one sentence of `not_an_act` and `no_such_act`, now "Nothing
+  was done. ..." (both resolvers; `look_first`, `needs_calculation`, `unknown_form` and `unclear` stay apart). Told
+  alike, they are one answer to the scorer. Small on this data: the refusal disagreements are mostly an act against
+  `no_such_act` (34 of the readers' 45), which no merging of labels settles.
+- **F. Values written two ways.** Both resolvers read `"day 22 of year 1"` as `"year 1, day 22"` (`first`, `until`, a
+  form's date; `contracts/test/when.json`), and the scorer compares dates by value. An office as its id or "the" and
+  its id, and a count with or without its commas, were already one value to the resolvers and the scorer; most of the
+  audit's cause 7 was its own script's normalising. What is left is real: a raw moment against a day, and words such as
+  "the outside buyer" that are no id.
+- **G. Re-measured by code** (`translator/model/relabel.ts measure`; record ids read from the data, the nearest it holds
+  to what a seat was shown). Readers: 442 split, 186 after A, B, E, F. Model: 143 wrong, 125 after; as served with C and
+  D, 90 wrong and 43 more asked back. By cause (the audit's heuristic), readers before / after, model before / after:
+  basis 142 / 1, 16 / 0; for (on whose behalf) 105 / 0, 2 / 0; a payment's memo there or not 0 / 0, 21 / 21; data 31 / 36,
+  8 / 8; copied text 11 / 5, 32 / 32; refusals 45 / 45, 27 / 26; draft route 23 / 23, 9 / 9; a value two ways 49 / 39,
+  7 / 6; other 36 / 37, 21 / 23. The audit's estimate for A to C was 146 and 89; the model's is not reached because its
+  21 memo errors are a payment's purpose written or not, which renaming does not decide. The exact scorer stays strict
+  (the coordinator, the same day); the fair score, which leaves copied free text and a memo's presence out, is given
+  beside it: 98 wrong before, 81 after.
+- **The draft route (cause 6)** was largely answered by the hand-over forms (`draft_<form>`, `draft_for_client`,
+  `send_signed`, landed today); the data here predates them, so what is left of it is for the next pilot to show.
+- **Contract changes** (contracts/README.md, "One right call"): `money(memo=...)`; calls.md's "What code sets"; the four
+  refusals told alike; the day-first date.
+- **Byte-identical:** the 300-person town, 90 days, lean log, on the base commit's kernel and on this one's: the same
+  final state (96f8c445...) and the same log, entry for entry (489,898), the build tag aside. Code's calls do not change.
+- **Revisit if:** seats do not quote once told (then the ask-back costs more than it saves); a record cited only to be
+  left alone is acted on as a basis somewhere that matters; a translated act needs to be in another's name than its
+  post's (then `for` comes back as something code reads from the post, not words); the retrain shows memo presence is
+  the main error left (then decide the memo by rule too).
+
 ## 2026-11-10 · Our translator alone in the study's arms; served counted per seat model; a plain note for models without tools
 
 - **Ours alone** (`seats.translator: { first: "decide/<model>", arrangement: "alone" }`; `createAlone` in
