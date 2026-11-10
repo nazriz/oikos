@@ -12493,6 +12493,101 @@ plain words and with no menu of the world's acts (P1, P2):
 - **Revisit if:** seats leave by writing the line as a sign-off, without meaning it (read their reasons and debriefs
   first: the line asks for a reason and the guide says what follows it).
 
+## 2026-11-11 · Assistant seats woken only by what is theirs, in working hours, writing to the post that hands them work (no model called but the local test)
+
+Most of a model assistant's sittings were the platform's doing (the scope pilot's round 5, the local runs d and e):
+woken by its organisation's papers that were not for it, brought back by every result of its own acts and every
+acknowledgement whatever "done for n days" it had said, and told to write to its whole organisation, so that one letter
+brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, "When it sits".
+- **A. Whom it writes to** (participants/src/llm/participant.ts, `whoLines`). The post that hands it its work: the post
+  its brief, remits and matters are written in, under the agreement of the delivery that names its system ("You work
+  for Finance officer (finance), of Town of Millbrook (city): to write to it, write to finance, not to city"); a
+  provider's desk, its provider's sales and service desk. A letter to a post already reaches its holder in that post
+  only (the kernel's `recipients`). Read by the agreement because the town's two assistants (the finance office's and the
+  rating office's) are each shown the other's matters (risk MT-31): read by post alone, both were told they worked for
+  both.
+- **B. Woken only by what is its own** (kernel/src/schedule.rs, `keep_to_own`; engine option `seats_keep_to_own`;
+  perception `shown_as_news`). A seat named there (a participant, or the template of its system) is woken by a record
+  naming its organisation only if one of its own channels would show it as it comes (not one read on request, a register
+  asked of its keeper, or a board), never by an `acknowledgement`, and by no letter in an office's fixed words
+  (`office_note`). The experiment harness names the template steward's kinds for a fork whose steward is a model
+  (not `mock/<policy>`, which is the code brain under a policy and sits as its twin). Nothing else changes: with the
+  option empty the scheduler is as before, so a code arm and a town without a model are woken as ever.
+- **C. Working hours** (worlds/generator/generate.ts, `assistantSeat`: `sessions` from the profile's `round`). One
+  sitting a working day, by the mechanism office seats have (participant.ts, `sessions`). Chosen from the code: the
+  system's template hours (`MACHINE_HOURS`, the whole day) are the first source and allow any sitting; the office it
+  serves keeps the place's working day, and its principal's papers come in it; the mechanism opens one sitting a working
+  day and keeps it open while the seat works, its acts' results coming back within it. More than one a day would be the
+  letter-by-letter reading this removes; fewer is the seat's own choice ("done for n days"). A desk's provider states no
+  calendar, so the place's working week is its, as for the outside agency's casework desk. Not modelled: public holidays
+  (the sessions know days of the week only). "Done for n days" is honoured: in participant.ts a letter in an office's
+  fixed words is not mail (`officeNote`, following the kernel's `office_note`) and an `acknowledgement` paper is not a
+  paper filed; a desk's kept briefs and remits (`with_matters`) are not in-trays (seat-config.ts). What is its to act on
+  (its matters: a referral, a sign-off or decline, an answer to its request; a letter in someone's own words) brings it
+  back at the next working day's sitting after it came, a paper and a letter alike. For a letter this changes every seat
+  with office hours, not only an assistant's: until now a letter brought one back at once within hours (pilot 7's
+  rule); an office reads its post at a sitting, not as each letter comes (the llm-participant test's office hours).
+- **D. An acknowledgement wakes no seat** (B and C): it is set out at the next sitting. For code units nothing changes:
+  a code office acknowledges letters that code never writes, and the code assistant reads none.
+- **E. What moves.** Code-only towns: nothing (town-300, 45 days, and town-1000 with `assistants=true`, 30 days: the
+  same final state as main's, 669141b6... and df9d05c7...). A town with providers and no model seat: nothing (the
+  generator's change is inside `assistantSeat`). A town that seats models in assistants (the study's): its config gains
+  the seats' `sessions`, so its state hashes move; every event of the code arm's 60-day fork is the same as main's,
+  line for line (2,067,471 entries; only the config and the checkpoints' state hashes differ). The code assistant does
+  not keep hours: it is a machine acting when its code unit wakes. Hours for it would change every town with providers
+  and the reference arm's twin exactness; recorded as a choice, revisit below.
+- **The plan's reckoning of Claude Code's calls** (orchestrator/prices.json, `claude-code/claude-haiku-5-5` and
+  `claude-code/claude-sonnet-5-5`; experiment-seats.ts `priceOf`). The adapter charges the greater of the API price and
+  what Claude Code reports, which for Haiku 5.5 is about fifty times the API price (fitted to 35 calls: $7.0 a million
+  written to the cache, $0.52 read, $24.5 out; one Sonnet call within 10% of the same). The fork's reserve for its
+  debriefs was sized at the API price, so a claude-code fork that reached its limit had about a fiftieth of what its
+  debriefs cost kept back (MT-30 again). Now priced as Claude Code reckons. The experiment-seats test's starved Haiku
+  arm's limit is $1.30 (was $0.025), what one Haiku debrief through Claude Code costs.
+- **Measured, acceptance 1** (the study's town, seed 7, 60 days after the day-30 fork, every model seat played by the
+  mock through the whole loop and our translator; main a4e3c225 against this branch; wakes from the fork's `observe`
+  commands, a sitting a wake with a model call, `empty_sitting` notes, and the seats' participant calls):
+  | seat | wakes before / after | sittings | skipped as empty | model calls |
+  |---|---|---|---|---|
+  | par.3 (finance's assistant) | 88 / 70 | 80 / 44 | 8 / 0 | 96 / 60 |
+  | par.4 (factory's) | 119 / 73 | 85 / 44 | 34 / 0 | 105 / 64 |
+  | par.5 (rating office's) | 88 / 71 | 81 / 45 | 7 / 0 | 85 / 49 |
+  | provider-a-desk-system | 82 / 84 | 82 / 43 | 0 / 0 | 119 / 78 |
+  | all | 377 / 298 | 328 / 176 | 49 / 0 | 405 / 251 |
+  The mock says it is back in a day (its brain's rhythm), so after the change it sits every working day (43 in 60
+  days): a ceiling a model that says it is done for longer sits under. Wakes between sittings remain (about 1.7 a seat
+  a working day: a matter's paper, its own acts' ends) and cost no call. The debriefs are 12 or 13 questions a seat,
+  before and after. Mean prompt 8,568 tokens (mock reckoning), the largest 19,610.
+- **Measured, the local test** (experiments/open-weight/local.ts: seed 1, 14 days after the fork, three seats, plain
+  notes, our translator alone; free; counted as above):
+  | run | model | wakes | sittings | calls | requests | first time | after a restatement | never | drafts offered / confirmed | seats that left | longest prompt | a call, median / mean | fork |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | `open-weight-local-2026-11-11` (e, before) | qwen2.5:7b-instruct | 522 | 348 | 604 | 528 | 82 (16%) | 20 | 183 | 102 / 85 | 0 of 3 | 32,658 | 9.6 / 13.9 s | 2 h 26 |
+  | `open-weight-local-2026-11-11-hours-b` | qwen2.5:7b-instruct | 86 | 22 | 32 | 44 | 6 (14%) | 2 | 10 | 8 / 5 | 0 of 3 | 13,950 | 19.2 / 25.1 s | 9 min |
+  | `open-weight-local-2026-11-11-14b` | qwen2.5:14b-instruct | 113 | 41 | 63 | 133 | 8 (6%) | 18 | 32 | 26 / 22 | 0 of 3 | 23,564 | 32.2 / 46.7 s (205 s the longest) | 39 min |
+  No seat wrote "Stop for good:" in either new run (run e's 21 questions about stopping were before leaving became a
+  plain line). In hours-b the 7B desk declined its debrief at the consent question ("go_on": false, all kept back):
+  recorded, as asked. The calls took longer than in run e because the machine was busy (the gate, the mock runs), and the
+  14B ran with flash attention and an 8-bit cache (`OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0`), three at
+  once, in about 9 GB for the weights. Which larger model: qwen2.5:14b-instruct (a 9.0 GB download), the 7B's own family
+  at twice the size, so that only the size differs; a 32B at 4-bit (about 20 GB) would not have left room for three
+  32,768-token contexts beside the machine's other work. It served about three times as many requests in all (26 of 133
+  drafted, 22 confirmed) and its notes are longer; it can hold a seat, slowly, and is the first pilot's local arm.
+  An earlier run of the 7B on this branch, before a letter's timing and the desk's line were settled
+  (`open-weight-local-2026-11-11-hours`), sat 26 times for 41 calls.
+- **The first true pilot's spec** (experiments/scope-pilot/first-pilot.ts; not run, but its dry run): the study's
+  town, seed 7, 90 days after the fork, arms code, `claude-code/claude-haiku-5-5`, `claude-code/claude-sonnet-5-5` and
+  `ollama/qwen2.5:14b-instruct`, our translator alone, framing unstated. The estimate is in its header: about 490
+  sitting calls and 52 debrief questions an arm, about $75 of plan dollars as the adapter reckons for each of Haiku and
+  Sonnet (Claude Code reckons them at about the same rates), about 1.5 hours a fork; the local arm free, about 3 hours.
+  Limits $112 an arm (half again). The estimate rests on the mock sitting every working day and on the round-5 models'
+  1.9 calls a sitting; the first calls will show Sonnet's turns, which may make it cheaper. Its dry run (the mock in
+  every seat) ran all four arms to day 120: 260 sittings and 436 sitting calls an arm, prompts 9,202 tokens on average,
+  $24.50 an arm at Claude Code's rates with the mock's short one-turn answers (the low end of the estimate).
+- **Revisit if:** a seat misses work it needed because a paper that was for it named only its organisation in a
+  channel it reads on request (then the channel, not the wake, is wrong); a model never sits on a day with work for it
+  (an in-tray the sessions do not count); the code assistant's acting at any hour is read as a difference between arms
+  (then give it the office's hours too, by the same rule, and accept the hash change in towns with providers); MT-31 is
+  fixed (then the agreement chain in `whoLines` may become the post alone).
 ## 2026-11-11 · Obstacles as laws of the institutions that make them: a proposal (docs/design/obstacles.md; nothing built)
 
 - A proposal for review: O1 reframed as an authority to act on file at the counterparty, O4 a counterparty's acceptance rule, O3 a keeper's record, O2 after a general working-hours law (WM-18); an obstacle record read by `beyond.rs`; readiness to grant from the cost of delay. **Revisit if** Naz rejects the reframing of O1 or the general hours law.

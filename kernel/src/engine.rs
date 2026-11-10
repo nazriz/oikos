@@ -74,6 +74,11 @@ pub struct EngineOptions {
     /// The seats are the mock (no model): a seat that sits as its code twin (`mock.twin` with a `mock.brain`) is
     /// scheduled as its brain's unit would be (run.ts `llmUnit`). A host with a real model says false.
     pub mock_seats: bool,
+    /// Seats that keep to their own post (participants, or templates of systems): of what names their organisation only
+    /// what their own channels show them wakes them, and never an office's acknowledgement (kernel/src/schedule.rs,
+    /// `keep_to_own`). An experiment's host gives it for a fork whose seats a model holds; empty, every seat that sits as
+    /// its code twin is woken as that code unit is.
+    pub seats_keep_to_own: Vec<String>,
     /// The host carries its seats through the participant API itself (the TS host's run loop, orchestrator/src/run.ts,
     /// under OIKOS_WORLD=rust): a seat awake is handed over unobserved, the host observes it, decides and acts for it
     /// with commands of its own, and says when its wake is done (`host_finished`); the round's code actions before a
@@ -199,6 +204,7 @@ impl Default for EngineOptions {
             share_at: std::env::var("OIKOS_SHARE_AT").ok().and_then(|x| x.parse::<usize>().ok()).filter(|n| *n > 0).unwrap_or(WORTH_SHARING),
             decide_window: WINDOW,
             mock_seats: true,
+            seats_keep_to_own: vec![],
             host_seats: false,
             record_observations: false,
             record_observations_of: BTreeSet::new(),
@@ -619,6 +625,7 @@ impl<W: Write> Engine<W> {
         let run = Run::start_loaded(loaded, run_id, crate::run::KernelIdentity::current(), out, anchors).map_err(|e| e.to_string())?;
         let mut e = Engine::assemble(run, base, opts, Scheduler::new(0));
         e.sched = Scheduler::new(e.tick);
+        e.keep_to_own();
         e.parts = parts;
         e.positions = positions;
         for pid in e.parts.keys().cloned().collect::<Vec<_>>() {
@@ -650,6 +657,8 @@ impl<W: Write> Engine<W> {
             }
         }
         let until = opts.until.map_or(base.run_end, |u| u.min(base.run_end));
+        let mut sched = sched;
+        sched.keep_to_own(&opts.seats_keep_to_own, &run.kernel().statics().config.knowing);
         Engine {
             sched,
             run,
@@ -694,6 +703,12 @@ impl<W: Write> Engine<W> {
             withheld: vec![],
             capture: None,
         }
+    }
+
+    /// The seats that keep to their own post, as the options say (`Scheduler::keep_to_own`).
+    fn keep_to_own(&mut self) {
+        let knowing = self.run.kernel().statics().config.knowing.clone();
+        self.sched.keep_to_own(&self.opts.seats_keep_to_own, &knowing);
     }
 
     /// The capture's stream opened, where the run makes one (at its start, or where it is taken up again).

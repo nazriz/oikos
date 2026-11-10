@@ -199,6 +199,37 @@ to answer, nothing kept for it but looks that found nothing, nothing due on its 
 file unchanged) holds no sitting and calls no model; it is noted (`empty_sitting`) and the seat is back when it had
 arranged. A mock that sits as its code twin does always sits.
 
+**Since 2026-11-11, a model's seat keeps to its post and to working hours.**
+- *Woken only by what is its own* (kernel/src/schedule.rs, `keep_to_own`; the engine's `seats_keep_to_own`, which the
+  experiment harness gives a fork whose seats a model holds). Of the papers that name its organisation, only one that
+  its own channels show it as it comes wakes it (not one read only on request, or a board's); never an
+  `acknowledgement`; and no letter in an office's fixed words (an acknowledgement, a standing report, a bank's note of a
+  request of its own: `office_note`). A code arm's seats, and a `mock/<policy>` steward, are woken as their code units
+  are: the town without a model, act for act.
+- *Working hours.* An assistant's seat sits within the working calendar of the office it serves: one sitting a working
+  day, in the place's working hours (the profile's `round`: 9 to 5, five days a week in au-vic), by the office seats'
+  own mechanism (`sessions`, participants/src/llm/participant.ts). An organisation's assistant serves its principal's
+  office, which keeps the place's working day; a provider's desk serves from the provider, which states no calendar of
+  its own, so it keeps the place's working week, as the outside agency's casework desk does. The system's own hours (a
+  machine's whole day) allow any sitting; the sitting is the office's. What comes between sittings is read together at
+  the next. One sitting a day, not more: the mechanism opens one sitting a working day and holds it open while the seat
+  works (its turns, and the results of its acts, within it), and an office reads its post in such a sitting, not letter
+  by letter.
+- *"Done for n days" is honoured.* Neither the results of its own acts, nor an acknowledgement (on paper or by letter),
+  nor its organisation's papers that are not for it bring it back early. What is its to act on does (a matter handed to
+  it, an answer to its request, a sign-off or decline of its draft: its `matters`; a letter in someone's own words), and
+  then at the next working day's sitting after it came, never at once (for a letter, every seat with office hours
+  since 2026-11-11: before, a letter brought one back at once within hours). A desk's clients' briefs
+  and remits, which it keeps and is not shown as a list, bring it back no sooner.
+- *Whom it writes to.* Its standing instructions name the post that hands it its work: the post its brief, remits and
+  matters are written in, under the agreement of the delivery that names its system ("You work for Finance officer
+  (finance), of Town of Millbrook (city): to write to it, write to finance, not to city"). A provider's desk is told to
+  write to its provider's sales and service desk. A letter to a post reaches its holder in that post only. Until then a
+  town's assistant was told to write to `city`, and one letter reached every office of the town, each of which
+  acknowledged it (about twenty acknowledgements, each a wake).
+- *Not yet:* two offices of one organisation that each engage an assistant (the town's finance and rating offices) are
+  shown each other's matters, for the principal's papers are the organisation's (risk MT-31).
+
 **Answers to requests, and letters** (2026-11-10). A request for more scope (`scope_request`) is answered by its
 principal, part by part, in its own time, citing the request (`scope_answer`, `basis` the request; charged as any paper
 is, `publish/scope_answer`):

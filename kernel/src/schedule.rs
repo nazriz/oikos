@@ -12,10 +12,15 @@
 //!   language-model participant (it reads what's come in on its own cadence, and letters wake it). A unit busy with an
 //!   act isn't woken: it sees the news when its act is done. A change in one's own body (a condition begun, ended or
 //!   treated) wakes that person's own code unit; so does a death in the space they are in (they are there, and know it).
+//! - **A seat that keeps to its own post** (`keep_to_own`: a model's seat in an experiment's fork, never a code unit
+//!   or a mock that sits as its code twin): of the papers naming its organisation, only one its own channels show it
+//!   as it comes wakes it, never an acknowledgement; of letters, none in an office's fixed words (an acknowledgement,
+//!   a standing report, a bank's note of a request of its own). The rest it reads at its next sitting. A code twin is
+//!   woken as its code unit is, so a code arm and a town with no model are as they were.
 //! - **Guards:** at most three news wakes a unit a tick (then the next tick); more than `MAX_COHORTS_PER_MOMENT`
 //!   cohorts at one moment stops the run.
 
-use crate::blocks::Id;
+use crate::blocks::{Id, Record, RecordBody};
 use crate::events::{Event, EventBody, VacateReason};
 use crate::state::State;
 use serde::{Deserialize, Serialize};
@@ -96,20 +101,27 @@ pub struct Scheduler {
     queue: BTreeSet<(i64, String, String)>,
     moment_at: i64,
     cohorts_now: u32,
+    /// The seats that keep to their own post (`keep_to_own`), by participant or by the template their system was made
+    /// from: the host's choice for a fork, given again whenever it is taken up (never saved).
+    #[serde(skip)]
+    own_news: BTreeSet<String>,
+    /// What the world says is published on a board (searched, never shown as it comes): read for those seats.
+    #[serde(skip)]
+    knowing: crate::config::Knowing,
 }
 
 /// What an event means for wakes, as `Scheduler::note` reads it.
 enum News<'a> {
     /// An act begun: who, in what capacity, and when it's done.
     Started { participant: &'a str, capacity: Option<&'a str>, done: i64 },
-    /// A message, to these participants.
-    Delivered(Vec<&'a str>),
+    /// A message (its id), to these participants.
+    Delivered(Vec<&'a str>, &'a str),
     /// Something happened to this person's own body.
     Body(&'a str),
     /// A keeper has answered a question put in this capacity of this participant (foundations F11).
     Answered { participant: &'a str, capacity: &'a str },
-    /// A record made (its JSON).
-    Recorded(&'a Value),
+    /// A record made (its JSON, and the record itself where the event carried it).
+    Recorded(&'a Value, Option<&'a Record>),
 }
 
 /// What the host should do next.
@@ -129,6 +141,23 @@ impl Scheduler {
 
     pub fn perturb(&mut self, p: Perturb) {
         self.perturb = (p.extra_wakes_bps > 0).then_some(p);
+    }
+
+    /// These seats (participants, or the templates their systems are made from) keep to their own post: woken only by
+    /// what is theirs (the module's rules above). The host says so for a fork whose seats a model holds; the world's
+    /// `knowing` says which channels are boards.
+    pub fn keep_to_own(&mut self, who: &[String], knowing: &crate::config::Knowing) {
+        self.own_news = who.iter().cloned().collect();
+        self.knowing = if who.is_empty() { Default::default() } else { knowing.clone() };
+    }
+
+    /// Whether a unit is a seat that keeps to its own post.
+    fn keeps_own(&self, st: &State, u: &Unit) -> bool {
+        u.llm
+            && u.hears
+            && !self.own_news.is_empty()
+            && (self.own_news.contains(&u.participant)
+                || st.participants.get(u.participant.as_str()).and_then(|p| p.template.as_ref()).is_some_and(|t| self.own_news.contains(t.as_str())))
     }
 
     /// A deterministic draw in [0, n) for a unit at a time (splitmix64 over the seed, the key and the time).
@@ -331,7 +360,7 @@ impl Scheduler {
             let news = match e["event"].as_str() {
                 // (Gone to look at somewhere: busy until back, as with an act.)
                 Some("action_started" | "visit_started") => News::Started { participant: e["participant"].as_str().unwrap_or_default(), capacity: e["as"].as_str(), done: e["free"].as_i64().or(e["done"].as_i64()).unwrap_or(t) },
-                Some("message_delivered") => News::Delivered(e["to"].as_array().into_iter().flatten().filter_map(Value::as_str).collect()),
+                Some("message_delivered") => News::Delivered(e["to"].as_array().into_iter().flatten().filter_map(Value::as_str).collect(), e["message"].as_str().unwrap_or_default()),
                 Some("ask_answered") => match (e["participant"].as_str(), e["as"].as_str()) {
                     (Some(participant), Some(capacity)) => News::Answered { participant, capacity },
                     _ => continue,
@@ -344,7 +373,7 @@ impl Scheduler {
                     Some(person) => News::Body(person),
                     None => continue,
                 },
-                Some("recorded") => News::Recorded(&e["record"]),
+                Some("recorded") => News::Recorded(&e["record"], None),
                 _ => continue,
             };
             self.news(st, news, t);
@@ -357,7 +386,7 @@ impl Scheduler {
             match &e.body {
                 EventBody::ActionStarted { participant, position, done, free, .. } => self.news(st, News::Started { participant, capacity: position.as_deref(), done: free.unwrap_or(*done) }, t),
                 EventBody::VisitStarted { participant, position, done, .. } => self.news(st, News::Started { participant, capacity: position.as_deref(), done: *done }, t),
-                EventBody::MessageDelivered { to, .. } => self.news(st, News::Delivered(to.iter().map(|x| x.as_str()).collect()), t),
+                EventBody::MessageDelivered { to, message, .. } => self.news(st, News::Delivered(to.iter().map(|x| x.as_str()).collect(), message.as_str()), t),
                 // A keeper has answered an office's question: the office is woken to go on from the answer. (Not a person's own unit: someone
                 // asking for themselves has it at their next wake. A wake at the moment it is done moved the hours a person wakes at.)
                 EventBody::AskAnswered { participant, position: Some(position), .. } => self.news(st, News::Answered { participant, capacity: position }, t),
@@ -383,8 +412,8 @@ impl Scheduler {
                 }
                 EventBody::Recorded { record } => {
                     if st.is_some() {
-                        let record = serde_json::to_value(&**record).expect("records serialize");
-                        self.news(st, News::Recorded(&record), t);
+                        let json = serde_json::to_value(&**record).expect("records serialize");
+                        self.news(st, News::Recorded(&json, Some(&**record)), t);
                     }
                 }
                 _ => {}
@@ -405,11 +434,20 @@ impl Scheduler {
                 let keys = self.units_of(participant).filter(|(_, u)| (u.capacity.as_deref() == Some(capacity) || (u.hears && u.participant == participant)) && u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect();
                 self.wake_now(keys, t);
             }
-            News::Delivered(to) => {
+            News::Delivered(to, message) => {
                 for to in to {
                     // (A letter to a seat is a letter to the person it sits beside, and one to the person reaches the seat: one body, whoever it was addressed to.)
                     let bodies: BTreeSet<&str> = std::iter::once(to).chain(self.units_of(to).filter_map(|(_, u)| u.body.as_deref())).collect();
-                    let keys = bodies.into_iter().flat_map(|b| self.units_of(b)).filter(|(_, u)| u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect::<BTreeSet<_>>().into_iter().collect();
+                    let keys = bodies
+                        .into_iter()
+                        .flat_map(|b| self.units_of(b))
+                        .filter(|(_, u)| u.next_wake > t && !Self::busy(u, t))
+                        // (A seat that keeps to its own post is not woken by an office's note in its fixed words: it reads it at its next sitting.)
+                        .filter(|(_, u)| !st.is_some_and(|st| self.keeps_own(st, u) && Self::fixed_words(st, &u.participant, message)))
+                        .map(|(k, _)| k.clone())
+                        .collect::<BTreeSet<_>>()
+                        .into_iter()
+                        .collect();
                     self.wake_now(keys, t);
                 }
             }
@@ -417,10 +455,10 @@ impl Scheduler {
             // (Flooded out of where one was is felt at once too.)
             News::Body(person) => {
                 let Some(st) = st else { return };
-                let keys = self.acting_for(st, person, "", t);
+                let keys = self.acting_for(st, person, "", t, None);
                 self.wake_now(keys, t);
             }
-            News::Recorded(r) => {
+            News::Recorded(r, rec) => {
                 let Some(st) = st else { return };
                 let mut named: BTreeSet<&str> = BTreeSet::new();
                 for f in ["holder", "counterparty", "as", "to"] {
@@ -432,8 +470,11 @@ impl Scheduler {
                     named.insert(x);
                 }
                 let author = r["author"].as_str().unwrap_or_default();
+                // (The record itself, read from its JSON only where a seat that keeps to its own post may be asked of it.)
+                let parsed: Option<Record> = if rec.is_none() && !self.own_news.is_empty() { serde_json::from_value(r.clone()).ok() } else { None };
+                let rec = rec.or(parsed.as_ref());
                 for entity in named {
-                    let keys = self.acting_for(st, entity, author, t);
+                    let keys = self.acting_for(st, entity, author, t, Some(rec));
                     self.wake_now(keys, t);
                 }
             }
@@ -445,9 +486,23 @@ impl Scheduler {
         st.participants.get(participant).and_then(|p| p.person.as_deref()).unwrap_or(participant)
     }
 
+    /// Whether a message delivered to a participant is an office's note in its fixed words (an acknowledgement, a
+    /// standing report, a bank's note of a request of its own): `oikos_actors::common::office_note`.
+    fn fixed_words(st: &State, participant: &str, message: &str) -> bool {
+        st.participants.get(participant).and_then(|p| p.pending.values().flat_map(|x| x.inbox.iter()).find(|m| m.id == message)).is_some_and(|m| oikos_actors::common::office_note(&m.text))
+    }
+
+    /// Whether a record made is for a seat that keeps to its own post: shown to it as it comes, and not an acknowledgement.
+    fn for_own(&self, st: &State, u: &Unit, rec: Option<&Record>) -> bool {
+        let Some(rec) = rec else { return true }; // (a record that could not be read: woken, as before)
+        let ack = matches!(&rec.body, RecordBody::Statement { kind, .. } if kind == "acknowledgement");
+        !ack && crate::observe::shown_as_news(&self.knowing, st, rec, &u.participant)
+    }
+
     /// Code units acting for an entity now, not the author's: its person's own unit, or the units holding its positions.
-    fn acting_for(&self, st: &State, entity: &str, author: &str, t: i64) -> Vec<String> {
-        let wakeable = |u: &Unit| (!u.llm || u.hears) && u.next_wake > t && !Self::busy(u, t);
+    /// `rec`: the record that is the news, where it is one (`Some(None)`: one that could not be read).
+    fn acting_for(&self, st: &State, entity: &str, author: &str, t: i64, rec: Option<Option<&Record>>) -> Vec<String> {
+        let wakeable = |u: &Unit| (!u.llm || u.hears) && u.next_wake > t && !Self::busy(u, t) && !(rec.is_some() && self.keeps_own(st, u) && !self.for_own(st, u, rec.flatten()));
         if let Some(pid) = st.entities.get(entity).and_then(|e| e.body.as_ref()).and_then(|b| b.participant.as_deref()) {
             if pid == author || Self::body_of(st, author) == Self::body_of(st, pid) {
                 return vec![];

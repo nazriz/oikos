@@ -1014,6 +1014,30 @@ fn capacities<'a>(st: &'a State, participant: &str) -> Vec<Capacity<'a>> {
     v
 }
 
+/// Whether a record just made would be shown to a participant as it comes: in one of its capacities' channels of papers
+/// that it is shown at an ordinary look (not one read only on request, a register asked of its keeper or a board
+/// searched), as that channel's filter and its entity's sight let it. What a seat that keeps to its own post is woken by
+/// (kernel/src/schedule.rs). A channel with an area is taken to show it (whether it does turns on where the capacity
+/// is: a wake too many, never one too few).
+pub fn shown_as_news(knowing: &crate::config::Knowing, st: &State, rec: &Record, participant: &str) -> bool {
+    if !st.participants.contains_key(participant) {
+        return false;
+    }
+    capacities(st, participant).into_iter().any(|cap| {
+        let me = cap.entity;
+        cap.channels.iter().any(|ch| match &ch.kind {
+            ChannelKind::Records { way, filter, from, area, .. } => {
+                if ch.on_request == Some(true) || *way == Way::Ask || (*way == Way::Published && from.is_none() && knowing.board_most(filter).is_some()) {
+                    return false;
+                }
+                let want = Want::of(*way, from.as_ref(), &me);
+                can_see(st, rec, &me) && (area.is_some() || placed_ok(st, rec, &me, None)) && matches(st, rec, filter, want.as_ref(), true)
+            }
+            _ => false,
+        })
+    })
+}
+
 /// Build a participant's observation (read-only): what it perceives now, what it looked through (for the world to mark
 /// seen), and the transactions it was shown (for the world to drain). `only`: one capacity ("self" or a position it
 /// holds); None: all of them. The world then delivers it (World::deliver), with the outcomes and messages waiting.

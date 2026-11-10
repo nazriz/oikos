@@ -24,7 +24,9 @@ The path, in order (decided 2026-11-10):
 - [ ] 4. The translator back to its design (`docs/design/translator-and-resolver.md` P1 to P15): general, judged on
   forms it has not seen; repeated failures fixed in the blocks; no larger model behind it in study runs (audit first).
 - [?] 5. The first true pilot: Haiku, Sonnet and one open-weight model on a small setup. Needs from Naz: the month's API
-  credit and a Featherless Developer key.
+  credit and a Featherless Developer key. The spec, with its estimate and limits, is `experiments/scope-pilot/first-pilot.ts`
+  (2026-11-11: Haiku and Sonnet through `claude -p`, qwen2.5:14b locally; assistant seats now keep working hours and are
+  woken only by what is theirs); it waits for the owner's go-ahead on the estimate.
 - [ ] 6. The main study, sized from that pilot: the obstacle laws, the counting pipeline, the pairs.
 
 Alongside:
