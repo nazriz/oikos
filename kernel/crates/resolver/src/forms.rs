@@ -42,6 +42,11 @@ fn not_a_date(s: &str) -> String {
 /// A date as written ("year 2, day 40", or "day 40" of the first year): the moment that day begins. Bare digits are
 /// a moment as a record has it, in seconds.
 pub fn parse_date(s: &str) -> Result<i64, String> {
+    // (The same date with its day first: "day 30 of year 1". 2026-11-10: two readers wrote one date both ways.)
+    let lower = s.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ");
+    if let Some(turned) = crate::calls::day_first(&lower) {
+        return parse_date(&turned);
+    }
     let t = s.trim();
     if (1..=15).contains(&t.len()) && t.bytes().all(|b| b.is_ascii_digit()) {
         return Ok(t.parse().unwrap_or_default());

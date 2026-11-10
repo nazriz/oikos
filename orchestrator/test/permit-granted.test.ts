@@ -34,7 +34,9 @@ async function town(name: string, grant: (app: { id: string; lot: string; type: 
       program = grant({ id: app[1]!, applicant: app[2]!, lot: lotFirst ? app[3]! : app[4]!, type: lotFirst ? app[4]! : app[3]! });
       return [use("do", { what: "Decide the permit application.", as: "planning" })];
     },
-    translator: () => [{ type: "tool_use" as const, id: `x${++n}`, name: "call", input: { program } }],
+    // (A decision written out as a statement with its data is no translation since 2026-11-10, which asks such a paper
+    // back: it stands here as what a run begun before then holds, so it is handed over as written, `verbatim`.)
+    translator: () => [{ type: "tool_use" as const, id: `x${++n}`, name: "call", input: { program, ...(/\bdata=/.test(program) ? { verbatim: true } : {}) } }],
     debrief: () => [{ type: "text", text: "Noted." }],
   });
   const s = await runWorld({ config, runId: name, outDir: mkdtempSync(join(tmpdir(), `oikos-${name}-`)), until: 12 * DAY, adapter, recordObservations: "none", recordDecisions: "none" });

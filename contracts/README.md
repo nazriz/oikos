@@ -851,3 +851,24 @@ without providers of assistants is unchanged to the byte.
   `ScopeRequest.record` and `.matter`, and two new papers, `scope_answer` (the request, granted or not, `reasons` for the
   record, a copy as `paper`, `look_again_at`) and `acknowledgement` (`of`: the letter acknowledged).
 - **Papers published:** `payment_details` (a collector's account for what a law charges), in towns with providers.
+
+## One right call: what code sets, a payment's memo, refusals told alike (2026-11-10; docs/decisions.md, "One right call"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive to the schemas; the rest is how a translated program is read. Code seats write calls as before, and a
+code-only town is unchanged to the byte (the 300-person town, 90 days: the same log).
+
+- **`money(memo=...)`** (calls.schema.json, calls.md): what a payment is for, in words; it goes on the payment as its
+  memo and on a request to pay as "for ...", as `for` on money did. `for` on money is still read where `memo` is absent
+  (code's calls write it so). Both resolvers, held to `contracts/test/payments.json`.
+- **What a translator never writes, and the platform sets by rule** (calls.md, "What code sets"; `participants/src/calls.ts`
+  `RULED`, `TAUGHT`; `translator/src/rules.ts` `ruled`, applied to every translated program before either resolver sees
+  it): `basis` is every record the request cites (a minted record id, or one the seat has been shown that is no form)
+  that no other argument takes, in the order written, on each line that can cite one; `for` is dropped (an act is in
+  the capacity it is made in, `as`), and on a payment it is read as `memo`; a statement's `data` is asked back ("A paper
+  that is read for its figures and ids is made on the form of whoever takes it in. ..."). The schema still has all
+  three: code writes them.
+- **Refusals told alike:** `not_yours` and `too_much` are told to the seat in the sentence of `not_an_act` and
+  `no_such_act`, which now begins "Nothing was done." (both resolvers' label tables; `contracts/test/holds.json`).
+  `look_first`, `needs_calculation`, `unknown_form` and `unclear` keep their own.
+- **A date with its day first** (`"day 22 of year 1"`) is read as the same date as `"year 1, day 22"`, for `first` and
+  `until` and for a form's date field (both resolvers; `contracts/test/when.json`).

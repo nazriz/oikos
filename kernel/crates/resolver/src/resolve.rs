@@ -18,12 +18,10 @@ pub const RESOLVER_VERSION: &str = "0.7.0";
 /// Fixed texts for the translator's refusal labels (section 11.1).
 pub fn label_text(label: &str) -> &'static str {
     match label {
-        "not_yours" => "That's for someone else to decide. You could write to them, or propose something.",
         "needs_calculation" => "Please state the amount itself.",
-        "too_much" => "Please take this one step at a time.",
         "unknown_form" => "You haven't seen a form by that name.",
-        // (One sentence for both: the translator v4 round 3 audit, translator/src/resolver.ts `NOTHING_DONE`.)
-        "not_an_act" | "no_such_act" => "Nothing here does that as such. If it is something to look up or read, look at your reports and papers, or write to whoever keeps it; if it is for someone else to see to, direct them in writing, on their form for it if they have one.",
+        // (One sentence for all four: translator/src/resolver.ts `NOTHING_DONE`, 2026-11-10.)
+        "not_an_act" | "no_such_act" | "not_yours" | "too_much" => "Nothing was done. If it is something to look up or read, look at your reports and papers, or write to whoever keeps it; if it is for someone else to settle or see to, write to them, on their form for it if they have one; if it is several things, ask for each by itself.",
         // (Said of the request alone: nothing is looked up to say it, so it tells the caller nothing it didn't know.)
         // (The resolver's own answer, never a translator's: the translator does not know who exists. Given alone, with no
         // candidates, it says only this.)
@@ -760,7 +758,8 @@ impl Resolver<'_> {
     fn money_outcome(&self, c: &Call, from: Option<String>, commitment: bool) -> R<Json> {
         let Some(amount) = self.amount(c, "amount")? else { return ask("How much?") };
         let to = self.payee(&self.need(c, "to", "Paid to whom?")?, commitment)?;
-        let purpose = Self::str_(c, "for")?.filter(|p| !p.is_empty());
+        // (What it is for: `memo`; code's own calls may still write it `for`, as they did before 2026-11-10.)
+        let purpose = Self::str_(c, "memo")?.filter(|p| !p.is_empty()).or(Self::str_(c, "for")?.filter(|p| !p.is_empty()));
         let settles = self.id(c, "settles")?;
         let line = self.id(c, "line")?;
         Ok(obj(vec![("from", from.map(Json::from)), ("to", some(to)), ("amount", some(amount)), ("for", purpose.map(Json::from)), ("settles", settles.map(Json::from)), ("line", line.map(Json::from))]))

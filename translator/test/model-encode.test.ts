@@ -2,7 +2,7 @@
 import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
 import { AgreeAdapter, CUT_OFF, DecideAdapter, formsMisfit, formsShown, programOf, shown } from "../model/adapter";
-import { cutShort } from "../model/serve-rules";
+import { cutShort, quoteRule } from "../model/serve-rules";
 import { LABEL_TEXT, toldAlike } from "../src/resolver";
 import { asWord, decode, encode, vocabulary, type Span } from "../model/encode";
 import { pieces, row, stepsOf } from "../model/export";
@@ -263,6 +263,13 @@ test("served only where it is safe to: copied words cut short are asked back, tw
   const m = 'message(text="report what is on lot-01-17.", to=inspector)';
   expect(cutShort(t, m)).toBeUndefined();
   expect(cutShort(t, m, [], { trailing: true })).toEqual({ field: "text", kind: "trailing" });
+  // The quote rule (2026-11-10): words the request quotes are copied as quoted, whatever edge the answer gave them;
+  // a paper's words longer than a phrase that it quotes nowhere are asked back; a payment's memo is not ruled.
+  const q = 'Tell the clerk: "File the minutes by Friday, with the votes." Thanks.';
+  expect(quoteRule(q, 'message(text="File the minutes by Friday", to=clerk)')).toEqual({ program: 'message(text="File the minutes by Friday, with the votes.", to=clerk)', quoted: true });
+  expect(quoteRule(r, 'message(text="send me the total of the roll", to="the rates officer")')).toEqual({ ask: "text" });
+  expect(quoteRule(r, 'message(text="the roll", to="the rates officer")')).toEqual({ program: 'message(text="the roll", to="the rates officer")', quoted: false });
+  expect("ask" in quoteRule(p, 'money(amount="$40.00", memo="the waste taken in rec.12 at the depot", from=acc-1, to=acc-9)')).toBe(false);
   // Two models: a draft only where both write the same program, at the lesser sureness.
   const pair = new AgreeAdapter("a+b", { first: true, quiet: true });
   const said = (program: string, sure: number) => async () => ({ program, sure, ms: 5 });

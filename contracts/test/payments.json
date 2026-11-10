@@ -178,6 +178,21 @@
    ]
   },
   {
+   "name": "what a payment is for is its memo (2026-11-10); where code's for= stands beside it, memo= is read",
+   "seat": "teller",
+   "as": "teller",
+   "program": "money(to=acc-c0003, amount=\"XYZ 10\", from=acc-city, memo=\"Rent.\", for=\"Wages.\")",
+   "blocks": [
+    {
+     "block": "transfer",
+     "from": "acc-city",
+     "to": "acc-c0003",
+     "amount": "1000",
+     "memo": "Rent."
+    }
+   ]
+  },
+  {
    "name": "a keeper's payment that carries out no request names none",
    "seat": "teller",
    "as": "teller",

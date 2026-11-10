@@ -295,19 +295,27 @@ Roughly one function per physics outcome, plus `form`, **generated from the kern
 
 | Function | Outcome | Arguments (draft; `?` optional) | Resolves to (seat's own act, or a request/offer to whoever must act) |
 |---|---|---|---|
-| `money` | Money moves between accounts | `to`, `amount`, `from?`, `every?`, `first?`, `for?`, `settles?` | `transfer` if the seat's entity keeps the paying account; otherwise a `request` to its keeper (standing if `every`) |
+| `money` | Money moves between accounts | `to`, `amount`, `from?`, `every?`, `first?`, `memo?`, `settles?` | `transfer` if the seat's entity keeps the paying account; otherwise a `request` to its keeper (standing if `every`) |
 | `account` | An account exists / is closed | `holder`, `at?`, `close?` | `open_account` / `close_account` if the seat's entity is the keeper; otherwise a `request` to `at` |
-| `structure` | A building exists / is gone | `type`, `on`, `by?`, `price?`, `from?`, `basis?`, `remove?` | `construct` / `demolish` if `by` is the seat's entity; otherwise an offered agreement to `by` (4.3). Missing `by` or `from` → a question (4.5) |
+| `structure` | A building exists / is gone | `type`, `on`, `by?`, `price?`, `from?`, `remove?` | `construct` / `demolish` if `by` is the seat's entity; otherwise an offered agreement to `by` (4.3). Missing `by` or `from` → a question (4.5) |
 | `occupancy` | Someone is in / out of a building | `in`, `who?`, `slot?`, `count?`, `leave?` | `occupy` / `vacate`. Removing someone else is physically possible (eviction), and done exactly as said |
 | `entity` | An organisation exists | `kind`, `name`, `visible?` | `create_entity` |
-| `claim` | A legal position is on record / transferred / released | `holder`, `position`, `against?`, `about`, `basis?`, `to?`, `release?` | `record_claim` / `transfer_claim` / `release_claim` |
+| `claim` | A legal position is on record / transferred / released | `holder`, `position`, `against?`, `about`, `to?`, `release?` | `record_claim` / `transfer_claim` / `release_claim` |
 | `agreement` | An agreement is offered / signed / given notice | `with`, `terms`, `template?`, `sign?`, `notice?` | `propose_agreement` (+ `sign_agreement`) / `sign_agreement` / `give_notice` |
-| `statement` | A statement is published (or put up on a lot, `on?`: D44) / withdrawn | `kind`, `text`, `to?`, `visible?`, `basis?`, `on?`, `withdraw?` | `publish` / `withdraw` |
+| `statement` | A statement is published (or put up on a lot, `on?`: D44) / withdrawn | `kind`, `text`, `to?`, `visible?`, `on?`, `withdraw?` | `publish` / `withdraw` |
 | `vote` | A choice is cast | `ballot`, `choice` | `vote` |
 | `message` | Someone is told something | `to`, `text`, `re?` | `message` |
 | `form` | A published form is filled in and submitted | `to`, `form`, plus the form's own fields | `publish` of the form's statement kind, fields checked (4.4) |
 
 Notes:
+- **What the platform sets, and the translator never writes** (2026-11-10, "one right call": docs/decisions.md). Four
+  rounds of translator failures were answered with more data and serving rules; none changed the language. Read by the
+  method of VISION section 5, the failure log said three arguments let one request have more than one right call, and
+  two careful readers split over them on hundreds of real requests. So they left the translator's language: `basis`
+  (the records an act cites: every record the request cites that no other argument takes, by rule, §8.2 step 0), `for`
+  (on whose behalf: the capacity the act is made in, the seat's post), and a statement's `data` (which code reads: made
+  on the form of whoever reads it, never composed from words). A payment's purpose, which `for` also meant, is `memo`.
+  Code seats still write all three (P14): only what the translator chooses changed.
 - **Human words map to the physics, whatever the wording.** "Hire Alice at $1,500 a fortnight" is `agreement(with=alice, terms=…)`, and "sell the lot" is an agreement plus a claim transfer done as steps. The model supplies generality of *language*; the outcomes are physics.
 - **Free-form content stays free-form.** A law's text, an agreement's written terms and a claim's `about` are copied as the seat said them. Parts code institutions must read are given structure by forms (§9.3) or by the shared outcome language (§9).
 - **Messages** can also go through the existing direct `message` action. The text is exactly what's sent, so no translation is needed. `message(...)` exists for when a message is part of a larger request.
@@ -355,6 +363,12 @@ It must not:
 
 ### 8.2 Steps, per call
 
+0. **Set what code sets** (a translated program only; 2026-11-10, translator/src/rules.ts `ruled`): any `basis` and
+   `for` the translator wrote are dropped (a `for` on a payment is read as its `memo`); every record the request cites
+   (a minted record id, or one the seat has been shown that is no form) that no argument of the program takes becomes
+   the `basis` of each line that can cite one, in the order the request writes them; a program that composes a
+   statement's `data` is asked back ("made on the form of whoever takes it in"). This reads ids, not intentions: a
+   record the request names only to say it is not acted on is cited too.
 1. **Check the call** against the function's argument schema (generated from the kernel contract).
 2. **Resolve references** against the seat's knowledge only:
    - bare ids must be things the seat has seen;
@@ -468,9 +482,9 @@ Feedback reaches the seat as `notices` (the Observation field added on 2026-09-2
 
 | Label | When | What the seat is told (fixed text) |
 |---|---|---|
-| `not_yours` | Someone else's decision ("make the council vote yes") | "That's for someone else to decide. You could write to them or propose something." |
+| `not_yours` | Someone else's decision ("make the council vote yes") | Since 2026-11-10 the sentence of `no_such_act` (below), as `too_much`, `not_an_act` and `no_such_act` are: "Nothing was done. If it is something to look up or read, ...; if it is for someone else to settle or see to, write to them, on their form for it if they have one; if it is several things, ask for each by itself." Readers split over which of these a request was; all bring nothing about. |
 | `needs_calculation` | Relative amounts ("10% of the budget", "half") | "Please state the amount itself." |
-| `too_much` | More than the allowed independent outcomes, or steps that depend on others acting first | "Please take this one step at a time." |
+| `too_much` | More than the allowed independent outcomes, or steps that depend on others acting first | As `not_yours` (2026-11-10). |
 | `unclear` | No recognisable outcome | "It isn't clear what should happen. Could you say it more plainly?" |
 | `unknown_form` | Names a form the seat hasn't seen | "You haven't seen a form by that name." |
 

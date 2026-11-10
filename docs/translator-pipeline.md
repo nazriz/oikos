@@ -665,6 +665,30 @@ program. The join's own leak check runs again there.
 
 Nothing here was run on a model. Prompt **0.9.5** (the `line` of a payment, the `hours` of an agreement, a notice of a practice and an offer anyone may take up, each with worked examples and seen cases `r95-*`); `translator/train/synthetic.ts` `lateKinds` and its options, in `translator-data`: `--line-payments N` (tag `line_payment`), `--report-payments N` (`report_amounts`), `--split-payments N` (`split_payment`: the `needs_calculation` refusals that state no share are made from these), `--hours-terms N` (`hours_term`), `--practice-notices N` (`practice_notice`), `--offer-notices N` (`offer_notice`), all taken by `--only`; `--max-pieces` (640, 1024 or 2048) on the trainer, to be given with `--max-tokens` (the long reader: `--max-tokens 2048 --max-pieces 2048`), because with an encoder a row of more pieces than this is left out of training; `scripts/forms-inventory.ts`, `scripts/forms-released.ts`. The practice and offer kinds are not encodable by the model's export yet (docs/design/translator-round-3.md, "Progress"). A slot-by-slot model is decoded by the slots in its own config.json (`grammar`), so a contract that gains an argument does not break a model trained before.
 
+## One right call (2026-11-10): what code sets, relabelled by code
+
+The call language lost three choices that let one request have more than one right call (docs/decisions.md, "One
+right call"; contracts/calls.md, "What code sets"): `basis`, `for` and a statement's `data`. The host sets them on every
+translated program (`translator/src/rules.ts` `ruled`), whatever any translator wrote, and a payment's purpose is `memo`.
+Refusals told in one sentence (`not_an_act`, `no_such_act`, `not_yours`, `too_much`) are one answer to the scorer
+(`toldAlike`). The scorer (`train/meaning.ts`) reads a date written either way (`"day 22 of year 1"` is
+`"year 1, day 22"`), in `first`, `until` and a form's date field, as one value, as both resolvers now do.
+
+- **Relabel by code, no model:** `bun translator/model/relabel.ts write <rows.jsonl> <out.jsonl>` writes a keyed file in
+  the new language (basis by rule, no `for`, a payment's `memo`, refusals as one label; `data` left as it is). Which ids
+  are records is read from the file itself (every id any of its programs cites as a basis, and every minted `rec.`).
+  `bun translator/model/relabel.ts measure --rejects <rejects.jsonl>... --set <rows> <answers>... --out <dir>`: the
+  readers' disagreements and a model's errors before and after, and what the serving rules (C, D) would ask back.
+- **The quote rule** is a serving check (`translator/model/serve-rules.ts` `quoteRule`, withheld `unquoted`, one of
+  `SERVING_CHECKS`): a paper's words the request quotes are copied as quoted; longer than 25 characters and quoted
+  nowhere, the request is asked back ("Put them in quotation marks."). The seat's `do` tool says so.
+- **Kept in git** (moved from run folders, their worktree paths removed; run folders through `OIKOS_RUNS`):
+  `translator/train/v3/join-v3.ts`, `implied.ts`, `pilot-rows.ts` (translator v3's join), and
+  `translator/model/round4/serve.py`, `fit.py` (round 4's offline serving and the style-blind calibrator).
+- **For the retrain** (not run): the export's slot grammar (`encode.ts` `grammar`) is still `calls.ARGS`, which keeps
+  `basis`, `for` and `data` (code writes them) and gains `memo`; a model trained on it would be ruled anyway. The retrain
+  switches it to `calls.TAUGHT` and relabels every file it reads; the slot tests that pin money's slots move with it.
+
 ## Not built
 
 - The retrain's first two steps as one command: generated parts are written and checked by their own commands, and
