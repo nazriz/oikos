@@ -726,6 +726,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         speaks_for: Some(me.to_string()),
                         visible_to: private.then(|| Visibility::only([me])),
                         bind: None,
+                        carries: None,
                     },
                     B::Withdraw { record } => Block::Withdraw { record: pick(&records, *record).unwrap(), text: None, basis: None, speaks_for: None, visible_to: None, bind: None },
                     B::Vote { record } => Block::Vote { ballot: pick(&records, *record).unwrap(), choice: "yes".into(), speaks_for: Some(me.to_string()), visible_to: None },

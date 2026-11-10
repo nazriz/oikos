@@ -1251,6 +1251,7 @@ impl Resolver<'_> {
         let practice = Self::json_(c, "practice")?;
         let assertion = Self::json_(c, "assertion")?;
         let registry = Self::json_(c, "registry")?;
+        let carries = Self::str_(c, "carries")?.map(|k| as_label(&k)).filter(|k| !k.is_empty());
         let mut v = vec![
             ("block", some("publish")),
             ("kind", some(kind)),
@@ -1264,6 +1265,7 @@ impl Resolver<'_> {
             ("practice", practice),
             ("assertion", assertion),
             ("registry", registry),
+            ("carries", carries.map(Json::from)),
         ];
         v.extend(common);
         Ok(vec![obj(v)])

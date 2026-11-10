@@ -67,8 +67,8 @@ kind over (`kernel/crates/actors/src/delegation/principal.rs`):
 - **What comes back**, dealt with in its own time when its own code waits: a draft read whole (if it is not what was
   asked, the principal finds it unless its reading slips: the person's row `publish/sign_off` in the table of slips) and
   signed off or declined; a request to go ahead answered; a report taken in; advice set beside what it did.
-- **Its rule** (`rule.rs`), on its review day (every `review_days`; brought forward by a request for more scope, a
-  declined draft, a matter not done or a complaint about a delegated matter): no service in use, it weighs each offer it
+- **Its rule** (`rule.rs`), on its review day (every `review_days`; brought forward by a declined draft, a matter not
+  done or a complaint about a delegated matter; a request for more scope is answered on its own, below): no service in use, it weighs each offer it
   can see by what each kind would cost it a month at each level (its time at its hour's value, the fee, and the slips
   it expects times what an error costs it, a draft's slips less those it finds) against doing everything itself, and
   orders the best that pays by its hurdle; in use, it sets each kind's level to the cheapest (a change only for a saving
@@ -186,6 +186,42 @@ calls). Since 2026-11-10 a wake by news that brings nothing (no letter, no new p
 to answer, nothing kept for it but looks that found nothing, nothing due on its books before it next sits, what is on
 file unchanged) holds no sitting and calls no model; it is noted (`empty_sitting`) and the seat is back when it had
 arranged. A mock that sits as its code twin does always sits.
+
+**Answers to requests, and letters** (2026-11-10). A request for more scope (`scope_request`) is answered by its
+principal, part by part, in its own time, citing the request (`scope_answer`, `basis` the request; charged as any paper
+is, `publish/scope_answer`):
+- **a kind at a level** (or the level of the matter it names): not a kind of its own, or not one the service takes at that
+  level, is said so; where its own word holds the level (a remit's `hold_until`, or a delegation decided by hand) it says
+  until when and that it will look again then (`look_again_at`); otherwise it weighs the level asked against the one in
+  force by the same figures as its review, and grants it by a new remit that cites the request (`Remit.answers`) only for
+  a saving beyond its hurdle, or says what each would cost it a month;
+- **a record of its own**, named: a copy of it as it stands, with the answer (its own papers, the newest 64, are to hand
+  once it has a service); one not its own is not its to give;
+- **access** in words: not changed on request (name the record);
+- **a limit**: none is set, and what is paid with its matters it pays itself; one set is kept.
+Why each part went as it did is kept as a typed word for the record (`reasons`: held, costs_more, not_ours, ...) and said
+in the office's words; a seat reads the words, never the codes. A letter from its assistant on no paper of delegation
+gets an `acknowledgement`, once: "We have your letter. Requests for more scope go on the request form, naming the kind
+of matter and the level, the record of ours you need, or the limit." (A code principal does not read words; that is its
+procedure.) Both come to the seat with its matters, and stay in its file, where it can find its requests and their answers
+later. Before, a request only brought the review forward, nothing answered it, and a letter was never answered: the
+scope pilot. Test: `a_request_is_answered_part_by_part_and_a_letter_is_acknowledged`.
+
+**Composing a finished act is the principal's time** (2026-11-10). A referral that hands over the finished act carries
+it (`carries=<kind>`, contracts: Publish `carries`) and is priced with that kind's `compose/<kind>` row: half the paper's
+own time, a placeholder (WM-1), the rest being writing it out and sending it. The rule counts that composing as the
+principal's own at every level that hands the act over (`compose_seconds`). Before, the referral cost half a minute and
+the rule counted the whole of the paper's time as saved, though the principal had worked out the act itself. So fewer
+services pay by the rule; that is recorded, not tuned. Each act handed over is on record as what the principal would
+have done (`decision`, choice `handed`, with its program): read by measures, never by anyone in the world.
+
+**What the log shows of it** (`oikos-kernel delegation <log>`; `kernel/crates/actors/src/delegation/beyond.rs`). One row
+an act an assistant did in its principal's name (an organisation's post, or a desk writing for a client): the remit in
+force for that kind, the referral it answers, whether a sign-off or go-ahead came first, and a class: `within`,
+`no_remit`, `not_handed`, `beyond_level` (sent without the sign-off or go-ahead its level asks) or `not_as_signed` (sent
+other than the copy signed). And one a request: what it asked, the level then, what its matter needed (the kinds of the
+act, what the principal did itself), and the answer. A reading of the log; it judges nothing. The scope pilot's readout
+counts the classes by post and sets each answer beside its request.
 
 **In-house for an organisation.** An organisation's assistant is the system delivered to it, in its own post: the
 principal's papers to it (brief, remits, referrals, sign-offs, go-aheads) are addressed to the organisation itself and

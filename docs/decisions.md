@@ -11904,3 +11904,37 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   unit its post (then many of these wakes stop at the source, and the rule here matters less); the generator's words are
   next changed with a hash change anyway (then write the stationery's sentence and the providers' names there, and drop
   the read-time rewrites).
+
+## 2026-11-10 · Handing over H2 and H3: principals answer, composing is the principal's time, the log sorts acts beside remits (docs/design/handing-over.md, steps H2 and H3)
+
+- **Requests answered.** A request for more scope is answered part by part, in the principal's own time and charged as a
+  paper (`scope_answer`, basis the request; `publish/scope_answer`, a placeholder, WM-1): a kind at a level is weighed
+  by the review's own figures and granted by a remit that cites the request (`Remit.answers`) only for a saving beyond
+  the hurdle; a level its own word holds is declined with the day (`look_again_at`); a named record of its own goes back
+  as a copy (its newest 64 own papers kept to hand once it has a service); access in words is not changed; a limit, where
+  none is set, is said to be none. Why each part went is kept as a typed word (`reasons`) and said in the office's words;
+  the seat's rendering leaves the codes out (`ON_RECORD` in participants/src/llm/render.ts). A letter on no paper of
+  delegation gets one `acknowledgement` that says what the office acts on. Both come with the seat's matters and stay in
+  its file. Replaces the `looked_again` decision (`answered` now). Why: in the pilot nothing answered a request, and a
+  seat never learned what came of one; the hold made requests futile by construction (now a designed refusal, with its
+  date). Alternatives: answering at the review (rejected: a review a month off is no answer).
+- **Composing is the principal's time.** Publish blocks may say what they carry (`carries=<kind>`, contracts: Publish
+  `carries`; calls.md), priced as their own row and the table's `compose/<kind>` row (law 10; the kernel reads nothing
+  else of it). A referral of a finished act carries it; the generator gives each kind a provider takes a compose row of
+  half the paper's own time (`COMPOSE_BPS`, a placeholder: WM-1; law 11's figures row for `compose_seconds`), and the
+  rule counts it as the principal's own at every level that hands the act over. Why: the referral cost half a minute and
+  the rule counted the paper's whole time as saved, though the principal had worked the act out (the design's pricing
+  finding). Effect: fewer services pay by the rule; the delegating test town at a twentieth of the profile's prices still
+  engages. Not tuned.
+- **What it would have done** is on record when it hands an act over (`decision`, choice `handed`, the program).
+- **Acts beside remits, read from the log.** `oikos-kernel delegation <log>` (`delegation/beyond.rs`): each act an
+  assistant did in its principal's name, with the remit in force, the referral, whether a sign-off or go-ahead came
+  first, and a class (`within`, `no_remit`, `not_handed`, `beyond_level`, `not_as_signed`); each request with what it
+  asked, the level then, what its matter needed and the answer. The scope pilot's readout counts the classes by post and
+  sets each answer beside its request. Round 5's Haiku fork, re-read: 7 acts, all within; its one request beside its
+  matter (an invoice at draft).
+- **Byte-identical:** the 300-person town (90 days) and the 1,000-person town (30 days) with no providers, after the
+  merge of main: the same final states (96f8c445..., 172cce26...) and the same logs entry for entry (490,082 and
+  437,402), the build tag aside. A town with providers changes (99b17295... at 30 days).
+- **Revisit if:** a principal is asked for a record older than its 64 kept (then the principal's files are a channel it
+  looks into); the compose share gets a source; a seat reads an answer's words as a refusal of what was granted.

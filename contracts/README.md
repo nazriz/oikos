@@ -833,3 +833,21 @@ Restrictive; no hard rule touched (it serves law 9's). Every generated town alre
   no hardware by anyone but an edge is refused (`unknown_place`).
 - **A kind of vehicle runs on something** (`moves_for_nothing` at load): `fuel` (a kind of the catalogue),
   `fuel_per_100km` and `tank` (each at least 1) are required.
+
+## Handing over: signed copies, answers, what a paper carries (2026-11-10; docs/design/handing-over.md, steps H1 to H3; docs/decisions.md, "Handing over H1" and "Handing over H2 and H3"; under the owner's blanket approval of contract changes, 2026-10-11, and the lead's approval of the design, 2026-11-10)
+
+Additive; no hard rule touched. Every field is optional and absent by default, so every existing log and every town
+without providers of assistants is unchanged to the byte.
+
+- **FormData `copies`** (outcomes.schema.json): `"=name"`, the field of a form that names a sign-off carrying a paper
+  signed (`data.paper`); the form publishes that paper exactly, in the name of whoever it is made for. Both resolvers,
+  held to `contracts/test/forms.json`.
+- **Publish `carries`** (blocks.schema.json; the call language's `statement(..., carries=<kind>)`, calls.md): the kind of
+  paper whose whole content this one carries, made by whoever publishes it. The act is priced by the table of work as
+  any act is (law 10): its own row and the carried kind's `compose/<kind>` row; a world whose table has no such row
+  refuses it as unpriced. The kernel reads nothing else of it, and knows nothing of what the paper is for.
+- **The papers of delegation** (typed in `kernel/crates/actors/src/papers/delegation.rs`): `SignOff.paper` (the signed
+  copy), `Referral.does_itself` (the kinds of the same act its principal does), `Remit.answers` (the request it grants),
+  `ScopeRequest.record` and `.matter`, and two new papers, `scope_answer` (the request, granted or not, `reasons` for the
+  record, a copy as `paper`, `look_again_at`) and `acknowledgement` (`of`: the letter acknowledged).
+- **Papers published:** `payment_details` (a collector's account for what a law charges), in towns with providers.

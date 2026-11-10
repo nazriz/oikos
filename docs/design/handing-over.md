@@ -1,6 +1,6 @@
 # Handing over: matters and wants, not finished acts (design, 2026-11-10)
 
-**Status:** approved by the lead under the owner's go of 2026-11-10; H1 to H3 building. It follows `docs/design/delegation.md` (the services,
+**Status:** approved by the lead under the owner's go of 2026-11-10; H1 to H3 built (2026-11-10), H5 next, then H4. It follows `docs/design/delegation.md` (the services,
 remits and levels, built 2026-10-31) and the scope pilot (`docs/research/pilot-results.md`). Contract changes are under
 the blanket approval of 2026-10-11 and are all listed in section 9. **It decides no result.**
 

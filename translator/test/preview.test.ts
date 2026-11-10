@@ -51,7 +51,7 @@ const SAMPLES: any[] = [
     basis: "rec.7", addressed_to: ["builder", "greenco"], place: "cell.1.1", speaks_for: "greenco", visible_to: "public", ref: "l",
     offer: { by: "city", to: { anyone: true }, take_up: "apply", terms: { commitments: [{ who: "city", does: { text: "consider it" } }] } },
     practice: { at: "str.5", every: 604_800, first: 86_400, lasts: 3600, roles: [{ role: "member" }] },
-    registry: { entity: "greenco", event: "registered" }, assertion: { that: "the river is rising", about: ["lot-00"] } },
+    registry: { entity: "greenco", event: "registered" }, assertion: { that: "the river is rising", about: ["lot-00"] }, carries: "invoice" },
   // Asking someone else to bring something about.
   { block: "publish", kind: "request", text: "Please pay $500.00 from acc-city to acc-builder.", data: { outcome: { money: { from: "acc-city", to: "acc-builder", amount: "50000", for: "the works", settles: "rec.88" } }, every: 2_592_000, first: 86_400, per_request: "rec.5" },
     basis: "rec.7", addressed_to: ["bank", "greenco"], speaks_for: "greenco", visible_to: ["city", "bank"], ref: "r" },

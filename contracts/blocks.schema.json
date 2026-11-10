@@ -620,6 +620,10 @@
         "ref": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/RefName"
         },
+        "carries": {
+          "description": "The kind of paper whose whole content this one carries, made by whoever publishes it (a referral that hands over a finished act: its principal composed that paper). Priced as its own row and that kind's compose/<kind> row of the table of work (docs/design/handing-over.md 4.2). The kernel reads nothing else of it.",
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"
+        },
         "offer": {
           "$ref": "#/$defs/Offer"
         },
