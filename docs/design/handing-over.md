@@ -116,8 +116,9 @@ The model in an assistant seat had no consequential choice, and nothing answered
   for the account it pays from. That information is the organisation's own ("it is theirs"). The principal also names
   the post on the account's mandate, which is an act of its own, priced. A bank that checks who may instruct an account
   reads that mandate. Round 5's Sonnet seat ("you don't know who keeps account acc-factory-1") is then answered by its
-  own channel. (To confirm how the bank reads an organisation's signatories today. If it reads none, this is a law for
-  every organisation, and its own step.)
+  own channel. (Checked 2026-11-10: the bank already reads an organisation's named signatories, the latest list
+  standing, so no general law is needed. The town names its finance officer alone; its assistant's post is added only
+  by a new mandate of the principal's, when it hands over a kind that pays.)
 - **The collector's account (W5).** The collector publishes where its tax is paid (`payment_details`: account and
   keeper) on the laws board, as tax offices publish their payment details. The finance office can then hand over
   "pay the period's withholding" at matter depth.
@@ -161,7 +162,7 @@ fear, sense of agency and what they have learned (`ways_for`). An assistant that
 its client. So the code baseline at want depth is a clerk who takes the formal route in a fixed order. The person's own
 choice is still in the log, with its odds, in the `want` decision annotation `pursue` already writes. A measure can
 set the two side by side. Source for the order (write to the other party first, then the venue): consumer and tenancy
-guidance in the profile's state (to confirm).
+guidance in the profile's state (to confirm, ME-22).
 
 The rules to move into the rules crate are:
 - `rules::invoice::for_delivery`, from `market/producer.rs` (an export invoice from goods moved and the price list in
@@ -188,7 +189,7 @@ Each move must leave every town byte-identical. That is the test of the move.
 ### 4.5 Answering a request (B)
 
 The wrapper reads a `ScopeRequest` when it arrives, and queues its answer behind its own work (`queue` drains only when
-the inner actor waits). The answer is charged on the post-holder's timeline (`publish/scope_answer`, a placeholder, five
+the inner actor waits). The answer is charged on the post-holder's timeline (`publish/scope_answer`, a placeholder (WM-1), five
 minutes).
 
 | Asked | The principal's rule (its own channels only) | Answer |
@@ -196,7 +197,7 @@ minutes).
 | a kind at a level, or a depth | not a kind of its own: `not_ours`. Not in the offer: `not_offered`. Held: `held` with the date. Otherwise weigh the asked remit against the current one with its own estimate (`rule::cost`), granting it if the asked one is cheaper by the hurdle | a new remit, or a decline with the reason and the figures in words |
 | access to a named record | if the record is its own and the matter named cites it or needs it by the kind's rule, send a copy; otherwise `not_ours_to_give` | the copy, or a decline |
 | access to a channel | reorganise the post with the channel (the act that exists, `delegation.md` section 3) only if the kind's rule needs it for matters it hands over; otherwise decline | the new post, or a decline |
-| a limit | grant up to the largest act of that kind it made itself in the last three months (a placeholder margin); otherwise `over_limit` | a new brief, or a decline |
+| a limit | grant up to the largest act of that kind it made itself in the last three months (a placeholder margin, ME-22); otherwise `over_limit` | a new brief, or a decline |
 | words only | none | an `acknowledgement` |
 
 Every answer is a `decision` with its inputs: the request, the seen-records it weighed and the remit in force. A
@@ -268,7 +269,7 @@ before the run and checked by the code-only screen (paper plan 7.1):
 2. **The kinds an office's real recurring work makes.** The profile's offers gain the kinds a real paperwork service
    takes: delivery notes, purchase orders, supply requests, payment requests to the bank and price lists for a firm;
    the rates notices and claims for the city's rates post, seated as a fourth principal. Each offer row needs its source
-   (to confirm: published feature lists of real accounts-payable and invoicing services).
+   (to confirm, ME-22: published feature lists of real accounts-payable and invoicing services).
 3. **Matters that take several steps over days.** At matter and want depth a matter is no longer one paper. The
    assistant looks up the records, asks a keeper for one it lacks and waits, drafts, sends what was signed, and follows
    up when no answer comes (a want's `answer_days`, then a venue). These steps are the work itself, as an office

@@ -353,7 +353,7 @@ The mechanism:
 - **Where:** `firms/payroll.rs`, the finance office's books.
 - **Effect:** The finance office's assistant gets about one matter a month (docs/design/handing-over.md, section 6),
   and payroll errors and delays cannot arise.
-- **L / I:** certain / medium · **Status:** open; a missing law, decided 2026-11-10
+- **L / I:** high / medium (it is certain today) · **Status:** open; a missing law, decided 2026-11-10
 - **Notice by:** the finance office's acts a month.
 - **Fix when:** before the finance office is a main seat of a study. It moves every town's hash.
 
