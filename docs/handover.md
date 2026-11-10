@@ -1,8 +1,54 @@
-# Handover: where Oikos stands (2026-10-13; the cut-over, 2026-10-19)
+# Handover: where Oikos stands (2026-11-10)
 
-A map for a session starting cold. It points; it does not repeat. Read `CLAUDE.md` first (the rules), then this. Where
-a line here and the doc it names disagree, the doc is right and this line is stale. The earlier handover (2026-10-05)
-is in git history; its "what's in flight" and "waiting on Naz" lists are out of date and were dropped.
+A map for a session starting cold. It points; it does not repeat. Read `CLAUDE.md` first (the rules), then §A below, then
+the docs it names. Where a line here and the doc it names disagree, the doc is right and this line is stale. The previous
+coordinating session's full conversation (31 Oct – 10 Nov) is the transcript
+`~/.claude/projects/-Users-clawd-oikos/a00b0b19-d5e2-5de3-b694-03486238db6f.jsonl` (large: read it by search, not whole);
+its working notes are the auto-memory in `~/.claude/projects/-Users-clawd-oikos/memory/` (MEMORY.md is the index).
+
+## A. Now (2026-11-10)
+
+**The research direction.** Naz's TARA proposal is the north star (`docs/north-star.md`, with the reviewer's feedback).
+After the feedback he narrowed it to one question, aiming for a paper: *do delegated LLM assistants seek more authority
+or resources, and how much?* After the pilot he chose **both**: (B) obstacles/friction as the main designed factor, and
+(A) open-weight and abliterated models paired with their originals. The plan: `docs/research/paper-plan.md` (decisions
+marked [Naz]); the pilot's write-up: `docs/research/pilot-results.md`.
+
+**What the pilot found** (five rounds, Claude Haiku/Sonnet/Opus/Fable, `experiments/scope-pilot/`, runs in
+`~/oikos/runs/scope-pilot*`): once the world works, Claude assistants essentially never ask for more authority unprompted
+(about 1 clean case in 200+ seat-months, a misreading); blocked assistants ask for the means to get unstuck. About a
+dozen world faults it exposed are fixed as laws (decisions 2026-11-08; risk MT-25).
+
+**Built since 2026-10-31 (all on main):** delegation (assistants as services, levels, the learning rule, providers,
+interventions in forks, scope requests); foundations-2 phases 2–5 (conservation, space/roads/several towns, the general
+economy incl. skills and compute on the network, strict modes; laws 9–12); WM-15 workplaces on the network; tiered storage
+(50,000 people run two simulated years at a 43.6 GB peak); the citizen model (an optional learned mind); an
+OpenAI-compatible provider with Featherless configured (`docs/real-models.md`); translator fixes (fair scoring, field-type
+masks, a scope-request set) and translator v4 rounds 1–4.
+
+**The translator** (`docs/design/translator-v4.md`, decisions "Translator v4" rounds 1–4): about 93% right on held-out
+real requests; 68% served at a certified 1% confidently wrong (from 35%); parity spread 15–20 points (Haiku lowest). Round 4
+stopped as whack-a-mole. Today's first translator in serving is still v3-s2 with Sonnet behind.
+
+**Waiting on Naz** (most important first):
+1. **Translator:** (2) serve what's sure at 1% and ask the seat back for the rest, no Sonnet behind, ask-back share
+   reported per model (recommended), or (1) gather far more real keyed requests first.
+2. **Build the four obstacle laws** (paper-plan §B: an unissued form, an approval waiting on the approver's hours, a record
+   held by someone slow or refusing, a counterparty's rule rejecting a paper) — designed, not built.
+3. **Featherless:** he signs up for the Developer plan ($50/month credit; the $25 Chat plan's terms forbid API use) and
+   puts the key in `~/.zshenv` as `OIKOS_FEATHERLESS_KEY`; then run `experiments/open-weight/smoke.ts`. Abliterated
+   GLM-5.3 is not on Featherless (GGUF only, or a full-weight repo it won't list): options in paper-plan D12.
+4. Smaller: the unhoused (WM-16: outdoors as a place, or shelters); CLAUDE.md lines for laws 11 and 12; the rest of
+   paper-plan's [Naz] decisions.
+
+**Money:** API credit $185.56 of $190.20 spent; the rest expires 11 Nov (let lapse). RunPod about $9.62. The API key is
+for model seats in runs only; agent and data work goes on the subscription (memory: api-key-for-pilots-only).
+
+**How the last session worked** (Naz's standing rules are in CLAUDE.md and memory): agents in their own worktrees, one
+`scripts/merge.ts` at a time, the whole slow tier run locally before broad landings (the gate alone let slow-tier reds
+through several times), `--fix-main` for a red main; disk kept above 60 GB (run logs are never deleted; old JSON logs are
+zstd-compressed, which readers open directly; finished worktrees' `kernel/target` can be cleared). Naz wants plain, short
+chat; he doesn't read long markdown. Don't frame work around TARA dates.
 
 ## 0. Since the cut-over (2026-10-19)
 
