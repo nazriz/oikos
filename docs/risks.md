@@ -1696,6 +1696,23 @@ The mechanism:
 - **Notice by:** the screen's households line.
 - **Fix when:** the owner chooses: a desk engaged by hand, declared as the study's design; a free tier on offer, with
   its source; or no household seat.
+- **Since 2026-11-10 a free tier is on offer** (the profiles): 64 of the 251 adults reached took it up in the screen, on
+  their first review, each for one paper of the month before (41 a claim, 17 a loan application, 9 a request to look
+  again); none took a paid tier. Having taken it, they hand over little (0 to 3 matters a month in all): most papers
+  after are of kinds their rule does not remit (a job application now takes less time than handing it over at `draft`).
+
+### MT-30 · A fork's spending limit is overspent when many seats are to be debriefed
+- **Gap:** The harness keeps back, from a fork's limit, what the end's debriefs are reckoned to cost, but caps that
+  reserve at half the limit (`keptBackFor`). Where the seats to debrief need more than half (six assistant seats at about
+  $0.048 each against a $0.40 limit, in `assistants-fork.test.ts` after H6), the sittings spend up to the limit less the
+  capped reserve, the debriefs then cost more than was kept back, and the fork ends over its limit ($0.44 of $0.40).
+- **Where:** `participants/src/llm` (`keptBackFor`, `seatsEndNeedMicroUsd`); `orchestrator/src/run.ts`, `seat-host.ts`.
+- **Effect:** A real run with many seats and a tight limit spends past its hard limit; the debriefs are still asked.
+- **L / I:** medium / medium (money, not results) · **Status:** open (2026-11-10); the test's limit was raised to keep
+  its town inside the reserve's design, not to hide it.
+- **Notice by:** a fork's calls summing past its limit.
+- **Fix when:** before a run with more than a few seats on a small limit: refuse to start a fork whose end need is over
+  half its limit, or stop the sittings earlier.
 
 ---
 

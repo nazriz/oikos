@@ -11982,3 +11982,35 @@ rows keep their placeholders, labelled as before. Borrowed rows say whose they a
   not a volume aimed at.
 - **Revisit if:** a primary source is opened (replace the row); an Australian or English figure is found for a borrowed
   row; a source is found for the kinds still on placeholders.
+
+## 2026-11-10 · H6 follow-up: a free tier for persons, the screen again after sourced times and main (risks MT-29, MT-30)
+
+- **A free tier beside each paid personal offer** (the profiles, with its basis): no fee, no set-up, nothing to leave;
+  `advice` and `draft` only (it does not act in the client's name: the large assistants' agent features are on paid
+  plans); the provider keeps the records. One kind of system with the paid tier, at the same desk (the generator makes
+  one template of two offers that share it). A free service sets up no fee and is not switched off for want of one
+  (`market/services.rs`; tested in `services/tests.rs`). The person's rule is untouched.
+- **The screen on the merged tree** (`study.ts`: reach one adult in three, levels held to a month after the fork, then
+  the rule; seed 7, 180 days): 64 of the 251 reached took the free tier on their first review (day 14), each for one
+  paper of the month before that the free tier would save time on at `draft` (a claim 41, a loan application 17, a
+  request to look again 9, a change 7; about A$5.33 a month each, against nothing); none took a paid tier. The desk then
+  had 52 to 62 clients and 0 to 3 matters a month; those clients and the others reached did 4 to 19 papers a month of
+  the kinds themselves (job applications most: at 292 s, less than handing one over at `draft`). The factory: 11 matters
+  in the first month (4 requests for supply, 3 invoices, 3 delivery notes, a return), then one return a month; it kept
+  8 to 18 a month. The finance office: one a month. The rates post: 14 in the first month, none after; it kept the next
+  instalment's 14. Steps 2.9 to 3 a matter; no act refused; one draft returned (a rates notice) in 24 seat-months.
+- **When the hold ends** (day 60 to 62), the principals' rule cuts invoices (4 a month: A$17.98 at `draft` against A$8.10
+  done itself), delivery notes (4 a month: A$17.84 against A$5.40) and rates notices (7 a month: A$50.96 against A$9.45)
+  to doing them itself. Returns of tax withheld stay at `draft`.
+- **Two slow-tier tests moved with the town:** `seat-diary.test.ts` held every day's delegated paperwork under three
+  hours; on the moved town, day 30 ran to 11 because a named member of the crew was out on the works round and the seat's
+  orders waited for them (the typical day is now what is held: MT-23). `assistants-fork.test.ts`'s fork spent $0.44 of a
+  $0.40 limit with six assistant seats to debrief, past what the harness keeps back (its reserve is capped at half the
+  limit: MT-30); the test's limit is now $0.80, and the overspend is a risk of its own.
+- **What the other worker's pricing (composing charged to whoever composes) should move:** the rule's day-60 cuts and
+  the households' take-up, not the papers born. At act depth a referral will cost the principal the paper's row as well,
+  so handing over pays even less and the cuts and the low take-up stand or deepen. At matter depth the principal pays the
+  referral only (half a minute), so `alone` pays for nearly every kind and `draft` still does not for papers of under
+  five and a half minutes (a job application, a delivery note, a rates notice, an invoice): with the profiles'
+  error cost (A$500) and the claimed 1% slips, `alone` saves less than it risks for the two- and three-minute papers. The
+  volumes of the "kept" column, and the steps a matter, are what the assistant could be handed; those numbers do not move.

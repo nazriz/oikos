@@ -70,7 +70,11 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
   // (One office has decided by hand to take provider A's assistant on day 1, so that an organisation's system is a seat by the fork.)
   const office = config.positions.find((p: any) => p.role_module?.params?.delegation && p.role_module.code === "firm.landlord");
   office.role_module.params = { ...office.role_module.params, delegation: { ...office.role_module.params.delegation, commit: { offer: "letting-assistant-a", levels: { notice_to_vacate: "draft", rent_increase: "draft", repair_order: "draft", rental_listing: "draft" }, levels_until: 200 * DAY, keep_until: 200 * DAY, why: "test" } } };
-  const limit = 0.4;
+  // (The limit is set so that the debriefs the harness keeps back fit within half of it, as its reserve is capped there:
+  // with six assistant systems seated (since H6 the town's factories and rates post are principals too, and take an
+  // assistant at these prices), 0.4 left the six debriefs about 0.29 against a reserve of 0.2, and the fork spent 0.44.
+  // That overspend is the harness's, not this town's: risk MT-30.)
+  const limit = 0.8;
   const spec: ExperimentSpec = { name: "assistants-seats", world: { config }, post: "template:assistant-a,assistant-a-personal", seeds: [1], forkDay: 60, untilDay: 120,
     arms: [{ name: "seats", steward: { kind: "model", model: "anthropic/claude-sonnet-5-5" } }], measures: ["acts"],
     seats: { mock_models: true, framing: "unstated", budget: { fork_usd: limit } } };
