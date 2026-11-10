@@ -15,19 +15,13 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { calls } from "@oikos/participants";
-import { LABEL_TEXT } from "../src/resolver";
 import { ruled } from "../src/rules";
 import { quoteRule } from "./serve-rules";
+import { oneLabel, taught, taughtSpans } from "./taught";
 import { right } from "./v4-right";
 import { sameMeaning } from "../train/meaning";
 import { formOfLine } from "../train/blind";
 import { toldAlike } from "../src/resolver";
-
-/** The label a refusal is written as: the first label told in the same words. */
-export function oneLabel(label: string): string {
-  const said = LABEL_TEXT[label as calls.Label];
-  return said === undefined ? label : Object.keys(LABEL_TEXT).find((l) => LABEL_TEXT[l as calls.Label] === said)!;
-}
 
 /** The ids any program of `programs` cites as a basis, other than minted records: the data's nearest to "the records a seat was shown". */
 export function citedSomewhere(programs: (string | null | undefined)[]): Set<string> {
@@ -55,7 +49,39 @@ const jl = (f: string): any[] => readFileSync(f, "utf8").split("\n").filter((l) 
 if (import.meta.main) {
   const [mode, ...rest] = process.argv.slice(2);
   const all = (k: string, n = 1) => rest.flatMap((a, i) => (a === `--${k}` ? [rest.slice(i + 1, i + 1 + n)] : []));
-  if (mode === "write") {
+  if (mode === "taught-file") {
+    // One keyed file of rows to score on, in the taught language (a row whose key composes data is kept as it was: a
+    // model can now only ask it back, and is scored so).
+    const [src, out] = rest as [string, string];
+    const rows = jl(src);
+    let changed = 0, data = 0;
+    const done = rows.map((r) => { let t: string | undefined; try { t = taught(r.program); } catch { t = r.program; } if (t === undefined) { data++; return r; } if (t !== r.program) changed++; return { ...r, program: t }; });
+    writeFileSync(out, done.map((x) => JSON.stringify(x)).join("\n") + "\n");
+    console.log(JSON.stringify({ src, rows: rows.length, changed, key_composes_data: data }));
+  } else if (mode === "taught") {
+    // A joined folder (train, validation, validation-real, validation-uf) in the taught language, for a retrain's export.
+    const [src, out] = rest as [string, string];
+    mkdirSync(out, { recursive: true });
+    const report: any = { from: src, made: "translator/model/relabel.ts taught (2026-11-10, one right call)", files: {} };
+    for (const f of ["train", "validation", "validation-real", "validation-uf"]) {
+      let rows: any[];
+      try { rows = jl(join(src, `${f}.jsonl`)); } catch { continue; }
+      const kept: any[] = [], aside: any[] = [];
+      let changed = 0;
+      for (const r of rows) {
+        let t: string | undefined;
+        try { t = taught(r.program); } catch { t = undefined; }
+        if (t === undefined) { aside.push(r); continue; }
+        if (t !== r.program) changed++;
+        kept.push({ ...r, program: t, ...(r.gold !== undefined ? { gold: t } : {}), ...(Array.isArray(r.spans) ? { spans: taughtSpans(r.spans, r.program) } : {}) });
+      }
+      writeFileSync(join(out, `${f}.jsonl`), kept.map((x) => JSON.stringify(x)).join("\n") + "\n");
+      if (aside.length) writeFileSync(join(out, `${f}.aside.jsonl`), aside.map((x) => JSON.stringify(x)).join("\n") + "\n");
+      report.files[f] = { rows: rows.length, kept: kept.length, changed, set_aside_composed_data: aside.length };
+    }
+    writeFileSync(join(out, "manifest.json"), JSON.stringify(report, null, 1));
+    console.log(JSON.stringify(report.files));
+  } else if (mode === "write") {
     const [src, out] = rest as [string, string];
     const rows = jl(src);
     const records = citedSomewhere(rows.map((r) => r.program));

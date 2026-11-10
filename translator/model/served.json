@@ -1,0 +1,9 @@
+{
+ "about": "Trained translators served by name (decide/<name>), each a folder in the models' folder (OIKOS_TRANSLATOR_MODELS, by default runs/translator-model: a link to the run that trained it, as pod-small-v3-s2 is), with the cut-off on sureness certified for it: the one-sided 95% bound of 1% wrong among what is served, on validation (validation-real 615, the scope pilot's validation sides 62 and 235). Below the cut-off our translator alone offers its draft with what is unclear; with a translator behind, the request goes behind. docs/decisions.md, 2026-11-11, 'The study serves round 3 seed 2'.",
+ "round3-s2": {
+  "folder": "runs/translator-v4-r3-2026-11-08/models/v4r3-D-deberta-s2",
+  "cut": 0.999613299097851,
+  "certified_on": "runs/translator-v5-2026-11-10/sets: vr, vp, nv in the taught language (translator/model/round5/summary.py)",
+  "measured": "right 539/615 (vr), 334/368 (test side), 808/824 (unseen forms); at the cut, served right 222 of 368 on the test side (2 wrong) and 545 of 824 on unseen forms (0 wrong)"
+ }
+}
