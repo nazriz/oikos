@@ -45,3 +45,12 @@ test("the pre-push hook: a push to main only with the lock held; other branches 
     expect(push("refs/heads/main", { OIKOS_MERGE_LOCK: "424" }).code).toBe(1); // (a prefix of the holder's pid is not it)
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("the commit-msg hook: a subject of at most 72 characters, comments and the body not counted", () => {
+  const dir = mkdtempSync(join(tmpdir(), "oikos-commit-msg-"));
+  try {
+    const commit = (text: string) => { writeFileSync(join(dir, "m"), text); return Bun.spawnSync(["sh", join(import.meta.dir, "hooks", "commit-msg"), join(dir, "m")], { stdout: "pipe", stderr: "pipe" }).exitCode; };
+    expect(commit(`# a comment line longer than the limit ${"x".repeat(80)}\n${"é".repeat(72)}\n\n${"body ".repeat(40)}\n`)).toBe(0);
+    expect(commit(`${"a".repeat(73)}\n`)).toBe(1);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
