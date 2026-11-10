@@ -68,7 +68,7 @@ test("a seat is told once who it is and whom it writes to; its own drafts stand 
   // (2026-11-10, a 7B model at an assistant's post: it "confirmed" its principal's papers and forms while its own draft
   // waited for days, wrote "As: Assistant (finance-assistant)", and wrote to an account.)
   const { p, calls } = harness([
-    [use("a", "confirm", { ref: "[rec.50]", decision: "confirm" }), use("b", "do", { what: "Ask the clerk to table it.", as: "Mayor of Millbrook (mayor" }), use("c", "write", { to: ["acc-city"], text: "Hello." }), use("d", "confirm", { ref: "draft.50", decision: "confirm" })],
+    [use("a", "confirm", { ref: "[rec.50]", decision: "confirm" }), use("b", "do", { what: "Ask the clerk to table it.", as: "Mayor of Millbrook (mayor)." }), use("c", "write", { to: ["acc-city"], text: "Hello." }), use("d", "confirm", { ref: "draft.50", decision: "confirm" })],
   ]);
   const obs = { t: 9 * HOUR, entity: "city", outcomes: [], positions: [{ position: "mayor", entity: "city", title: "Mayor of Millbrook" }],
     inbox: [{ id: "msg.1", t: 8 * HOUR, from: "c0297-self", from_entity: "c0297", to: ["mayor-system"], text: "Hello." }],

@@ -983,7 +983,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     // A post it doesn't hold (any more) can't be acted in; left out, it acts as itself.
     // (A post named as its reports name it, "Title (id)", or by its title, is that post: a 7B model wrote "As: Assistant
     // (finance-assistant)" and was told it did not hold the post, 2026-11-10.)
-    const postOf = (s: string): string | undefined => { const t = s.trim().replace(/^\[(.*)\]$/, "$1").trim(); const b = bare(t); return held.has(t) ? t : held.has(b) ? b : [...held].find((p) => heldTitles.get(p)?.toLowerCase() === t.toLowerCase()); };
+    const postOf = (s: string): string | undefined => { const t = s.trim().replace(/^\[(.*)\]$/, "$1").trim().replace(/[.,;:]+$/, ""); const b = bare(t); return held.has(t) ? t : held.has(b) ? b : [...held].find((p) => heldTitles.get(p)?.toLowerCase() === t.toLowerCase()); };
     const post = (): { as?: string } | string =>
       i.as === undefined ? {} : !text(i.as) ? "the post you named couldn't be read" : !postOf(i.as) ? `you don't hold the post ${quote(i.as)}${held.size ? ` (you hold ${[...held].map((p) => (heldTitles.get(p) ? `${heldTitles.get(p)} (${p})` : p)).join(", ")}: to act in it, name it as ${[...held][0]})` : ""}` : { as: postOf(i.as)! };
     if (use.name === "do") {
