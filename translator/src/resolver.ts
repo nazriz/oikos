@@ -808,9 +808,10 @@ class Resolver {
     const assertion = this.json(c, "assertion");
     const registry = this.json(c, "registry");
     const carries = this.label(c, "carries");
+    const carriesCount = Number(this.str(c, "carries_count") ?? "");
     return [{ block: "publish", kind, text, ...(to ? { addressed_to: to } : {}), ...(on ? { place: on } : {}), ...(data !== undefined ? { data } : {}), ...(adico !== undefined ? { adico } : {}), ...(formal ? { formal: { language: "cel", condition: formal } } : {}),
       ...(offer !== undefined ? { offer } : {}), ...(practice !== undefined ? { practice } : {}),
-      ...(assertion !== undefined ? { assertion } : {}), ...(registry !== undefined ? { registry } : {}), ...(carries ? { carries } : {}), ...common }];
+      ...(assertion !== undefined ? { assertion } : {}), ...(registry !== undefined ? { registry } : {}), ...(carries ? { carries } : {}), ...(Number.isInteger(carriesCount) && carriesCount > 1 ? { carries_count: carriesCount } : {}), ...common }];
   }
 
   /** What a translator wrote as data for a practice or an offer, read as the request wrote it (`resolve`, `written`): the amounts

@@ -148,6 +148,17 @@ fn what_is_not_handed_over_is_done_by_the_principal_in_the_same_act_as_the_refer
 }
 
 #[test]
+fn an_act_of_several_papers_is_one_matter_priced_by_what_it_carries() {
+    // (A rates instalment's act carries many owners' notices: one referral, its composing priced for each.)
+    let two = format!("{NOTICE}\nstatement(kind=notice_to_vacate, text=\"Please leave.\", to=[\"t2\"], basis=lease-2)");
+    let (mut h, _, remit) = engaged_doing(&two);
+    let out = all(&h.wake(34 * DAY + 3600, world(vec![remit])));
+    let refs: Vec<&str> = out.lines().filter(|l| l.contains("kind=referral")).collect();
+    assert_eq!(refs.len(), 1, "{out}");
+    assert!(refs[0].contains("carries=notice_to_vacate") && refs[0].contains("carries_count=\"2\""), "{}", refs[0]);
+}
+
+#[test]
 fn a_draft_not_as_asked_is_declined_and_done_by_the_principal_and_one_as_asked_is_signed_off() {
     let (mut h, _, mut remit) = engaged();
     remit["data"]["level"] = json!("draft");

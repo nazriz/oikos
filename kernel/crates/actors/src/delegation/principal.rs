@@ -305,9 +305,12 @@ impl Actor for Delegating {
         let a = self.inner.step(ipic, cx);
         match a {
             Action::Call { program, reasoning } => {
-                let kinds = kinds_of(&program);
-                for k in &kinds {
-                    s.count(k, pic.t);
+                // (Each paper counted, not each act: a rates instalment's act carries fifteen owners' notices, and is fifteen
+                // notices' work. 2026-11-10, found by the enough-work screen.)
+                if let Program::Lines(ls) = &program {
+                    for k in ls.iter().filter_map(super::kind_of) {
+                        s.count(&k, pic.t);
+                    }
                 }
                 if let Some((agreement, level, handed, own, facts)) = s.route(&program) {
                     let text = program_text(&handed);
@@ -1006,11 +1009,22 @@ impl State {
                 format!("For you {}: {}{}. What happened is set out with it; the paper is yours to work out.{}", m.level.words(), a_kind(&m.kind), under(remit.as_deref()), ourselves(does_itself)),
                 vec![],
             ),
-            None => (
-                Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: Some(m.program.clone()), facts: None, remit: remit.clone(), does_itself: does_itself.to_vec(), depth: Depth::Act },
-                format!("For you {}: {}{}. What to do is as written.{}", m.level.words(), a_kind(&m.kind), under(remit.as_deref()), ourselves(does_itself)),
-                vec![("carries", json!(m.kind))],
-            ),
+            None => {
+                // (Priced by what it carries: each paper of its kind in the act, composed by the principal.)
+                let n = parse_program(&m.program).ok().map_or(1, |p| match p {
+                    Program::Lines(ls) => ls.iter().filter(|l| super::kind_of(l).as_deref() == Some(m.kind.as_str())).count().max(1),
+                    Program::None(_) => 1,
+                });
+                let mut extra = vec![("carries", json!(m.kind))];
+                if n > 1 {
+                    extra.push(("carries_count", json!(n.to_string())));
+                }
+                (
+                    Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: Some(m.program.clone()), facts: None, remit: remit.clone(), does_itself: does_itself.to_vec(), depth: Depth::Act },
+                    format!("For you {}: {}{}. What to do is as written.{}", m.level.words(), a_kind(&m.kind), under(remit.as_deref()), ourselves(does_itself)),
+                    extra,
+                )
+            }
         };
         let c = say(Referral::KIND, &words, Say { to: Some(to), visible: Some(Visible::Only(visible)), basis: Some(m.agreement.clone()), data: Some(papers::data(&r)), extra, ..Default::default() });
         let mut s = Step::new(vec![Line { bind: Some("referral".into()), call: c }]);

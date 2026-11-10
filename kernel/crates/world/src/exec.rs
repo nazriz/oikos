@@ -2705,7 +2705,7 @@ impl<'a> Exec<'a> {
                 self.bind(bind, &id)
             }
 
-            Block::Publish { kind, text, data, adico, formal, offer, practice, assertion, registry, basis, addressed_to, place, speaks_for, visible_to, bind, carries: _ } => {
+            Block::Publish { kind, text, data, adico, formal, offer, practice, assertion, registry, basis, addressed_to, place, speaks_for, visible_to, bind, carries: _, carries_count: _ } => {
                 let addressed_to = addressed_to.as_ref().map(|a| a.iter().map(|x| self.r(x)).collect::<R<Vec<_>>>()).transpose()?;
                 if let Some(p) = place {
                     if !self.st.cells.contains_key(p) {

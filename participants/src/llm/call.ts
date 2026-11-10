@@ -97,7 +97,7 @@ export function seatsEndNeedMicroUsd(costs: EndCosts, o: { seats: number; seatMo
 /** What is kept back of the limit for a need: all of the need, never under a twentieth of the limit, never over the limit.
  * Where the need is over the limit, `short` says by how much, and the run does not start (`reserveOrRefuse`). Until
  * 2026-11-10 it was never over half the limit, and a fork of many seats on a small limit overspent: six seats at about
- * 0.048 USD each against 0.40 spent 0.44 (found by the enough-work screen). */
+ * 0.048 USD each against 0.40 spent 0.44 (risk MT-30, fixed). */
 export function keptBackFor(limitMicroUsd: number, need: number): { microusd: number; short_microusd: number } {
   const microusd = Math.min(limitMicroUsd, Math.max(Math.floor(limitMicroUsd / 20), need));
   return { microusd, short_microusd: Math.max(0, need - limitMicroUsd) };

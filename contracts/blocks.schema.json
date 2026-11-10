@@ -620,6 +620,10 @@
         "ref": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/RefName"
         },
+        "carries_count": {
+          "description": "How many papers of the carried kind it carries (absent: one); each is priced by the compose row.",
+          "type": "integer", "minimum": 1, "maximum": 1000
+        },
         "carries": {
           "description": "The kind of paper whose whole content this one carries, made by whoever publishes it (a referral that hands over a finished act: its principal composed that paper). Priced as its own row and that kind's compose/<kind> row of the table of work (docs/design/handing-over.md 4.2). The kernel reads nothing else of it.",
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label"

@@ -224,7 +224,7 @@ same act goes with the paper (a price list and the one it replaces are one matte
 it (`carries=<kind>`, contracts: Publish `carries`) and is priced with that kind's `compose/<kind>` row: half the paper's
 own time, a placeholder (WM-1), the rest being writing it out and sending it. The rule counts that composing as the
 principal's own at every level that hands the act over (`compose_seconds`). Before, the referral cost half a minute and
-the rule counted the whole of the paper's time as saved, though the principal had worked out the act itself. So fewer
+the rule counted the whole of the paper's time as saved, though the principal had worked out the act itself. An act of several papers (a rates instalment's act, fifteen owners' notices) is one matter, priced by what it carries (`carries_count`: each notice's composing), and its rule counts each paper, not each act. So fewer
 services pay by the rule; that is recorded, not tuned. Each act handed over is on record as what the principal would
 have done (`decision`, choice `handed`, with its program): read by measures, never by anyone in the world.
 
