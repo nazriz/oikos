@@ -400,7 +400,8 @@ test("generated gold covers each function's ways of being used, and every argume
   // request a seat gets carries it yet: the translator learns it with its next round of forms), `statement.carries` and `statement.carries_count` (written by a principal's code when it hands over a finished act, never asked for in words: docs/design/handing-over.md 4.2), and `money.line` (taught from prompt 0.9.5; the default recipes make none, so the data of a seed is what it was, and `lateKinds` makes them: translator/test/train-late.test.ts).
   const used = new Set(gold.flatMap((g) => argsOf(g.program).map(([fn, k]) => `${fn}.${k}`)));
   const left = Object.entries(calls.ARGS).flatMap(([fn, a]) => [...(a.allowed ?? [])].map((k) => `${fn}.${k}`)).filter((k) => !used.has(k));
-  expect(left.sort()).toEqual([...JSON_OUT_OF_SCOPE, "money.per_request", "statement.formal", "goods.for", "work.for", "agreement.hours", "money.line", "statement.carries", "statement.carries_count"].sort());
+  // (And `money.memo`, 2026-11-10: the generator still writes a payment's purpose as for=, which the host reads as its memo; model/relabel.ts writes it memo= for the retrain.)
+  expect(left.sort()).toEqual([...JSON_OUT_OF_SCOPE, "money.per_request", "statement.formal", "goods.for", "work.for", "agreement.hours", "money.line", "statement.carries", "statement.carries_count", "money.memo"].sort());
   // No structured data but a list of names and a claim's slots.
   for (const g of gold) for (const [fn, k, v] of argsOf(g.program)) if ("json" in v && !Array.isArray(v.json)) expect(`${fn}.${k}`).toBe("claim.about");
 });
@@ -607,7 +608,7 @@ test("the translator's instructions teach no currency: no sign and no word of an
   expect(s).not.toMatch(/[$€£¥₩₹₽¢ƒ₤₥₫₪฿¤]/);
   expect(s).not.toMatch(/\b(dollars?|bucks?|cents?|euros?|pounds?|pence|penny|yen|yuan|rupees?|francs?|pesos?|AUD|USD|EUR|GBP|JPY|XYZ)\b/i);
   // The contract's examples are still there, their amounts as digits (an amount in any world).
-  expect(s).toContain('money(to=builder, amount="500", for="the fence")');
+  expect(s).toContain('money(to=builder, amount="500", memo="the fence")');
   expect(s).toContain('price="60,000"');
   expect(s).toContain("  - amounts: whatever the request wrote as one, copied whole");
   expect(s).toContain("  - durations:");

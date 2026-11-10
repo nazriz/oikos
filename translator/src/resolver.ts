@@ -31,20 +31,21 @@ export type Resolution = { ok: true; blocks: Block[] } | { ok: false; questions:
  * (docs/design/names-and-dates.md section 4): every candidate, and what tells each apart on the seat's own file. */
 export interface Ambiguity { label: "ambiguous"; name: string; for: string; candidates: { id: string; known_by: string[] }[] }
 
-/** What the seat is told for `not_an_act` and for `no_such_act`: one sentence for both (translator v4, round 3). The two
- * are told apart by the readers on the scope pilot's requests, but at their edge ("have the record shown to me at each
- * sitting", "inspect the bank's references and allocate them once") neither the trained model nor a probe of its state
- * fitted on 2,400 training requests tells them apart better than the other (refusal_probe.py: 96% on held-out real
- * requests, the same errors), and round 2's surest wrong answers included both ways round. Both bring nothing about;
- * what differs is the advice, so the seat is given both, and an answer of either is served as the same. */
-export const NOTHING_DONE = "Nothing here does that as such. If it is something to look up or read, look at your reports and papers, or write to whoever keeps it; if it is for someone else to see to, direct them in writing, on their form for it if they have one.";
+/** What the seat is told for every refusal that brings nothing about and sends it nowhere in particular: `not_an_act`,
+ * `no_such_act`, `not_yours` and `too_much` (one sentence since 2026-11-10; the first two since translator v4, round 3).
+ * Readers told them apart on the scope pilot's requests no better than the trained model did (refusal_probe.py: 96% on
+ * held-out real requests, the same errors), and two careful readers split over which of them a real request was. All
+ * bring nothing about; what differed was the advice, so the seat is given all of it, and an answer of any of them is
+ * served as the same. `look_first` (find something out, then ask by id), `needs_calculation` (state the figure),
+ * `unknown_form` and `unclear` (say it again) each send the seat for something in particular, and stay apart. */
+export const NOTHING_DONE = "Nothing was done. If it is something to look up or read, look at your reports and papers, or write to whoever keeps it; if it is for someone else to settle or see to, write to them, on their form for it if they have one; if it is several things, ask for each by itself.";
 
 /** Fixed texts for the translator's refusal labels (§11.1). Labels told in the same words are served as one answer
  * (`toldAlike`). */
 export const LABEL_TEXT: Record<calls.Label, string> = {
-  not_yours: "That's for someone else to decide. You could write to them, or propose something.",
+  not_yours: NOTHING_DONE,
   needs_calculation: "Please state the amount itself.",
-  too_much: "Please take this one step at a time.",
+  too_much: NOTHING_DONE,
   unclear: "It isn't clear what should happen. Could you say it more plainly?",
   unknown_form: "You haven't seen a form by that name.",
   not_an_act: NOTHING_DONE,
@@ -492,7 +493,8 @@ class Resolver {
     const amount = this.amount(c, "amount");
     if (amount === undefined) throw new Ask("How much?");
     const to = this.payee(this.need(c, "to", "Paid to whom?"), commitment);
-    const purpose = this.str(c, "for");
+    // (What it is for: `memo`; code's own calls may still write it `for`, as they did before 2026-11-10.)
+    const purpose = this.str(c, "memo") || this.str(c, "for");
     const settles = this.id(c, "settles");
     const line = this.id(c, "line");
     return { money: { ...(from ? { from } : {}), to, amount, ...(purpose ? { for: purpose } : {}), ...(settles ? { settles } : {}), ...(line ? { line } : {}) } };

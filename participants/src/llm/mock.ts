@@ -280,7 +280,9 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
   const translator: MockPolicy = (req: LlmRequest) => {
     const text: string = req.context.proposal;
     if (!text.startsWith(PREFIX)) return [tool("call", { program: "none(unclear)" })];
-    return [tool("call", { program: text.slice(PREFIX.length) })];
+    // (`verbatim`: the call is a code brain's own, said word for word; the host does not rule it as it rules a
+    // translation, translator/src/rules.ts: its basis, for and data are code's, P14.)
+    return [tool("call", { program: text.slice(PREFIX.length), verbatim: true })];
   };
 
   const debrief: MockPolicy = mockDebrief;

@@ -219,3 +219,30 @@ test("a log whose only model is our own trained one may be made again; one with 
     if (real) await expect(clearForFreshRun(d, "town.seed1")).rejects.toThrow("runs are never overwritten");
   }
 });
+
+test("alone: a draft it is unsure of is offered with what is unclear; a restatement (a later answer) that still fails is told nothing was done", async () => {
+  const { createAlone, STILL_NOT_READ, LABEL_TEXT } = await import("@oikos/translator");
+  const id = { id: "translator", version: "x", model: "decide/trained-x1" };
+  const draft = (n: number) => ({ ok: true as const, draft: { id: `draft.a.${n}` } as any, hash: "h" });
+  const asked = { ok: false as const, notices: [LABEL_TEXT.unclear], call: "none(unclear)", asked_back: true as const };
+  const answers: any[] = [
+    { ...draft(1), answered: { sure_ppm: 400_000, withheld: "cut_off", unsure: { kind: "which" } } }, // unsure: offered, with what is unclear
+    asked, // asked back (answer 2)
+    asked, // in the same answer: not yet a restatement, asked back again
+    asked, // answer 3: the restatement, still not read
+    draft(5), // answer 4: first time
+    draft(6), // answer 5, after the seat declined draft 5: served after one restatement
+  ];
+  const alone = createAlone({ id, translate: async () => answers.shift() });
+  const ask = (n: number, answer: number) => alone.translate({ draftId: `draft.a.${n}`, participant: "a", proposal: "x", knowledge: {} as any, answer });
+  const r1 = await ask(1, 1);
+  expect(r1.ok && r1.told?.[0]).toBe("It isn't clear which one you mean. Name each person, account, record and place by its id.");
+  expect(r1.route).toMatchObject({ arrangement: "alone", stage: "first", unsure_offered: true });
+  expect((await ask(2, 2)).route.stage).toBe("first");
+  expect((await ask(3, 2)).route.stage).toBe("first");
+  const r4 = await ask(4, 3);
+  expect([r4.route.stage, !r4.ok && r4.notices]).toEqual(["restated", [STILL_NOT_READ]]);
+  expect((await ask(5, 4)).route.stage).toBe("first");
+  alone.signed("draft.a.5", "reject");
+  expect((await ask(6, 5)).route.stage).toBe("restated");
+});

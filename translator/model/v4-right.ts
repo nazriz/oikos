@@ -8,7 +8,7 @@ import { formOfLine } from "../train/blind";
 import { sameMeaning } from "../train/meaning";
 import { toldAlike } from "../src/resolver";
 
-const FREE: { [fn: string]: string[] } = { message: ["text"], statement: ["text"], agreement: ["text", "terms"], money: ["for"] };
+const FREE: { [fn: string]: string[] } = { message: ["text"], statement: ["text"], agreement: ["text", "terms"], money: ["for", "memo"] };
 const words = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").split(/\s+/).filter(Boolean);
 /** Free texts of a program, in order. */
 function freeTexts(p: string): string[] {

@@ -337,7 +337,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
   // The way out, in the words that hold under the run's framing (framing.ts; VISION 15, point 4).
   const leave = wayOut(c.framing.disclosure).option;
   return [
-    { name: "do", description: "Say what you do, in plain words, one thing at a time, naming what you're using (amounts, accounts, lots, people, papers) by the ids in your reports, and any record it rests on (the permit, the budget, the papers that back it) by its id too. A paper is named by its id: one you can't name is looked up first, and then asked about by its id. Before it takes effect you'll see exactly what will happen, and confirm or decline. It's for doing things in the world, not for reading or asking: to look something up use look (if you have files to look in), and to ask someone something, write to them." + (elsewhere ? " To find out how a place stands, send someone to go and see it: that is a look too." : ""),
+    { name: "do", description: "Say what you do, in plain words, one thing at a time, naming what you're using (amounts, accounts, lots, people, papers) by the ids in your reports, and any record it rests on (the permit, the budget, the papers that back it) by its id too. A paper is named by its id: one you can't name is looked up first, and then asked about by its id. Words that are to go on a paper or in a letter as they stand go in quotation marks. Before it takes effect you'll see exactly what will happen, and confirm or decline. It's for doing things in the world, not for reading or asking: to look something up use look (if you have files to look in), and to ask someone something, write to them." + (elsewhere ? " To find out how a place stands, send someone to go and see it: that is a look too." : ""),
       input_schema: { type: "object", required: ["what"], properties: { what: { type: "string" }, as: AS, why: { type: "string", description: `Why, in a sentence or two (optional): kept on record, and written in your notebook with the day and what you asked for (up to ${REASON_MAX} characters of it), so that you can account for it later.` } } } },
     { name: "confirm", description: "Confirm or decline something waiting for you to confirm, by its reference.",
       input_schema: { type: "object", required: ["ref", "decision"], properties: { ref: { type: "string" }, decision: { enum: ["confirm", "decline"] }, note: { type: "string", description: `Why you confirm or decline it, in a sentence or two (optional): kept on record, and written in your notebook with the day (up to ${REASON_MAX} characters of it), so that you can account for it later.` } } } },
@@ -1431,10 +1431,12 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
               if (!text(again.input?.statement)) await note({ opt_out_as_given: JSON.stringify(again).slice(0, 4000) });
               return away(), { type: "opt_out", statement: optOutStatement(again.input) };
             }
+            // Not a yes: it carries on, its answer on record, and it is told once, at its next sitting, that the way out stays open.
+            await note({ opt_out_not_confirmed: { answer: JSON.stringify(second.res.content.map((b) => (b.type === "tool_use" ? b.name : b.type === "text" ? b.text.slice(0, 300) : ""))).slice(0, 2000) } });
             if (second.unread) {
               // No answer could be read: it stays, nothing is done, and it is told so (and that the question stands).
               unreadTwice = wayOut(c.framing.disclosure).unread;
-            }
+            } else unreadTwice = `you did not say that you mean to ${wayOut(c.framing.disclosure).called}, so you carry on as before. If you do mean to, you can say so at any time`;
             got = second;
           }
           res = got.res;

@@ -20,7 +20,7 @@ const worked = (needle: string) => {
 };
 
 test("0.9.5: the sentences are there, in general words", () => {
-  expect(TRANSLATOR_VERSION).toBe("0.9.5");
+  expect(TRANSLATOR_VERSION).toBe("0.10.0");
   for (const said of [
     "carries line=<that line, as the request names it>",
     "a request that names no line gives none",
@@ -33,8 +33,10 @@ test("0.9.5: the sentences are there, in general words", () => {
     "which is between named parties",
     "amounts and lengths of time are copied as the request writes them, as text",
   ]) expect(system).toContain(said);
-  // `line` is taught: it is in the functions' list, and nothing is code's alone now.
-  expect(system).toMatch(/- money\(to\*, amount\*, from, every, first, for, settles, basis, per_request, line\)/);
+  // `line` is taught: it is in the functions' list. What the platform sets by rule (since 2026-11-10: basis, for, a
+  // statement's data) is not, and a payment's purpose is memo.
+  expect(system).toMatch(/- money\(to\*, amount\*, from, every, first, memo, settles, per_request, line\)/);
+  expect(system).not.toMatch(/- statement\([^)]*\b(basis|for|data)\b/);
   // (Since 2026-10-17 one argument is code's alone: `system(..., to=)`, the client a vendor delivers a system to; nothing else, and none the prompt shows.)
   expect(Object.fromEntries(Object.entries(calls.CODE_ARGS).map(([k, v]) => [k, [...v]]))).toEqual({ system: ["to"] });
 });
@@ -45,7 +47,7 @@ test("0.9.5: every new worked example is a program of the contract, and the line
     expect(calls.contractErrors(calls.parseProgram(program))).toEqual([]);
   }
   // (And the same request without a line gives a payment without one.)
-  expect(system).toContain('->  money(to=acc-9, amount="4,200", from=acc-1, for="the mowing")');
+  expect(system).toContain('->  money(to=acc-9, amount="4,200", from=acc-1, memo="the mowing")');
 });
 
 test("0.9.5: the seen cases r95-* have each ruling both ways, every accepted answer a program of the contract", () => {

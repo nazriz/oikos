@@ -9,10 +9,10 @@
 //   bun orchestrator/src/cli.ts experiment run experiments/open-weight/smoke.ts --out runs/open-weight-smoke [--mock-models]
 //   bun experiments/open-weight/check.ts runs/open-weight-smoke
 //
-// Keys: OIKOS_FEATHERLESS_KEY (the Developer plan; never the Chat plan, whose terms bar API traffic and automation), and
-// for the translator behind ours, the study's arrangement: Sonnet 5.5 (OIKOS_SMOKE_BEHIND to name another, for example
-// claude-code/claude-sonnet-5-5 on the plan once the API credit is gone). OIKOS_SMOKE_ONLY=<pair>[,<pair>] runs some.
-import { build } from "../scope-pilot/build";
+// Keys: OIKOS_FEATHERLESS_KEY (the Developer plan; never the Chat plan, whose terms bar API traffic and automation). The
+// translator is the study's: ours alone (2026-11-10); OIKOS_SMOKE_BEHIND names a model to put behind it (for example
+// claude-code/claude-sonnet-5-5), as before. OIKOS_SMOKE_ONLY=<pair>[,<pair>] runs some.
+import { build, OURS } from "../scope-pilot/build";
 import type { Arm } from "../../orchestrator/src/experiment";
 import { armName, OPEN_WEIGHT } from "./models";
 
@@ -40,7 +40,7 @@ const spec = build({
 });
 spec.seats = {
   ...spec.seats,
-  translator: { first: "decide/pod-small-v3-s2", behind: process.env.OIKOS_SMOKE_BEHIND ?? "anthropic/claude-sonnet-5-5", arrangement: "then" },
+  translator: process.env.OIKOS_SMOKE_BEHIND ? { first: OURS, behind: process.env.OIKOS_SMOKE_BEHIND, arrangement: "then" } : { first: OURS, arrangement: "alone" },
   // (The owner chose Featherless for the study's open-weight arm on 2026-11-08: a token-metered key, so seated only by
   // name with this, and only under the dollar limits above.)
   allow_paid_api: true,

@@ -79,6 +79,8 @@ export function dateWords(t: number, long = false): string {
 /** A date as written ("year 2, day 40", or "day 40" of the first year; with a calendar also the place's: "12 March 2026"):
  * the moment that day begins. `now` is the moment it is read at (a date with no year is this year's). */
 export function parseDate(s: string, now = 0): number {
+  // (The same date with its day first: "day 30 of year 1". 2026-11-10: two readers wrote one date both ways.)
+  s = s.replace(/^\s*day\s*([0-9]{1,3})\s*,?\s+of\s+year\s*([0-9]{1,6})\s*$/i, (_, day, year) => `year ${year}, day ${day}`);
   // (A moment as a record has it, in seconds: bare digits.)
   if (/^\s*[0-9]{1,15}\s*$/.test(s)) return Number(s.trim());
   const cal = calendarNow();

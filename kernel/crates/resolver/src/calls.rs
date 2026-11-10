@@ -759,6 +759,19 @@ pub enum When {
     In(i64),
 }
 
+/// A date written with its day first ("day 22 of year 1", "day 22, of year 1"; lower case, single spaces) as the
+/// same date year first ("year 1, day 22"), or None. (participants/src/calls.ts `parseWhen` and forms.ts
+/// `parseDate` read the same.)
+pub fn day_first(t: &str) -> Option<String> {
+    let num = |x: &str, max: usize| (1..=max).contains(&x.len()) && x.bytes().all(|b| b.is_ascii_digit());
+    let r = t.strip_prefix("day")?.trim_start();
+    let n = r.bytes().take_while(u8::is_ascii_digit).count();
+    let (day, r) = r.split_at(n);
+    let r = r.strip_prefix(',').unwrap_or(r).trim_start();
+    let year = r.strip_prefix("of")?.trim_start().strip_prefix("year")?.trim_start();
+    (num(day, 3) && num(year, 6)).then(|| format!("year {year}, day {day}"))
+}
+
 /// A "when" as written (`first`, `until`): a date as the world's papers write one ("year 1, day 22", "year 1 day 22",
 /// "day 22" of the year it now is, "year 2"; "tomorrow"), or a length of time ("14 days", "a fortnight", "today" and
 /// "now": none at all). The words people put round either are read past ("from year 1, day 22", "in 14 days", "14
@@ -793,6 +806,10 @@ pub fn parse_when_in(s: &str, now: i64, dated: Option<&oikos_rules::calendar::Da
     }
     if t == "tomorrow" {
         return Ok(When::At((now.div_euclid(DAY) + 1) * DAY));
+    }
+    // (The same date with its day first: "day 22 of year 1". 2026-11-10: two readers wrote one date both ways.)
+    if let Some(turned) = day_first(&t) {
+        t = turned;
     }
     if let Some(at) = dated.and_then(|d| d.read(&t, now)) {
         return Ok(When::At(at));

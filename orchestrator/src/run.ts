@@ -1055,6 +1055,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       // With two translators as one: who drafted this request, why it went behind, and what each answered. For the
       // record only: nothing of it is ever said to a seat.
       if (tr.route) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_route: { draft: draftId, ...tr.route } } } });
+      // Whether the paper words of the draft were quoted in the request (the quote rule, before its ask-back is
+      // decided): for a run's report, by seat model. For the record only.
+      if (tr.ok && tr.paper_words) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { paper_words: { draft: draftId, ...tr.paper_words } } } });
       if (!tr.ok) {
         await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: tr.notices.join(" "), ...(tr.asked_back ? { asked_back: true } : {}), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw) } : {}) } } });
         for (const text of tr.notices) u.notices.push({ t, text: aboutRequest(action.text, text), re: draftId });

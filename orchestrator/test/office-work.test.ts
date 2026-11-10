@@ -40,7 +40,7 @@ async function worksSeat(citing: boolean) {
       const post = postingFor(seen, "works crew", me, "works/works-business");
       const had = offeredTo(me);
       const apps = post ? applicantsTo(seen, post.id).filter((a) => !had.has(a.speaks_for)).slice(0, 3) : [];
-      return apps.length ? apps.map((a) => ({ what: `Offer ${a.speaks_for} employment on the works crew.`,
+      return apps.length ? apps.map((a) => ({ what: `Offer ${a.speaks_for} employment on the works crew${citing ? `, on the advertisement ${post.id}` : ""}.`,
         program: `agreement(${citing ? `basis=${post.id}, ` : ""}template=employment, we_do=money(amount="${wage}", every="${period}", from=acc-city, to=acc-${a.speaks_for}), with=${a.speaks_for})` })) : undefined;
     } },
     ...[6, 9, 12, 15, 18].map((day) => ({ day, asks: () => [] })),

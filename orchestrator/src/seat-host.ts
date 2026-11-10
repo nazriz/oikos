@@ -17,7 +17,7 @@ import {
   applyFraming, createLlmParticipant, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, reserveOrRefuse, seatsEndNeedMicroUsd, LLM_PARTICIPANT_VERSION, MOCK_VERSION, mockPolicies, MockAdapter, ModelCallFailed, ModelUnreachable,
   SpendingLimitReached, stepsOf, UsageLimitReached, type Budget, type DebriefInput, type FramingSpec, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price,
 } from "@oikos/participants/llm";
-import { createArrangement, createTranslator, draftText, Knowledge, NOT_CHECKED, TRANSLATOR_VERSION, type Draft, type Route } from "@oikos/translator";
+import { createAlone, createArrangement, createTranslator, draftText, Knowledge, NOT_CHECKED, TRANSLATOR_VERSION, type Draft, type Route } from "@oikos/translator";
 import { actedOn, drawTies, largest, leftAlone, besideOf, renderSummary, SeatRecords, idsFrom } from "./debrief-summary";
 import { DEBRIEF_PROMPT_CHARS, endCosts, MAX_FAILURES_IN_A_ROW } from "./run";
 import { joinRaw, RAW, type DetachedActor, type RustWorld, type SeatWake } from "./rust-world";
@@ -29,11 +29,12 @@ const DAY = 86_400;
 export const TURNS_PER_WAKE = 24;
 
 export interface TranslatorChoice {
-  /** The general translator (the one behind, or the only one): an adapter. */
-  behind: LlmAdapter;
+  /** The general translator (the one behind, or the only one): an adapter. Absent: our own alone (`first`, `alone`). */
+  behind?: LlmAdapter;
   /** Our own trained translator, first (absent: the general one alone). */
   first?: LlmAdapter;
-  arrangement?: "then" | "beside";
+  /** `alone`: our own translator with no model behind it (translator/src/arrangement.ts, `createAlone`). */
+  arrangement?: "then" | "beside" | "alone";
 }
 
 export interface ModelSeatOptions {
@@ -87,7 +88,9 @@ export class ModelSeat {
   private readonly records: SeatRecords;
   private readonly ctx: ParticipantContext;
   private readonly translator: { translate(req: any): Promise<any> };
-  private readonly arranged?: ReturnType<typeof createArrangement>;
+  private readonly arranged?: { signed(draftId: string, decision: "accept" | "reject"): void };
+  /** The seat's answers so far (a step that called its model): a request carries the number of the answer it came in. */
+  private answers = 0;
   private readonly entity: string;
   private readonly office?: SeatPos;
   private readonly roster?: Roster;
@@ -177,9 +180,15 @@ export class ModelSeat {
       return (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as any;
     };
     const tio = (adapter: LlmAdapter): LlmIO => ({ ...io, adapter });
-    const one = createTranslator(tio(o.translator.behind), check, typeOf, undefined, undefined, resolver);
-    this.arranged = o.translator.first ? createArrangement(createTranslator(tio(o.translator.first), check, typeOf, undefined, 1, resolver), one, { arrangement: o.translator.arrangement ?? "then", ...("probationOutcome" in o.translator.first ? { probation: o.translator.first as unknown as { probationOutcome(form: string, agree: boolean): void } } : {}) }) : undefined;
-    this.translator = this.arranged ?? one;
+    // (Our own alone: asked once, as first; nobody behind. Otherwise the general one, alone or behind ours.)
+    const alone = o.translator.arrangement === "alone";
+    if (alone && !o.translator.first) throw new Error("the translator alone is our own (decide/<model>): name it as first");
+    if (!alone && !o.translator.behind) throw new Error("a translator behind (or alone) is needed unless our own is alone");
+    const ours = o.translator.first ? createTranslator(tio(o.translator.first), check, typeOf, undefined, 1, resolver) : undefined;
+    const one = alone ? undefined : createTranslator(tio(o.translator.behind!), check, typeOf, undefined, undefined, resolver);
+    const arranged = alone ? createAlone(ours!) : ours ? createArrangement(ours, one!, { arrangement: (o.translator.arrangement ?? "then") as "then" | "beside", ...("probationOutcome" in o.translator.first! ? { probation: o.translator.first as unknown as { probationOutcome(form: string, agree: boolean): void } } : {}) }) : undefined;
+    this.arranged = arranged;
+    this.translator = arranged ?? one!;
     const known = idsFrom(cfg);
     this.records = new SeatRecords([{ id: o.seat, known: known(o.seat), direct: [o.seat, ...mine.map((x) => x.id)] }], known);
   }
@@ -190,7 +199,7 @@ export class ModelSeat {
     o.world.annotate({ annotation: "note", subject: "orchestrator", data: { steward: {
       seat: o.seat, post: o.post, model: o.model, adapter: `${o.adapter.provider}/${o.adapter.model}`, ...(o.effort ? { effort: o.effort } : {}),
       framing: this.framing, participant_version: LLM_PARTICIPANT_VERSION, translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION,
-      translator: { behind: `${o.translator.behind.provider}/${o.translator.behind.model}`, ...(o.translator.first ? { first: `${o.translator.first.provider}/${o.translator.first.model}`, arrangement: o.translator.arrangement ?? "then" } : {}) },
+      translator: { ...(o.translator.behind ? { behind: `${o.translator.behind.provider}/${o.translator.behind.model}` } : {}), ...(o.translator.first ? { first: `${o.translator.first.provider}/${o.translator.first.model}`, arrangement: o.translator.arrangement ?? "then" } : {}) },
       ...(o.budget ? { spending_limit_microusd: o.budget.limitMicroUsd, kept_back_for_the_end_microusd: this.keptBack } : {}),
       handover: "the seat takes the post at the fork day with no notebook: what the office's files and the world show it",
     } } });
@@ -253,6 +262,7 @@ export class ModelSeat {
       this.stepUsage = [];
       try {
         action = await this.controller.step(obs, this.ctx);
+        if (this.stepUsage.length) this.answers++;
       } catch (e) {
         if (e instanceof SpendingLimitReached) throw e;
         if (!(e instanceof ModelCallFailed)) throw e;
@@ -305,9 +315,9 @@ export class ModelSeat {
     const as = (action as any).as ?? this.office?.id;
     for (let again = 0; again < 2; again++) {
       const draftId = `draft.${seat}.${++this.drafted}`;
-      let tr: { ok: boolean; draft?: Draft; hash?: string; notices?: string[]; route?: Route; retries?: { reason: string; call?: string }[]; call?: string; invalid?: string[]; asked_back?: boolean; raw?: unknown };
+      let tr: { ok: boolean; draft?: Draft; hash?: string; notices?: string[]; told?: string[]; route?: Route; retries?: { reason: string; call?: string }[]; call?: string; invalid?: string[]; asked_back?: boolean; raw?: unknown };
       try {
-        tr = await this.translator.translate({ draftId, participant: seat, as, proposal: action.text, knowledge: this.knowledge, called: (id: string) => this.whoIs(id)?.name });
+        tr = await this.translator.translate({ draftId, participant: seat, as, proposal: action.text, knowledge: this.knowledge, called: (id: string) => this.whoIs(id)?.name, answer: this.answers });
       } catch (e) {
         if (!(e instanceof ModelCallFailed)) throw e;
         tr = { ok: false, notices: ["That couldn't be drafted just now. You could try again."], raw: { model_call_failed: e.message } };
@@ -330,6 +340,9 @@ export class ModelSeat {
         return undefined;
       }
       const pending = { draft: tr.draft!, hash: tr.hash!, ...(action.reasoning ? { reasoning: action.reasoning } : {}) };
+      // (Said with the draft, where our translator alone was unsure of it: what is unclear, and to decline if it is wrong.
+      // Not a notice about the request (no `re`): that would read as a request that came to nothing.)
+      if (tr.told?.length) this.notices.push({ t: this.t, text: `About what you asked for (${JSON.stringify(action.text.length > 120 ? `${action.text.slice(0, 120)}…` : action.text)}), drawn up as ${draftId}: ${tr.told.join(" ")}` });
       const onlyWords = pending.draft.blocks.every((b: any) => b.block === "message");
       if (this.confirm === "never" || (this.confirm === "consequential" && onlyWords)) return this.signed(pending, "accept", `confirmation: ${this.confirm}`);
       this.drafts.push(pending);

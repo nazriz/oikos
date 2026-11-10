@@ -86,6 +86,7 @@ import { canonical, fixture, TEST_CURRENCY, tidy } from "../eval/run";
 import { sharesWording } from "../eval/held-out";
 import type { Case } from "../eval/cases";
 import { translatorSystem } from "../src/index";
+import { ruled } from "../src/rules";
 import { Knowledge } from "../src/knowledge";
 import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
@@ -2218,6 +2219,22 @@ export function copies(request: string, program: string, forms: FormSpec[] = [])
  */
 export const sameProgram = (a: string, b: string, ctx: MeaningContext = {}): boolean => canonical(a) === canonical(b) || sameMeaning(a, b, ctx);
 
+/** The same program as the host serves a translation of `request` (translator/src/rules.ts): what code sets set by rule
+ * on both, a record being a minted one or one either cites as a basis (2026-11-10). */
+export function sameServed(a: string, b: string, request: string, ctx: MeaningContext = {}): boolean {
+  if (sameProgram(a, b, ctx)) return true;
+  const cited = new Set([a, b].flatMap((p) => [...p.matchAll(/basis=(\[[^\]]*\]|[A-Za-z0-9_.:\/-]+)/g)].flatMap((m) => [...m[1]!.matchAll(/[a-z0-9][a-z0-9_.:\/-]*/g)].map((x) => x[0]))));
+  const served = (p: string): string => {
+    try {
+      const r = ruled(calls.parseProgram(p), request, (id) => /^rec\.[0-9]+$/.test(id) || cited.has(id), { keepData: true });
+      return r.ok ? calls.programText(r.program) : p;
+    } catch {
+      return p;
+    }
+  };
+  return sameProgram(served(a), served(b), ctx);
+}
+
 /** Which line of a program is its letter (the first that is one). */
 const letterLine = (program: string): number => { const p = calls.parseProgram(program); return "none" in p ? -1 : p.lines.findIndex((l) => l.call.fn === "message"); };
 
@@ -3033,7 +3050,7 @@ async function fromPlan(plan: PlanItem[], o: {
     seen.add(key);
     if (check) {
       if (c.backFailed) continue;
-      if (c.got === undefined || !sameProgram(c.got, program, { ...(g.currency ? { currency: g.currency } : {}), ...(g.forms ? { forms: g.forms } : {}) })) {
+      if (c.got === undefined || !sameServed(c.got, program, request, { ...(g.currency ? { currency: g.currency } : {}), ...(g.forms ? { forms: g.forms } : {}) })) {
         dropped.round_trip++;
         rejects.push({ request, program, why: "round_trip", ...(c.got !== undefined ? { got: c.got } : {}), written_by: model, checked_by: check.back.model, style });
         continue;
@@ -3094,7 +3111,7 @@ async function fromPlan(plan: PlanItem[], o: {
       const failed = dropped.failed;
       const got = await attempt(() => check.back.translate(request, []));
       if (stopped || dropped.failed > failed) continue;
-      if (got === undefined || !sameProgram(got, program)) {
+      if (got === undefined || !sameServed(got, program, request)) {
         dropped.round_trip++;
         rejects.push({ request, program, why: "round_trip", ...(got !== undefined ? { got } : {}), written_by: model, checked_by: check.back.model, style });
         continue;

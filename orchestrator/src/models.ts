@@ -27,7 +27,7 @@ export interface ModelChoice {
 }
 
 /** An adapter for "provider/model", with its price and the run's spending limit (in dollars; required for a model that costs money). */
-export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: string; env?: Record<string, string | undefined>; /** One attempt's time limit for a model called through a command-line tool (theirs if absent: three minutes). */ timeoutMs?: number; /** The model answers first, with another translator behind it (translator/src/arrangement.ts). */ first?: boolean; /** For tests: a price table in place of prices.json. */ prices?: Record<string, Price> } = {}): ModelChoice {
+export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: string; env?: Record<string, string | undefined>; /** One attempt's time limit for a model called through a command-line tool (theirs if absent: three minutes). */ timeoutMs?: number; /** The model answers first, with another translator behind it (translator/src/arrangement.ts). */ first?: boolean; /** Our own translator with nobody behind it (arrangement.ts, `createAlone`). */ alone?: boolean; /** How a local model is asked to answer: through the API's tools (the default) or as a plain note (`text`: participants/src/llm/note.ts). */ answer?: "tools" | "text"; /** For tests: a price table in place of prices.json. */ prices?: Record<string, Price> } = {}): ModelChoice {
   const env = o.env ?? process.env;
   const [provider, ...rest] = name.split("/");
   const model = rest.join("/");
@@ -54,7 +54,7 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
     : provider === "openai" ? new OpenAICompatibleAdapter("openai", model, { apiKey: need("OPENAI_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "codex" ? new CodexCliAdapter(model, undefined, o.timeoutMs ? { timeoutMs: o.timeoutMs } : {}) // ("model@effort": the effort is part of the model's name, so the log records it)
     : provider === "claude-code" ? new ClaudeCodeAdapter(model, undefined, o.timeoutMs ? { timeoutMs: o.timeoutMs } : {}) // ("model@effort", as for codex)
-    : provider === "decide" ? new (model.includes("+") ? AgreeAdapter : DecideAdapter)(model, { ...(env.OIKOS_DECIDE_THRESHOLD ? { threshold: Number(env.OIKOS_DECIDE_THRESHOLD) } : {}), ...(env.OIKOS_DECIDE_UNCHECKED ? { unchecked: true } : {}), ...(o.first ? { first: true } : {}) }) // our own trained model (translator/model)
+    : provider === "decide" ? new (model.includes("+") ? AgreeAdapter : DecideAdapter)(model, { ...(env.OIKOS_DECIDE_THRESHOLD ? { threshold: Number(env.OIKOS_DECIDE_THRESHOLD) } : {}), ...(env.OIKOS_DECIDE_UNCHECKED ? { unchecked: true } : {}), ...(o.first ? { first: true } : {}), ...(o.alone ? { alone: true } : {}) }) // our own trained model (translator/model)
     : provider === "openai-compat" ? (() => {
       // openai-compat/<host>/<model>: a hosted OpenAI-compatible API (Fireworks, Together, OpenRouter), its key from the
       // host's own variable, its base URL from --base-url, OIKOS_<HOST>_BASE_URL or the host's default.
@@ -63,6 +63,9 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
       if (!h || !m.length) throw new Error(`openai-compat/<host>/<model>: the host is one of ${Object.keys(COMPAT_HOSTS).join(", ")}, got "${model}"`);
       return new OpenAICompatHostedAdapter(host!, m.join("/"), { apiKey: need(h.keyEnv), baseUrl: o.baseUrl ?? env[`OIKOS_${host!.toUpperCase()}_BASE_URL`] ?? h.baseUrl, answer: (prices[name] as any).answer ?? "text", ...(typeof (prices[name] as any).context_tokens === "number" ? { contextTokens: (prices[name] as any).context_tokens } : {}) });
     })()
+    // (A local model in text mode answers in a plain note, as a model with no tool calling must: OpenAICompatHostedAdapter's
+    // `text`, under the provider's own name, with no key. Its context window from OIKOS_LOCAL_CONTEXT, where set.)
+    : (provider === "ollama" || provider === "local") && o.answer === "text" ? new OpenAICompatHostedAdapter(provider, model, { provider, apiKey: "", answer: "text", baseUrl: o.baseUrl ?? (provider === "ollama" ? env.OIKOS_OLLAMA_BASE_URL ?? "http://localhost:11434/v1" : (() => { throw new Error("local/<model> needs --base-url (an OpenAI-compatible server)"); })()), ...(env.OIKOS_LOCAL_CONTEXT ? { contextTokens: Number(env.OIKOS_LOCAL_CONTEXT) } : {}), timeoutMs: 900_000 })
     : provider === "ollama" ? new OpenAICompatibleAdapter("ollama", model, { baseUrl: o.baseUrl ?? "http://localhost:11434/v1" })
     : provider === "local" ? new OpenAICompatibleAdapter("local", model, { baseUrl: o.baseUrl ?? (() => { throw new Error("local/<model> needs --base-url (an OpenAI-compatible server)"); })() })
     : (() => { throw new Error(`unknown provider "${provider}": anthropic, openai, openai-compat, codex, claude-code, ollama or local`); })();

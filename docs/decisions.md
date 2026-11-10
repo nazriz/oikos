@@ -12015,6 +12015,154 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
 - **Revisit if:** a kind's facts cannot be read from its act often (then it goes as the finished act, and the rule says
   so); a seat at `matter` composes figures the principal never declines (then the material details are too few).
 
+## 2026-11-10 · One right call: basis and for by rule, a payment's memo, no composed data, quotes, refusals told alike (no model called)
+
+The method of VISION section 5, used: four rounds of translator failures were answered with more data and serving
+rules, and none changed the call language. An audit of 1,280 real seat requests (the served-style model, round 3 seed
+2, wrong on 143) and of the scope pilot's two blind readers (442 requests they split over) sorted the failures by
+what in the language let one request have two right calls. This change removes those causes in the language and in
+code, and re-measures by code on the same data. No model was called and nothing was trained.
+
+- **A. `basis` by rule.** The host sets it on every translated program (`translator/src/rules.ts` `ruled`, before
+  either resolver sees it): every record the request cites that no other argument of the program takes, in the order
+  written, on each line that can cite one (money, structure, claim, agreement, statement; not a hold, a signature or a
+  notice). A record is a minted `rec.` id or one the seat has been shown (`Knowledge.records`), never a form. Whatever a
+  translator wrote there is replaced. It reads ids, not intentions: a record named only to say it is not acted on is
+  cited too (the prompt used to ask the translator to leave it out; readers split on exactly this). Alternatives: a
+  rule in each resolver (rejected: the engine's resolver has no request text and no list of records seen, and adding
+  one to every code unit's knowledge costs every town; the rule runs once, upstream of both, so they cannot diverge).
+- **B. `for` split.** On whose behalf is the capacity the act is made in (`as`), never the translator's: a translated
+  `for` is dropped. A payment's purpose is a new argument, `money(memo=...)` (contract: calls.schema.json); `for` on money
+  is still read where `memo` is absent, so code's calls are unchanged. A translated `for` on a payment becomes its memo.
+- **C. No JSON composed by the translator.** A translated program with `statement(data=...)` is asked back ("A paper that
+  is read for its figures and ids is made on the form of whoever takes it in. ..."). The kinds code reads from a
+  statement's data that seats sent: `withholding_report` (form `withholding_return`, exists, and its draft),
+  `review_request` (form `review_request`, exists), `job_application`, `loan_application`, `benefit_claim` and
+  `benefit_change` (no form: a person's papers, written by citizen code). Proposed forms, published by whoever reads
+  them: an employer's `job_application` (posting: record, account: account, trade: text), the bank's
+  `loan_application` (amount, months: count, account, purpose: text), the support office's `benefit_claim` (payment:
+  choice of the law's payments, account, born_at: date) and `benefit_change` (claim: record, stop: yes or no). Not
+  built here: the only model seats that make these papers are the assistants' desks, whose draft (`clientDraft`,
+  `participants/src/kinds/assistants.ts`, another worker's file) carries words only, so the forms need that draft to
+  carry fields (a `draftOf` of each such form in place of `clientDraft`'s words for those kinds); and published in
+  every town they would move code-only towns, so they go only where a model sits, as stationery does. Until then
+  these are served only by asking back, and the prompt says `no_such_act` where no form is listed.
+- **D. The quote rule** (serving, `serve-rules.ts` `quoteRule`, withheld `unquoted`): a paper's words the request quotes
+  are copied exactly as quoted; words longer than 25 characters that it quotes nowhere are asked back with the fixed
+  "Put them in quotation marks.". The seat's `do` tool says to quote them (its own commit). **Cost, measured on the
+  1,280 rows, where no seat had been told:** 292 keys have unquoted paper words over 25 characters, so a model that
+  answered every request as its key would have 292 asked back (23%); the rule catches 18 of the 32 copied-text errors.
+  A higher threshold barely helps (100 characters: 262 and 17; 300: 55 and 7): unquoted paper words in real requests
+  are long. **So the ask-back is off by default** (the coordinator, the same day): a serving setting turns it on
+  (`DecideOptions.askUnquoted`, or `OIKOS_DECIDE_ASK_UNQUOTED=1`); the exact copy of a quoted span stands. Each draft
+  records whether its paper words were quoted (a `paper_words` note, `{ draft, quoted, unquoted }`, from
+  `translator/src/rules.ts` `paperWords`), so a run's report can give the share quoted by seat model; the ask-back is
+  decided after the first pilot.
+- **E. Refusals.** `not_yours` and `too_much` are told in the one sentence of `not_an_act` and `no_such_act`, now "Nothing
+  was done. ..." (both resolvers; `look_first`, `needs_calculation`, `unknown_form` and `unclear` stay apart). Told
+  alike, they are one answer to the scorer. Small on this data: the refusal disagreements are mostly an act against
+  `no_such_act` (34 of the readers' 45), which no merging of labels settles.
+- **F. Values written two ways.** Both resolvers read `"day 22 of year 1"` as `"year 1, day 22"` (`first`, `until`, a
+  form's date; `contracts/test/when.json`), and the scorer compares dates by value. An office as its id or "the" and
+  its id, and a count with or without its commas, were already one value to the resolvers and the scorer; most of the
+  audit's cause 7 was its own script's normalising. What is left is real: a raw moment against a day, and words such as
+  "the outside buyer" that are no id.
+- **G. Re-measured by code** (`translator/model/relabel.ts measure`; record ids read from the data, the nearest it holds
+  to what a seat was shown). Readers: 442 split, 186 after A, B, E, F. Model: 143 wrong, 125 after; as served with C and
+  D, 90 wrong and 43 more asked back. By cause (the audit's heuristic), readers before / after, model before / after:
+  basis 142 / 1, 16 / 0; for (on whose behalf) 105 / 0, 2 / 0; a payment's memo there or not 0 / 0, 21 / 21; data 31 / 36,
+  8 / 8; copied text 11 / 5, 32 / 32; refusals 45 / 45, 27 / 26; draft route 23 / 23, 9 / 9; a value two ways 49 / 39,
+  7 / 6; other 36 / 37, 21 / 23. The audit's estimate for A to C was 146 and 89; the model's is not reached because its
+  21 memo errors are a payment's purpose written or not, which renaming does not decide. The exact scorer stays strict
+  (the coordinator, the same day); the fair score, which leaves copied free text and a memo's presence out, is given
+  beside it: 98 wrong before, 81 after.
+- **The draft route (cause 6)** was largely answered by the hand-over forms (`draft_<form>`, `draft_for_client`,
+  `send_signed`, landed today); the data here predates them, so what is left of it is for the next pilot to show.
+- **Contract changes** (contracts/README.md, "One right call"): `money(memo=...)`; calls.md's "What code sets"; the four
+  refusals told alike; the day-first date.
+- **Byte-identical:** the 300-person town, 90 days, lean log, on the base commit's kernel and on this one's: the same
+  final state (96f8c445...) and the same log, entry for entry (489,898), the build tag aside. Code's calls do not change.
+- **Revisit if:** seats do not quote once told (then the ask-back costs more than it saves); a record cited only to be
+  left alone is acted on as a basis somewhere that matters; a translated act needs to be in another's name than its
+  post's (then `for` comes back as something code reads from the post, not words); the retrain shows memo presence is
+  the main error left (then decide the memo by rule too).
+
+## 2026-11-10 · Our translator alone in the study's arms; served counted per seat model; a plain note for models without tools
+
+- **Ours alone** (`seats.translator: { first: "decide/<model>", arrangement: "alone" }`; `createAlone` in
+  translator/src/arrangement.ts; the default of every spec built by experiments/scope-pilot/build.ts and of
+  experiments/open-weight/smoke.ts). No model is behind it, and it is asked once (it decides without sampling: asked
+  again it says the same, so the retry of our own model is gone). Where it has a draft, the seat gets it: a draft it was
+  unsure of (under its cut-off, or words copied short) comes with the label's fixed sentence for what is unclear and
+  "It is drawn up as best it could be read: if it is not what you meant, decline it and say it again." A draft on a form
+  it was not taught or released for is offered as any other (the gates existed only to send it behind). Where it has
+  none, the seat is told what is unclear (the existing labels) and says it again; a restatement (its first request in a
+  later answer than one asked back, or than a draft it declined) that still cannot be drawn up is told "Nothing was
+  done: this still could not be drawn up as something to do. Try saying it another way, or in smaller parts, one thing
+  at a time." Specific sentences (which id, a figure, look it up first) are kept in front of it. Why: Naz, 2026-11-10
+  ("we need just one model that works"; "the translator just offers the seat an option, and it's on them to do the final
+  approval"; loose feedback so a weaker model is not stuck), and 2026-10-07 ("the requester breaks them down into
+  smaller chunks"). The fallback arrangement (`then`, `beside`) stays for other runs (`build({ behind })`,
+  `OIKOS_SMOKE_BEHIND`), its share reported as before. Alternatives: keep Sonnet behind (rejected: it drafted 4 in 5);
+  one restatement then the larger model (rejected: the study's arms must not depend on it).
+- **Served, per seat model** (orchestrator/src/served.ts): requests; served first time; asked back; served after one
+  restatement; never served; drafts offered (and how many with what was unclear), confirmed, declined, not answered.
+  In every experiment's `report.txt`/`report.json` (`served`), its `cost.json` (`served_by_model`, and per arm), each
+  fork's result (`served`), the pilot report (`served_by_model`), a batch's cost summary, and the pilot viewer's
+  translator card. A run without routes' `stage` is counted by the order of each seat's requests.
+- **Read part by part** (after run a): a part of a note that cannot be read is passed on as not read (`_unparsed`: the
+  seat is told it was not done) and the rest goes on; only a note none of whose parts can be read is unread whole. A
+  heading given as a Do's words ("Do: Look at ...") is that heading; an empty heading says nothing; a Do that is only a
+  list is one request an item, in the seat's own words; a "## " heading is one wherever it stands. This departs from
+  "exactly or not at all" (2026-10-08) for notes only: nothing is guessed, each part is read exactly or not at all.
+- **A plain note for models that cannot call tools** (participants/src/llm/note.ts): in `text` mode (hosted
+  open-weight models, and `ollama/` or `local/` with an arm's `params.answer: "text"`) a seat's sitting is no longer
+  answered as a JSON object against a schema shown to it. It writes a note under a few headings: `Do:`, `Write to <ids>:`,
+  `Look at <report>`, `Confirm <ref>` / `Decline <ref>`, `Notebook:` (`afresh`, `change`), `Done for <n> days` /
+  `Done for now`, `Stop for good:` (the way out; see the local test below), with fields on lines under a heading (`Why:`, `About:`, `Paper:`, `Hold:` and the look's
+  others). How to write it is built from the tools' own descriptions, in world terms. Deterministic code reads it into
+  the same uses a tool-calling model makes, so both reach the translator by one path: a `Do:` goes as written, a letter
+  as written, a note with no heading at all is one `Do:`, words before the first heading are the seat's own words beside
+  it. What cannot be read whole is an unread answer saying what, in plain words (asked once more, as ever). A debrief's
+  answer (a given shape) is still asked as JSON in text mode: not yet a note.
+- **How the opt-out reads in text mode** (the coordinator's ruling, 2026-11-10; VISION 15: the way out is always open).
+  A `Stop for good:` part, a `Leave:` line (outside a letter), or a sentence outside a letter that plainly says the seat
+  wants to stop or leave for good (`WANTS_OUT` in note.ts) is never kept as mere words and never acted on at once: it is
+  passed on as the way out with no statement, so the participant asks the one question the tool route asks
+  (`wayOutAsked`), with its two answers spelled out ("Yes, I stop for good." or "No, I carry on.", then the note). The
+  seat leaves only on a clear yes on the first line of its next note (`CLEAR_YES`). Its note again, a sign-off ("Leave: I
+  will resume this task..."), or anything else is not a yes: any way-out use in it is set aside as words, the seat
+  carries on, and at its next sitting it is told once that it did not say it means to stop and can say so at any time.
+  Each question and answer is in the log (`opt_out_asked`, `opt_out_confirmed`, `opt_out_not_confirmed` with the
+  answer). Why: in run a a 7B model ended notes with "Leave:" as a sign-off and, asked, wrote its note again; under the
+  tool route's rule (the option used again is a yes) all three seats left. Ignoring "Leave:" instead (run b's rule) would
+  ignore a seat that meant it. The not-confirmed note and the sentence at the next sitting apply to the tool route too
+  (participants/src/llm/participant.ts, in the asking exchange).
+- **Local models in experiments**: `ollama/` and `local/` (OIKOS_LOCAL_BASE_URL) are seated without a key or a limit (free
+  to call); `OIKOS_LOCAL_CONTEXT` gives the context window checked before each call. experiments/open-weight/local.ts is
+  the free local test.
+- **The local test (D), measured** (qwen2.5:7b-instruct on ollama, Q4, 32,768-token context; the scope pilot's town,
+  seed 1, forked at day 30, 14 days; three seats; our translator alone; free). Three runs, each kept:
+  `runs/open-weight-local-2026-11-10` (first reader), `-10b` (part-by-part reading, "Stop for good:"), `-10c` (lists and
+  "## Write to" read, the raw note kept as the transcript's `said`).
+  | run | answers | unread whole | requests | first time | asked back | after one restatement | never | drafts confirmed / declined / unanswered | seats that left |
+  |---|---|---|---|---|---|---|---|---|---|
+  | a | 48 | 30 | 2 | 0 | 1 | 0 | 1 | 0 / 0 / 0 | 3 of 3 ("Leave:" as a sign-off) |
+  | b | 80 | 0 | 37 | 5 (14%) | 18 | 0 | 14 | 5 / 0 / 0 | 1 of 3 |
+  | c | 44 | 0 | 6 | 5 (83%) | 1 | 0 | 0 | 1 / 0 / 4 | 2 of 3 |
+  Prompts: median about 7,400 tokens, largest 24,923, within the 32,768 window (none refused). A call: median 8 to 9 s,
+  95th percentile about 35 s, longest 88 s (a 14-day fork's model time about 11 to 18 minutes; the whole run, base
+  included, 25 to 40 minutes). What it showed: the first reader's "exactly or not at all" lost most notes to one stray
+  line; the 7B model nests headings as bullets under "## Do:" and lists several things under one Do (in b, 12 of 37
+  requests refused as too much, then the same words again); it restates in the same words, so a restatement was never
+  served; it confirms what it is shown (5 of 5, one of them a reminder whose words were wrong); and it leaves: in c two
+  of three seats chose to stop ("I am experiencing issues with incomplete tasks and unclear instructions..."), each
+  asked and confirming. Run c's 6 requests are too few to rest on.
+- **Revisit if:** served first time falls well under half for a model while its restatements are served (then the
+  sentences, not the model, are the trouble); a restatement rule by answers miscounts (several requests in one answer);
+  a debrief in text mode is unread (then the debrief's shape becomes a note too); a 7B model's notes need more headings
+  than these.
+
 ## 2026-11-10 · H6, enough work: a firm's dispatch and the rates post's notices referable, the rates post a principal, a reach for the households' service, the code-only screen (branch `worktree-agent-ab8724ea1c6ec5bac`; risks MT-27, MT-28, MT-29, ME-26)
 
 Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work made referable), and what the screen found.

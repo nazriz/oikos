@@ -69,6 +69,9 @@ export interface LlmResponse {
   usage: Usage;
   /** True when token counts are estimates (the mock), not a provider's report. */
   estimated?: boolean;
+  /** The model's words as it wrote them, where an adapter read them into uses (a plain note: note.ts): kept in the
+   * transcript, since the words are the data (P2). */
+  said?: string;
 }
 
 export interface LlmAdapter {

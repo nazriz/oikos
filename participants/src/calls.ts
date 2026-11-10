@@ -176,6 +176,26 @@ export const CODE_ARGS: { [fn: string]: Set<string> } = {
   system: new Set(["to"]),
 };
 
+/**
+ * Arguments the platform sets in a translated program by rule, and a translator never chooses (2026-11-10, one right
+ * call: docs/decisions.md; translator/src/rules.ts `ruled`). Each let one request have more than one right call:
+ * `basis`, the records an act cites, is every record the request cites that no other argument takes; `for`, on whose
+ * behalf, is the capacity the act is made in (`as`), and a payment's purpose is `memo`; a statement's `data`, which
+ * code reads, is written by a form's fields, never composed from words (a translated program that composes it is asked
+ * back). Code seats write them as ever. A translator is not taught them (`TAUGHT`); a trained model whose slots still
+ * hold them (`ARGS`, until its retrain) is ruled like any other.
+ */
+export const RULED: { [fn: string]: ReadonlySet<string> } = {
+  money: new Set(["basis", "for"]),
+  goods: new Set(["for"]),
+  work: new Set(["for"]),
+  structure: new Set(["basis"]),
+  claim: new Set(["basis", "for"]),
+  agreement: new Set(["basis", "for"]),
+  statement: new Set(["basis", "for", "data"]),
+  vote: new Set(["for"]),
+};
+
 /** Per function: the arguments it takes (undefined: any, as with a form's fields) and the ones it needs. Read from contracts/calls.schema.json, so it can't drift from the contract. Not the arguments only code writes (`CODE_ARGS`). */
 export const ARGS: { [fn: string]: { allowed?: Set<string>; required: string[] } } = Object.fromEntries(
   (CALLS_SCHEMA as any).$defs.Call.allOf.map((rule: any) => {
@@ -183,6 +203,11 @@ export const ARGS: { [fn: string]: { allowed?: Set<string>; required: string[] }
     const fn = rule.if.properties.fn.const;
     return [fn, { allowed: args.propertyNames ? new Set<string>((args.propertyNames.enum as string[]).filter((k) => !CODE_ARGS[fn]?.has(k))) : undefined, required: args.required ?? [] }];
   }),
+);
+
+/** What a translator is taught, per function: `ARGS` without what the platform sets by rule (`RULED`). */
+export const TAUGHT: { [fn: string]: { allowed?: Set<string>; required: string[] } } = Object.fromEntries(
+  Object.entries(ARGS).map(([fn, a]) => [fn, { allowed: a.allowed && new Set([...a.allowed].filter((k) => !RULED[fn]?.has(k))), required: a.required }]),
 );
 
 /** What's wrong with a program against the contract (unknown or missing arguments, in any nested call); empty if nothing. */
@@ -487,6 +512,8 @@ export function parseWhen(s: string, now: number): When {
   }
   if (["today", "now", "immediately", "at once", "straight away"].includes(t)) return { in: 0 };
   if (t === "tomorrow") return { at: (Math.floor(now / DAY) + 1) * DAY };
+  // (The same date with its day first: "day 22 of year 1". 2026-11-10: two readers wrote one date both ways.)
+  t = t.replace(/^day ?([0-9]{1,3}),? of year ?([0-9]{1,6})$/, (_, day, year) => `year ${year}, day ${day}`);
   // (A date as the world's calendar writes one, where it has a calendar: "12 March 2026", "15 April".)
   const cal = calendarNow();
   const civil = cal ? readCalendarDate(cal, t, now) : undefined;

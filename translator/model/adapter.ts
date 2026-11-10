@@ -10,7 +10,7 @@ import { calls } from "@oikos/participants";
 import { formsIn, inputOf, lineOf, programFrom, type Decoding, type Grammar } from "./encode";
 import { pieces } from "./export";
 import { namedAmong, partsOf, ranked, taken, type FormFacts } from "./subset";
-import { cutShort } from "./serve-rules";
+import { cutShort, quoteRule } from "./serve-rules";
 
 const HERE = import.meta.dir;
 
@@ -185,14 +185,15 @@ export const CUT_OFF = 0.1;
 /** Why this adapter offers no draft where the model's own answer was not a refusal it is sure of: its sureness is under
  * the cut-off; the form it filled in is not one of the forms shown as shown; or its steps make no program of the call
  * language; or the request with its forms is longer than the model reads. */
-export type Withheld = "cut_off" | "form_check" | "no_program" | "too_long" | "form_not_shown" | "forms_subset" | "form_unseen" | "type_unreleased" | "probation" | "cut_short" | "trailing" | "disagree";
+export type Withheld = "cut_off" | "form_check" | "no_program" | "too_long" | "form_not_shown" | "forms_subset" | "form_unseen" | "type_unreleased" | "probation" | "cut_short" | "trailing" | "unquoted" | "disagree";
 
 /** The checks that are part of what is served, not of what a model can be scored on (translator v4, round 3): copied
  * words cut short part way through the request's sentence, or ending where the request goes on with sentences nothing
  * else of the answer accounts for (serve-rules.ts `cutShort`), and two models that do not write the same program
- * (`AgreeAdapter`). An answer withheld by one is asked back (or goes behind), and scoring counts it so;
- * the other reasons above are this adapter's own and a score reads past them to the model's answer. */
-export const SERVING_CHECKS: readonly string[] = ["cut_short", "trailing", "disagree"];
+ * (`AgreeAdapter`); and, since 2026-11-10, a paper's words longer than a phrase that the request did not put in
+ * quotation marks (serve-rules.ts `quoteRule`). An answer withheld by one is asked back (or goes behind), and scoring
+ * counts it so; the other reasons above are this adapter's own and a score reads past them to the model's answer. */
+export const SERVING_CHECKS: readonly string[] = ["cut_short", "trailing", "unquoted", "disagree"];
 
 /** A field's kind of value as a form's line shows it: `choice` for one of a few options, else the type it names. */
 /** A request as the model is shown it: on one line, each line break a space (adapter.translate). */
@@ -295,10 +296,18 @@ export function readerOf(dir: string): { most?: number; forms?: number; trained?
 
 export interface DecideOptions {
   dir?: string; threshold?: number; unchecked?: boolean; quiet?: boolean; first?: boolean;
+  /** `alone`: this model is the only translator (translator/src/arrangement.ts, `createAlone`). Nothing is withheld
+   * for anyone behind: a draft it is unsure of is offered with what is unclear about it (`unsure`), and a draft on a form
+   * it was not taught or released for is offered as any other (the seat reads the preview and decides: Naz,
+   * 2026-11-10). A draft that does not fit the forms shown, or that names a form it was not shown, is still not offered. */
+  alone?: boolean;
   /** A `cards` model measured before anything is released for it (release.ts): its drafts as they are, with no release by kind and no trial. */
   unreleased?: boolean;
   /** The serving checks on copied words (serve-rules.ts): on unless false (or OIKOS_DECIDE_NO_CHECKS is set). */
   checks?: boolean;
+  /** The quote rule's ask-back for a paper's words quoted nowhere (serve-rules.ts `quoteRule`): off unless true (or
+   * OIKOS_DECIDE_ASK_UNQUOTED=1). The exact copy of a quoted span is made either way. */
+  askUnquoted?: boolean;
 }
 
 export class DecideAdapter implements LlmAdapter {
@@ -459,19 +468,29 @@ export class DecideAdapter implements LlmAdapter {
       asked = true;
       withheld = "cut_off";
       const least = a.parts ? (["choices", "places", "texts"] as const).reduce((x, y) => (a.parts[y] < a.parts[x] ? y : x)) : "choices";
-      program = "none(unclear)";
+      // (Alone, the draft is offered all the same, with what is unclear: there is no one behind to draft it.)
+      if (!this.o.alone || /^none\(\w+\)$/.test(program)) program = "none(unclear)";
       unsure = { kind: least === "places" ? "which" : least === "texts" ? "words" : "act" };
     }
-    // Copied words that stop part way through the request's sentence, or before sentences of it nothing else of the
-    // answer accounts for, are asked back: what is sent might not be what was said (serve-rules.ts).
-    const short = !withheld && (this.o.checks ?? !process.env.OIKOS_DECIDE_NO_CHECKS) && !/^none\(\w+\)$/.test(program) ? cutShort(oneLine(request), program, forms, { trailing: true }) : undefined;
+    // A paper's words are the words the request quotes: code copies the quoted span exactly, and asks back for words
+    // longer than a phrase that are quoted nowhere (serve-rules.ts `quoteRule`). Words the request quoted are where
+    // the seat said they begin and end; others that stop part way through the request's sentence, or before
+    // sentences of it nothing else of the answer accounts for, are asked back: what is sent might not be what was said.
+    const checks = !withheld && (this.o.checks ?? !process.env.OIKOS_DECIDE_NO_CHECKS) && !/^none\(\w+\)$/.test(program);
+    const q = checks ? quoteRule(oneLine(request), program, forms, { ask: this.o.askUnquoted ?? process.env.OIKOS_DECIDE_ASK_UNQUOTED === "1" }) : undefined;
+    if (q && "ask" in q) {
+      withheld = "unquoted";
+      if (!this.o.alone) program = "none(unclear)";
+      unsure = { kind: "words" };
+    } else if (q) program = q.program;
+    const short = checks && !withheld && !(q && "quoted" in q && q.quoted) ? cutShort(oneLine(request), program, forms, { trailing: true }) : undefined;
     if (short) {
       withheld = short.kind;
-      program = "none(unclear)";
+      if (!this.o.alone) program = "none(unclear)";
       unsure = { kind: "words" };
     }
     // (A form that can't be one of the forms shown is not offered, however sure the model is.)
-    const misfit = this.o.unchecked || withheld === "form_not_shown" ? undefined : formsMisfit(program, forms);
+    const misfit = this.o.unchecked || withheld === "form_not_shown" || /^none\(\w+\)$/.test(program) ? undefined : formsMisfit(program, forms);
     if (misfit) {
       withheld = "form_check";
       program = `none(${misfit.label})`;
@@ -492,14 +511,15 @@ export class DecideAdapter implements LlmAdapter {
     // released kind, and each form it fills was taught or is past its trial. Otherwise it is recorded and the
     // translator behind drafts. (Fewer forms shown than the asker knows of still goes behind, as for any model.)
     let trial: string[] | undefined;
-    if (this.decoding === "cards" && !(this.o.unreleased ?? !!process.env.OIKOS_DECIDE_UNRELEASED) && !withheld && !/^none\(\w+\)$/.test(program)) {
+    // (Alone, none of this: nobody is behind to draft in its place.)
+    if (this.decoding === "cards" && !this.o.alone && !(this.o.unreleased ?? !!process.env.OIKOS_DECIDE_UNRELEASED) && !withheld && !/^none\(\w+\)$/.test(program)) {
       const k = byKind(program, forms, this.released, (f) => this.passed(f, reader.trained));
       trial = k.trial;
       if (shown) withheld = "forms_subset";
       else if (k.withheld) withheld = k.withheld;
       if (withheld) program = "none(unclear)";
     }
-    if (this.decoding !== "cards" && !withheld && !/^none\(\w+\)$/.test(program)) {
+    if (this.decoding !== "cards" && !this.o.alone && !withheld && !/^none\(\w+\)$/.test(program)) {
       const filled = [...program.matchAll(/\bform=([\w.-]+)/g)].map((m) => m[1]!);
       // (The forms the folder says are released, where it says; else those it was taught; else, for an asker whose forms
       // were once a subset, any.)
@@ -529,7 +549,7 @@ export class DecideAdapter implements LlmAdapter {
     // (With another translator behind it, its answer says how sure it was, how long it took and why it offers no
     // draft where it offers none: the arrangement routes on that, and the transcript keeps it. Whole numbers, as
     // everything in a log is: sureness in parts per million, time in milliseconds.)
-    const more = this.o.first ? { sure_ppm: Math.round(sure * 1e6), ms: Math.round(ms), ...(withheld ? { withheld } : {}), ...(wrote !== undefined ? { wrote } : {}), ...(sub ? { forms_shown: sub.forms, forms_of: sub.of } : {}), ...(trial ? { trial } : {}) } : {};
+    const more = this.o.first || this.o.alone ? { ...(this.o.alone && unsure ? { unsure } : {}), sure_ppm: Math.round(sure * 1e6), ms: Math.round(ms), ...(withheld ? { withheld } : {}), ...(wrote !== undefined ? { wrote } : {}), ...(sub ? { forms_shown: sub.forms, forms_of: sub.of } : {}), ...(trial ? { trial } : {}) } : {};
     return { content: [{ type: "tool_use", id: "decide", name: req.tools?.[0]?.name ?? "call", input: { program, ...(unsure ? { unsure } : {}), ...more } }], usage: { input_tokens: 0, output_tokens: 0 }, estimated: true };
   }
 

@@ -2,12 +2,13 @@
 // goes in code). Each is a property of the answer and the request alone, the same for every base and every writer; an
 // answer that fails one is asked back, never altered.
 import { calls } from "@oikos/participants";
+import { PAPER_WORDS, quotedFor } from "../src/rules";
 
 /** The fields whose copied words are said as they stand (a message, a statement, an agreement's terms, what a payment
  * is for, a form's field typed text of three words or more: a shorter one is a label, "waste"): what is sent or filed
  * must not stop part way through a sentence of the request. */
-const WHOLE_WORDS: { [fn: string]: string[] } = { message: ["text"], statement: ["text"], agreement: ["text", "terms"], money: ["for"] };
-const textFieldsOf = (forms: string[]) => {
+const WHOLE_WORDS: { [fn: string]: string[] } = { message: ["text"], statement: ["text"], agreement: ["text", "terms"], money: ["for", "memo"] };
+export const textFieldsOf = (forms: string[]) => {
   const s = new Set<string>();
   for (const l of forms) for (const m of l.matchAll(/([a-z_]+) \(text(?:, required)?\)/g)) s.add(m[1]!);
   return s;
@@ -67,4 +68,58 @@ export function cutShort(request: string, program: string, forms: string[] = [],
     return { field, kind: "cut_short" };
   }
   return undefined;
+}
+
+export { quotedSpans } from "../src/rules";
+/** Copied words longer than this many characters are a paper's words, and must be quoted to be copied, where the
+ * ask-back is on. */
+export const QUOTE_FROM = 25;
+
+/**
+ * The quote rule (2026-11-10, docs/decisions.md "One right call"): a paper's own words are the words the request puts
+ * in quotation marks, and code copies them. Where the answer's copied words (a letter's or a statement's text, an
+ * agreement's terms, a form's field of text) overlap exactly one quoted span of the request, that span is what goes,
+ * exactly as quoted. With `ask` (off unless a serving setting says so: the coordinator, 2026-11-10, because on past
+ * data it would ask back about a quarter of right answers, and nobody has yet seen how seats write once told to
+ * quote), words longer than `QUOTE_FROM` characters that overlap none are asked back ("Put them in quotation marks.").
+ * A payment's memo is a description, not a paper's words, and is not ruled. Returns the program with the quoted spans
+ * in place (`quoted`: whether any was), or `ask` with the field.
+ */
+export function quoteRule(request: string, program: string, forms: string[] = [], o: { ask?: boolean } = {}): { program: string; quoted: boolean } | { ask: string } {
+  let p: calls.Program;
+  try {
+    p = calls.parseProgram(program);
+  } catch {
+    return { program, quoted: false };
+  }
+  if ("none" in p) return { program, quoted: false };
+  const typed = textFieldsOf(forms);
+  let quoted = false;
+  let ask: string | undefined;
+  const visit = (c: calls.Call): calls.Call => {
+    const args: calls.Call["args"] = {};
+    for (const [k, v] of Object.entries(c.args)) {
+      if ("call" in v) {
+        args[k] = { call: visit(v.call) };
+        continue;
+      }
+      const paper = "text" in v && (PAPER_WORDS[c.fn]?.includes(k) || (c.fn === "form" && typed.has(k)));
+      if (!paper) {
+        args[k] = v;
+        continue;
+      }
+      const q = quotedFor(request, v.text);
+      if (q !== undefined) {
+        args[k] = { text: q };
+        quoted = true;
+      } else {
+        if (o.ask && v.text.trim().length > QUOTE_FROM) ask ??= k;
+        args[k] = v;
+      }
+    }
+    return { ...c, args };
+  };
+  const lines = p.lines.map((l) => ({ ...l, call: visit(l.call) }));
+  if (ask) return { ask };
+  return { program: quoted ? calls.programText({ lines }) : program, quoted };
 }

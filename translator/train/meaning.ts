@@ -35,7 +35,7 @@
 // This file depends on the call language and the resolver's label rule only, so the translator's test set can use it
 // too (translator/eval/run.ts compares in canonical form today).
 
-import { calls, type Currency } from "@oikos/participants";
+import { calls, forms as formsLib, type Currency } from "@oikos/participants";
 import { asLabel } from "../src/resolver";
 
 /** What a comparison may know of the world the programs are from: how it writes money, and the forms known there. */
@@ -49,11 +49,14 @@ export interface MeaningContext {
 /** Free text by function: not compared when `freeText` is false. */
 const FREE_TEXT: { [fn: string]: string[] } = { message: ["text"], statement: ["text"], agreement: ["text", "terms"] };
 /** Arguments that are free text and may be there or not, by function: left out when `freeText` is false. */
-const FREE_OPTIONAL: { [fn: string]: string[] } = { money: ["for"], message: ["re"] };
+const FREE_OPTIONAL: { [fn: string]: string[] } = { money: ["for", "memo"], message: ["re"] };
 const ANY_TEXT = "\u2026";
 
 const AMOUNT_ARGS = new Set(["amount", "price", "carrying"]);
-const DURATION_ARGS = new Set(["every", "term", "our_notice", "their_notice", "first", "age"]);
+const DURATION_ARGS = new Set(["every", "term", "our_notice", "their_notice", "age"]);
+/** When something done again and again starts or ends: a date or a length of time, as the resolver reads it
+ * (`parseWhen`: "day 22 of year 1" is "year 1, day 22"). */
+const WHEN_ARGS = new Set(["first", "until"]);
 const COUNT_ARGS = new Set(["quantity", "units"]);
 /** The yes-or-no arguments, per function (the resolver's `yes`), and the one spelling gold programs use. */
 export const FLAGS: { [fn: string]: string[] } = { occupancy: ["leave"], presence: ["leave"] };
@@ -66,7 +69,7 @@ export const ONE_EACH: { [fn: string]: string } = { message: "to" };
 /** Arguments the resolver reads as an id or a name the seat knows (kernel/crates/resolver `id`, `need`, `ids`, `basis`,
  * `visible`), as translator/model/py/fair.py `IDS` (less the arguments one function reads as words there). */
 const READ_AS_ID = new Set(["to", "from", "at", "from_at", "basis", "visible", "holder", "against", "appoint", "transfer", "release", "retire", "remove", "vacate", "withdraw", "with", "notice", "sign", "settles", "line", "investigate", "survey", "taken_at", "on", "materials_at", "close", "in", "who", "ballot", "hold", "cells", "re", "task", "type", "for", "by", "kind", "position", "registry"]);
-const READ_AS_WORDS_BY_FN = new Set(["money.for", "entity.kind", "statement.kind", "entity.position", "goods.by"]);
+const READ_AS_WORDS_BY_FN = new Set(["money.for", "money.memo", "entity.kind", "statement.kind", "entity.position", "goods.by"]);
 /** A form's field types the resolver reads as words, not as an id. */
 const FIELD_WORDS = new Set(["amount", "duration", "count", "date", "choice", "structure_type", "text"]);
 /** Ids that are never a name the seat knows (records, accounts, laws, forms, messages, places): fair.py `_NOT_A_NAME`. */
@@ -113,6 +116,14 @@ function scalar(kind: string | undefined, s: string, ctx: MeaningContext): Norm 
       const n = attempt(() => calls.parseCount(s));
       return n !== undefined ? { count: String(n) } : squeezed(s);
     }
+    case "when": {
+      const w = attempt(() => calls.parseWhen(s, 0));
+      return w !== undefined ? ("at" in w ? { at: String(w.at) } : { in: String(w.in) }) : squeezed(s);
+    }
+    case "date": {
+      const t = attempt(() => formsLib.parseDate(s, 0));
+      return t !== undefined ? { at: String(t) } : squeezed(s);
+    }
     case "flag": return /^(yes|true)$/i.test(s.trim()) ? FLAG_YES : /^(no|false)$/i.test(s.trim()) ? undefined : s;
     case "label": return asLabel(s) || s;
     case "purpose": return squeezed(s).replace(/^(the|a|an) /, "").replace(/[.!\s]+$/, "");
@@ -124,14 +135,15 @@ function scalar(kind: string | undefined, s: string, ctx: MeaningContext): Norm 
 function kindOf(fn: string, key: string, fields: { [name: string]: { type: string } } | undefined): string | undefined {
   if (fn === "form") {
     const t = fields?.[key]?.type;
-    return t === "amount" || t === "duration" || t === "count" ? t : undefined;
+    return t === "amount" || t === "duration" || t === "count" || t === "date" ? t : undefined;
   }
+  if (WHEN_ARGS.has(key)) return "when";
   if (AMOUNT_ARGS.has(key)) return "amount";
   if (DURATION_ARGS.has(key)) return "duration";
   if (COUNT_ARGS.has(key)) return "count";
   if (FLAGS[fn]?.includes(key)) return "flag";
   if (LABELS[fn]?.includes(key)) return "label";
-  if (fn === "money" && key === "for") return "purpose";
+  if (fn === "money" && (key === "for" || key === "memo")) return "purpose";
   return undefined;
 }
 
