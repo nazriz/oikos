@@ -79,7 +79,12 @@ test("a town that does not ask for assistants is generated as before; one that d
   // draft, and answered a matter handed at draft with a request to go ahead); and reads its service agreements.
   const personal = (loadProfile(base.profile) as any).values.assistants.providers[0].offers.find((o: any) => o.for === "persons");
   const draft = seated.world.records.find((r: any) => r.kind === "form" && r.data?.office === "provider-a-desk" && r.data.form === "draft_for_client");
-  expect(draft.data.fields.kind.options).toEqual([...personal.kinds].sort());
+  // (A client's papers that the receiving office reads for its figures have forms of their own, with their drafts, and
+  // are not on the words-only draft: H4b, "One right call" C.)
+  const own = ["benefit_change", "benefit_claim", "job_application", "loan_application"];
+  expect(draft.data.fields.kind.options).toEqual([...personal.kinds].filter((k: string) => !own.includes(k)).sort());
+  const deskForms = seated.world.records.filter((r: any) => r.kind === "form" && r.data?.office === "provider-a-desk").map((r: any) => r.data.form);
+  for (const k of own) expect(deskForms).toEqual(expect.arrayContaining([k, `draft_${k}`]));
   expect(draft.data.writes).toMatchObject({ kind: "draft", to: ["=client"], data: { paper: { kind: "=kind", to: ["=recipient"] } } });
   expect(seated.positions.find((x: any) => x.id === "provider-a-desk").channels.find((c: any) => c.id === "agreements")).toMatchObject({ way: "mine", match: { records: ["agreement"] }, on_request: true });
   // (What its post shows it: the terms it works on, the matters as they come, a file it looks into on request and who's

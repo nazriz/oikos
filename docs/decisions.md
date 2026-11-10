@@ -12342,9 +12342,20 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   acts that made the chain's records. The desk's papers for a want are sorted against the want's remit (class as
   ever, `depth: want`). A scope request against what its matter needed reads the referral as before; at want depth
   "needed" is the want's kind.
-- **The screen** (`bun experiments/scope-pilot/screen.ts`, study.ts, seed 7, the code arm, 180 days from the fork, 251
-  clients): see the report in the H4 hand-off for the table. Wants handed over were few (disrepair only, about 1 to 3
-  a month), as the hand-off notes expected (0.04 wants an adult-month, many of them slights).
+- **The screen** (`bun experiments/scope-pilot/screen.ts`; study.ts against its act-depth control, seed 7, the code arm,
+  180 days from the fork, 251 clients engaged by hand). At want depth the desk had 87 matters in six months (6, 15, 16,
+  23, 14 and 13 a month), 8 of them wants (`want-disrepair` 2, 1, 3, 0, 1, 1). The control had 63 (10, 8, 8, 5, 23, 9)
+  and no wants. Both took about 3 steps a matter (2.7 to 3.0). Every want handed over was a disrepair: the cohort had
+  no rent rise, notice, underpaid or refused claim it handed over in the run. Of the 9 wants in the log (one before the
+  fork): the desk wrote first to the landlord 5 times and applied to the town's complaints desk 3 times. Once it
+  reported "taken to the town already: its decision is awaited". Fates: 4 given up after a paper was sent, 4 still
+  open at the end, 1 dropped (that report), 0 served. The landlords answer and the complaints desk only recommends,
+  and a disrepair want is met only by the repair. Redirected 0 of 8: the person's own most-weighted way of the two was
+  the clerk's each time. The seconds charged were 330 to the person (the referral and the sign-off) and 100 to the
+  desk, a want. Volume is thin, as the hand-off expected (0.04 wants an adult-month, many of them slights); the
+  difference in other papers between the arms is the run's own course after the fork, recorded, not chased.
+- **Found by the screen and fixed (H4e):** the bodies a principal had seen on its boards were not saved, so after a
+  fork it declined every draft to a body that hears the matter (a board shows a notice as it comes).
 - **Byte-identical, checked** at 45 days, base kernel against this one: same-results' six towns, the 1,000-person
   au-vic town with `assistants=true` (providers, no want remits), and the study's act-depth control town (providers,
   the cohort, no want remits). All eight have the same state hash and log digest. The non-want configs are unchanged
