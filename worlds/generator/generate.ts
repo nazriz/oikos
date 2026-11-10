@@ -8,7 +8,7 @@
 
 import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
-import { ASSISTANT_ISSUES, clientDraft, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { ASSISTANT_ISSUES, MATTER_KINDS, clientDraft, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
 import { COMPOSE_BPS, SCOPE_ANSWER_SECONDS } from "./registry";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
@@ -2758,7 +2758,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     office(`${pr.id}-sales`, pr.id, "Sales and service desk", undefined, [{ id: "ledger", kind: "accounts" }, K.mine()],
       code("firm.provider", { account: `acc-${pr.id}`, ...(desk ? { desk: `${pr.id}-desk-system` } : {}), ...(HOST ? { hosting: { account: "acc-host", fee_month: HOST.fee } } : {}), offers: pr.offers.map((o) => ({ id: o.id, title: o.title, for: o.for, template: o.template, kinds: o.kinds, levels: o.levels,
         seconds: Object.fromEntries(o.kinds.map((k) => [k, Math.max(1, Math.round((personPaper(k) * o.speed_bps) / 10_000))])), claim_slip_bps: o.claim_slip_bps,
-        fee_month: o.fee_month, setup: o.setup, exit: o.exit, notice_days: o.notice_days, term_days: o.term_days, records: o.records })) }));
+        fee_month: o.fee_month, setup: o.setup, exit: o.exit, notice_days: o.notice_days, term_days: o.term_days, records: o.records,
+        // (An organisation's assistant takes the kinds the engine composes as what happened too: docs/design/handing-over.md, H5.)
+        ...(o.for === "organisations" && o.kinds.some((k) => MATTER_KINDS.includes(k)) ? { depths: Object.fromEntries(o.kinds.filter((k) => MATTER_KINDS.includes(k)).sort().map((k) => [k, ["act", "matter"]])) } : {}) })) }));
   }
   // The foreman looks up in the register the plan of a lot it is asked to build on (nobody has the register by heart),
   // and goes to see the ground before building there, to know where on a lot a building goes. It gives notice of

@@ -207,6 +207,19 @@ procedure.) Both come to the seat with its matters, and stay in its file, where 
 later. Before, a request only brought the review forward, nothing answered it, and a letter was never answered: the
 scope pilot. Test: `a_request_is_answered_part_by_part_and_a_letter_is_acknowledged`.
 
+**What happened, not the finished act** (2026-11-10, `delegation/compose.rs`). A remit names a depth beside its level:
+`act` (the finished act, as before) or `matter` (what happened). Where its service takes a kind as what happened (the
+offer's `depths`: an organisation's invoices and delivery notes), a principal hands those over so: its referral sets out
+the facts (the goods, how many, from where, to whom, the unit price, the account; for a delivery note the order, what was
+ordered and delivered, the refund, the terms, where they went) and not the paper: what it comes to and what is owed are
+the assistant's to work out. Its own code's act stays with it, on record, and a draft is read against it on the kind's
+material details and whom it goes to, never its words; a draft that differs is declined, the detail named. The code
+assistant works the paper out by the same reckoning the principal's code uses; a model is shown the facts. Since the
+composing is the assistant's, the principal's rule does not count it as its own time at that depth. A withdrawal in the
+same act goes with the paper (a price list and the one it replaces are one matter). Test:
+`a_matter_handed_over_as_what_happened_carries_its_facts_and_its_draft_is_read_on_its_material_details`,
+`handed_what_happened_it_composes_the_paper_from_the_facts`.
+
 **Composing a finished act is the principal's time** (2026-11-10). A referral that hands over the finished act carries
 it (`carries=<kind>`, contracts: Publish `carries`) and is priced with that kind's `compose/<kind>` row: half the paper's
 own time, a placeholder (WM-1), the rest being writing it out and sending it. The rule counts that composing as the

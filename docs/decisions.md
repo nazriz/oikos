@@ -11991,3 +11991,26 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   refusals. Contract: `Remit.at_least`, `Commit.hold`, the reason `below_floor`. What the rule then grants is recorded,
   not tuned.
 - **Revisit if:** the study wants a ceiling too (a kind its principal will not raise), or a floor per request.
+
+## 2026-11-10 · Handing over H5, first kinds: invoices and delivery notes as what happened (docs/design/handing-over.md, step H5)
+
+- **What:** a remit names a depth beside its level (`act`: the finished act; `matter`: what happened). An offer says
+  which kinds it takes as what happened (`ServiceOffer.depths`; the generator gives an organisation's offers the kinds
+  the engine composes, `MATTER_KINDS`: invoices and delivery notes). At `matter`, the principal's referral carries the
+  facts it reads from the act its own code would have sent (`delegation/compose.rs`, `facts_of`: an invoice's goods,
+  quantity, where they went from, the unit price, the account; a delivery note's order, what was ordered and delivered,
+  the refund, the terms, where the goods went), never the figures the paper works out (the amount, what is owed). The
+  code assistant works the paper out from the facts by the same reckoning (`compose`); a model in the seat is shown the
+  facts and works it out itself. A draft is read on the kind's material details and addressees (`differs`), never its
+  words; a decline names the detail ("The draft is not as we have it: outcome money amount."). At `matter` the referral
+  carries no composing, so the rule weighs the kind without the principal's composing time: the depth is what makes
+  handing a short paper over worth anything (the enough-work screen: at act depth principals took short papers back).
+  The act it would have sent is on record (`handed`, with its depth).
+- **Withdrawals go with the paper they belong to:** an act that publishes a paper and withdraws another is one matter
+  (a price list and the one it replaces), so nothing stands withdrawn while a draft waits.
+- **Not yet:** a matter whose act is a payment (a purchase order paid with the order, a payment to the bank, a rates
+  claim): its own step, with the bank mandate (H1's note). The rates post's acts priced by what they carry: with the
+  rates kinds, once the enough-work branch's offers are in.
+- **Byte-identical:** towns without providers (the check below).
+- **Revisit if:** a kind's facts cannot be read from its act often (then it goes as the finished act, and the rule says
+  so); a seat at `matter` composes figures the principal never declines (then the material details are too few).

@@ -242,7 +242,12 @@ impl Plan for Assisting {
         for (id, x) in referrals {
             self.handled.insert(id.clone());
             let m = self.service(&x.agreement).cloned().expect("filtered above");
-            let calls = x.calls.clone().unwrap_or_default();
+            // (Handed what happened: it works the paper out from the facts, as its principal's code would have.)
+            let calls = match (&x.calls, &x.facts) {
+                (Some(c), _) => c.clone(),
+                (None, Some(f)) => super::compose::compose(&x.kind, f, &m.client, &|n| crate::common::money_words(n, &cx.ctx.world)).unwrap_or_default(),
+                _ => String::new(),
+            };
             if m.stop.contains(&x.kind) {
                 steps.push(self.report(&m, &id, false, BTreeMap::new(), Some(format!("your brief says not to act on a {} until told", x.kind.replace('_', " ")))));
                 continue;

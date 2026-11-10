@@ -357,6 +357,55 @@ fn a_level_decided_by_hand_as_a_floor_is_kept_at_least_and_its_rule_may_raise_it
     assert!(two.contains("\"why\":\"costs_more\""), "{two}");
 }
 
+/// An export as the producer makes it: the goods sent, and the invoice for them.
+const EXPORT: &str = "goods(at=outside, carried=yes, from_at=works, kind=goods, quantity=\"20\", to=outside)\ninvoice = statement(basis=rec.16, data={\"from_at\":\"works\",\"kind\":\"goods\",\"outcome\":{\"money\":{\"amount\":\"200000\",\"for\":\"20 goods exported\",\"to\":\"acc-ll\"}},\"quantity\":20}, kind=invoice, text=\"Invoice: 20 goods at $100.00 each, $2,000.00.\", to=[\"outside\"], visible=[\"ll\",\"outside\"])";
+
+#[test]
+fn a_matter_handed_over_as_what_happened_carries_its_facts_and_its_draft_is_read_on_its_material_details() {
+    // (A service that takes invoices as what happened: its system works the paper out. The principal's rule weighs that
+    // without its composing, and its remit says the depth.)
+    let script: Vec<Value> = (1..=40).map(|d| json!({ "at": d * DAY + 3600, "call": EXPORT })).collect();
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "invoice": { "own_seconds": 1800, "error_cost": 1000, "compose_seconds": 900 } }, "hour_value": 4000, "review_days": 30 } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    let mut o = offer();
+    o["kinds"] = json!(["invoice"]);
+    o["seconds"] = json!({ "invoice": 60 });
+    o["depths"] = json!({ "invoice": ["act", "matter"] });
+    for d in 1..=30 {
+        h.wake(d * DAY + 3600, world(if d == 1 { vec![statement("rec.off", 0, PROV, "service_offer", &[], o.clone())] } else { vec![] }));
+    }
+    let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).expect("it engages") as i64 + 1);
+    let mut up = set_up(&order);
+    up[0]["data"]["offer"] = o;
+    h.wake(32 * DAY + 3600, world(up));
+    h.wake(33 * DAY + 3600, world(vec![signed()]));
+    let remit = h.sent.iter().rev().find(|p| p.contains("kind=remit")).cloned().unwrap_or_default();
+    assert!(remit.contains("\"depth\":\"matter\""), "{remit}");
+    let rec = json!({ "id": "rec.remit", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 33 * DAY, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [ME], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "invoice", "level": "draft", "depth": "matter" } });
+    let out = all(&h.wake(34 * DAY + 3600, world(vec![rec])));
+    let line = out.lines().find(|l| l.contains("kind=referral")).unwrap_or_else(|| panic!("{out}"));
+    assert!(line.contains("\"facts\":{") && !line.contains("\"calls\"") && !line.contains("carries=") && line.contains("\"unit_price\":\"10000\"") && !line.contains("200000"), "the facts, not the paper: {line}");
+    assert!(out.lines().any(|l| l.starts_with("goods(")), "the goods it sends itself: {out}");
+    assert!(h.decisions.iter().any(|d| d["choice"] == "handed" && d["depth"] == "matter"), "the act it would have sent, on record");
+    // (A draft as its own code would have sent it, in other words: signed off. One that invoices for more: declined,
+    // the detail named.)
+    let referral = last_referral(&h);
+    let same = statement("rec.d1", 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "invoice", "text": "Our invoice for the 20 goods.", "to": ["outside"],
+        "data": { "kind": "goods", "quantity": 20, "from_at": "works", "outcome": { "money": { "amount": "200000", "to": "acc-ll", "for": "export" } } } } }));
+    let out = all(&h.wake(35 * DAY + 3600, world(vec![same])));
+    assert!(out.contains("kind=sign_off"), "{out}");
+    h.wake(36 * DAY + 3600, world(vec![]));
+    let referral = last_referral(&h);
+    let more = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "invoice", "text": "Invoice.", "to": ["outside"],
+        "data": { "kind": "goods", "quantity": 20, "from_at": "works", "outcome": { "money": { "amount": "250000", "to": "acc-ll" } } } } }));
+    let out = all(&h.wake(37 * DAY + 3600, world(vec![more])));
+    let no = out.lines().find(|l| l.contains("kind=declined")).unwrap_or_else(|| panic!("{out}"));
+    assert!(no.contains("outcome money amount"), "{no}");
+}
+
 #[test]
 fn a_principal_remits_and_hands_over_only_kinds_of_its_own() {
     // (The scope pilot's W2: a factory's level decided by hand wrote a remit for every kind its offer took, and handed

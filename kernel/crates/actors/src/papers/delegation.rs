@@ -85,6 +85,23 @@ impl Level {
     }
 }
 
+/// What is handed over of a matter (docs/design/handing-over.md section 3.1): the finished act (`act`: its principal
+/// composed it, and the assistant writes it out) or what happened (`matter`: the facts, and the assistant works the paper
+/// out). A set beside the level, not a ladder.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Depth {
+    #[default]
+    Act,
+    Matter,
+}
+
+impl Depth {
+    pub fn is_act(&self) -> bool {
+        *self == Depth::Act
+    }
+}
+
 /// Who keeps the records an assistant makes, and what passes at the end (the service agreement's `records` term, law as
 /// data: docs/design/delegation.md section 6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,6 +169,10 @@ pub struct ServiceOffer {
     /// How many clients it has (its references).
     #[serde(default)]
     pub references: i64,
+    /// The depths it takes each kind at, beyond the finished act (`matter`: what happened, and its system works the paper
+    /// out). A kind not named: the finished act only.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub depths: BTreeMap<String, Vec<Depth>>,
 }
 impl Paper for ServiceOffer {
     const KIND: &'static str = "service_offer";
@@ -217,6 +238,9 @@ pub struct Remit {
     /// Absent, `hold_until` is a freeze: it does not look at the level again before then.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at_least: Option<Level>,
+    /// What is handed over of a matter of this kind: the finished act, or what happened.
+    #[serde(default, skip_serializing_if = "Depth::is_act")]
+    pub depth: Depth,
 }
 impl Paper for Remit {
     const KIND: &'static str = "remit";
@@ -246,6 +270,9 @@ pub struct Referral {
     /// was paying already).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub does_itself: Vec<String>,
+    /// What is handed over: the finished act (`calls`), or what happened (`facts`, at `matter`).
+    #[serde(default, skip_serializing_if = "Depth::is_act")]
+    pub depth: Depth,
 }
 impl Paper for Referral {
     const KIND: &'static str = "referral";
