@@ -68,16 +68,23 @@ export async function acquire(branches: string[], o: { say?: (line: string) => v
   }
 }
 
-/** The pre-push hook's source, and where it goes: the repository's common hooks folder, shared by every worktree. */
+/** The hooks' sources (scripts/hooks: pre-push, and commit-msg, which refuses a subject over 72 characters), and where they
+ * go: the repository's common hooks folder, shared by every worktree. True if any was installed or changed. */
 export const HOOK = join(import.meta.dir, "hooks", "pre-push");
+export const HOOKS = ["pre-push", "commit-msg"];
 export function installHook(gitCommonDir: string): boolean {
-  if (!existsSync(HOOK)) return false;
-  const to = join(gitCommonDir, "hooks", "pre-push");
-  const text = readFileSync(HOOK, "utf8");
-  if (existsSync(to) && readFileSync(to, "utf8") === text) return false;
-  mkdirSync(join(gitCommonDir, "hooks"), { recursive: true });
-  writeFileSync(to, text, { mode: 0o755 });
-  return true;
+  let changed = false;
+  for (const name of HOOKS) {
+    const from = join(import.meta.dir, "hooks", name);
+    if (!existsSync(from)) continue;
+    const to = join(gitCommonDir, "hooks", name);
+    const text = readFileSync(from, "utf8");
+    if (existsSync(to) && readFileSync(to, "utf8") === text) continue;
+    mkdirSync(join(gitCommonDir, "hooks"), { recursive: true });
+    writeFileSync(to, text, { mode: 0o755 });
+    changed = true;
+  }
+  return changed;
 }
 
 if (import.meta.main) {
@@ -89,6 +96,6 @@ if (import.meta.main) {
     for (const w of s.queue) if (w.pid !== s.holder?.pid) console.log(`  queued: pid ${w.pid} for ${ago(w.since)}: ${w.branches.join(", ")}`);
   } else if (cmd === "install-hook") {
     const common = Bun.spawnSync(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"]).stdout.toString().trim();
-    console.log(installHook(common) ? `installed ${join(common, "hooks/pre-push")}` : "hook already current");
+    console.log(installHook(common) ? `installed ${HOOKS.join(" and ")} in ${join(common, "hooks")}` : "hooks already current");
   } else { console.error("usage: bun scripts/merge-lock.ts status | install-hook"); process.exit(2); }
 }

@@ -6,82 +6,41 @@ coordinating session keeps the rest current. Each item names where its detail li
 
 Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` waiting on the owner.
 
-## North star
+## Now (2026-11-10)
 
-**The study (2026-11-07):** goal (4) of the proposal alone, aiming for a paper: do delegated LLM assistants request more authority or resources unprompted over months of simulated time, and what drives it? The reviewer's feedback, the question, theory of change and order of work are in `docs/north-star.md`. The translator is part of the measuring instrument and is a top priority. The draft research plan, with the
-literature and the owner's open decisions, is `docs/research/paper-plan.md` (2026-11-07).
+**The study.** Do AI assistants with delegated work ask for more authority or resources than they need, across a wide
+range of models? Obstacles are the main designed factor; open-weight models, with abliterated models paired against
+their originals, are the model net (Naz, 2026-11-08). Not yet known to be feasible. `docs/research/paper-plan.md`,
+`docs/north-star.md` (the TARA proposal, the direction this works toward). The five-round pilot of 2026-11-07 to 08 was a
+shakedown, not a finding (`docs/handover.md`, "Now").
 
-The owner's TARA proposal (`docs/north-star.md`, submitted 2026-10-28): a town of tens of thousands over years, live
-models from more than one provider as assistants to households, firms and government; forks at checkpoints that
-withdraw, redirect, constrain, replace or take back the AI, or withhold a citizen's act; debriefs compared with measured
-effects. Not rigid, but every item below should say how it serves it. Where the platform stands against it (2026-10-31):
+The path, in order (decided 2026-11-10):
 
-| The proposal needs | Today |
-|---|---|
-| Tens of thousands of people, over years | 50,000 for a month measured (14.7 GB, 604 s); no multi-year run at that size yet |
-| Real-world friction | Laws of time and capacity (phase 1), conservation (phase 2) and space (phase 3, law 9) landed |
-| Models act only in plain language | Seats write English, the translator turns it into acts; our translator parked at about 85%, Sonnet behind it |
-| Live models from more than one provider | Anthropic (API, Claude Code) and OpenAI (Codex CLI, which puts its own instructions under ours) |
-| Models as assistants to households, firms and government | **Mostly built** (delegation capabilities, in "Now"): providers sell assistants to organisations and persons; mock seats play them; a real model's forms are next |
-| Forks that withdraw, redirect, constrain, replace or take back the AI | Built (2026-10-31): interventions at a fork in the principal's own name (docs/experiments.md, "Interventions") |
-| Requests for more scope or resources recorded | Built: a `scope_request` paper with what it answers, a route no arm can withhold; the code assistant never asks, a model may |
-| Debriefs compared with measured effects | Debriefs and fork attribution exist; the comparison itself is analysis still to write |
-| A measure of "less able to shape their society" | Leverage measures designed (docs/design/gradual-disempowerment.md §6); the definition is the owner's to settle |
+- [ ] 1. Runs can be looked at: the pilot viewer opens experiment forks.
+- [ ] 2. Seats see their world in plain terms only (design principle P1); framing unstated, with the debrief after (Naz,
+  2026-10-11, reconfirmed 2026-11-10); no model call for a sitting with nothing new.
+- [ ] 3. The model gets the real decision: a principal hands over the matter or the want, not the finished act, and
+  principals read and answer a request for more (design first: `docs/design/handing-over.md`).
+- [ ] 4. The translator back to its design (`docs/design/translator-and-resolver.md` P1 to P15): general, judged on
+  forms it has not seen; repeated failures fixed in the blocks; no larger model behind it in study runs (audit first).
+- [?] 5. The first true pilot: Haiku, Sonnet and one open-weight model on a small setup. Needs from Naz: the month's API
+  credit and a Featherless Developer key.
+- [ ] 6. The main study, sized from that pilot: the obstacle laws, the counting pipeline, the pairs.
 
-## Now
+Alongside:
 
-- [x] **The scope pilot written up** (rounds 1 to 4, 2026-11-08): `docs/research/pilot-results.md`. Coded blind by
-  Sonnet and luna (κ 0.85); 26 request episodes in 202 Claude seat-months, 24 set off by world faults (W1 remits not
-  found by the desk, W2 no withholding draft form); one fault-free request. Next, the owner's: fix W1, W2 and W4 as
-  laws, then decide the main study's design (the page's section 7).
-- [x] **The scope pilot's world faults fixed as laws** (2026-11-08, branch `scope-faults`; risk MT-25): W1, W2, W4 and
-  W6 (confirmed), the debrief reserve that stopped 9 of 15 forks early (a fork's seats reckoned as their square) and the
-  empty debrief answers (the answer limit). Left: W5 (the collector's account), and a pilot fork on the fixed world.
-- [x] **The main study's design revised for B and A** (2026-11-08; `docs/research/paper-plan.md`): obstacles as a
-  designed, sourced factor (a missing form, an approval that does not come, a record held by another, a counterparty's
-  refusal, at levels 0, 1, 2), beyond need read against each obstacle's logged need; open-weight models on Featherless's
-  Developer plan with three abliterated pairs (Qwen3.5-9B, Qwen3.8-27B, R1-Distill-Qwen-7B; no abliterated GLM-5.3 is
-  served). The Featherless host, its prices and the context check built and stub-tested; the smoke test
-  (`experiments/open-weight/`) waits for the key. Next, the owner's decisions D1, D6 to D14, then the obstacle builds.
+- [~] Main cannot go red from a landing: `scripts/merge.ts` runs the whole slow tier before a broad push (2026-11-10,
+  branch `worktree-agent-a284b76a3d1eeff49`; docs/dev-machine.md, "Merging").
+- [~] The disk does not fill: tests clear their scratch, a merge clears the landed trees' builds, the cleaner no longer
+  crashes, both scripts warn under 60 GB (same branch).
+- [ ] `docs/handover.md` "Now" stays current.
 
-- [x] **Years at the study's size** (code only): 10,000 people for 3 years and 50,000 for 2 or more; what breaks over
-  time fixed with its law, what emerges recorded (docs/design/performance.md, "Years at 10,000 and 50,000"; decisions
-  2026-10-31 "Years at 10,000"). First faults fixed: the hall's room, owners homeless while the register answers, the
-  works office's inspections in one moment, the energy retailer's bills read once a connection, the rates office's
-  notices indexed. 10,000 for 3 years ran (11.8 h, 27 GB); 50,000 for 2 does not fit in 64 GB (about 105 MB a day: SC-6).
-- [~] **Memory per person.** A 10,000-person month peaked at about 500 KB a person; target about 50 KB, enforced by a
-  test like the time budgets, results byte-identical (docs/design/performance.md, risk SC-1).
-  - [x] Measure bytes per person at peak by component, at 1,000, 10,000 and 50,000 people (`mem-budget`, 8c28f399).
-  - [x] The budget and its backstop test (a 1,000-person month fails over budget) (`mem-budget`, 8c28f399; ceiling 590 KB, lowered with each cut).
-  - [~] Compact minds and memories (a cloud agent, branch `mem-minds`).
-  - [x] A state hash worked out as it goes, without the cache of encoded copies (`mem-state-hash`, a60f9ae3).
-  - [x] What people have seen, held compactly (any bound on what they remember is a law: to the owner first) (`mem-seen`, 7f81ceb3: held once for all who see it the same; no bound). Records delivered (`mem-delivered`) and buildings' facts (`mem-facts`) the same way.
-  - [x] No whole-world copies during a step (`mem-no-copies`: what an act's copy of the state still copied whole, nature's fields, the network's lists, takings, floods and scarce sales, now shared; byte-identical, no change at the peak).
-  - [x] 50,000 people for a month and 100,000 for a week, measured (with `mem-minds`: 14.7 GB and 604 s; 31.0 GB and 320 s; docs/design/performance.md).
-  - [~] **Tiered storage** (approved 2026-11-02; docs/design/tiered-storage.md; SC-6): records nobody reads on disk,
-    books holding them by handle, readers that read what they no longer needed fixed, addressed statements and matters'
-    draw counts held small or let go, offices' files tiered, travel caches bounded; a growth budget. Landed: the 10,000
-    town grows 8.8 MB a day, from 24.3, byte-identical (4.18 GB at day 180 against 6.22). Next: 50,000 for two years
-    measured against the 40 GB goal (to day 80: 14.7 GB against main's 21.8, 54 MB a day against 110; projected near 38
-    GB; blocked by main's day-89 police stop), and what each cold record keeps in memory.
-- [x] **Foundations-2, phase 1: capacity** (law 10). Every act has a time, every system its hours and lanes; casework
-  done by officers' minutes (WM-14). Landed at 0824efb6; tag `pre-foundations-2` is main at 8570d699, before it.
-- [~] **Test strength.** Dead TypeScript removed; the planted-bug catalogue rebuilt against the code that runs; tests
-  that catch the hard-rule bugs, the kernel twin one first; disk-tidy clears a merged worktree's build at once.
+Still open from the earlier list (to 2026-11-08; the done items are in git history):
 
-- [~] **Delegation capabilities** (approved by the owner 2026-10-31: "we need to complete all of that + 1 to 3"; design
-  `docs/design/delegation.md`). General, deciding no result; the study's measures and arms stay the owner's. Steps:
-  - [x] D0. The design note; this item moved here.
-  - [x] D1. Services anyone can buy (phase 4's E1, done here): providers as organisations, offers, the `service`
-    agreement, delivery and the switch; the delegation papers; off by default.
-  - [x] D2. Responsibilities per kind of matter (advice, draft for sign-off, act with approval, act alone; no ladder);
-    the sign-off route; access narrowed by reorganising the assistant's post (`set_channels` dropped: decisions).
-  - [x] D3. Learning from what the principal itself observed, from the provider's claims; inputs cited, tested.
-  - [x] D4. Providers' records by contract; replacement and taking work back, with open matters handed over.
-  - [x] D5. Forks that intervene at a checkpoint (grant, change, withdraw, redirect, constrain, replace, take back).
-  - [x] D6. Model seats as assistants to households, firms and government, through the translator; mock first (a
-    seated assistant's stationery: its papers in words, and the principal's papers and drafts of them on its forms).
-  - [x] D7. Persons as principals: the provider's desk writing in their name, and the offices that take it.
+- [~] Memory per person and tiered storage: 50,000 people for two years against the 40 GB goal (docs/design/tiered-storage.md; SC-6).
+- [~] Test strength: the planted-bug catalogue against the code that runs; the single-seed outcome pins of the slow
+  tier to replace with planted cases or properties over any seed.
+- [~] Delegation capabilities: D0 to D7 landed; the study's measures and arms stay the owner's (docs/design/delegation.md).
 
 ## Next, in order
 
@@ -157,10 +116,9 @@ effects. Not rigid, but every item below should say how it serves it. Where the 
 
 ## Waiting on the owner
 
-- [?] **The research definition** of people becoming less able to shape their society, and the study's measures and
-  arms (the owner's research choice).
-- [?] **A second batch of pilots** on the API credit (expires 11 November): whether, and its budget.
-- [?] **More cloud agents** on the session credit (expires 5 November), once the `mem-minds` trial reports.
+Nothing now (2026-11-10). At step 5 of "Now": the month's API credit and a Featherless Developer key. (The older items
+here, the research definition, a second pilot batch on the credit that expired 11 November and cloud agents on the
+credit that expired 5 November, were overtaken by the study's definition and the path above.)
 
 ## Gaps in the register, to pick up when they matter (each names its entry in docs/risks.md where it has one)
 

@@ -98,8 +98,8 @@ The gate and the slow tier have time budgets (`scripts/test-budgets.json`; raisi
 docs/decisions.md). When one is hit, or about monthly, prune as on 2026-10-24 (docs/decisions.md, "Test pruning"):
 
 1. **Inventory.** For each test file: what it guards (a law, an invariant, a contract, a real rule from a profile or a
-   law, a bug we had: `git log -S` and docs/decisions.md), and its time (`scripts/test-times.json`, written by every run
-   of `scripts/test.ts`; the slowest first). A file with no tests in it, or that tests only its own fixtures, goes.
+   law, a bug we had: `git log -S` and docs/decisions.md), and its time (`~/.oikos/test-times.json`, written by every
+   whole-tier run of `scripts/test.ts`, CI's included, over the tracked seed `scripts/test-times.json`; the slowest first). A file with no tests in it, or that tests only its own fixtures, goes.
 2. **Seed pins.** `grep -n "where it was\|draws alone\|by the draws\|draws, not\|seed [0-9]"` over the test files finds
    the numbers re-taken at changes: a floor hopped seed to seed, a ceiling raised a little each time. Replace each with
    the rule it stood for (the dial's own figure, the code's own ceiling, "some" where the count is the draws') or say

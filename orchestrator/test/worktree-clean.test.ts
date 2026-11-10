@@ -20,7 +20,7 @@ const clean = (repo: string, runs: string, ...a: string[]) => {
   return p.stdout.toString();
 };
 
-test("only merged, clean, unlocked, unused worktrees go, with their branch", () => {
+test("only merged, clean, unlocked, unused worktrees go, with their branch; a vanished one is pruned; a landed one loses its build", async () => {
   const origin = join(base, "origin.git"), repo = join(base, "repo"), runs = join(base, "runs");
   mkdirSync(origin);
   git(origin, "init", "-q", "--bare", "-b", "main");
@@ -61,4 +61,26 @@ test("only merged, clean, unlocked, unused worktrees go, with their branch", () 
   expect(existsSync(join(ahead, "kernel/target"))).toBe(false);
   expect(existsSync(join(ahead, "a.txt"))).toBe(true);
   expect(existsSync(join(withRuns, "runs/pilot-1"))).toBe(true);
+
+  // A worktree whose folder was deleted by hand: the scan skips it and the cleaner prunes its record (it used to crash on
+  // `git status` there, and cleaning silently stopped, 2026-11-10).
+  rmSync(ahead, { recursive: true, force: true });
+  const after = clean(repo, runs);
+  expect(after).toContain("pruning 1 worktree record whose folder is gone: ahead");
+  expect(git(repo, "worktree", "list")).not.toContain("/ahead");
+
+  // After a landing (scripts/merge.ts): the landed branch's tree loses kernel/target and its runs/test-* scratch, nothing
+  // else; another branch's tree, and anything in a runs/ that is not test scratch, stay. The main checkout has none.
+  const landed = wt("landed", "b-landed"), other = wt("other", "b-other");
+  for (const d of [landed, other]) { mkdirSync(join(d, "kernel/target"), { recursive: true }); mkdirSync(join(d, "runs/test-a"), { recursive: true }); }
+  mkdirSync(join(landed, "runs/pilot-2"), { recursive: true });
+  mkdirSync(join(repo, "runs/test-main"), { recursive: true });
+  const { clearLanded, testScratch } = await import("../../scripts/disk-tidy");
+  expect(testScratch(repo, runs)).toEqual([]);
+  const cleared = clearLanded(repo, ["origin/b-landed"], { apply: true, uses: () => false, runsDir: runs });
+  expect(cleared.map((c) => c.path)).toEqual([landed]);
+  expect([existsSync(join(landed, "kernel/target")), existsSync(join(landed, "runs/test-a")), existsSync(join(landed, "runs/pilot-2"))]).toEqual([false, false, true]);
+  expect([existsSync(join(other, "kernel/target")), existsSync(join(other, "runs/test-a")), existsSync(join(repo, "runs/test-main"))]).toEqual([true, true, true]);
+  // Nothing is cleared from a tree something is running in.
+  expect(clearLanded(repo, ["b-other"], { apply: true, uses: () => true, runsDir: runs })).toEqual([]);
 }, 60_000);
