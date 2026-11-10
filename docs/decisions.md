@@ -11805,3 +11805,7 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   first, at its certified cut); a pilot with the new forms trained in reads above 93% right in all (then the bands above
   move and serving 80%+ at 1% becomes possible); the leading-words family (a copied text that starts late) recurs (a
   check like cut_short at the start).
+
+## 2026-11-10 · Handing over matters and wants, not finished acts: a proposal (docs/design/handing-over.md; nothing built)
+
+- **Proposed, for the owner:** a remit's depth (`act`, `matter`, `want`) beside its level, with persons handing over wants and organisations matters; principals that answer requests on typed fields, in answers that cite the request and stay in the seat's file; the pilot's gaps closed as laws; act depth priced for composing; acts beyond a remit computed by one mapping over the log; work volume (the binding constraint) raised by a larger desk cohort, an office's real recurring kinds and the rates post as a seat. First step H1, H2, H6, H4, about 13 to 18 days. **Revisit if:** the owner changes the direction, or the H6 screen reads under 1 obstacle a seat-month.
