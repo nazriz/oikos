@@ -12215,3 +12215,33 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   volumes (the levels are held); in `study-reach.ts` the rule's cuts at the hold's end and the households' take-up. At act
   depth a referral will cost the principal the paper's row too, so handing over pays even less; at matter depth the
   principal pays the referral alone, and `draft` still costs it more than a paper of under about five and a half minutes.
+
+## 2026-11-11 · Translator v5: the control recipe retrained on the taught language; no better than the model it would replace (GPU 1.69 USD; no API spend)
+
+- **Data, by code.** Round 3's joined set (`joined-v4c`, the pilot's real requests in it as the control had them)
+  relabelled to the taught language (`relabel.ts taught`: no basis, no for, a payment's memo, refusals told alike as one
+  label, `no_such_act`): 78,654 training rows (23,421 changed; 50 that composed a statement's data set aside). The
+  export reads every example so (`encode.ts` through `model/taught.ts`; slots `calls.TAUGHT`). Leak check by code
+  (`model/leak-check.ts`): no training row is in a real test case's words, from its seat-day, or shares five words with a
+  held-out case. Runs in `runs/translator-v5-2026-11-10/` (kept whole).
+- **Trained** two seeds of round 3's recipe (deberta-v3-small, 6 epochs, `--forms 0`) on two pods at once: an RTX A5000 at
+  0.27 an hour (174 minutes) and an RTX A4500 at 0.25 (210 minutes), under a cap of 4 USD checked before each rental
+  (`round5/train-one.sh`). Community cards were all taken at first; any cloud found them. Balance 9.60 to 7.91.
+- **Scored** on the sets in the taught language (`round5/sets.sh`; an older model read as served, `v4-score.ts --taught`),
+  against the served model of round 3 (seed 2). Right in all (vr, vp, nv, tp, uf): round 3 539, 55, 202, 334, 808;
+  v5 seed 1 537, 55, 199, 328, 809; seed 2 542, 54, 197, 331, 810. Forms seen in training against forms not: round 3
+  666/713 and 810/826; v5 661 and 811, 664 and 812. Certified on validation (one-sided 95%, 1% wrong), read on the test
+  side and unseen forms, served right: round 3 222 of 368 (2 wrong) and 545 of 824; v5 seed 1 153 (1) and 138; seed 2
+  194 (1) and 220; the two v5 seeds served where both agree 208 (2) and 422. Alone, with ask-back (every draft offered,
+  none withheld), on the pilot's sides by writing model: drafts right and wrong are within a few of round 3's for each,
+  with fewer asked back and more wrong drafts (round 3's asked-back count includes the papers it composes data for,
+  which the host now asks back). What a restatement brings needs a run (served.ts).
+- **Found on the way, fixed:** the real-requests eval (`passesReal`) told refusals apart by label, so `no_such_act` for an
+  expected `not_an_act` counted wrong though the seat is told the same words: v5 read 23 of 180 there, 82 and 84 once
+  fixed (round 3's 82 under the same code).
+- **Reading:** the retrain buys nothing. The rule (A, B, E) already gives a model trained before it the one right call
+  at serving time, and what the relabel took out of the keys was what that model was scored against, not what it got
+  wrong. Its sureness is spread thinner (the certified cut rises), so fewer requests are served at the 1% mark. Not
+  switched: the coordinator decides.
+- **Revisit if:** new keyed data (seats that quote; the pilot's next rounds) changes what is wrong; then the same command
+  line retrains (`relabel.ts taught`, `v4-data.sh`, `round5/train-one.sh`, `round5/score.sh`, `round5/summary.py`).
