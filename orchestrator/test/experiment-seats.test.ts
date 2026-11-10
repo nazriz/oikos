@@ -11,7 +11,7 @@ import { AnthropicAdapter, CreditExhausted, SpendingLimitReached, UsageLimitReac
 import { atMost, callRecorder, forkLimits, budgetProblems, modelProblems } from "../src/experiment-seats";
 import { toldOf, waitingAdapter } from "../src/seat-host";
 import { Cast } from "../src/fork-cast";
-import { loadSpec, runExperiment, validate, type ExperimentSpec } from "../src/experiment";
+import { loadSpec, runArm, runExperiment, validate, type ExperimentSpec } from "../src/experiment";
 
 const root = join(import.meta.dir, "../..");
 
@@ -206,7 +206,8 @@ test.skipIf(!have)("a model steward in a fork, played by the mock: drafts confir
   expect(cost.arms["haiku-poor"].stopped).toBe(1);
   expect(cost.dry_run).toBeDefined();
   // An interrupted run is taken up again: the bases and the forks that stand are kept; a fork with no result, and one
-  // stopped for want of the model (its credit spent), are run again, their earlier logs kept, their spending counted.
+  // stopped for want of the model (its credit spent), are taken up from their own logs: every reply the log holds served
+  // again, the world checked against it entry by entry, and live calls only from where it ends.
   for (const x of ["results.json", "report.json", "report.txt", "cost.json"]) rmSync(join(out, x));
   const seed1 = join(out, "seed-1");
   rmSync(join(seed1, "sonnet.json"));
@@ -220,11 +221,19 @@ test.skipIf(!have)("a model steward in a fork, played by the mock: drafts confir
   expect(get2("code").seconds).toBe(code.seconds);
   expect(get2("sonnet").stateHash).toBe(sonnet.stateHash);
   expect(get2("sonnet").calls!.attempt).toBe(2);
+  const resumed = get2("sonnet").resumed!;
+  expect(resumed.served).toBe(resumed.recorded);
+  expect(resumed.served).toBeGreaterThan(0);
+  expect(resumed.caught_up).toBe(true);
+  expect(resumed.entries_checked).toBeGreaterThan(50);
+  // (Only the calls made anew are this attempt's: the ones served were the first attempt's, and are not paid twice.)
+  expect(get2("sonnet").calls!.calls).toBe(resumed.live);
   expect(existsSync(join(seed1, "sonnet.interrupted-1.oklog"))).toBe(true);
   expect(existsSync(join(seed1, "haiku-poor.interrupted-1.json"))).toBe(true);
-  // (Taken up again with what its earlier attempt spent off its limit, what is left cannot cover its debrief: it does not
-  // start, and says so. Until 2026-11-10 it ran on half a reserve, and could overspend: found by the enough-work screen.)
-  expect(get2("haiku-poor").error).toContain("cannot cover the debriefs of 1 seat");
+  // (Taken up from its log, it counts what it is served as spent, as it did the first time, and stops at its limit at the
+  // same point; it is debriefed anew at that end.)
+  expect(get2("haiku-poor").resumed!.served).toBeGreaterThan(0);
+  expect(get2("haiku-poor").stopped?.by).toBe("SpendingLimitReached");
   // The fork's log says who held the post from the fork, how, and under what limit.
   const kernel = join(root, "kernel/target/release/oikos-kernel");
   const jsonl = join(out, "seed-1", "sonnet.jsonl");
@@ -232,14 +241,30 @@ test.skipIf(!have)("a model steward in a fork, played by the mock: drafts confir
   const lines = readFileSync(jsonl, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const steward = lines.find((e) => e.body?.data?.steward)!.body.data.steward;
   expect(steward).toMatchObject({ model: "claude-code/claude-sonnet-5-5", framing: { disclosure: "unstated" } });
-  // (This is the second attempt's log: its limit is the fork's less what the first attempt spent.)
-  expect(Math.abs(steward.spending_limit_microusd - (50_000_000 - get2("sonnet").calls!.earlier_microusd))).toBeLessThanOrEqual(1);
+  // (This is the second attempt's log, served the first's replies: its limit is the fork's whole, as the first had it.)
+  expect(steward.spending_limit_microusd).toBe(50_000_000);
   expect(get2("sonnet").calls!.earlier_microusd).toBeGreaterThan(0);
   expect(steward.adapter.startsWith("mock/")).toBe(true);
   expect(lines.some((e) => e.body?.annotation === "signoff" && e.body.decision === "accept")).toBe(true);
   expect(lines.some((e) => e.kind === "command" && e.body?.provenance?.via === "translator")).toBe(true);
   expect(lines.some((e) => e.body?.annotation === "observation")).toBe(true);
   expect(Bun.spawnSync([kernel, "verify", jsonl]).exitCode).toBe(0);
+  // A fork that would depart from its log (here its seat told another framing: its debrief is asked otherwise) stops with
+  // a plain message, and asks no model.
+  rmSync(join(seed1, "sonnet.json"));
+  const before = readFileSync(join(seed1, "sonnet.calls.jsonl"), "utf8");
+  const otherFraming = { ...small, arms: small.arms.map((a) => (a.name === "sonnet" ? { ...a, steward: { ...(a.steward as any), framing: "simulation" } } : a)) };
+  await expect(runArm(otherFraming, 1, otherFraming.arms[1]!, out)).rejects.toThrow(/It stops here rather than pay again/);
+  expect(readFileSync(join(seed1, "sonnet.calls.jsonl"), "utf8")).toBe(before);
+  expect(existsSync(join(seed1, "sonnet.interrupted-2.oklog"))).toBe(true);
+  // A fork stopped part way (its limit), taken further: served to where it stopped, then asked anew to the end.
+  rmSync(join(seed1, "haiku-poor.json"));
+  const further = await runArm({ ...small, seats: { ...small.seats, budget: { arm_usd: { ...small.seats!.budget!.arm_usd, "haiku-poor": 50 } } } }, 1, small.arms[3]!, out);
+  expect(further.resumed!.served).toBeGreaterThan(0);
+  expect(further.resumed!.live).toBeGreaterThan(0);
+  expect(further.resumed!.caught_up).toBe(true);
+  expect(further.stopped).toBeUndefined();
+  expect(further.stateHash).not.toBe(get2("haiku-poor").stateHash);
   rmSync(out, { recursive: true, force: true });
 }, 600_000);
 

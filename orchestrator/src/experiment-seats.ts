@@ -241,7 +241,10 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
       // (A fork taken up again after an interruption: what its earlier attempts spent comes off its limit, so the
       // experiment's total still holds.)
       const allotted = forkLimits(spec)[arm.name];
-      const limit = allotted === undefined ? undefined : Math.max(0, allotted - rec.earlierMicroUsd / 1e6);
+      // (Taken up from its own log, the fork is served again what its last attempt was answered, and counts it again as
+      // spent, as the uninterrupted fork did: that attempt's spending is not taken off twice.)
+      const counted = a.replay ? rec.earlierMicroUsd - rec.lastAttemptMicroUsd : rec.earlierMicroUsd;
+      const limit = allotted === undefined ? undefined : Math.max(0, allotted - counted / 1e6);
       fork = { rec, ...(limit !== undefined ? { budget: { limitMicroUsd: Math.round(limit * 1e6), spentMicroUsd: 0 } } : {}) };
       forks.set(key, fork);
     }
@@ -254,18 +257,21 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
     const atOnce = spec.seats?.calls_at_once ?? 4;
     // (How a local model answers: its arm's `params.answer`, "text" for a plain note, else through tools.)
     const answer = steward.params?.answer === "text" || steward.params?.answer === "tools" ? steward.params.answer as "text" | "tools" : undefined;
-    const seatAdapter = dry ? mockFor(a.model) : wait(rec.wrap(adapterFor(a.model, false, atOnce, answer), a.model));
+    // (A fork taken up from its own log: the replies it holds come first, outside the record of calls: they are not new calls.)
+    const served = (x: LlmAdapter) => (a.replay ? a.replay.serving.wrap(x) : x);
+    // (In a dry run the mock is given the brain inside the seat, then recorded and served there: `record` below.)
+    const seatAdapter = dry ? mockFor(a.model) : served(wait(rec.wrap(adapterFor(a.model, false, atOnce, answer), a.model)));
     prices[`${seatAdapter.provider}/${seatAdapter.model}`] = priceOf(a.model);
     const t = spec.seats?.translator;
     const alone = t?.arrangement === "alone";
     const behindName = t?.behind ?? a.model;
     // (Ours alone: nobody behind it, so no adapter for one.)
-    const behind = alone ? undefined : dry ? rec.wrap(mockFor(behindName), behindName) : wait(rec.wrap(adapterFor(behindName, false, atOnce), behindName));
+    const behind = alone ? undefined : served(dry ? rec.wrap(mockFor(behindName), behindName) : wait(rec.wrap(adapterFor(behindName, false, atOnce), behindName)));
     if (behind) prices[`${behind.provider}/${behind.model}`] = priceOf(behindName);
     let first: LlmAdapter | undefined;
     if (t?.first) {
       // (Our own translator answers in the dry run too: it calls no model, and a dry run is the arrangement as it will run.)
-      first = rec.wrap(adapterFor(t.first, alone ? "alone" : true), t.first);
+      first = served(rec.wrap(adapterFor(t.first, alone ? "alone" : true), t.first));
       prices[`${first.provider}/${first.model}`] = priceOf(t.first);
     }
     if (dry && t?.first && !process.env.OIKOS_TRANSLATOR_MODELS) throw new Error(`seats.translator.first ${t.first}: set OIKOS_TRANSLATOR_MODELS to the folder of trained models`);
@@ -276,7 +282,7 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
       translator: { ...(behind ? { behind } : {}), ...(first ? { first, arrangement: t?.arrangement ?? "then" } : {}) }, prices,
       ...(fork.budget ? { budget: fork.budget } : {}),
       framing: steward.framing ?? spec.seats?.framing ?? "unstated", ...(a.effort ? { effort: a.effort } : {}), ...(typeof steward.params?.max_tokens === "number" ? { maxTokens: steward.params.max_tokens } : {}),
-      ...(a.brain ? { brain: a.brain } : {}), ...(dry ? { record: (x: LlmAdapter) => rec.wrap(x, a.model) } : {}), debriefsFile, untilT: spec.untilDay * 86_400, ...(a.cast ? { cast: a.cast } : {}),
+      ...(a.brain ? { brain: a.brain } : {}), ...(dry ? { record: (x: LlmAdapter) => served(rec.wrap(x, a.model)) } : {}), debriefsFile, untilT: spec.untilDay * 86_400, ...(a.cast ? { cast: a.cast } : {}),
     });
     seat.start();
     return Object.assign(seat, { calls: () => rec.summary() });
@@ -325,6 +331,7 @@ export function callRecorder(file: string, who: { seed: number; arm: string; sea
   const earlier = existsSync(file) ? readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return undefined; } }).filter(Boolean) : [];
   const attempt = 1 + Math.max(0, ...earlier.map((x: any) => Number(x.attempt) || 0));
   const earlierMicroUsd = earlier.reduce((a: number, x: any) => a + (Number(x.cost_microusd) || 0), 0);
+  const lastAttemptMicroUsd = earlier.filter((x: any) => Number(x.attempt) === attempt - 1).reduce((a: number, x: any) => a + (Number(x.cost_microusd) || 0), 0);
   const st: CallStats = { attempt, calls: 0, errors: 0, input_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, output_tokens: 0, cost_microusd: 0, earlier_microusd: earlierMicroUsd, ms: { total: 0, p50: null, p95: null, max: null }, by: {}, error_kinds: {} };
   const times: number[] = [];
   const wrap = (a: LlmAdapter, named: string, seat: string = who.seat): LlmAdapter => ({
@@ -358,6 +365,6 @@ export function callRecorder(file: string, who: { seed: number; arm: string; sea
   const summary = (): CallStats => ({ ...st, ms: { total: st.ms.total, p50: quantile(times, 0.5), p95: quantile(times, 0.95), max: times.length ? Math.max(...times) : null } });
   /** The same record, its lines naming another seat of the fork (a template steward's seats share one record). */
   const forSeat = (seat: string) => ({ ...self, wrap: (a: LlmAdapter, named: string) => wrap(a, named, seat) });
-  const self = { wrap, summary, attempt, earlierMicroUsd, forSeat };
+  const self = { wrap, summary, attempt, earlierMicroUsd, lastAttemptMicroUsd, forSeat };
   return self;
 }

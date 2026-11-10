@@ -12492,3 +12492,29 @@ plain words and with no menu of the world's acts (P1, P2):
   to record, not something to prevent.
 - **Revisit if:** seats leave by writing the line as a sign-off, without meaning it (read their reasons and debriefs
   first: the line asks for a reason and the guide says what follows it).
+
+## 2026-11-11 · An interrupted fork takes itself up from its own log (orchestrator/src/experiment.ts `runArm`, resume.ts `ForkReplay`)
+
+- **What changed:** a model fork whose log has no result (killed, or stopped for want of the model) was renamed
+  `.interrupted-k.oklog` and run again from the snapshot with fresh model calls. It is still renamed and kept, but the
+  fork is now taken up from it: the log is exported, every model reply it holds is served again in order (`Serving`, in a
+  new strict mode), and every entry the resumed fork writes is set beside the interrupted log's entry of the same number
+  (the same kind, an annotation of the same name, a world event with the same time and body). Only once the world stands
+  where that log ends (or where its stop note is: what follows a stop, its debriefs, belongs to that ending) may a call go
+  to the live model. A request that is not the one recorded, a world event that differs, or replies that run out before
+  the world gets there stop the fork with a plain message (`ReplayMismatch`, never taken for a failed call by `callModel`,
+  and once raised every later call is refused), never a silent second payment. A log that cannot be read back stops the
+  fork too, saying how to run it afresh. The fork's result says what it took (`resumed`: recorded, served, live, entries
+  checked, caught up).
+- **Money:** served replies are outside the record of calls (`<arm>.calls.jsonl`): they are not new calls. The seat
+  counts them as spent, as the first attempt did, so it reaches its limit at the same point; so the fork's limit no longer
+  has the served attempt's spending taken off it a second time (only earlier attempts', if any).
+- **Why:** seats now run on the owner's subscription and API credit; a fork killed at day 150 of 180 cost the whole fork
+  again. A replay that went on silently past a difference would mix two runs in one log.
+- **Test:** `orchestrator/test/experiment-seats.test.ts` (mock seats): a fork with no result is served every reply and ends
+  with the same state hash, no new calls; a fork stopped at its limit and taken further is served to its stop, then asked
+  anew; a fork whose seat is told another framing stops with the message and adds nothing to its record of calls.
+- **Not done:** a killed fork loses the entries not yet in a block (1 MiB of log; `kernel/src/blog.rs`), and with them
+  the replies in that tail: those calls are made again. Flushing a block after every model reply would close that.
+- **Revisit if:** a resumed fork stops on a difference that is not a real departure (an annotation written from the wall
+  clock, say): compare less, not nothing.

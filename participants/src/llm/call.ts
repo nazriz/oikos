@@ -192,6 +192,8 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
   } catch (e) {
     // (A limit stops the run: nothing was answered, and the call is made again when the run is resumed.)
     if (e instanceof SpendingLimitReached) throw e;
+    // (Nor is a resumed fork's departure from its own log a failed call: it stops the fork, asking nothing more.)
+    if ((e as Error)?.name === "ReplayMismatch") throw e;
     // (One already in these words is a recorded failure, served again by a resumed run: the same words go in its log.)
     const failed = e instanceof ModelCallFailed ? e : new ModelCallFailed(`${key} (${req.purpose}, for ${req.subject}): ${(e as Error).message}`.slice(0, 2000));
     // Recorded as a transcript is, without an answer: what was sent (the system prompt by its hash), and the error.
