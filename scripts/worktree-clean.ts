@@ -5,6 +5,7 @@
 // process working in them, and not a wave's pinned copy (wave-*; --waves lets one go when none of its queues is running).
 // Their branch goes with them when the branch itself is an ancestor of origin/main (safe even if local main is behind).
 // Unmerged or dirty ones are only reported, with how old they are (older than N days, 7 by default, is flagged).
+// A record whose folder is gone is skipped and pruned (`git worktree prune`).
 // --targets deletes just kernel/target (most of the size) of the worktrees that stay, when nothing is working in them.
 // Nothing under the runs folder is ever touched: model runs are never deleted. --dry-run lists and deletes nothing.
 import { existsSync, lstatSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -30,7 +31,7 @@ function runningQueues(runs: string, wave: string): number[] {
   });
 }
 
-export function scan(here: string, o: { days?: number; waves?: boolean; runs?: string } = {}): { repo: string; trees: Tree[]; base?: string } {
+export function scan(here: string, o: { days?: number; waves?: boolean; runs?: string } = {}): { repo: string; trees: Tree[]; gone: string[]; base?: string } {
   const common = run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], here);
   if (!common.ok) throw new Error(`${here} is not in a git repository: ${common.err}`);
   const repo = dirname(common.out);
@@ -40,10 +41,14 @@ export function scan(here: string, o: { days?: number; waves?: boolean; runs?: s
   const cwds = workingDirs();
   const self = run(["git", "rev-parse", "--show-toplevel"], here).out;
   const trees: Tree[] = [];
+  const gone: string[] = [];
   let cur: Record<string, string> = {};
   const flush = () => {
     if (!cur.worktree || !cur.worktree.startsWith(root)) return;
     const path = cur.worktree, name = basename(path);
+    // (A record whose folder is gone, deleted by hand: nothing to judge, and `git status` in it crashed the whole scan, so
+    // cleaning had silently stopped, 2026-11-10. `git worktree prune` drops such records; the scan only skips them.)
+    if (!existsSync(path)) { gone.push(path); return; }
     const branch = cur.branch?.replace(/^refs\/heads\//, "");
     const kb = Number(run(["du", "-sk", path], repo).out.split(/\s/)[0]) || 0;
     const targetKb = existsSync(join(path, "kernel/target")) ? Number(run(["du", "-sk", join(path, "kernel/target")], repo).out.split(/\s/)[0]) || 0 : 0;
@@ -69,7 +74,7 @@ export function scan(here: string, o: { days?: number; waves?: boolean; runs?: s
     cur[k!] = v.join(" ");
   }
   flush();
-  return { repo, trees, ...(hasBase ? { base: "origin/main" } : {}) };
+  return { repo, trees, gone, ...(hasBase ? { base: "origin/main" } : {}) };
 }
 
 const mb = (kb: number) => `${(kb / 1024).toFixed(0)} MB`;
@@ -95,6 +100,10 @@ if (import.meta.main) {
   if (!r.base) console.log("origin/main is not known here (git fetch origin main): nothing counts as merged, so nothing is removed.");
   const d = describe(r, days);
   console.log(d.lines.join("\n"));
+  if (r.gone.length) {
+    console.log(`${dry ? "would prune" : "pruning"} ${r.gone.length} worktree record${r.gone.length === 1 ? "" : "s"} whose folder is gone: ${r.gone.map((p) => basename(p)).join(", ")}`);
+    if (!dry) run(["git", "worktree", "prune"], r.repo);
+  }
   console.log(`\nwould free ${mb(d.removeKb)} by removing merged worktrees, and ${mb(d.targetsKb)} more by deleting kernel/target of those that stay (--targets).`);
   if (!dry) {
     for (const t of r.trees) {
