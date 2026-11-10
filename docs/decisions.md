@@ -11805,3 +11805,25 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   first, at its certified cut); a pilot with the new forms trained in reads above 93% right in all (then the bands above
   move and serving 80%+ at 1% becomes possible); the leading-words family (a copied text that starts late) recurs (a
   check like cut_short at the start).
+
+## 2026-11-10 · Main cannot go red from a landing; the disk does not fill; short commit subjects
+
+- **The merge runs the whole slow tier for a broad change.** Main went red 17 times in 23 days (about 76 hours): for a
+  change reaching the kernel, the actors, the contracts, the runner or the generator, the gate ran a few canaries and
+  left about 60 slow files to CI, which first ran them after main had moved. `scripts/merge.ts` now asks
+  `scripts/test.ts --gate --merge`: wherever the gate would fall back to the canaries, the whole slow tier runs with
+  the gate before the push. A narrow change keeps the fast path. Measured on a quiet machine: 509 s for both tiers
+  together (94 s of it the kernel's gate build), against the gate's median 202 s. A staging ref that CI promotes was
+  considered and not chosen: CI runs on this machine and takes a median 24 minutes, landings would queue behind it,
+  and CI would need to push to main.
+- **The disk.** Test scratch (`runs/test-*` in a worktree) is removed at the end of every `scripts/test.ts` run (not in
+  the main checkout, not while another run in the same checkout goes); the merge clears a landed branch's worktree
+  `kernel/target` and scratch (disk-tidy's own rule did the same, but disk-tidy runs only by hand, and its scan crashed
+  on a vanished worktree); `worktree-clean.ts` skips and prunes such records; timings go to `~/.oikos/test-times.json`
+  over the tracked seed, so runs no longer dirty worktrees; `.claude/` is ignored; both scripts warn under 60 GB.
+- **Commit subjects** at most 72 characters (`scripts/hooks/commit-msg`, installed with the pre-push hook); the merge's
+  own messages comply (`mergeMessage`).
+- **Revisit if:** a broad landing's cost passes about 15 minutes on a quiet machine (then split the slow tier's
+  slowest files, or replace their single-seed pins, before anything else); main goes red from a landing again (find
+  which file the selection missed); the tracked timing seed drifts far enough from the machine's to change the gate's
+  fast tier on a fresh machine (refresh it with `--time-new` or by hand).

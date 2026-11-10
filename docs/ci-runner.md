@@ -4,11 +4,11 @@
 and a fork's code must not run on this machine): `bun install`, `bun run kernel`, `bun run typecheck`, both tiers of
 the suite. A second workflow, `.github/workflows/linux.yml`, runs the same nightly on a GitHub-hosted `ubuntu-latest`
 machine with no secrets (PL-4). ci.yml runs on a self-hosted runner on the run server (the Mac mini),
-labels `self-hosted`, `macOS`, `oikos-mini`, one job at a time, under the `clawd` user. Until the runner is registered,
-jobs wait in the queue. The runner shares the machine's slots (docs/dev-machine.md), so CI waits its turn with everyone else.
+labels `self-hosted`, `macOS`, `oikos-mini`, one job at a time, under the `clawd` user (registered and running as a
+user LaunchAgent, `actions.runner.nazriz-oikos.oikos-mini`; checked 2026-11-10). The runner shares the machine's slots (docs/dev-machine.md), so CI waits its turn with everyone else.
 
-Registering needs a token only the repo owner can create, and the agents' `gh` login is not valid here
-(`gh auth status`: "the token in default is invalid"), so this is the owner's one-time setup.
+Registering needs a token only the repo owner can create, so it was the owner's one-time setup. The steps, kept for
+re-registering:
 
 ## Steps (owner)
 
@@ -33,14 +33,17 @@ cd ~/actions-runner && ./svc.sh install && ./svc.sh start && ./svc.sh status
 ```
 
    If the mini must run it with nobody logged in, that needs a LaunchDaemon and a password: ask for it then.
-4. Check: the runner shows **Idle** under Settings -> Actions -> Runners. Push or open a PR and watch the Actions tab.
-5. Private repo: Actions minutes on a self-hosted runner are free. Under Settings -> Actions -> General, keep "Require
-   approval for outside collaborators" on: a pull request from a fork would run its code on this machine.
+4. Check: the runner shows **Idle** under Settings -> Actions -> Runners. Push to main (by `scripts/merge.ts`) or start
+   the workflow by hand, and watch the Actions tab.
+5. The repository is public. The workflow has no pull-request trigger, so a fork's code never runs on this machine;
+   under Settings -> Actions -> General, keep "Require approval for outside collaborators" on as a second guard.
 
 ## Notes
 
 - The workflow adds `~/.local/bin` (cargo), `/opt/homebrew/bin` and `~/.bun/bin` to the PATH; the launchd service has none.
 - Each job checks out into `_work`, so `node_modules` and `kernel/target` start empty there: the first run is a cold build
   (sccache helps). To reuse a warm tree, run `bun scripts/worktree-warm.ts` on `_work/oikos/oikos` once.
-- `scripts/merge.ts` is separate: it merges to main with the full suite locally; CI is the independent check on the push.
+- `scripts/merge.ts` is separate: it runs the gate tier, and for a broad change the whole slow tier too, before it pushes
+  (docs/dev-machine.md, "Merging"); CI runs both tiers whole on the push, the independent check, and its result is what
+  the merge script reads before the next landing.
 - Stop the runner: `cd ~/actions-runner && ./svc.sh stop`; remove: `./svc.sh uninstall`, then `./config.sh remove --token <TOKEN>`.
