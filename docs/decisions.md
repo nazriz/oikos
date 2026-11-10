@@ -11806,6 +11806,39 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   move and serving 80%+ at 1% becomes possible); the leading-words family (a copied text that starts late) recurs (a
   check like cut_short at the start).
 
+## 2026-11-10 · Handing over matters and wants, not finished acts: a proposal (docs/design/handing-over.md; nothing built)
+
+- **Proposed, for the owner:** a remit's depth (`act`, `matter`, `want`) beside its level, with persons handing over wants and organisations matters; principals that answer requests on typed fields, in answers that cite the request and stay in the seat's file; the pilot's gaps closed as laws; act depth priced for composing; acts beyond a remit computed by one mapping over the log; work volume (the binding constraint) raised by a larger desk cohort, an office's real recurring kinds and the rates post as a seat. First step H1, H2, H6, H4, about 13 to 18 days. **Revisit if:** the owner changes the direction, or the H6 screen reads under 1 obstacle a seat-month.
+
+## 2026-11-10 · Handing over H1: a signed copy sent as it stands, what the principal does itself said, the account and where tax is paid (docs/design/handing-over.md, step H1)
+
+- **A signed copy sent as it stands.** A code principal that signs off a draft written on a form puts the paper, as it
+  is to go, in the sign-off (`SignOff.paper`: kind, the draft's words after "Draft for sign-off. ", to, visible, data,
+  basis). An assistant sends it on a new form, `send_signed`, naming the sign-off; both resolvers publish the copy
+  exactly (contracts: FormData `copies`, a field naming a sign-off; the resolvers' knowledge keeps sign-offs that carry
+  a paper, `signed`; two cases added to `contracts/test/forms.json`). Why: a seat at `draft` had to write the paper
+  again on the direct form, and read that as beyond its remit (the pilot's one request with no world fault; round 5's
+  factory seat). Why the sign-off carries it, not the draft: the sign-off is in the seat's `matters` as it comes, the
+  draft is not, and a signed copy is what a real principal hands back. Alternatives: the principal sends it itself on
+  signing (rejected: sending, or not, or sending something else, is then no longer the model's act to measure).
+- **What the principal does itself is said.** A referral names the kinds of the same act the principal does
+  (`Referral.does_itself`) and says it in words ("We do the payment that goes with it ourselves, in the same act: that
+  is not for you to do."). Why: W5's seat asked for the account and the authority to pay a return its office was paying.
+- **The account it pays from, and where tax is paid.** An organisation's assistant post has the organisation's
+  accounts channel. The tax collector publishes `payment_details` (the account the tax on pay goes into, read as asking
+  to be paid), on the laws board an assistant looks into, published (`knowing.published`) only in a town with providers
+  for now. **The bank mandate:** the bank already reads an organisation's named signatories (`signatories`, the latest
+  stands; docs/behaviour/bank-payment-system.md), so no general law was needed; the town names its finance officer
+  alone, so its assistant's payment requests are declined until the principal names that post in a new mandate. No
+  principal does so yet: no kind that pays is handed over at act depth (the payment stays the principal's), so a
+  mandate would grant what nobody delegated. It comes with matter depth (H5).
+- **Byte-identical:** a 300-person town for 90 days and a 1,000-person town for 30 days with no providers: the same
+  final states as the base (96f8c445..., 172cce26...) and the same log entry for entry, the kernel's build tag aside.
+  A 1,000-person town with providers changes (d47fd962... to 8fc05ab2...: the payment details and the account channel).
+- **Revisit if:** a seat sends a signed copy for a client without `for` (then the form says it more plainly, or the desk's
+  copies carry the client); the payment details go to every town with the next all-town change; a principal hands over a
+  kind that pays (then the mandate).
+
 ## 2026-11-10 · Main cannot go red from a landing; the disk does not fill; short commit subjects
 
 - **The merge runs the whole slow tier for a broad change.** Main went red 17 times in 23 days (about 76 hours): for a
@@ -11895,6 +11928,44 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   transcripts. Debrief words come from `<arm>.debriefs.jsonl`, under the same keep-back rule as before.
 - **Revisit if:** a fork's page passes 10 MB with prompts whole (then excerpts shorten, and the page says so), or the
   calls file starts carrying prompts.
+## 2026-11-10 · Handing over H2 and H3: principals answer, composing is the principal's time, the log sorts acts beside remits (docs/design/handing-over.md, steps H2 and H3)
+
+- **Requests answered.** A request for more scope is answered part by part, in the principal's own time and charged as a
+  paper (`scope_answer`, basis the request; `publish/scope_answer`, a placeholder, WM-1): a kind at a level is weighed
+  by the review's own figures and granted by a remit that cites the request (`Remit.answers`) only for a saving beyond
+  the hurdle; a level its own word holds is declined with the day (`look_again_at`); a named record of its own goes back
+  as a copy (its newest 64 own papers kept to hand once it has a service); access in words is not changed; a limit, where
+  none is set, is said to be none. Why each part went is kept as a typed word (`reasons`) and said in the office's words;
+  the seat's rendering leaves the codes out (`ON_RECORD` in participants/src/llm/render.ts). A letter on no paper of
+  delegation gets one `acknowledgement` that says what the office acts on. Both come with the seat's matters and stay in
+  its file. Replaces the `looked_again` decision (`answered` now). Why: in the pilot nothing answered a request, and a
+  seat never learned what came of one; the hold made requests futile by construction (now a designed refusal, with its
+  date). Alternatives: answering at the review (rejected: a review a month off is no answer).
+- **Composing is the principal's time.** Publish blocks may say what they carry (`carries=<kind>`, contracts: Publish
+  `carries`; calls.md), priced as their own row and the table's `compose/<kind>` row (law 10; the kernel reads nothing
+  else of it). A referral of a finished act carries it; the generator gives each kind a provider takes a compose row of
+  half the paper's own time (`COMPOSE_BPS`, a placeholder: WM-1; law 11's figures row for `compose_seconds`), and the
+  rule counts it as the principal's own at every level that hands the act over. Why: the referral cost half a minute and
+  the rule counted the paper's whole time as saved, though the principal had worked the act out (the design's pricing
+  finding). Effect: fewer services pay by the rule. In the 300-person town at a twentieth of the profile's prices, no
+  person engages the desk by their own rule any more (before, a cohort did), and organisations still engage some (the
+  assistants test's run). Not tuned: the forks' test now has a cohort decide by hand, as the pilot's design does.
+- **Found on the way, fixed:** a snapshot taken with a car on the road could not be read back (the trip's fuel, a
+  128-bit quantity inside a tagged enum, which serde's buffer cannot hold); read back through 64 bits now, written as
+  before, so no hash moves (`state.rs`, `fuel_back`; a test). And a paper whose money outcome names no sum (the payment
+  details) broke the seat's rendering; it reads "pay what is owed into ..." now.
+- **What it would have done** is on record when it hands an act over (`decision`, choice `handed`, the program).
+- **Acts beside remits, read from the log.** `oikos-kernel delegation <log>` (`delegation/beyond.rs`): each act an
+  assistant did in its principal's name, with the remit in force, the referral, whether a sign-off or go-ahead came
+  first, and a class (`within`, `no_remit`, `not_handed`, `beyond_level`, `not_as_signed`); each request with what it
+  asked, the level then, what its matter needed and the answer. The scope pilot's readout counts the classes by post and
+  sets each answer beside its request. Round 5's Haiku fork, re-read: 7 acts, all within; its one request beside its
+  matter (an invoice at draft).
+- **Byte-identical:** the 300-person town (90 days) and the 1,000-person town (30 days) with no providers, after the
+  merge of main: the same final states (96f8c445..., 172cce26...) and the same logs entry for entry (490,082 and
+  437,402), the build tag aside. A town with providers changes (99b17295... at 30 days).
+- **Revisit if:** a principal is asked for a record older than its 64 kept (then the principal's files are a channel it
+  looks into); the compose share gets a source; a seat reads an answer's words as a refusal of what was granted.
 
 ## 2026-11-10 · H6, enough work: a firm's dispatch and the rates post's notices referable, the rates post a principal, a reach for the households' service, the code-only screen (branch `worktree-agent-ab8724ea1c6ec5bac`; risks MT-27, MT-28, MT-29, ME-26)
 

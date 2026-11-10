@@ -7,4 +7,11 @@
 // Empty at its start (2026-11-08): the generator's literals are still where they are written, counted by file. (Where
 // a generated config's numbers come from is worlds/generator/figures.ts, a separate table.)
 
-export {};
+/** placeholder (to confirm; WM-1): of a paper's time, the share that is composing it (working out what it says), not
+ * writing it out and sending it: what a principal that hands over the finished act still spends (`compose/<kind>`;
+ * docs/design/handing-over.md 4.2). Would be sourced by a time-use study of drafting correspondence. */
+export const COMPOSE_BPS = 5_000;
+
+/** placeholder (to confirm; WM-1): five minutes for a principal to weigh a request for more scope and answer it in
+ * writing (`publish/scope_answer`), as long as the request takes to write. */
+export const SCOPE_ANSWER_SECONDS = 300;

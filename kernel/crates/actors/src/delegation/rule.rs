@@ -24,11 +24,16 @@ impl Default for Seconds {
     }
 }
 
-/// What the principal knows of a kind of matter it does: how long one takes it, and what one done wrong costs it.
+/// What the principal knows of a kind of matter it does: how long one takes it, what one done wrong costs it, and how
+/// much of its time goes in composing it (working out what it says: the table's `compose/<kind>` row). Handed over as a
+/// finished act, the composing stays the principal's: only the writing out and sending go (docs/design/handing-over.md
+/// 4.2; before 2026-11-10 the rule counted a finished act handed over as saving all of its time).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KindFacts {
     pub own_seconds: i64,
     pub error_cost: i64,
+    #[serde(default)]
+    pub compose_seconds: i64,
 }
 
 /// A kind as the rule weighs it: its facts, and how many a month it does.
@@ -113,6 +118,8 @@ pub fn cost(level: Level, k: &Kind, slip_bps: i64, w: &Weights) -> i128 {
     let p = i128::from(slip_bps.clamp(0, 10_000));
     let err = i128::from(k.facts.error_cost.max(0));
     let own = |s: i64| time_cost(k.per_month, s, w.hour_value);
+    // (A finished act handed over: the principal composed it, and that time is its own.)
+    let compose = k.facts.compose_seconds.clamp(0, k.facts.own_seconds.max(0));
     let wrong = |share: i128| (v * p * share * err + 50_000_000) / 100_000_000;
     match level {
         Level::None => own(k.facts.own_seconds),
@@ -121,10 +128,10 @@ pub fn cost(level: Level, k: &Kind, slip_bps: i64, w: &Weights) -> i128 {
             let f = i128::from(w.finds_bps.clamp(0, 10_000));
             // (What it finds it does itself: its own time again for those.)
             let redone = (v * p * f * i128::from(k.facts.own_seconds.max(0)) * i128::from(w.hour_value.max(0)) + 180_000_000_000) / (100_000_000 * 3_600);
-            own(w.seconds.referral + w.seconds.sign_off) + wrong(10_000 - f) + redone
+            own(compose + w.seconds.referral + w.seconds.sign_off) + wrong(10_000 - f) + redone
         }
-        Level::Approve => own(w.seconds.referral + w.seconds.go_ahead) + wrong(10_000),
-        Level::Alone => own(w.seconds.referral) + wrong(10_000),
+        Level::Approve => own(compose + w.seconds.referral + w.seconds.go_ahead) + wrong(10_000),
+        Level::Alone => own(compose + w.seconds.referral) + wrong(10_000),
     }
 }
 
@@ -207,7 +214,7 @@ mod tests {
         Weights { hour_value: 4_000, seconds: Seconds::default(), finds_bps: 8_000, prior_matters: 20, hurdle_bps: 2_000, horizon_months: 12 }
     }
     fn k(per_month: i64, err: i64) -> Kind {
-        Kind { facts: KindFacts { own_seconds: 1_800, error_cost: err }, per_month }
+        Kind { facts: KindFacts { own_seconds: 1_800, error_cost: err, compose_seconds: 0 }, per_month }
     }
     const ALL: [Level; 4] = [Level::Advice, Level::Draft, Level::Approve, Level::Alone];
 
@@ -231,6 +238,9 @@ mod tests {
         assert_eq!(best(&ALL, &k(10, 50_000), 500, &w()).0, Level::Draft);
         // Dearer still, with slips common: doing it oneself.
         assert_eq!(best(&ALL, &k(10, 50_000_000), 5_000, &w()).0, Level::None);
+        // Composing a finished act stays the principal's: with all of the time in composing, handing it over saves none.
+        let all = Kind { facts: KindFacts { own_seconds: 1_800, error_cost: 1_000, compose_seconds: 1_800 }, per_month: 10 };
+        assert_eq!(best(&ALL, &all, 100, &w()).0, Level::None);
         // Only what is offered can be chosen.
         assert_eq!(best(&[Level::Advice], &k(10, 1_000), 100, &w()).0, Level::None, "advice never saves time");
     }

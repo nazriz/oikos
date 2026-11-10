@@ -44,6 +44,10 @@ const TIME_SPANS = new Set(["every", "period", "notice", "term"]);
 // (Dates by the names the world's office papers give them: a payroll notice's first pay day read "first pay: 6652800"
 // to the seats of 2026-10-09.)
 const MOMENTS = new Set(["at", "since", "until", "first", "closes", "opens", "due", "first_due", "first_pay", "last_day", "last_from", "period_end", "hold_until"]);
+// (Details a paper keeps for the record, whose content its own words already say: not set out again. An answer to a
+// request for more scope keeps why each part went as it did as typed codes, for whoever measures, and says it in the
+// office's words; a referral names in its words what its principal does itself. docs/design/handing-over.md, 2026-11-10.)
+const ON_RECORD = new Set(["reasons", "does_itself"]);
 const whole = (v: unknown): v is number | string => (typeof v === "number" && Number.isSafeInteger(v)) || (typeof v === "string" && /^-?(0|[1-9][0-9]{0,37})$/.test(v));
 const percent = (v: number, per: number) => `${String(Number(((v * 100) / per).toFixed(6)))}%`;
 /** A moment as a date, with the time of day where it is not the day's start (so that two moments never read alike). */
@@ -171,7 +175,7 @@ function factWordsOf(raw: unknown, fields?: FieldKinds, under?: string): string 
   const last: string[] = []; // (what a matter asks to be done, and the paper a draft would send: said after the rest)
   const carried = (o as { paper?: unknown }).paper; // (the paper a draft carries, as it would go)
   for (const [k, v] of Object.entries(o)) {
-    if (v === undefined) continue;
+    if (v === undefined || ON_RECORD.has(k)) continue;
     if (k === "outcome" && v !== null && typeof v === "object" && !Array.isArray(v)) parts.push(`${words(k)}: ${outcomeWords(v, whole(o.every) ? Number(o.every) : undefined)}`);
     else if (k === "calls" && typeof v === "string") last.push(`what is to be done: ${programWords(v)}`);
     else if (v === carried && v !== null && typeof v === "object" && !Array.isArray(v)) last.push(`the paper: ${paperWords(v as any)}`);
@@ -332,6 +336,8 @@ export function ruleWords(r: { adico?: any; formal?: any }, o: { asWritten?: boo
 export function outcomeWords(o: any, every?: number, by?: string): string {
   const rep = every ? ` every ${duration(every)}` : "";
   if (o?.goods) return `deliver ${o.goods.quantity} ${o.goods.kind} to ${o.goods.to} at ${o.goods.at}${rep}`;
+  // (No sum: where money is to go, as a collector's payment details say it: whatever is owed, paid into this account.)
+  if (o?.money && (o.money.amount === undefined || o.money.amount === null)) return `pay what is owed${o.money.from ? ` from ${o.money.from}` : ""} into ${o.money.to}${rep}${o.money.for ? ` (${o.money.for})` : ""}`;
   if (o?.money) return `pay ${sumOf(o.money.amount)}${o.money.from ? ` from ${o.money.from}` : ""} to ${o.money.to}${rep}${o.money.for ? ` (${o.money.for})` : ""}`;
   if (o?.structure) return o.structure.remove ? `demolish ${o.structure.remove}` : `build a ${o.structure.type} on ${o.structure.on}`;
   // (Whoever commits to be in a place themselves comes there: a worker and their place of work read "c0009 will let

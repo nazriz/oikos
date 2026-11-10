@@ -807,9 +807,10 @@ class Resolver {
     const practice = this.asWritten ? this.writtenData(this.json(c, "practice")) : this.json(c, "practice");
     const assertion = this.json(c, "assertion");
     const registry = this.json(c, "registry");
+    const carries = this.label(c, "carries");
     return [{ block: "publish", kind, text, ...(to ? { addressed_to: to } : {}), ...(on ? { place: on } : {}), ...(data !== undefined ? { data } : {}), ...(adico !== undefined ? { adico } : {}), ...(formal ? { formal: { language: "cel", condition: formal } } : {}),
       ...(offer !== undefined ? { offer } : {}), ...(practice !== undefined ? { practice } : {}),
-      ...(assertion !== undefined ? { assertion } : {}), ...(registry !== undefined ? { registry } : {}), ...common }];
+      ...(assertion !== undefined ? { assertion } : {}), ...(registry !== undefined ? { registry } : {}), ...(carries ? { carries } : {}), ...common }];
   }
 
   /** What a translator wrote as data for a practice or an offer, read as the request wrote it (`resolve`, `written`): the amounts
@@ -876,7 +877,7 @@ class Resolver {
       const where = [...new Set(elsewhere.map((x) => Knowledge.formOf(x)))];
       throw new Ask(`The ${name.replace(/_/g, " ")} form isn't one ${to} takes: it goes to ${where.join(" or ")}.`);
     }
-    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } }; writes?: forms.FormWrites };
+    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } }; writes?: forms.FormWrites; copies?: string };
     const data: { [k: string]: unknown } = {};
     const missing: string[] = [];
     for (const [field, t] of Object.entries(spec.fields)) {
@@ -903,6 +904,17 @@ class Resolver {
     const unknown = Object.keys(c.args).filter((a) => !FORM_CALL_NAMES.includes(a) && !(a in spec.fields) && !(a === "text" && ownWords));
     if (unknown.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} form has no ${unknown.join(" or ")} field. Its fields are: ${Object.keys(spec.fields).join(", ")}.`);
     if (missing.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} needs: ${missing.join(", ")}.`);
+    // A signed copy sent as it stands (contracts: FormData `copies`): the paper the named sign-off carries, in the name of
+    // whoever it is made for. Nothing of it is written again, so nothing of it can differ from what was signed.
+    if (typeof spec.copies === "string" && spec.copies.startsWith("=")) {
+      const me = this.id(c, "for") ?? this.me;
+      const id = String(data[spec.copies.slice(1)] ?? "");
+      const paper = this.k.signed.get(id);
+      if (!paper) throw new Ask(`You have no signed copy on file as ${id}: name the sign-off that came back with the paper signed.`);
+      const block: Block = { block: "publish", kind: paper.kind, text: String(paper.text ?? "").slice(0, 16384) } as Block;
+      for (const [from, to] of [["to", "addressed_to"], ["data", "data"], ["visible", "visible_to"], ["basis", "basis"]] as const) if (paper[from] !== undefined && paper[from] !== null) (block as any)[to] = paper[from];
+      return [{ ...block, speaks_for: me, ...(bind ? { ref: bind } : {}) } as Block];
+    }
     // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement
     // the rest of the world reads. It does not cite the form.
     if (spec.writes) {

@@ -319,6 +319,11 @@ pub enum Block {
         visible_to: Option<Visibility>,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
+        /// The kind of paper whose whole content this one carries, made by whoever publishes it (a referral that hands
+        /// over a finished act: the principal composed that paper). Priced as its own row and that kind's
+        /// `compose/<kind>` row (docs/design/handing-over.md 4.2). The kernel reads nothing else of it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        carries: Option<String>,
     },
     Withdraw {
         record: IdOrRef,
@@ -448,6 +453,16 @@ impl Block {
             Block::Link { op, .. } => Some(format!("link/{}", op.name())),
             _ => None,
         }
+    }
+
+    /// The steps of the table of work this block is priced by: its own, and, for a paper that carries another's whole
+    /// content (`carries`), the composing of that one (`compose/<kind>`).
+    pub fn steps(&self) -> Vec<(&'static str, Option<String>)> {
+        let mut v = vec![(self.name(), self.makes())];
+        if let Block::Publish { carries: Some(k), .. } = self {
+            v.push(("publish", Some(format!("compose/{k}"))));
+        }
+        v
     }
 
     pub fn name(&self) -> &'static str {

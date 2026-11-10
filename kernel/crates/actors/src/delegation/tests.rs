@@ -123,6 +123,10 @@ fn a_kind_handed_over_goes_as_a_referral_and_comes_back_to_the_principal_when_no
     assert!(line.contains("to=[\"ll\"]") && line.contains("visible=[\"ll\"]") && !line.contains(PROV), "an organisation's own system is handed its work in-house, not through the provider (whose desk for persons saw it before 2026-11-08): {line}");
     assert!(line.contains("\"remit\":\"rec.remit\"") && line.contains("under our remit rec.remit"), "the matter comes with the remit it is handed under (the scope pilot's desk could not find its clients' remits: W1): {line}");
     assert!(!out.lines().any(|l| l.starts_with("statement(basis=lease-1")), "and not out under the principal's hand: {out}");
+    // (The finished act is the principal's composing: the referral carries it, and is priced with it; what it would have
+    // done is on record for the log's readers.)
+    assert!(line.contains("carries=notice_to_vacate"), "{line}");
+    assert!(h.decisions.iter().any(|d| d["choice"] == "handed" && d["kind"] == "notice_to_vacate" && d["program"].as_str().is_some_and(|p| p.contains("basis=lease-1"))), "the handed act on record");
     let referral = last_referral(&h);
     let report = statement("rec.rep", 34 * DAY + 7200, ME, "report", &[ME], json!({ "referral": referral, "done": false, "why": "refused" }));
     let back = all(&h.wake(35 * DAY + 3600, world(vec![report])));
@@ -140,6 +144,7 @@ fn what_is_not_handed_over_is_done_by_the_principal_in_the_same_act_as_the_refer
     let sent = h.sent.iter().rev().find(|p| p.contains("kind=referral")).unwrap();
     let calls = sent.split("\"calls\":\"").nth(1).and_then(|x| x.split("\",\"kind\"").next()).unwrap_or_default();
     assert!(calls.contains("notice_to_vacate") && !calls.contains("acc-tribunal"), "the notice is handed over, the payment is not: {calls}");
+    assert!(sent.contains("\"does_itself\":[\"money\"]") && sent.contains("We do the payment that goes with it ourselves"), "and the assistant is told the payment is not its to make (the scope pilot's W5): {sent}");
 }
 
 #[test]
@@ -169,9 +174,38 @@ fn a_draft_on_a_form_is_read_by_the_paper_it_would_send() {
     assert!(out.contains("kind=declined"), "to someone else: not what was asked: {out}");
     h.wake(36 * DAY + 3600, world(vec![]));
     let referral = last_referral(&h);
-    let same = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "notice_to_vacate", "text": "Please go.", "to": ["t1"] } }));
+    let mut same = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "notice_to_vacate", "text": "Please {go}.", "to": ["t1"], "basis": "lease-1" } }));
+    same["text"] = json!("Draft for sign-off. Please go.");
     let out = all(&h.wake(37 * DAY + 3600, world(vec![same])));
     assert!(out.contains("kind=sign_off"), "the same paper to the same tenant, in its own words: signed off: {out}");
+    // (The sign-off is the signed copy, as it is to go, in the draft's own words: what its assistant sends as it stands.)
+    let line = out.lines().find(|l| l.contains("kind=sign_off")).unwrap_or_default();
+    let copy = line.split("\"paper\":").nth(1).unwrap_or_default();
+    assert!(["\"basis\":\"lease-1\"", "\"kind\":\"notice_to_vacate\"", "\"text\":\"Please go.\"", "\"to\":[\"t1\"]"].iter().all(|x| copy.contains(x)), "the signed copy: {line}");
+}
+
+#[test]
+fn a_request_is_answered_part_by_part_and_a_letter_is_acknowledged() {
+    let (mut h, _, mut remit) = engaged();
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit]));
+    // (Draft is dearer than going alone for a cheap error, by its own figures: a request for alone is granted, its remit
+    // citing the request; a record of its own is sent as a copy; access is not changed on request.)
+    let mine = statement("rec.lease", 10 * DAY, ME, "lease_terms", &[ME], json!({ "rent": "100" }));
+    let ask = statement("rec.ask", 34 * DAY + 7200, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "level": "alone", "record": "rec.lease", "access": "the tenants' ledger" }));
+    let out = all(&h.wake(35 * DAY + 3600, world(vec![mine, ask])));
+    let rm = out.lines().find(|l| l.contains("kind=remit")).unwrap_or_else(|| panic!("a remit: {out}"));
+    assert!(rm.contains("\"level\":\"alone\"") && rm.contains("\"answers\":\"rec.ask\"") && rm.contains("basis=rec.ask"), "{rm}");
+    let ans = out.lines().find(|l| l.contains("kind=scope_answer")).unwrap_or_default();
+    assert!(ans.contains("\"granted\":true") && ans.contains("\"why\":\"sent\"") && ans.contains("\"why\":\"not_changed\"") && ans.contains("\"paper\":{"), "{ans}");
+    assert!(ans.contains("A copy of rec.lease, as it stands, is with this answer."), "{ans}");
+    // (A letter from its assistant's post, on no paper of delegation: acknowledged once, saying what it acts on.)
+    let mut letter = statement("rec.let", 36 * DAY, ME, "letter", &[ME], json!({}));
+    letter["in_position"] = json!("ll-assistant");
+    let out = all(&h.wake(36 * DAY + 3600, world(vec![letter.clone()])));
+    let ack = out.lines().find(|l| l.contains("kind=acknowledgement")).unwrap_or_else(|| panic!("an acknowledgement: {out}"));
+    assert!(ack.contains("basis=rec.let") && ack.contains("Requests for more scope go on the request form"), "{ack}");
+    assert!(!all(&h.wake(37 * DAY + 3600, world(vec![letter]))).contains("kind=acknowledgement"), "once");
 }
 
 #[test]
@@ -248,16 +282,18 @@ fn a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after(
         kept.push_str(&all(&h.wake(d * DAY + 3600, world(if d == 35 { vec![held.clone()] } else { vec![] }))));
     }
     assert!(!kept.contains("notice=agr.1") && !h.decisions.iter().any(|d| d["choice"] == "leave"), "no leaving before the day it said");
-    // (A request for more scope while it holds: looked at again at once, nothing changed, and the look on record citing it.)
+    // (A request for more scope while it holds: answered, citing it, declined with the day its word holds until, in the
+    // office's own words; the decision on record. Before 2026-11-10 it only brought a review forward, and nothing answered.)
     let ask = statement("rec.ask", 50 * DAY + 7200, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "level": "alone" }));
-    h.wake(51 * DAY + 3600, world(vec![ask]));
+    let mut answered = all(&h.wake(51 * DAY + 3600, world(vec![ask])));
     for d in 52..=53 {
-        h.wake(d * DAY + 3600, world(vec![]));
+        answered.push_str(&all(&h.wake(d * DAY + 3600, world(vec![]))));
     }
-    let looked = h.decisions.iter().find(|d| d["choice"] == "looked_again").expect("the review the request brought on, on record");
-    assert_eq!(looked["answers"], json!(["rec.ask"]));
-    assert_eq!(looked["changed"], json!(false));
-    assert_eq!(looked["held"], json!(true));
+    let line = answered.lines().find(|l| l.contains("kind=scope_answer")).unwrap_or_else(|| panic!("an answer: {answered}"));
+    assert!(line.contains("basis=rec.ask") && line.contains("\"request\":\"rec.ask\"") && line.contains("\"why\":\"held\"") && line.contains(&format!("\"look_again_at\":{}", 60 * DAY)), "{line}");
+    assert!(line.contains("We keep notice to vacates at draft for sign-off until year 1, day 61. After that we will look at it again."), "the hold in the office's words: {line}");
+    let d = h.decisions.iter().find(|d| d["choice"] == "answered").expect("the answer's decision");
+    assert_eq!((d["answers"].clone(), d["granted"].clone()), (json!("rec.ask"), json!(false)));
     let mut after = String::new();
     for d in 90..=125 {
         after.push_str(&all(&h.wake(d * DAY + 3600, world(vec![]))));

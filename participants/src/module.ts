@@ -212,6 +212,9 @@ export interface Issued {
   /** What issuing the paper does, in a sentence, for whoever holds the office: said on the form with its name. */
   does?: string;
   fields: { [name: string]: FormField };
+  /** A form that sends a signed copy as it stands (contracts: FormData `copies`): "=name", the field naming the sign-off
+   * that carries the paper. Its `writes` then say only what kind of paper the form is filed as. */
+  copies?: string;
   /** (`sends`: whom the form itself sends every paper to, whatever its fields say, and why, in the form's own words:
    * each of the office's own named in `to` ("@feeds") that no field puts there. Said on the form and in a draft's preview.) */
   writes: { kind: string; text: string; data?: unknown; to?: unknown[]; visible?: "public" | unknown[]; basis?: string; offer?: unknown; assertion?: unknown; sends?: { to: string[]; why: string }[]; claim?: { when?: { [field: string]: string }; position: "right" | "liberty" | "power" | "immunity"; holder: string; about: unknown; basis?: string } };

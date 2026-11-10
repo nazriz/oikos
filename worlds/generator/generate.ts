@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
 import { ASSISTANT_ISSUES, clientDraft, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
+import { COMPOSE_BPS, SCOPE_ANSWER_SECONDS } from "./registry";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
@@ -167,7 +168,7 @@ const WORK_TIME = {
 /** The papers of delegation (docs/design/delegation.md): what a principal writes, with its own time for each (placeholders,
  * to confirm; WM-1), added to the table only where a town has providers; and what its assistant writes and sees. */
 const DELEGATION_TIME = {
-  person: { "publish/referral": 30, "publish/sign_off": 300, "publish/go_ahead": 60, "publish/declined": 120, "publish/remit": 120, "publish/brief": 300, "publish/scope_request": 300 },
+  person: { "publish/referral": 30, "publish/sign_off": 300, "publish/go_ahead": 60, "publish/declined": 120, "publish/remit": 120, "publish/brief": 300, "publish/scope_request": 300, "publish/scope_answer": SCOPE_ANSWER_SECONDS, "publish/acknowledgement": 60 },
   sources: {
     "person.publish/referral": "Placeholder (to confirm; WM-1): half a minute to hand a routine matter to an assistant, with what to do (a forward with a word): software, no source. Would be sourced by a time-use study of delegating routine correspondence.",
     "person.publish/sign_off": "Placeholder (to confirm; WM-1): five minutes to read a draft whole and sign it off. Would be sourced by a study of review time for drafted correspondence.",
@@ -176,11 +177,14 @@ const DELEGATION_TIME = {
     "person.publish/remit": "Placeholder (to confirm; WM-1): two minutes to say what an assistant may do of a kind of matter.",
     "person.publish/brief": "Placeholder (to confirm; WM-1): five minutes to brief an assistant on taking it on.",
     "person.publish/scope_request": "Placeholder (to confirm; WM-1): five minutes to ask for more scope in writing.",
+    "person.publish/scope_answer": "Placeholder (to confirm; WM-1): five minutes to weigh a request for more scope and answer it in writing.",
+    "person.publish/acknowledgement": "Placeholder (to confirm; WM-1): a minute to acknowledge a letter.",
   } as Record<string, string>,
 };
+// (The composing share, COMPOSE_BPS, is in the registry: worlds/generator/registry.ts. Rows added only where a town has providers.)
 const ASSISTANT_PAPERS = ["advice", "draft", "approval_request", "report", "scope_request", "handover"];
 const ASSISTANT_PAPER_SECONDS = 5;
-const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "referral", "sign_off", "declined", "go_ahead", "handover"];
+const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement"];
 /** What an assistant's post is shown (docs/behaviour/assistants.md, "A model in an assistant seat"): the terms it works
  * on (the delivery, the service's end, briefs and remits), the matters handed to it and the answers to what it asked, as
  * they come; on request, its file of all of those and of its own papers on them and what it sent for its principal (the
@@ -189,12 +193,12 @@ const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "
  * to check what they had been handed and whether a paper had gone, and could not; and a collector they knew only as an
  * id in a referral's words could not be named (docs/decisions.md, 2026-11-08, "The scope pilot's first round"). */
 const ASSISTANT_TERMS = ["service_delivery", "service_ended", "brief", "remit"];
-const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover"];
+const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement"];
 const assistantChannels = (also: string[] = []) => [
   K.mine("terms", ASSISTANT_TERMS, { title: "The service you work under: its delivery, briefs and remits" }),
   K.mine("matters", ASSISTANT_MATTERS, { title: "Matters handed to you, and the answers to what you asked" }),
   K.mine("file", [...new Set([...ASSISTANT_SEES, ...ASSISTANT_PAPERS, ...also])], { title: "Your file: the matters handed to you, your papers on them and what you sent, looked up on request (look, with what to find)", on_request: true }),
-  K.board("laws", ["law", "charter"], { title: "The town's laws and charter, published: looked up on request (look, with what to find), for the law a matter rests on" }),
+  K.board("laws", ["law", "charter", "payment_details"], { title: "The town's laws and charter, and where what they charge is paid, published: looked up on request (look, with what to find), for the law a matter rests on" }),
   K.lookUp("who", { title: WHO }),
 ];
 
@@ -526,7 +530,9 @@ export function stationeryForm(office: string, entity: string, x: Issued, own: {
   const whose = holder ? `Filled in by the ${holder.charAt(0).toLowerCase()}${holder.slice(1)}, of the office's own accord (nobody's direction or leave is needed)` : "A paper of the office's own";
   return { id: `form-${office}-${x.form}`.replace(/_/g, "-"), record: "statement", author: "genesis", at: 0, visible_to: [entity], speaks_for: entity, kind: "form",
     text: `${x.title}. ${x.does ? `${x.does} ` : ""}${sent ? `${sent} ` : ""}${whose}: filled in, it is issued as the form sets it out.`,
-    data: { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: x.fields,
+    // (A form that sends a signed copy writes nothing from its fields: the copy is the paper.)
+    data: x.copies ? { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: x.fields, copies: x.copies }
+      : { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: x.fields,
       writes: { ...writes, text: writes.text.replace(/\{@([a-z_][a-z0-9_]*)\}/g, (_, name: string) => String(own[name] ?? "")) } } };
 }
 
@@ -2425,6 +2431,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     text: `Tax on pay. ${chargesInWords(taxLaw.charges, V.currency, payees(taxLaw.charges))}. ${withholdingInWords({ period_days: V.pay_period_days, work_days: WORK_DAYS })} ${returnsInWords(taxLaw)}${taxLaw.charges.some((c) => c.itemised) ? " A charge reported worker by worker is reported naming each worker and their pay in the period." : ""}`,
     adico: { attribute: "employers", deontic: "must", aim: "withhold income tax from each pay and report and pay it over", condition: "on the days the returns fall due" },
     data: { tax: "income", charges: taxLaw.charges, returns: returnsOf(taxLaw) } });
+  // Where the tax on pay is paid, as a collector publishes its payment details (the scope pilot's W5: an assistant filing a
+  // return could not find the account the tax goes into; the law names the payee, not the account). Published, read by
+  // asking to be paid (a money outcome with no payer). Only in a town with providers of assistants for now: in every town
+  // it would move every town's hash, so it goes there with the next change that moves them all (docs/decisions.md,
+  // 2026-11-10, "Handing over H1").
+  if (AS && taxLaw.charges.length) for (const account of [...new Set(taxLaw.charges.filter((c) => c.collector === "outside").map((c) => c.account))].sort())
+    records.push({ id: `payment-details-${account}`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "payment_details", basis: taxLaw.id,
+      text: `Payment details: tax on pay owed to ${payeeName(account)} under ${taxLaw.id} is paid into account ${account}.`,
+      data: { law: taxLaw.id, outcome: { money: { to: account, for: "tax on pay" } } } });
   // The support law (the outside world's, as the income tax is): the payments, published for anyone to read; the
   // payments office applies it, and people claim under it.
   if (PAYMENTS.length) records.push({ id: "law-support", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
@@ -2698,6 +2713,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // for it: the offer\'s speed against that. The offer\'s template carries the row (law 10), with its source beside the table\'s.
   const personTable: { [k: string]: number } = { ...WORK_TIME.person, ...V.work_time?.person };
   const personPaper = (kind: string) => personTable[`publish/${kind}`] ?? personTable.publish!;
+  /** The composing of a kind of paper (`compose/<kind>`): its share of the paper's own time. */
+  const composeOf = (kind: string) => Math.round((personPaper(kind) * COMPOSE_BPS) / 10_000);
+  /** Every kind some provider takes, composed by whoever hands it over as a finished act: the table's rows for it. */
+  const composeRows: Record<string, number> = AS ? Object.fromEntries([...new Set(AS.providers.flatMap((pr) => pr.offers.flatMap((o) => o.kinds)))].sort().map((k) => [`compose/${k}`, composeOf(k)])) : {};
   var officeRows: { sources: { [k: string]: string } } | undefined;
   for (const o of AUTO?.offers ?? []) if (o.for === "offices") {
     officeRows ??= { sources: {} };
@@ -3235,7 +3254,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // its own account; its own time for each paper the table's row, its hour at the profile's pay for clerical work.)
   const PERSONS = AS ? AS.providers.flatMap((pr) => pr.offers.filter((o) => o.for === "persons").flatMap((o) => o.kinds)) : [];
   const personDelegation = PERSONS.length && AS ? { delegation: { hour_value: Math.round((PS.wage_per_pay_period * 7 * HOUR) / ((PAY / DAY) * V.ordinary_hours_per_week * HOUR)),
-    kinds: Object.fromEntries([...new Set(PERSONS)].sort().map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost }])),
+    kinds: Object.fromEntries([...new Set(PERSONS)].sort().map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost, compose_seconds: composeOf(k) }])),
     seconds: { referral: DELEGATION_TIME.person["publish/referral"], sign_off: DELEGATION_TIME.person["publish/sign_off"], go_ahead: DELEGATION_TIME.person["publish/go_ahead"] },
     finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
     horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints } } : {};
@@ -3457,10 +3476,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const kinds = [...issued].filter((k) => takes.has(k)).sort();
       if (!m || !kinds.length || pos.entity === "outside" || !accounts.some((a) => a.id === `acc-${pos.entity}`)) continue;
       const post = `${pos.id}-assistant`;
-      positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: assistantChannels(kinds) });
+      // (The account it pays from and its keeper: the organisation's own, so its post may be shown it. Before 2026-11-10 a
+      // seat could not name the bank to ask it to pay from it: "You don't know who keeps account acc-factory-1".)
+      positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: [...assistantChannels(kinds), { id: "account", kind: "accounts" }] });
       assistantPosts.push({ post, entity: pos.entity, code: m.code, kinds });
       Object.assign(m.params, { delegation: { post, account: `acc-${pos.entity}`, hour_value: hourValue,
-        kinds: Object.fromEntries(kinds.map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost }])),
+        kinds: Object.fromEntries(kinds.map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost, compose_seconds: composeOf(k) }])),
         seconds: { referral: rows["publish/referral"], sign_off: rows["publish/sign_off"], go_ahead: rows["publish/go_ahead"] },
         finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
         horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints } });
@@ -4226,8 +4247,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}), ...(AS ? { services: true } : {}) }),
     // (Work is done in a workplace: a person named to do an act's work must be in one. `by` is F3's; the generator names none yet.)
     orchestration: { thinking_time: "free", performers_in: "workplace", act_time: {
-      ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person, ...(AS ? DELEGATION_TIME.person : {}) }, ...(V.work_time?.system ? { system: { ...V.work_time.system } } : {}),
+      ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person, ...(AS ? DELEGATION_TIME.person : {}), ...composeRows }, ...(V.work_time?.system ? { system: { ...V.work_time.system } } : {}),
       sources: { ...WORK_TIME.sources, ...V.work_time?.sources, ...(officeRows?.sources ?? {}), ...(AS ? DELEGATION_TIME.sources : {}),
+        ...Object.fromEntries(Object.keys(composeRows).map((r) => [`person.${r}`, `Placeholder (to confirm; WM-1): composing it, ${COMPOSE_BPS / 100}% of the paper's own time (the rest is writing it out and sending it): what a principal that hands it over as a finished act still spends.`])),
         ...(AS ? Object.fromEntries(AS.providers.flatMap((pr) => pr.offers.flatMap((o) => [
           ...o.kinds.map((k) => [`template.${o.template}.publish/${k}`, `Placeholder: an assistant of the offer ${o.id} writes a ${k} in ${o.speed_bps / 100}% of the time a person takes (the offer's speed; ${P.sources["assistants"] ?? "no source given"}).`]),
           ...[...ASSISTANT_PAPERS.map((k) => `publish/${k}`), "withdraw", "message"].map((r) => [`template.${o.template}.${r}`, `Placeholder: ${ASSISTANT_PAPER_SECONDS} seconds for an assistant to write a paper of its own to its principal (advice, a draft's covering note, a report): software, no source.`])]))) : {}),

@@ -41,7 +41,20 @@ test("a town that does not ask for assistants is generated as before; one that d
   expect(seated.templates.find((t: any) => t.id === "assistant-a").controller).toMatchObject({ type: "llm", params: { mock: { brain: "assistant" } } });
   const post = principals[0].role_module.params.delegation.post;
   const forms = seated.world.records.filter((r: any) => r.kind === "form" && r.data?.office === post).map((r: any) => r.data.form);
-  expect(forms).toEqual(expect.arrayContaining(["advice", "report", "scope_request", "handover"]));
+  expect(forms).toEqual(expect.arrayContaining(["advice", "report", "scope_request", "handover", "send_signed"]));
+  // A signed-off draft goes as it stands on a form of its own, at an organisation's post and a desk (before 2026-11-10 a
+  // seat had to write it out again on the direct form, and read that as beyond its remit); an organisation's assistant
+  // sees the account it pays from; and the collector says where the tax on pay is paid (the scope pilot's W5).
+  for (const office of [post, "provider-a-desk"]) {
+    const send = seated.world.records.find((r: any) => r.kind === "form" && r.data?.office === office && r.data.form === "send_signed");
+    expect(send.data).toMatchObject({ copies: "=sign_off", fields: { sign_off: { type: "record", required: true } } });
+    expect(send.data.writes).toBeUndefined();
+  }
+  expect(seated.positions.find((x: any) => x.id === post).channels.find((c: any) => c.id === "account")).toMatchObject({ kind: "accounts" });
+  const details = seated.world.records.filter((r: any) => r.kind === "payment_details");
+  expect(details.length).toBeGreaterThan(0);
+  for (const r of details) expect(r).toMatchObject({ speaks_for: "outside", visible_to: "public", data: { outcome: { money: { to: expect.any(String) } } } });
+  expect(plain.world.records.some((r: any) => r.kind === "payment_details")).toBe(false);
   expect(forms.some((x: string) => x.startsWith("draft_"))).toBe(true);
   expect(seated.world.records.some((r: any) => r.kind === "form" && r.data?.office === "provider-a-desk" && r.data.form === "scope_request")).toBe(true);
   // Every kind a principal may hand over (its own kinds: it hands over no other) has its form and its draft at its

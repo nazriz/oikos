@@ -55,6 +55,9 @@ export class Knowledge {
    * account a standing payment instruction is paid from, say). What a hold on one is addressed to. */
   readonly addressed = new Map<string, string[]>();
   private readonly formsById = new Map<string, StatementRecord>();
+  /** Signed copies seen: a sign-off's id -> the paper it signed, as it is to go (kind, text, to, visible, data, basis).
+   * What a form that sends a signed copy (`copies`) sends. */
+  readonly signed = new Map<string, { [k: string]: unknown }>();
   /** Laws and claims the participant has seen: what law warnings are judged against (§10). */
   readonly laws = new Map<string, StatementRecord>();
   readonly claims: Record[] = [];
@@ -185,6 +188,7 @@ export class Knowledge {
     if (r.record === "statement") {
       if (r.addressed_to?.length) this.addressed.set(r.id, r.addressed_to);
       if (r.kind === "form") this.formsById.set(r.id, r);
+      if (r.kind === "sign_off" && r.data?.paper && typeof r.data.paper === "object" && !Array.isArray(r.data.paper)) this.signed.set(r.id, r.data.paper);
       // Job advertisements, and the applications that answer them: an offer of employment made on one is on its terms.
       if (r.kind === "job_posting") this.jobs.set(r.id, { advertisement: r.id, ...(typeof r.data?.space === "string" && r.data.space ? { space: r.data.space } : {}) });
       if (r.kind === "job_application" && typeof r.data?.posting === "string") this.applications.set(r.id, r.data.posting);

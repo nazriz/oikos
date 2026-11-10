@@ -980,8 +980,10 @@ pub enum Sched {
         to: Id,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         via: Vec<Id>,
-        /// The fuel its vehicle's trip takes, and the metres driven (S5).
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        /// The fuel its vehicle's trip takes, and the metres driven (S5). (Read back through whole numbers of 64 bits: inside
+        /// this tagged enum serde buffers a value, and its buffer holds no 128-bit integer, so a snapshot taken with a car
+        /// on the road could not be read: found 2026-11-10 by a fork of the assistants' test. Written as before.)
+        #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "fuel_back")]
         fuel: Option<(Id, crate::money::Money, i64)>,
         arrives: i64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1431,5 +1433,26 @@ mod tests {
         let after = l.all();
         assert_eq!(after.iter().take(600).map(|x| (**x).clone()).collect::<Vec<_>>(), before.iter().map(|x| (**x).clone()).collect::<Vec<_>>());
         assert_eq!(after.back().map(|x| x.memo.clone()), Some(Some("later".into())));
+    }
+}
+
+/// A trip's fuel read back (`Pending::Depart`): its quantity as a 64-bit whole number, held as money's own type.
+fn fuel_back<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<(Id, crate::money::Money, i64)>, D::Error> {
+    let v: Option<(Id, i64, i64)> = serde::Deserialize::deserialize(d)?;
+    Ok(v.map(|(k, q, m)| (k, crate::money::Money::from(q), m)))
+}
+
+#[cfg(test)]
+mod fuel_tests {
+    use super::*;
+
+    /// A car on the road at a snapshot reads back (2026-11-10: the fuel's 128-bit quantity, inside the tagged enum, did not).
+    #[test]
+    fn a_departure_with_its_fuel_reads_back_as_it_was_written() {
+        let d = Sched::Depart { body: "c1".into(), to: "h1".into(), via: vec![], fuel: Some(("transport".into(), 3, 200)), arrives: 9, vehicle: Some("car-c1".into()), act: None, by: "c1-self".into() };
+        let text = serde_json::to_string(&d).unwrap();
+        assert!(text.contains("\"fuel\":[\"transport\",3,200]"), "{text}");
+        let back: Sched = serde_json::from_str(&text).unwrap();
+        assert_eq!(serde_json::to_string(&back).unwrap(), text);
     }
 }
