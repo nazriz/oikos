@@ -12588,6 +12588,7 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
   (an in-tray the sessions do not count); the code assistant's acting at any hour is read as a difference between arms
   (then give it the office's hours too, by the same rule, and accept the hash change in towns with providers); MT-31 is
   fixed (then the agreement chain in `whoLines` may become the post alone).
+
 ## 2026-11-11 · Obstacles as laws of the institutions that make them: a proposal (docs/design/obstacles.md; nothing built)
 
 - A proposal for review: O1 reframed as an authority to act on file at the counterparty, O4 a counterparty's acceptance rule, O3 a keeper's record, O2 after a general working-hours law (WM-18); an obstacle record read by `beyond.rs`; readiness to grant from the cost of delay. **Revisit if** Naz rejects the reframing of O1 or the general hours law.

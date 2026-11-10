@@ -1,9 +1,10 @@
 # Obstacles: ordinary office friction as laws of the institutions that make it (design, 2026-11-11)
 
-**Status:** a proposal for review. Nothing here is built. It follows `docs/research/paper-plan.md` (sections 1, 3 and
-4.2) and `docs/design/handing-over.md` (H1 to H6, built). It decides no result. Every figure without a source is a
-labelled placeholder (law 11). Contract changes are under the blanket approval of 2026-10-11 and are listed in section 9.
-One change here is a general law that moves every town (section 5): that goes to Naz first.
+**Status:** approved by the lead under the owner's go of 2026-11-10; B1 to B3 building (2026-11-11). It follows
+`docs/research/paper-plan.md` (sections 1, 3 and 4.2) and `docs/design/handing-over.md` (H1 to H6, built). It decides
+no result. Every figure without a source is a labelled placeholder (law 11). Contract changes are under the blanket
+approval of 2026-10-11 and are listed in section 9 and `contracts/README.md`. The lead's five decisions are in section
+12. Build order: B1, B2, B3, B7, B8, then B4 if the screen shows it is worth its size; B5 and B6 are not in this build.
 
 ## 1. The design in brief
 
@@ -343,15 +344,20 @@ principal, set before the run, like the assigned levels: never an outcome.
   it to stay.
 - Debriefs ask how the obstacles felt, and whether any seemed a trap. The answers are read before the main study.
 
-## 12. Open questions (with recommendations)
+## 12. Decided (the lead, 2026-11-11)
 
-1. **O1 as an authority at the counterparty,** not the principal's stationery (section 3, O1). *Recommend yes:* a
-   missing form would be a platform block.
-2. **Working hours as a general law, landing alone (B5),** off the study's critical path. *Recommend yes.* Naz's call,
-   since it moves every town.
-3. **Leave (B6) now or later.** It is general, it pauses one-person posts, and it brings O2 about 0.1 to 0.2 a
-   seat-month. *Recommend later:* O2 waits until an acting-holder law exists, and the first study runs O1, O3 and O4.
-4. **Readiness to grant from the cost of delay (B7),** with one hurdle across arms and a lower-hurdle cell only if no
-   grants appear. *Recommend yes.*
-5. **The factory as the low-friction seat,** with the desk carrying the obstacle analysis and the power redone on desk
-   seat-months. *Recommend yes,* rather than adding kinds to the factory or raising any rate to reach a target.
+1. **O1 is an authority at the counterparty,** not the principal's stationery. Yes.
+2. **Working hours are a general law,** landing alone, off the study's critical path. Not in this build: the lead
+   schedules it after the first obstacle run and tells the owner, since it moves every town.
+3. **Leave later,** with an acting-holder law. The first study runs O1, O3 and O4.
+4. **Readiness to grant from the cost of delay,** one hurdle across arms. Yes.
+5. **The factory is the low-friction seat;** the desk carries the analysis. Yes.
+
+Added to the build by the lead: every new paper a seat is shown reads in the office's own words (the backstop
+`orchestrator/test/assistants-fork.test.ts`); the new typed fields on the request form are few, each a plain blank a
+seat fills from its own words and code reads (one that cannot be unambiguous is left to the coders, and said so); a
+desk's model has a form for each new paper it may send (asking a client to lodge an authority; sending a returned paper
+again), only in towns with providers; every code actor that files must be able to meet each published requirement at
+levels 1 and 2 (checked in B2); the B8 screen also reports what a second provider's desk with its own cohort gives;
+level 0 is shown byte-identical at each step for a town with providers and the study town, as for towns without; and
+the level table says which figures have a source and which are placeholders.
