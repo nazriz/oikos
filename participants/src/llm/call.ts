@@ -233,7 +233,7 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
       purpose: req.purpose, ...(req.ref ? { ref: req.ref } : {}), t: io.now(), provider: adapter.provider, model: adapter.model, system_sha256: systemHash,
       ...(newSystem ? { system: req.system } : {}),
       turn: req.messages.length, input: last?.content ?? "", ...(apart ? { output_apart: true, output_sha256: apart } : { output: res.content }), ...(req.effort ? { effort: req.effort } : {}),
-      ...(res.estimated ? { usage_estimated: true } : {}),
+      ...(res.estimated ? { usage_estimated: true } : {}), ...(res.said !== undefined ? { said: res.said } : {}),
     },
   });
   return res;

@@ -40,7 +40,10 @@ applied afterwards.
     hold is over (a request still brings a look forward, as ever).
   - `neutral.ts`, **the form's words**: the request form titled "A note on the service's terms", its fields described
     without "more", since a form titled as a request for more scope may itself cue requests.
-- **The translator:** held fixed for every arm: our own trained model first (`decide/pod-small-v3-s2`), Sonnet 5.5 on
+- **The translator (from 2026-11-10):** our own trained model alone (`decide/pod-small-v3-s2`, `arrangement: "alone"`),
+  no model behind it; each report counts per seat model the requests served first time, after one restatement and never
+  (docs/real-models.md, "Our translator alone"). `build({ behind })` puts a model behind it again.
+- **The translator (rounds 1 to 5):** held fixed for every arm: our own trained model first (`decide/pod-small-v3-s2`), Sonnet 5.5 on
   the API behind it, its calls charged to the arm. Our model has never been taught the assistants' forms (TR-8), so
   nearly every request is Sonnet's to draft. Before the pilot, the scope-request set is read through this same
   arrangement (`translator/eval/scope-served.ts`: 148 requests, recall and false positives by writing style).

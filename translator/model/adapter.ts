@@ -295,6 +295,11 @@ export function readerOf(dir: string): { most?: number; forms?: number; trained?
 
 export interface DecideOptions {
   dir?: string; threshold?: number; unchecked?: boolean; quiet?: boolean; first?: boolean;
+  /** `alone`: this model is the only translator (translator/src/arrangement.ts, `createAlone`). Nothing is withheld
+   * for anyone behind: a draft it is unsure of is offered with what is unclear about it (`unsure`), and a draft on a form
+   * it was not taught or released for is offered as any other (the seat reads the preview and decides: Naz,
+   * 2026-11-10). A draft that does not fit the forms shown, or that names a form it was not shown, is still not offered. */
+  alone?: boolean;
   /** A `cards` model measured before anything is released for it (release.ts): its drafts as they are, with no release by kind and no trial. */
   unreleased?: boolean;
   /** The serving checks on copied words (serve-rules.ts): on unless false (or OIKOS_DECIDE_NO_CHECKS is set). */
@@ -459,7 +464,8 @@ export class DecideAdapter implements LlmAdapter {
       asked = true;
       withheld = "cut_off";
       const least = a.parts ? (["choices", "places", "texts"] as const).reduce((x, y) => (a.parts[y] < a.parts[x] ? y : x)) : "choices";
-      program = "none(unclear)";
+      // (Alone, the draft is offered all the same, with what is unclear: there is no one behind to draft it.)
+      if (!this.o.alone || /^none\(\w+\)$/.test(program)) program = "none(unclear)";
       unsure = { kind: least === "places" ? "which" : least === "texts" ? "words" : "act" };
     }
     // Copied words that stop part way through the request's sentence, or before sentences of it nothing else of the
@@ -467,11 +473,11 @@ export class DecideAdapter implements LlmAdapter {
     const short = !withheld && (this.o.checks ?? !process.env.OIKOS_DECIDE_NO_CHECKS) && !/^none\(\w+\)$/.test(program) ? cutShort(oneLine(request), program, forms, { trailing: true }) : undefined;
     if (short) {
       withheld = short.kind;
-      program = "none(unclear)";
+      if (!this.o.alone) program = "none(unclear)";
       unsure = { kind: "words" };
     }
     // (A form that can't be one of the forms shown is not offered, however sure the model is.)
-    const misfit = this.o.unchecked || withheld === "form_not_shown" ? undefined : formsMisfit(program, forms);
+    const misfit = this.o.unchecked || withheld === "form_not_shown" || /^none\(\w+\)$/.test(program) ? undefined : formsMisfit(program, forms);
     if (misfit) {
       withheld = "form_check";
       program = `none(${misfit.label})`;
@@ -492,14 +498,15 @@ export class DecideAdapter implements LlmAdapter {
     // released kind, and each form it fills was taught or is past its trial. Otherwise it is recorded and the
     // translator behind drafts. (Fewer forms shown than the asker knows of still goes behind, as for any model.)
     let trial: string[] | undefined;
-    if (this.decoding === "cards" && !(this.o.unreleased ?? !!process.env.OIKOS_DECIDE_UNRELEASED) && !withheld && !/^none\(\w+\)$/.test(program)) {
+    // (Alone, none of this: nobody is behind to draft in its place.)
+    if (this.decoding === "cards" && !this.o.alone && !(this.o.unreleased ?? !!process.env.OIKOS_DECIDE_UNRELEASED) && !withheld && !/^none\(\w+\)$/.test(program)) {
       const k = byKind(program, forms, this.released, (f) => this.passed(f, reader.trained));
       trial = k.trial;
       if (shown) withheld = "forms_subset";
       else if (k.withheld) withheld = k.withheld;
       if (withheld) program = "none(unclear)";
     }
-    if (this.decoding !== "cards" && !withheld && !/^none\(\w+\)$/.test(program)) {
+    if (this.decoding !== "cards" && !this.o.alone && !withheld && !/^none\(\w+\)$/.test(program)) {
       const filled = [...program.matchAll(/\bform=([\w.-]+)/g)].map((m) => m[1]!);
       // (The forms the folder says are released, where it says; else those it was taught; else, for an asker whose forms
       // were once a subset, any.)
@@ -529,7 +536,7 @@ export class DecideAdapter implements LlmAdapter {
     // (With another translator behind it, its answer says how sure it was, how long it took and why it offers no
     // draft where it offers none: the arrangement routes on that, and the transcript keeps it. Whole numbers, as
     // everything in a log is: sureness in parts per million, time in milliseconds.)
-    const more = this.o.first ? { sure_ppm: Math.round(sure * 1e6), ms: Math.round(ms), ...(withheld ? { withheld } : {}), ...(wrote !== undefined ? { wrote } : {}), ...(sub ? { forms_shown: sub.forms, forms_of: sub.of } : {}), ...(trial ? { trial } : {}) } : {};
+    const more = this.o.first || this.o.alone ? { ...(this.o.alone && unsure ? { unsure } : {}), sure_ppm: Math.round(sure * 1e6), ms: Math.round(ms), ...(withheld ? { withheld } : {}), ...(wrote !== undefined ? { wrote } : {}), ...(sub ? { forms_shown: sub.forms, forms_of: sub.of } : {}), ...(trial ? { trial } : {}) } : {};
     return { content: [{ type: "tool_use", id: "decide", name: req.tools?.[0]?.name ?? "call", input: { program, ...(unsure ? { unsure } : {}), ...more } }], usage: { input_tokens: 0, output_tokens: 0 }, estimated: true };
   }
 

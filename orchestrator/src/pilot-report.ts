@@ -14,6 +14,7 @@ import { debriefCounts, DebriefCollector, renderDebriefCounts } from "./debriefs
 import { framingOf } from "@oikos/participants/llm";
 import { cultureMeasures, renderCultureMeasures } from "./culture-measures";
 import { NOT_CHECKED, NOT_PUT } from "../../translator/src/index";
+import { ServedTally, servedText, type Served } from "./served";
 
 /** The sentences a translator that asked back says (translator/src/index.ts `unsureText`): which one, which words, a
  * form's fields or options. A log from before the run recorded `asked_back` is told by these; the plain "could you say it more plainly"
@@ -119,6 +120,8 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     return r;
   };
   const askBacks: { draft: string; t: number; sentence: string }[] = [];
+  // How the translator served each seat model's requests (served.ts).
+  const served = new ServedTally();
   // What the run recorded for citizen models (docs/design/ai-citizens.md 7): code citizens' decisions, and what each
   // came to know of how its choices turned out. Counted, so that a pilot recording none is noticed.
   const citizens = { decisions: 0, outcomes: 0 };
@@ -136,6 +139,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     try { e = JSON.parse(line); } catch { continue; } // (a last line cut off as the process ended)
     const b = e.body ?? {};
     if (DebriefCollector.wants(line)) debriefCollector.add(e);
+    served.see(e);
     last = Math.max(last, e.t ?? 0);
     if (e.kind === "end") end = { ...b, t: e.t };
     else if (e.kind === "command") {
@@ -297,6 +301,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     debrief: debriefCounts(debriefCollector.finish()),
     per_seat: Object.fromEntries([...seats].filter(([, s]) => s.model_calls || s.opted_out || s.sittings_missed).map(([k, s]) => { const { model: _m, configured: _c, ...rest } = s; return [k, rest]; })),
     translator_report: {
+      served_by_model: served.byModel((k) => seats.get(k)?.model),
       model_calls: tr.model_calls, failed_calls: tr.failed_calls, cost_microusd: tr.cost_microusd, its_own_retries: tr.retries,
       requests: byTime.length, endings, refused_by_label: refused,
       asked_back: askBacks.sort((a, b) => a.t - b.t),
@@ -363,6 +368,17 @@ export function behindShare(requests: number, byFirst: number, firstDrafts: numb
 }
 export const shareText = (a: { requests: number; handed_behind: number; behind_share: number | null; drafts_behind_share: number | null }): string =>
   `${a.handed_behind} of ${a.requests} requests (${a.behind_share === null ? "-" : `${(100 * a.behind_share).toFixed(1)}%`}), ${a.drafts_behind_share === null ? "-" : `${(100 * a.drafts_behind_share).toFixed(1)}%`} of the drafts offered`;
+
+/** How the translator served each seat model's requests over a run's logs (served.ts; for the cost summary: batch.ts). */
+export async function servedOfLogs(logs: string[]): Promise<{ [model: string]: Served }> {
+  const t = new ServedTally();
+  for (const log of logs) for await (const line of logLines(log)) {
+    if (!line.includes('"kind":"annotation"') || !/"annotation":"(usage|note|draft|translation_failure|signoff)"/.test(line)) continue;
+    if (line.includes('"annotation":"note"') && !line.includes("translation_route")) continue;
+    try { t.see(JSON.parse(line)); } catch {}
+  }
+  return t.byModel();
+}
 
 /** The two translators' shares over a run's logs, from each request's route (for the cost summary: batch.ts). Undefined
  * where no request had two translators. */
@@ -436,6 +452,7 @@ export function renderReport(r: any): string {
   const a = r.translator_arrangement;
   if (a) L.push(`   drafted behind (${a.behind}): ${shareText(a)}`);
   if (a) L.push(`   two translators (${a.arrangement}): ${a.requests} requests; the first (${a.first}) answered ${a.answered_by_first} (drafts ${a.seats_answers.first.drafts}: confirmed ${a.seats_answers.first.confirmed}, declined ${a.seats_answers.first.declined}; refusals that stood ${a.first_refusals_that_stood}; ${a.first_calls.mean_ms ?? "?"} ms a request); behind (${a.behind}) ${a.handed_behind}: ${kv(a.handed_behind_why)} (drafts ${a.seats_answers.behind.drafts}: confirmed ${a.seats_answers.behind.confirmed}, declined ${a.seats_answers.behind.declined}; ${a.behind_calls.cost_microusd ?? 0} microusd); both answered ${a.both_answered}, agreed ${a.agreed}`);
+  for (const [m, s] of Object.entries<any>(t.served_by_model ?? {})) L.push(`   served, ${m}: ${servedText(s)}`);
   for (const a of t.asked_back) L.push(`   asked back ${a.draft}: ${a.sentence}`);
   L.push(`   drafts offered ${t.drafts_offered}: confirmed ${t.drafts_confirmed}, declined ${t.drafts_declined}, unanswered ${t.drafts_unanswered}`);
   L.push(`   matters ${t.matters}, through within two tries ${t.matters_through_within_two_tries}; longest run of ask-backs ${t.longest_ask_back_run.length}${t.longest_ask_back_run.seat ? ` (${t.longest_ask_back_run.seat})` : ""}`);

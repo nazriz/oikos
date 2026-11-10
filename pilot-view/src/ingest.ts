@@ -5,6 +5,7 @@
 
 import { logLines } from "../../orchestrator/src/logs";
 import type { DebriefCollector } from "../../orchestrator/src/debriefs";
+import { ServedTally } from "../../orchestrator/src/served";
 import { dayOf, requestWords, summariseBlocks, notebookOf, type BlockSummary } from "./parse";
 
 export interface Transcript { t: number; seq: number; subject: string; purpose: string; turn: number; ref?: string; model?: string; provider?: string; opening?: string; notebook?: string; results: { id: string; text: string }[]; output: any[]; request?: string; systemSha?: string; shown?: string }
@@ -17,7 +18,9 @@ export interface Actor { id: string; acts: number; blocks: { [k: string]: number
 export interface Raw {
   header: any; end?: { reason?: string; detail?: string; t: number }; llm?: any; lastT: number; lines: number;
   transcripts: Transcript[]; usage: Usage[];
-  drafts: Map<string, any>; failures: Map<string, any>; signoffs: Map<string, { decision: string; t: number }>; routes: Map<string, any>; retries: Map<string, number>; requestText: Map<string, { t: number; words: string; attempts: number }>;
+  drafts: Map<string, any>; failures: Map<string, any>; signoffs: Map<string, { decision: string; t: number }>; routes: Map<string, any>;
+  /** How the translator served each seat model's requests (orchestrator/src/served.ts). */
+  served: ServedTally; retries: Map<string, number>; requestText: Map<string, { t: number; words: string; attempts: number }>;
   notes: { t: number; subject: string; kind: string; data: any }[];
   failedCalls: { t: number; subject: string; purpose: string; why: string }[]; optOuts: { t: number; participant: string; statement: string }[];
   seatActs: SeatAct[];
@@ -64,7 +67,7 @@ export interface IngestOptions {
 
 export async function ingest(path: string, o: IngestOptions): Promise<Raw> {
   const raw: Raw = {
-    header: undefined, lastT: 0, lines: 0, transcripts: [], usage: [], drafts: new Map(), failures: new Map(), signoffs: new Map(), routes: new Map(), retries: new Map(), requestText: new Map(), notes: [], failedCalls: [], optOuts: [], seatActs: [], otherKinds: new Map(),
+    header: undefined, lastT: 0, lines: 0, transcripts: [], usage: [], drafts: new Map(), failures: new Map(), signoffs: new Map(), routes: new Map(), served: new ServedTally(), retries: new Map(), requestText: new Map(), notes: [], failedCalls: [], optOuts: [], seatActs: [], otherKinds: new Map(),
     actors: new Map(), daily: { acts: [], refused: [], payments: [], moved: [], papers: [], messages: [], worked: [], kinds: new Map() }, census: [], people: { arrived: [], left: [], died: [], created: [] },
     systems: new Map(), woken: [], stewards: new Map(), reqSeat: new Map(), translatorCalls: new Map(),
   };
@@ -119,20 +122,24 @@ export async function ingest(path: string, o: IngestOptions): Promise<Raw> {
         raw.transcripts.push(tr);
       } else if (line.includes('"annotation":"usage"')) {
         const e = JSON.parse(line), b = e.body;
+        raw.served.see(e);
         raw.usage.push({ t: e.t, subject: b.subject, purpose: b.purpose, model: b.model, provider: b.provider, cost: b.cost_microusd ?? 0, input: b.input_tokens ?? 0, output: b.output_tokens ?? 0 });
       } else if (line.includes('"annotation":"draft"')) {
-        const b = JSON.parse(line).body, d = b.draft ?? {};
+        const e = JSON.parse(line), b = e.body, d = b.draft ?? {};
+        raw.served.see(e);
         if (d.id && d.participant) raw.reqSeat.set(d.id, d.participant);
         if (d.id) raw.drafts.set(d.id, { id: d.id, participant: d.participant, call: d.call, proposal: d.proposal, summary: d.summary, check: d.check, translator: d.translator, t: num(line, "t") });
       } else if (line.includes('"annotation":"translation_failure"')) {
-        const b = JSON.parse(line).body, d = b.data ?? {};
+        const e = JSON.parse(line), b = e.body, d = b.data ?? {};
+        raw.served.see(e);
         if (d.draft && b.subject) raw.reqSeat.set(d.draft, b.subject);
         if (d.draft) raw.failures.set(d.draft, { call: d.call, reason: d.reason, proposal: d.proposal, asked_back: d.asked_back === true, invalid: d.invalid });
       } else if (line.includes('"annotation":"signoff"')) {
         const e = JSON.parse(line);
+        raw.served.see(e);
         raw.signoffs.set(e.body.draft, { decision: e.body.decision, t: e.t });
       } else if (line.includes('"annotation":"note"')) {
-        if (line.includes('"translation_route"')) { const b = JSON.parse(line).body, d = b.data.translation_route; raw.routes.set(String(d.draft), d); if (b.subject && b.subject !== "orchestrator") raw.reqSeat.set(String(d.draft), b.subject); }
+        if (line.includes('"translation_route"')) { const e = JSON.parse(line), b = e.body, d = b.data.translation_route; raw.served.see(e); raw.routes.set(String(d.draft), d); if (b.subject && b.subject !== "orchestrator") raw.reqSeat.set(String(d.draft), b.subject); }
         else if (line.includes('"translation_retry"')) { const d = JSON.parse(line).body.data.translation_retry; raw.retries.set(String(d.draft), (raw.retries.get(String(d.draft)) ?? 0) + 1); }
         else if (line.includes('"steward"') && line.includes('"subject":"orchestrator"')) { const s = JSON.parse(line).body.data?.steward; if (s?.seat) raw.stewards.set(String(s.seat), s); }
         else if (seatList.some((s) => line.includes(`"subject":"${s}"`))) {

@@ -665,6 +665,15 @@ program. The join's own leak check runs again there.
 
 Nothing here was run on a model. Prompt **0.9.5** (the `line` of a payment, the `hours` of an agreement, a notice of a practice and an offer anyone may take up, each with worked examples and seen cases `r95-*`); `translator/train/synthetic.ts` `lateKinds` and its options, in `translator-data`: `--line-payments N` (tag `line_payment`), `--report-payments N` (`report_amounts`), `--split-payments N` (`split_payment`: the `needs_calculation` refusals that state no share are made from these), `--hours-terms N` (`hours_term`), `--practice-notices N` (`practice_notice`), `--offer-notices N` (`offer_notice`), all taken by `--only`; `--max-pieces` (640, 1024 or 2048) on the trainer, to be given with `--max-tokens` (the long reader: `--max-tokens 2048 --max-pieces 2048`), because with an encoder a row of more pieces than this is left out of training; `scripts/forms-inventory.ts`, `scripts/forms-released.ts`. The practice and offer kinds are not encodable by the model's export yet (docs/design/translator-round-3.md, "Progress"). A slot-by-slot model is decoded by the slots in its own config.json (`grammar`), so a contract that gains an argument does not break a model trained before.
 
+## Serving it alone (2026-11-10)
+
+In the study's arms our model is the only translator (`createAlone`, translator/src/arrangement.ts; docs/real-models.md,
+"Our translator alone"). `DecideAdapter` with `alone` withholds nothing for anyone behind: under its cut-off it offers
+its draft with what is unclear (`unsure`), and a draft on a form it was not taught or released for is offered (the
+release lists and trials matter only with a model behind it). A draft that does not fit the forms shown, or names a form
+it was not shown, is still not offered. What a retrain is measured against in a run is now `served_by_model` in its
+report: served first time, after one restatement, never, and the seats' answers to the drafts.
+
 ## Not built
 
 - The retrain's first two steps as one command: generated parts are written and checked by their own commands, and
