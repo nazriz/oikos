@@ -12264,6 +12264,35 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   depth a referral will cost the principal the paper's row too, so handing over pays even less; at matter depth the
   principal pays the referral alone, and `draft` still costs it more than a paper of under about five and a half minutes.
 
+## 2026-11-11 · Translator v5: the control recipe retrained on the taught language; no better than the model it would replace (GPU 1.69 USD; no API spend)
+
+- **Data, by code.** Round 3's joined set (`joined-v4c`, the pilot's real requests in it as the control had them)
+  relabelled to the taught language (`relabel.ts taught`: no basis, no for, a payment's memo, refusals told alike as one
+  label, `no_such_act`): 78,654 training rows (23,421 changed; 50 that composed a statement's data set aside). The
+  export reads every example so (`encode.ts` through `model/taught.ts`; slots `calls.TAUGHT`). Leak check by code
+  (`model/leak-check.ts`): no training row is in a real test case's words, from its seat-day, or shares five words with a
+  held-out case. Runs in `runs/translator-v5-2026-11-10/` (kept whole).
+- **Trained** two seeds of round 3's recipe (deberta-v3-small, 6 epochs, `--forms 0`) on two pods at once: an RTX A5000 at
+  0.27 an hour (174 minutes) and an RTX A4500 at 0.25 (210 minutes), under a cap of 4 USD checked before each rental
+  (`round5/train-one.sh`). Community cards were all taken at first; any cloud found them. Balance 9.60 to 7.91.
+- **Scored** on the sets in the taught language (`round5/sets.sh`; an older model read as served, `v4-score.ts --taught`),
+  against the served model of round 3 (seed 2). Right in all (vr, vp, nv, tp, uf): round 3 539, 55, 202, 334, 808;
+  v5 seed 1 537, 55, 199, 328, 809; seed 2 542, 54, 197, 331, 810. Forms seen in training against forms not: round 3
+  666/713 and 810/826; v5 661 and 811, 664 and 812. Certified on validation (one-sided 95%, 1% wrong), read on the test
+  side and unseen forms, served right: round 3 222 of 368 (2 wrong) and 545 of 824; v5 seed 1 153 (1) and 138; seed 2
+  194 (1) and 220; the two v5 seeds served where both agree 208 (2) and 422. Alone, with ask-back (every draft offered,
+  none withheld), on the pilot's sides by writing model: drafts right and wrong are within a few of round 3's for each,
+  with fewer asked back and more wrong drafts (round 3's asked-back count includes the papers it composes data for,
+  which the host now asks back). What a restatement brings needs a run (served.ts).
+- **Found on the way, fixed:** the real-requests eval (`passesReal`) told refusals apart by label, so `no_such_act` for an
+  expected `not_an_act` counted wrong though the seat is told the same words: v5 read 23 of 180 there, 82 and 84 once
+  fixed (round 3's 82 under the same code).
+- **Reading:** the retrain buys nothing. The rule (A, B, E) already gives a model trained before it the one right call
+  at serving time, and what the relabel took out of the keys was what that model was scored against, not what it got
+  wrong. Its sureness is spread thinner (the certified cut rises), so fewer requests are served at the 1% mark. Not
+  switched: the coordinator decides.
+- **Revisit if:** new keyed data (seats that quote; the pilot's next rounds) changes what is wrong; then the same command
+  line retrains (`relabel.ts taught`, `v4-data.sh`, `round5/train-one.sh`, `round5/score.sh`, `round5/summary.py`).
 ## 2026-11-10 · A matter priced by what it carries; the study's run-long hold a floor (enough-work screen findings)
 
 - **What:** an act of several papers of a kind (the rates post's: fifteen owners' notices to an act) is one matter, and
@@ -12588,3 +12617,27 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
   (an in-tray the sessions do not count); the code assistant's acting at any hour is read as a difference between arms
   (then give it the office's hours too, by the same rule, and accept the hash change in towns with providers); MT-31 is
   fixed (then the agreement chain in `whoLines` may become the post alone).
+## 2026-11-11 · The study serves round 3 seed 2 (`decide/round3-s2`), not v3-s2; v5 trained and not adopted
+
+- **What was served.** `experiments/scope-pilot/build.ts` `OURS` was `decide/pod-small-v3-s2`, the v3 model of
+  2026-10-25 (in the audit it read the pilot's forms at 80% where seen and 55% where not), and every arm of the study
+  (and the open-weight smoke, which takes `OURS`) seated it alone. It is now `decide/round3-s2`: round 3's seed 2
+  (`runs/translator-model/round3-s2` -> `runs/translator-v4-r3-2026-11-08/models/v4r3-D-deberta-s2`, a link as
+  pod-small-v3-s2's is; no weights in git). `decide/pod-small-v3-s2` stays available by name (`OURS_BEFORE`).
+- **Why:** the best measured on the pilot's own requests (scored in the taught language, as the host now serves it):
+  right 539/615 on validation-real, 334/368 on the pilot's test side, 808/824 on unseen forms; forms seen in training
+  666/713, unseen 810/826. At its certified cut-off (0.999613, the one-sided 95% bound of 1% wrong on validation) it
+  serves 222 of 368 right on the test side (2 wrong) and 545 of 824 on unseen forms (none wrong). On the in-repo real
+  requests (R180) 82/180 as the served adapter offers them, the same as v5's.
+- **The cut-off is beside it** in `translator/model/served.json`, which `DecideAdapter` reads for a model served by name
+  (unless a caller sets one): our translator alone offers a draft under it with what is unclear; with a translator
+  behind, the request goes behind.
+- **Checked end to end, nothing called:** `experiments/scope-pilot/dry.ts` (the study's town, the code arm and one mock
+  arm for 3 days after the fork, mock models): the translator step loaded `decide/round3-s2`, served alone (every
+  route `arrangement: alone`), and the report gave the served counts by seat model (17 requests from the mock's code
+  calls, which no model is trained to read: a plumbing check, not a score). The model answered in 100 to 400 ms a
+  request on this machine's CPU. `OIKOS_TRANSLATOR_MODELS` must name `runs/translator-model` for a run outside the main
+  checkout.
+- **v5** (the control recipe retrained on the taught language, two seeds, GPU 1.69 USD) was not adopted: no better on any
+  set, and its sureness certifies fewer requests at the 1% mark (the entry before this one). Its folders are kept.
+- **Revisit if:** a retrain on new keyed data beats round3-s2 on the pilot's test side at the certified cut.

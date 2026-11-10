@@ -5,6 +5,7 @@
 // field can (the answer then says which it lacks); a field a form's line does not list cannot be written; the rule is the same in the trainer's language; and a model of the earlier decoding is read
 // as it always was.
 import { expect, test } from "bun:test";
+import { taught } from "../model/taught";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -70,9 +71,9 @@ function cases(): Case[] {
 test("a program comes back exactly from its slot decisions: ids, text, a word, an implied value, a list, data, a nested call, a variable, a form, a refusal; as pieces too", () => {
   for (const c of cases()) {
     const e = slots(c);
-    expect(decodeSlots(e.input, e.steps)).toBe(canonical(c.program));
+    expect(decodeSlots(e.input, e.steps)).toBe(canonical(taught(c.program)!));
     const r = row("x", "positive", e)!;
-    expect(decodeSlots(e.input, stepsOf(r, r.steps))).toBe(canonical(c.program));
+    expect(decodeSlots(e.input, stepsOf(r, r.steps))).toBe(canonical(taught(c.program)!));
     // Nothing names an argument, closes a call or ends the program: there is no such decision to get wrong.
     for (const s of e.steps) if (typeof s === "string") expect(/^(arg:|\)$|eos$)/.test(s)).toBe(false);
     for (const s of e.steps) if (typeof s !== "string") expect(s[0]).not.toBe("field");
@@ -87,10 +88,11 @@ test("the decisions of a payment and of a form, one by one: the contract's order
   const [pay, , , , form] = cases();
   const e = slots(pay!);
   // money's slots as the contract lists them: to, amount, from, every, first, for, memo, settles, basis, per_request,
-  // line (`line` taught from 2026-10-14, `memo` added 2026-11-10: a model trained before has fewer, and decodes by its
-  // own grammar: below).
+  // line; and as a translator is taught them (2026-11-10: basis and for are set by rule, a payment's purpose is memo).
+  // (`line` taught from 2026-10-14: a model trained before has fewer, and decodes by its own grammar: below.)
   expect([...calls.ARGS.money!.allowed!]).toEqual(["to", "amount", "from", "every", "first", "for", "memo", "settles", "basis", "per_request", "line"]);
-  expect(read(e.input, e.steps)).toEqual([PROGRAM, "lines:1", "fn:money", "c0412", "$1,200.90", "acc-city", "every 14 days", 'const:"0 days"', "the fence", LEFT_OUT, LEFT_OUT, LEFT_OUT, LEFT_OUT, LEFT_OUT]);
+  expect([...calls.TAUGHT.money!.allowed!]).toEqual(["to", "amount", "from", "every", "first", "memo", "settles", "per_request", "line"]);
+  expect(read(e.input, e.steps)).toEqual([PROGRAM, "lines:1", "fn:money", "c0412", "$1,200.90", "acc-city", "every 14 days", 'const:"0 days"', "the fence", LEFT_OUT, LEFT_OUT, LEFT_OUT]);
   // A form: form, to, then the fields of the line it names and goes to (the second of the two budget proposals is
   // another office's, with other fields), in that line's order: year, works, staff, reserve, note.
   const f = slots(form!);
@@ -129,15 +131,15 @@ test("a call cannot end early and a program cannot: too few decisions, or too ma
 test("an argument the contract requires cannot be left out; a form's required field can, and the answer then says which", () => {
   const input = "Pay c0412 $5.";
   // money needs to and amount (the contract): the first two slots.
-  const whole: Step[] = [PROGRAM, "lines:1", "fn:money", ["id", 4, 9], ["text", 10, 12], ...Array(9).fill(LEFT_OUT)];
+  const whole: Step[] = [PROGRAM, "lines:1", "fn:money", ["id", 4, 9], ["text", 10, 12], ...Array(7).fill(LEFT_OUT)];
   expect(decodeSlots(input, whole)).toBe('money(amount="$5", to=c0412)');
   const without: Step[] = whole.map((s, i) => (i === 4 ? LEFT_OUT : s));
   expect(() => decodeSlots(input, without)).toThrow("money needs amount");
   // As a model's answer over pieces: no program, so it asks back. (In the other decoding the same call is offered,
   // and whoever resolves it asks for the amount.)
   const ps = pieces(input);
-  expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], LEFT_OUT, ...Array(9).fill(LEFT_OUT)], "slots")).toBe("none(unclear)");
-  expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], ["text", 2, 3], ...Array(9).fill(LEFT_OUT)], "slots")).toBe('money(amount="$5", to=c0412)');
+  expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], LEFT_OUT, ...Array(7).fill(LEFT_OUT)], "slots")).toBe("none(unclear)");
+  expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], ["text", 2, 3], ...Array(7).fill(LEFT_OUT)], "slots")).toBe('money(amount="$5", to=c0412)');
   expect(programOf(input, ps, ["fn:money", "arg:to", ["id", 1, 1], ")", "eos"])).toBe("money(to=c0412)");
   expect(programOf(input, ps, ["none:not_yours"], "slots")).toBe("none(not_yours)");
   // A form must say which form (the contract).
@@ -209,7 +211,7 @@ test("every example the generator makes comes back from its slot decisions, and 
     try { const x = encode(e); old = decode(x.input, x.steps); } catch { continue; }
     const s = encode(e, "name", "slots");
     expect(decodeSlots(s.input, s.steps)).toBe(old);
-    expect(programFrom(s.input, s.steps, "slots")).toBe(canonical(g.program));
+    expect(programFrom(s.input, s.steps, "slots")).toBe(canonical(taught(g.program)!));
     const r = row("x", "positive", s);
     if (r) expect(decodeSlots(s.input, stepsOf(r, r.steps))).toBe(old);
     n++; forms += Number(g.program.startsWith("form(")); lines += Number(p.lines.length > 1);
@@ -237,7 +239,7 @@ test("the trainer's language holds the same rule: it follows every label to its 
   const got = out.stdout.toString().trim().split("\n").map((l) => JSON.parse(l) as { fits: boolean; slots: string[]; off: number[] });
   all.forEach((e, i) => expect([i, got[i]!.fits, got[i]!.off]).toEqual([i, true, []]));
   expect(got[4]!.slots).toEqual(["kind", "lines", "fn", "arg:form", "arg:to", "field:year", "field:works", "field:staff", "field:reserve", "field:note"]);
-  expect(got[0]!.slots.slice(2)).toEqual(["fn", ...[...calls.ARGS.money!.allowed!].map((a) => `arg:${a}`)]);
+  expect(got[0]!.slots.slice(2)).toEqual(["fn", ...[...calls.TAUGHT.money!.allowed!].map((a) => `arg:${a}`)]);
   const n = all.length;
   expect([got[n]!.fits, got[n]!.off]).toEqual([true, []]);
   expect([got[n + 1]!.fits, got[n + 1]!.off]).toEqual([true, [4]]);
@@ -267,13 +269,13 @@ test("a model is read by the slots it was taught: one trained before money gaine
   const input = "Pay c0412 $5.";
   const taught = grammar();
   const before = { ...taught, money: { ...taught.money!, args: taught.money!.args.filter((a) => a !== "line" && a !== "memo") } };
-  const nine: Step[] = [PROGRAM, "lines:1", "fn:money", ["id", 4, 9], ["text", 10, 12], ...Array(7).fill(LEFT_OUT)];
+  const nine: Step[] = [PROGRAM, "lines:1", "fn:money", ["id", 4, 9], ["text", 10, 12], ...Array(5).fill(LEFT_OUT)];
   expect(decodeSlots(input, nine, { grammar: before })).toBe('money(amount="$5", to=c0412)');
   // (Read against the contract as it stands, the same nine decisions end early.)
   expect(() => decodeSlots(input, nine)).toThrow(NotEncodable);
   expect(programFrom(input, nine, "slots", before)).toBe('money(amount="$5", to=c0412)');
   const ps = pieces(input);
-  expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], ["text", 2, 3], ...Array(7).fill(LEFT_OUT)], "slots", before)).toBe('money(amount="$5", to=c0412)');
+  expect(programOf(input, ps, [PROGRAM, "lines:1", "fn:money", ["id", 1, 1], ["text", 2, 3], ...Array(5).fill(LEFT_OUT)], "slots", before)).toBe('money(amount="$5", to=c0412)');
 });
 
 test("a request of several lines is shown on one, so that a line of it is never read as a form (a checklist crashed the reader)", () => {

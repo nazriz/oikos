@@ -101,7 +101,9 @@ export interface Options {
 }
 
 /** Our own trained translator, held fixed for every arm. */
-export const OURS = "decide/pod-small-v3-s2";
+export const OURS = "decide/round3-s2";
+/** The model the study seated before 2026-11-11, kept by name: decide/pod-small-v3-s2. */
+export const OURS_BEFORE = "decide/pod-small-v3-s2";
 
 export function build(o: Options): ExperimentSpec {
   const until = FORK_DAY + o.days;

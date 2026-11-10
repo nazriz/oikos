@@ -3,6 +3,7 @@
 // it has its spans and the steps a model is trained on rebuild it. Each way of failing is counted by its own name.
 
 import { expect, test } from "bun:test";
+import { taught } from "../model/taught";
 import { canonical } from "../eval/run";
 import { decode, encode } from "../model/encode";
 import { labelled, NOT_KEPT, withListsQuoted, type Unlabelled } from "../train/readers";
@@ -45,7 +46,7 @@ test("two readers who agree make an example, in the shape of a generated set's c
 test("every example kept can be trained on: its steps rebuild its program", () => {
   for (const e of r.examples) {
     const enc = encode(e);
-    expect(canonical(decode(enc.input, enc.steps))).toBe(canonical(e.program));
+    expect(canonical(decode(enc.input, enc.steps))).toBe(canonical(taught(e.program)!));
   }
 });
 
