@@ -246,6 +246,16 @@ or replace the service before the day it said. After those days its rule weighs 
 and whenever the assistant asks for more scope. Nothing else in the world reads it. Test:
 `kernel/crates/actors/src/delegation/tests.rs`, `a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after`.
 
+**A floor or a freeze** (`commit.hold`, 2026-11-10). By default the levels decided are a **floor**: the principal has
+agreed to keep each kind with its assistant at least at that level until the day given (a service's committed term and
+scope, as a contract has). Its remit says so ("We have agreed to keep them with you at least at draft until ...";
+`Remit.at_least` with `hold_until`). Its rule weighs the kind as ever on its review days and may raise it, never below
+the floor, and a request for more is weighed and may be granted; a request to go below is declined as the floor, with
+its day. As a **freeze** (`hold: "freeze"`: the scope pilot's month-long hold, and a study cell) it does not look at the
+levels again before the day, and a request is declined with it ("we look at levels again on that day"). Why: for the
+study who has an assistant and at what level is assigned for the whole run, and as a freeze every request would be
+refused, leaving no grants to compare. Test: `a_level_decided_by_hand_as_a_floor_is_kept_at_least_and_its_rule_may_raise_it_or_grant_more`.
+
 **A set-up of nothing is paid as placed.** An order whose total is nothing (au-vic's offers to organisations cost
 nothing to set up) is set up at once: before 2026-11-07 the seller waited for a payment that never came and declined the
 order as unpaid after a week, so no organisation could ever be delivered an assistant at the sourced prices

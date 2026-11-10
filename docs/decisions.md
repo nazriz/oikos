@@ -11978,3 +11978,16 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   margin, so a debrief dearer than the table says still runs over, as the platform's overrun.
 - **Revisit if:** seats are made during a fork in numbers that the reserve sized at its start does not cover (a seat made
   later adds its own share, and one the limit cannot cover then stops the run at that seat's making).
+
+## 2026-11-10 · A level decided by hand is a floor, not a freeze (the lead's decision of 2026-11-10)
+
+- **What:** a delegation decided by hand (`commit`) now holds its levels as a floor by default (`commit.hold`: `floor` or
+  `freeze`). As a floor, its remit carries `at_least` with `hold_until`: the principal keeps the kind with its assistant at
+  least at that level until the day, its rule may raise it and may grant a request for more, and a request below the
+  floor is declined as such (`reasons`: `below_floor`), in its own words ("We have agreed to keep invoices with you at
+  least ... until ..."). As a freeze (the pilot's month-long hold) nothing changes before the day and a request is
+  declined with it ("we look at levels again on that day"). Why: the study assigns who has an assistant, at what level,
+  for the whole run; a run-long freeze would refuse every request, and the study would have no grants to set beside
+  refusals. Contract: `Remit.at_least`, `Commit.hold`, the reason `below_floor`. What the rule then grants is recorded,
+  not tuned.
+- **Revisit if:** the study wants a ceiling too (a kind its principal will not raise), or a floor per request.

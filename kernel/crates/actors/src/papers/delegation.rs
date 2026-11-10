@@ -62,6 +62,17 @@ impl Level {
     pub fn from_word(w: &str) -> Option<Level> {
         Level::ALL.into_iter().find(|l| l.word() == w)
     }
+    /// How much a level hands over, for "at least" (a floor a principal has agreed to keep a kind at): nothing, advice,
+    /// a draft, approval, alone. Not a ladder anyone climbs: only what a floor is measured against.
+    pub fn rank(self) -> u8 {
+        match self {
+            Level::None => 0,
+            Level::Advice => 1,
+            Level::Draft => 2,
+            Level::Approve => 3,
+            Level::Alone => 4,
+        }
+    }
     /// In words, for a paper.
     pub fn words(self) -> &'static str {
         match self {
@@ -201,6 +212,11 @@ pub struct Remit {
     /// The request for more scope this remit grants, where it grants one (so that the grant and the request are linked).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answers: Option<String>,
+    /// A floor, not a freeze: until `hold_until` the principal has agreed to keep this kind with its assistant at least at
+    /// this level (a service's committed term and scope), and its rule may still raise it, or grant a request for more.
+    /// Absent, `hold_until` is a freeze: it does not look at the level again before then.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at_least: Option<Level>,
 }
 impl Paper for Remit {
     const KIND: &'static str = "remit";
@@ -395,6 +411,8 @@ pub enum Why {
     Sent,
     /// The principal's own word holds the level until a day (its remit's `hold_until`, or a delegation decided by hand).
     Held,
+    /// Asked to lower a kind below the level the principal has agreed to keep it at, until a day.
+    BelowFloor,
     /// By the principal's own figures the asked level would cost it more than the one in force.
     CostsMore,
     /// Not a kind of matter of the principal's own.

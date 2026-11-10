@@ -94,6 +94,20 @@ pub struct Commit {
     /// Why, in words: in every decision it logs under it.
     #[serde(default)]
     pub why: String,
+    /// What its word on the levels is: a floor (the default: it keeps each kind with the assistant at least at its level
+    /// until `levels_until`, and its rule may raise it, or grant a request for more) or a freeze (it does not look at the
+    /// levels again before then: the scope pilot's month-long hold, and a study cell).
+    #[serde(default)]
+    pub hold: Hold,
+}
+
+/// A delegation decided by hand holds its levels as a floor or as a freeze (`Commit.hold`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Hold {
+    #[default]
+    Floor,
+    Freeze,
 }
 fn d_finds() -> i64 {
     8_000
@@ -707,28 +721,30 @@ impl State {
         back
     }
 
-    /// Until when it has said it will not change a kind under a service (its newest remit's `hold_until`).
-    fn held(&self, agreement: &str, kind: &str, t: i64) -> bool {
+    /// Its newest remit for a kind under a service.
+    fn newest_remit(&self, agreement: &str, kind: &str) -> Option<Remit> {
         self.book
             .all(Remit::KIND)
             .rev()
             .filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str()))
             .filter_map(|r| papers::read::<Remit>(r))
             .find(|x| x.agreement == agreement && x.kind == kind)
-            .and_then(|x| x.hold_until)
-            .is_some_and(|h| t < h)
     }
 
-    /// Until when it has said it will not change a kind under a service, where that is still ahead.
+    /// Whether it has said it will not look at a kind's level again yet (its newest remit's `hold_until`, a freeze).
+    fn held(&self, agreement: &str, kind: &str, t: i64) -> bool {
+        self.held_until(agreement, kind, t).is_some()
+    }
+
+    /// Until when it has said it will not look at a kind's level again, where that is still ahead (a freeze: a floor
+    /// is `floor`).
     fn held_until(&self, agreement: &str, kind: &str, t: i64) -> Option<i64> {
-        self.book
-            .all(Remit::KIND)
-            .rev()
-            .filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str()))
-            .filter_map(|r| papers::read::<Remit>(r))
-            .find(|x| x.agreement == agreement && x.kind == kind)
-            .and_then(|x| x.hold_until)
-            .filter(|h| t < *h)
+        self.newest_remit(agreement, kind).filter(|x| x.at_least.is_none()).and_then(|x| x.hold_until).filter(|h| t < *h)
+    }
+
+    /// The level it has agreed to keep a kind with its assistant at least at, and until when, where that is still ahead.
+    fn floor(&self, agreement: &str, kind: &str, t: i64) -> Option<(Level, i64)> {
+        self.newest_remit(agreement, kind).and_then(|x| Some((x.at_least?, x.hold_until?))).filter(|(_, h)| t < *h)
     }
 
     /// Whether a delegation decided by hand still keeps the service (it does not leave or replace it before then).
@@ -792,7 +808,8 @@ impl State {
             let a = x.agreement.clone();
             let now = self.remit(&a, &k);
             let named = k.replace('_', " ");
-            let until = self.held_until(&a, &k, t).or_else(|| self.p.commit.as_ref().filter(|c| t < c.levels_until && c.levels.contains_key(&k)).map(|c| c.levels_until));
+            let until = self.held_until(&a, &k, t).or_else(|| self.p.commit.as_ref().filter(|c| c.hold == Hold::Freeze && t < c.levels_until && c.levels.contains_key(&k)).map(|c| c.levels_until));
+            let floor = self.floor(&a, &k, t);
             let why = if !self.p.kinds.contains_key(&k) {
                 words.push(format!("{} are not papers of ours: we hand you none.", plural(&named)));
                 Why::NotOurs
@@ -804,8 +821,12 @@ impl State {
                 Why::Granted
             } else if let Some(h) = until {
                 look_again = Some(h);
-                words.push(format!("We keep {} at {} until {}. After that we will look at it again.", plural(&named), now.words().trim_start_matches("to "), date(h)));
+                words.push(format!("We keep {} at {} until {}: we look at levels again on that day.", plural(&named), now.words().trim_start_matches("to "), date(h)));
                 Why::Held
+            } else if let Some((f, h)) = floor.filter(|(f, _)| level.rank() < f.rank()) {
+                look_again = Some(h);
+                words.push(format!("We have agreed to keep {} with you at least {} until {}.", plural(&named), f.words(), date(h)));
+                Why::BelowFloor
             } else {
                 let kinds = self.kinds_now(t);
                 let w = self.p.weights();
@@ -818,7 +839,8 @@ impl State {
                 if (c_now - c_want) * 10_000 > c_want.max(1) * i128::from(w.hurdle_bps.max(0)) {
                     let back = if hands_over(level) { vec![] } else { self.take_back(&a, &k) };
                     words.push(format!("From now, {}: {}. It stands until a remit of ours changes it.{}", plural(&named), level.words(), taken_back(&back)));
-                    remit = Some(Remit { agreement: a.clone(), kind: k.clone(), level, hold_until: None, takes_back: back, answers: Some(id.to_string()) });
+                    let (at_least, hold_until) = self.floor(&a, &k, t).map_or((None, None), |(f, h)| (Some(f), Some(h)));
+                    remit = Some(Remit { agreement: a.clone(), kind: k.clone(), level, hold_until, takes_back: back, answers: Some(id.to_string()), at_least });
                     Why::Granted
                 } else {
                     let money = |n: i128| money_words(n as i64, &cx.ctx.world);
@@ -1070,13 +1092,28 @@ impl State {
                 if !kinds.contains_key(k) {
                     continue;
                 }
-                // (A level decided by hand, while it holds: written once, held by its remit's own word.)
-                if let Some((want, until, why)) = self.p.commit.as_ref().filter(|c| c.offer == e.offer.id && t < c.levels_until).and_then(|c| c.levels.get(k).map(|l| (*l, c.levels_until, c.why.clone()))) {
+                // (A level decided by hand as a floor, while it holds: written as the least it keeps the kind at; its rule
+                // then weighs the kind as ever, never below it. 2026-11-10: as a freeze it held every level a run long, and
+                // every request under it was refused.)
+                if let Some((want, until, why)) = self.p.commit.as_ref().filter(|c| c.hold == Hold::Floor && c.offer == e.offer.id && t < c.levels_until).and_then(|c| c.levels.get(k).map(|l| (*l, c.levels_until, c.why.clone()))) {
+                    let now = self.remit(&a, k);
+                    if self.floor(&a, k, t).is_none() || now.rank() < want.rank() {
+                        let to = if now.rank() < want.rank() { want } else { now };
+                        cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": now, "to": to, "committed": why, "at_least": want, "hold_until": until, "inputs": self.inputs(&e, &seen) }));
+                        let words = format!("From now, {}s: {}. We have agreed to keep them with you at least at {} until {}; after that, until a remit of ours changes it.", k.replace('_', " "), to.words(), want.word(), crate::common::when_words(until, &cx.ctx.world));
+                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: to, hold_until: Some(until), takes_back: vec![], answers: None, at_least: Some(want) };
+                        self.changed = true;
+                        self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
+                        continue;
+                    }
+                }
+                // (A level decided by hand as a freeze, while it holds: written once, held by its remit's own word.)
+                if let Some((want, until, why)) = self.p.commit.as_ref().filter(|c| c.hold == Hold::Freeze && c.offer == e.offer.id && t < c.levels_until).and_then(|c| c.levels.get(k).map(|l| (*l, c.levels_until, c.why.clone()))) {
                     if self.remit(&a, k) != want && !self.held(&a, k, t) {
                         cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": self.remit(&a, k), "to": want, "committed": why, "hold_until": until, "inputs": self.inputs(&e, &seen) }));
                         let back = if hands_over(want) { vec![] } else { self.take_back(&a, k) };
                         let words = format!("From now, {}s: {}. This level is fixed until {}. It does not expire: after that day it stays in force until we send a new remit.{}", k.replace('_', " "), want.words(), crate::common::when_words(until, &cx.ctx.world), taken_back(&back));
-                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: Some(until), takes_back: back, answers: None };
+                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: Some(until), takes_back: back, answers: None, at_least: None };
                         self.changed = true;
                         self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
                     }
@@ -1087,7 +1124,12 @@ impl State {
                     continue;
                 }
                 let now = self.remit(&a, k);
-                let want = x.levels.get(k).copied().unwrap_or(Level::None);
+                let floor = self.floor(&a, k, t);
+                let mut want = x.levels.get(k).copied().unwrap_or(Level::None);
+                // (Never below a floor it has agreed to.)
+                if let Some((f, _)) = floor.filter(|(f, _)| want.rank() < f.rank()) {
+                    want = f;
+                }
                 if want == now {
                     continue;
                 }
@@ -1104,8 +1146,9 @@ impl State {
                 // ourselves, and the remit says which. Before 2026-11-08 they were left open, and the principal went on
                 // to answer a request to go ahead on one: the scope pilot's W4.)
                 let back = if hands_over(want) { vec![] } else { self.take_back(&a, k) };
-                let words = format!("From now, {}s: {}. It stands until a remit of ours changes it.{}", k.replace('_', " "), want.words(), taken_back(&back));
-                let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: None, takes_back: back, answers: None };
+                let kept = floor.map(|(f, h)| format!(" We have agreed to keep them with you at least at {} until {}.", f.word(), crate::common::when_words(h, &cx.ctx.world))).unwrap_or_default();
+                let words = format!("From now, {}s: {}. It stands until a remit of ours changes it.{kept}{}", k.replace('_', " "), want.words(), taken_back(&back));
+                let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: floor.map(|(_, h)| h), takes_back: back, answers: None, at_least: floor.map(|(f, _)| f) };
                 self.changed = true;
                 self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
             }

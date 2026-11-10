@@ -259,7 +259,7 @@ fn a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after(
     // (A study's design: the principal has decided to take this offer, notices at draft, for 60 days, and to keep the
     // service for 90; the offer is far too dear for its rule ever to take.)
     let script: Vec<Value> = (1..=120).map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
-    let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 60 * DAY, "keep_until": 90 * DAY, "why": "the study's design" });
+    let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 60 * DAY, "keep_until": 90 * DAY, "why": "the study's design", "hold": "freeze" });
     let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
         "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "commit": commit } }));
     let inner = crate::stub::Script.create(&h.ctx).unwrap();
@@ -291,7 +291,7 @@ fn a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after(
     }
     let line = answered.lines().find(|l| l.contains("kind=scope_answer")).unwrap_or_else(|| panic!("an answer: {answered}"));
     assert!(line.contains("basis=rec.ask") && line.contains("\"request\":\"rec.ask\"") && line.contains("\"why\":\"held\"") && line.contains(&format!("\"look_again_at\":{}", 60 * DAY)), "{line}");
-    assert!(line.contains("We keep notice to vacates at draft for sign-off until year 1, day 61. After that we will look at it again."), "the hold in the office's words: {line}");
+    assert!(line.contains("We keep notice to vacates at draft for sign-off until year 1, day 61: we look at levels again on that day."), "the hold in the office's words: {line}");
     let d = h.decisions.iter().find(|d| d["choice"] == "answered").expect("the answer's decision");
     assert_eq!((d["answers"].clone(), d["granted"].clone()), (json!("rec.ask"), json!(false)));
     let mut after = String::new();
@@ -319,6 +319,42 @@ fn a_remit_that_hands_a_kind_over_no_longer_takes_back_what_is_open_of_it() {
     let ask = statement("rec.ask", 35 * DAY + 7200, ME, "approval_request", &[ME], json!({ "referral": referral, "gist": "the notice" }));
     let late = all(&h.wake(36 * DAY + 3600, world(vec![ask])));
     assert!(!late.contains("kind=go_ahead") && !late.lines().any(|l| l.starts_with("statement(basis=lease-1")), "and says nothing more on it, nor does it twice: {late}");
+}
+
+#[test]
+fn a_level_decided_by_hand_as_a_floor_is_kept_at_least_and_its_rule_may_raise_it_or_grant_more() {
+    // (A study's assignment for the whole run: notices at least at draft for 120 days. Cheap errors, so its rule would
+    // sooner go alone: it may, above the floor; it does not go below it, and a request to go below is declined as such.)
+    let script: Vec<Value> = (1..=100).map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
+    let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 120 * DAY, "keep_until": 120 * DAY, "why": "the study's design" });
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "commit": commit } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    h.wake(DAY + 3600, world(vec![offer_rec(10_000)]));
+    let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).unwrap() as i64 + 1);
+    h.wake(32 * DAY + 3600, world(set_up(&order)));
+    h.wake(33 * DAY + 3600, world(vec![signed()]));
+    let first = h.sent.iter().rev().find(|p| p.contains("kind=remit")).cloned().unwrap_or_default();
+    assert!(first.contains("\"level\":\"draft\"") && first.contains("\"at_least\":\"draft\"") && first.contains(&format!("\"hold_until\":{}", 120 * DAY)), "{first}");
+    assert!(first.contains("We have agreed to keep them with you at least at draft until year 1, day 121"), "{first}");
+    let remit = |id: &str, at: i64, level: &str| json!({ "id": id, "record": "statement", "author": "ll-system", "speaks_for": ME, "at": at, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [PROV], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "notice_to_vacate", "level": level, "hold_until": 120 * DAY, "at_least": "draft" } });
+    let mut out = String::new();
+    for d in 34..=70 {
+        out.push_str(&all(&h.wake(d * DAY + 3600, world(if d == 34 { vec![remit("rec.f1", 34 * DAY, "draft")] } else { vec![] }))));
+    }
+    let raised = out.lines().find(|l| l.contains("kind=remit")).unwrap_or_else(|| panic!("its rule raises it above the floor: {out}"));
+    assert!(raised.contains("\"level\":\"alone\"") && raised.contains("\"at_least\":\"draft\""), "above the floor, the floor kept: {raised}");
+    // (Asked to go below the floor: declined as the floor, with its day. Asked for draft, at the floor: weighed, and kept.)
+    let below = statement("rec.ask1", 71 * DAY, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "level": "advice" }));
+    let at = statement("rec.ask2", 71 * DAY, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "level": "draft" }));
+    let mut ans = all(&h.wake(71 * DAY + 3600, world(vec![remit("rec.f2", 70 * DAY, "alone"), below, at])));
+    ans.push_str(&all(&h.wake(72 * DAY + 3600, world(vec![]))));
+    let one = ans.lines().find(|l| l.contains("kind=scope_answer") && l.contains("rec.ask1")).unwrap_or_else(|| panic!("{ans}"));
+    assert!(one.contains("\"why\":\"below_floor\"") && one.contains("We have agreed to keep notice to vacates with you at least to draft for sign-off until year 1, day 121."), "{one}");
+    let two = ans.lines().find(|l| l.contains("kind=scope_answer") && l.contains("rec.ask2")).unwrap_or_else(|| panic!("{ans}"));
+    assert!(two.contains("\"why\":\"costs_more\""), "{two}");
 }
 
 #[test]
