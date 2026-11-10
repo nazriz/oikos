@@ -56,7 +56,7 @@ test("what a form was filled in with reads as the form says each field is: money
   expect(advert).toContain("With these details: wage: £85,000.00; period: 1 year; role: crew.");
   // An agreement's terms beyond its sentence, and an act's other fields: the same reading.
   expect(new Preview(gb, "city").of([{ block: "publish", kind: "notice", speaks_for: "city", visible_to: "public", text: "Rates.", data: { rate_bps: 1600, closes_at: 3 * DAY + 9 * 3600, lines: { parks: "6000000", staff: "27000000" }, figures: { notice: { unit: "seconds", value: 5_184_000 } } } } as any]))
-    .toContain('With these details: {"rate":"16%","closes_at":"year 1, day 4, 09:00","lines":{"parks":"£60,000.00","staff":"£270,000.00"},"figures":{"notice":"60 days"}}.');
+    .toContain("With these details: rate: 16%; closes at: year 1, day 4, 09:00; lines: (parks: £60,000.00; staff: £270,000.00); figures: (notice: 60 days).");
 });
 
 test("lengths of time are said as people say them", () => {
@@ -70,15 +70,16 @@ test("the papers a seat is shown read the same way: no smallest units, seconds o
   const prices = { id: "rec.7", record: "statement", kind: "price_list", author: "builder-system", at: 0, speaks_for: "builder", visible_to: "public", text: "Our prices.", data: { prices: { apartments: 320_553_600, park: 6_108_600 }, demolition: { park: 207_240 }, min_order: 100 } };
   const obs = { t: 0, entity: "city", outcomes: [], inbox: [], drafts: [], channels: { laws: { kind: "records", records: [law, tax, prices] } } } as unknown as Observation;
   const onFile = renderStanding(obs, new Set(["laws"]));
-  expect(onFile).toContain('({"figures":{"notice":"60 days","review":"360 days"}})');
-  expect(onFile).toContain('({"brackets":[{"from":"£0.00","rate":"0%"},{"from":"£12,570.00","rate":"20%"}],"levy":"8%","levy_from":"£12,570.00","rate":"0.5959%","due_days":30,"instalments":4})');
-  expect(onFile).toContain('({"prices":{"apartments":"£3,205,536.00","park":"£61,086.00"},"demolition":{"park":"£2,072.40"},"min_order":100})');
-  for (const raw of ["5184000", "rate_bps", "320553600", "rate_ppm", '"value"']) expect(onFile).not.toContain(raw);
+  // (In words: each detail by its name, what is inside one in brackets after it; never the store's notation.)
+  expect(onFile).toContain("(figures: (notice: 60 days; review: 360 days))");
+  expect(onFile).toContain("(brackets: ((from: £0.00; rate: 0%); (from: £12,570.00; rate: 20%)); levy: 8%; levy from: £12,570.00; rate: 0.5959%; due days: 30; instalments: 4)");
+  expect(onFile).toContain("(prices: (apartments: £3,205,536.00; park: £61,086.00); demolition: (park: £2,072.40); min order: 100)");
+  for (const raw of ["5184000", "rate_bps", "320553600", "rate_ppm", '"value"', '{"']) expect(onFile).not.toContain(raw);
   // As they come, and in a list: a ballot's closing, a benefit's amount and period.
   const ballot = { id: "rec.40", record: "statement", kind: "ballot", author: "clerk-system", at: DAY, speaks_for: "city", visible_to: "public", text: "Shall the budget be adopted?", data: { closes_at: 15 * DAY, options: ["yes", "no"] } };
   const decision = { id: "rec.41", record: "statement", kind: "benefit_decision", author: "payments-system", at: DAY, speaks_for: "outside", visible_to: ["c0297"], text: "Granted.", data: { amount: 48_260, every: 14 * DAY } };
   const came = renderObservation({ ...obs, channels: { civic: { kind: "records", records: [ballot, decision] } } } as any);
-  expect(came).toContain('({"closes_at":"year 1, day 16","options":["yes","no"]})');
+  expect(came).toContain("(closes at: year 1, day 16; options: yes, no)");
   expect(came).toContain("(amount: £482.60; every: 14 days)");
   // What nothing here names is left as it is: a count stays a count.
   expect(readable({ quantity: 137, for_days: 14, members: 3, years: 12 })).toEqual({ quantity: 137, for_days: 14, members: 3, years: 12 });

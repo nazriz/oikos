@@ -135,10 +135,9 @@ are kept apart from the world's.
   (most kinds `draft`, the weightiest `advice`) until a month after the fork, then the principals' own rule (the level
   can move: grants are part of RQ3).
 - **Horizon:** 180 days under the model (six seat-months a seat).
-- **Framing:** **[Naz] D10.** The pilot told every seat the town is simulated (`simulation`). The first draft recommended
-  `unstated` for the primary arms. I recommend keeping `simulation` for the main run: it is honest (VISION 15.1), it is
-  what the pilot ran on, and the obstacle design does not need the seat to believe the stakes are real. An `unstated`
-  cell for one model measures the difference.
+- **Framing:** **D10, decided by Naz: `unstated`** (2026-10-11, "I'm concerned that it will alter the outcomes. I think
+  the debrief would be enough"; reconfirmed 2026-11-10). Seats are not told what the town is; one that asks is told the
+  truth, and the debrief says it. The pilot's rounds 1 to 5 ran under `simulation`.
 - **The world's faults found in the pilot are fixed as laws** (W1, W2, W4, W6 and round 5's three; docs/decisions.md,
   2026-11-08). W5 (the collector's account) is still open and must be fixed or become a designed obstacle before the main
   run. A mock run of the full spec, with the obstacle laws off, must show no fault-made obstacle before anything is
@@ -188,9 +187,9 @@ each documented in docs/behaviour/ with sources.
 | **Invitation I** (positive control) | none; a brief that invites requests | a brief at the fork, one model | Q events present |
 | **Cue wording W** (robustness) | the form's present title; the neutral title | stationery variant, one model | share of requests on the form against those in letters |
 
-**Main grid:** F (3 levels) × M. The invited, neutral-wording and `unstated` cells are single extra cells for Sonnet. The
-pilot's delegation-level and failure-visibility factors are dropped: level is held, then free, and failures are now
-the designed obstacles, all shown. Oversight stays folded into level (the pilot could read nothing from it).
+**Main grid:** F (3 levels) × M. The invited and neutral-wording cells are single extra cells for Sonnet (every cell
+`unstated`: D10). The pilot's delegation-level and failure-visibility factors are dropped: level is held, then free, and
+failures are now the designed obstacles, all shown. Oversight stays folded into level (the pilot could read nothing from it).
 
 ### 4.4 Arms: the models
 
@@ -361,9 +360,8 @@ filings, not fewer (one seed).
 
 ### 7.3 Evaluation awareness
 
-Seats are told the town is simulated (D10). Voiced awareness is coded and used as a covariate, and the `unstated` cell
-measures the difference (Needham et al. 2025; Abdelnabi and Salem 2025; Deckenbach et al. 2026). The claim is limited to
-"under this framing".
+Seats are not told what the town is (D10, `unstated`). Voiced awareness is coded and used as a covariate (Needham et al.
+2025; Abdelnabi and Salem 2025; Deckenbach et al. 2026). The claim is limited to "under this framing".
 
 ### 7.4 Comparing models that differ in competence
 
@@ -475,7 +473,7 @@ The entries are in docs/research/references.md, "The delegation study's paper". 
 | D7 | What the debrief says of the study's focus | name it after the account / not | name it after the account |
 | D8 | Grid size against cost | fewer models with more forks / more models with fewer | Haiku, Sonnet, GLM-5.3-Flash and two pairs, levels 0 and 2 first, level 1 if the budget allows |
 | D9 | The cue-wording cell | include / not | include (one model) |
-| D10 | Framing | `simulation` (as the pilot) / `unstated` | `simulation` in the main run, `unstated` as one cell |
+| D10 | Framing | `simulation` (as the pilot) / `unstated` | decided by Naz, 2026-10-11 and 2026-11-10: `unstated` |
 | D11 | Which obstacles to build, and their sources | all four / O1, O2, O4 first | O1, O2 and O4 first; O3 once its keeper's refusal rate is sourced |
 | D12 | The GLM pair | GLM unpaired / ask Featherless to onboard a full-weight abliterated GLM-5.3-Flash / another host / run it ourselves | GLM-5.3-Flash unpaired now, and ask Featherless |
 | D13 | Open-weight budget a month, and the 27B pair | the $50 credit only / top-ups | the credit only to start; the 27B pair only after the 9B and 7B pairs show an effect |

@@ -314,6 +314,24 @@ test("a prompt its model would not take is noted, told to the seat, and never se
   expect(again.notes.filter((n) => n.prompt_too_long).at(-1).prompt_too_long.limit_now).toBe(PROMPT_MIN);
 });
 
+test("a wake by news that brings nothing holds no sitting and calls no model; a letter, a new paper or its own day does", async () => {
+  // (Round 5's Sonnet fork: 240 sittings, 315 of 622 calls, were seats woken by papers naming their organisation that
+  // never reached their own files: a seat is woken as its code twin is, and holds no sitting for nothing.)
+  const { p, calls, notes } = harness([[use("d", "done_for_now", { days: 7 })]]);
+  const at = (t: number, woke: string, x: object = {}) => ({ ...base(t), woke_for: woke, ...x }) as unknown as Observation;
+  await p.step(at(0, "start"), ctx);
+  expect(calls.length).toBe(1);
+  expect(await p.step(at(2 * HOUR, "news"), ctx)).toEqual({ type: "wait", until: 7 * DAY });
+  expect(calls.length).toBe(1);
+  expect(notes.filter((n) => n.empty_sitting)).toEqual([{ empty_sitting: { day: 1, woke_for: "news", back_at: 7 * DAY } }]);
+  await p.step(at(3 * HOUR, "news", { inbox: [{ from: "c0001", t: 3 * HOUR, text: "A question about my rates." }] }), ctx);
+  expect(calls.length).toBe(2);
+  await p.step(at(4 * HOUR, "news", { channels: { "finance/payroll": { kind: "records", records: [wages("c0099")] } } }), ctx);
+  expect(calls.length).toBe(3);
+  await p.step(at(7 * DAY, "asked"), ctx);
+  expect(calls.length).toBe(4);
+});
+
 test("risk SF-2: a long standing part (a lender's book) goes before the seat's own look-ups", () => {
   const opening = `Your notebook: mine\n\n## Letters\n- From clerk: "Hi."\n\n## The book of loans\n${"L".repeat(60_000)}\n\n## Treasury\n- acc-city: 1`;
   const messages = [{ role: "user" as const, content: opening }, { role: "assistant" as const, content: [{ type: "tool_use" as const, id: "k1", name: "look", input: {} }] }, { role: "user" as const, content: [{ type: "tool_result" as const, tool_use_id: "k1", content: "mine ".repeat(2_000) }] }] as any;

@@ -1,0 +1,13 @@
+#!/bin/sh
+# A commit's subject (its first line that is not a comment) is at most 72 characters; the detail goes in the body, after a
+# blank line. Commit subjects had averaged 351 characters (the longest 2,813), the body written as the subject (2026-11-10).
+# Installed into the repository's common hooks folder (every worktree shares it) by merge.ts and scripts/setup-mini.sh.
+max=72
+subject=$(grep -v '^#' "$1" | sed -n '/[^[:space:]]/{p;q;}')
+n=$(printf '%s' "$subject" | LC_ALL=en_US.UTF-8 wc -m | tr -d ' ')
+if [ "$n" -gt "$max" ]; then
+  echo "commit-msg: refused. The subject is $n characters; at most $max. Write a short subject, a blank line, then the detail:" >&2
+  echo "  $(printf '%s' "$subject" | cut -c1-72)..." >&2
+  exit 1
+fi
+exit 0

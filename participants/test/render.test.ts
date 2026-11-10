@@ -127,27 +127,30 @@ test("done for now alongside an action: the action, then no call until the next 
   expect(JSON.stringify(seen[1])).toContain("Figures: $1,000.");
 });
 
-test("a form is shown whole, on file and in a report, however many fields it has (other details are still cut short)", async () => {
+test("a form is shown whole as a paper form, on file and in a report, however many blanks it has; other details are still cut short", async () => {
   const { renderStanding } = await import("../src/llm/render");
-  const fields = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`line_${i}`, { type: "amount", description: `For a budget: line ${i} of the thirty.` }]));
+  const fields: { [k: string]: object } = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`line_${i}`, { type: "amount", description: `For a budget: line ${i} of the thirty.` }]));
+  fields.kind = { type: "choice", options: ["law", "budget"], required: true, description: "A law or a budget." };
   const form = { id: "form-budget", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form", text: "A budget.", data: { form: "budget", submit_as: "proposal", submit_to: ["city"], fields } };
   const long = { ...form, id: "minutes-1", kind: "minutes" };
   const o = obs({ forms: { kind: "records", records: [form, long] } });
-  const whole = JSON.stringify(form.data);
-  expect(whole.length).toBeGreaterThan(1500);
-  const onFile = renderStanding(o, new Set(["forms"])).split("\n");
-  expect(onFile[0]).toContain(whole);
-  expect(onFile[1]).not.toContain("line_29"); // (not a form: its details are cut short, with a mark)
-  expect(onFile[1]).toContain("…");
-  expect(renderObservation(o).split("\n").find((l) => l.includes("[form-budget]"))).toContain(whole);
-  // The generated town's forms: every field is in what its mayor has on file.
+  const onFile = renderStanding(o, new Set(["forms"]));
+  // Its title and what it is for, then every blank in words: what goes in it, whether it must be filled in, the choices.
+  expect(onFile).toStartWith('- [form-budget] form of city: "A budget."\n  Its blanks:\n  - line 0: For a budget: line 0 of the thirty. A sum of money.\n');
+  expect(onFile).toContain("  - line 29: For a budget: line 29 of the thirty. A sum of money.\n  - kind (must be filled in): A law or a budget. One of: law, budget.");
+  const minutes = onFile.split("\n").find((l) => l.startsWith("- [minutes-1]"))!;
+  expect(minutes).not.toContain("line 29"); // (not a form: its details are cut short, with a mark)
+  expect(minutes).toContain("…");
+  expect(renderObservation(o)).toContain("  - line 29: For a budget: line 29 of the thirty. A sum of money.");
+  // The generated town's forms: every blank is in what its mayor has on file, and none of the store's notation.
   const { generate } = await import("../../worlds/generator/generate");
   const { readFileSync } = await import("node:fs");
   const c = generate({ ...(Bun.YAML.parse(readFileSync(`${import.meta.dir}/../../worlds/town.yaml`, "utf8")) as any), citizens: 80 });
   const forms = c.world.records.filter((r: any) => r.kind === "form");
   expect(forms.length).toBeGreaterThan(0);
   const filed = renderStanding(obs({ forms: { kind: "records", records: forms } }), new Set(["forms"]));
-  for (const f of forms) for (const name of Object.keys(f.data.fields)) expect(filed).toContain(`"${name}":`);
+  for (const f of forms) for (const name of Object.keys(f.data.fields)) expect(filed).toContain(`\n  - ${name.replace(/_/g, " ")}`);
+  expect(filed).not.toMatch(/\{"|"type"|"options"|of the office's own accord/);
 });
 
 test("a law's rule is shown to whoever reads it, and that acts are checked against it; a law in words only shows neither", () => {
@@ -358,7 +361,7 @@ test("why something couldn't be done is said from inside the world", async () =>
 test("on file shows only what stands: not a law withdrawn, nor one an amended law replaces; and nothing once the last is withdrawn", async () => {
   const law = (id: string, at: number, text: string, x: object = {}) => ({ id, record: "statement", author: "clerk", at, visible_to: "public", kind: "law", speaks_for: "city", text, ...x });
   const withdrawal = (id: string, of: string, x: object = {}) => ({ id, record: "withdrawal", author: "clerk", at: 9, visible_to: "public", speaks_for: "city", withdraws: of, ...x });
-  const file = (records: any[]) => renderStanding(obs({ laws: { kind: "records", records } }), new Set(["laws"])).split("\n").filter(Boolean).map((l) => /^- \[([\w.-]+)\]/.exec(l)![1]);
+  const file = (records: any[]) => renderStanding(obs({ laws: { kind: "records", records } }), new Set(["laws"])).split("\n").filter((l) => l.startsWith("- [")).map((l) => /^- \[([\w.-]+)\]/.exec(l)![1]);
   const notice60 = law("law-1", 0, "Sixty days' notice.");
   const kind = law("law-2", 0, "Be kind.");
   expect(file([notice60, kind])).toEqual(["law-1", "law-2"]);

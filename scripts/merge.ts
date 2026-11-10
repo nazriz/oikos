@@ -1,9 +1,15 @@
 // Merge branches into main the way the maintainer does by hand: `bun scripts/merge.ts <branch>... [--message "..."] [--no-push] [--full] [--fix-main]`.
 // Several branches are merged in sequence into one merge worktree and tested once, pushed all or none; if that fails, the
-// branch at fault is found by bisecting (settle, below) and the others are pushed. The test run is `--affected` (what the
-// change can reach, the fast tier, the invariants and backstops; a kernel change selects everything): the whole suite runs
-// on every push in CI and nightly, and a red main (scripts/main-status.ts) stops this script until it is green (--fix-main
-// for the merge that repairs it). `--full` runs the whole suite here. Jobs run with slot priority: ahead of the queue.
+// branch at fault is found by bisecting (settle, below) and the others are pushed. The test run is `--gate --merge` (what
+// the change can reach, the fast tier, the invariants and backstops; and wherever the agents' gate would run only the slow
+// tier's canaries -- a change to the kernel, the contracts, the manifests or the runner, or one reaching more than eight
+// slow files, such as the generator or a profile -- the whole slow tier, before the push: main went red 17 times in 23
+// days from slow files left to CI, 2026-11-10). CI still runs everything on every push and nightly, and a red main
+// (scripts/main-status.ts) stops this script until it is green (--fix-main for the merge that repairs it). `--full` runs
+// the whole suite on the release kernel. Jobs run with slot priority: ahead of the queue.
+// After the push, the landed branches' worktrees lose kernel/target and their test scratch when nothing runs in them
+// (disk-tidy.ts, clearLanded). It warns at its start under 60 GB free. Its merge commits' subjects keep to 72 characters
+// (mergeMessage; the commit-msg hook it installs refuses longer ones).
 // The kernel is rebuilt only when kernel/ differs from the last build in the merge worktree.
 // It works in its own clean worktree (.claude/worktrees/merge-bot, made if missing; never merge-main): fetch, reset to
 // origin/main, `git merge --no-ff <branch>`. Conflicts in docs/decisions.md and docs/research/references.md are resolved by
@@ -16,10 +22,13 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { blocker, fromRuns, readStatus } from "./main-status";
 import { acquire, installHook } from "./merge-lock";
+import { clearLanded, lowDisk } from "./disk-tidy";
 
 export const KEEP_BOTH_FILES = ["docs/decisions.md", "docs/research/references.md"];
 /** Conflicts resolved by keeping main's side: the suite's timings, a cache any run writes again. */
 export const KEEP_OURS_FILES = ["scripts/test-times.json"];
+/** What the merge asks of scripts/test.ts (scripts/test-runner.test.ts runs the selection with exactly these). */
+export const GATE_ARGS = ["--gate", "--merge"];
 export const KNOWN_FLAKES = ["scripts/slots.test.ts", "orchestrator/test/pilot-wave.test.ts"];
 export const TRAILER = "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>";
 
@@ -38,7 +47,22 @@ export function keepBoth(text: string): string {
   return out.join("\n");
 }
 
-export const hasMarkers = (text: string) => /^(<{7}( |$)|={7}$|>{7}( |$))/m.test(text);
+/** The most a commit subject may be (scripts/hooks/commit-msg). */
+export const SUBJECT_MAX = 72;
+/**
+ * A merge commit's message: the subject `Merge <branch>` (cut to SUBJECT_MAX), or the `--message` given when its first
+ * line fits; a longer one goes in the body under `Merge <branch>`. Then the trailer.
+ */
+export function mergeMessage(branch: string, message?: string): string {
+  const fit = (s: string) => (s.length <= SUBJECT_MAX ? s : `${s.slice(0, SUBJECT_MAX - 1)}…`);
+  const subject = fit(`Merge ${branch}`);
+  const m = message?.trim();
+  if (!m) return `${subject}\n\n${TRAILER}`;
+  const first = m.split("\n")[0]!;
+  return first.length <= SUBJECT_MAX ? `${m}\n\n${TRAILER}` : `${subject}\n\n${m}\n\n${TRAILER}`;
+}
+
+export const hasMarkers =(text: string) => /^(<{7}( |$)|={7}$|>{7}( |$))/m.test(text);
 
 /** What the suite's output says failed: test files (by the `FAIL <file>` lines of scripts/test.ts) and anything else. */
 export function readFailures(log: string): { files: string[]; other: string[] } {
@@ -124,6 +148,8 @@ async function main() {
   const common = run(main, ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"]).out.trim();
   const base = common.replace(/\/\.git\/?$/, "") || top;
   const wt = join(base, ".claude", "worktrees", "merge-bot");
+  const low = lowDisk(base);
+  if (low) console.error(`\n${low}\n`);
   if (!existsSync(wt)) {
     if (!run(base, ["git", "worktree", "add", "--detach", wt, "HEAD"]).ok) stop("could not create the merge worktree");
   }
@@ -158,7 +184,7 @@ async function main() {
     g("clean", "-fd", "-e", "node_modules", "-e", "kernel/target", "-e", "merge-test*.log"); // (the last run's log stays, to be read)
     for (const b of set) {
       const ref = refs[branches.indexOf(b)]!;
-      const msg = `${branches.length === 1 && message ? message : `Merge ${b}`}\n\n${TRAILER}`;
+      const msg = mergeMessage(b.replace(/^origin\//, ""), branches.length === 1 ? message : undefined);
       const m = run(wt, ["git", "merge", "--no-ff", "-m", msg, ref], true);
       if (m.ok) continue;
       const conflicted = g("diff", "--name-only", "--diff-filter=U").out.trim().split("\n").filter(Boolean);
@@ -206,10 +232,10 @@ async function main() {
     // Typecheck alongside the tests; the selection (the kernel's cargo tests are in it when kernel/ changed).
     const tc = stream(wt, ["bun", "run", "typecheck"]);
     const t1 = Date.now();
-    const suite = await stream(wt, ["bun", "scripts/test.ts", ...(full ? ["--no-build"] : ["--gate"])], log);
+    const suite = await stream(wt, ["bun", "scripts/test.ts", ...(full ? ["--no-build"] : GATE_ARGS)], log);
     // (Each test run's log is kept beside the last, by the set tested: a batch's bisection reads them after.)
     writeFileSync(join(wt, `merge-test-${runNo++}.log`), `${tested.join(" + ")}\n${suite.text}`);
-    console.log(`  ${full ? "whole suite" : "gate"}: ${Math.round((Date.now() - t1) / 1000)}s`);
+    console.log(`  ${full ? "whole suite" : /--gate --merge: .*the whole slow tier/.test(suite.text) ? "gate and the whole slow tier" : "gate"}: ${Math.round((Date.now() - t1) / 1000)}s`);
     const tcr = await tc;
     if (tcr.code !== 0) { console.error(tcr.text.split("\n").slice(-30).join("\n")); console.error("typecheck failed"); return false; }
     const lines = suite.text.trim().split("\n");
@@ -244,5 +270,9 @@ async function main() {
   const push = Bun.spawnSync(["git", "push", "origin", "HEAD:main"], { cwd: wt, stdout: "pipe", stderr: "pipe", env: { ...process.env, OIKOS_MERGE_LOCK: String(process.pid) } });
   if (push.exitCode !== 0) { console.error(push.stderr.toString().trim()); stop("push failed (origin main moved? run again)"); }
   console.log(`PUSHED ${sha} (${accepted.join(", ")}; ${runs} test run${runs === 1 ? "" : "s"}). ${summary}\n${secs()}`);
+  // The landed branches' worktrees: their build and test scratch go now (their work is in main; cargo and the tests make it again).
+  try {
+    for (const c of clearLanded(base, accepted, { apply: true })) console.log(`cleared ${c.what.map((p) => p.slice(c.path.length + 1)).join(", ")} in ${c.path}`);
+  } catch (e) { console.error(`(clearing the landed worktrees failed, nothing lost: ${e})`); }
   process.exit(rejected.length ? 1 : 0);
 }
