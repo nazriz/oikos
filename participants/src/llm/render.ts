@@ -336,6 +336,8 @@ export function ruleWords(r: { adico?: any; formal?: any }, o: { asWritten?: boo
 export function outcomeWords(o: any, every?: number, by?: string): string {
   const rep = every ? ` every ${duration(every)}` : "";
   if (o?.goods) return `deliver ${o.goods.quantity} ${o.goods.kind} to ${o.goods.to} at ${o.goods.at}${rep}`;
+  // (No sum: where money is to go, as a collector's payment details say it: whatever is owed, paid into this account.)
+  if (o?.money && (o.money.amount === undefined || o.money.amount === null)) return `pay what is owed${o.money.from ? ` from ${o.money.from}` : ""} into ${o.money.to}${rep}${o.money.for ? ` (${o.money.for})` : ""}`;
   if (o?.money) return `pay ${sumOf(o.money.amount)}${o.money.from ? ` from ${o.money.from}` : ""} to ${o.money.to}${rep}${o.money.for ? ` (${o.money.for})` : ""}`;
   if (o?.structure) return o.structure.remove ? `demolish ${o.structure.remove}` : `build a ${o.structure.type} on ${o.structure.on}`;
   // (Whoever commits to be in a place themselves comes there: a worker and their place of work read "c0009 will let

@@ -11924,8 +11924,13 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   half the paper's own time (`COMPOSE_BPS`, a placeholder: WM-1; law 11's figures row for `compose_seconds`), and the
   rule counts it as the principal's own at every level that hands the act over. Why: the referral cost half a minute and
   the rule counted the paper's whole time as saved, though the principal had worked the act out (the design's pricing
-  finding). Effect: fewer services pay by the rule; the delegating test town at a twentieth of the profile's prices still
-  engages. Not tuned.
+  finding). Effect: fewer services pay by the rule. In the 300-person town at a twentieth of the profile's prices, no
+  person engages the desk by their own rule any more (before, a cohort did), and organisations still engage some (the
+  assistants test's run). Not tuned: the forks' test now has a cohort decide by hand, as the pilot's design does.
+- **Found on the way, fixed:** a snapshot taken with a car on the road could not be read back (the trip's fuel, a
+  128-bit quantity inside a tagged enum, which serde's buffer cannot hold); read back through 64 bits now, written as
+  before, so no hash moves (`state.rs`, `fuel_back`; a test). And a paper whose money outcome names no sum (the payment
+  details) broke the seat's rendering; it reads "pay what is owed into ..." now.
 - **What it would have done** is on record when it hands an act over (`decision`, choice `handed`, the program).
 - **Acts beside remits, read from the log.** `oikos-kernel delegation <log>` (`delegation/beyond.rs`): each act an
   assistant did in its principal's name, with the remit in force, the referral, whether a sign-off or go-ahead came

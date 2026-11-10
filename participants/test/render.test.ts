@@ -22,6 +22,8 @@ test("the papers of delegation read in the office's words: a signed copy as the 
   expect(answer).not.toMatch(/held|reasons|why|5184000|5,184,000/);
   expect(answer).toContain(when(86_400 * 60));
   expect(factWords({ agreement: "rec.1", kind: "withholding_report", wants: "draft", does_itself: ["money"] })).not.toMatch(/does itself|money/);
+  // (A collector's payment details: where what is owed goes, with no sum.)
+  expect(factWords({ law: "law-income-tax", outcome: { money: { to: "acc-outside", for: "tax on pay" } } })).toContain("pay what is owed into acc-outside (tax on pay)");
 });
 
 test("outcomes read as what someone will do", () => {
