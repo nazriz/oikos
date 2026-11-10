@@ -7,9 +7,14 @@
 //  - "tools": the API's own function calling (the mapping of openai.ts);
 //  - "json": the answer's shape (codex.ts's `answerSchema`, or the caller's own `answer` shape) written into the prompt
 //    and the reply asked for as a JSON object (`response_format: json_object`);
-//  - "text" (the default, the path for a model with no reliable tool or JSON mode): the same prompt, nothing asked of the
-//    API, and the reply read exactly or not at all (answer.ts): an answer that can't be read is a text block marked
-//    unread, which the participant tells the seat about and asks once more, as for every other way in.
+//  - "text" (the default, the path for a model with no reliable tool or JSON mode): a seat's sitting is answered as a
+//    plain note under a few headings, as a person writes one (note.ts: "Do: ...", "Write to <id>: ...", "Look at ...",
+//    "Confirm <ref>", "Notebook: ...", "Done for <n> days"), read by deterministic code into the same uses a tool-calling
+//    model makes, so both reach the translator by one path; nothing about JSON or a schema is shown (2026-11-10, before
+//    which the seat was shown the answer's JSON Schema and asked for a JSON object with each use's input as a string of
+//    JSON). Other calls (a debrief's answer of a given shape) still ask for one JSON object. Either way the reply is
+//    read exactly or not at all: an answer that can't be read is a text block marked unread, which the participant
+//    tells the seat about and asks once more, as for every other way in.
 // The key is sent in the authorization header and nowhere else: never in a URL, an error or a log line.
 // A model's context window, where its price entry gives one (`context_tokens`), is checked before every call: a prompt,
 // estimated generously, that with the room asked for the answer would pass it is never sent (no call is made, nothing is
@@ -24,6 +29,7 @@ import { post, type HttpOptions } from "./anthropic";
 import { readAnswerText } from "./answer";
 import { CreditExhausted, UsageLimitReached } from "./call";
 import { answerSchema, codexPrompt } from "./codex";
+import { noteFits, noteGuide, noteMessages, readNote } from "./note";
 import { OpenAICompatibleAdapter } from "./openai";
 
 export type CompatAnswer = "tools" | "json" | "text";
@@ -52,6 +58,9 @@ export interface CompatOptions extends Omit<HttpOptions, "apiKey" | "cache"> {
   answer?: CompatAnswer;
   /** The model's context window in tokens (prompt and answer together), checked before every call. */
   contextTokens?: number;
+  /** A local server's own provider name (`ollama`, `local`): the adapter is named by it, its model as given, and no key
+   * is sent (a local server takes none). */
+  provider?: string;
 }
 
 /** A prompt's tokens, estimated generously (a token for every three characters: open-weight tokenizers run at three
@@ -71,7 +80,7 @@ export function overContext(req: LlmRequest, contextTokens: number | undefined):
 export const withoutThinking = (said: string) => said.replace(/^\s*<think>[\s\S]*?<\/think>\s*/, "");
 
 export class OpenAICompatHostedAdapter implements LlmAdapter {
-  readonly provider = "openai-compat";
+  readonly provider: string;
   readonly model: string;
   private calls = 0;
   constructor(
@@ -79,7 +88,8 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
     readonly hostModel: string,
     private readonly o: CompatOptions,
   ) {
-    this.model = `${host}/${hostModel}`;
+    this.provider = o.provider ?? "openai-compat";
+    this.model = o.provider ? hostModel : `${host}/${hostModel}`;
   }
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
@@ -91,7 +101,7 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
     } catch (e) {
       // (The key is never in a message: post() puts the URL and the provider's reply in it, not the headers. It is
       // taken out anyway, should a provider ever echo it.)
-      const m = (e as Error).message.split(this.o.apiKey).join("[key]");
+      const m = this.o.apiKey ? (e as Error).message.split(this.o.apiKey).join("[key]") : (e as Error).message;
       if (COMPAT_CREDIT.test(m)) throw new CreditExhausted(`the ${this.host} account's credit or quota is spent (${m.slice(0, 300)}): no further call is made, and nothing is bought`);
       if (COMPAT_LIMITED.test(m)) throw new UsageLimitReached(`${this.host}'s rate limit was reached and outlasted the retries (${m.slice(0, 300)}): the run stops here; resume it later (oikos resume <log>)`);
       throw new Error(m);
@@ -105,6 +115,24 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
       return inner.complete(req);
     }
     const names = (req.tools ?? []).map((t) => t.name);
+    const auth: Record<string, string> = this.o.apiKey ? { authorization: `Bearer ${this.o.apiKey}` } : {};
+    const nextId = () => `compat-${++this.calls}`;
+    // A seat's sitting, in text: a plain note under headings (note.ts), the conversation as plain chat.
+    if (mode === "text" && !req.answer && req.tools && noteFits(req.tools)) {
+      const chat = noteMessages(req.messages);
+      const last = chat.at(-1);
+      if (last?.role === "user") last.content = `${last.content}\n\n(Write your note now, under the headings set out at the start.)`;
+      const body = {
+        model: this.hostModel,
+        max_tokens: req.maxTokens,
+        messages: [{ role: "system", content: `${req.system}\n\n${noteGuide(req.tools)}` }, ...chat],
+        ...(this.o.temperatureMilli !== undefined ? { temperature: this.o.temperatureMilli / 1000 } : {}),
+        ...(this.host === "openrouter" ? { usage: { include: true } } : {}),
+      };
+      const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl}/chat/completions`, auth, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
+      const said: string = typeof r.choices?.[0]?.message?.content === "string" ? withoutThinking(r.choices[0].message.content) : "";
+      return { content: readNote(said, req.tools, nextId), usage: usageOf(r) };
+    }
     const shape = req.answer ? req.answer.schema : answerSchema(names);
     // (Codex's prompt, with its first line, which is about a command-line tool, replaced, and the shape written out.)
     const prompt = codexPrompt(req).split("\n").slice(1).join("\n");
@@ -120,9 +148,8 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
       // (OpenRouter reports what a call cost when asked; other hosts ignore the field.)
       ...(this.host === "openrouter" ? { usage: { include: true } } : {}),
     };
-    const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl}/chat/completions`, { authorization: `Bearer ${this.o.apiKey}` }, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
+    const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl}/chat/completions`, auth, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
     const said: string = typeof r.choices?.[0]?.message?.content === "string" ? withoutThinking(r.choices[0].message.content) : "";
-    const nextId = () => `compat-${++this.calls}`;
     let content: ContentBlock[];
     if (req.answer) {
       let o: unknown;

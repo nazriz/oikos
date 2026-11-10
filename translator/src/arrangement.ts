@@ -27,9 +27,11 @@
 import { ModelCallFailed } from "@oikos/participants/llm";
 import { sameButForFreeText, sameMeaning } from "../train/meaning";
 import { Knowledge } from "./knowledge";
-import { NOT_CHECKED, type Answered, type Translation, type TranslateRequest, type TranslatorId } from "./index";
+import { NOT_CHECKED, NOT_PUT, unsureText, type Answered, type Translation, type TranslateRequest, type TranslatorId } from "./index";
+import { LABEL_TEXT, NOTHING_DONE } from "./resolver";
 
-export type Arrangement = "then" | "beside";
+/** `alone`: our translator is the only one (`createAlone`); `then` and `beside`: two as one (`createArrangement`). */
+export type Arrangement = "then" | "beside" | "alone";
 
 /** The first's refusals that stand, where it is sure of them (at or over its cut-off): the seat is told, and the one
  * behind is not asked. Only `not_an_act`: on the 180 real requests the trained model (pod-small-r2-s1) said it 58
@@ -87,6 +89,11 @@ export interface RouteSide {
 
 export interface Route {
   arrangement: Arrangement;
+  /** Alone: whether the request was the seat's first saying of it, or its restatement (its first request in a later
+   * answer after one that was asked back or whose draft it declined); and whether a draft was offered with what was
+   * unclear about it. Two as one: absent. */
+  stage?: "first" | "restated";
+  unsure_offered?: boolean;
   /** Whose answer the seat got. */
   used: "first" | "behind";
   /** Why it went behind, where it did. */
@@ -231,6 +238,66 @@ export function createArrangement(first: One, behind: One, o: { arrangement: Arr
         for (const f of d.trial?.forms ?? []) o.probation?.probationOutcome(f, d.trial!.agree);
       }
       else if (d.by === "first" || d.continued) open.set(d.who, { proposal: d.proposal, declined: true });
+    },
+  };
+}
+
+/** What a seat is told when its restatement could still not be drawn up (Naz, 2026-10-07: "the requester breaks them
+ * down into smaller chunks"; 2026-11-10: "it shouldn't get stuck"). Fixed, so it tells the seat nothing it did not know. */
+export const STILL_NOT_READ = "Nothing was done: this still could not be drawn up as something to do. Try saying it another way, or in smaller parts, one thing at a time.";
+/** Said with a draft our translator drew up and is unsure of, after the sentence saying what is unclear. */
+export const UNSURE_DRAFT = "It is drawn up as best it could be read: if it is not what you meant, decline it and say it again.";
+/** Sentences that only say the request could not be read: after a restatement they give way to `STILL_NOT_READ`. */
+// (Made when first used: index.ts and this file import each other.)
+const onlyUnread = (n: string) => n === LABEL_TEXT.unclear || n === NOT_PUT || n === NOTHING_DONE;
+
+/**
+ * Our translator alone (Naz, 2026-11-10: "we need just one model that works"; "the translator just offers the seat an
+ * option, and it's on them to do the final approval"). No model is behind it, and it is asked once (it decides without
+ * sampling: asked again it says the same). Where it has a draft, the seat gets it, with a plain sentence saying what is
+ * unclear where it was unsure (the labels' fixed sentences: `unsureText`); where it has none, the seat is told what is
+ * unclear and says it again. A restatement (the seat's first request in a later answer than one that was asked back or
+ * whose draft it declined) that still cannot be drawn up is told plainly that nothing was done, and to try another way
+ * or in smaller parts. Every request's route says which it was (`stage`), so a run's report counts, per seat model,
+ * the requests served first time, after one restatement and never (orchestrator/src/served.ts).
+ */
+export function createAlone(one: One) {
+  /** By seat: the answer whose request was asked back or whose draft was declined, where its next is a restatement. */
+  const open = new Map<string, number | undefined>();
+  const offered = new Map<string, { who: string; answer?: number }>();
+  const seat = (participant: string, as?: string) => `${participant}|${as ?? ""}`;
+  return {
+    id: one.id,
+    arrangement: "alone" as const,
+    first: one.id,
+    async translate(req: TranslateRequest): Promise<Arranged> {
+      const who = seat(req.participant, req.as);
+      const before = open.has(who) ? { answer: open.get(who) } : undefined;
+      // (A request in the same answer as the one asked back has not seen what it was told: not yet a restatement.)
+      const restated = !!before && (before.answer === undefined || req.answer === undefined || req.answer > before.answer);
+      const r = await one.translate(req);
+      const side = sideOf(one.id, r);
+      const stage = restated ? "restated" as const : "first" as const;
+      if (restated) open.delete(who);
+      const { answered, ...t } = r;
+      if (t.ok) {
+        offered.set(t.draft.id, { who, ...(req.answer !== undefined ? { answer: req.answer } : {}) });
+        const unclear = answered?.withheld && answered.unsure ? unsureText(answered.unsure, req) : undefined;
+        return { ...t, ...(unclear ? { told: [unclear, UNSURE_DRAFT] } : {}), route: { arrangement: "alone", used: "first", stage, ...(unclear ? { unsure_offered: true } : {}), first: side } };
+      }
+      if (!restated) {
+        open.set(who, req.answer);
+        return { ...t, route: { arrangement: "alone", used: "first", stage, first: side } };
+      }
+      const kept = t.notices.filter((n) => !onlyUnread(n));
+      return { ...t, notices: [...kept, STILL_NOT_READ], route: { arrangement: "alone", used: "first", stage, first: side } };
+    },
+    /** A seat's answer to a draft: declined, its next request (in a later answer) is a restatement. */
+    signed(draftId: string, decision: "accept" | "reject"): void {
+      const d = offered.get(draftId);
+      if (!d) return;
+      offered.delete(draftId);
+      if (decision === "reject") open.set(d.who, d.answer);
     },
   };
 }

@@ -56,9 +56,13 @@ export interface TranslateRequest {
   /** For a code participant's words (docs/behaviour/founding.md): the one capacity it perceives in, which the engine
    * keeps what it knows under. Absent: a seat, which perceives all its capacities. */
   only?: string;
+  /** Which of the seat's answers the request came in (counted by its host from 1): a request in a later answer than
+   * one that was asked back is its restatement (arrangement.ts, `createAlone`). Absent: every request is its own answer. */
+  answer?: number;
 }
 
-export type Translation = { ok: true; draft: Draft; hash: string } | { ok: false; notices: string[]; call?: string; raw?: unknown; invalid?: string[]; asked_back?: true };
+/** `told`, with a draft: plain sentences said with it (our translator alone, unsure of what it drew up: arrangement.ts). */
+export type Translation = { ok: true; draft: Draft; hash: string; told?: string[] } | { ok: false; notices: string[]; call?: string; raw?: unknown; invalid?: string[]; asked_back?: true };
 
 export type KernelCheck = (participant: string, position: string | undefined, blocks: Block[]) => Promise<{ ok: boolean; refusal?: any; error?: string }>;
 
@@ -485,7 +489,7 @@ export function draftText(d: Draft): string {
   ].join("\n");
 }
 
-export { createArrangement, STANDS, type Arrangement, type Arranged, type Route, type RouteSide, type Why } from "./arrangement";
+export { createAlone, createArrangement, STANDS, STILL_NOT_READ, UNSURE_DRAFT, type Arrangement, type Arranged, type Route, type RouteSide, type Why } from "./arrangement";
 export { Knowledge } from "./knowledge";
 export { Preview } from "./preview";
 export { LABEL_TEXT, RESOLVER, resolve, type Resolution } from "./resolver";

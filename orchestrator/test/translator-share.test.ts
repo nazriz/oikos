@@ -4,7 +4,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { behindShare, shareText, translatorShare } from "../src/pilot-report";
+import { behindShare, servedOfLogs, shareText, translatorShare } from "../src/pilot-report";
 
 test("of requests and of drafts offered, as the routes in a log say", async () => {
   expect(behindShare(0, 0, 0, 0)).toEqual({ behind_share: null, drafts_behind_share: null });
@@ -18,4 +18,20 @@ test("of requests and of drafts offered, as the routes in a log say", async () =
   const none = join(mkdtempSync(join(tmpdir(), "oikos-share-")), "town.seed1.jsonl");
   writeFileSync(none, "\n");
   expect(await translatorShare([none])).toBeUndefined();
+});
+
+test("served per seat model, from a log: first time, asked back, after one restatement, never; the seats' answers to the drafts", async () => {
+  const ann = (body: object) => JSON.stringify({ seq: 1, t: 0, kind: "annotation", body });
+  const route = (draft: string, stage: string) => ann({ annotation: "note", subject: "a", data: { translation_route: { draft, arrangement: "alone", used: "first", stage, first: { model: "decide/ours", result: "draft" } } } });
+  const drafted = (id: string) => ann({ annotation: "draft", draft: { id, participant: "a" } });
+  const failed = (id: string) => ann({ annotation: "translation_failure", subject: "a", data: { draft: id, proposal: "x", reason: "?" } });
+  const log = join(mkdtempSync(join(tmpdir(), "oikos-served-")), "town.seed1.jsonl");
+  writeFileSync(log, [
+    ann({ annotation: "usage", purpose: "participant", subject: "a", provider: "ollama", model: "m" }),
+    route("draft.a.1", "first"), drafted("draft.a.1"), ann({ annotation: "signoff", participant: "a", draft: "draft.a.1", decision: "accept" }),
+    route("draft.a.2", "first"), failed("draft.a.2"),
+    route("draft.a.3", "restated"), drafted("draft.a.3"), ann({ annotation: "signoff", participant: "a", draft: "draft.a.3", decision: "reject" }),
+    route("draft.a.4", "restated"), failed("draft.a.4"),
+  ].join("\n") + "\n");
+  expect((await servedOfLogs([log]))["ollama/m"]).toEqual({ requests: 4, served_first_time: 1, asked_back: 1, served_after_restatement: 1, never_served: 1, drafts_unsure: 0, drafts_offered: 2, drafts_confirmed: 1, drafts_declined: 1, drafts_unanswered: 0 });
 });

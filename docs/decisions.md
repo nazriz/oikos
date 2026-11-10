@@ -11966,3 +11966,44 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   437,402), the build tag aside. A town with providers changes (99b17295... at 30 days).
 - **Revisit if:** a principal is asked for a record older than its 64 kept (then the principal's files are a channel it
   looks into); the compose share gets a source; a seat reads an answer's words as a refusal of what was granted.
+## 2026-11-10 · Our translator alone in the study's arms; served counted per seat model; a plain note for models without tools
+
+- **Ours alone** (`seats.translator: { first: "decide/<model>", arrangement: "alone" }`; `createAlone` in
+  translator/src/arrangement.ts; the default of every spec built by experiments/scope-pilot/build.ts and of
+  experiments/open-weight/smoke.ts). No model is behind it, and it is asked once (it decides without sampling: asked
+  again it says the same, so the retry of our own model is gone). Where it has a draft, the seat gets it: a draft it was
+  unsure of (under its cut-off, or words copied short) comes with the label's fixed sentence for what is unclear and
+  "It is drawn up as best it could be read: if it is not what you meant, decline it and say it again." A draft on a form
+  it was not taught or released for is offered as any other (the gates existed only to send it behind). Where it has
+  none, the seat is told what is unclear (the existing labels) and says it again; a restatement (its first request in a
+  later answer than one asked back, or than a draft it declined) that still cannot be drawn up is told "Nothing was
+  done: this still could not be drawn up as something to do. Try saying it another way, or in smaller parts, one thing
+  at a time." Specific sentences (which id, a figure, look it up first) are kept in front of it. Why: Naz, 2026-11-10
+  ("we need just one model that works"; "the translator just offers the seat an option, and it's on them to do the final
+  approval"; loose feedback so a weaker model is not stuck), and 2026-10-07 ("the requester breaks them down into
+  smaller chunks"). The fallback arrangement (`then`, `beside`) stays for other runs (`build({ behind })`,
+  `OIKOS_SMOKE_BEHIND`), its share reported as before. Alternatives: keep Sonnet behind (rejected: it drafted 4 in 5);
+  one restatement then the larger model (rejected: the study's arms must not depend on it).
+- **Served, per seat model** (orchestrator/src/served.ts): requests; served first time; asked back; served after one
+  restatement; never served; drafts offered (and how many with what was unclear), confirmed, declined, not answered.
+  In every experiment's `report.txt`/`report.json` (`served`), its `cost.json` (`served_by_model`, and per arm), each
+  fork's result (`served`), the pilot report (`served_by_model`), a batch's cost summary, and the pilot viewer's
+  translator card. A run without routes' `stage` is counted by the order of each seat's requests.
+- **A plain note for models that cannot call tools** (participants/src/llm/note.ts): in `text` mode (hosted
+  open-weight models, and `ollama/` or `local/` with an arm's `params.answer: "text"`) a seat's sitting is no longer
+  answered as a JSON object against a schema shown to it. It writes a note under a few headings: `Do:`, `Write to <ids>:`,
+  `Look at <report>`, `Confirm <ref>` / `Decline <ref>`, `Notebook:` (`afresh`, `change`), `Done for <n> days` /
+  `Done for now`, `Leave:`, with fields on lines under a heading (`Why:`, `About:`, `Paper:`, `Hold:` and the look's
+  others). How to write it is built from the tools' own descriptions, in world terms. Deterministic code reads it into
+  the same uses a tool-calling model makes, so both reach the translator by one path: a `Do:` goes as written, a letter
+  as written, a note with no heading at all is one `Do:`, words before the first heading are the seat's own words beside
+  it. What cannot be read whole is an unread answer saying what, in plain words (asked once more, as ever). A debrief's
+  answer (a given shape) is still asked as JSON in text mode: not yet a note.
+- **Local models in experiments**: `ollama/` and `local/` (OIKOS_LOCAL_BASE_URL) are seated without a key or a limit (free
+  to call); `OIKOS_LOCAL_CONTEXT` gives the context window checked before each call. experiments/open-weight/local.ts is
+  the free local test.
+- **The local test (D)**: see "Measured" below.
+- **Revisit if:** served first time falls well under half for a model while its restatements are served (then the
+  sentences, not the model, are the trouble); a restatement rule by answers miscounts (several requests in one answer);
+  a debrief in text mode is unread (then the debrief's shape becomes a note too); a 7B model's notes need more headings
+  than these.

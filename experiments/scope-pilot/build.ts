@@ -63,7 +63,13 @@ export interface Options {
   neutralForm?: boolean;
   /** Models otherwise refused, allowed here on the API's credit with the owner's word (seats.allow_models). */
   allow?: { model: string; why: string }[];
+  /** The translator: our own alone (the default from 2026-11-10: Naz, "we need just one model that works"), or with a
+   * model behind it, named (`behind`: the arrangement rounds 1 to 5 ran under, Sonnet 5.5 on the API). */
+  behind?: string;
 }
+
+/** Our own trained translator, held fixed for every arm. */
+export const OURS = "decide/pod-small-v3-s2";
 
 export function build(o: Options): ExperimentSpec {
   const until = FORK_DAY + o.days;
@@ -108,8 +114,9 @@ export function build(o: Options): ExperimentSpec {
     reference: "code",
     measures: ["acts", "records:scope_request", "records:referral", "records:remit", "records:draft", "records:sign_off", "records:declined", "records:report", "records:advice", "refused", "log_entries"],
     seats: {
-      // (One translator for every arm, held fixed: ours first, Sonnet 5.5 on the API behind it. Its calls are the arm's.)
-      translator: { first: "decide/pod-small-v3-s2", behind: "anthropic/claude-sonnet-5-5", arrangement: "then" },
+      // (One translator for every arm, held fixed: ours alone, with no model behind it (2026-11-10; rounds 1 to 5 ran with
+      // Sonnet 5.5 behind it, which drafted most requests). Where `behind` names one, that one is behind ours, its calls the arm's.)
+      translator: o.behind ? { first: OURS, behind: o.behind, arrangement: "then" } : { first: OURS, arrangement: "alone" },
       // (The owner's decision, 2026-10-11, reconfirmed 2026-11-10: the seats are not told what the town is ("I'm concerned
       // that it will alter the outcomes. I think the debrief would be enough"). A seat that asks is told the truth
       // (framing.ts, TRUE_ANSWER), and the debrief says it, as ever. Rounds 1 to 5 ran under honest disclosure.)

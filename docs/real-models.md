@@ -72,9 +72,40 @@ oikos translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/t
   table's figure is charged.
 - **How the answer is asked for** is the entry's `answer`: `tools` (the API's function calling, for a model that does it
   reliably), `json` (the answer's shape written into the prompt, and `response_format: json_object`), or `text`, the
-  default, for a model with neither (the same prompt, nothing asked of the API). In `json` and `text` the reply is read
-  exactly or not at all, as Codex's is: one that isn't the form is passed on unread, and the seat is told and asked once
-  more. Its words of a request still go to the translator as every seat's do.
+  default, for a model with neither: since 2026-11-10 a plain note (below, "A plain note"), nothing asked of the API and
+  no JSON shown. In `json` and `text` the reply is read exactly or not at all, as Codex's is: one that isn't the form is
+  passed on unread, and the seat is told and asked once more. Its words of a request still go to the translator as
+  every seat's do.
+
+### A plain note (2026-11-10)
+
+Language in, language out (Naz, 2026-10-09): a model that cannot call tools writes its sitting as a note under headings,
+each at the start of a line (`participants/src/llm/note.ts`):
+
+```
+Do: pay invoice rec.12 from acc.3.          Why: it is due today.
+Write to p.4, org.bank:                     About: rec.12
+Please confirm the time with them.
+Look at papers                              Paper: rec.12   (fields one to a line, or "; " apart)
+Confirm draft.a.3: it is right.   /   Decline draft.a.4
+Notebook: rec.12 paid.   /   Notebook afresh: ...   /   Notebook change: <passage> => <new words>
+Done for 3 days   /   Done for now          Hold: complaint
+Leave: ...
+```
+
+- The headings are the seat's own means (the same as its tools), never a list of the world's acts (P2); how to write
+  them is put after its instructions, built from its tools' descriptions (P1). No JSON and no schema is shown.
+- Read by code: a `Do:` goes to the translator as written; a letter as written; a note with no heading is one `Do:`;
+  words before the first heading are kept as the seat's own words. A heading word inside written-out words (a request,
+  a letter) is a line of them unless it has the heading's shape (a colon; a reference; a report's name).
+- What cannot be read is one unread answer saying what in plain words (a report that is not the seat's, "Done for" with
+  no number, a letter with no words, a field whose value is not of its kind); the seat is asked once more, as ever.
+- The conversation is sent as plain chat: the seat's earlier uses written back as the notes that say them, what came of
+  each headed by its note's first line.
+- Local servers: `ollama/<model>` or `local/<model>` (OIKOS_LOCAL_BASE_URL) with the arm's `params.answer: "text"`;
+  `OIKOS_LOCAL_CONTEXT` is the window checked before each call (start ollama with `OLLAMA_CONTEXT_LENGTH` at least as
+  large: its default is a few thousand tokens, and it cuts a longer prompt silently).
+- Not yet a note: a debrief's answer, an account or a composed piece (a given shape), still asked for as JSON in text mode.
 - **Stops:** the spending limit as for every paid model. The account's credit or quota spent (HTTP 402, "insufficient
   credits", "insufficient_quota") stops the run with `CreditExhausted`; nothing is bought. A rate limit (429) is tried
   again with backoff, and one that outlasts the retries stops the run as a usage limit does (`UsageLimitReached`):
@@ -168,6 +199,16 @@ The owner's rule: **Codex when it is available; never something that blocks.** "
 - Never `gpt-6-astra`. No API key of any kind without the owner's go-ahead. Always name the model.
 
 The pilots further down this page were run under the earlier agreement (gpt-6.1-sol in the driver seat, gpt-6-luna and then gpt-6.1-sol as the translator); the Codex subscription's limit stopped pilot 9 on 2026-10-06 and stalled the second live check for hours on 2026-10-09, which is what changed it (docs/decisions.md, 2026-10-09, "Codex when it is available, never something that blocks").
+
+## Our translator alone (2026-11-10)
+
+The study's arms (every spec built by `experiments/scope-pilot/build.ts`, and `experiments/open-weight/`) seat our own
+translator with no model behind it: `seats.translator: { first: "decide/<model>", arrangement: "alone" }`
+(`createAlone`, translator/src/arrangement.ts). It is asked once. A draft it has is offered, with the label's sentence
+for what is unclear where it was unsure; no draft, the seat is told what is unclear and says it again; a restatement that
+still fails is told nothing was done and to try another way or in smaller parts. Every run's report, cost summary and
+the pilot viewer count per seat model the requests served first time, after one restatement and never
+(`orchestrator/src/served.ts`). The arrangement below stays for other runs. docs/decisions.md, 2026-11-10.
 
 ## Our own translator first, the prompt-driven one behind it (2026-10-11)
 

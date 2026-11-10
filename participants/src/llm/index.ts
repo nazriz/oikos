@@ -9,6 +9,7 @@ export * from "./anthropic";
 export * from "./openai";
 export * from "./openai-compat";
 export * from "./answer";
+export * from "./note";
 export * from "./codex";
 export * from "./claude-code";
 export * from "./consult";

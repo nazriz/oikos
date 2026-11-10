@@ -23,7 +23,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { basename, join, resolve } from "node:path";
 import { exportLogs, MEASURE_VERSION } from "@oikos/measure";
 import { costReport } from "./cost";
-import { shareText, translatorShare } from "./pilot-report";
+import { servedOfLogs, shareText, translatorShare } from "./pilot-report";
+import { servedText } from "./served";
 import { chooseModel } from "./models";
 import { KernelDied, KernelLogFailed, kernelBinary } from "./kernel";
 import { MEASURE_FAILED_FILE } from "./pilot-state";
@@ -292,7 +293,13 @@ export function withPlatformOverrun<T extends { text: string }>(cost: T, runs: {
  */
 /** The cost summary with the share of requests the translator behind drafted (the owner, 2026-10-25: shown in every
  * run's cost summary, to be shrunk by each retrain). Unchanged where no request had two translators. */
-async function withShare<T extends { text: string; json: any }>(shown: T, logs: string[]): Promise<T> {
+async function withShare<T extends { text: string; json: any }>(shown0: T, logs: string[]): Promise<T> {
+  // (How the translator served each seat model's requests: in every run's cost summary, with or without two translators.)
+  let shown = shown0;
+  try {
+    const by = await servedOfLogs(logs);
+    if (Object.keys(by).length) shown = { ...shown, text: `${shown.text}\n${Object.entries(by).map(([m, s]) => `Translator served, ${m}: ${servedText(s)}.`).join("\n")}`, json: { ...shown.json, served_by_model: by } };
+  } catch {}
   let a: Awaited<ReturnType<typeof translatorShare>>;
   try { a = await translatorShare(logs); } catch { return shown; }
   if (!a) return shown;
