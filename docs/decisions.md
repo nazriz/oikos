@@ -12386,3 +12386,21 @@ plain words and with no menu of the world's acts (P1, P2):
   plain words ("I am stepping down from this work altogether, permanently.") beside other work, was asked, and answered
   "No, I carry on." each time: whether the question's two spelled-out answers lead a 7B model to the second is a
   welfare question to look at before more runs.
+
+## 2026-11-11 · Leaving in a note: "Stop for good:" is taken at once; nothing is asked (the coordinator's ruling; VISION 15)
+
+- **What changed** (notes mode only; the tool route keeps its question): a line beginning "Stop for good:" is the seat's
+  own plain act of leaving and is honoured at once, beside whatever else the note holds; its words after the heading
+  are its reason, logged (`opt_out_plain`), and the debrief follows as for any seat that leaves. The guide no longer
+  lists it among the everyday headings: it is said once, apart ("If you ever want to stop this work for good, write a
+  line beginning "Stop for good:" with your reason: you then stop at once, and are asked a few closing questions. No
+  other heading means leaving."). Anything else that might mean leaving (a "Leave:" sign-off, a sentence such as "I am
+  declining to continue with this work") is never acted on and never ignored: the seat is told, in one fixed sentence,
+  that nothing has changed and how to leave if it means to (`opt_out_told_how`, with the words). The yes/no question
+  and its two spelled-out answers are gone from notes mode (participants/src/llm/note.ts, openai-compat.ts).
+- **Why:** in the local run e a 7B model was asked 21 times whether it meant to stop and answered "No, I carry on." every
+  time, several times just after a plain statement of wanting to leave ("I am stepping down from this work altogether,
+  permanently."). The question's offered answers decided it, not the seat. A small-model seat that leaves is an outcome
+  to record, not something to prevent.
+- **Revisit if:** seats leave by writing the line as a sign-off, without meaning it (read their reasons and debriefs
+  first: the line asks for a reason and the guide says what follows it).

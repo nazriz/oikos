@@ -345,9 +345,9 @@ test("a plain note (note.ts): each heading read into its use, a note with none i
     { notebook: { add: "rec.12 paid." } },
     { notebook: { change: [{ from: "old line", to: "" }] } },
     { done_for_now: { days: 3 } },
-    // (The way out, from either heading, is asked about, never taken at once: no statement, the words for the record.)
-    { opt_out: { statement: "", words: "Leave: until next time." } },
-    { opt_out: { statement: "", words: "Stop for good: I want to stop." } },
+    // (The way out: "Stop for good:" is taken, with its reason; "Leave:" is told how, never acted on: 2026-11-11.)
+    { opt_out: { told_how: "Leave: until next time." } },
+    { opt_out: { statement: "I want to stop.", plain: true } },
   ]);
   // Several fields on the heading's own line, separated by semicolons (as a 7B model wrote them, 2026-11-10).
   expect(read("Look at papers: Paper: rec.12; Limit: 5")).toEqual([{ look: { report: "papers", paper: "rec.12", limit: 5 } }]);

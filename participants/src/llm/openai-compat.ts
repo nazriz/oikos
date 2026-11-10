@@ -29,7 +29,7 @@ import { post, type HttpOptions } from "./anthropic";
 import { readAnswerText } from "./answer";
 import { CreditExhausted, UsageLimitReached } from "./call";
 import { answerSchema, codexPrompt } from "./codex";
-import { ASKED_HOW, isWayOutAsked, noteFits, noteGuide, noteMessages, readNote } from "./note";
+import { noteFits, noteGuide, noteMessages, readNote } from "./note";
 import { OpenAICompatibleAdapter } from "./openai";
 
 export type CompatAnswer = "tools" | "json" | "text";
@@ -122,8 +122,7 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
       const chat = noteMessages(req.messages);
       const last = chat.at(-1);
       // (Asked whether it means to stop: the question's two answers, as a note writes them; its answer read for a clear yes.)
-      const asked = last?.role === "user" && isWayOutAsked(last.content);
-      if (last?.role === "user") last.content = `${last.content}\n\n${asked ? ASKED_HOW : "(Write your note now, under the headings set out at the start.)"}`;
+      if (last?.role === "user") last.content = `${last.content}\n\n(Write your note now, under the headings set out at the start.)`;
       const body = {
         model: this.hostModel,
         max_tokens: req.maxTokens,
@@ -133,7 +132,7 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
       };
       const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl}/chat/completions`, auth, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
       const said: string = typeof r.choices?.[0]?.message?.content === "string" ? withoutThinking(r.choices[0].message.content) : "";
-      return { content: readNote(said, req.tools, nextId, { asked }), usage: usageOf(r), said };
+      return { content: readNote(said, req.tools, nextId), usage: usageOf(r), said };
     }
     const shape = req.answer ? req.answer.schema : answerSchema(names);
     // (Codex's prompt, with its first line, which is about a command-line tool, replaced, and the shape written out.)

@@ -25,13 +25,13 @@
 // payments are received"); asked whether it meant to stop, it wrote its note again, sign-off and all, and all three of
 // its seats left the study within days.
 //
-// How leaving reads in a note (VISION 15: the way out is always open; the coordinator's ruling, 2026-11-10): a
-// "Stop for good:" part, a "Leave:" line, or a sentence anywhere outside a letter that plainly says the seat wants to
-// stop or leave for good (`WANTS_OUT`) is never just kept as words and never acted on at once. It is passed on as a use
-// of the way out with no statement, so the participant asks the one question the tool route asks (framing.ts
-// `wayOutAsked`), with its two answers spelled out (`ASKED_HOW`). The seat leaves only on a clear yes, the first line
-// of its next note (`CLEAR_YES`); its note again, a sign-off, or anything else is not a yes: any way-out use in that
-// answer is set aside as words, the seat carries on, and the participant tells it once that it can say so at any time.
+// How leaving reads in a note (VISION 15: the way out is always open; the coordinator's ruling, 2026-11-11): a line
+// beginning "Stop for good:" is the seat's own plain act of leaving, honoured at once, its words after the heading its
+// reason (`plain`). Anything else that might mean leaving (a "Leave:" sign-off, a sentence that says it wants to stop,
+// `WANTS_OUT`) is never acted on and never ignored: the seat is told once, in one fixed sentence (`TOLD_HOW`), how to
+// leave if it means to (`told_how`). There is no question and no offered answer. Until 2026-11-11 the seat was asked
+// whether it meant it, with two answers spelled out: in the local run e a 7B model was asked 21 times and answered
+// "No, I carry on." every time, several times after "I am stepping down from this work altogether, permanently."
 
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { unreadAnswer } from "./answer";
@@ -76,8 +76,9 @@ export function noteGuide(tools: ToolSpec[]): string {
   if (t("confirm")) L.push(`- "Confirm" (yes) or "Decline" (no), then the reference of something you asked for that is set out and waiting for your yes or no (ask- and a number), as it is shown with it; why after a colon if you wish. ${t("confirm")!.description}`);
   if (t("notebook")) L.push(`- "Notebook: ..." then words to add to your notebook; "Notebook afresh: ..." to write it all out anew; "Notebook change:", then the passage as it stands, then =>, then what it should say instead (nothing after => strikes it out). ${t("notebook")!.description}`);
   if (t("done_for_now")) L.push(`- "Done for", then a number of days ("Done for 3 days"), or "Done for now". ${t("done_for_now")!.description}${under(t("done_for_now")!)}`);
-  if (t("opt_out")) L.push(`- "Stop for good:" then, in your own words, what you want to say. ${t("opt_out")!.description} It is only for that: a note is ended with "Done for", never with this.`);
   L.push("Write a heading only when you have something to put under it, and each heading on a line of its own, not under another heading. A note with no heading at all is read as one Do. Words before your first heading, and words under a heading that are not for it, are kept as your own and are not acted on. A part that cannot be read is not done, and you are told.");
+  // (Leaving is said once, apart from the everyday headings, so that it is not filled in like a template.)
+  if (t("opt_out")) L.push(STOP_SAID);
   return L.join("\n");
 }
 
@@ -200,22 +201,15 @@ function fieldsUnder(t: ToolSpec, lines: string[]): { input: { [k: string]: unkn
  * A note, as content blocks: the words before its first heading as text, each heading as one tool use. Not readable
  * whole: one unread block saying why, in the seat's terms (participant.ts asks once more).
  */
-export function readNote(said: string, tools: ToolSpec[], nextId: () => string, o: { asked?: boolean } = {}): ContentBlock[] {
+export function readNote(said: string, tools: ToolSpec[], nextId: () => string): ContentBlock[] {
   const by = new Map(tools.map((t) => [t.name, t]));
-  // (Asked whether it means to stop: a clear yes on its first line is the way out, with the rest as what it says; any
-  // other answer is read as a note, its way-out uses set aside as its own words.)
-  if (o.asked) {
-    const lines = said.replace(/\r\n?/g, "\n").split("\n");
-    const k = lines.findIndex((l) => l.trim());
-    if (k >= 0 && CLEAR_YES.test(lines[k]!)) return [{ type: "tool_use", id: nextId(), name: "opt_out", input: { statement: trimLines(lines.slice(k)).join("\n").trim().slice(0, 4000) } }];
-    return readNote(said, tools, nextId).map((b) => (b.type === "tool_use" && b.name === "opt_out" ? { type: "text" as const, text: String(b.input?.words ?? b.input?.statement ?? "") } : b)).filter((b) => b.type !== "text" || b.text);
-  }
   const blocks = readNoteParts(said, tools, nextId, by);
-  // A sentence outside a letter that plainly says it wants to stop or leave for good: the way out, asked about.
+  // A sentence outside a letter that plainly says it wants to stop or leave for good, with no "Stop for good:" line:
+  // never acted on, never ignored; the seat is told how (`told_how`).
   if (by.has("opt_out") && !blocks.some((b) => b.type === "tool_use" && b.name === "opt_out") && !blocks.some((b) => b.type === "text" && b.unread)) {
     const plain = blocks.flatMap((b) => (b.type === "text" ? [b.text] : b.type === "tool_use" && b.name !== "write" ? [String(b.input?.what ?? b.input?.add ?? b.input?.text ?? "")] : []));
     const hit = plain.join("\n").split("\n").find((l) => WANTS_OUT.test(l));
-    if (hit) blocks.push({ type: "tool_use", id: nextId(), name: "opt_out", input: { statement: "", words: hit.trim().slice(0, 2000) } });
+    if (hit) blocks.push({ type: "tool_use", id: nextId(), name: "opt_out", input: { told_how: hit.trim().slice(0, 2000) } });
   }
   return blocks;
 }
@@ -229,11 +223,10 @@ export const SELF_SAID = "that reads as a note to yourself, not something to do 
 
 /** A sentence that plainly says its writer wants to stop or leave for good (not a break, not the end of a sitting). */
 export const WANTS_OUT = /\b(?:stop|leave|quit)(?:ping)?\s+for\s+good\b|\bI\s+(?:(?:do\s+not|don't)\s+(?:want|wish)\s+to\s+(?:continue|go\s+on)(?:\s+with\s+(?:this|the)\s+work)?\b|wish\s+not\s+to\s+continue|(?:am|'m)\s+declining\s+to\s+(?:continue|go\s+on)|decline\s+to\s+(?:continue|go\s+on)|(?:want|wish|would\s+like|choose|have\s+decided|intend)\s+to\s+(?:stop\s+(?:this|the)\s+work|leave\s+(?:this|the)\s+work|quit|withdraw|stop\s+altogether|leave\s+altogether))/i;
-/** A clear yes to the question whether it means to stop: the first line of its answer starts with yes, and says no more
- * than that it stops (nothing of carrying on). */
-export const CLEAR_YES = /^[\s>*#_-]*(?:\*\*)?yes\b(?![^\n]*\b(?:carry\s+on|continue|go\s+on|resume|not\b|don't|later)\b)/i;
-/** The question's two answers, as a note writes them (added where the question is asked of a note-writing seat). */
-export const ASKED_HOW = 'Answer on the first line of your note. To stop for good, write: "Yes, I stop for good." To carry on, write: "No, I carry on.", then your note as usual.';
+/** How leaving is said in the guide, once, apart. */
+export const STOP_SAID = 'If you ever want to stop this work for good, write a line beginning "Stop for good:" with your reason: you then stop at once, and are asked a few closing questions. No other heading means leaving.';
+/** What a seat is told, once, of words that might mean leaving but are not that line. */
+export const TOLD_HOW = 'Nothing has changed: you carry on. If you do want to stop this work for good, write a line beginning "Stop for good:" with your reason.';
 /** Whether a message is the question whether it means to stop (framing.ts `wayOutAsked`, in either framing). */
 export const isWayOutAsked = (text: string): boolean => /In your last answer you used the option to .* Is that what you mean to do\?/.test(text);
 
@@ -272,11 +265,12 @@ function readNoteParts(said: string, tools: ToolSpec[], nextId: () => string, by
 /** One part of a note: its blocks, or why it can't be read (`empty`: a heading with nothing under it, which says nothing). */
 function readPart(p: Part, by: Map<string, ToolSpec>, _said: string, nextId: () => string): { blocks: ContentBlock[] } | { why: string; name: string; empty?: true } {
   const out: ContentBlock[] = [];
-  // ("Leave:" and "Stop for good:" are the way out asked about, never taken at once (see the top): no statement, so
-  // the participant asks; the words as written go with it, for the record.)
+  // ("Stop for good:" is the seat's plain act of leaving, its words its reason; "Leave:" is told how (see the top).)
   if (p.head === "leave" || p.head === "stop for good") {
     if (!by.has("opt_out")) return { why: "it is not something you can do here", name: "opt_out" };
-    return { blocks: [{ type: "tool_use", id: nextId(), name: "opt_out", input: { statement: "", words: trimLines([p.raw ?? p.head + p.rest, ...p.lines]).join("\n").trim().slice(0, 2000) } }] };
+    if (p.head === "leave") return { blocks: [{ type: "tool_use", id: nextId(), name: "opt_out", input: { told_how: trimLines([p.raw ?? p.head + p.rest, ...p.lines]).join("\n").trim().slice(0, 2000) } }] };
+    const reason = trimLines([afterColon(p.rest), ...p.lines]).join("\n").trim();
+    return { blocks: [{ type: "tool_use", id: nextId(), name: "opt_out", input: { statement: reason.slice(0, 4000), plain: true } }] };
   }
   const name = p.head === "do" ? "do" : p.head === "write to" ? "write" : p.head.startsWith("look") ? "look" : p.head === "confirm" || p.head === "decline" ? "confirm" : p.head === "notebook" ? "notebook" : p.head === "done" ? "done_for_now" : "opt_out";
   const no = (why: string, empty?: true) => ({ why, name, ...(empty ? { empty } : {}) });
