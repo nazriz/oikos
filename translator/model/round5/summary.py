@@ -12,10 +12,13 @@
 #   restatement needs a run (orchestrator/src/served.ts counts it there): offline it is not known.
 import glob, json, os, re, subprocess, sys, collections
 W = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-R = os.environ.get('OIKOS_RUNS', '/Users/clawd/oikos/runs') + '/translator-v5-2026-11-10'
+R = os.environ.get('OIKOS_ROUND') or os.environ.get('OIKOS_RUNS', '/Users/clawd/oikos/runs') + '/translator-v5-2026-11-10'
+JOINED = os.environ.get('OIKOS_JOINED', R + '/joined-v5')
+# (EXTRA: further sets of the round's, scored and read alone by writing model as the pilot's sides are: `sm`, 2026-11-11.)
+EXTRA = tuple(os.environ.get('EXTRA', '').split())
 FORM = re.compile(r'\bform\([^\n]*?\bform=([A-Za-z0-9_.:-]+)')
 trained = set()
-for l in open(R + '/joined-v5/train.jsonl'):
+for l in open(JOINED + '/train.jsonl'):
     trained.update(FORM.findall(json.loads(l)['program']))
 
 def rows(s): return {r['id']: r for r in map(json.loads, open(f'{R}/sets/{s}.jsonl')) if r}
@@ -27,7 +30,7 @@ def serve(args):
 
 for tag in sys.argv[1:]:
     out = {'tag': tag, 'right': {}, 'forms': {}, 'alone': {}}
-    for s in ('vr', 'vp', 'nv', 'tp', 'uf'):
+    for s in ('vr', 'vp', 'nv', 'tp', 'uf') + EXTRA:
         a = answers(tag, s)
         out['right'][s] = f"{sum(bool(x.get('own_ok', x['ok'])) for x in a)}/{len(a)}"
         rs = rows(s)
@@ -43,15 +46,15 @@ for tag in sys.argv[1:]:
     v = serve(val)
     cut = v['bound95']['cut']
     out['certified'] = {'cut': cut, 'validation': v['bound95']}
-    for s in ('tp', 'uf'):
+    for s in ('tp', 'uf') + EXTRA:
         x = serve(['--rows', f'{R}/sets/{s}.jsonl', '--a', glob.glob(f'{R}/scores/{tag}-{s}.decide_*.jsonl')[0], '--cut', str(cut)])
         out['certified'][s] = {k: x['at_cut'][k] for k in ('served', 'right', 'wrong', 'right_served_share')} | {'rows': x['rows']}
-    for s in ('vp', 'nv', 'tp'):
+    for s in ('vp', 'nv', 'tp') + EXTRA:
         for x in answers(tag, s):
             w = x.get('writer', '?')
             own = x.get('own', x['program']) or 'none(unclear)'
             ok = bool(x.get('own_ok', x['ok']))
-            c = out['alone'].setdefault(w, collections.Counter())
+            c = out['alone'].setdefault((s + ' ' if s in EXTRA else '') + w, collections.Counter())
             c['requests'] += 1
             if own.strip() == 'none(unclear)': c['asked_back'] += 1
             elif ok: c['drafted_right'] += 1
