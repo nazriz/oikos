@@ -259,7 +259,7 @@ test.skipIf(!have)("a model steward in a fork, played by the mock: drafts confir
   expect(existsSync(join(seed1, "sonnet.interrupted-2.oklog"))).toBe(true);
   // A fork stopped part way (its limit), taken further: served to where it stopped, then asked anew to the end.
   rmSync(join(seed1, "haiku-poor.json"));
-  const further = await runArm({ ...small, seats: { ...small.seats, budget: { arm_usd: { ...small.seats!.budget!.arm_usd, "haiku-poor": 50 } } } }, 1, small.arms[3]!, out);
+  const further = await runArm({ ...small, seats: { ...small.seats, budget: { arm_usd: { ...(small.seats!.budget!.arm_usd as { [arm: string]: number }), "haiku-poor": 50 } } } }, 1, small.arms[3]!, out);
   expect(further.resumed!.served).toBeGreaterThan(0);
   expect(further.resumed!.live).toBeGreaterThan(0);
   expect(further.resumed!.caught_up).toBe(true);
