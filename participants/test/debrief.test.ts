@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { readFileSync } from "node:fs";
-import { callModel, endNeedMicroUsd, endReserveMicroUsd, keptBackFor, reckonedEndMicroUsd, seatsEndNeedMicroUsd, SpendingLimitReached, UsageLimitReached, type EndCosts } from "../src/llm/call";
+import { callModel, endNeedMicroUsd, endReserveMicroUsd, keptBackFor, reserveOrRefuse, reckonedEndMicroUsd, seatsEndNeedMicroUsd, SpendingLimitReached, UsageLimitReached, type EndCosts } from "../src/llm/call";
 import { costMicroUsd } from "../src/llm/adapter";
 import { ASK_AGAIN, DEBRIEF_ANSWER_TOKENS, DEBRIEF_SYSTEM, DEBRIEF_VERSION, INSTRUCTIONS_LEFT_OUT, keptBack, mockDebrief, preamble, QUESTIONS, questionText, runDebrief, SAY_MORE, SCALES, stepsOf, type DebriefInput, type DebriefSeat, type MockDebrief } from "../src/llm/debrief";
 import { ACCOUNT_SYSTEM, ACCOUNT_SYSTEM_REWORDED, darkAccount, mockAccount, renderAccountBrief, sampleAccounts, strataOf, writeAccount, type AccountBrief } from "../src/llm/account";
@@ -380,9 +380,12 @@ test("the reserve covers what debriefs have cost: lv-05's four seats and six acc
   expect(need.microusd).toBeGreaterThan(1_116_000);
   // Each figure is the largest measured times the margin, nothing else.
   expect(need.seat.each).toBe(Math.ceil(COSTS.seat[SONNET]!.microusd * COSTS.margin_percent / 100));
-  // With a limit that leaves room, that is what is kept back; with one that does not, half of it, and the shortfall is said.
+  // With a limit that leaves room, all of it is kept back, however much of the limit that is (half, until
+  // 2026-11-10, and a fork of six seats on 0.40 spent 0.44); with one that cannot cover it, the run does not start.
   expect(keptBackFor(40_000_000, need.microusd)).toEqual({ microusd: need.microusd, short_microusd: 0 });
-  expect(keptBackFor(2_000_000, need.microusd)).toEqual({ microusd: 1_000_000, short_microusd: need.microusd - 1_000_000 });
+  expect(keptBackFor(need.microusd + 10, need.microusd)).toEqual({ microusd: need.microusd, short_microusd: 0 });
+  expect(keptBackFor(2_000_000, need.microusd)).toEqual({ microusd: 2_000_000, short_microusd: need.microusd - 2_000_000 });
+  expect(() => reserveOrRefuse(2_000_000, need.microusd, 4)).toThrow("cannot cover the debriefs of 4 seats");
   expect(keptBackFor(100_000_000, 1)).toEqual({ microusd: 5_000_000, short_microusd: 0 });
 });
 

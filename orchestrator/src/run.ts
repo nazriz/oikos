@@ -33,7 +33,7 @@ import { ReadingDesk, type DeskCounts } from "./reading";
 import { culture as cultureNs, reading as readingNs } from "@oikos/participants";
 import { DayBook, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, WORDS, type Words, inCurrency, inCalendar, modules as builtin, Randomness, Roster, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { lexiconReader, READING_TABLE, Tagger, READING_VERSION, type Reader, type ReadingTable } from "@oikos/participants/llm";
-import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
+import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reserveOrRefuse, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Draws } from "./draws";
 import { Kernel } from "./kernel";
@@ -696,7 +696,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const need = endNeedMicroUsd(costs, { seats, seatModel, ...(io.prices![seatModel] ? { seatPrice: io.prices![seatModel] } : {}), seatReckoned: reckonedEndMicroUsd({ seats: 1, seatPrice: io.prices![seatModel], calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2) }),
       accounts: n, accountModel, ...(accountPrice ? { accountPrice } : {}), accountReckoned: reckonedEndMicroUsd({ seats: 0, calls: 0, promptChars: 0, answerTokens: 0, accounts: 1, accountPrice, accountChars: ACCOUNT_PROMPT_CHARS, accountTokens: ACCOUNT_TOKENS }) });
     const kept = keptBackFor(o.budget.limitMicroUsd, need.microusd);
-    o.budget.keptBackMicroUsd = kept.microusd;
+    o.budget.keptBackMicroUsd = reserveOrRefuse(o.budget.limitMicroUsd, need.microusd, seats);
     // Said where whoever set the limit will see it: a limit too small to keep back what the end needs. The reserve is
     // not shrunk in silence, and not grown past half the limit (a run must be able to start); the end then runs over
     // the limit, and that overrun is recorded as the platform's.

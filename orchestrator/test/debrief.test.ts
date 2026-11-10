@@ -317,25 +317,25 @@ test("a run's own log gives the same summary afterwards as the seat was shown; a
   let n = 0;
   const policies = mockPolicies(new Map());
   const paid: LlmAdapter = { provider: "anthropic", model: "paid", complete: async (req: LlmRequest) => ({ content: req.purpose === "debrief" ? await policies.debrief(req) : [{ type: "tool_use" as const, id: `t${++n}`, name: "done_for_now", input: { days: 1 } }], usage: { input_tokens: 2_000, output_tokens: 200 } }) };
-  const budget = { limitMicroUsd: 2_000_000, spentMicroUsd: 0 };
+  const budget = { limitMicroUsd: 3_000_000, spentMicroUsd: 0 };
   const lim = await run("limit", generate({ ...spec, citizens: 40, mayor: "llm", model_seats: "finance" }), 300 * DAY, { adapter: paid, prices: { "anthropic/paid": { input: 3_000_000, output: 15_000_000 } }, budget });
   expect(lim.stopped?.by).toBe("SpendingLimitReached");
   expect(lim.debriefs).toEqual({ "mayor-system": "complete", "finance-system": "complete" });
   const ll = lines(lim.logPath);
   const kept = ll.find((e) => e.body?.data?.kept_back_for_the_end).body.data.kept_back_for_the_end;
-  expect(kept).toMatchObject({ of_limit_microusd: 2_000_000, seats_to_debrief: 2, calls_a_debrief: 17, accounts: 0 }); // (what is kept back follows the script: 16 calls under 0.4, 17 since 0.5.0 asks one question more)
-  // (An unmeasured model: sized by the floor, which is over half of this small limit, so the note says the limit is too small.)
-  expect(kept).toMatchObject({ a_seat_by: "floor", margin_percent: 125, microusd: 1_000_000 });
-  expect(kept.needed_microusd).toBeGreaterThan(1_000_000);
-  expect(kept.short_microusd).toBe(kept.needed_microusd - 1_000_000);
-  expect(kept.limit_too_small).toContain("too small");
+  expect(kept).toMatchObject({ of_limit_microusd: 3_000_000, seats_to_debrief: 2, calls_a_debrief: 17, accounts: 0 }); // (what is kept back follows the script: 16 calls under 0.4, 17 since 0.5.0 asks one question more)
+  // (An unmeasured model: sized by the floor, over half of this limit, and all of it kept back: 2026-11-10.)
+  expect(kept).toMatchObject({ a_seat_by: "floor", margin_percent: 125 });
+  expect(kept.microusd).toBe(kept.needed_microusd);
+  expect(kept.needed_microusd).toBeGreaterThan(1_500_000);
+  expect(kept.limit_too_small).toBeUndefined();
   expect(lim.platformOverrun).toBeUndefined();
   expect(kept.microusd).toBeGreaterThan(100_000);
-  expect(kept.microusd).toBeLessThanOrEqual(1_000_000);
+  expect(kept.microusd).toBeLessThanOrEqual(3_000_000);
   // Before the debriefs, spending had stopped short of what was kept back; with them it is still within the limit.
   const spentBefore = ll.filter((e) => e.body?.annotation === "usage" && e.body.purpose !== "debrief").reduce((x, e) => x + e.body.cost_microusd, 0);
-  expect(spentBefore).toBeLessThanOrEqual(2_000_000 - kept.microusd);
-  expect(budget.spentMicroUsd).toBeLessThanOrEqual(2_000_000);
+  expect(spentBefore).toBeLessThanOrEqual(3_000_000 - kept.microusd);
+  expect(budget.spentMicroUsd).toBeLessThanOrEqual(3_000_000);
   expect(budget.spentMicroUsd).toBeGreaterThan(spentBefore);
   const opening = ll.find((e) => e.kind === "annotation" && e.body.annotation === "transcript" && e.body.data.ref === "debrief/consent").body.data.input as string;
   expect(opening).toMatch(/It was stopped on day \d+ of 730, when it reached the limit set on what its model calls may cost\./);
@@ -344,11 +344,11 @@ test("a run's own log gives the same summary afterwards as the seat was shown; a
 test("a run whose debriefs cost more than was kept back still debriefs every seat; the overrun is the platform's, and the pilot's own spending and its stop on the limit are as they were", async () => {
   let n = 0;
   const policies = mockPolicies(new Map());
-  // A debrief call here costs 90,000 micro-USD (20,000 tokens in and 2,000 out), so 2 seats of 12 calls come to more than the half of the limit that is kept back.
+  // A debrief call here costs 135,000 micro-USD (30,000 tokens in and 3,000 out), so 2 seats' debriefs come to more than is kept back for them by the table's figures.
   const dear: LlmAdapter = { provider: "anthropic", model: "paid", complete: async (req: LlmRequest) => req.purpose === "debrief"
-    ? { content: await policies.debrief(req), usage: { input_tokens: 20_000, output_tokens: 2_000 } }
+    ? { content: await policies.debrief(req), usage: { input_tokens: 30_000, output_tokens: 3_000 } }
     : { content: [{ type: "tool_use" as const, id: `t${++n}`, name: "done_for_now", input: { days: 1 } }], usage: { input_tokens: 2_000, output_tokens: 200 } } };
-  const budget = { limitMicroUsd: 2_000_000, spentMicroUsd: 0 };
+  const budget = { limitMicroUsd: 3_000_000, spentMicroUsd: 0 };
   const r = await run("overrun", generate({ ...spec, citizens: 40, mayor: "llm", model_seats: "finance" }), 300 * DAY, { adapter: dear, prices: { "anthropic/paid": { input: 3_000_000, output: 15_000_000 } }, budget });
   // Stopped on the limit as ever, and every seat debriefed in full.
   expect(r.stopped?.by).toBe("SpendingLimitReached");
@@ -359,17 +359,17 @@ test("a run whose debriefs cost more than was kept back still debriefs every sea
   const atEnd = usage.filter((e) => e.body.purpose === "debrief").reduce((x, e) => x + e.body.cost_microusd, 0);
   const kept = ll.find((e) => e.body?.data?.kept_back_for_the_end).body.data.kept_back_for_the_end;
   // The pilot's own spending stayed out of what was kept back; the overrun is only what the end spent beyond the limit.
-  expect(own).toBeLessThanOrEqual(2_000_000 - kept.microusd);
-  expect(own + atEnd).toBeGreaterThan(2_000_000);
+  expect(own).toBeLessThanOrEqual(3_000_000 - kept.microusd);
+  expect(own + atEnd).toBeGreaterThan(3_000_000);
   expect(r.spentMicroUsd).toBe(own + atEnd);
-  expect(r.platformOverrun!.microusd).toBe(own + atEnd - 2_000_000);
+  expect(r.platformOverrun!.microusd).toBe(own + atEnd - 3_000_000);
   // (By whose calls went past the limit: the seat debriefed first used the reserve, so it is the later seat's that did.)
   expect(Object.keys(r.platformOverrun!.by_subject).length).toBeGreaterThan(0);
   for (const seat of Object.keys(r.platformOverrun!.by_subject)) expect(["finance-system", "mayor-system"]).toContain(seat);
   expect(Object.values(r.platformOverrun!.by_subject).reduce((a, b) => a + b, 0)).toBe(r.platformOverrun!.microusd);
   // Recorded in the log, as a note of the orchestrator's, apart from the stop, which says the work hit the limit.
   const note = ll.find((e) => e.body?.data?.platform_overrun_of_limit).body.data.platform_overrun_of_limit;
-  expect(note).toMatchObject({ microusd: r.platformOverrun!.microusd, of_limit_microusd: 2_000_000, by_subject: r.platformOverrun!.by_subject });
+  expect(note).toMatchObject({ microusd: r.platformOverrun!.microusd, of_limit_microusd: 3_000_000, by_subject: r.platformOverrun!.by_subject });
   expect(ll.filter((e) => e.body?.data?.stopped).length).toBe(1);
   // The pilot's report and cost report say it, apart from the pilot having reached its limit.
   const rep = await reportOfLog(join(base, "overrun"), r.logPath);

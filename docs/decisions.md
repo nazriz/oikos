@@ -11966,3 +11966,15 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   437,402), the build tag aside. A town with providers changes (99b17295... at 30 days).
 - **Revisit if:** a principal is asked for a record older than its 64 kept (then the principal's files are a channel it
   looks into); the compose share gets a source; a seat reads an answer's words as a refusal of what was granted.
+
+## 2026-11-10 · A fork's reserve for debriefs is all they need, or the run does not start (found by the enough-work screen)
+
+- **What:** the reserve a run or a fork keeps back of its spending limit for debriefs is now all of what they are
+  expected to cost (`keptBackFor`: at least a twentieth of the limit, at most the limit), no longer at most half of it.
+  Where the limit cannot cover the debriefs at all, the run does not start, and says so in plain words (`reserveOrRefuse`:
+  "the spending limit of 0.40 USD cannot cover the debriefs of 6 seats, which are expected to cost ... USD: raise the
+  limit, or seat fewer"). Why: a fork of six seats at about 0.048 USD each on a 0.40 limit spent 0.44; the half-limit cap
+  let the work spend into what the debriefs needed. The debriefs are still sized from the measured table with its
+  margin, so a debrief dearer than the table says still runs over, as the platform's overrun.
+- **Revisit if:** seats are made during a fork in numbers that the reserve sized at its start does not cover (a seat made
+  later adds its own share, and one the limit cannot cover then stops the run at that seat's making).

@@ -55,14 +55,14 @@ test("a run on a model that costs money stops at its limit, says why, and still 
   const out = join(root, "runs", "test-budget");
   rmSync(out, { recursive: true, force: true });
   const prices = { "anthropic/claude-sonnet-5": { input: 2_000_000, output: 10_000_000 } };
-  const s = await runWorld({ config: generate({ ...spec, mayor: "llm" }), runId: "budget", outDir: out, until: 365 * DAY, adapter, prices, budget: { limitMicroUsd: 100_000, spentMicroUsd: 0 } });
+  const s = await runWorld({ config: generate({ ...spec, mayor: "llm" }), runId: "budget", outDir: out, until: 365 * DAY, adapter, prices, budget: { limitMicroUsd: 1_000_000, spentMicroUsd: 0 } }); // (A limit that covers its debrief and little more: since 2026-11-10 one that cannot does not start)
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   const end = log.at(-1)!;
   expect(end.kind).toBe("end");
   expect(end.body.reason).toBe("aborted");
   expect(end.body.detail).toContain("spending limit reached");
   const spent = log.filter((e) => e.kind === "annotation" && e.body.annotation === "usage").reduce((a, e) => a + e.body.cost_microusd, 0);
-  expect(spent).toBeLessThanOrEqual(100_000);
+  expect(spent).toBeLessThanOrEqual(1_000_000);
   expect(log.some((e) => e.kind === "annotation" && e.body.annotation === "debrief")).toBe(true);
   expect(s.t).toBeLessThan(365 * DAY);
 }, 300_000);
