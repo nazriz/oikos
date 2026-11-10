@@ -66,6 +66,47 @@ export function clientDraft(kinds: string[]): Issued {
     writes: { kind: "draft", text: "Draft for sign-off. {words}", basis: "=referral", to: ["=client"], visible: ["=self", "=client"], data: { referral: "=referral", paper: { kind: "=kind", to: ["=recipient"], text: "=words" } } } };
 }
 
+/** A person's own papers that the office receiving them reads for its figures and ids, on forms in the client's name
+ * (docs/decisions.md, 2026-11-10, "One right call", C; docs/design/handing-over.md H4): the desk fills in the fields the
+ * receiving office's code reads, never their JSON. `payments` are the support law's payments, by id (the choices of a
+ * claim). Published only at a desk a model sits in, as its stationery is, so a code-only town does not move. */
+export function clientPapers(payments: string[]): Issued[] {
+  const client = f("entity", "Whom you work for: the paper goes in their name.", req);
+  return [
+    { form: "job_application", title: "An application for a job advertised, in a client's name",
+      does: "Applies, in the client's name, for a job an employer has advertised. The employer reads the account the pay would go into and the trade the client works in, and picks among those who applied.",
+      fields: { client, employer: f("entity", "The employer whose advertisement it answers.", req), posting: f("record", "The advertisement applied for.", req), account: f("account", "The client's account, which the pay would go into.", req),
+        trade: f("text", "The trade the client works in, or last worked in, if any.") },
+      writes: { kind: "job_application", text: "Application for the advertised job.", basis: "=posting", to: ["=employer"], visible: ["=client", "=employer"], data: { posting: "=posting", account: "=account", trade: "=trade" } } },
+    { form: "loan_application", title: "An application for a loan, in a client's name",
+      does: "Applies to a lender, in the client's name, for a loan: how much, over how many months, paid into which account, and what for. The lender decides it.",
+      fields: { client, lender: f("entity", "The lender applied to.", req), amount: f("amount", "How much is asked for.", req), months: f("count", "Over how many months it is repaid.", req),
+        account: f("account", "The client's account, which the loan is paid into.", req), purpose: f("text", "What it is for.", req) },
+      writes: { kind: "loan_application", text: "Application for a loan of {amount} over {months} months.", to: ["=lender"], visible: ["=client", "=lender"], data: { amount: "=amount", months: "=months", account: "=account", purpose: "=purpose" } } },
+    { form: "benefit_claim", title: "A claim for a support payment, in a client's name",
+      does: "Claims a support payment of the law's, in the client's name, from the office that pays it. The office decides it by the law's conditions and pays it into the account named.",
+      fields: { client, office: f("entity", "The office that pays it.", req), payment: f("choice", "The payment claimed, as the law names it.", { required: true, options: [...payments].sort() }),
+        account: f("account", "The client's account, which it is paid into.", req), born_at: f("date", "The client's date of birth.") },
+      writes: { kind: "benefit_claim", text: "Claim: {payment}.", to: ["=office"], visible: ["=client", "=office"], data: { payment: "=payment", account: "=account", born_at: "=born_at" } } },
+    { form: "benefit_change", title: "A request to stop paying a claim, in a client's name",
+      does: "Asks the office that pays a support payment, in the client's name, to stop paying a claim of theirs.",
+      fields: { client, office: f("entity", "The office that pays it.", req), claim: f("record", "The client's claim to stop.", req) },
+      writes: { kind: "benefit_change", text: "Please stop paying my claim {claim}.", basis: "=claim", to: ["=office"], visible: ["=client", "=office"], data: { claim: "=claim", stop: true } } },
+  ];
+}
+
+/** The desk's draft for sign-off of one of a client's papers on its form ([clientPapers]): the paper as it would go in
+ * their name, carried in the draft and sent as it stands once signed off (`send_signed`). */
+export function clientDraftOf(x: Issued): Issued {
+  const { sends: _s, ...paper } = x.writes;
+  return {
+    form: `draft_${x.form}`, title: `A draft for sign-off: ${x.title.charAt(0).toLowerCase()}${x.title.slice(1)}`,
+    ...(x.does ? { does: `Once signed off: ${x.does.charAt(0).toLowerCase()}${x.does.slice(1)} Nothing goes in their name until they have signed it off.` } : {}),
+    fields: { referral: f("record", "The matter you were handed.", req), ...x.fields },
+    writes: { kind: "draft", text: `Draft for sign-off. ${x.writes.text}`, basis: "=referral", to: ["=client"], visible: ["=self", "=client"], data: { referral: "=referral", paper } },
+  };
+}
+
 /**
  * A provider of assistants (docs/behaviour/assistants.md; docs/design/delegation.md): it sells the work of its systems as a
  * service, at the profile's prices, delivers a system to an organisation that orders and pays the set-up, offers the

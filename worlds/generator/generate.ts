@@ -8,7 +8,7 @@
 
 import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
-import { ASSISTANT_ISSUES, MATTER_KINDS, clientDraft, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { ASSISTANT_ISSUES, MATTER_KINDS, clientDraft, clientDraftOf, clientPapers, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
 import { COMPOSE_BPS, SCOPE_ANSWER_SECONDS } from "./registry";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
@@ -3514,7 +3514,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const desk = pr.offers.find((o) => o.for === "persons");
       if (!desk || !spec.assistant_seats.includes(desk.template)) continue;
       // (Its own papers, and a draft for sign-off of a paper in a client's name, of the kinds its offer takes.)
-      for (const x of [...ASSISTANT_ISSUES, clientDraft(desk.kinds)]) records.push(stationeryForm(`${pr.id}-desk`, pr.id, x, {}, "Assistants' desk"));
+      // (A client's papers that the receiving office reads for its figures, on forms of their own with their drafts: a
+      // model at the desk fills in fields, never JSON. docs/design/handing-over.md H4.)
+      const papers = clientPapers(PAYMENTS.map((r) => r.id)).filter((x) => desk.kinds.includes(x.writes.kind));
+      const words = desk.kinds.filter((k) => !papers.some((x) => x.writes.kind === k));
+      for (const x of [...ASSISTANT_ISSUES, clientDraft(words), ...papers, ...papers.map(clientDraftOf)]) records.push(stationeryForm(`${pr.id}-desk`, pr.id, x, {}, "Assistants' desk"));
       positions.find((p) => p.id === `${pr.id}-desk`)!.channels.push(K.mine("stationery", ["form"], { title: "The desk's own forms" }));
     }
   }

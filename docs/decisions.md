@@ -12295,3 +12295,21 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   applications, 18 applications and a variation request in its 150 days, so the moved paperwork was exercised.
 - **Revisit if:** a paper of the shared set needs something only the person knows that a clerk would not (then it is
   a fact the person gives, never read by the clerk).
+
+## 2026-11-11 · H4b: a client's papers on forms of their own at the providers' desk (the decisions entry "One right call", C)
+
+- **Decision.** Where a model sits at a provider's desk (`assistant_seats` names the desk's template), its stationery
+  has a form for each of a client's papers that the receiving office's code reads for its figures, with its draft for
+  sign-off (`clientPapers`, `clientDraftOf`, `participants/src/kinds/assistants.ts`): a job application (`employer`,
+  `posting`, `account`, `trade`), a loan application (`lender`, `amount`, `months`, `account`, `purpose`), a claim for a
+  support payment (`office`, `payment` as a choice of the law's payments, `account`, `born_at`) and a request to stop
+  paying a claim (`office`, `claim`; `stop` is always true, as the citizen's own paper says nothing else). Each names
+  `client`, and goes in the client's name, seen by them and the receiving office. The words-only `draft_for_client`
+  keeps the offer's other kinds. A desk's draft on these forms carries the paper, sent as it stands on `send_signed`.
+- **Why.** Since "One right call" the translator composes no JSON, so a model at the desk could not file these papers
+  at all; the fields are those `JobApplication`, `LoanApplication`, `BenefitClaim` and `BenefitChange` read.
+- **Not moved:** towns without a model at the desk (stationery is published only where a model sits): the same
+  configs as before for every same-results town and the assistants town (checked: the config differs only in the
+  study's town, by these eight forms).
+- **Revisit if:** the citizen's own papers gain fields (the forms follow them), or a seat files a claim for a payment
+  its client is not eligible for often enough to need the law's conditions on the form.
