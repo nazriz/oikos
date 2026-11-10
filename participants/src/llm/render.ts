@@ -4,9 +4,10 @@
 // agreements, a survey of the town. No blocks, records, channels or refusal
 // codes. Deterministic: the same observation always reads the same.
 
-import { cents, moneyNow } from "../money";
+import { cents, currencyNow, moneyNow } from "../money";
 import type { Body, Observation, Outcome, Reading, Record, SiteCell, SiteStructure, Transaction, VariableView } from "../contracts";
 import { channels, citedWords, firstDue } from "../contracts";
+import { parseAmount, parseProgram, type Call, type Value } from "../calls";
 import { refusalText } from "./words";
 
 const DAY = 86_400;
@@ -35,7 +36,9 @@ export function duration(s: number): string {
 // hundredths of a per cent; a detail is known for one of those by the name the world's papers give it (the lists
 // below: names, never a place's figures), by the unit written beside it ({unit, value}), or, on a form, by what the
 // form says the field is. Anything else stands as it is.
-const MONEY_DETAILS = new Set(["amount", "unit_price", "price", "refund", "wage", "rent", "land", "levy_from", "balance", "cost", "fee", "fine", "deposit", "bond", "principal", "payment", "carrying"]);
+// (A provider's offer: its fee a month, its set-up and what it costs to leave, read "fee month: 3100" to the assistant
+// seats of the scope pilot until 2026-11-10.)
+const MONEY_DETAILS = new Set(["amount", "unit_price", "price", "refund", "wage", "rent", "land", "levy_from", "balance", "cost", "fee", "fine", "deposit", "bond", "principal", "payment", "carrying", "fee_month", "fee_per_year", "setup", "exit"]);
 const MONEY_LISTS = new Set(["prices", "demolition", "goods", "lines", "amounts"]);
 const TIME_SPANS = new Set(["every", "period", "notice", "term"]);
 // (Dates by the names the world's office papers give them: a payroll notice's first pay day read "first pay: 6652800"
@@ -109,6 +112,17 @@ function signed(id: string): string {
   const org = w?.of ? whoIs?.(w.of) : undefined;
   return `${w?.name && w.name !== me ? `${w.name} (${me})` : me}${w?.of ? `, ${org?.name && org.name !== w.of ? `${org.name} (${w.of})` : w.of}` : ""}`;
 }
+/** What each detail of a kind of paper is, by the form that makes papers of that kind (the forms the reader has seen):
+ * a return's `paid` is a sum because its form says so. Set for the report being written. */
+let formFields: Map<string, FieldKinds> | undefined;
+/** The forms among some papers, by the kind of paper each makes: what each detail of such a paper is. */
+export function formFieldsIn(records: Iterable<{ record?: string; kind?: string; data?: any }>, into = new Map<string, FieldKinds>()): Map<string, FieldKinds> {
+  for (const r of records) {
+    if (r.record !== "statement" || r.kind !== "form" || !r.data?.fields || typeof r.data.fields !== "object") continue;
+    for (const kind of [r.data.writes?.kind, r.data.issues, r.data.submit_as].filter((k): k is string => typeof k === "string" && k !== "draft")) into.set(kind, { ...(into.get(kind) ?? {}), ...r.data.fields });
+  }
+  return into;
+}
 let inFull = false;
 /** The books papers (an office's clerk's) set out in full among a list: the newest of each office's, whose words are the
  * day's list of cases to decide. Earlier ones are a line each, as they were. */
@@ -122,21 +136,131 @@ const cap = (x: string) => words(x).replace(/^./, (c) => c.toUpperCase());
 const num = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 /** A name as someone might write it, for matching: case, underscores and hyphens don't matter. */
 const plain = (s: string) => s.toLowerCase().replace(/[_-]+/g, " ").trim();
-const details = (raw: unknown, max = 400) => {
-  if (raw === null || raw === undefined || typeof raw !== "object") return "";
-  const x = readable(raw);
-  const entries = Object.entries(x as object);
-  const flat = entries.every(([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v));
-  return clip(flat ? entries.map(([k, v]) => `${words(k)}: ${v}`).join("; ") : JSON.stringify(x), max);
+const details = (raw: unknown, max = 400) => (raw === null || raw === undefined || typeof raw !== "object" ? "" : clip(factWords(raw), max));
+
+// A paper's details in words, however they are kept: each by its name, its figures as a person reads them (`readable`),
+// what is inside one of them in brackets after its name, a list as a list. Never the store's own notation (braces,
+// quotation marks around names): a seat reads a paper, not a record (principle 14; until 2026-11-10 a detail holding
+// another read as JSON). What a few details are is said in words of their own: what someone is to do (`outcome`), what
+// a matter asks to be done (`calls`, a program in the call language, which no seat is shown: it is read as the facts it
+// sets down), and the paper a draft would send (`paper`).
+const yesNo = (v: unknown) => (v === true ? "yes" : v === false ? "no" : v);
+const plainValue = (v: unknown): string => {
+  const x = yesNo(v);
+  return typeof x === "number" && Number.isSafeInteger(x) && Math.abs(x) >= 10_000 ? num(x) : x === null || x === undefined ? "none" : String(x);
 };
-/** A statement's details. A form's are always whole: its fields are what it's filled in from, and whoever reads the
- * request made on it sees every one (a long form cut short reads as a form without its last fields). */
-const dataWords = (r: { kind: string; data?: unknown }) => details(r.kind === "form" ? formAsShown(r.data) : r.data, r.kind === "form" ? Infinity : 400);
-/** A form's details as whoever fills it in needs them: of a paper of the office's own, its name, whose it is and its
- * fields (how the paper is put together from them is the form's business, and is shown when it is filled in). */
-function formAsShown(data: unknown): unknown {
-  const d = data as { writes?: { kind?: string }; form?: unknown; office?: unknown; fields?: unknown } | undefined;
-  return d?.writes ? { form: d.form, office: d.office, issues: d.writes.kind, fields: d.fields } : data;
+const isPlain = (v: unknown) => v === null || ["string", "number", "boolean"].includes(typeof v);
+/** Whether `readable` reads this value as one figure (a figure with its unit beside it; a list of sums under its name). */
+const oneFigure = (k: string, v: object) => (whole((v as any).value) && typeof (v as any).unit === "string") || (MONEY_LISTS.has(k) && !Array.isArray(v) && Object.values(v).length > 0 && Object.values(v).every(whole));
+/** How sums are written while a paper is put in words: the world's money now, unless a reader with its own says. */
+let sumNow: ((a: string | number) => string) | undefined;
+const sumOf = (a: string | number) => (sumNow ? sumNow(a) : money(a));
+export function factWords(raw: unknown, fields?: FieldKinds, under?: string, sum?: (a: string | number) => string): string {
+  if (!sum) return factWordsOf(raw, fields, under);
+  const was = sumNow;
+  sumNow = sum;
+  try { return factWordsOf(raw, fields, under); } finally { sumNow = was; }
+}
+function factWordsOf(raw: unknown, fields?: FieldKinds, under?: string): string {
+  if (isPlain(raw) || raw === undefined) return plainValue(raw);
+  if (Array.isArray(raw)) return raw.length ? (raw.every(isPlain) ? raw.map(plainValue).join(", ") : raw.map((v) => (isPlain(v) ? plainValue(v) : `(${factWords(v, undefined, under)})`)).join("; ")) : "none";
+  const o = raw as { [k: string]: unknown };
+  // (A figure with its unit beside it, alone: read as the one figure it is.)
+  if (whole(o.value) && typeof o.unit === "string") { const r = readable(o, sumNow ? { money: sumNow } : {}); if (typeof r === "string") return r; }
+  const parts: string[] = [];
+  const last: string[] = []; // (what a matter asks to be done, and the paper a draft would send: said after the rest)
+  const carried = (o as { paper?: unknown }).paper; // (the paper a draft carries, as it would go)
+  for (const [k, v] of Object.entries(o)) {
+    if (v === undefined) continue;
+    if (k === "outcome" && v !== null && typeof v === "object" && !Array.isArray(v)) parts.push(`${words(k)}: ${outcomeWords(v, whole(o.every) ? Number(o.every) : undefined)}`);
+    else if (k === "calls" && typeof v === "string") last.push(`what is to be done: ${programWords(v)}`);
+    else if (v === carried && v !== null && typeof v === "object" && !Array.isArray(v)) last.push(`the paper: ${paperWords(v as any)}`);
+    // (Lengths of time by what each is for, kept in seconds: a provider's offer says how long its system takes over each kind.)
+    else if (k === "seconds" && v !== null && typeof v === "object" && !Array.isArray(v) && Object.values(v).length && Object.values(v).every(whole)) parts.push(`time it takes: (${Object.entries(v).map(([n, x]) => `${words(n)}: ${duration(Number(x))}`).join("; ")})`);
+    else if (isPlain(v) || (Array.isArray(v) && v.every(isPlain)) || (typeof v === "object" && oneFigure(k, v as object))) {
+      // (One detail at a time, so that each is read by its own name, as `readable` reads a paper's.)
+      for (const [k2, v2] of Object.entries(readable({ [k]: v }, { ...(fields ? { fields } : {}), ...(sumNow ? { money: sumNow } : {}) }, under) as object)) parts.push(`${words(k2)}: ${Array.isArray(v2) ? (v2.length ? v2.map(plainValue).join(", ") : "none") : isPlain(v2) ? plainValue(v2) : `(${factWords(v2, undefined, k)})`}`);
+    } else parts.push(`${words(k)}: (${factWords(v, undefined, k)})`);
+  }
+  return [...parts, ...last].join("; ");
+}
+/** A paper a draft would send, in words: what kind of paper, to whom, citing what, its words and its details. */
+function paperWords(p: { kind?: unknown; to?: unknown; basis?: unknown; text?: unknown; data?: unknown; [k: string]: unknown }): string {
+  const to = Array.isArray(p.to) ? p.to.join(", ") : typeof p.to === "string" ? p.to : "";
+  const basis = Array.isArray(p.basis) ? p.basis.join(", ") : typeof p.basis === "string" ? p.basis : "";
+  const rest = Object.fromEntries(Object.entries(p).filter(([k]) => !["kind", "to", "basis", "text", "data", "visible", "visible_to", "addressed_to"].includes(k)));
+  return [`${typeof p.kind === "string" ? aKind(p.kind) : "a paper"}${to ? ` to ${to}` : ""}${basis ? `, citing ${basis}` : ""}`,
+    ...(typeof p.text === "string" ? [`in these words: "${p.text}"`] : []),
+    ...(p.data !== undefined && p.data !== null ? [`with these details: ${factWords(p.data, typeof p.kind === "string" ? formFields?.get(p.kind) : undefined)}`] : []), ...(Object.keys(rest).length ? [factWords(rest)] : [])].join(", ");
+}
+/** A kind of paper with its article: "an invoice", "a benefit claim". */
+const aKind = (kind: string) => `${/^[aeiou]/i.test(words(kind)) ? "an" : "a"} ${words(kind)}`;
+
+/**
+ * What a program in the call language sets down, as facts in words (principle 14: the call language is the platform's,
+ * and no seat is shown it). A matter handed to an assistant carries what is to be done as such a program (written by its
+ * principal's code); it is read here as the paper or payment or letter it would make. A program that cannot be read is
+ * said to be so, never shown.
+ */
+export function programWords(text: string): string {
+  let p: ReturnType<typeof parseProgram>;
+  try { p = parseProgram(text); } catch { return "(its details could not be read)"; }
+  if ("none" in p) return "nothing";
+  return p.lines.map((l) => callWords(l.call)).join("; then ");
+}
+function callWords(c: Call): string {
+  const a = c.args;
+  const said = (v: Value | undefined): string => (v === undefined ? "" : "id" in v ? v.id : "text" in v ? v.text : "var" in v ? `the ${words(v.var)} made above` : "call" in v ? callWords(v.call) : factWords(v.json));
+  const list = (v: Value | undefined): string => (v !== undefined && "json" in v && Array.isArray(v.json) ? v.json.map(plainValue).join(", ") : said(v));
+  const sum = (v: Value | undefined): string => { const s = said(v); try { return sumOf(parseAmount(s, currencyNow())); } catch { return s; } };
+  const others = (skip: string[]) => Object.entries(a).filter(([k]) => !skip.includes(k)).map(([k, v]) => `${words(k)}: ${"json" in v && v.json !== null && typeof v.json === "object" && !Array.isArray(v.json) ? `(${factWords(v.json)})` : list(v)}`);
+  const tail = (xs: string[]) => (xs.length ? `; ${xs.join("; ")}` : "");
+  switch (c.fn) {
+    case "statement": {
+      const kind = a.kind ? said(a.kind) : "";
+      const data = a.data && "json" in a.data ? a.data.json : undefined;
+      return [`${kind ? aKind(kind) : "a paper"}${a.to ? ` to ${list(a.to)}` : ""}${a.for ? `, in the name of ${said(a.for)}` : ""}${a.basis ? `, citing ${list(a.basis)}` : ""}`,
+        ...(a.text ? [`in these words: "${said(a.text)}"`] : []), ...(data !== undefined && data !== null ? [`with these details: ${factWords(data, formFields?.get(kind))}`] : [])].join(", ")
+        + tail(others(["kind", "to", "for", "basis", "text", "data", "visible"]));
+    }
+    case "money":
+      return `a payment of ${sum(a.amount)}${a.from ? ` from ${said(a.from)}` : ""} to ${said(a.to)}${a.for ? ` (for ${said(a.for)})` : ""}${a.every ? `, every ${said(a.every)}` : ""}${a.settles ? `, settling ${said(a.settles)}` : ""}` + tail(others(["amount", "from", "to", "for", "every", "settles", "visible"]));
+    case "message":
+      return `a letter to ${list(a.to)}${a.re ? `, about ${said(a.re)}` : ""}: "${said(a.text)}"`;
+    case "form":
+      return `the ${words(said(a.form))} form filled in${a.to ? ` for ${said(a.to)}` : ""}${tail(others(["form", "to"]))}`;
+    default:
+      return `${words(c.fn)}${tail(others(["visible"]))}`;
+  }
+}
+
+/** A statement's details: for a form, its blanks (formWords); for any other paper, its details in words, filled in on
+ * the form it was made on where that is known (`fields`: what each detail is). */
+const dataWords = (r: { kind: string; data?: unknown }, fields?: FieldKinds) => (r.kind === "form" ? "" : r.data === null || r.data === undefined || typeof r.data !== "object" ? ""
+  // (What a matter asks to be done, or the paper a draft would send, is the matter: said whole, as a form is.)
+  : clip(factWords(r.data, fields), typeof (r.data as any).calls === "string" || (r.data as any).paper ? 4_000 : 400));
+
+/** What each kind of blank on a form takes, in words. */
+const BLANK: { [type: string]: string } = { record: "a paper, by its id", entity: "a person or an organisation, by id", account: "an account, by its id", amount: "a sum of money", date: "a date", duration: "a length of time",
+  count: "a number", lot: "a lot, by its id", list: "a list", structure_type: "a kind of building", cell: "a cell of ground, by its id", position: "a post, by its id" };
+/** The boilerplate the generator writes on an office's own stationery, as a person would say it. */
+const OWN_FORM = /Filled in by the ([^,]+), of the office's own accord \(nobody's direction or leave is needed\): filled in, it is issued as the form sets it out\./;
+/**
+ * A form as a person sees a paper form (principle 14; P11, a form publishes the input it expects): its title and what it
+ * is for (its words), then each blank, named in plain words, with what goes in it, whether it must be filled in, and for
+ * a choice the choices. Always whole: a form cut short reads as a form without its last blanks. The form's name, where
+ * it goes and how a paper is put together from it are the form's own business and are not set out.
+ */
+export function formWords(r: { id: string; text: string; data?: any }, head: string): string {
+  const fields = (r.data?.fields ?? {}) as { [k: string]: { type?: string; description?: string; options?: string[]; required?: boolean; unit?: string } };
+  const text = r.text.replace(OWN_FORM, (_, who: string) => `The ${who} fills it in, on the office's own account: nobody's direction or leave is needed.`).replace(/A paper of the office's own: filled in, it is issued as the form sets it out\.$/, "A paper of the office's own.");
+  const blank = ([name, f]: [string, (typeof fields)[string]]) => {
+    const what = f.type === "choice" && f.options?.length ? `one of: ${f.options.join(", ")}` : f.type === "text" || !f.type ? "" : `${BLANK[f.type] ?? words(f.type)}${f.unit ? ` (in ${words(f.unit)})` : ""}`;
+    return `  - ${words(name)}${f.required ? " (must be filled in)" : ""}: ${[f.description ?? "", what ? `${what.charAt(0).toUpperCase()}${what.slice(1)}.` : ""].filter(Boolean).join(" ")}`;
+  };
+  const amends = typeof r.data?.amends === "string" ? ` It amends ${r.data.amends}.` : "";
+  const list = Object.entries(fields);
+  return [`${head}: "${text}"${amends}`, ...(list.length ? ["  Its blanks:", ...list.map(blank)] : ["  It has no blanks to fill in."])].join("\n");
 }
 
 /**
@@ -195,7 +319,7 @@ export function outcomeLines(x: Outcome, what: string, now: number): string[] {
  */
 export function ruleWords(r: { adico?: any; formal?: any }, o: { asWritten?: boolean } = {}): string {
   const a = r.adico;
-  const more = (x: any, said: string[]) => Object.entries(x).filter(([k]) => !said.includes(k)).map(([k, v]) => `; ${words(k)}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join("");
+  const more = (x: any, said: string[]) => Object.entries(x).filter(([k]) => !said.includes(k)).map(([k, v]) => `; ${words(k)}: ${typeof v === "string" ? v : factWords(v)}`).join("");
   const deontic = ({ may: "may", must: "must", must_not: "must not" } as { [k: string]: string })[a?.deontic] ?? a?.deontic;
   const rule = a ? `Its rule, as recorded: ${[a.attribute ?? "(nobody named)", deontic ?? "(may, must or must not isn't said)", a.aim ?? "(no action named)"].join(" ")}${a.condition ? `, ${a.condition}` : ""}${a.or_else ? `; or else: ${a.or_else}` : ""}${more(a, ["attribute", "deontic", "aim", "condition", "or_else"])}.` : "";
   const f = r.formal;
@@ -208,7 +332,7 @@ export function ruleWords(r: { adico?: any; formal?: any }, o: { asWritten?: boo
 export function outcomeWords(o: any, every?: number, by?: string): string {
   const rep = every ? ` every ${duration(every)}` : "";
   if (o?.goods) return `deliver ${o.goods.quantity} ${o.goods.kind} to ${o.goods.to} at ${o.goods.at}${rep}`;
-  if (o?.money) return `pay ${money(o.money.amount)}${o.money.from ? ` from ${o.money.from}` : ""} to ${o.money.to}${rep}${o.money.for ? ` (${o.money.for})` : ""}`;
+  if (o?.money) return `pay ${sumOf(o.money.amount)}${o.money.from ? ` from ${o.money.from}` : ""} to ${o.money.to}${rep}${o.money.for ? ` (${o.money.for})` : ""}`;
   if (o?.structure) return o.structure.remove ? `demolish ${o.structure.remove}` : `build a ${o.structure.type} on ${o.structure.on}`;
   // (Whoever commits to be in a place themselves comes there: a worker and their place of work read "c0009 will let
   // c0009 live or be in town-hall/workplace.1" until 2026-10-11, and a finance seat held a wage over the "garbled" terms.)
@@ -250,15 +374,18 @@ function describe(r: Record, readings?: { [id: string]: Reading }): string {
         : r.kind === "office_books" && Array.isArray(r.data?.open) && !inFull ? { stands_open: r.data.open.length, the_list: `in this paper (${r.id}), read by its id` }
         : r.kind === "work_order" && r.data?.work && whole(r.data?.every) ? { ...Object.fromEntries(Object.entries(r.data as object).filter(([k]) => k !== "first" && k !== "first_at")), first_due: firstDue(r, 0) } : r.data;
       const voters = (list: unknown) => (Array.isArray(list) && list.length ? list.map((p) => writer(String(p))).join(", ") : "nobody");
-      const d = [closed ? `closed: no more votes are taken${typeof r.data.result === "string" ? `; its result is ${r.data.result}` : ""}` : "", dataWords({ kind: r.kind, data: shownData }),
+      const d = [closed ? `closed: no more votes are taken${typeof r.data.result === "string" ? `; its result is ${r.data.result}` : ""}` : "", dataWords({ kind: r.kind, data: shownData }, formFields?.get(r.kind)),
         named ? `voted for: ${voters(r.data.voted_for)}; voted against: ${voters(r.data.voted_against)}` : ""].filter(Boolean).join("; ");
       const rule = ruleWords(r);
+      if (r.kind === "form") return formWords(r, `[${r.id}] form from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}`) + (rule ? ` ${rule}` : "");
       return `[${r.id}] ${words(r.kind)} from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${clip(r.text, booksWhole.has(r.id) ? BOOKS_WORDS_MAX : 1000)}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${citedWords(r)}` : ""}${rule ? `. ${rule}` : ""}`;
     }
     case "claim":
       return `[${r.id}] ${r.holder} ${POSITION[r.position] ?? r.position}${r.counterparty ? ` against ${r.counterparty}` : ""}: ${details(r.about) || "(no details)"}${r.basis ? `, citing ${citedWords(r)}` : ""}${from}`;
     case "agreement": {
-      const c = r.terms.commitments.map((x) => `${x.who} will ${x.does?.outcome ? outcomeWords(x.does.outcome, x.every, x.who) : clip(JSON.stringify(x.does), 200)}`).join("; ");
+      // (A commitment in words only: what it says, as said. It read `provider-a will {"text":"…"}` until 2026-11-10.)
+      const does = (x: any) => (x.does?.outcome ? outcomeWords(x.does.outcome, x.every, x.who) : typeof x.does?.text === "string" && Object.keys(x.does).length === 1 ? `do this: "${clip(x.does.text, 400)}"` : clip(factWords(x.does), 200));
+      const c = r.terms.commitments.map((x) => `${x.who} will ${does(x)}`).join("; ");
       return `[${r.id}] ${r.terms.template ? `${words(r.terms.template)} agreement` : "agreement"} between ${r.terms.parties.join(" and ")}${r.terms.term ? `, for ${duration(r.terms.term)}` : ""}: ${c || "no commitments"}${r.terms.text ? `. "${clip(r.terms.text)}"` : ""}${from}${readingWords(readings?.[r.id])}`;
     }
     case "signature":
@@ -527,10 +654,7 @@ const alike = (a: Record, b: Record) => a.record === "claim" && b.record === "cl
 
 /** One entry of a list in a paper (a lot of a register, an area of a map), in a line: each thing it says by name. */
 function entryWords(raw: unknown): string {
-  const e = readable(raw);
-  if (e === null || typeof e !== "object" || Array.isArray(e)) return clipTo(typeof e === "object" ? JSON.stringify(e) : String(e), 600);
-  const value = (v: unknown): string => (Array.isArray(v) && v.every((x) => x === null || typeof x !== "object") ? v.join(", ") : v !== null && typeof v === "object" ? JSON.stringify(v) : String(v));
-  return clipTo(Object.entries(e).map(([k, v]) => `${words(k)}: ${value(v)}`).join("; "), 600);
+  return clipTo(factWords(raw), 600);
 }
 const clipTo = (x: string, max: number) => (x.length > max ? `${x.slice(0, max)}…` : x);
 
@@ -727,6 +851,9 @@ export interface RenderOptions {
   counter?: { counters(r: Record): boolean };
   /** Told of each look cut short at the most one look shows (`LOOK_CHARS_MAX`). */
   onCut?: (cut: { report: string; characters: number; limit: number }) => void;
+  /** What each detail of a kind of paper is, by the forms the reader has seen (`formFieldsIn`): none given, the forms in
+   * this report. */
+  formFields?: Map<string, FieldKinds>;
 }
 
 /** What a look that finds nothing says: of papers looked up, and of a report with nothing new in it. */
@@ -737,6 +864,7 @@ export const NOTHING_NEW = "Nothing new there since you last looked.";
 export function renderObservation(obs: Observation, o: RenderOptions = {}): string {
   inFull = false;
   whoIs = o.whoIs;
+  formFields = o.formFields ?? formFieldsIn(Object.values(obs.channels).flatMap((ch) => (ch.kind === "records" ? ch.records : [])));
   const max = o.maxRecords ?? 40;
   const postTitle = new Map((obs.positions ?? []).map((p) => [p.position, p.title ?? words(p.role ?? p.position)]));
   // A post's reports are named after the post (`mayor/budget` reads "Mayor: Budget").
@@ -933,8 +1061,9 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
  * the same kind, from whoever it speaks for, says it replaces (an amended law names the law it replaces), whether or
  * not the withdrawal is among what's shown. The same reading as a code participant's book (`Book`, behaviour/common.ts).
  */
-export function renderStanding(obs: Observation, standing: Set<string>, who?: WhoIs): string {
+export function renderStanding(obs: Observation, standing: Set<string>, who?: WhoIs, fieldsOf?: Map<string, FieldKinds>): string {
   whoIs = who;
+  formFields = fieldsOf ?? formFieldsIn(Object.values(obs.channels).flatMap((ch) => (ch.kind === "records" ? ch.records : [])));
   const out: string[] = [];
   // An office's own stationery (a form that writes a paper of that office's) is on file for whoever holds the
   // office: another office of the same organisation is not shown it.
@@ -951,7 +1080,12 @@ export function renderStanding(obs: Observation, standing: Set<string>, who?: Wh
   }
   for (const [id, ch] of Object.entries(obs.channels)) {
     if (!standing.has(id) || ch.kind !== "records") continue;
-    for (const r of ch.records) if (r.record === "statement" && !down.has(r.id) && !othersStationery(r)) out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${dataWords(r)})` : ""}${ruleWords(r) ? ` ${ruleWords(r)}` : ""}`);
+    for (const r of ch.records) {
+      if (r.record !== "statement" || down.has(r.id) || othersStationery(r)) continue;
+      const d = r.data ? dataWords(r, formFields?.get(r.kind)) : "";
+      out.push(r.kind === "form" ? formWords(r, `- [${r.id}] form${r.speaks_for ? ` of ${r.speaks_for}` : ""}`) + (ruleWords(r) ? ` ${ruleWords(r)}` : "")
+        : `- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${d ? ` (${d})` : ""}${ruleWords(r) ? ` ${ruleWords(r)}` : ""}`);
+    }
   }
   return out.join("\n");
 }

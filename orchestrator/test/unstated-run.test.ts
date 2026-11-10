@@ -58,7 +58,7 @@ test("a mock pilot under unstated: nothing its seats are shown says what the tow
   expect(shown.some((e) => e.body.subject === "tribunal-member-system")).toBe(true);
   // Its standing instructions: its office and nothing of what the town is.
   const system = shown.find((e) => e.body.subject === "tribunal-member-system" && e.body.data.system).body.data.system as string;
-  expect(system.startsWith("You are the tribunal member of Civil and Administrative Tribunal, in Millbrook.\n\nYou are Tribunal member, acting for Civil and Administrative Tribunal (tribunal).")).toBe(true);
+  expect(system.startsWith("You are the tribunal member of Civil and Administrative Tribunal, in Millbrook.\n\nYou act as the tribunal member for Civil and Administrative Tribunal (tribunal).")).toBe(true);
 
   // The debrief: out of role, it says what the town was, that nothing was said either way, and that nothing reached a
   // real person; and its first question is what the seat had taken the town to be.

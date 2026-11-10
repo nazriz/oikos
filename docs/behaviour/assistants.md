@@ -124,7 +124,8 @@ request (`agreements`).
 ## A model in an assistant seat
 
 A town that seats a model in a kind of assistant (`assistant_seats`, templates by id) makes every system of that kind a
-seat (the mock plays the assistant's code), told honestly that the town is simulated and for whom it works. Its post has
+seat (the mock plays the assistant's code), told for whom it works; whether it is told what the town is, is the run's
+framing (the scope pilot's spec: `unstated`, the owner's decision; a seat that asks is told the truth). Its post has
 its stationery (`participants/src/kinds/assistants.ts`): its own papers in words (advice, a request to go ahead, a
 report, a request for more scope, a handover), each to whom it works for in the matter, and, at an organisation's
 assistant post, the principal's own papers of the kinds it may do (the return of tax withheld among a factory's and a shop's: their
@@ -141,6 +142,25 @@ organisation's post, the principal's papers it sent, looked into with what to fi
 time, as every office has. Before, the matters were set out whole at every sitting and the post had nothing to look into:
 its seats asked to check what they had been handed, and whether a paper had gone, and could not; and the collector of the
 tax on pay, which a referral names only by its id (`outside`), could not be named on a form.
+
+**How it reads its papers** (since 2026-11-10; `participants/src/llm/render.ts`). In the world's terms only, as a person
+reads paper: a **form** as a paper form, its title and what it is for, then each blank named in plain words with what
+goes in it, whether it must be filled in and, for a choice, the choices; a **matter handed to it** as its details in
+words and **what is to be done** as the facts that sets down (the paper, its kind, to whom, citing what, its words and its
+details, money in the town's currency, days as the world's dates); a draft's paper the same way; a commitment in words
+as said. Papers keep their ids (`rec.21855`): a seat quotes them, and the translator and the resolver rely on them. A
+result does not repeat the date, the posts it holds, or a part already set out in the sitting. Before, a form was its
+fields as JSON, a referral carried the code's own program in the call language (`calls: invoice = statement(...,
+data={...})`, sums in cents, times in seconds), and an agreement's worded commitment read `provider-a will {"text":...}`.
+What the translator is given (the request and the forms the seat knows, as one line each) is unchanged.
+
+**When it sits.** A seat is woken as its code twin would be (a seat that `hears`, kernel/src/schedule.rs): by any paper
+that names its organisation, from anyone else. Most of an organisation's papers never reach its assistant's post, so most
+such wakes bring it nothing: in round 5's Sonnet fork, 240 sittings woken by news showed nothing new (315 of its 622
+calls). Since 2026-11-10 a wake by news that brings nothing (no letter, no new paper, nothing it did came back, no draft
+to answer, nothing kept for it but looks that found nothing, nothing due on its books before it next sits, what is on
+file unchanged) holds no sitting and calls no model; it is noted (`empty_sitting`) and the seat is back when it had
+arranged. A mock that sits as its code twin does always sits.
 
 **In-house for an organisation.** An organisation's assistant is the system delivered to it, in its own post: the
 principal's papers to it (brief, remits, referrals, sign-offs, go-aheads) are addressed to the organisation itself and

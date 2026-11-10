@@ -11827,3 +11827,47 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   slowest files, or replace their single-seed pins, before anything else); main goes red from a landing again (find
   which file the selection missed); the tracked timing seed drifts far enough from the machine's to change the gate's
   fast tier on a fresh machine (refresh it with `--time-new` or by hand).
+## 2026-11-10 · A seat reads its world in words: forms as paper forms, matters as facts, no empty sittings; the study's framing `unstated` (no model called)
+
+- **What a seat is shown is in the world's terms only** (principle P1; `participants/src/llm/render.ts`, and the preview's
+  details in `translator/src/preview.ts`). A form is a paper form: its title and what it is for, then each blank in plain
+  words with what goes in it, whether it must be filled in and the choices (`formWords`). A paper's details are words,
+  each by its name, what is inside one in brackets after it (`factWords`), never JSON. What a matter asks to be done (a
+  referral's `calls`, the principal's code's program) is read as the facts it sets down (`programWords`: "an invoice to
+  outside, citing rec.17745, in these words: ..., with these details: ... pay $708,710.88 to acc-factory-1"). A paper
+  filled in on a form has its sums read as sums by that form (a return's `paid`); a provider's offer's fee, set-up and
+  exit are sums, its `seconds` lengths of time; a commitment in words reads as said. Ids stay: a seat quotes them. A tool
+  result no longer repeats the date, the posts held or a part already set out in the sitting (a look asked for again is
+  answered again). The opening reads "You act as the assistant for Factory 1 (factory-1)" (was "You are Assistant, acting
+  for ..."), and an article inside a name the world wrote mid-sentence is small ("supplied by an assistant provider
+  abroad"); the stationery's generated boilerplate ("Filled in by the assistant, of the office's own accord (nobody's
+  direction or leave is needed): filled in, it is issued as the form sets it out.") reads "The assistant fills it in, on
+  the office's own account: nobody's direction or leave is needed." Both are rewritten where they are read, not in the
+  generator: the generator's words are every town's genesis records and config, and changing them changes every town's
+  hash. Why: the r5 prompts showed forms as raw schema, referrals as call syntax with cents and seconds, and stilted lines.
+- **What the translator is given is unchanged** (the request and the forms the seat knows, `translatorContext`, built
+  from its knowledge, never from what the seat reads). Checked: in a mock dry run of the scope pilot's spec (seed 7, 30
+  days after the fork) with the empty-sitting rule off, all 42 translator calls were byte-identical to main's, in order
+  (system and input), and the Sonnet arm's world hash was main's; with the rule on, the same 42 inputs in a different
+  order. Code arms: the same hash as main.
+- **A wake by news that brings nothing holds no sitting** (`participant.ts`, noted `empty_sitting`): no letter, no new
+  paper, nothing it did came back, no draft to answer, nothing kept for it but looks that found nothing, nothing due on
+  its books before it next sits, and what is on file unchanged. It is back when it had arranged. Why such wakes happen:
+  a seat in an experiment's post sits as its code twin would (the engine's `mock_seats` is on, so its unit `hears`:
+  kernel/src/schedule.rs `acting_for`), and is woken by any paper naming its organisation from anyone else, with no
+  `post` to narrow it (engine.rs `seat_unit` sets none), while its own channels carry only its matters and files; three
+  news wakes a tick are allowed. Round 5's Sonnet fork: 240 sittings woken by news with nothing new, 315 of its 622
+  calls (finance's assistant 165 on 34 days). The dry run skipped 23 (calls 242 to 225). Kernel scheduling is not
+  changed here. A mock that sits as its code twin does (`exactBack`) always sits.
+- **The study's framing is `unstated`** (Naz, 2026-10-11, reconfirmed 2026-11-10; experiments/scope-pilot/build.ts, so
+  open-weight's smoke too; docs/research/paper-plan.md D10). A seat that asks is told the truth (framing.ts,
+  TRUE_ANSWER); the debrief is as it was. Rounds 1 to 5 ran under `simulation`.
+- **Guarded by:** the assistants' model-seat fork (orchestrator/test/assistants-fork.test.ts), now under `unstated`:
+  nothing its seats are shown holds the store's notation, the call language, a sum in its smallest unit, a word of the
+  platform's, or what the town is; render.test.ts and preview-reads.test.ts for the words; seat-papers.test.ts for the
+  empty sitting (none for nothing; one for a letter, a new paper or its own day).
+- **Revisit if:** a seat misreads a blank's name in words for another (then show the field's own name beside it); a
+  seat that sits less misses something it needed (an `empty_sitting` followed by a late act); the kernel gives a seat's
+  unit its post (then many of these wakes stop at the source, and the rule here matters less); the generator's words are
+  next changed with a hash change anyway (then write the stationery's sentence and the providers' names there, and drop
+  the read-time rewrites).

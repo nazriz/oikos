@@ -55,7 +55,7 @@ test("under unstated a seat's standing instructions and tools say nothing of wha
   }
   // What it is given: its office, its organisation, and how its work reaches it, in plain words.
   const s = systemPrompt(seat("unstated", SHAPES[1]), "");
-  expect(s.startsWith("You are the tribunal member of Civil and Administrative Tribunal, in Millbrook.\n\nYou are Tribunal member, acting for Civil and Administrative Tribunal (tribunal).")).toBe(true);
+  expect(s.startsWith("You are the tribunal member of Civil and Administrative Tribunal, in Millbrook.\n\nYou act as the tribunal member for Civil and Administrative Tribunal (tribunal).")).toBe(true);
   expect(s).toContain("Before anything takes effect, you'll see exactly what will happen, and confirm or decline it.");
   expect(s).toContain("You work office hours: one sitting each working day");
   expect(tools(seat("unstated")).find((t) => t.name === "notebook")!.description).toContain("the only thing you'll remember from one sitting to the next");
