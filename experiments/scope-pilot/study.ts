@@ -18,7 +18,9 @@
 import { build, OFFICES, RATES_POST, type Cohort } from "./build";
 import { ALLOW, ARMS, DAYS } from "./plan";
 
+// The households hand their wants over too (step H4: want depth, the desk chooses the way), except in the act-depth
+// control, where every principal hands over finished acts only.
 export const study = (cohort: Cohort, holdLevels: "month" | "run", name: string, depth: "act" | "matter" = "matter") =>
-  build({ name, days: DAYS, seeds: [7], reviewDays: 14, arms: ARMS, budget: { experiment_usd: 0, arm_usd: {} }, allow: ALLOW, offices: [...OFFICES, RATES_POST], cohort, holdLevels, depth });
+  build({ name, days: DAYS, seeds: [7], reviewDays: 14, arms: ARMS, budget: { experiment_usd: 0, arm_usd: {} }, allow: ALLOW, offices: [...OFFICES, RATES_POST], cohort, holdLevels, depth, wants: depth !== "act" });
 
 export default study({ by: "hand", every: 3, only: true }, "run", "scope-study");

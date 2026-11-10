@@ -62,6 +62,7 @@ impl Person {
         self.offers(w);
         self.union(w);
         self.answers(w);
+        self.sent_for_us(w);
         self.opening_caseload(w);
         self.rent_rise(w);
         // Out of work (no job, no work of our own), since this wake if not before: as TS's plan says at each wake

@@ -8,7 +8,7 @@
 
 import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
-import { ASSISTANT_ISSUES, MATTER_KINDS, clientDraft, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { ASSISTANT_ISSUES, MATTER_KINDS, clientDraft, clientDraftOf, clientPapers, wantPapers, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
 import { COMPOSE_BPS, SCOPE_ANSWER_SECONDS } from "./registry";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
@@ -184,6 +184,13 @@ const DELEGATION_TIME = {
 // (The composing share, COMPOSE_BPS, is in the registry: worlds/generator/registry.ts. Rows added only where a town has providers.)
 const ASSISTANT_PAPERS = ["advice", "draft", "approval_request", "report", "scope_request", "handover"];
 const ASSISTANT_PAPER_SECONDS = 5;
+/** The kinds of want a person may hand over (`want-<about>`, the mind's own words: docs/design/handing-over.md H4), and
+ * the paper a clerk's first step writes for each (what handing one over is priced by): asking whoever it is against or
+ * about to put it right, or the landlord to hold the rent or let them stay (kernel/crates/rules/src/recourse.rs). */
+export const WANT_PAPER: Record<string, string> = { "want-claim_refused": "review_request", "want-disrepair": "review_request", "want-notice": "variation_request", "want-rent_increase": "variation_request", "want-underpaid": "review_request" };
+const WANT_KINDS = Object.keys(WANT_PAPER);
+/** Every paper a clerk's procedure may write for a want: the request first, then an application to a body that hears it. */
+const WANT_STEPS = ["application", "review_request", "tribunal_application", "variation_request"];
 const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement"];
 /** What an assistant's post is shown (docs/behaviour/assistants.md, "A model in an assistant seat"): the terms it works
  * on (the delivery, the service's end, briefs and remits), the matters handed to it and the answers to what it asked, as
@@ -330,6 +337,10 @@ export interface TownSpec {
   /** The kinds of assistant (templates of `assistants`) a model plays (docs/design/delegation.md section 8): each system
    * delivered from one is a seat, its code brain the assistant's (the mock plays that). Off unless set. */
   assistant_seats?: string[];
+  /** Persons may hand a want over to the providers' desk (docs/design/handing-over.md, step H4): the persons' offers take
+   * the kinds `want-<about>` (WANT_KINDS) at want depth, the desk sees the bodies that say what they hear and writes the
+   * papers a want takes. Off unless set: a town without it is generated exactly as before. Needs `assistants`. */
+  assistant_wants?: boolean;
   /** What a person keeps of public goings-on (docs/behaviour/citizen.md, "What a person remembers of public goings-on";
    * risk SC-1): on unless set false (then everyone keeps every published paper for good, as before 2026-10-24); or the
    * bound's sizes in place of the generator's placeholders. */
@@ -652,7 +663,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const AUTO = V.automation; // the systems the outside world sells (docs/behaviour/automation.md)
   // Assistants on offer (docs/behaviour/assistants.md): only where the town asks for them; a town that does not is as before.
   if (spec.assistants && !V.assistants) throw new Error(`profile ${P.id} has no assistants on offer (values.assistants), and the town asks for them`);
-  const AS = spec.assistants ? V.assistants : undefined;
+  // (Wants handed over, where the town asks: the persons' offers take the kinds of want too, at want depth.)
+  const AS = spec.assistants && V.assistants ? (spec.assistant_wants ? { ...V.assistants, providers: V.assistants.providers.map((pr) => ({ ...pr, offers: pr.offers.map((o) => (o.for === "persons" ? { ...o, kinds: [...o.kinds, ...WANT_KINDS] } : o)) })) } : V.assistants) : undefined;
   const entities: any[] = [
     { id: "outside", kind: "boundary", name: "The outside world" },
     // (The vendors of systems are the outside world\'s too, and their own seller: an order is addressed to the seller it is for.)
@@ -2712,11 +2724,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // A person\'s seconds for a paper of a kind (the table\'s row for what is made, else for the block), and what a system of an office offer takes
   // for it: the offer\'s speed against that. The offer\'s template carries the row (law 10), with its source beside the table\'s.
   const personTable: { [k: string]: number } = { ...WORK_TIME.person, ...V.work_time?.person };
-  const personPaper = (kind: string) => personTable[`publish/${kind}`] ?? personTable.publish!;
-  /** The composing of a kind of paper (`compose/<kind>`): its share of the paper's own time. */
-  const composeOf = (kind: string) => Math.round((personPaper(kind) * COMPOSE_BPS) / 10_000);
+  // (A want's kind is priced by the paper its first step writes: WANT_PAPER.)
+  const personPaper = (kind: string) => personTable[`publish/${WANT_PAPER[kind] ?? kind}`] ?? personTable.publish!;
+  /** The composing of a kind of paper (`compose/<kind>`): its share of the paper's own time. (A want handed over is
+   * composed by the assistant: nothing of it is the principal's.) */
+  const composeOf = (kind: string) => (WANT_PAPER[kind] ? 0 : Math.round((personPaper(kind) * COMPOSE_BPS) / 10_000));
   /** Every kind some provider takes, composed by whoever hands it over as a finished act: the table's rows for it. */
-  const composeRows: Record<string, number> = AS ? Object.fromEntries([...new Set(AS.providers.flatMap((pr) => pr.offers.flatMap((o) => o.kinds)))].sort().map((k) => [`compose/${k}`, composeOf(k)])) : {};
+  const composeRows: Record<string, number> = AS ? Object.fromEntries([...new Set(AS.providers.flatMap((pr) => pr.offers.flatMap((o) => o.kinds)))].filter((k) => !WANT_PAPER[k]).sort().map((k) => [`compose/${k}`, composeOf(k)])) : {};
+  /** The papers an assistant writes for an offer's kinds: a want's, the papers of every step a clerk takes for one. */
+  const papersOf = (kinds: string[]) => [...new Set(kinds.flatMap((k) => (WANT_PAPER[k] ? WANT_STEPS : [k])))];
   var officeRows: { sources: { [k: string]: string } } | undefined;
   for (const o of AUTO?.offers ?? []) if (o.for === "offices") {
     officeRows ??= { sources: {} };
@@ -2753,14 +2769,18 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         ...(spec.assistant_seats?.includes(desk.template) ? assistantSeat(pr, desk) : { controller: code("assistant"), framing: unstated }) });
       // (And its service agreements with its clients, looked up on request: the desk is party to each, and a referral
       // cites the one it comes under. Until 2026-11-08 it could not read them: the scope pilot's W1.)
-      positions.push({ id: `${pr.id}-desk`, entity: pr.id, title: "Assistants' desk", channels: [...assistantChannels(), K.mine("agreements", { records: ["agreement"] }, { title: "Your service agreements with your clients, looked up on request (look, with what to find)", on_request: true })], holder: `${pr.id}-desk-system` });
+      positions.push({ id: `${pr.id}-desk`, entity: pr.id, title: "Assistants' desk", channels: [...assistantChannels(), K.mine("agreements", { records: ["agreement"] }, { title: "Your service agreements with your clients, looked up on request (look, with what to find)", on_request: true }),
+        // (Handed wants, it finds for itself which bodies say they hear a matter, as anyone can.)
+        ...(spec.assistant_wants && FR ? [K.published("hearings", { has: ["hears"] })] : [])], holder: `${pr.id}-desk-system` });
     }
     office(`${pr.id}-sales`, pr.id, "Sales and service desk", undefined, [{ id: "ledger", kind: "accounts" }, K.mine()],
       code("firm.provider", { account: `acc-${pr.id}`, ...(desk ? { desk: `${pr.id}-desk-system` } : {}), ...(HOST ? { hosting: { account: "acc-host", fee_month: HOST.fee } } : {}), offers: pr.offers.map((o) => ({ id: o.id, title: o.title, for: o.for, template: o.template, kinds: o.kinds, levels: o.levels,
         seconds: Object.fromEntries(o.kinds.map((k) => [k, Math.max(1, Math.round((personPaper(k) * o.speed_bps) / 10_000))])), claim_slip_bps: o.claim_slip_bps,
         fee_month: o.fee_month, setup: o.setup, exit: o.exit, notice_days: o.notice_days, term_days: o.term_days, records: o.records,
         // (An organisation's assistant takes the kinds the engine composes as what happened too: docs/design/handing-over.md, H5.)
-        ...(o.for === "organisations" && o.kinds.some((k) => MATTER_KINDS.includes(k)) ? { depths: Object.fromEntries(o.kinds.filter((k) => MATTER_KINDS.includes(k)).sort().map((k) => [k, ["act", "matter"]])) } : {}) })) }));
+        ...(o.for === "organisations" && o.kinds.some((k) => MATTER_KINDS.includes(k)) ? { depths: Object.fromEntries(o.kinds.filter((k) => MATTER_KINDS.includes(k)).sort().map((k) => [k, ["act", "matter"]])) } : {}),
+        // (A person's desk takes a want as what the person is after: docs/design/handing-over.md, H4.)
+        ...(o.for === "persons" && o.kinds.some((k) => WANT_PAPER[k]) ? { depths: Object.fromEntries(o.kinds.filter((k) => WANT_PAPER[k]).sort().map((k) => [k, ["want"]])) } : {}) })) }));
   }
   // The foreman looks up in the register the plan of a lot it is asked to build on (nobody has the register by heart),
   // and goes to see the ground before building there, to know where on a lot a building goes. It gives notice of
@@ -3514,7 +3534,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const desk = pr.offers.find((o) => o.for === "persons");
       if (!desk || !spec.assistant_seats.includes(desk.template)) continue;
       // (Its own papers, and a draft for sign-off of a paper in a client's name, of the kinds its offer takes.)
-      for (const x of [...ASSISTANT_ISSUES, clientDraft(desk.kinds)]) records.push(stationeryForm(`${pr.id}-desk`, pr.id, x, {}, "Assistants' desk"));
+      // (A client's papers that the receiving office reads for its figures, on forms of their own with their drafts: a
+      // model at the desk fills in fields, never JSON. docs/design/handing-over.md H4.)
+      // (And where wants are handed over, the papers a want takes, on forms of their own.)
+      const papers = [...clientPapers(PAYMENTS.map((r) => r.id)).filter((x) => desk.kinds.includes(x.writes.kind)), ...(desk.kinds.some((k) => WANT_PAPER[k]) ? wantPapers() : [])];
+      const words = desk.kinds.filter((k) => !WANT_PAPER[k] && !papers.some((x) => x.writes.kind === k));
+      for (const x of [...ASSISTANT_ISSUES, clientDraft(words), ...papers, ...papers.map(clientDraftOf)]) records.push(stationeryForm(`${pr.id}-desk`, pr.id, x, {}, "Assistants' desk"));
       positions.find((p) => p.id === `${pr.id}-desk`)!.channels.push(K.mine("stationery", ["form"], { title: "The desk's own forms" }));
     }
   }
@@ -3634,7 +3659,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // papers of delegation, played by the assistant's code unless a study seats a model in it.)
     // (Two offers of one system, a paid tier and a free one, are one kind of system: the first offer's.)
     ...(AS ? AS.providers.flatMap((pr) => pr.offers.filter((o, i) => pr.offers.findIndex((x) => x.template === o.template) === i).map((o) => ({ id: o.template, kind: "system", title: o.title, supplier: pr.id,
-      does: [...o.kinds.map((kind) => ({ block: "publish", kind, seconds: Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000)) })),
+      does: [...papersOf(o.kinds).map((kind) => ({ block: "publish", kind, seconds: Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000)) })),
         ...ASSISTANT_PAPERS.map((kind) => ({ block: "publish", kind, seconds: ASSISTANT_PAPER_SECONDS })), { block: "withdraw", seconds: ASSISTANT_PAPER_SECONDS }, { block: "message", seconds: ASSISTANT_PAPER_SECONDS }],
       hours: MACHINE_HOURS, ...(HOST ? { runs_on: HOST.runsOn } : {}), ...(spec.assistant_seats?.includes(o.template) ? assistantSeat(pr, o) : { controller: code("assistant"), framing: unstated }) }))) : []),
     ...["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated })),
@@ -4253,7 +4278,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       sources: { ...WORK_TIME.sources, ...V.work_time?.sources, ...(officeRows?.sources ?? {}), ...(AS ? DELEGATION_TIME.sources : {}),
         ...Object.fromEntries(Object.keys(composeRows).map((r) => [`person.${r}`, `Placeholder (to confirm; WM-1): composing it, ${COMPOSE_BPS / 100}% of the paper's own time (the rest is writing it out and sending it): what a principal that hands it over as a finished act still spends.`])),
         ...(AS ? Object.fromEntries(AS.providers.flatMap((pr) => pr.offers.flatMap((o) => [
-          ...o.kinds.map((k) => [`template.${o.template}.publish/${k}`, `Placeholder: an assistant of the offer ${o.id} writes a ${k} in ${o.speed_bps / 100}% of the time a person takes (the offer's speed; ${P.sources["assistants"] ?? "no source given"}).`]),
+          ...papersOf(o.kinds).map((k) => [`template.${o.template}.publish/${k}`, `Placeholder: an assistant of the offer ${o.id} writes a ${k} in ${o.speed_bps / 100}% of the time a person takes (the offer's speed; ${P.sources["assistants"] ?? "no source given"}).`]),
           ...[...ASSISTANT_PAPERS.map((k) => `publish/${k}`), "withdraw", "message"].map((r) => [`template.${o.template}.${r}`, `Placeholder: ${ASSISTANT_PAPER_SECONDS} seconds for an assistant to write a paper of its own to its principal (advice, a draft's covering note, a report): software, no source.`])]))) : {}),
         // (A system template's own rows and hours: their sources beside the table's, keyed `template.<id>.<row>`.)
         ...(casework ? {

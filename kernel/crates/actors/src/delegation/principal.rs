@@ -24,7 +24,7 @@ use crate::common::{addressed_to, bases_of, money_words, Book, DAY, MONTH};
 use crate::market::services::{self, Engagements};
 use crate::market::trade::{self, Ordering};
 use crate::papers::delegation::{
-    Acknowledgement, Advice, ApprovalRequest, Brief, Declined, Depth, Draft, GoAhead, Level, Part, Referral, Remit, Report, ScopeAnswer, ScopeRequest, ServiceEnded, ServiceOffer, SignOff, Why, KINDS as PAPERS,
+    is_want, Acknowledgement, Advice, ApprovalRequest, Brief, Declined, Depth, Draft, GoAhead, Level, Part, Referral, Remit, Report, ScopeAnswer, ScopeRequest, ServiceEnded, ServiceOffer, SignOff, WantHanded, Why, KINDS as PAPERS,
 };
 use crate::papers::{self, Paper};
 use crate::steps::{arg, because, call, say, Say, Step, Visible};
@@ -161,6 +161,11 @@ struct Matter {
     /// Handed over as what happened: the facts it gave (none: the finished act).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     facts: Option<Value>,
+    /// What was handed over (a person's want: `want`, with the want's own fields).
+    #[serde(default, skip_serializing_if = "Depth::is_act")]
+    depth: Depth,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    want: Option<WantHanded>,
 }
 
 /// How many of its own papers it keeps to hand, to send a copy of.
@@ -236,6 +241,12 @@ pub struct State {
     /// (During a review: whether it changed anything.)
     #[serde(default, skip)]
     changed: bool,
+    /// Where it hands wants over: the bodies on its boards that say what they hear, and their fees, as it last saw
+    /// them: what it reads a draft's addressee against. (Saved: a board shows a notice as it comes, so a principal
+    /// restored at a fork would not see it again. Until 2026-11-11 it was not saved, and after the study's fork every
+    /// draft to a body that hears the matter was declined.)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    venues: Vec<(String, Vec<String>, i64)>,
 }
 
 pub struct Delegating {
@@ -276,6 +287,7 @@ impl Delegating {
                 own_papers: vec![],
                 acknowledged: vec![],
                 changed: false,
+                venues: vec![],
             },
         })
     }
@@ -312,7 +324,13 @@ impl Actor for Delegating {
                         s.count(&k, pic.t);
                     }
                 }
-                if let Some((agreement, level, handed, own, facts)) = s.route(&program) {
+                let routed = s.route(&program);
+                // (A want handed over is never an act of the world's: one its remit no longer hands over, a remit come
+                // since its code chose the way, is dropped, and its code hears it done; the want stays its own.)
+                if routed.is_none() && has_wants(&program) {
+                    return Action::Call { program: without_wants(program), reasoning };
+                }
+                if let Some((agreement, level, handed, own, facts)) = routed {
                     let text = program_text(&handed);
                     let kind = kinds_of(&handed).first().cloned().unwrap_or_default();
                     if level == Level::Advice {
@@ -321,8 +339,11 @@ impl Actor for Delegating {
                         return Action::Call { program, reasoning };
                     }
                     // (What it does not hand over it does itself, in the same act as the referral.)
-                    let depth = if facts.is_some() { Depth::Matter } else { Depth::Act };
-                    let m = Matter { kind, level, agreement: agreement.clone(), program: text.clone(), at: pic.t, referral: None, subjects: subjects_of(&handed), own: BTreeMap::new(), facts };
+                    let depth = if is_want(&kind) { Depth::Want } else if facts.is_some() { Depth::Matter } else { Depth::Act };
+                    // (A want: its own fields, and the facts its holder chose to give.)
+                    let want = facts.as_ref().filter(|_| depth == Depth::Want).and_then(|f| serde_json::from_value::<WantHanded>(f["want"].clone()).ok());
+                    let facts = if depth == Depth::Want { facts.map(|f| f["facts"].clone()) } else { facts };
+                    let m = Matter { kind, level, agreement: agreement.clone(), program: text.clone(), at: pic.t, referral: None, subjects: subjects_of(&handed), own: BTreeMap::new(), facts, depth, want };
                     // (What it would have done, on record for whoever reads the log: what the matter needed. Never shown to
                     // anyone in the world.)
                     cx.decided(json!({ "domain": "delegation", "choice": "handed", "agreement": agreement, "kind": m.kind, "level": level, "depth": depth, "program": text, "does_itself": kinds_of(&own), "inputs": [] }));
@@ -453,6 +474,20 @@ impl State {
                 }
             }
         }
+        // (A want with its assistant: the bodies that say what they hear, as its boards show them, to read a draft's
+        // addressee against.)
+        // (Kept as they come, the newest notice of each body standing, where it hands wants over at all.)
+        if self.p.kinds.keys().any(|k| is_want(k)) {
+            for r in pic.all_records() {
+                let RecordBody::Statement { offer: Some(o), .. } = &r.body else { continue };
+                let Some(hears) = o.get("hears").and_then(|x| x.as_array()) else { continue };
+                let venue = r.speaks_for.map(|x| x.to_string()).unwrap_or_else(|| r.author.to_string());
+                let matters: Vec<String> = hears.iter().filter_map(|h| h.get("about").and_then(|a| a.as_str()).map(String::from)).collect();
+                let fee = crate::citizen::recourse::venue_fee(o).map_or(0, |f| f.1);
+                self.venues.retain(|(v, _, _)| *v != venue);
+                self.venues.push((venue, matters, fee));
+            }
+        }
         for r in fresh {
             self.take(&r, pic.t, cx);
         }
@@ -489,6 +524,11 @@ impl State {
                 });
                 self.matters.remove(&action);
                 self.by_referral.remove(&x.referral);
+            } else if m.depth == Depth::Want {
+                // (Not done on a want: the want is still its holder's, who may go after it again by any way. Nothing it
+                // did is undone, and it counts no slip: a clerk waiting for an answer has not slipped.)
+                self.myself(&action, &m, "");
+                self.by_referral.remove(&x.referral);
             } else {
                 self.seen.entry(k).or_default().saw(true, &r.id);
                 self.myself(&action, &m, &format!("The assistant reports it did not do it ({}): doing it ourselves.", x.why.as_deref().unwrap_or("no reason given")));
@@ -500,6 +540,10 @@ impl State {
             // (A draft on a form, a model's, is read by what it would send: the paper's kind and to whom, against what was asked.)
             // (Handed over as what happened, the paper is the assistant's: it is read on the kind's material details and
             // whom it goes to, against what its own code would have sent, never its words.)
+            if m.depth == Depth::Want {
+                self.read_for_want(r, &action, &m, &x, t, cx);
+                return;
+            }
             let differs = if m.facts.is_some() { matter_differs(&m, &x) } else { vec![] };
             let wrong = if m.facts.is_some() {
                 !differs.is_empty()
@@ -784,7 +828,12 @@ impl State {
         let e = self.in_use()?;
         let a = e.agreement.clone()?;
         // (Only a kind of its own: the kinds its parameters price, which are the ones its assistant's post has forms for.)
-        let handed = |l: &Line| super::kind_of(l).is_some_and(|k| e.offer.kinds.contains(&k) && self.p.kinds.contains_key(&k) && self.remit(&a, &k) != Level::None);
+        let handed = |l: &Line| {
+            super::kind_of(l).is_some_and(|k| {
+                let level = self.remit(&a, &k);
+                e.offer.kinds.contains(&k) && self.p.kinds.contains_key(&k) && if is_want(&k) { hands_over(level) } else { level != Level::None }
+            })
+        };
         let (mut mine, mut others): (Vec<Line>, Vec<Line>) = lines.iter().cloned().partition(|l| handed(l));
         if mine.is_empty() {
             return None;
@@ -805,6 +854,11 @@ impl State {
         let l = *order.iter().find(|l| levels.contains(l))?;
         // (Handed over as what happened, where its remit says so and the act is one paper whose facts can be read.)
         let facts = match mine.as_slice() {
+            // (A want: what its holder gave, as its code wrote it.)
+            [one] if super::kind_of(one).is_some_and(|k| is_want(&k)) => match one.call.get("data") {
+                Some(oikos_sight::calls::Value::Json(v)) => Some(v.clone()),
+                _ => Some(Value::Null),
+            },
             [one] if l != Level::Advice => super::kind_of(one).filter(|k| self.depth(&a, k) == Depth::Matter).and_then(|k| super::compose::facts_of(&k, one, &others)),
             _ => None,
         };
@@ -822,7 +876,9 @@ impl State {
         if let Some(d) = self.p.commit.as_ref().and_then(|c| c.depths.get(kind)) {
             return *d;
         }
-        if offer.depths.get(kind).is_some_and(|ds| ds.contains(&Depth::Matter)) {
+        if offer.depths.get(kind).is_some_and(|ds| ds.contains(&Depth::Want)) {
+            Depth::Want
+        } else if offer.depths.get(kind).is_some_and(|ds| ds.contains(&Depth::Matter)) {
             Depth::Matter
         } else {
             Depth::Act
@@ -966,6 +1022,69 @@ impl State {
         }
     }
 
+    /// A person's reading of a draft for a want it handed over (docs/design/handing-over.md section 4.4). A code
+    /// principal cannot read words: it signs the paper off if, read for what it would bring, it meets the want
+    /// (`wants::meets`, on the paper's typed fields: what it undoes, whom it bears on); if it goes to whom the want is
+    /// about or against, or to a body whose notice says it hears the matter; and if what it costs at once (a body's
+    /// fee) is within the brief's limit. Otherwise it declines, saying which, and the want is its own again.
+    fn read_for_want(&mut self, r: &Arc<Record>, action: &str, m: &Matter, x: &Draft, t: i64, cx: &mut Cx) {
+        let found = self.want_reading(m, x);
+        let missed = !found.is_empty() && slip(cx, "publish/sign_off", &r.id, &SlipOptions::default());
+        if found.is_empty() || missed {
+            let paper = x.paper.as_ref().map(|p| signed_copy(p, crate::common::text(r)));
+            let words = match paper {
+                Some(_) => format!("Draft {} read and signed off. Send it as it stands: this is the signed copy.", r.id),
+                None => format!("Draft {} read and signed off: send it as it stands.", r.id),
+            };
+            let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
+            self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
+            return;
+        }
+        let said = found.join(" ");
+        let d = Declined { of: r.id.to_string(), referral: x.referral.clone(), found: Some(said.clone()) };
+        self.paper(Declined::KIND, &format!("Draft {} declined. {said} We will see to it ourselves.", r.id), &m.agreement, &r.id, papers::data(&d), Then::Plain);
+        self.myself(action, m, "");
+        self.by_referral.remove(&x.referral);
+        let _ = t;
+    }
+
+    /// What is wrong with a draft for a want, read on its typed fields (none: it signs it off).
+    fn want_reading(&self, m: &Matter, x: &Draft) -> Vec<String> {
+        let Some(w) = m.want.as_ref() else { return vec!["We cannot tell what this draft is for.".into()] };
+        let Some((_, to, basis, data)) = drafted_paper(x) else { return vec!["We cannot read what this draft would send.".into()] };
+        let party = m.facts.as_ref().and_then(|f| f["data"]["matter"]["party"].as_str().map(String::from));
+        let matter = m.facts.as_ref().and_then(|f| f["data"]["matter"]["matter"].as_str().map(String::from)).unwrap_or_else(|| w.about.clone());
+        let about: Vec<String> = w.whom.iter().cloned().chain(w.against.iter().map(|a| a.by.clone())).chain(party).collect();
+        let heard = |v: &str| self.venues.iter().find(|(x, hears, _)| x == v && hears.iter().any(|h| *h == matter));
+        let mut out = vec![];
+        if to.is_empty() || !to.iter().all(|x| about.contains(x) || heard(x).is_some()) {
+            out.push("It does not go to whom this is about, or to a body that hears it.".to_string());
+        }
+        let mut bears = to.clone();
+        bears.extend(data.get("against").and_then(Value::as_str).map(String::from));
+        let o = crate::mind::wants::Opening {
+            key: "draft".into(),
+            kind: "draft".into(),
+            id: None,
+            by: None,
+            brings: vec![],
+            undoes: basis.map(|b| crate::mind::wants::Undoes { record: Some(b), kinds: None }),
+            bears: Some(bears),
+        };
+        let seeks = w.seeks.iter().filter_map(|k| serde_json::from_value(json!(k)).ok()).collect();
+        let mut want = crate::mind::wants::Want::new(&w.about, seeks, 0, w.since, crate::mind::wants::Origin::Event);
+        want.whom = w.whom.clone();
+        want.against = w.against.as_ref().map(|a| crate::mind::wants::Against { record: a.record.clone(), kind: a.kind.clone(), by: a.by.clone() });
+        if !crate::mind::wants::meets(&want, &o) {
+            out.push("It would not bring what we are after.".to_string());
+        }
+        let limit = self.book.all(Brief::KIND).filter_map(|b| papers::read::<Brief>(b)).filter(|b| b.agreement == m.agreement).filter_map(|b| b.limit).last().unwrap_or(0);
+        if to.iter().any(|v| heard(v).is_some_and(|(_, _, fee)| *fee > limit)) {
+            out.push("Applying there costs more than we said you may spend.".to_string());
+        }
+        out
+    }
+
     fn provider_of(&self, agreement: &str) -> String {
         self.eng.by_agreement(agreement).map(|e| e.offer.provider.clone()).unwrap_or_default()
     }
@@ -1004,8 +1123,13 @@ impl State {
         // (Handed over as what happened: the facts, and the paper is the assistant's to work out. As the finished act: it
         // carries it whole, the principal composed that paper, and is charged for composing it.)
         let (r, words, extra) = match &m.facts {
+            _ if m.depth == Depth::Want => (
+                Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: None, facts: m.facts.clone(), remit: remit.clone(), does_itself: vec![], depth: Depth::Want, want: m.want.clone() },
+                format!("For you {}{}: {}", m.level.words(), under(remit.as_deref()), want_words(&self.me, m.want.as_ref(), &m.kind, &|at| crate::common::when_words(at, &_cx.ctx.world))),
+                vec![],
+            ),
             Some(f) => (
-                Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: None, facts: Some(f.clone()), remit: remit.clone(), does_itself: does_itself.to_vec(), depth: Depth::Matter },
+                Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: None, facts: Some(f.clone()), remit: remit.clone(), does_itself: does_itself.to_vec(), depth: Depth::Matter, want: None },
                 format!("For you {}: {}{}. What happened is set out with it; the paper is yours to work out.{}", m.level.words(), a_kind(&m.kind), under(remit.as_deref()), ourselves(does_itself)),
                 vec![],
             ),
@@ -1020,7 +1144,7 @@ impl State {
                     extra.push(("carries_count", json!(n.to_string())));
                 }
                 (
-                    Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: Some(m.program.clone()), facts: None, remit: remit.clone(), does_itself: does_itself.to_vec(), depth: Depth::Act },
+                    Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: Some(m.program.clone()), facts: None, remit: remit.clone(), does_itself: does_itself.to_vec(), depth: Depth::Act, want: None },
                     format!("For you {}: {}{}. What to do is as written.{}", m.level.words(), a_kind(&m.kind), under(remit.as_deref()), ourselves(does_itself)),
                     extra,
                 )
@@ -1035,7 +1159,7 @@ impl State {
     fn ask_advice(&mut self, agreement: &str, kind: &str, program: &str, _cx: &Cx) {
         let (to, visible) = self.to_assistant(agreement);
         let remit = self.remit_id(agreement, kind);
-        let r = Referral { agreement: agreement.to_string(), kind: kind.to_string(), wants: Level::Advice, calls: Some(program.to_string()), facts: None, remit: remit.clone(), does_itself: vec![], depth: Depth::Act };
+        let r = Referral { agreement: agreement.to_string(), kind: kind.to_string(), wants: Level::Advice, calls: Some(program.to_string()), facts: None, remit: remit.clone(), does_itself: vec![], depth: Depth::Act, want: None };
         let words = format!("For your advice{}: {} we are doing ourselves. What would you have done?", under(remit.as_deref()), a_kind(kind));
         let c = say(Referral::KIND, &words, Say { to: Some(to), visible: Some(Visible::Only(visible)), basis: Some(agreement.to_string()), data: Some(papers::data(&r)), ..Default::default() });
         let mut s: Step<()> = Step::new(vec![Line { bind: Some("referral".into()), call: c }]);
@@ -1045,6 +1169,24 @@ impl State {
 
     /// Doing a matter itself after all: the act the inner actor asked for, as its own, its outcome the inner actor's.
     fn myself(&mut self, action: &str, m: &Matter, why: &str) {
+        // (A want comes back to its holder with nothing to redo: the hand-over was done, and its code hears so; the want
+        // is still its own, to go after again as it chooses.)
+        if m.depth == Depth::Want {
+            self.synth.push(Outcome {
+                action: action.into(),
+                t: m.at,
+                status: OutcomeStatus::Applied,
+                created: Some(m.own.iter().map(|(a, b)| (a.clone(), b.as_str().into())).collect()),
+                refusal: None,
+                investigated: None,
+                surveyed: None,
+                seen: vec![],
+                trips: Default::default(),
+                freight: Default::default(),
+            });
+            self.matters.remove(action);
+            return;
+        }
         if self.queue.iter().any(|o| matches!(&o.then, Then::Myself { action: a } if a == action)) {
             return;
         }
@@ -1109,7 +1251,7 @@ impl State {
             .iter()
             .map(|(k, f)| {
                 let mut facts = *f;
-                if offer.is_some_and(|o| self.depth_for(o, k) == Depth::Matter) {
+                if offer.is_some_and(|o| self.depth_for(o, k) != Depth::Act) {
                     facts.compose_seconds = 0;
                 }
                 (k.clone(), Kind { facts, per_month: self.per_month(k, t) })
@@ -1426,6 +1568,64 @@ fn matter_differs(m: &Matter, x: &Draft) -> Vec<String> {
         },
         (None, None) => vec!["the paper".into()],
     }
+}
+
+/// Whether a program has a line that hands over a want (`want-<about>`).
+fn has_wants(program: &Program) -> bool {
+    matches!(program, Program::Lines(ls) if ls.iter().any(|l| super::kind_of(l).is_some_and(|k| is_want(&k))))
+}
+
+/// The program without its want lines (nothing left: no act).
+fn without_wants(program: Program) -> Program {
+    match program {
+        Program::Lines(ls) => {
+            let rest: Vec<Line> = ls.into_iter().filter(|l| !super::kind_of(l).is_some_and(|k| is_want(&k))).collect();
+            if rest.is_empty() {
+                Program::None("a want its assistant no longer takes".into())
+            } else {
+                Program::Lines(rest)
+            }
+        }
+        p => p,
+    }
+}
+
+/// A want handed over, in a referral's words: whose it is, what it is about and against, since when, and that the
+/// way is the assistant's to choose. No weight: that is the person's.
+fn want_words(me: &str, w: Option<&WantHanded>, kind: &str, date: &dyn Fn(i64) -> String) -> String {
+    let about = w.map_or_else(|| kind.trim_start_matches("want-").to_string(), |w| w.about.clone()).replace('_', " ");
+    let mut s = format!("{me} wants this seen to: {about}");
+    if let Some(w) = w {
+        if let Some(a) = &w.against {
+            s.push_str(&format!(", against {} ({}, from {})", a.record, a.kind.replace('_', " "), a.by));
+        } else if let Some(x) = &w.whom {
+            s.push_str(&format!(", about {x}"));
+        }
+        s.push_str(&format!(". Since {}", date(w.since)));
+    }
+    s.push_str(". What they give is set out with it; the way is yours to choose.");
+    s
+}
+
+/// The paper a draft would send: its kind, to whom, what it cites and its data (from its form's paper, or the first
+/// paper of its calls).
+fn drafted_paper(x: &Draft) -> Option<(String, Vec<String>, Option<String>, Value)> {
+    let strings = |v: &Value| -> Vec<String> { v.as_array().map(|a| a.iter().filter_map(|y| y.as_str().map(String::from)).collect()).or_else(|| v.as_str().map(|s| vec![s.to_string()])).unwrap_or_default() };
+    if let Some(p) = &x.paper {
+        return Some((p["kind"].as_str()?.to_string(), strings(&p["to"]), p["basis"].as_str().map(String::from), p["data"].clone()));
+    }
+    let Ok(Program::Lines(l)) = parse_program(x.calls.as_deref()?) else { return None };
+    let d = l.into_iter().find(|l| l.call.fn_ == "statement" && super::kind_of(l).is_some())?;
+    let id = |k: &str| match d.call.get(k) {
+        Some(oikos_sight::calls::Value::Json(v)) => strings(v),
+        Some(oikos_sight::calls::Value::Id(s)) | Some(oikos_sight::calls::Value::Text(s)) => vec![s.clone()],
+        _ => vec![],
+    };
+    let data = match d.call.get("data") {
+        Some(oikos_sight::calls::Value::Json(v)) => v.clone(),
+        _ => Value::Null,
+    };
+    Some((super::kind_of(&d)?, id("to"), id("basis").into_iter().next(), data))
 }
 
 /// A program as its canonical text (two writings of one act compare equal).

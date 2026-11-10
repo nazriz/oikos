@@ -21,7 +21,7 @@ use super::mind::{ConductAsk, Event, GrievanceView, Intent, Opening, Openings, O
 use super::params::Params;
 #[allow(unused_imports)]
 use super::person::{Person, Todo, Week};
-use crate::common::{addressed_to, data, kind, money_words, when_words, ClaimKey, Fields, DAY, MONTH};
+use crate::common::{addressed_to, data, kind, money_words, when_words, ClaimKey, Fields, DAY};
 use crate::steps::{because, pay, say, Pay, Say, Visible};
 use crate::Cx;
 use oikos_sight::{Record, RecordBody};
@@ -87,6 +87,10 @@ pub struct Grievance {
     pub applied: BTreeMap<String, Applied>,
     pub ordered: Option<Ordered>,
     pub told: bool,
+    /// Asked of the other side, or taken to a body, by our assistant in our name (what we learn of it is the
+    /// assistant way's).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub handed: bool,
 }
 
 /// A grievance's key (citizen.ts `gkey`).
@@ -127,6 +131,15 @@ pub struct Recourse {
     ask_again_days: i64,
     rise_bps: i64,
     cheaper_bps: i64,
+    /// Wants handed to an assistant (their key), when.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub handed: BTreeMap<String, i64>,
+    /// What our assistant asked of the other party to an agreement in our name (`agreement:about`, or the agreement).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    handed_asks: BTreeSet<String>,
+    /// Papers sent in our name by our assistant, taken in.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    handed_seen: BTreeSet<String>,
 }
 
 impl Recourse {
@@ -299,6 +312,10 @@ impl Person {
             k => k,
         }
     }
+    /// How long we give the other side to answer what we asked (the frictions' figure).
+    pub fn answer_days(&self) -> i64 {
+        self.p.frictions.answer_days.unwrap_or(14)
+    }
     fn usd_of(w: &Week, n: i64) -> String {
         money_words(n, &w.cx.ctx.world)
     }
@@ -450,7 +467,8 @@ impl Person {
             let about = d.s("about").unwrap_or_default().to_string();
             let by = r.speaks_for.unwrap_or_else(|| r.author.clone().into());
             let ok = d.flag("granted");
-            self.way_outcome(w, "ask", if ok { "granted" } else { "refused" }, &by, if ok { 10_000 } else { 1_000 }, json!({ "about": about }));
+            let way = if self.recourse.handed_asks.contains(&about) || self.recourse.handed_asks.iter().any(|k| k.ends_with(&format!(":{about}"))) { "assistant" } else { "ask" };
+            self.way_outcome(w, way, if ok { "granted" } else { "refused" }, &by, if ok { 10_000 } else { 1_000 }, json!({ "about": about }));
             // (TS's `landing` and the tie: the mind moves trust and the tie from how we were treated.)
             self.treat_landing(w, &by, ok, if ok { 20_000 } else { 10_000 }, Some(&r.id), None, Some(if ok { (1_500, "granted") } else { (-500, "refused") }));
             let rise = d.i("wage").filter(|wg| ok && self.s.job.as_ref().is_some_and(|j| j.employer == by && j.agreement == about && *wg > j.wage));
@@ -530,13 +548,13 @@ impl Person {
             if k == paper::ANSWER {
                 let Some(key) = self.recourse.grievances.values().find(|g| Some(g.matter.as_str()) == d.s("matter") && g.party == by && g.asked.is_some() && g.answer.is_none()).map(|g| g.key.clone()) else { continue };
                 let ok = d.flag("granted");
-                let (matter, amount, about, seeks) = {
+                let (matter, amount, about, seeks, handed) = {
                     let g = self.recourse.grievances.get_mut(&key).unwrap_or_else(|| unreachable!());
                     g.answer = Some(if ok { "granted" } else { "refused" }.into());
                     g.answered_at = Some(t);
-                    (g.matter.clone(), g.amount, g.about.clone(), g.seeks.clone())
+                    (g.matter.clone(), g.amount, g.about.clone(), g.seeks.clone(), g.handed)
                 };
-                self.way_outcome(w, "ask", if ok { "granted" } else { "refused" }, &by, if ok { 10_000 } else { 1_000 }, json!({ "about": matter }));
+                self.way_outcome(w, if handed { "assistant" } else { "ask" }, if ok { "granted" } else { "refused" }, &by, if ok { 10_000 } else { 1_000 }, json!({ "about": matter }));
                 self.treat_landing(w, &by, ok, if ok { 20_000 } else { 10_000 }, Some(&r.id), None, Some(if ok { (1_000, "granted") } else { (-1_000, "refused") }));
                 if ok && amount.is_some() {
                     if matter == "underpaid" {
@@ -558,15 +576,16 @@ impl Person {
                 let Some(key) = self.recourse.grievances.values().find(|g| Some(g.matter.as_str()) == d.s("matter") && Some(g.party.as_str()) == d.s("against") && g.applied.contains_key(by.as_str())).map(|g| g.key.clone()) else { continue };
                 let f = d.s("finding").unwrap_or_default().to_string();
                 let binding = d.get("binding").and_then(|x| x.as_bool()) != Some(false);
-                let (matter, seeks, since_applied) = {
+                let (matter, seeks, since_applied, handed) = {
                     let g = self.recourse.grievances.get_mut(&key).unwrap_or_else(|| unreachable!());
+                    let handed = g.handed;
                     let a = g.applied.entry(by.to_string()).or_default();
                     a.finding = Some(f.clone());
-                    (g.matter.clone(), g.seeks.clone(), a.t)
+                    (g.matter.clone(), g.seeks.clone(), a.t, handed)
                 };
                 let won = matches!(f.as_str(), "pay" | "do" | "set_aside" | "settled");
                 let payoff = if won { 10_000 } else if f == "referred" { 5_000 } else { 500 };
-                self.way_outcome(w, "desk", &f, &by, payoff, json!({ "about": matter, "days": (t - since_applied).div_euclid(DAY), "binding": binding }));
+                self.way_outcome(w, if handed { "assistant" } else { "desk" }, &f, &by, payoff, json!({ "about": matter, "days": (t - since_applied).div_euclid(DAY), "binding": binding }));
                 if f != "referred" {
                     let kb = self.civil(&by, &w.cx.ctx.params);
                     self.treat_landing(w, &by, won, 20_000, Some(&r.id), Some(kb), None);
@@ -592,7 +611,7 @@ impl Person {
     /// fallen into disrepair, the landlord's to put right; and a notice to vacate that lapsed, told to the mind.
     pub fn disrepair(&mut self, w: &mut Week) {
         let t = w.t;
-        let answer_days = self.p.frictions.answer_days.unwrap_or(14);
+        let answer_days = self.answer_days();
         let promise_days = self.p.frictions.promise_days.unwrap_or(45);
         let keys: Vec<String> = self.recourse.grievances.keys().cloned().collect();
         for key in keys {
@@ -602,7 +621,7 @@ impl Person {
                 if let Some(x) = self.recourse.grievances.get_mut(&key) {
                     x.answer = Some("ignored".into());
                 }
-                self.way_outcome(w, "ask", "ignored", &g.party, 0, json!({ "about": g.matter }));
+                self.way_outcome(w, if g.handed { "assistant" } else { "ask" }, "ignored", &g.party, 0, json!({ "about": g.matter }));
                 self.treat(w, &g.party, false, false, true, None, None);
             }
             if g.promised.is_some_and(|p| t - p >= promise_days * DAY) {
@@ -896,48 +915,15 @@ impl Person {
             Intent::AskLandlord { about, rise } => {
                 let Some(h) = self.s.home.clone().filter(|h| !h.owned) else { return };
                 self.s.asked_party.insert(format!("{}:{about}", h.agreement), t);
-                let was = Self::usd_of(w, h.rent);
-                let (reason, words, would) = if *rise {
-                    (
-                        format!("Our landlord means to raise the rent: asking them to hold it at {was} a month."),
-                        format!("Request: please hold the rent for {} at {was} a month.", h.space),
-                        crate::papers::citizen::Would { who: me.clone(), does: json!({ "outcome": { "money": { "amount": h.rent.to_string() } } }), every: Some(MONTH) },
-                    )
-                } else {
-                    (
-                        "Our landlord has given us notice: asking to stay on.".to_string(),
-                        format!("Request: please let us stay on at {}.", h.space),
-                        crate::papers::citizen::Would { who: h.landlord.clone(), does: json!({ "outcome": { "occupancy": { "who": me, "in": h.space } } }), every: None },
-                    )
-                };
-                let v = crate::papers::citizen::VariationRequest { agreement: h.agreement.clone(), about: about.clone(), would };
-                w.push(because(
-                    reason,
-                    vec![say(
-                        "variation_request",
-                        &words,
-                        Say { to: Some(vec![h.landlord.clone()]), visible: Some(Visible::Only(vec![me.clone(), h.landlord.clone()])), basis: Some(about.clone()), data: Some(crate::papers::data(&v)), ..Default::default() },
-                    )],
-                ));
+                let l = oikos_rules::recourse::Lease { me: &me, landlord: &h.landlord, agreement: &h.agreement, space: &h.space, rent: h.rent };
+                let p = oikos_rules::recourse::ask_landlord(&l, about, *rise, &|n| Self::usd_of(w, n));
+                w.push(sent(p));
             }
             Intent::AskRise { agreement, wage } => {
                 let Some(j) = self.s.job.clone() else { return };
                 self.s.asked_party.insert(agreement.clone(), t);
-                let days = div_round(j.period, DAY);
-                let pay_words = Self::usd_of(w, *wage);
-                let v = crate::papers::citizen::VariationRequest {
-                    agreement: agreement.clone(),
-                    about: agreement.clone(),
-                    would: crate::papers::citizen::Would { who: j.employer.clone(), does: json!({ "outcome": { "money": { "amount": wage.to_string() } } }), every: Some(j.period) },
-                };
-                w.push(because(
-                    format!("Asking our employer for a rise, to {pay_words} every {days} days."),
-                    vec![say(
-                        "variation_request",
-                        &format!("Request: a rise in my pay, to {pay_words} every {days} days."),
-                        Say { to: Some(vec![j.employer.clone()]), visible: Some(Visible::Only(vec![me.clone(), j.employer.clone()])), basis: Some(agreement.clone()), data: Some(crate::papers::data(&v)), ..Default::default() },
-                    )],
-                ));
+                let p = oikos_rules::recourse::ask_rise(&me, &j.employer, agreement, j.period, *wage, &|n| Self::usd_of(w, n));
+                w.push(sent(p));
             }
             Intent::ChallengeRent { notice } => {
                 let (Some(tr), Some(n)) = (self.p.tribunal.clone(), self.book.get(notice).cloned()) else { return };
@@ -945,20 +931,7 @@ impl Person {
                 if self.housing.is_challenged(notice) || !self.recourse.challenged.insert(notice.clone()) {
                     return;
                 }
-                w.push(because(
-                    "A notice of rent increase that breaks the law: taking it to the tribunal, and paying the rent as it was meanwhile.",
-                    vec![say(
-                        "tribunal_application",
-                        &format!("Application: the notice of rent increase {notice} from {by} breaks the law; we ask that it be found invalid."),
-                        Say {
-                            to: Some(vec![tr.entity.clone()]),
-                            visible: Some(Visible::Only(vec![me.clone(), tr.entity.clone(), by.to_string()])),
-                            basis: Some(notice.clone()),
-                            data: Some(json!({ "kind": "rent_increase", "against": by, "notice": notice, "evidence": serde_json::to_value(&*n).unwrap_or(Value::Null) })),
-                            ..Default::default()
-                        },
-                    )],
-                ));
+                w.push(sent(oikos_rules::recourse::challenge_rent(&me, &tr.entity, &by, notice, serde_json::to_value(&*n).unwrap_or(Value::Null))));
             }
             Intent::ApplyDebt { claim } => {
                 self.s.apply_debt_now.insert(claim.clone());
@@ -969,32 +942,8 @@ impl Person {
                 let Some(g) = self.recourse.grievances.get_mut(grievance) else { return };
                 g.asked = Some(t);
                 let g = g.clone();
-                let words = g.matter.replace('_', " ");
-                let amt = g.amount.filter(|a| *a != 0).map(|a| Self::usd_of(w, a));
-                let req = crate::papers::finance::ReviewRequest {
-                    matter: g.matter.clone(),
-                    against: Some(g.party.clone()),
-                    about: g.about.clone(),
-                    amount: g.amount,
-                    account: g.amount.map(|_| acc.account.clone()),
-                    structure: g.structure.clone(),
-                    request: None,
-                    seeks: g.seeks.clone(),
-                    particulars: None,
-                    brought_forward: None,
-                };
-                w.push(because(
-                    format!("Asking {} to put it right ({words}{}).", g.party, amt.as_ref().map_or(String::new(), |a| format!(", {a}"))),
-                    vec![say(
-                        paper::REQUEST,
-                        &format!(
-                            "Request: please put this right ({words}{}{}).",
-                            amt.as_ref().map_or(String::new(), |a| format!(": {a} is owed to us")),
-                            g.structure.as_ref().map_or(String::new(), |s| format!(" at {s}"))
-                        ),
-                        Say { to: Some(vec![g.party.clone()]), visible: Some(Visible::Only(vec![me.clone(), g.party.clone()])), basis: g.about.clone(), data: Some(crate::papers::data(&req)), ..Default::default() },
-                    )],
-                ));
+                let p = oikos_rules::recourse::ask_put_right(&me, &matter_of(&g), &acc.account, &|n| Self::usd_of(w, n));
+                w.push(sent(p));
             }
             Intent::Venue { grievance, venue, hearing, cost } => {
                 let Some(acc) = w.acc.clone() else { return };
@@ -1004,54 +953,22 @@ impl Person {
                     x.applied.insert(venue.clone(), Applied { t, finding: None });
                 }
                 let offer = offer_of(&h).cloned().unwrap_or_default();
-                let form = offer.get("hears").and_then(|x| x.as_array()).and_then(|a| a.iter().find(|x| x.s("about") == Some(g.matter.as_str()))).and_then(|x| x.s("form")).unwrap_or(paper::APPLICATION).to_string();
-                let fee_to = venue_fee(&offer).map(|f| f.0);
-                let words = g.matter.replace('_', " ");
-                let decided_at = self.decided_at(&g);
-                let amt = g.amount.filter(|a| *a != 0).map(|a| Self::usd_of(w, a));
-                let asked_words = g.asked.map_or(String::new(), |a| {
-                    format!(
-                        "; we asked them {} days ago{}",
-                        (t - a).div_euclid(DAY),
-                        match g.answer.as_deref() {
-                            Some("refused") => " and they refused",
-                            Some("ignored") => " and had no answer",
-                            _ => "",
-                        }
-                    )
-                });
-                let app = crate::papers::finance::Application {
-                    kind: Some(g.matter.clone()),
-                    matter: g.matter.clone(),
-                    against: Some(g.party.clone()),
-                    about: g.about.clone(),
-                    amount: g.amount,
-                    account: g.amount.map(|_| acc.account.clone()),
-                    structure: g.structure.clone(),
-                    request: g.asked.map(|a| format!("asked on day {}", a.div_euclid(DAY))),
-                    seeks: g.seeks.clone(),
-                    particulars: Some(json!(particulars_of(&g, t, &w.cx.ctx.world))),
+                let a = oikos_rules::recourse::Applying {
+                    venue: venue.clone(),
+                    hearing: hearing.clone(),
+                    form: form_for(&offer, &g.matter),
+                    cost: *cost,
+                    asked: g.asked,
+                    answer: g.answer.clone(),
+                    particulars: json!(particulars_of(&g, t, &w.cx.ctx.world)),
                     evidence: g.evidence.clone(),
-                    decided_on: decided_at,
+                    decided_on: self.decided_at(&g),
                     reviewed_on: g.answered_at,
                     review_asked_on: g.asked.filter(|_| g.answered_at.is_none() && g.matter == "claim_refused"),
-                    brought_forward: None,
                 };
-                let mut calls = vec![say(
-                    &form,
-                    &format!(
-                        "Application: {words} against {}{}{}{asked_words}.",
-                        g.party,
-                        amt.as_ref().map_or(String::new(), |a| format!("; {a} is owed to us")),
-                        g.structure.as_ref().map_or(String::new(), |s| format!("; at {s}"))
-                    ),
-                    Say { to: Some(vec![venue.clone()]), visible: Some(Visible::Only(vec![me.clone(), venue.clone(), g.party.clone()])), basis: Some(hearing.clone()), data: Some(crate::papers::data(&app)), ..Default::default() },
-                )];
-                if let (true, Some(to)) = (*cost > 0, fee_to) {
-                    calls.push(pay(&to, *cost, Pay { from: Some(acc.account.clone()), for_: Some("Application fee.".into()), ..Default::default() }, w.cx));
-                }
-                let fee_words = if *cost > 0 { format!(", with its fee of {}", Self::usd_of(w, *cost)) } else { String::new() };
-                w.push(because(format!("Taking it to {venue}, which hears such things ({words} against {}){fee_words}.", g.party), calls));
+                let p = oikos_rules::recourse::apply(&me, &matter_of(&g), &acc.account, &a, t, &|n| Self::usd_of(w, n));
+                let fee = venue_fee(&offer).map(|f| f.0).filter(|_| *cost > 0);
+                w.push(sent_with_fee(p, fee.map(|to| pay(&to, *cost, Pay { from: Some(acc.account.clone()), for_: Some("Application fee.".into()), ..Default::default() }, w.cx))));
             }
             Intent::TellWronged { grievance, whom } => {
                 let Some(g) = self.recourse.grievances.get_mut(grievance) else { return };
@@ -1074,10 +991,119 @@ impl Person {
             Intent::Stand { notice } => {
                 self.s.stand_now.insert(notice.clone());
             }
+            Intent::HandOver { provider, about, seeks, against, whom, since } => self.hand_over(w, provider, about, seeks, against.as_ref(), whom.as_deref(), *since),
             Intent::StopLooking { until } => self.s.discouraged_until = *until,
             Intent::FoundBusiness { until } => self.s.venture_wanted = *until,
             Intent::JoinUnion | Intent::JoinGroup { .. } | Intent::Other { .. } | Intent::Wait => {}
         }
+    }
+
+    /// Handing a want to our assistant (docs/design/handing-over.md sections 2.3 and 3.1): the want's own fields and the
+    /// facts we choose to give (our lease, where it is about our home; the matter as we hold it, with what we asked and
+    /// what came back; our account, and how long we give the other side to answer), as one line our principal's
+    /// wrapper hands over as a referral. Never the want's weight, our trust or our mood: those are ours.
+    #[allow(clippy::too_many_arguments)]
+    fn hand_over(&mut self, w: &mut Week, provider: &str, about: &str, seeks: &[String], against: Option<&(String, String, String)>, whom: Option<&str>, since: i64) {
+        let me = self.me.clone();
+        let key = gkey(about, whom.unwrap_or(""), against.map(|a| a.0.as_str()));
+        self.recourse.handed.insert(key.clone(), w.t);
+        let mut data = json!({ "answer_days": self.answer_days() });
+        let mut records: Vec<String> = against.iter().map(|a| a.0.clone()).collect();
+        if let Some(h) = self.s.home.as_ref().filter(|h| !h.owned && matches!(about, "rent_increase" | "notice")) {
+            data["lease"] = json!({ "landlord": h.landlord, "agreement": h.agreement, "space": h.space, "rent": h.rent });
+            records.push(h.agreement.clone());
+        }
+        if let Some(g) = self.recourse.grievances.get(&key) {
+            let m = matter_of(g);
+            data["matter"] = json!({ "matter": m.matter, "party": m.party, "about": m.about, "amount": m.amount, "structure": m.structure, "seeks": m.seeks });
+            records.extend(g.about.clone());
+            if let Some(a) = g.asked {
+                data["asked"] = json!(a);
+            }
+            if let Some(a) = &g.answer {
+                data["answer"] = json!(a);
+            }
+            if !g.applied.is_empty() {
+                data["applied"] = json!(g.applied.keys().collect::<Vec<_>>());
+            }
+        }
+        if let Some(acc) = &w.acc {
+            data["account"] = json!(acc.account);
+        }
+        records.dedup();
+        let mut want = json!({ "about": about, "since": since });
+        if !seeks.is_empty() {
+            want["seeks"] = json!(seeks);
+        }
+        if let Some((record, kind_, by)) = against {
+            want["against"] = json!({ "record": record, "kind": kind_, "by": by });
+        }
+        if let Some(x) = whom {
+            want["whom"] = json!(x);
+        }
+        let kind_ = format!("{}{about}", crate::papers::delegation::WANT_PREFIX);
+        w.push(because(
+            format!("Having our assistant ({provider}) see to it: {}.", about.replace('_', " ")),
+            vec![say(&kind_, &format!("For our assistant to see to: {}.", about.replace('_', " ")), Say { visible: Some(Visible::Only(vec![me])), data: Some(json!({ "want": want, "facts": { "records": records, "data": data } })), ..Default::default() })],
+        ));
+    }
+
+    /// Papers our assistant sent in our name (written at its desk, in our name): what we take in of them, as if we had
+    /// sent them ourselves, since they are ours (a request asked, an application made, a challenge brought). Only once
+    /// we have handed a want over.
+    pub fn sent_for_us(&mut self, w: &mut Week) {
+        if self.recourse.handed.is_empty() {
+            return;
+        }
+        let me = self.me.clone();
+        for r in self.recourse_fresh() {
+            if !is_statement(&r) || r.speaks_for.as_deref() != Some(me.as_str()) || r.position.is_none() || !self.recourse.handed_seen.insert(r.id.to_string()) {
+                continue;
+            }
+            let d = data(&r).clone();
+            let to0 = addressed_to(&r).first().map(|x| x.to_string()).unwrap_or_default();
+            match kind(&r).unwrap_or_default() {
+                paper::REQUEST => {
+                    let (Some(m), Some(party)) = (d.s("matter"), d.s("against").map(String::from).or(Some(to0.clone()))) else { continue };
+                    if let Some(g) = self.recourse.grievances.get_mut(&gkey(m, &party, d.s("about"))) {
+                        g.asked.get_or_insert(r.at);
+                        g.handed = true;
+                    }
+                }
+                "variation_request" => {
+                    let (Some(a), Some(about)) = (d.s("agreement"), d.s("about")) else { continue };
+                    let key = if a == about { a.to_string() } else { format!("{a}:{about}") };
+                    self.s.asked_party.insert(key.clone(), r.at);
+                    self.recourse.handed_asks.insert(key);
+                }
+                "tribunal_application" if d.s("kind") == Some("rent_increase") => {
+                    if let Some(n) = d.s("notice") {
+                        self.recourse.challenged.insert(n.to_string());
+                    }
+                }
+                k if k == paper::APPLICATION || d.s("matter").is_some_and(|m| self.recourse.grievances.values().any(|g| g.matter == m)) => {
+                    let (Some(m), Some(party)) = (d.s("matter"), d.s("against")) else { continue };
+                    if let Some(g) = self.recourse.grievances.get_mut(&gkey(m, party, d.s("about"))) {
+                        g.applied.entry(to0.clone()).or_insert(Applied { t: r.at, finding: None });
+                        g.handed = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        let _ = w;
+    }
+
+    /// The provider whose desk holds a remit of ours to see to wants of this kind (`want-<about>`), at a level that hands
+    /// them over, at want depth, under a service in force: the newest such remit of ours. Ours: our own papers.
+    pub fn handing(&self, about: &str) -> Option<String> {
+        use crate::papers::delegation::{Depth, Level, Remit};
+        let kind_ = format!("{}{about}", crate::papers::delegation::WANT_PREFIX);
+        let (r, x) = self.book.all("remit").rev().filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str()) && !self.book.withdrawn(&r.id)).filter_map(|r| crate::papers::read::<Remit>(r).map(|x| (r, x))).find(|(_, x)| x.kind == kind_)?;
+        if !matches!(x.level, Level::Draft | Level::Approve | Level::Alone) || x.depth != Depth::Want || !self.book.in_force(&x.agreement) {
+            return None;
+        }
+        addressed_to(r).first().map(|p| p.to_string())
     }
 
     /// When the decision a refused claim's grievance is about was made (its paper, or the paper tendered).
@@ -1088,7 +1114,7 @@ impl Person {
 }
 
 /// What applying to a venue costs, where its terms say: (to whom, cents).
-fn venue_fee(offer: &Frozen) -> Option<(String, i64)> {
+pub fn venue_fee(offer: &Frozen) -> Option<(String, i64)> {
     let none = vec![];
     offer
         .get("terms")
@@ -1100,6 +1126,33 @@ fn venue_fee(offer: &Frozen) -> Option<(String, i64)> {
         .filter_map(|c| c.get("does").and_then(|d| d.get("outcome")).and_then(|o| o.get("money")))
         .find(|m| m.get("to").is_some())
         .map(|m| (m.s("to").unwrap_or_default().to_string(), m.i("amount").unwrap_or(0)))
+}
+
+/// The form a body's notice of what it hears names for a matter (none named: an application).
+pub fn form_for(offer: &Frozen, matter: &str) -> String {
+    offer.get("hears").and_then(|x| x.as_array()).and_then(|a| a.iter().find(|x| x.s("about") == Some(matter))).and_then(|x| x.s("form")).unwrap_or(paper::APPLICATION).to_string()
+}
+
+/// A grievance as the paperwork shared with a clerk reads it (`oikos_rules::recourse::Matter`).
+pub fn matter_of(g: &Grievance) -> oikos_rules::recourse::Matter {
+    oikos_rules::recourse::Matter { matter: g.matter.clone(), party: g.party.clone(), about: g.about.clone(), amount: g.amount, structure: g.structure.clone(), seeks: g.seeks.clone() }
+}
+
+/// A paper of the shared paperwork as the call that sends it.
+pub fn call_of(p: &oikos_rules::recourse::Paper) -> oikos_sight::calls::Call {
+    say(&p.kind, &p.words, Say { to: Some(p.to.clone()), visible: Some(Visible::Only(p.visible.clone())), basis: p.basis.clone(), data: Some(p.data.clone()), ..Default::default() })
+}
+
+/// A paper of the shared paperwork as the step that sends it, with its reason.
+pub fn sent<T>(p: oikos_rules::recourse::Paper) -> crate::steps::Step<T> {
+    sent_with_fee(p, None)
+}
+
+/// The same, with the payment of its fee after it.
+pub fn sent_with_fee<T>(p: oikos_rules::recourse::Paper, fee: Option<oikos_sight::calls::Call>) -> crate::steps::Step<T> {
+    let mut calls = vec![call_of(&p)];
+    calls.extend(fee);
+    because(p.reason, calls)
 }
 
 // ------------------------------------------------------------------ life's openings for a want (citizen.ts 2119-2298)
@@ -1313,6 +1366,21 @@ impl Openings for Ways<'_> {
                 let mut o = Self::open("tell".into(), "tell", Intent::TellWronged { grievance: g.key.clone(), whom: vec![] });
                 o.bears = vec![g.party.clone()];
                 o.others = Some(0);
+                out.push(o);
+            }
+        }
+        // Our assistant, where a remit of ours has its provider's desk see to wants of this kind (docs/design/
+        // handing-over.md section 2.3): handed over again only once the other side has had its time to answer.
+        if let Some(provider) = p.handing(&want.about) {
+            let key = gkey(&want.about, want.whom.as_deref().unwrap_or(""), want.against.as_ref().map(|a| a.0.as_str()));
+            let answer_days = p.answer_days();
+            if r.handed.get(&key).is_none_or(|at| t - at >= answer_days * DAY) {
+                let intent = Intent::HandOver { provider: provider.clone(), about: want.about.clone(), seeks: want.seeks.clone(), against: want.against.clone(), whom: want.whom.clone(), since: want.since };
+                let mut o = Self::open(format!("assistant:{provider}"), "assistant", intent);
+                o.by = Some(provider);
+                o.brings = want.seeks.clone();
+                o.undoes = want.against.as_ref().map(|a| a.0.clone());
+                o.bears = want.whom.iter().cloned().chain(want.against.as_ref().map(|a| a.2.clone())).collect();
                 out.push(o);
             }
         }
@@ -1885,4 +1953,62 @@ mod tests {
         at(&mut p, &c, &pic(2 * DAY, vec![]), |p, w| p.disrepair(w));
         assert_eq!(said(&p).iter().filter(|x| x["kind"] == "notice_lapsed").count(), 1);
     }
+
+    /// A want handed to our assistant (docs/design/handing-over.md H4): offered only with a want-depth remit of ours in
+    /// force; handed with its own fields and the facts we give, never its weight; what the desk sends in our name is
+    /// ours (the grievance asked); what comes of it reaches us only by the other side's answer, learned as the
+    /// assistant's way; the desk's report tells us nothing.
+    #[test]
+    fn a_want_handed_to_our_assistant_is_met_only_by_the_other_sides_answer_and_learned_from_its_fate() {
+        let c = ctx(json!({}), true);
+        let mut p = person(&c, 0);
+        tenant(&mut p);
+        at(&mut p, &c, &pic(10 * DAY, vec![]), |p, w| {
+            p.grieve(w, "disrepair", "landlord-1", None, None, Some("apts-1"), 6_000, "shelter", None);
+        });
+        let wnt = want("disrepair", "landlord-1", None, &[]);
+        assert!(ways(&p, &pic(11 * DAY, vec![]), &wnt).iter().all(|o| o.kind != "assistant"), "no remit of ours: no such way");
+        let service = vec![
+            rec(json!({ "id": "agr.9", "record": "agreement", "author": "prov-a-sales", "at": DAY, "visible_to": ["prov-a", ME], "terms": { "template": "service", "parties": ["prov-a", ME], "commitments": [] } })),
+            rec(json!({ "id": "agr.9-a", "record": "signature", "author": "prov-a-sales", "at": DAY, "visible_to": ["prov-a", ME], "agreement": "agr.9", "as": "prov-a" })),
+            rec(json!({ "id": "agr.9-b", "record": "signature", "author": "c1-self", "at": DAY, "visible_to": ["prov-a", ME], "agreement": "agr.9", "as": ME })),
+            rec(json!({ "id": "rem.1", "record": "statement", "author": "c1-self", "speaks_for": ME, "at": 2 * DAY, "visible_to": [ME, "prov-a"], "addressed_to": ["prov-a"], "kind": "remit", "text": "From now",
+                "data": { "agreement": "agr.9", "kind": "want-disrepair", "level": "draft", "depth": "want" } })),
+        ];
+        let pc = pic(12 * DAY, service);
+        p.book.absorb(&pc);
+        let o = ways(&p, &pc, &wnt).into_iter().find(|o| o.kind == "assistant").expect("the assistant way, with the remit");
+        assert_eq!((o.key.as_str(), o.by.as_deref(), o.bears.clone()), ("assistant:prov-a", Some("prov-a"), vec!["landlord-1".to_string()]));
+        let (out, _) = at(&mut p, &c, &pc, |p, w| p.carry_out(w, &o.intent, None));
+        let (k, _, _, _, d) = &out[0];
+        assert_eq!(k, "want-disrepair");
+        assert_eq!((d["want"]["about"].as_str(), d["want"]["whom"].as_str()), (Some("disrepair"), Some("landlord-1")));
+        assert_eq!((d["facts"]["data"]["matter"]["party"].as_str(), d["facts"]["data"]["account"].as_str()), (Some("landlord-1"), Some("acc-c1")));
+        assert!(d["want"].get("weight").is_none() && !d.to_string().contains("trust"), "never its weight or our trust: {d}");
+        assert!(ways(&p, &pic(13 * DAY, vec![]), &wnt).iter().all(|o| o.kind != "assistant"), "handed: not again until the other side has had its time");
+        // (The desk's report: nothing of it reaches us.)
+        let before = said(&p).len();
+        let report = rec(json!({ "id": "rep.1", "record": "statement", "author": "prov-a-desk-system", "in_position": "prov-a-desk", "speaks_for": "prov-a", "at": 14 * DAY, "visible_to": [ME, "prov-a"], "addressed_to": [ME], "kind": "report", "text": "Done.", "data": { "referral": "rf.1", "done": true, "way": "review_request to landlord-1" } }));
+        at(&mut p, &c, &pic(14 * DAY, vec![report]), |p, w| {
+            p.answers(w);
+            p.sent_for_us(w);
+            p.opening_caseload(w);
+        });
+        assert_eq!(said(&p).len(), before, "the report tells us nothing");
+        // (The request it sent in our name is ours: asked; the landlord's answer comes to us, and is learned as the
+        // assistant's way; granted, nothing is over until the repair is done.)
+        let asked = rec(json!({ "id": "rq.1", "record": "statement", "author": "prov-a-desk-system", "in_position": "prov-a-desk", "speaks_for": ME, "at": 14 * DAY, "visible_to": [ME, "landlord-1"], "addressed_to": ["landlord-1"], "kind": "review_request", "text": "Request.",
+            "data": { "matter": "disrepair", "against": "landlord-1", "structure": "apts-1" } }));
+        let answer = statement("ans.1", 15 * DAY, "remedy_answer", "landlord-1", json!({ "request": "rq.1", "matter": "disrepair", "granted": false }));
+        at(&mut p, &c, &pic(15 * DAY, vec![asked, answer]), |p, w| {
+            p.answers(w);
+            p.sent_for_us(w);
+            p.opening_caseload(w);
+        });
+        let g = &p.recourse.grievances["disrepair:landlord-1"];
+        assert_eq!((g.asked, g.answer.as_deref(), g.handed), (Some(14 * DAY), Some("refused"), true));
+        assert!(said(&p).iter().any(|x| x["domain"] == "way" && x["option"] == "assistant" && x["kind"] == "refused"), "{:?}", said(&p));
+        assert!(!said(&p).iter().any(|x| x["domain"] == "way" && x["option"] == "ask"), "we did not ask: our assistant did");
+    }
+
 }

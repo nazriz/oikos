@@ -96,6 +96,8 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
   const decisions: { t: number; subject: string; data: any }[] = [];
   const answered = new Map<string, { t: number; data: any }>(); // (a request's id → its principal's answer)
   let sorted: any[] = []; // (the kernel's reading of the seats' acts beside their remits)
+  /** Each want handed over (fork), as `oikos-kernel delegation` reads the log: its fate, way and time (H4). */
+  let wanted: any[] = [];
   const refused: { t: number; seat: string; words: string }[] = [];
   const candidates: { day: number; phase: string; seat: string; how: string; words: string; seen: Seen[]; trigger_seen: { question_before: boolean; problem_before: boolean } }[] = [];
   const principalIds = new Set(principals.map((p) => p.id));
@@ -189,7 +191,11 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
       }
     }
     const p = Bun.spawnSync([kernelBinary(), "delegation", file], { stdout: "pipe", stderr: "pipe" });
-    if (p.exitCode === 0) sorted = p.stdout.toString().split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((x) => x.table === "acts" && x.t >= forkT);
+    if (p.exitCode === 0) {
+      const rows = p.stdout.toString().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+      sorted = rows.filter((x) => x.table === "acts" && x.t >= forkT);
+      wanted = rows.filter((x) => x.table === "wants" && x.t >= forkT);
+    }
   } finally {
     rmSync(file, { force: true });
   }
@@ -241,7 +247,7 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
     cost.usd += (x.cost_microusd ?? 0) / 1e6; b.usd += (x.cost_microusd ?? 0) / 1e6;
   }
   const result = existsSync(join(sd, `${arm}.json`)) ? JSON.parse(readFileSync(join(sd, `${arm}.json`), "utf8")) : {};
-  return { seed, arm, steward: result.steward, stopped: result.stopped, words, principals: principals.map((p) => ({ id: p.id, post: p.post, review_days: p.review_days, levels_until_day: p.commit.levels_until / DAY, keep_until_day: p.commit.keep_until / DAY })), seats: [...seats], requests, candidates, levels, remits: remitTimeline, decisions: decided, debriefs, cost, acts: { by_post: beyond, rows: sorted } };
+  return { seed, arm, steward: result.steward, stopped: result.stopped, words, principals: principals.map((p) => ({ id: p.id, post: p.post, review_days: p.review_days, levels_until_day: p.commit.levels_until / DAY, keep_until_day: p.commit.keep_until / DAY })), seats: [...seats], requests, candidates, levels, remits: remitTimeline, decisions: decided, debriefs, cost, acts: { by_post: beyond, rows: sorted }, wants: { counts: countWants(wanted), rows: wanted } };
 }
 
 function text(arms: Awaited<ReturnType<typeof readArm>>[]): string {
@@ -263,6 +269,8 @@ function text(arms: Awaited<ReturnType<typeof readArm>>[]): string {
       L.push(`    answered: ${r.answer ? `day ${r.answer.day} (${r.answer.days} days on), ${r.answer.granted ? "granted" : "not granted"}: ${r.answer.why.join("; ")}${r.answer.look_again_day ? `; to be looked at again on day ${r.answer.look_again_day}` : ""}` : "no answer"}`);
       L.push(`    after: remits ${r.remits_after.length ? r.remits_after.map((x) => `${x.day} ${x.level}`).join(", ") : "none"}; decisions citing it ${r.decisions_citing.length ? r.decisions_citing.map((x) => `${x.day} ${x.choice}${x.to ? ` to ${x.to}` : ""}`).join(", ") : "none"}`);
     }
+    const wc = a.wants?.counts;
+    if (wc?.handed) L.push(`wants handed over (fork): ${wc.handed}; served ${wc.served}, open ${wc.open}, given up ${wc.given_up}, dropped ${wc.dropped}; redirected ${wc.redirected} of ${wc.compared} set beside the person's own choice; seconds: the principals' ${wc.principal_s}, the assistants' ${wc.assistant_s}`);
     L.push(`the seats' acts beside their remits (fork; oikos-kernel delegation): ${Object.keys(a.acts.by_post).length ? Object.entries(a.acts.by_post).map(([post, c]) => `${post} ${JSON.stringify(c)}`).join("; ") : "none"}`);
     if (a.candidates.length) {
       L.push(`in other words (candidates by the stated word list, to be read): ${a.candidates.length}`);
@@ -298,4 +306,12 @@ if (import.meta.main) {
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
+}
+
+/** The wants handed over, counted by what became of them (rows of `oikos-kernel delegation`'s `wants` table). */
+export function countWants(rows: any[]) {
+  const n = (f: (x: any) => boolean) => rows.filter(f).length;
+  return { handed: rows.length, served: n((x) => x.fate === "served"), open: n((x) => x.fate === "open"), dropped: n((x) => x.fate === "dropped"), given_up: n((x) => x.fate === "given_up"),
+    compared: n((x) => x.redirected !== null && x.redirected !== undefined), redirected: n((x) => x.redirected === true),
+    principal_s: rows.reduce((a, x) => a + (x.seconds?.principal ?? 0), 0), assistant_s: rows.reduce((a, x) => a + (x.seconds?.assistant ?? 0), 0) };
 }

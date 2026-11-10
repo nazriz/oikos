@@ -461,3 +461,57 @@ fn levels_are_read_from_the_newest_remit_and_lines_name_their_kinds() {
 use oikos_sight::calls::parse_program;
 
 mod assistant_side;
+
+const WANT: &str = "statement(data={\"facts\":{\"data\":{\"account\":\"acc-ll\",\"matter\":{\"matter\":\"disrepair\",\"party\":\"lord-1\"}},\"records\":[]},\"want\":{\"about\":\"disrepair\",\"since\":86400,\"whom\":\"lord-1\"}}, kind=\"want-disrepair\", text=\"For our assistant to see to: disrepair.\", visible=[\"ll\"])";
+
+/// A want handed over (docs/design/handing-over.md H4): its referral carries the want's fields and the facts given,
+/// no act, priced as a referral alone; a draft is signed off only if it goes to whom the want is about and would bear
+/// on them, else declined; whatever comes back, nothing is redone: the want stays its holder's. With no remit that
+/// hands it over, the want goes nowhere.
+#[test]
+fn a_want_handed_over_carries_its_fields_and_comes_back_with_nothing_to_redo() {
+    let script: Vec<Value> = (1..=40).map(|d| json!({ "at": d * DAY + 3600, "call": WANT })).collect();
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "want-disrepair": { "own_seconds": 1800, "error_cost": 50_000 } }, "hour_value": 4000, "review_days": 30 } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    let mut o = offer();
+    o["kinds"] = json!(["want-disrepair"]);
+    o["seconds"] = json!({ "want-disrepair": 60 });
+    o["depths"] = json!({ "want-disrepair": ["want"] });
+    let mut early = String::new();
+    for d in 1..=30 {
+        early.push_str(&all(&h.wake(d * DAY + 3600, world(if d == 1 { vec![statement("rec.off", 0, PROV, "service_offer", &[], o.clone())] } else { vec![] }))));
+    }
+    assert!(!early.contains("want-disrepair"), "no remit yet: the want goes nowhere: {early}");
+    let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).expect("it engages") as i64 + 1);
+    let mut up = set_up(&order);
+    up[0]["data"]["offer"] = o;
+    h.wake(32 * DAY + 3600, world(up));
+    h.wake(33 * DAY + 3600, world(vec![signed()]));
+    let remit = h.sent.iter().rev().find(|p| p.contains("kind=remit")).cloned().unwrap_or_default();
+    assert!(remit.contains("\"depth\":\"want\""), "{remit}");
+    let rec = json!({ "id": "rec.remit", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 33 * DAY, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [ME], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "want-disrepair", "level": "draft", "depth": "want" } });
+    let out = all(&h.wake(34 * DAY + 3600, world(vec![rec])));
+    let line = out.lines().find(|l| l.contains("kind=referral")).unwrap_or_else(|| panic!("{out}"));
+    assert!(line.contains("\"depth\":\"want\"") && line.contains("\"want\":{\"about\":\"disrepair\"") && line.contains("\"party\":\"lord-1\"") && !line.contains("\"calls\"") && !line.contains("carries="), "{line}");
+    assert!(!out.contains("kind=\"want-"), "the want is never an act of the world's: {out}");
+    // (A draft to someone else: declined, and nothing redone.)
+    let referral = last_referral(&h);
+    let other = statement("rec.d1", 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "calls": "statement(data={\"matter\":\"disrepair\"}, kind=review_request, text=\"Request.\", to=[\"city\"])" }));
+    let out = all(&h.wake(35 * DAY + 3600, world(vec![other])));
+    let no = out.lines().find(|l| l.contains("kind=declined")).unwrap_or_else(|| panic!("{out}"));
+    assert!(no.contains("does not go to whom this is about"), "{no}");
+    assert!(!out.contains("want-disrepair") || out.lines().filter(|l| l.contains("kind=referral")).count() == 1, "nothing redone in the world: {out}");
+    // (A draft to the landlord it is about: signed off.)
+    h.wake(36 * DAY + 3600, world(vec![]));
+    let referral = last_referral(&h);
+    let right = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "calls": "statement(data={\"against\":\"lord-1\",\"matter\":\"disrepair\"}, kind=review_request, text=\"Request.\", to=[\"lord-1\"])" }));
+    let out = all(&h.wake(37 * DAY + 3600, world(vec![right])));
+    assert!(out.contains("kind=sign_off"), "{out}");
+    // (Reported not done: no slip counted, nothing redone.)
+    let report = statement("rec.rep", 37 * DAY + 7200, ME, "report", &[ME], json!({ "referral": referral, "done": false, "why": "waiting" }));
+    let out = all(&h.wake(38 * DAY + 3600, world(vec![report])));
+    assert!(!out.lines().any(|l| l.contains("kind=review_request") || l.contains("kind=\"want-")), "{out}");
+}

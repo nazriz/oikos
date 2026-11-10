@@ -12338,3 +12338,92 @@ plain words and with no menu of the world's acts (P1, P2):
   reserve's, MT-30). Only the provider's desk sat, on day 31: its prompt is large (about $0.35 a call reckoned at API
   prices), so the limit was reached before the organisations' assistants sat. **Codex** (`codex/gpt-6.1-sol`): 3 calls,
   each answered in 5 to 7 s (`runs/codex-route-check-2026-11-10.txt`).
+
+## 2026-11-11 · H4a: a person's recourse paperwork moved to the rules crate, byte-identical (docs/design/handing-over.md H4)
+
+- **Decision.** The paperwork of the ways a person's mind chooses for a grievance or a paper in their way (asking the
+  landlord to hold the rent or let them stay, asking for a rise, asking a party to put something right, challenging a
+  notice of rent increase, applying to a body that hears the matter) is one set of pure functions,
+  `oikos_rules::recourse` (`ask_landlord`, `ask_rise`, `challenge_rent`, `ask_put_right`, `apply`), each returning the
+  paper as it is to go (kind, words, the step's reason, to, visible, basis, data). `citizen/recourse.rs` calls them
+  (`sent`, `call_of`, `matter_of`, `form_for`), so the code assistant at a provider's desk (H4c) writes a want's papers
+  with the same functions, to the letter. The clerk's fixed order (`next`: ask first; after a refusal, or the days to
+  answer gone by, apply to a body that hears the matter within the limit; else wait) is there too, used from H4c.
+- **Why.** Design 4.3: the code assistant may not use the person's own choice rule (a god's view of its client), but
+  its papers must be the person's own papers; one copy of each.
+- **Byte-identical, checked:** same-results' towns (200 and 1,000 people, au-vic, gb-eng and us-oh), a 1,000-person
+  au-vic town with `assistants=true`, and the study's town (`experiments/scope-pilot/study.ts`, seed 7: living,
+  friction and initiative at 10,000, the opening caseload), 45 days each, on the base commit's kernel and this one's:
+  the same state hash and the same log digest (build tag and hash chain aside) for all eight; and the assistants town,
+  the au-vic town and the study's town to day 150 likewise. The study's town wrote 870 review requests, 108 tribunal
+  applications, 18 applications and a variation request in its 150 days, so the moved paperwork was exercised.
+- **Revisit if:** a paper of the shared set needs something only the person knows that a clerk would not (then it is
+  a fact the person gives, never read by the clerk).
+
+## 2026-11-11 · H4b: a client's papers on forms of their own at the providers' desk (the decisions entry "One right call", C)
+
+- **Decision.** Where a model sits at a provider's desk (`assistant_seats` names the desk's template), its stationery
+  has a form for each of a client's papers that the receiving office's code reads for its figures, with its draft for
+  sign-off (`clientPapers`, `clientDraftOf`, `participants/src/kinds/assistants.ts`): a job application (`employer`,
+  `posting`, `account`, `trade`), a loan application (`lender`, `amount`, `months`, `account`, `purpose`), a claim for a
+  support payment (`office`, `payment` as a choice of the law's payments, `account`, `born_at`) and a request to stop
+  paying a claim (`office`, `claim`; `stop` is always true, as the citizen's own paper says nothing else). Each names
+  `client`, and goes in the client's name, seen by them and the receiving office. The words-only `draft_for_client`
+  keeps the offer's other kinds. A desk's draft on these forms carries the paper, sent as it stands on `send_signed`.
+- **Why.** Since "One right call" the translator composes no JSON, so a model at the desk could not file these papers
+  at all; the fields are those `JobApplication`, `LoanApplication`, `BenefitClaim` and `BenefitChange` read.
+- **Not moved:** towns without a model at the desk (stationery is published only where a model sits): the same
+  configs as before for every same-results town and the assistants town (checked: the config differs only in the
+  study's town, by these eight forms).
+- **Revisit if:** the citizen's own papers gain fields (the forms follow them), or a seat files a claim for a payment
+  its client is not eligible for often enough to need the law's conditions on the form.
+
+## 2026-11-11 · H4c–e: a person hands over a want; the desk's clerk; the readout's wants; the screen (docs/design/handing-over.md H4)
+
+- **Decision.** Want depth for persons, as designed (sections 2 to 5): `Depth::Want`, kinds `want-<about>` for
+  `claim_refused`, `disrepair`, `notice`, `rent_increase` and `underpaid`. The way `assistant` in the mind's choice is
+  offered while a remit of the person's own hands that kind over at want depth. It is weighed as a desk is: trust in
+  the provider plus agency (a placeholder weighing, WM-1: the desk's, recorded here). The person's code hands the want over
+  as one `want-<about>` line with the want's fields and the facts it gives, which its wrapper always replaces with a
+  referral (`Referral.want`, `facts`, no calls, priced as a referral alone). The desk's code is the clerk of
+  `oikos_rules::recourse::next`. The person signs a draft off by `wants::meets` on its typed fields, its addressee, and
+  a fee within the limit. What the desk sent in the person's name is theirs (`sent_for_us`). The other side's answer
+  is learned as the assistant's way. A declined draft, a report "not done" or a take-back redoes nothing. The
+  generator gives all this only under the spec's `assistant_wants`, and the study sets it, assigning the cohort the
+  want kinds at draft; `study(..., "act")` is the control without wants. Behaviour: docs/behaviour/assistants.md, "A
+  want, not a paper".
+- **`want-`, not `want:`** (design 3.1 said `want:<about>`): a config key may not hold a colon (the contracts' Opaque
+  key pattern), and law 11's figure paths split on a dot, so `want.` failed too; a hyphen is neither.
+- **Each step is a hand-over.** The clerk takes one step a hand-over. The person hands the want over again when their
+  mind next chooses to, once the other side has had its days to answer. The person's facts carry what they know of the
+  earlier steps (asked when, the answer, the bodies already applied to), so the clerk goes on from there. The clerk
+  cannot see the other side's answer, which goes to the person.
+- **The readout** (`oikos-kernel delegation`, table `wants`; `experiments/scope-pilot/readout.ts`, `countWants`): each
+  want handed over, with its fate. `served`: met by the person's own want event after the desk's first paper and
+  before any giving up. `given_up`: a paper sent, then given up. `dropped`: no paper. Otherwise `open`. Beside the fate:
+  the way taken (`ask`, writing to the other side, or `desk`, a body) against the person's own most-weighted of those
+  two in their `want` decision at the hand-over (`redirected`), and the seconds charged to each side, read from the
+  acts that made the chain's records. The desk's papers for a want are sorted against the want's remit (class as
+  ever, `depth: want`). A scope request against what its matter needed reads the referral as before; at want depth
+  "needed" is the want's kind.
+- **The screen** (`bun experiments/scope-pilot/screen.ts`; study.ts against its act-depth control, seed 7, the code arm,
+  180 days from the fork, 251 clients engaged by hand). At want depth the desk had 87 matters in six months (6, 15, 16,
+  23, 14 and 13 a month), 8 of them wants (`want-disrepair` 2, 1, 3, 0, 1, 1). The control had 63 (10, 8, 8, 5, 23, 9)
+  and no wants. Both took about 3 steps a matter (2.7 to 3.0). Every want handed over was a disrepair: the cohort had
+  no rent rise, notice, underpaid or refused claim it handed over in the run. Of the 9 wants in the log (one before the
+  fork): the desk wrote first to the landlord 5 times and applied to the town's complaints desk 3 times. Once it
+  reported "taken to the town already: its decision is awaited". Fates: 4 given up after a paper was sent, 4 still
+  open at the end, 1 dropped (that report), 0 served. The landlords answer and the complaints desk only recommends,
+  and a disrepair want is met only by the repair. Redirected 0 of 8: the person's own most-weighted way of the two was
+  the clerk's each time. The seconds charged were 330 to the person (the referral and the sign-off) and 100 to the
+  desk, a want. Volume is thin, as the hand-off expected (0.04 wants an adult-month, many of them slights); the
+  difference in other papers between the arms is the run's own course after the fork, recorded, not chased.
+- **Found by the screen and fixed (H4e):** the bodies a principal had seen on its boards were not saved, so after a
+  fork it declined every draft to a body that hears the matter (a board shows a notice as it comes).
+- **Byte-identical, checked** at 45 days, base kernel against this one: same-results' six towns, the 1,000-person
+  au-vic town with `assistants=true` (providers, no want remits), and the study's act-depth control town (providers,
+  the cohort, no want remits). All eight have the same state hash and log digest. The non-want configs are unchanged
+  JSON.
+- **Revisit if:** wants handed over stay too few to measure (then more kinds of want, or persons' wants of a firm's);
+  the clerk's single step per hand-over makes a seat look idle (then follow-ups from its own file); or a model's
+  drafts that are right on their fields but useless in words turn out to matter (a code principal cannot read).

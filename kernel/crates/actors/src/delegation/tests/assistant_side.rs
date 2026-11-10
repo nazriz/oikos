@@ -127,3 +127,35 @@ fn where_it_slips_the_matter_is_lost_as_written_and_it_believes_it_done() {
     let out = all(&h.wake(34 * DAY + 3600, world(handed("draft", "agr.1"))));
     assert!(out.contains("kind=draft") && !out.contains("\"calls\""), "a draft that is not what was asked: {out}");
 }
+
+/// Handed a want, the desk's code is a clerk (docs/design/handing-over.md section 4.3): it writes first, in its client's
+/// name, to whom the want is about; asked already and refused, it applies to a body its board says hears the matter;
+/// with nowhere to go, it reports so. Its report says the way it took.
+#[test]
+fn handed_a_want_its_clerk_writes_first_to_whom_it_is_about_then_to_a_body_that_hears_it() {
+    let run = |facts: Value, extra: Vec<Value>| {
+        let mut h = Harness::new(&Assistant, PROV, json!({}));
+        h.ctx.performer = Performer::System;
+        let mut person = offer();
+        person["for"] = json!("persons");
+        let mut recs = vec![
+            statement("rec.del", 32 * DAY, PROV, "service_delivery", &["ann"], json!({ "order": "rec.50", "offer": person, "systems": ["prov-a-system"] })),
+            statement("rec.brief", 33 * DAY, "ann", "brief", &[PROV], json!({ "agreement": "agr.9", "delivery": "rec.del" })),
+            statement("rec.ref", 34 * DAY, "ann", "referral", &[PROV], json!({ "agreement": "agr.9", "kind": "want-disrepair", "wants": "alone", "depth": "want",
+                "want": { "about": "disrepair", "whom": "lord-1", "since": DAY }, "facts": { "records": [], "data": facts } })),
+        ];
+        recs.extend(extra);
+        all(&h.wake(60 * DAY + 3600, world(recs)))
+    };
+    let out = run(json!({ "matter": { "matter": "disrepair", "party": "lord-1", "structure": "apts-1" }, "account": "acc-ann", "answer_days": 14 }), vec![]);
+    let ask = out.lines().find(|l| l.contains("kind=review_request")).unwrap_or_else(|| panic!("{out}"));
+    assert!(ask.contains("to=[\"lord-1\"]") && ask.contains("for=ann") && ask.contains("\"against\":\"lord-1\""), "{ask}");
+    let mut venue = statement("rec.h1", 0, "city", "offer", &[], json!({}));
+    venue["offer"] = json!({ "take_up": "apply", "hears": [{ "about": "disrepair" }] });
+    venue["visible_to"] = json!("public");
+    let out = run(json!({ "matter": { "matter": "disrepair", "party": "lord-1" }, "account": "acc-ann", "asked": 40 * DAY, "answer": "refused", "answer_days": 14 }), vec![venue]);
+    let app = out.lines().find(|l| l.contains("kind=application")).unwrap_or_else(|| panic!("{out}"));
+    assert!(app.contains("to=[\"city\"]") && app.contains("basis=rec.h1") && app.contains("for=ann"), "{app}");
+    let out = run(json!({ "matter": { "matter": "disrepair", "party": "lord-1" }, "account": "acc-ann", "asked": 40 * DAY, "answer": "refused", "answer_days": 14 }), vec![]);
+    assert!(out.contains("kind=report") && out.contains("\"done\":false") && out.contains("no body on the board"), "{out}");
+}

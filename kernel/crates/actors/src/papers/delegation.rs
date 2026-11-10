@@ -94,6 +94,41 @@ pub enum Depth {
     #[default]
     Act,
     Matter,
+    /// What a person is after (a want of their mind's), with the facts they choose to give: the assistant chooses the
+    /// way, and what came of it reaches the person only by the paths outcomes already take (docs/design/handing-over.md
+    /// sections 2 and 4.3, step H4).
+    Want,
+}
+
+/// The kinds of matter a person may hand over as a want: `want-<about>`, the `about` the mind's own word
+/// (`Want.about`). docs/design/handing-over.md section 3.1.
+pub const WANT_PREFIX: &str = "want-";
+
+/// Whether a kind of matter is a want's (`want-<about>`).
+pub fn is_want(kind: &str) -> bool {
+    kind.starts_with(WANT_PREFIX)
+}
+
+/// A paper a want is made against, as the person holds it: which, of what kind, by whom.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Against {
+    pub record: String,
+    pub kind: String,
+    pub by: String,
+}
+
+/// A person's want, as handed over: the want's own typed fields, with no weight (its weight is the person's inner
+/// state, never handed over).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WantHanded {
+    pub about: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub seeks: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub against: Option<Against>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub whom: Option<String>,
+    pub since: i64,
 }
 
 impl Depth {
@@ -270,9 +305,12 @@ pub struct Referral {
     /// was paying already).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub does_itself: Vec<String>,
-    /// What is handed over: the finished act (`calls`), or what happened (`facts`, at `matter`).
+    /// What is handed over: the finished act (`calls`), or what happened (`facts`, at `matter`), or what a person is
+    /// after (`want`, with the `facts` they chose to give, at `want`).
     #[serde(default, skip_serializing_if = "Depth::is_act")]
     pub depth: Depth,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub want: Option<WantHanded>,
 }
 impl Paper for Referral {
     const KIND: &'static str = "referral";
@@ -396,6 +434,9 @@ pub struct Report {
     pub created: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub why: Option<String>,
+    /// At want depth, the way it took: the kind of paper it sent and to whom ("review_request to landlord-1").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub way: Option<String>,
 }
 impl Paper for Report {
     const KIND: &'static str = "report";
