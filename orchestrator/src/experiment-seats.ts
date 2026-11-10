@@ -170,7 +170,9 @@ export function priceOf(model: string): Price {
   const [provider, ...rest] = model.split("/");
   const name = rest.join("/");
   if (provider === "codex" || provider === "decide" || LOCAL.has(provider!)) return { input: 0, output: 0, cache_read: 0, cache_write: 0 };
-  if (provider === "claude-code") return table[`anthropic/${name.split("@")[0]}`] ?? table[model]!;
+  // (Where the table has what Claude Code itself reckons a model's calls at, that: it is what a call is charged, the
+  // greater of the two, and a fork's reserve for its debriefs is sized by it. Otherwise the model's API price.)
+  if (provider === "claude-code") return table[`claude-code/${name.split("@")[0]}`] ?? table[`anthropic/${name.split("@")[0]}`] ?? table[model]!;
   return table[model] ?? { input: 0, output: 0 };
 }
 

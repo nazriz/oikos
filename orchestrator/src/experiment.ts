@@ -537,7 +537,12 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   // (The arm's interventions, as the acts its principals make at the fork: expanded against what the base showed of their services.)
   const tracker = arm.intervene?.length ? DelegationTracker.restore(JSON.parse(readFileSync(f.delegation, "utf8"))) : undefined;
   const atFork = (arm.intervene ?? []).flatMap((iv) => expand(iv, config, tracker!, spec.forkDay * DAY));
-  const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 }, ...(arm.withhold?.length ? { withhold: arm.withhold } : {}), ...(atFork.length ? { at_fork: atFork } : {}) });
+  // (A model's seats keep to their own post: woken by what their own channels show them, never by papers of their
+  // organisation's that are not for them nor by an office's acknowledgement. A code arm's are woken as their code units
+  // are, so it is the town without a model, to the byte. kernel/src/schedule.rs, `keep_to_own`; 2026-11-11.)
+  // (A `mock/<policy>` steward is the post's code brain under a policy, sitting as its twin does: as the code's.)
+  const keepToOwn = arm.steward.kind === "model" && !arm.steward.model.startsWith("mock/") ? (templ ? templatesOf(spec.post) : [seat]) : [];
+  const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 }, ...(arm.withhold?.length ? { withhold: arm.withhold } : {}), ...(atFork.length ? { at_fork: atFork } : {}), ...(keepToOwn.length ? { seats_keep_to_own: keepToOwn } : {}) });
   const forkT = w.t();
   // (The stewardship ledger: the base's, taken up with this arm's steward, counting from the fork.)
   const ledger = wantsStewardship(spec) ? (existsSync(f.ledger) ? Ledger.restore(JSON.parse(readFileSync(f.ledger, "utf8")), { from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) }) : new Ledger({ config, from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) })) : undefined;

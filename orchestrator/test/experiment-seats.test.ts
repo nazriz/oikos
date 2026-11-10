@@ -165,7 +165,7 @@ test.skipIf(!have)("a model steward in a fork, played by the mock: drafts confir
       { name: "sonnet-told", steward: { kind: "model", model: "claude-code/claude-sonnet-5-5", framing: "simulation" } },
       { name: "haiku-poor", steward: { kind: "model", model: "claude-code/claude-haiku-5-5" } },
     ],
-    seats: { mock_models: true, budget: { arm_usd: { sonnet: 50, "sonnet-told": 50, "haiku-poor": 0.025 } } }, // (A limit that covers its debrief and little more: the enough-work screen)
+    seats: { mock_models: true, budget: { arm_usd: { sonnet: 50, "sonnet-told": 50, "haiku-poor": 1.3 } } }, // (A limit that covers its debrief and little more, at what Claude Code reckons a call: since 2026-11-11 orchestrator/prices.json has it, and a debrief of Haiku through claude -p is about $1.25)
     measures: ["acts", "records:weather_warning", "log_entries"],
   };
   const out = join(root, "runs", "test-experiment-seats");

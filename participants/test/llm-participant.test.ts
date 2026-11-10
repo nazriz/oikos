@@ -72,15 +72,14 @@ test("office hours: one sitting a working day; what comes in between waits for i
   // Done for now (no days: its usual rhythm, a week): next sitting tomorrow, but with no mail it's not called then.
   expect(done).toEqual({ type: "wait", until: DAY + 9 * HOUR });
   expect(await p.step(obs(DAY + 9 * HOUR), ctx)).toEqual({ type: "wait", until: 7 * DAY + 9 * HOUR });
-  // Someone writes on day 3 in working hours: a sitting then.
-  await p.step(obs(3 * DAY + 11 * HOUR, "a letter"), ctx);
-  expect(calls.length).toBe(2);
-  // Once that sitting's over, a letter the same afternoon waits for the next working day's.
+  // Someone writes on day 3 in working hours: not at once, but at the next working day's sitting, with what came after
+  // it that day (an office reads its post at a sitting, not as each letter comes: 2026-11-11).
+  expect(await p.step(obs(3 * DAY + 11 * HOUR, "a letter"), ctx)).toEqual({ type: "wait", until: 4 * DAY + 9 * HOUR });
   await p.step(obs(3 * DAY + 15 * HOUR, "another"), ctx);
-  expect(calls.length).toBe(2);
+  expect(calls.length).toBe(1);
   await p.step(obs(4 * DAY + 9 * HOUR), ctx);
-  expect(calls.length).toBe(3);
-  expect(JSON.stringify(calls[2]!.messages)).toContain("another");
+  expect(calls.length).toBe(2);
+  for (const l of ["a letter", "another"]) expect(JSON.stringify(calls[1]!.messages)).toContain(l);
 });
 
 // --- Opting out, being told what wasn't done, failed calls, and what's cut (the 2026-10-05 audit) ---

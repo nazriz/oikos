@@ -118,3 +118,30 @@ test("a tenant's letter to a landlord (to stay on, for time, for a repair) is th
   expect(await many.p.step(letting(2 * DAY + 9 * HOUR), ctx)).toMatchObject({ type: "wait" });
   expect(many.calls.length).toBe(1);
 });
+
+test("an assistant's done for n days is honoured: an acknowledgement, a paper or a letter in an office's fixed words, brings it back no sooner; a matter handed to it does, at its next sitting, with what came between read together", async () => {
+  // (2026-11-11: a seat that sat 58 times in 3 days was brought back by every acknowledgement and every result of its acts.)
+  const desk = (t: number, matters: object[] = [], inbox: object[] = []): Observation => ({ t, channels: { "finance-assistant/matters": { kind: "records", records: matters } }, outcomes: [], inbox, drafts: [],
+    positions: [{ position: "finance-assistant", entity: "city", title: "Assistant" }] }) as unknown as Observation;
+  const from = (id: string, kind: string, t: number, data: object = { agreement: "rec.2" }, post = "finance") => ({ id, record: "statement", kind, author: `${post}-system`, in_position: post, speaks_for: "city", at: t, text: `${kind} ${id}.`, visible_to: ["city"], addressed_to: ["city"], data });
+  // (Its delivery and its principal's brief; and the town's other office's matter, under an agreement of its own, which
+  // it is shown too, the town's papers to its assistants being the town's: not whom it works for.)
+  const terms = [{ ...from("rec.1", "service_delivery", 0, { systems: ["par.3"] }), author: "provider-a-sales-system", in_position: "provider-a-sales", speaks_for: "provider-a" },
+    from("rec.3", "brief", 0, { agreement: "rec.2", delivery: "rec.1" }), from("rec.4", "referral", 0, { agreement: "rec.8" }, "rates")];
+  const ack = { from: "rates-system", t: DAY + 10 * HOUR, text: "From the rating office: your letter is received. This office does not act on a letter's words. It acts on its forms." };
+  const { p, calls } = harness([[use("d", "done_for_now", { days: 4 })]], { participant: "par.3", title: "Assistant", trays: { kinds: new Map([["finance-assistant/matters", true as const]]), all: new Set() } });
+  await p.step(desk(9 * HOUR, terms), ctx);
+  expect(calls.length).toBe(1);
+  // The next day: an acknowledgement on paper and one by letter. Neither is its to act on: no sitting before the day it gave.
+  expect(await p.step(desk(DAY + 10 * HOUR, [from("rec.5", "acknowledgement", DAY + 10 * HOUR)], [ack]), ctx)).toEqual({ type: "wait", until: 2 * DAY + 9 * HOUR });
+  expect(await p.step(desk(2 * DAY + 9 * HOUR), ctx)).toEqual({ type: "wait", until: 3 * DAY + 9 * HOUR });
+  expect(calls.length).toBe(1);
+  // A matter handed to it that afternoon: back at the next working day's sitting, not at once, the acknowledgements beside it.
+  expect(await p.step(desk(2 * DAY + 14 * HOUR, [from("rec.9", "referral", 2 * DAY + 14 * HOUR)]), ctx)).toEqual({ type: "wait", until: 3 * DAY + 9 * HOUR });
+  expect(calls.length).toBe(1);
+  await p.step(desk(3 * DAY + 9 * HOUR), ctx);
+  expect(calls.length).toBe(2);
+  for (const s of ["referral rec.9.", "acknowledgement rec.5.", "your letter is received"]) expect(shown(calls[1]!)).toContain(s);
+  // Whom it writes to: the post that hands it its work, not the whole organisation (a letter to which every office answers).
+  expect(String(calls[1]!.system)).toContain("You work for finance, of city: to write to it, write to finance, not to city.");
+});
