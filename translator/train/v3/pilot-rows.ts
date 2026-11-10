@@ -8,10 +8,10 @@
 // Moved into git from runs/translator-v3-2026-10-25/scripts/pilot-rows.ts on 2026-11-10.
 import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { shown } from "../../model/adapter.ts";
-import { spansIn } from "../data.ts";
-import { withImplied } from "./implied.ts";
-import { cardRows } from "../../model/export.ts";
+import { shown } from "../../model/adapter";
+import { spansIn } from "../data";
+import { withImplied } from "./implied";
+import { cardRows } from "../../model/export";
 const out = resolve(process.argv[2]!);
 const R = process.env.OIKOS_RUNS ?? "/Users/clawd/oikos/runs";
 const D = join(R, "translator-v3-2026-10-25/datasets");

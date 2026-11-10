@@ -2,7 +2,7 @@
 // and a field's option. Read twice, each is pointed at where the form's line shows it, so a request need not say it.
 // Added as `implied` where spansIn found no place for it (a value the request does say keeps its span).
 // Moved into git from runs/translator-v3-2026-10-25/scripts/implied.ts on 2026-11-10.
-import { calls } from "../../../participants/src/index.ts";
+import { calls } from "@oikos/participants";
 
 export function withImplied(spans: any[], program: string, forms: string[]): any[] {
   const p = calls.parseProgram(program);

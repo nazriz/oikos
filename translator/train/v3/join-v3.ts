@@ -12,12 +12,12 @@
 // Moved into git from runs/translator-v3-2026-10-25/scripts/join-v3.ts on 2026-11-10.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { spansIn } from "../data.ts";
-import { withImplied } from "./implied.ts";
-import { cardRows } from "../../model/export.ts";
-import { calls } from "../../../participants/src/index.ts";
-import { loadHeldOut, sharesWording } from "../../eval/held-out.ts";
-import { PILOT_CASES, FORMS } from "../../eval/pilot-cases.ts";
+import { spansIn } from "../data";
+import { withImplied } from "./implied";
+import { cardRows } from "../../model/export";
+import { calls } from "@oikos/participants";
+import { loadHeldOut, sharesWording } from "../../eval/held-out";
+import { PILOT_CASES, FORMS } from "../../eval/pilot-cases";
 const out = resolve(process.argv[2]!);
 mkdirSync(out, { recursive: true });
 const REPO = resolve(import.meta.dir, "../../..");
@@ -60,7 +60,8 @@ count("base train", train.length); count("base validation", validation.length);
 
 // ---- the forms of real tests and of the written targets: never kept out
 const keep = new Set<string>();
-for (const lines of Object.values(FORMS) as string[][]) for (const l of lines) keep.add(nameOf(l));
+// (As the script ran in round v3, untyped: FORMS holds records, so this keeps nothing by name; kept as it ran.)
+for (const lines of Object.values(FORMS) as unknown as string[][]) for (const l of lines) keep.add(nameOf(l));
 const pilotLines: { [form: string]: string[] } = JSON.parse(readFileSync(join(V3, "pilot-form-lines.json"), "utf8"));
 for (const k of Object.keys(pilotLines)) keep.add(k);
 const allPilotLines = Object.values(pilotLines).flat();
