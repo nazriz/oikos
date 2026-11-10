@@ -12492,3 +12492,7 @@ plain words and with no menu of the world's acts (P1, P2):
   to record, not something to prevent.
 - **Revisit if:** seats leave by writing the line as a sign-off, without meaning it (read their reasons and debriefs
   first: the line asks for a reason and the guide says what follows it).
+
+## 2026-11-11 · Obstacles as laws of the institutions that make them: a proposal (docs/design/obstacles.md; nothing built)
+
+- A proposal for review: O1 reframed as an authority to act on file at the counterparty, O4 a counterparty's acceptance rule, O3 a keeper's record, O2 after a general working-hours law (WM-18); an obstacle record read by `beyond.rs`; readiness to grant from the cost of delay. **Revisit if** Naz rejects the reframing of O1 or the general hours law.
