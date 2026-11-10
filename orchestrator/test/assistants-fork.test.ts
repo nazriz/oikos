@@ -75,9 +75,11 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
   // engages one: docs/decisions.md, "Handing over H2 and H3".)
   const PERSONAL = { offer: "personal-assistant-a", levels: { benefit_claim: "draft", benefit_change: "draft", job_application: "draft", loan_application: "draft", rental_application: "draft", review_request: "draft" }, levels_until: 200 * DAY, keep_until: 200 * DAY, why: "test" };
   for (const p of config.participants.filter((x: any) => x.controller?.params?.delegation).slice(0, 60)) p.controller.params = { ...p.controller.params, delegation: { ...p.controller.params.delegation, commit: PERSONAL } };
-  // (Enough to keep back every seat's debrief, at the table's measured cost for its model, and leave some work: since
-  // 2026-11-10 a limit that cannot cover the debriefs does not start. A Sonnet seat's is about 0.49 USD.)
-  const limit = 4;
+  // (The smallest limit that keeps back every seat's debrief, at the table's measured cost for its model, and leaves a
+  // little work: since 2026-11-10 a limit that cannot cover the debriefs does not start (risk MT-30, fixed). Since H6 the
+  // town's factories and rates post are principals for more kinds and, at these prices, take assistants by their own
+  // rule, so about eleven systems sit and are debriefed.)
+  const limit = 6;
   const spec: ExperimentSpec = { name: "assistants-seats", world: { config }, post: "template:assistant-a,assistant-a-personal", seeds: [1], forkDay: 60, untilDay: 120,
     arms: [{ name: "seats", steward: { kind: "model", model: "anthropic/claude-sonnet-5-5" } }], measures: ["acts"],
     seats: { mock_models: true, framing: "unstated", budget: { fork_usd: limit } } };

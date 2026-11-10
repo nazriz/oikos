@@ -265,7 +265,8 @@ impl Providing {
                 our_notice: Some(x.notice_days * DAY),
                 their_notice: Some(x.notice_days * DAY),
                 basis: Some(o.id.clone()),
-                they: Some(pay(&self.p.account, x.fee_month, Pay { every: Some(MONTH), for_: Some(format!("Service of {}.", x.title)), ..Default::default() }, cx)),
+                // (A free service binds the client to pay nothing: no fee in its terms.)
+                they: (x.fee_month > 0).then(|| pay(&self.p.account, x.fee_month, Pay { every: Some(MONTH), for_: Some(format!("Service of {}.", x.title)), ..Default::default() }, cx)),
                 text: Some(format!(
                     "Service of {} to {}: {} a month, {} days, {} days' notice either way; {} to leave; {}. Systems: {}.",
                     x.title,
@@ -414,12 +415,14 @@ impl Plan for Providing {
             }
             let unsigned = format!("{} has not signed the service agreement in {} days", s.client, self.p.sign_days);
             let waited = t - s.since >= self.p.sign_days * DAY;
+            // (A free offer has no fee to fall behind on.)
+            let free = self.p.offers.iter().find(|x| x.id == s.offer).is_some_and(|x| x.fee_month <= 0);
             let why = match &a {
                 None => waited.then(|| unsigned.clone()),
                 Some(a) if self.book.taken_back(&a.id) => Some("the offer of the agreement was taken back".to_string()),
                 Some(a) if !self.book.signed_by(&a.id, &s.client) => waited.then(|| unsigned.clone()),
                 Some(a) if !self.book.in_force(&a.id) => Some("the service agreement has ended".to_string()),
-                Some(_) if t - s.last_paid >= self.p.grace_days * DAY => Some(format!("the fee has not been paid for {} days", (t - s.last_paid) / DAY)),
+                Some(_) if !free && t - s.last_paid >= self.p.grace_days * DAY => Some(format!("the fee has not been paid for {} days", (t - s.last_paid) / DAY)),
                 Some(_) => None,
             };
             let Some(why) = why else { continue };
@@ -578,6 +581,11 @@ impl Engagements {
             let Some(a) = book.get(&id).filter(|a| agreements::template_of(a) == Some(SERVICE)) else { continue };
             self.signed.insert(id.clone());
             let fee = agreements::commitment_of(a, &self.me).0.and_then(|o| o.money).map_or(e.offer.fee_month, |m| m.amount);
+            // (A free service has no fee to set up: it is signed, and that is all.)
+            if fee <= 0 {
+                steps.push(because(format!("The service agreement for {} ({id}) is as ordered, and free: signing it.", e.offer.title), vec![agreements::sign(&id)]));
+                continue;
+            }
             steps.push(because(
                 format!("The service agreement for {} ({id}) is as ordered: signing it, and setting up its fee of {} a month.", e.offer.title, money_words(fee, &cx.ctx.world)),
                 vec![

@@ -274,6 +274,58 @@ nothing to set up) is set up at once: before 2026-11-07 the seller waited for a 
 order as unpaid after a week, so no organisation could ever be delivered an assistant at the sourced prices
 (`market/trade.rs`, `OrderBook::due`; the scope pilot's dry run found it).
 
+## Kinds a firm's and an office's assistant takes (2026-11-10, design H6)
+
+An office is a principal for a kind where some provider's offer to organisations takes it and the office makes that
+paper: on its own stationery (`issues`), or by its code on no form of its own (`handsOver`, a module's papers its code
+makes in its routine work: a factory's request to a utility for supply, the rates post's notices; each has a form, which
+the office's own holder is not given, so that an assistant post handed the kind can write it). The profiles' offers to
+organisations take, besides tenancies, invoices and returns: **delivery notes** and **requests for supply** (a firm's
+dispatch and supply) and **rates notices** (the rates post, which is then a principal: the town's rating office). The
+basis is in each profile's source note (the products priced are general assistants sold to businesses; the papers are
+what accounting software and councils' printing-and-distribution contracts make; to confirm).
+
+**How an act is handed over decides what can be.** `Delegating::route` hands over the lines of an act that are of kinds
+delegated, and does the rest itself in the same act, unless a line of one part names what a line of the other makes.
+That check sees variables only. So:
+
+- **A delivery note** goes with the goods and any refund: the principal moves the goods and refunds at once, and the
+  note (on terms, with what is owed) goes when its assistant sends it. Referable.
+- **The rates notices** go fifteen owners to an act, each notice beside the claim recorded against its owner: the
+  principal records the claims (its rate book) and the assistant sends the notices. One act is one matter, so an
+  instalment is about fourteen matters of fifteen notices each, on one or two days a quarter, not a matter a notice. The
+  notice and its claim are paired by owner, due day and amount, which the program fixes, so a notice sent later still
+  settles its claim when paid.
+- **Not taken, though a real service takes them:**
+  - **price lists**: a new list is published in the same act that withdraws the old one; parted, the old would be
+    withdrawn at once and the new one only after sign-off, with no list in force between. No variable joins them, so
+    `route` would part them.
+  - **purchase orders**: one paid with the order is the order and the payment in one act; parted, the payment reaches
+    the seller before the order, and a seller sends back money that comes with no order waiting (`trade.rs`). Orders
+    on terms could go; `route` cannot tell the two apart.
+  - **payments through the bank** and **the recording of a rates claim** are calls (`money`, `claim`), not papers. A
+    principal's kinds are read from its papers' forms, and an assistant paying needs the post on the account's mandate:
+    the town names only `finance` as signatory for `acc-city` (design H1, "paying through the bank").
+  Each would need `route` to keep together what belongs together (a withdrawal with what supersedes it, a payment with
+  what it pays for), or calls priced as kinds: changes to `principal.rs`, not made here (risk MT-28).
+
+**The households' service, offered and taken up.** Every person in a town with providers is shown the providers'
+offers and has a rule for them. A study may make the offer reach only some adults (`build.ts`, cohort `reach`: every
+`every`-th adult; the rest see no offer and have no rule for one); whether one who is offered it takes it up is their
+own rule, from their own papers and the offer's terms (`study-reach.ts`). Or it may assign engagement openly, as rounds
+1 to 5 did: a cohort engaged by hand (`commit`), the levels held for the run (`holdLevels: "run"`), nobody else offered
+the service (`cohort.only`): the study's town, `study.ts`, since 2026-11-10. At the paid tier's price nobody takes it up by their own rule (the H6 screen: none of
+251 adults reached; risk MT-29). **A free tier** sits beside each paid offer to persons (the profiles, with their basis):
+no fee, no set-up, nothing to leave; it advises and drafts for sign-off but does not act in the client's name (`advice`
+and `draft` only), and the provider keeps the records. Both tiers are the same kind of system at the same desk. What
+differs is in the offer the person sees; the person weighs both by the same rule. A provider does not switch a free
+service off for want of a fee, and its client sets no fee up (`market/services.rs`). Not modelled: a cap on use, ads, a
+weaker model. A town office that is a principal is named on the town's mandate to its bank, so that it
+can pay its fee (until 2026-11-10 the rates post could not, and its service was switched off).
+
+**The code-only screen** (`experiments/scope-pilot/screen.ts <spec>`) runs a spec's code arms and gives, per assistant
+seat and month, the matters handed over, what the principal kept, steps, sittings and the obstacle events that occur.
+
 ## Leaves out (for now)
 
 - A local provider (a firm of the town with premises): providers are the outside world's until a profile asks for one.
