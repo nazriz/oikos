@@ -104,14 +104,14 @@ test("a run that stops is reported as stopped, with why and the command that res
   process.env.OIKOS_ANTHROPIC_KEY = "test-key";
   const said: string[] = [];
   try {
-    const o = { world, seeds: 1, out, until: 60 * DAY, sets: ["citizens=40", "mayor=llm", "framing=simulation"], model: "anthropic/claude-haiku-4-5", baseUrl: `http://localhost:${server.port}`, budgetUsd: 0.005, compress: true, log: (m: string) => said.push(m) };
+    const o = { world, seeds: 1, out, until: 60 * DAY, sets: ["citizens=40", "mayor=llm", "framing=simulation"], model: "anthropic/claude-sonnet-5-5", baseUrl: `http://localhost:${server.port}`, budgetUsd: 0.25, compress: true, log: (m: string) => said.push(m) };
     const r = await runBatch(o);
     const run = r.runs[0]!;
     expect(run.t).toBeLessThan(60 * DAY);
     expect(run.end.reason).toBe("aborted");
     expect(run.end.detail).toContain("spending limit reached");
     expect(run.stopped).toMatchObject({ by: "SpendingLimitReached" });
-    const resume = `oikos resume ${join(out, "town.seed1.jsonl")} --model anthropic/claude-haiku-4-5 --budget 0.005 --base-url http://localhost:${server.port}`;
+    const resume = `oikos resume ${join(out, "town.seed1.jsonl")} --model anthropic/claude-sonnet-5-5 --budget 0.25 --base-url http://localhost:${server.port}`;
     expect(r.stopped).toEqual([{ seed: 1, runId: "town.seed1", t: run.t, why: run.stopped!.why, by: "SpendingLimitReached", resume }]);
     // The console: not a finished seed with fewer years.
     const line = said.find((m) => m.includes("seed 1:"))!;
