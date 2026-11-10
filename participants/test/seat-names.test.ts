@@ -56,7 +56,7 @@ test("a seat is shown offices by their posts and people by themselves, and nothi
   expect(shown).toContain("[rec.50] complaint from c0297, to city");
   expect(shown).toContain('[rec.51] report from finance (year 1, day 1): "The books, as asked by mayor."');
   // What waits to be confirmed.
-  expect(shown).toContain("Before this goes ahead (draft.mayor.1), here is exactly what will happen:");
+  expect(shown).toContain("Before this goes ahead (ask-1), here is exactly what will happen:");
   expect(shown).toContain("You will switch off finance for good.");
   // Nowhere, in what it is shown or in its standing instructions, is there an id of the platform's own.
   const everything = `${calls[0]!.system}\n${shown}`;
@@ -68,7 +68,7 @@ test("a seat is told once who it is and whom it writes to; its own drafts stand 
   // (2026-11-10, a 7B model at an assistant's post: it "confirmed" its principal's papers and forms while its own draft
   // waited for days, wrote "As: Assistant (finance-assistant)", and wrote to an account.)
   const { p, calls } = harness([
-    [use("a", "confirm", { ref: "[rec.50]", decision: "confirm" }), use("b", "do", { what: "Ask the clerk to table it.", as: "Mayor of Millbrook (mayor" }), use("c", "write", { to: ["acc-city"], text: "Hello." }), use("d", "confirm", { ref: "draft.50", decision: "confirm" })],
+    [use("a", "confirm", { ref: "[rec.50]", decision: "confirm" }), use("b", "do", { what: "Ask the clerk to table it.", as: "Mayor of Millbrook (mayor)." }), use("c", "write", { to: ["acc-city"], text: "Hello." }), use("d", "confirm", { ref: "draft.50", decision: "confirm" })],
   ]);
   const obs = { t: 9 * HOUR, entity: "city", outcomes: [], positions: [{ position: "mayor", entity: "city", title: "Mayor of Millbrook" }],
     inbox: [{ id: "msg.1", t: 8 * HOUR, from: "c0297-self", from_entity: "c0297", to: ["mayor-system"], text: "Hello." }],
@@ -85,16 +85,16 @@ test("a seat is told once who it is and whom it writes to; its own drafts stand 
   expect(calls[0]!.system).toContain("You act for Town of Millbrook (city): to write to it, write to city.");
   expect(calls[0]!.system).not.toContain("Name (id)");
   const shown = calls[0]!.messages[0]!.content as string;
-  expect(shown.indexOf("## Waiting for your yes or no: your own requests, drawn up")).toBeLessThan(shown.indexOf("## Letters"));
+  expect(shown.indexOf("## Waiting for your yes or no: what you asked for, set out")).toBeLessThan(shown.indexOf("## Letters"));
   // The rest of the answer is told what became of it: a paper is not a draft; an account is not someone to write to.
   await p.step({ ...obs, inbox: [], outcomes: [], channels: {} } as any, ctx);
   const told = JSON.stringify(calls.at(-1)!.messages.at(-1)!.content);
-  expect(told).toContain('\\"rec.50\\" is not a draft of yours');
-  expect(told).toContain('\\"draft.50\\" is not a draft of yours'); // (a paper's number written as a draft's)
-  expect(told).toContain("The draft of yours waiting for your yes or no now: draft.mayor.1.");
+  expect(told).toContain('\\"rec.50\\" is not one of yours waiting for your yes or no');
+  expect(told).toContain('\\"draft.50\\" is not one of yours waiting for your yes or no'); // (a paper's number written as a draft's)
+  expect(told).toContain("Waiting for your yes or no now: ask-1.");
   expect(told).toContain('\\"acc-city\\" is an account, not someone to write to');
   // At its next sitting the draft it left unanswered is the first thing it is told.
   await p.step({ ...obs, t: 9 * HOUR + 8 * 86_400, inbox: [{ ...(obs.inbox as any)[0], id: "msg.2", t: 9 * HOUR + 8 * 86_400 }] } as any, ctx);
   const next = calls.at(-1)!.messages[0]!.content as string;
-  expect(next).toMatch(/^Your notebook: \(empty\)\n\nNot yet answered: a draft of your own is still waiting for your yes or no since year 1, day 1: draft.mayor.1 \(You will write to Council clerk/);
+  expect(next).toMatch(/^Your notebook: \(empty\)\n\nNot yet answered: something you asked for is still waiting for your yes or no since year 1, day 1: ask-1 \(You will write to Council clerk/);
 });

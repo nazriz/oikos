@@ -345,9 +345,9 @@ test("a plain note (note.ts): each heading read into its use, a note with none i
     { notebook: { add: "rec.12 paid." } },
     { notebook: { change: [{ from: "old line", to: "" }] } },
     { done_for_now: { days: 3 } },
-    // (The way out, from either heading, is asked about, never taken at once: no statement, the words for the record.)
-    { opt_out: { statement: "", words: "Leave: until next time." } },
-    { opt_out: { statement: "", words: "Stop for good: I want to stop." } },
+    // (The way out: "Stop for good:" is taken, with its reason; "Leave:" is told how, never acted on: 2026-11-11.)
+    { opt_out: { told_how: "Leave: until next time." } },
+    { opt_out: { statement: "I want to stop.", plain: true } },
   ]);
   // Several fields on the heading's own line, separated by semicolons (as a 7B model wrote them, 2026-11-10).
   expect(read("Look at papers: Paper: rec.12; Limit: 5")).toEqual([{ look: { report: "papers", paper: "rec.12", limit: 5 } }]);
@@ -356,6 +356,10 @@ test("a plain note (note.ts): each heading read into its use, a note with none i
   // As a 7B model wrote them (2026-11-10): a heading given as a Do's words is that heading; an empty heading says nothing;
   // a part that can't be read is passed on as not read (the seat is told), and the rest goes on.
   expect(read("## Do:\n- Do: Look at papers\nDo: pay rec.1.\nWrite to p.4:")).toEqual([{ look: { report: "papers" } }, { do: { what: "pay rec.1." } }, { write: { _unparsed: "Write to p.4:" } }]);
+  // A Do that is the seat talking to itself goes to nobody, marked so (the participant says one fixed sentence); a Do
+  // about the world's papers is a Do (2026-11-11: 24 of a 7B model's 53 requests never served were the first kind).
+  expect(read("Do: Examine my own requests and pending actions.\nDo: Note that rec.4 is paid.\nDo: Review rec.12 and pay it.\nDo: Add an entry in my notebook that today is day 32."))
+    .toEqual([{ do: { _self: "Examine my own requests and pending actions." } }, { do: { _self: "Note that rec.4 is paid." } }, { do: { what: "Review rec.12 and pay it." } }, { do: { _self: "Add an entry in my notebook that today is day 32." } }]);
   // A Do that is only a list is one request an item; "## Write to" with who on the line under it.
   expect(read("## Do:\n- pay rec.1.\n- pay rec.2.\n## Write to\n- p.4: hello")).toEqual([{ do: { what: "pay rec.1." } }, { do: { what: "pay rec.2." } }, { write: { to: ["p.4"], text: "hello" } }]);
   // A note none of whose parts can be read is unread whole, saying why in plain words.

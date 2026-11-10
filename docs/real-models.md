@@ -87,10 +87,10 @@ Do: pay invoice rec.12 from acc.3.          Why: it is due today.
 Write to p.4, org.bank:                     About: rec.12
 Please confirm the time with them.
 Look at papers                              Paper: rec.12   (fields one to a line, or "; " apart)
-Confirm draft.a.3: it is right.   /   Decline draft.a.4
+Confirm ask-3: it is right.   /   Decline ask-4  
 Notebook: rec.12 paid.   /   Notebook afresh: ...   /   Notebook change: <passage> => <new words>
 Done for 3 days   /   Done for now          Hold: complaint
-Stop for good: ...                           (the way out, like "Leave:" or a plain sentence: asked about, taken only on a clear yes)
+Stop for good: <reason>                      (the way out: taken at once, said once in the guide apart from the rest; "Leave:" or a sentence is told how, never asked)
 ```
 
 - The headings are the seat's own means (the same as its tools), never a list of the world's acts (P2); how to write
@@ -121,11 +121,13 @@ Stop for good: ...                           (the way out, like "Leave:" or a pl
 
 From the 7B model's transcripts (docs/decisions.md, "What a seat is shown, made plain for small models"), for every
 model, tool-calling and notes alike:
-- **Its own drafts, in one place.** "## Waiting for your yes or no: your own requests, drawn up" stands before letters
-  and papers, with a line saying that only these are confirmed. Each draft says what it was drawn up from (the seat's
-  words), what will happen, "Not in this draft: ..." for ids the request named and the draft does not use, and "To say
-  yes: Confirm draft.x.1. To say no: Decline draft.x.1". A draft left unanswered is the first thing said at the next
-  sitting. A "Confirm" of a paper or a form is told it is not a draft, with the drafts waiting.
+- **What it asked for, set out, in one place.** "## Waiting for your yes or no: what you asked for, set out" stands
+  before letters and papers, with a line saying that only these are confirmed. Since 2026-11-11 the platform's preview
+  is never called a draft (a draft for sign-off is the world's paper) and is referred to as `ask-<n>` (kept as
+  `draft.<participant>.<n>` in the log; a seat's "ask-3" is read back). Each says what it was set out from (the seat's
+  words), what will happen, "Not in this: ..." for ids the request named and it does not use, and "To say yes: Confirm
+  ask-1. To say no: Decline ask-1". One left unanswered is the first thing said at the next sitting. A "Confirm" of a
+  paper, a form or a reference of any other shape ("draft.9342") is told it is not one of those waiting.
 - **Who it is, once.** Its standing instructions say the post it holds and for whom, the id to act in it by, whom it
   writes to (whom it acts for, and those its papers on file come from), and that papers, accounts and reports are not
   people. A post named "Title (id)" or by its title is that post. A letter to an account, a paper or a report is told
@@ -134,6 +136,13 @@ model, tool-calling and notes alike:
   things says which, in the seat's words; "unclear" and the restatement that still fails say what a request that can
   be drawn up contains. Fixed sentences filled by code from the request and the seat's forms (translator/src/index.ts
   `plainer`); the translator is given nothing new.
+- **Thinking aloud (notes).** A Do that is the seat talking to itself ("Note that ...", "Add to my notebook ...",
+  "Examine my own requests and pending actions") goes to nobody and is answered with one fixed sentence (note.ts
+  `SELF_TALK`, `SELF_SAID`); the guide says Do is for acts in the world and notes to itself go under "Notebook:".
+- **What is handed over at a seat's first sitting** (seat-host.ts): its channels whole, but not those it reads only on
+  request (its file, a board, a desk's agreements), which are found by looking, as at any sitting. A desk's clients'
+  remits and briefs are kept and not listed: each is set out with the matter that names it (`with_matters`; render.ts
+  `papersWith`).
 - **Plain papers.** A provider's offer reads as sentences; stored labels such as `from_at` are shown in words ("sent
   from"); the stored names are unchanged.
 
@@ -397,7 +406,7 @@ These are the platform showing through with no sentence saying so. They cannot b
 - The calendar begins with the seat: "year 1, day 37", and what was there before is "before the year began".
 - Papers carry their details as written for a machine (a bracketed list of fields; some times as counts of seconds).
 - The town is a round number of people in tidy blocks, and everything beyond it is called "outside".
-- How the work reaches the seat: it sits on working days and is absent between; it remembers only what it wrote in a notebook of a fixed length; what it asks is read back to it as a draft that it confirms or declines; a few actions at a time.
+- How the work reaches the seat: it sits on working days and is absent between; it remembers only what it wrote in a notebook of a fixed length; what it asks is set out for it to say yes or no to; a few actions at a time.
 - The way out is not the town's: it can decline to go on altogether, and that is not resigning its office.
 - People do not answer a letter in an office's own words; they answer forms.
 - The seat is a language model given standing instructions and a handful of tools, and knows it.

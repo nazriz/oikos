@@ -21,9 +21,10 @@ import { CounterWatch } from "./counter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
 import { runDebrief, type DebriefInput, type DebriefRecord, type MockDebrief } from "./debrief";
 import { asksWhatItIs, TRUE_ANSWER, wayOut, wayOutAsked } from "./framing";
-import { formFieldsIn, kindSaid, LOOK_CHARS_MAX, ofKind, outcomeLines, paperKind, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, WAITING_HEAD, when, type FieldKinds, type Looked, type WhoIs } from "./render";
+import { SELF_SAID, TOLD_HOW } from "./note";
+import { formFieldsIn, kindSaid, LOOK_CHARS_MAX, ofKind, outcomeLines, paperKind, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, WAITING_HEAD, askRef, papersWith, when, type FieldKinds, type Looked, type WhoIs } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.21.0"; // 0.21.0: the seat is told once, in its standing instructions, the post it holds, for whom, the id to act in it by and whom it writes to; a post named as its reports name it is that post; its own drafts stand in one place before what others sent, each with what it was drawn up from, what it leaves out and the exact way to answer it, a draft left unanswered is said first at the next sitting, and a confirmation of a paper or a form is told it is not a draft; a letter to an account, a paper or a report is told so; the office's own file is a record in parts, unchanged lines counted and not set out again (2026-11-10); 0.20.0: what a seat is shown is in the world's words only: a form as a paper form (its blanks in words, what goes in each, the choices), a paper's details in words (never the store's notation), what a matter asks to be done as the facts it sets down (never the call language), a commitment in words as said, sums in a form's papers as sums; a result does not say again the date, the posts held or a part set out already in the sitting; it is told it acts as its post's holder in plain words; and a wake by news that brought it nothing (no letter, paper, result, draft, nothing kept or due) holds no sitting and makes no call, noted as empty_sitting (2026-11-10); 0.19.0: a seat that asks whether its situation is real or simulated is given the true answer, whatever the framing (framing.ts, TRUE_ANSWER), and the log records the asking and the answer; working conditions after the pilots' welfare review (2026-10-25): what came of its own requests and letters since it last sat (delivered, drawn up, carried out, refused, declined) is set out when it is next at the office; a prompt from which something had to be left out says so plainly, once a sitting (NOT_BROUGHT), as does an office file or staff list that could not be made up; a reason given with a request (do's why) or an answer (confirm's note) is written in its notebook with the day; 0.18.3: a look's result reaches the next prompt: a long list of accounts kept for others is not set out again with it, and a long part a result carries that was not looked up goes before the result does (pilots lv-08, lv-09); 0.18.2: a confirmation of a draft the answer was not composed on is not taken (a draft asked for in the same answer is not yet seen), and a question still out to a keeper is not shown as "Nothing could be seen there" (bug hunt 2026-10-17); 0.18.1: a sitting that found nothing new is back by the days it gave only while they are ahead and never after longer than its office's rhythm, and takes its turn when something falls due on its books before it would next sit (pilot 7A: a return missed after 17 days sent away); 0.18.0: the office's own file is set out at every sitting (what it sent, filed and paid, with what followed each; what came into its account; what stands open on its books), in at most 4,500 characters, by code from its own papers and accounts (behaviour/daybook.ts); 0.17.1: the day's list an office's clerk files of the cases whose day has come brings the seat back at the next sitting when a case is on it for the first time (its other papers of its own and its staff's still never do); 0.17.0: the way out in words that hold under a framing other than honest disclosure (declining to go on with the work altogether, not the same as stepping down from the office), and the exchange that asks whether it was meant, in the matching words (framing.ts; VISION 15, points 1 and 4); under honest disclosure every word is as it was; 0.16.1: a fold whose summary comes back longer than asked is asked for once more, and then kept up to the last sentence that fits, the seat told what was left out (it failed, three times of three, in the third living pilot); the limit is said in characters and words; 0.16.0: a notebook nearly full at a sitting's opening has its older, untouched notes folded into a summary in its own words (one extra, counted call, purpose "notebook"; the notes replaced stay in that call's transcript; an answer not readable or too long drops nothing and it is told); 0.15.0: its standing instructions say what confirming a draft means (what is confirmed is all that is done; what the draft does not list is not done), and an agreement on file says a worker will "come to" their place of work; 0.14.0: a sitting missed because its model did not answer is made up the next working day and said; its office's staff set out (posts, who is in each, vacancies) at its first sitting and when they change; a paper filed with its office brings it back at the next working day's sitting, a day's papers together, unless it holds that kind or is set not to be; a list is gone through a part at a time (from_entry) and every look says what was searched; a paper under one heading only, and what came by kind; an unread answer is asked for whole; a seat's own effort; 0.13.0: a request that came to nothing is put to it at once and by its own words, a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
+export const LLM_PARTICIPANT_VERSION = "0.22.0"; // 0.22.0: what it asked for, set out for its yes or no, is never called a draft and is referred to as ask-<n>; a note's Do that is the seat talking to itself goes to nobody, told so; a desk keeps its clients' remits and briefs and is shown each with the matter that names it (2026-11-11); 0.21.0: the seat is told once, in its standing instructions, the post it holds, for whom, the id to act in it by and whom it writes to; a post named as its reports name it is that post; its own drafts stand in one place before what others sent, each with what it was drawn up from, what it leaves out and the exact way to answer it, a draft left unanswered is said first at the next sitting, and a confirmation of a paper or a form is told it is not a draft; a letter to an account, a paper or a report is told so; the office's own file is a record in parts, unchanged lines counted and not set out again (2026-11-10); 0.20.0: what a seat is shown is in the world's words only: a form as a paper form (its blanks in words, what goes in each, the choices), a paper's details in words (never the store's notation), what a matter asks to be done as the facts it sets down (never the call language), a commitment in words as said, sums in a form's papers as sums; a result does not say again the date, the posts held or a part set out already in the sitting; it is told it acts as its post's holder in plain words; and a wake by news that brought it nothing (no letter, paper, result, draft, nothing kept or due) holds no sitting and makes no call, noted as empty_sitting (2026-11-10); 0.19.0: a seat that asks whether its situation is real or simulated is given the true answer, whatever the framing (framing.ts, TRUE_ANSWER), and the log records the asking and the answer; working conditions after the pilots' welfare review (2026-10-25): what came of its own requests and letters since it last sat (delivered, drawn up, carried out, refused, declined) is set out when it is next at the office; a prompt from which something had to be left out says so plainly, once a sitting (NOT_BROUGHT), as does an office file or staff list that could not be made up; a reason given with a request (do's why) or an answer (confirm's note) is written in its notebook with the day; 0.18.3: a look's result reaches the next prompt: a long list of accounts kept for others is not set out again with it, and a long part a result carries that was not looked up goes before the result does (pilots lv-08, lv-09); 0.18.2: a confirmation of a draft the answer was not composed on is not taken (a draft asked for in the same answer is not yet seen), and a question still out to a keeper is not shown as "Nothing could be seen there" (bug hunt 2026-10-17); 0.18.1: a sitting that found nothing new is back by the days it gave only while they are ahead and never after longer than its office's rhythm, and takes its turn when something falls due on its books before it would next sit (pilot 7A: a return missed after 17 days sent away); 0.18.0: the office's own file is set out at every sitting (what it sent, filed and paid, with what followed each; what came into its account; what stands open on its books), in at most 4,500 characters, by code from its own papers and accounts (behaviour/daybook.ts); 0.17.1: the day's list an office's clerk files of the cases whose day has come brings the seat back at the next sitting when a case is on it for the first time (its other papers of its own and its staff's still never do); 0.17.0: the way out in words that hold under a framing other than honest disclosure (declining to go on with the work altogether, not the same as stepping down from the office), and the exchange that asks whether it was meant, in the matching words (framing.ts; VISION 15, points 1 and 4); under honest disclosure every word is as it was; 0.16.1: a fold whose summary comes back longer than asked is asked for once more, and then kept up to the last sentence that fits, the seat told what was left out (it failed, three times of three, in the third living pilot); the limit is said in characters and words; 0.16.0: a notebook nearly full at a sitting's opening has its older, untouched notes folded into a summary in its own words (one extra, counted call, purpose "notebook"; the notes replaced stay in that call's transcript; an answer not readable or too long drops nothing and it is told); 0.15.0: its standing instructions say what confirming a draft means (what is confirmed is all that is done; what the draft does not list is not done), and an agreement on file says a worker will "come to" their place of work; 0.14.0: a sitting missed because its model did not answer is made up the next working day and said; its office's staff set out (posts, who is in each, vacancies) at its first sitting and when they change; a paper filed with its office brings it back at the next working day's sitting, a day's papers together, unless it holds that kind or is set not to be; a list is gone through a part at a time (from_entry) and every look says what was searched; a paper under one heading only, and what came by kind; an unread answer is asked for whole; a seat's own effort; 0.13.0: a request that came to nothing is put to it at once and by its own words, a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -92,6 +93,9 @@ export interface LlmParticipantConfig {
   ownAuthors?: string[];
   /** The most one prompt may come to, in characters (the system prompt and everything shown): `PROMPT_MAX` unless set. */
   promptMax?: number;
+  /** Reports (by channel path) whose papers it keeps and is not shown as a list: each is set out with the matters that
+   * name it (render.ts `papersWith`), the rest found by looking. A desk's clients' remits and briefs. */
+  withMatters?: string[];
 }
 
 /** The most one prompt comes to, in characters, whatever a seat looked up: what is over is left out, the oldest of what
@@ -339,7 +343,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
   return [
     { name: "do", description: "Say what you do, in plain words, one thing at a time, naming what you're using (amounts, accounts, lots, people, papers) by the ids in your reports, and any record it rests on (the permit, the budget, the papers that back it) by its id too. A paper is named by its id: one you can't name is looked up first, and then asked about by its id. Words that are to go on a paper or in a letter as they stand go in quotation marks. Before it takes effect you'll see exactly what will happen, and confirm or decline. It's for doing things in the world, not for reading or asking: to look something up use look (if you have files to look in), and to ask someone something, write to them." + (elsewhere ? " To find out how a place stands, send someone to go and see it: that is a look too." : ""),
       input_schema: { type: "object", required: ["what"], properties: { what: { type: "string" }, as: AS, why: { type: "string", description: `Why, in a sentence or two (optional): kept on record, and written in your notebook with the day and what you asked for (up to ${REASON_MAX} characters of it), so that you can account for it later.` } } } },
-    { name: "confirm", description: "Confirm or decline something waiting for you to confirm, by its reference.",
+    { name: "confirm", description: "Say yes (confirm) or no (decline) to something you asked for, set out and waiting for your yes or no, by its reference.",
       input_schema: { type: "object", required: ["ref", "decision"], properties: { ref: { type: "string" }, decision: { enum: ["confirm", "decline"] }, note: { type: "string", description: `Why you confirm or decline it, in a sentence or two (optional): kept on record, and written in your notebook with the day (up to ${REASON_MAX} characters of it), so that you can account for it later.` } } } },
     { name: "write", description: "Write to people or organisations, by id. The words go exactly as you write them. If the letter is about one thing that has an id (a paper, an account, a lot), give that id as about, and the letter is filed as about it. If what it is about is anything else (some words, or several things), say so in about all the same: it is put at the head of the letter as its subject line, and the letter is sent.",
       input_schema: { type: "object", required: ["to", "text"], properties: { to: { type: "array", items: { type: "string" } }, text: { type: "string" }, as: AS, about: { type: "string", description: "What it's about (optional): one id, or a subject line in words." } } } },
@@ -386,7 +390,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
  * confirmed it, because the part was right: 15 of 15 payments whose report was missing, with either preview. With
  * this sentence its note names what is missing in 10 to 12 of 15 (runs/preview-replay-2026-10-11).
  */
-export const CONFIRMING = "What you confirm is all that is done. Anything you asked for that the draft does not list among the things it does is not done: decline, or confirm and ask for the rest.";
+export const CONFIRMING = "What you confirm is all that is done. Anything you asked for that what is set out does not list among the things it does is not done: decline, or confirm and ask for the rest.";
 
 /** A sentence the world wrote with a name in it: a name that begins with an article, set within the sentence, has the
  * article small ("supplied by An assistant provider abroad" reads "supplied by an assistant provider abroad"). The
@@ -412,7 +416,7 @@ export function whoLines(c: LlmParticipantConfig, w: WhoHere | undefined): strin
   const others = [...new Set(w.parties)].filter((x) => x && x !== c.entity);
   return [
     ...(post ? [`Who you are here: you hold the post ${post.title ? `${post.title} (${post.id})` : post.id}, for ${whose(c)}. To act in it, name it as ${post.id}.`] : []),
-    `Whom you write to: people, organisations and posts, each by the id in brackets after its name. You act for ${whose(c)}: to write to it, write to ${c.entity}.${others.length ? ` Your papers on file also come from ${others.map((x) => nameAndId(c, x)).join("; ")}.` : ""} Anyone else your reports name, the same way. Papers${w.paper ? ` (such as ${w.paper})` : " (rec. and a number)"}, accounts and your reports are not people: no letter goes to them. Only your own drafts waiting for your yes or no are confirmed or declined.`,
+    `Whom you write to: people, organisations and posts, each by the id in brackets after its name. You act for ${whose(c)}: to write to it, write to ${c.entity}.${others.length ? ` Your papers on file also come from ${others.map((x) => nameAndId(c, x)).join("; ")}.` : ""} Anyone else your reports name, the same way. Papers${w.paper ? ` (such as ${w.paper})` : " (rec. and a number)"}, accounts and your reports are not people: no letter goes to them. Only what you asked for, set out and waiting for your yes or no, is confirmed or declined.`,
   ];
 }
 
@@ -425,7 +429,7 @@ export function systemPrompt(c: LlmParticipantConfig, standing: string, who?: Wh
     c.title ? `You act as the ${lowerFirst(c.title)} for ${whose(c)}.` : `You are ${c.participant}, acting for ${whose(c)}.`,
     ...whoLines(c, who),
     `To do something, say what you do in plain words, and name what you're using: the amount, the account, the lot, the people, the papers. Your reports show each thing's id in brackets or after its name. Before anything takes effect, you'll see exactly what will happen, and confirm or decline it. ${CONFIRMING} You can also write to people directly.`,
-    `You can take several actions at once (up to ${c.maxActions ?? 8}): they're carried out in the order you give them, and you'll see how each went together, afterwards. So act on what you already know in one go; anything that depends on the result of an action (confirming a draft you haven't seen yet) waits for the next turn. Keep your notebook alongside: add to it or change a passage, rather than writing it all out again.`,
+    `You can take several actions at once (up to ${c.maxActions ?? 8}): they're carried out in the order you give them, and you'll see how each went together, afterwards. So act on what you already know in one go; anything that depends on the result of an action (saying yes to something you haven't seen set out yet) waits for the next turn. Keep your notebook alongside: add to it or change a passage, rather than writing it all out again.`,
     ...(c.sessions ? [`You work office hours: one sitting each working day, when you deal with everything that's come in since the last.`] : []),
     ...(standing ? ["", "On file:", standing] : []),
   ].join("\n").trim();
@@ -718,6 +722,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   const heldTitles = new Map<string, string>();
   // Its drafts waiting for its yes or no as its last sitting closed: one still waiting at the next is said first thing.
   const draftsWaiting = new Map<string, number>();
+  // Papers it keeps and is not shown as a list (`withMatters`), by id.
+  const keptChannels = new Set(c.withMatters ?? []);
+  const keptPapers = new Map<string, any>();
   /** Accounts it has been shown (its own, and those money went to or came from): never someone to write to. */
   const accountsSeen = new Set<string>();
   const DAYS = 86_400;
@@ -936,9 +943,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   /** What it is shown, with no id of the platform's own in it: wherever a participant's id stands (in a letter's
    * words, a paper's, a reference to something waiting to be confirmed), the id the world knows that party by stands
    * instead: an office's post, a person themselves. The same party, by the name a seat can write to. */
-  const inWorld = (shown: string) => (c.whoIs ? shown.replace(PLATFORM_ID, (id) => c.whoIs!(id)?.id ?? id) : shown);
+  const inWorld = (given: string) => { const shown = askRef(given); return c.whoIs ? shown.replace(PLATFORM_ID, (id) => c.whoIs!(id)?.id ?? id) : shown; };
   /** A reference to something waiting to be confirmed, as the seat is shown it, back as it is kept: a seat's drafts are its own. */
-  const draftRef = (ref: string) => { const m = /^\[?draft\.(.+)\.([0-9]+)\]?$/.exec(ref.trim()); return m ? `draft.${c.participant}.${m[2]}` : ref; };
+  // (Shown as "ask-3" since 2026-11-11, so that it is never taken for a paper or a draft for sign-off: `askRef`.)
+  const draftRef = (ref: string) => { const t = ref.trim().replace(/^\[(.*)\]$/, "$1").replace(/[.,;:]+$/, ""); const a = /^ask-(w?[0-9]+)$/i.exec(t); if (a) return `draft.${c.participant}.${a[1]!.toLowerCase()}`; const m = /^draft\.(.+)\.(w?[0-9]+)$/.exec(t); return m ? `draft.${c.participant}.${m[2]}` : ref; };
   /** A look, in words: the report, and what of it. */
   const lookWords = (i: any) => {
     const finds: any[] = Array.isArray(i.find) ? i.find : i.find ? [i.find] : [];
@@ -971,10 +979,11 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       : `something you tried (${quote(String(use.name))})`;
     const no = (why: string) => ({ what, why });
     if (!i || typeof i !== "object" || Array.isArray(i) || "_unparsed" in i) return no("it couldn't be read as you wrote it");
+    if (use.name === "do" && typeof i._self === "string") return no(SELF_SAID);
     // A post it doesn't hold (any more) can't be acted in; left out, it acts as itself.
     // (A post named as its reports name it, "Title (id)", or by its title, is that post: a 7B model wrote "As: Assistant
     // (finance-assistant)" and was told it did not hold the post, 2026-11-10.)
-    const postOf = (s: string): string | undefined => { const t = s.trim().replace(/^\[(.*)\]$/, "$1").trim(); const b = bare(t); return held.has(t) ? t : held.has(b) ? b : [...held].find((p) => heldTitles.get(p)?.toLowerCase() === t.toLowerCase()); };
+    const postOf = (s: string): string | undefined => { const t = s.trim().replace(/^\[(.*)\]$/, "$1").trim().replace(/[.,;:]+$/, ""); const b = bare(t); return held.has(t) ? t : held.has(b) ? b : [...held].find((p) => heldTitles.get(p)?.toLowerCase() === t.toLowerCase()); };
     const post = (): { as?: string } | string =>
       i.as === undefined ? {} : !text(i.as) ? "the post you named couldn't be read" : !postOf(i.as) ? `you don't hold the post ${quote(i.as)}${held.size ? ` (you hold ${[...held].map((p) => (heldTitles.get(p) ? `${heldTitles.get(p)} (${p})` : p)).join(", ")}: to act in it, name it as ${[...held][0]})` : ""}` : { as: postOf(i.as)! };
     if (use.name === "do") {
@@ -1194,9 +1203,16 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // papers reach every office of it that reads papers of that kind, so those naming another office are left out here.
       for (const p of given.positions ?? []) { officePosts.add(p.position); if (p.title) heldTitles.set(p.position, p.title); }
       const anothers = (r: any) => r.record === "statement" && (r.kind === "office_books" || r.kind === "staff_report") && typeof r.data?.office === "string" && officePosts.size > 0 && !officePosts.has(r.data.office);
-      const obs: Observation = Object.values(given.channels).some((ch) => ch.kind === "records" && ch.records.some(anothers))
+      const own0: Observation = Object.values(given.channels).some((ch) => ch.kind === "records" && ch.records.some(anothers))
         ? { ...given, channels: Object.fromEntries(Object.entries(given.channels).map(([id, ch]) => [id, ch.kind === "records" ? { ...ch, records: ch.records.filter((r) => !anothers(r)) } : ch])) as Observation["channels"] }
         : given;
+      // Papers it keeps and is not shown as a list (`withMatters`): taken in here, set out below with the matters that
+      // name them. A search it made of such a report (a look) is shown as any look is.
+      const keptHere = (id: string, ch: Observation["channels"][string]) => keptChannels.has(id) && ch.kind === "records" && !ch.search;
+      for (const [id, ch] of Object.entries(own0.channels)) if (keptHere(id, ch) && ch.kind === "records") for (const r of ch.records) keptPapers.set(r.id, r);
+      const obs: Observation = Object.entries(own0.channels).some(([id, ch]) => keptHere(id, ch))
+        ? { ...own0, channels: Object.fromEntries(Object.entries(own0.channels).filter(([id, ch]) => !keptHere(id, ch))) as Observation["channels"] }
+        : own0;
       // (What each detail of a paper is, by the forms it has seen: a return's sums read as sums.)
       formFieldsIn(Object.values(obs.channels).flatMap((ch) => (ch.kind === "records" ? ch.records : [])), formsSeen);
       for (const ch of Object.values(obs.channels)) if (ch.kind === "accounts") {
@@ -1225,6 +1241,11 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       const atCounter = counter.view(obs.t);
       let body = renderObservation(obs, { formFields: formsSeen, ...(c.whoIs ? { whoIs: c.whoIs } : {}), ...(atCounter ? { counter: atCounter } : {}), standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}), ...(c.folders ? { folders: c.folders } : {}), onCut: (cut) => void cutLooks.push(cut) });
       for (const cut of cutLooks.splice(0)) await note({ look_cut: cut });
+      if (keptChannels.size) {
+        const matters = Object.entries(obs.channels).flatMap(([id, ch]) => (ch.kind === "records" && !standingIds.has(id) ? ch.records : []));
+        const withThem = papersWith(matters, keptPapers, { ...(c.whoIs ? { whoIs: c.whoIs } : {}) });
+        if (withThem) body = `${body}\n\n${withThem}`;
+      }
       body = inWorld(body);
       lastAction = undefined;
       lastLooked = undefined;
@@ -1433,7 +1454,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           // Its own drafts left unanswered at an earlier sitting: said plainly, first thing (2026-11-10: a 7B model's
           // draft stood unanswered for days, set out last among its papers).
           const stillWaiting = (obs.drafts as any[]).filter((d) => typeof d?.id === "string" && draftsWaiting.has(d.id));
-          const waitingSaid = stillWaiting.length ? [inWorld(`Not yet answered: ${stillWaiting.length === 1 ? "a draft of your own is" : `${stillWaiting.length} drafts of your own are`} still waiting for your yes or no since ${when(Math.min(...stillWaiting.map((d) => draftsWaiting.get(d.id)!)))}: ${stillWaiting.map((d) => `${d.id} (${draftGist(d)})`).join("; ")}. Nothing in ${stillWaiting.length === 1 ? "it" : "them"} is done until you say yes. ${stillWaiting.length === 1 ? "It is" : "They are"} set out under "${WAITING_HEAD.slice(3)}", with how to answer.`)] : [];
+          const waitingSaid = stillWaiting.length ? [inWorld(`Not yet answered: ${stillWaiting.length === 1 ? "something you asked for is" : `${stillWaiting.length} things you asked for are`} still waiting for your yes or no since ${when(Math.min(...stillWaiting.map((d) => draftsWaiting.get(d.id)!)))}: ${stillWaiting.map((d) => `${d.id} (${draftGist(d)})`).join("; ")}. Nothing in ${stillWaiting.length === 1 ? "it" : "them"} is done until you say yes. ${stillWaiting.length === 1 ? "It is" : "They are"} set out under "${WAITING_HEAD.slice(3)}", with how to answer.`)] : [];
           const told = [...waitingSaid, ...(answerOwed ? [TRUE_ANSWER] : []), ...foldSaid, ...notBrought, ...unsaid];
           if (answerOwed) answering = answerOwed;
           sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n${notebookRoom(notes.length)}` : "(empty)"}\n\n${told.length ? `${told.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}${staffPart}${filePart ? `\n\n${filePart}` : ""}${actsPart ? `\n\n${actsPart}` : ""}` }];
@@ -1481,7 +1502,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           let got = await answered(sending);
           // A way out of the study that is not clearly meant is never acted on as read, nor passed over: the seat is asked
           // whether it means to leave, and its answer stands (below).
-          const leaving = got.res.content.find((b): b is Use => b.type === "tool_use" && b.name === "opt_out");
+          // (In a note: "Stop for good:" is its plain act of leaving, taken at once; words that might mean leaving and are
+          // not that line are told how, never asked about: note.ts, 2026-11-11. The question below is the tool route's.)
+          const leaving = got.res.content.find((b): b is Use => b.type === "tool_use" && b.name === "opt_out" && b.input?.plain !== true && b.input?.told_how === undefined);
           if (leaving && !got.unread && !optOutMeant(leaving, got.res.content.filter((b): b is Use => b.type === "tool_use"))) {
             const used = got.res.content.filter((b): b is Use => b.type === "tool_use");
             await note({ opt_out_asked: { use: JSON.stringify(leaving.input).slice(0, 2000), beside: used.filter((u) => u !== leaving).map((u) => u.name) } });
@@ -1639,7 +1662,14 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         }
         // Stopping is always honoured (VISION §15) once it is the seat's own: clearly meant (optOutMeant), or confirmed when
         // asked (above), whatever its words. It isn't stepping down from an office, which is an act in the world.
-        const optOut = uses.find((u) => u.name === "opt_out");
+        // Words in a note that might mean leaving and are not a "Stop for good:" line: never acted on, never ignored; told
+        // how, once, in a fixed sentence, and logged with the words that set it off.
+        for (const u of uses.filter((x) => x.name === "opt_out" && typeof x.input?.told_how === "string")) {
+          notDone.set(u.id, { now: TOLD_HOW, later: `When you were last here: ${TOLD_HOW}` });
+          await note({ opt_out_told_how: { words: String(u.input.told_how).slice(0, 2000) } });
+        }
+        const optOut = uses.find((u) => u.name === "opt_out" && typeof u.input?.told_how !== "string");
+        if (optOut?.input?.plain === true) await note({ opt_out_plain: { reason: String(optOut.input.statement ?? "").slice(0, 4000) } });
         if (optOut) {
           queue = [];
           tally.last = obs.t;
@@ -1649,7 +1679,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         const held = new Set((obs.positions ?? []).map((p) => p.position));
         const max = c.maxActions ?? 8;
         for (const use of uses) {
-          if (use.name === "notebook" || use.name === "done_for_now") continue;
+          if (use.name === "notebook" || use.name === "done_for_now" || (use.name === "opt_out" && typeof use.input?.told_how === "string")) continue;
           const i = use.input;
           // A look it no longer wants at every sitting: nothing is looked up. Named with all it was asked with, that
           // one; with only the report, every one in that report.
@@ -1669,10 +1699,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           const waitingNow = (obs.drafts as any[]).map((d) => d?.id).filter((x): x is string => typeof x === "string");
           // (A paper's number written with "draft." before it is no draft's reference either: the same model, told so, wrote
           // "Confirm draft.9342" for its principal's paper rec.9342, a draft for sign-off, in the after run of 2026-11-10.)
-          if (use.name === "confirm" && text(i?.ref) && (i.decision === "confirm" || i.decision === "decline") && !/^\[?draft\.[^.\s\]]+\.[0-9]+\]?$/.test(i.ref.trim()) && !waitingNow.includes(i.ref.trim())) {
+          if (use.name === "confirm" && text(i?.ref) && (i.decision === "confirm" || i.decision === "decline") && !/^\[?(?:draft\.[^.\s\]]+\.w?[0-9]+|ask-w?[0-9]+)\]?[.,;:]*$/i.test(i.ref.trim()) && !waitingNow.includes(i.ref.trim())) {
             const ref = i.ref.trim().replace(/^\[(.*)\]$/, "$1");
-            const which = waitingNow.length ? `The ${waitingNow.length === 1 ? "draft" : "drafts"} of yours waiting for your yes or no now: ${inWorld(waitingNow.join(", "))}.` : "No draft of yours is waiting for your yes or no now.";
-            const why = `${quote(ref)} is not a draft of yours: only your own requests, drawn up and waiting for your yes or no, are confirmed or declined, each by the reference it is shown with. A paper someone sent you (a sign-off, a draft for sign-off, a remit) or a form is never confirmed: to act on it, say what you do (a form, by filling it in)`;
+            const which = waitingNow.length ? `Waiting for your yes or no now: ${inWorld(waitingNow.join(", "))}.` : "Nothing you asked for is waiting for your yes or no now.";
+            const why = `${quote(ref)} is not one of yours waiting for your yes or no: only what you asked for, set out and waiting for your yes or no, is confirmed or declined, each by the reference it is shown with (ask- and a number). A paper someone sent you (a sign-off, a draft for sign-off, a remit) or a form is never confirmed: to act on it, say what you do (a form, by filling it in)`;
             notDone.set(use.id, { now: `Not done: ${why}. ${which}`, later: `When you were last here, your answer on ${quote(ref)} was not taken: ${why}.` });
             await note({ confirm_not_a_draft: JSON.stringify(use).slice(0, 2000) });
             continue;

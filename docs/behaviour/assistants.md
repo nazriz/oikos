@@ -149,6 +149,12 @@ its work (its own claim), and what becomes of the records. The seat's own drafts
 principal's papers (a sign-off, a remit, a form is never confirmed), and its file says what came of each of its papers
 (docs/real-models.md, "What every seat is shown, made plain").
 
+**A desk's clients' terms** (2026-11-11). A provider's desk serving persons is not shown its clients' briefs and
+remits as a list (there are about eight remits a client, and the study's desk has about 250 clients): it keeps them,
+and each matter shown comes with the remit and brief it names; the rest are in its file, found by looking (by client
+or by kind). Its standing instructions hold what is its own: who it is, its forms. The generator sets this with the
+seat's `with_matters: ["terms"]`.
+
 **Sending what was signed off** (2026-11-10). A code principal that signs off a draft written on a form sends back the
 signed copy: the paper as it is to go (its kind, words, addressees, who sees it, its data and what it cites), in the
 sign-off itself. Its assistant sends it on its form `send_signed`, naming the sign-off: the paper goes exactly as

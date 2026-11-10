@@ -905,8 +905,11 @@ export interface RenderOptions {
 }
 
 /** The heading of the one place a seat's own drafts stand, waiting for its yes or no, and the line under it. */
-export const WAITING_HEAD = "## Waiting for your yes or no: your own requests, drawn up";
-export const WAITING_SAYS = "Each is something you asked for, drawn up so that you can check it before anything happens. Nothing in it is done until you say yes. Only these are answered with Confirm or Decline: a paper someone sent you (rec. and a number) or a form is never confirmed.";
+export const WAITING_HEAD = "## Waiting for your yes or no: what you asked for, set out";
+export const WAITING_SAYS = "Each is something you asked for, set out so that you can check it before anything happens. Nothing in it is done until you say yes. Only these are answered with Confirm or Decline, by their references (ask- and a number): a paper someone sent you (rec. and a number), a draft for sign-off or a form is never confirmed.";
+/** How the platform's own preview is named to a seat: "ask-3", never "draft." (a draft for sign-off is the world's paper)
+ * and never "rec." (a paper's). The preview is kept as `draft.<participant>.<n>`; a seat's "ask-<n>" is read back to it. */
+export const askRef = (s: string): string => s.replace(/(?<![\w.-])draft\.(?:par\.[0-9]+|[a-z][a-z0-9_-]*)\.(w?[0-9]+)(?![\w-])/g, (_, n: string) => `ask-${n}`);
 
 /** What a look that finds nothing says: of papers looked up, and of a report with nothing new in it. */
 export const NOTHING_FOUND = "Nothing found.";
@@ -1108,6 +1111,27 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   // Somewhere it looked that isn't there to be seen (a report it no longer has): said.
   for (const [id, asked] of o.looked ?? []) if (!(id in obs.channels)) out.push("", `## ${title(id)}`, asked.sent ? SET_OUT : (obs.asking ?? []).some((a) => a === id || a.endsWith(`/${id}`)) ? WAITING_ON_KEEPER : "Nothing could be seen there.");
   return out.join("\n");
+}
+
+/**
+ * The papers a seat keeps without being shown them as a list (a desk's clients' remits and briefs, hundreds of them),
+ * set out with the matters that name them: the remit a matter says it comes under, any other paper it cites or names
+ * in its details, and the brief of the agreement it comes under. What is not named by a matter shown is not set out:
+ * it is in the seat's file, found by looking. Empty where no matter names any. (2026-11-11: a desk with 50 clients
+ * opened on 532 of them as a list; with 250 they ran past what a small model can read.)
+ */
+export function papersWith(matters: Record[], kept: Map<string, Record>, o: RenderOptions = {}): string {
+  whoIs = o.whoIs;
+  const named = (r: Record): string[] => {
+    const d = r.record === "statement" ? (r.data as any) : undefined;
+    const ids = [...(Array.isArray(r.basis) ? r.basis : typeof r.basis === "string" ? [r.basis] : []), ...["remit", "brief", "agreement", "delivery"].map((k) => d?.[k]).filter((x): x is string => typeof x === "string")];
+    const agreement = typeof d?.agreement === "string" ? d.agreement : undefined;
+    const briefs = agreement ? [...kept.values()].filter((k) => k.record === "statement" && k.kind === "brief" && (k.data as any)?.agreement === agreement).map((k) => k.id) : [];
+    return [...ids, ...briefs].filter((id) => kept.has(id));
+  };
+  const out = [...new Set(matters.flatMap(named))].map((id) => kept.get(id)!);
+  if (!out.length) return "";
+  return ["## What the matters above come under: the remits and briefs they name", ...recordLines(out, undefined, true).map((l) => `- ${l}`)].join("\n");
 }
 
 /**

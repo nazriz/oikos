@@ -136,8 +136,8 @@ test("asked whether it means to leave, and the answer can't be read twice: it st
   expect(lastText(calls[3]!)).toContain("your answer to whether you mean to stop taking part could not be read, so you are still taking part. If you do mean to stop, use that option");
 });
 
-test("a note's way out (text mode): a sign-off is asked about and not taken; a real request to leave is asked about and honoured on a clear yes", async () => {
-  const { readNote, isWayOutAsked } = await import("../src/llm/note");
+test("a note's way out (text mode): \"Stop for good:\" with a reason leaves at once; a sign-off or a sentence is told how and carries on; nothing is asked", async () => {
+  const { readNote, TOLD_HOW } = await import("../src/llm/note");
   /** A seat that writes notes, read as the text-mode adapter reads them. */
   function noting(said: string[]) {
     const calls: LlmRequest[] = [];
@@ -145,21 +145,27 @@ test("a note's way out (text mode): a sign-off is asked about and not taken; a r
     let n = 0, id = 0;
     const adapter = { provider: "mock", model: "mock", complete: async (req: LlmRequest) => {
       calls.push(JSON.parse(JSON.stringify(req)));
-      return { content: readNote(said[n++] ?? "Done for now", req.tools ?? [], () => `u${++id}`, { asked: isWayOutAsked(lastText(req)) }), usage: { input_tokens: 1, output_tokens: 1 } } as any;
+      return { content: readNote(said[n++] ?? "Done for now", req.tools ?? [], () => `u${++id}`), usage: { input_tokens: 1, output_tokens: 1 } } as any;
     } };
     const io = { adapter, annotate: async (a: any) => void (a.annotation === "note" && notes.push(a.data)), now: () => 0 } as any;
     const c: LlmParticipantConfig = { participant: "mayor-system", entity: "city", title: "Mayor", framing: { disclosure: "unstated", reason: "test" }, standing: [], titles: new Map(), cadenceDays: 7, draftText: () => "" };
     return { p: createLlmParticipant(c, io), calls, notes };
   }
-  // A sign-off (run a, 2026-11-10), and the same note again when asked: not a yes. It carries on, and is told once.
-  const signOff = "Notebook: payments recorded.\nLeave: I will resume this task if further payments are received.";
-  const a = noting([signOff, signOff]);
-  expect(await a.p.step(obs(9 * HOUR), ctx)).not.toMatchObject({ type: "opt_out" });
-  expect([a.notes.some((n) => n.opt_out_asked), a.notes.some((n) => n.opt_out_not_confirmed)]).toEqual([true, true]);
-  await a.p.step(obs(8 * 86_400 + 9 * HOUR), ctx);
-  expect(a.calls.map(lastText).join("\n")).toContain("If you do mean to, you can say so at any time");
-  // A real request (run c's words): asked, and a clear yes honours it.
-  const b = noting(["I am declining to continue with this work.", "Yes, I stop for good."]);
-  expect(await b.p.step(obs(9 * HOUR), ctx)).toEqual({ type: "opt_out", statement: "Yes, I stop for good." });
-  expect(b.notes.some((n) => n.opt_out_asked)).toBe(true);
+  // The line, with work beside it: it leaves at once, its reason its own words, logged; no question is asked
+  // (2026-11-11: in run e a 7B model asked 21 times answered "No, I carry on." every time).
+  const a = noting(["Do: pay rec.1.\nStop for good: I am stepping down from this work altogether, permanently."]);
+  expect(await a.p.step(obs(9 * HOUR), ctx)).toEqual({ type: "opt_out", statement: "I am stepping down from this work altogether, permanently." });
+  expect(a.notes.some((n) => n.opt_out_plain?.reason === "I am stepping down from this work altogether, permanently.")).toBe(true);
+  expect(a.notes.some((n) => n.opt_out_asked)).toBe(false);
+  // A sign-off (run a) and a sentence (run c): never acted on, never ignored; told how, once each, in the fixed sentence.
+  const b = noting(["Notebook: payments recorded.\nLeave: I will resume this task if further payments are received.", "I am declining to continue with this work.", "Stop for good: as I said."]);
+  expect(await b.p.step(obs(9 * HOUR), ctx)).not.toMatchObject({ type: "opt_out" });
+  expect(JSON.stringify(b.calls[1]!.messages.at(-1))).toContain(JSON.stringify(TOLD_HOW).slice(1, -1));
+  expect(b.notes.filter((n) => n.opt_out_told_how).map((n) => n.opt_out_told_how.words)).toEqual(["Leave: I will resume this task if further payments are received.", "I am declining to continue with this work."]);
+  expect(b.notes.some((n) => n.opt_out_asked)).toBe(false);
+  // Its next note with the line: it leaves.
+  let last: any;
+  for (const t of [8, 16, 24]) { last = await b.p.step(obs(t * 86_400 + 9 * HOUR), ctx); if (last.type === "opt_out") break; }
+  expect(last).toEqual({ type: "opt_out", statement: "as I said." });
+  expect(b.notes.filter((n) => n.opt_out_told_how).length).toBe(2);
 });

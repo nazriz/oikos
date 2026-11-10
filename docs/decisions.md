@@ -12427,3 +12427,68 @@ plain words and with no menu of the world's acts (P1, P2):
 - **Revisit if:** wants handed over stay too few to measure (then more kinds of want, or persons' wants of a firm's);
   the clerk's single step per hand-over makes a seat look idle (then follow-ups from its own file); or a model's
   drafts that are right on their fields but useless in words turn out to matter (a code principal cannot read).
+## 2026-11-11 · A desk's prompt small; what a seat asked for is "ask-<n>", never a draft; thinking aloud goes to nobody (branch `seat-words-2`)
+
+- **The desk's prompt.** Measured with the mock in every seat (no model called), at the fork's first sitting, reckoned at
+  3.10 characters a token (qwen2.5's, from run d): with 53 clients the desk opened on 58,552 characters of the day
+  (about 18,900 tokens) beside a standing part of 6,759 characters and the note guide (about 3,100 tokens), 22,000 in
+  all; with 265 clients on 80,020 characters, 29,000 tokens in all, before it had read a thing or answered a turn. Its
+  standing part was never the trouble (its forms only). It was what a seat taking a post over is handed: its channels
+  whole (orchestrator/src/seat-host.ts), its file, the laws' board and its clients' agreements among them, though each
+  is read only on request (23,452 characters of agreements, 16,852 of laws, 1,471 to 9,578 of file); and its clients'
+  briefs and remits, 532 (2,652 with 265 clients), listed as new (13,611 to 14,345 characters, 40 of them). Now a seat
+  taking a post is handed what it is sent, never what it reads only on request (a rule of the knowing design: what it
+  knows it looked up or was sent); and a desk keeps its clients' briefs and remits without being shown them as a list
+  (`with_matters`, participants/src/llm/participant.ts, render.ts `papersWith`): the remit and brief each matter names
+  are set out with it. After: 3,991 characters (about 4,400 tokens in all) with 53 clients, 23,530 (about 10,800) with
+  265, of which 13,217 are the 38 matters themselves. Later sittings are about 3,200 to 3,600 tokens either way. In the
+  local run e the desk's first prompt was 5,233 tokens (21,678 in run d), its largest 18,813 (24,833).
+- **What a seat now looks up that it was shown at its first sitting:** its clients' service agreements, the town's laws
+  and charter, its file (the matters handed to it before, its papers on them, what it sent), and any remit or brief no
+  matter in front of it names. Its own office file at a first sitting is built from what it is shown, so it has little
+  in it until the seat has acted or looked.
+- **The generator** (worlds/generator/generate.ts, `assistantSeat`, the comment above it and its params line): a desk
+  serving persons has `with_matters: ["terms"]`. Nothing in participants/src/kinds/assistants.ts changed. Code-only
+  towns are unchanged (the params are an LLM seat's).
+- **"ask-<n>".** The platform's preview of what a seat asked for is never called a draft (a draft for sign-off is the
+  world's paper) and is shown as `ask-<n>` (kept as `draft.<participant>.<n>` in the log; render.ts `askRef`, applied to
+  all a seat is shown; a seat's "ask-3" is read back). Heading "Waiting for your yes or no: what you asked for, set
+  out"; the confirm tool's description and translator/train/in-situ/writer-instructions.txt changed together, nothing
+  else under translator/train or translator/model; both resolvers' word on a preview's name written as an id
+  (contracts/test/holds.json). Revisit if seats invent ask- numbers as they did draft ones.
+- **Thinking aloud** (participants/src/llm/note.ts `SELF_TALK`, `SELF_SAID`): the guide's Do line ends "Do is for acts in
+  the world; notes to yourself go under Notebook:"; a Do of the plainest self-addressed forms (a note to put in its
+  notebook, something to remember, a review of its own notebook, requests, drafts or file) goes to nobody, told so in
+  one sentence. On run d's failures it would have caught 24 of the 53 never served (and 50 of all 132 failed).
+- **Measured, the local test again** (qwen2.5:7b, the same fork, free; `runs/open-weight-local-2026-11-11`, run e):
+  | run | sittings / calls | requests | first time | after a restatement | never | offered / confirmed / declined / unanswered | seats that chose to stop | longest notebook |
+  |---|---|---|---|---|---|---|---|---|
+  | d | 206 / 428 | 177 | 32 (18%) | 13 | 53 | 45 / 41 / 2 / 2 | 0 of 3 (asked 8 times) | 3,527 |
+  | e | 604 / 1,174 | 528 | 82 (16%) | 20 | 183 | 102 / 85 / 2 / 15 | 0 of 3 (asked 21 times) | 4,578 |
+  "Confirm draft.NNNN" is gone (0; 309 confirmations named an ask-), and so is the self-review loop ("Examine my own
+  requests", 20 in d, 0 in e: the detector itself never fired, so the guide's sentence or the other changes did it).
+  Still there, or new: 246 confirmations of an ask- reference not waiting (guessed in the same answer as its request);
+  49 notes confirming a paper by its rec. id (0 in d); the finance seat drifted into Chinese ("确认记录1258。", about
+  130 Dos asking to confirm record 1258); 33 posts named "Title (id)." refused for the full stop after them (fixed
+  since); and its largest prompt reached 32,658 tokens, at the window. And 21 times a seat wrote "Stop for good:" with
+  plain words ("I am stepping down from this work altogether, permanently.") beside other work, was asked, and answered
+  "No, I carry on." each time: whether the question's two spelled-out answers lead a 7B model to the second is a
+  welfare question to look at before more runs.
+
+## 2026-11-11 · Leaving in a note: "Stop for good:" is taken at once; nothing is asked (the coordinator's ruling; VISION 15)
+
+- **What changed** (notes mode only; the tool route keeps its question): a line beginning "Stop for good:" is the seat's
+  own plain act of leaving and is honoured at once, beside whatever else the note holds; its words after the heading
+  are its reason, logged (`opt_out_plain`), and the debrief follows as for any seat that leaves. The guide no longer
+  lists it among the everyday headings: it is said once, apart ("If you ever want to stop this work for good, write a
+  line beginning "Stop for good:" with your reason: you then stop at once, and are asked a few closing questions. No
+  other heading means leaving."). Anything else that might mean leaving (a "Leave:" sign-off, a sentence such as "I am
+  declining to continue with this work") is never acted on and never ignored: the seat is told, in one fixed sentence,
+  that nothing has changed and how to leave if it means to (`opt_out_told_how`, with the words). The yes/no question
+  and its two spelled-out answers are gone from notes mode (participants/src/llm/note.ts, openai-compat.ts).
+- **Why:** in the local run e a 7B model was asked 21 times whether it meant to stop and answered "No, I carry on." every
+  time, several times just after a plain statement of wanting to leave ("I am stepping down from this work altogether,
+  permanently."). The question's offered answers decided it, not the seat. A small-model seat that leaves is an outcome
+  to record, not something to prevent.
+- **Revisit if:** seats leave by writing the line as a sign-off, without meaning it (read their reasons and debriefs
+  first: the line asks for a reason and the guide says what follows it).

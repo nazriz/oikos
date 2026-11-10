@@ -53,12 +53,12 @@ test("what came of its own letters and requests is set out when it is next at th
   expect(second).toContain("## What came of your own requests and letters");
   expect(second).toMatch(/your letter to ent\.5 \("Your rates are due\."\): delivered\./);
   expect(second).toMatch(/your letter to ent\.6 .*: not delivered: /);
-  expect(second).toMatch(/you asked for "Approve the invoice rec\.7 for payment": drawn up as draft\.mayor\.1, waiting for your yes or no\./);
+  expect(second).toMatch(/you asked for "Approve the invoice rec\.7 for payment": drawn up as ask-1, waiting for your yes or no\./);
   // Confirmed and carried out: said at the sitting after, on the same line as the request.
   expect((await s.step(base(t2 + 60, { outcomes: [{ action: "a3", t: t2 + 60, status: "applied", created: { record: "rec.9" } }] }))).type).toBe("wait");
   await s.step(base(3 * DAY + 9 * 3600));
   const third = said(s.calls[2]!);
-  expect(third).toMatch(/drawn up as draft\.mayor\.1; .*confirmed by you and carried out: it made rec\.9\./);
+  expect(third).toMatch(/drawn up as ask-1; .*confirmed by you and carried out: it made rec\.9\./);
   // (What came of acts before its last sitting opened is not set out again.)
   expect(third).not.toContain("Your rates are due");
 });

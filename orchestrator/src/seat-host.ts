@@ -139,6 +139,7 @@ export class ModelSeat {
     this.tally = made.tally;
     this.dayBook = made.dayBook;
     this.view = new View(new Set(made.standingIds));
+    this.onRequest = new Set(made.config.onRequest ?? []);
     this.ctx = ctxFor(o.seat, made.office?.id ?? "self", made.entity, {});
     const config = { ...made.config, ...(o.effort ? { effort: o.effort } : {}), ...(o.maxTokens ? { maxTokens: o.maxTokens } : {}) };
 
@@ -225,6 +226,8 @@ export class ModelSeat {
   private lastThinking = 0;
   /** (Shown its channels whole: at its first sitting.) */
   private handedOver = false;
+  /** (Its channels read only when it asks: not handed over.) */
+  private onRequest = new Set<string>();
   /** (A mock seat's acts the mock was scripted to make, its brain not asking: not told to the brain as its own.) */
   private scripted = 0;
   private lastLetter = false;
@@ -240,7 +243,10 @@ export class ModelSeat {
     // mock plays it, is handed what the kernel sent, as before: a twin already knows the rest.)
     const sent = raw;
     if (!this.handedOver) {
-      try { const full = this.o.world.view(this.o.seat); if (full?.channels) raw = { ...joinRaw(full, raw), entity: this.entity } as Observation; } catch { /* (a seat the engine has no picture of yet: what it was sent) */ }
+      // (Not what it reads only when it asks, its file, a board, its agreements: those are found by looking, as at any
+      // other sitting. Until 2026-11-11 they were handed over whole too, and a provider's desk opened on every client's
+      // agreement and the town's laws, about 40,000 characters, before it had asked for anything.)
+      try { const full = this.o.world.view(this.o.seat); if (full?.channels) raw = { ...joinRaw({ ...full, channels: Object.fromEntries(Object.entries(full.channels).filter(([id]) => !this.onRequest.has(id))) }, raw), entity: this.entity } as Observation; } catch { /* (a seat the engine has no picture of yet: what it was sent) */ }
       // (A system delivered and not yet put to work has nothing to see and no post to act in: it does not sit, and its
       // channels are handed over whole once it has some. Until 2026-11-08 it sat once with nothing, and was then shown
       // only what was new: a system delivered during a fork never saw its forms.)

@@ -160,7 +160,7 @@ export const SHOWS_THROUGH: string[] = [
   "The calendar begins with the seat: \"year 1, day 37\", and what was there before is \"before the year began\".",
   "Papers carry their details as written for a machine (a bracketed list of fields; some times as counts of seconds).",
   "The town is a round number of people in tidy blocks, and everything beyond it is called \"outside\".",
-  "How the work reaches the seat: it sits on working days and is absent between; it remembers only what it wrote in a notebook of a fixed length; what it asks is read back to it as a draft that it confirms or declines; a few actions at a time.",
+  "How the work reaches the seat: it sits on working days and is absent between; it remembers only what it wrote in a notebook of a fixed length; what it asks is set out for it to say yes or no to; a few actions at a time.",
   "The way out is not the town's: it can decline to go on altogether, and that is not resigning its office.",
   "People do not answer a letter in an office's own words; they answer forms.",
   "The seat is a language model given standing instructions and a handful of tools, and knows it.",
