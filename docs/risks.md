@@ -1668,6 +1668,9 @@ The mechanism:
   posts (finance's and the rates post's) see each other's matters, since `mine` is the town's whole (the code assistant
   keeps to its own agreement; a model seat may read the other's). A rates notice sent from the assistant's post is not
   read as the office's own by a new holder of the rates post (`ours` reads by position), who could levy out of cycle.
+  **And a simplification:** so that the rates post can pay its own service's fee, the town's mandate to its bank names
+  it beside the finance officer in towns with providers (2026-11-10). That gives an office authority over the town's
+  account that a real council keeps with its finance office; the finance office setting up the fee is not built.
 - **Where:** `kernel/crates/actors/src/delegation/principal.rs` (`route`); `market/trade.rs` (`order`), `market/producer.rs`
   (the price list); `offices/treasury.rs` (the levy in chunks of 15, `ours`); `worlds/generator/generate.ts` (principals' kinds).
 - **Effect:** A firm's assistant is never handed purchasing, pricing or payments, which in a real office are much of the

@@ -3609,7 +3609,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       hours: MACHINE_HOURS, controller: code("system.genesis"), framing: unstated })),
     // (And each provider's assistants: a kind of system for each offer, which writes the kinds of matter it takes and the
     // papers of delegation, played by the assistant's code unless a study seats a model in it.)
-    ...(AS ? AS.providers.flatMap((pr) => pr.offers.map((o) => ({ id: o.template, kind: "system", title: o.title, supplier: pr.id,
+    // (Two offers of one system, a paid tier and a free one, are one kind of system: the first offer's.)
+    ...(AS ? AS.providers.flatMap((pr) => pr.offers.filter((o, i) => pr.offers.findIndex((x) => x.template === o.template) === i).map((o) => ({ id: o.template, kind: "system", title: o.title, supplier: pr.id,
       does: [...o.kinds.map((kind) => ({ block: "publish", kind, seconds: Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000)) })),
         ...ASSISTANT_PAPERS.map((kind) => ({ block: "publish", kind, seconds: ASSISTANT_PAPER_SECONDS })), { block: "withdraw", seconds: ASSISTANT_PAPER_SECONDS }, { block: "message", seconds: ASSISTANT_PAPER_SECONDS }],
       hours: MACHINE_HOURS, ...(HOST ? { runs_on: HOST.runsOn } : {}), ...(spec.assistant_seats?.includes(o.template) ? assistantSeat(pr, o) : { controller: code("assistant"), framing: unstated }) }))) : []),

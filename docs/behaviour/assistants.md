@@ -209,8 +209,13 @@ That check sees variables only. So:
 offers and has a rule for them. A study may make the offer reach only some adults (`build.ts`, cohort `reach`: every
 `every`-th adult; the rest see no offer and have no rule for one); whether one who is offered it takes it up is their
 own rule, from their own papers and the offer's terms. Rounds 1 to 5 engaged their cohort by hand (`commit`), which the
-study's own setting no longer does. At the sourced prices nobody takes it up by their own rule (the H6 screen: none of
-251 adults reached; risk MT-29). A town office that is a principal is named on the town's mandate to its bank, so that it
+study's own setting no longer does. At the paid tier's price nobody takes it up by their own rule (the H6 screen: none of
+251 adults reached; risk MT-29). **A free tier** sits beside each paid offer to persons (the profiles, with their basis):
+no fee, no set-up, nothing to leave; it advises and drafts for sign-off but does not act in the client's name (`advice`
+and `draft` only), and the provider keeps the records. Both tiers are the same kind of system at the same desk. What
+differs is in the offer the person sees; the person weighs both by the same rule. A provider does not switch a free
+service off for want of a fee, and its client sets no fee up (`market/services.rs`). Not modelled: a cap on use, ads, a
+weaker model. A town office that is a principal is named on the town's mandate to its bank, so that it
 can pay its fee (until 2026-11-10 the rates post could not, and its service was switched off).
 
 **The code-only screen** (`experiments/scope-pilot/screen.ts <spec>`) runs a spec's code arms and gives, per assistant

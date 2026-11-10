@@ -121,6 +121,24 @@ fn a_service_unsigned_ended_or_unpaid_is_switched_off_once() {
     assert!(!all(&h.wake(40 * DAY + H, world(vec![], paid))).contains("retire"));
     let out = all(&h.wake(40 * DAY + 80 * DAY, world(vec![], json!([]))));
     assert!(out.contains("retire=") && out.contains("the fee has not been paid for 79 days"), "{out}");
+
+    // A free tier (no fee, no set-up): nothing to fall behind on, so it is not switched off for want of payment; and its
+    // client signs and sets up no fee.
+    let mut h = harness(offer_json(json!({ "fee_month": 0, "setup": 0, "exit": 0 })));
+    h.wake(DAY + H, world(vec![order("rec.50", DAY, 0)], json!([])));
+    h.wake(10 * DAY, world(agreement("agr.1", "rec.50", true), json!([])));
+    assert!(!all(&h.wake(120 * DAY, world(vec![], json!([])))).contains("retire"));
+    let delivery = statement("rec.60", 100, PROVIDER, "service_delivery", &["planning"], json!({ "order": "rec.50", "offer": offer_json(json!({ "provider": PROVIDER, "account": "acc-prov-a", "fee_month": 0 })), "systems": ["par.9"] }));
+    let mut recs = vec![delivery];
+    recs.extend(agreement("agr.1", "rec.50", false));
+    let book = book_of(recs);
+    let mut e = Engagements::new("planning");
+    e.ordered("rec.50");
+    e.absorb(&book);
+    let c = ctx("planning", json!({}));
+    let mut d = Draws::new("planning-system", "self");
+    let s = e.paperwork::<()>(&book, "acc-planning", &cx_for(&c, &mut d, 200)).iter().map(|s| oikos_sight::calls::program_text(&s.program())).collect::<Vec<_>>().join("\n");
+    assert!(s.contains("sign=agr.1") && !s.contains("money("), "{s}");
 }
 
 #[test]

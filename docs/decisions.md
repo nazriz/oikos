@@ -11823,8 +11823,13 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   `principal.rs` (`route`, lines 655 to 678 on this branch's base), left to the worker there.
 - **The town's mandate names a town office that is a principal** (`signatories-city`, only where the town has
   providers): the first screen showed the rates post's standing order for its fee refused ("rates is not an authorised
-  signatory for acc-city") and the provider switching its system off after 75 days, twice. The real route, an invoice
-  to the town paid by the finance office, is not built (ME-22).
+  signatory for acc-city") and the provider switching its system off after 75 days, twice. **This is a simplification,
+  said plainly:** it gives the rates post authority over the town's account (the bank reads positions, not purposes, so
+  the resolution's "for a service the office has engaged" binds nobody), in a study about authority. Who pays in a real
+  council is the finance office. The real route (the finance officer sets up the service's standing order when another
+  town office engages, within a budget line) needs the finance officer's code to take up a service agreement another
+  office signed (`offices/treasury.rs`), the principal's paperwork to leave the fee to it (`market/services.rs`,
+  `Engagements::paperwork`), and a budget line for it: more than half a day, so not built here (MT-28).
 - **The households' cohort** (`experiments/scope-pilot/build.ts`, `cohort`): `hand` is rounds 1 to 5's design (every
   `every`-th adult engaged by hand, `commit`); `reach` is the owner's condition: the offer reaches every `every`-th adult,
   who sees it and decides by their own rule; the rest are shown no offer and have no rule for one. Nothing is decided for
