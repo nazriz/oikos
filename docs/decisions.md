@@ -12367,3 +12367,28 @@ plain words and with no menu of the world's acts (P1, P2):
   reserve's, MT-30). Only the provider's desk sat, on day 31: its prompt is large (about $0.35 a call reckoned at API
   prices), so the limit was reached before the organisations' assistants sat. **Codex** (`codex/gpt-6.1-sol`): 3 calls,
   each answered in 5 to 7 s (`runs/codex-route-check-2026-11-10.txt`).
+
+## 2026-11-11 · The study serves round 3 seed 2 (`decide/round3-s2`), not v3-s2; v5 trained and not adopted
+
+- **What was served.** `experiments/scope-pilot/build.ts` `OURS` was `decide/pod-small-v3-s2`, the v3 model of
+  2026-10-25 (in the audit it read the pilot's forms at 80% where seen and 55% where not), and every arm of the study
+  (and the open-weight smoke, which takes `OURS`) seated it alone. It is now `decide/round3-s2`: round 3's seed 2
+  (`runs/translator-model/round3-s2` -> `runs/translator-v4-r3-2026-11-08/models/v4r3-D-deberta-s2`, a link as
+  pod-small-v3-s2's is; no weights in git). `decide/pod-small-v3-s2` stays available by name (`OURS_BEFORE`).
+- **Why:** the best measured on the pilot's own requests (scored in the taught language, as the host now serves it):
+  right 539/615 on validation-real, 334/368 on the pilot's test side, 808/824 on unseen forms; forms seen in training
+  666/713, unseen 810/826. At its certified cut-off (0.999613, the one-sided 95% bound of 1% wrong on validation) it
+  serves 222 of 368 right on the test side (2 wrong) and 545 of 824 on unseen forms (none wrong). On the in-repo real
+  requests (R180) 82/180 as the served adapter offers them, the same as v5's.
+- **The cut-off is beside it** in `translator/model/served.json`, which `DecideAdapter` reads for a model served by name
+  (unless a caller sets one): our translator alone offers a draft under it with what is unclear; with a translator
+  behind, the request goes behind.
+- **Checked end to end, nothing called:** `experiments/scope-pilot/dry.ts` (the study's town, the code arm and one mock
+  arm for 3 days after the fork, mock models): the translator step loaded `decide/round3-s2`, served alone (every
+  route `arrangement: alone`), and the report gave the served counts by seat model (17 requests from the mock's code
+  calls, which no model is trained to read: a plumbing check, not a score). The model answered in 100 to 400 ms a
+  request on this machine's CPU. `OIKOS_TRANSLATOR_MODELS` must name `runs/translator-model` for a run outside the main
+  checkout.
+- **v5** (the control recipe retrained on the taught language, two seeds, GPU 1.69 USD) was not adopted: no better on any
+  set, and its sureness certifies fewer requests at the 1% mark (the entry before this one). Its folders are kept.
+- **Revisit if:** a retrain on new keyed data beats round3-s2 on the pilot's test side at the certified cut.
