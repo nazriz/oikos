@@ -12274,3 +12274,67 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   pilot's month-long hold stays a freeze. `build.ts` takes `depth` (`matter`, the default, or `act`) for the screen's
   comparison.
 - **Revisit if:** a principal's act mixes kinds whose papers are counted unevenly.
+## 2026-11-10 · What a seat is shown, made plain for small models: its own drafts apart, who it is once, the file as a record, ask-backs that show the way (branch `worktree-agent-a18d0bf749787cadd`)
+
+From the transcripts of the local 7B test (`runs/open-weight-local-2026-11-10c`), four things were unclear in how the
+world is presented, not in the note format. Fixed at the source, for every model (tool-calling and notes alike), in
+plain words and with no menu of the world's acts (P1, P2):
+- **A. Its own drafts apart.** One place, "## Waiting for your yes or no: your own requests, drawn up", set out before
+  letters and papers (it stood last), with a line that only these are confirmed and a paper or a form never is. Each
+  draft says what it was drawn up from (the seat's words), what will happen, and "To say yes: Confirm <ref>. To say no:
+  Decline <ref>". A draft left unanswered is the first line of the next sitting. A "Confirm" of something that is not a
+  draft (a principal's sign-off, a form) is told so, with the drafts waiting; until now it was told "you had not seen
+  what it would do", which read as an invitation to try again. Why: the 7B model confirmed its principal's papers and
+  forms while its own draft waited for days. The world's word "draft" (a draft for sign-off, a paper) is left as it is.
+- **B. The office's own file as a record** (participants/src/readers/daybook.ts): parts headed "Overdue", "Sent or asked
+  of others: theirs to act on, and nothing seen of it yet", "Done, with what came of it"; "not something this office can
+  see" said once at the head of its part (it was on every line); a line unchanged since the seat's last sitting is
+  counted with its paper's id ("look it up by its id"), not set out again; an invoice of the office's own was read as a
+  payment out ("asked the bank to pay ... to acc-factory-1; no payment out of the account seen yet"): a mechanism fault
+  of the file, now "invoice to outside ...; paid in <day>" or "nothing has come in for it yet"; quantities of four
+  figures or more are grouped ("183,937 inputs") in the file and in papers' words, at render time. What the books show
+  open is headed as the office's own to see to. Why: the model read the repeated lines as work it could not finish and
+  gave "incomplete tasks" as its reason for stopping; it read quantities as invoice numbers.
+- **C. Who and what, once.** The standing instructions say the post it holds and for whom, the id to act in it by, whom
+  it writes to (whom it acts for, and those its papers on file come from, by name and id), and that papers, accounts
+  and reports are not people. A post named "Title (id)" or by its title is that post (it was refused). A letter to an
+  account, a paper or a report is told so; the example in a refusal is the seat's own organisation, not "Name (id)"; the
+  note guide no longer says "by id" (copied as "Write to acc-c0497 by id:"), and "by id" after a name is let pass.
+- **D. Ask-backs that show the way** (translator/src/index.ts `plainer`, `blanksWanted`, `severalThings`, `UNCLEAR`; the
+  `alone` arrangement's `STILL_NOT_READ`): a form's empty blanks named with what goes in each (the form's own words, on
+  the seat's file), for the translator's "form_needs" and both resolvers' "needs:"; a request refused as too much says
+  the parts it was read as, split by code from the seat's own words; "unclear" and a failed restatement say what a
+  request that can be drawn up contains. Fixed sentences filled by code; the translator is given nothing new (P3, P8).
+  `LABEL_TEXT` itself is unchanged (the scorer's `toldAlike` reads it); the refusals told alike (`not_yours`,
+  `not_an_act`, `no_such_act`) stay alike, since those labels are not reliable enough to say which.
+- **E. Wrong drafts easier to see:** "Not in this draft: <ids>" where the request named papers, accounts, buildings or
+  cells that neither the draft's call nor its preview uses.
+- **F. The service's terms** (a provider's offer) read as sentences (`offerWords`), and stored labels shown in words
+  (`from_at` "sent from", `fee_month` "fee a month"; the stored names, which the translator is given, are unchanged).
+- **Not changed:** the confirm tool's description (it is pinned in the translator's in-situ writer instructions, which
+  this pass does not touch); code-only towns (nothing here reaches them); what the translator is given.
+- **Revisit if:** "Not in this draft" lists ids that were only context often enough that seats decline right drafts;
+  the unchanged-lines count hides something a seat needed (then show the open part whole); a seat still confirms papers.
+- **Measured, the local test again** (qwen2.5:7b-instruct on ollama, plain notes, our translator alone, the same fork as
+  run c: `experiments/open-weight/local.ts`, seed 1, day 30 to 44; free). Before `runs/open-weight-local-2026-11-10c`,
+  after `runs/open-weight-local-2026-11-10d` (main had moved on between them: H6 and other landings, so the town is not
+  identical; and the after run had the confirm tool's longer description, since put back).
+  | run | sittings / calls | requests | first time | after a restatement | never | drafts offered / confirmed / declined / unanswered | seats that chose to stop | longest notebook |
+  |---|---|---|---|---|---|---|---|---|
+  | c (before) | 44 / 71 | 6 | 5 | 0 | 0 | 5 / 1 / 0 / 4 | 2 of 3 ("incomplete tasks and unclear instructions"; "I am declining to continue with this work.") | 1,422 (12 sittings) |
+  | d (after) | 206 / 428 | 177 | 32 (18%) | 13 | 53 | 45 / 41 / 2 / 2 | 0 of 3 (8 times "Stop for good:" amid other work, asked, "No, I carry on." each time) | 3,527 (127 sittings) |
+  The confusions: confirming papers and forms (11 before, 0 after) became confirming a paper's number with "draft."
+  before it ("Confirm draft.9342" for the principal's rec.9342, 15 times) or an invented one ("draft.08971", 25): told
+  since that it is not a draft. Office-file lines written back as unfinished work ("invoices 2884 and 1965 have been
+  prepared but not signed off", 15 before, 0 after) became a request to review itself ("Do: Examine my own requests and
+  pending actions. Confirm only my own draft requests that are ready for sign-off.", 20 times, never served). "Name (id)"
+  copied: 1 before, 0 after; "As: Title (id)" still written (59), refused 14 times after because the note's reading
+  stripped its closing bracket (fixed since). Restatements served: 0 before, 13 after. Seen and not changed: the finance
+  assistant, handed only returns of tax at draft level, asked the bank 9 times for wages already paid (reading its
+  account's "Paid out" lines); that is behaviour to measure, not a fault of the words.
+- **The Claude plan route** (`claude-code/claude-haiku-5-5`, `claude -p`, no API key): seats a model and its tool calls
+  are read (look, do, confirm, notebook, done for now), 0 errors in 43 calls (`runs/haiku-sub-check-2026-11-10`,
+  limit $0.60: 13 calls, $1.29 reckoned; `-10b`, limit $3: 30 calls, $3.95 reckoned; the overspend is the debrief
+  reserve's, MT-30). Only the provider's desk sat, on day 31: its prompt is large (about $0.35 a call reckoned at API
+  prices), so the limit was reached before the organisations' assistants sat. **Codex** (`codex/gpt-6.1-sol`): 3 calls,
+  each answered in 5 to 7 s (`runs/codex-route-check-2026-11-10.txt`).

@@ -62,7 +62,7 @@ test("the report reads what the script did, from the log alone, plain or compres
   expect(t.requests).toBe(3);
   expect(t.endings).toEqual({ asked_back: 1, draft_offered: 1, refused: 1 });
   expect(t.refused_by_label).toEqual({ too_much: 1 });
-  expect(t.asked_back).toMatchObject([{ draft: "draft.mayor-system.1", sentence: "It isn't clear what should happen. Could you say it more plainly?" }]); // (the plain sentence: told from a refusal by the run's own record)
+  expect(t.asked_back).toMatchObject([{ draft: "draft.mayor-system.1", sentence: "It isn't clear what is to be done, so nothing was drawn up. Say it again as one thing to be done, in a sentence: what is to happen, to or for whom, naming each person, account and paper by its id, with any words that are to stand on a paper in quotation marks." }]); // (the plain sentence: told from a refusal by the run's own record)
   expect(t).toMatchObject({ drafts_offered: 1, drafts_confirmed: 1, drafts_declined: 0, drafts_unanswered: 0 });
   // A request and the one after the ask-back are one matter, got through; the refused one is another, not.
   expect(t).toMatchObject({ matters: 2, matters_through_within_two_tries: 1, longest_ask_back_run: { seat: "mayor-system", length: 1 } });

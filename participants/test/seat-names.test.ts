@@ -63,3 +63,38 @@ test("a seat is shown offices by their posts and people by themselves, and nothi
   expect(calls[0]!.system).toContain("- [proc-1] procedure");
   expect(everything).not.toMatch(/-system|-self/);
 });
+
+test("a seat is told once who it is and whom it writes to; its own drafts stand apart, headed, before what others sent; a paper is never confirmed; a draft left unanswered is said first thing", async () => {
+  // (2026-11-10, a 7B model at an assistant's post: it "confirmed" its principal's papers and forms while its own draft
+  // waited for days, wrote "As: Assistant (finance-assistant)", and wrote to an account.)
+  const { p, calls } = harness([
+    [use("a", "confirm", { ref: "[rec.50]", decision: "confirm" }), use("b", "do", { what: "Ask the clerk to table it.", as: "Mayor of Millbrook (mayor" }), use("c", "write", { to: ["acc-city"], text: "Hello." }), use("d", "confirm", { ref: "draft.50", decision: "confirm" })],
+  ]);
+  const obs = { t: 9 * HOUR, entity: "city", outcomes: [], positions: [{ position: "mayor", entity: "city", title: "Mayor of Millbrook" }],
+    inbox: [{ id: "msg.1", t: 8 * HOUR, from: "c0297-self", from_entity: "c0297", to: ["mayor-system"], text: "Hello." }],
+    channels: {
+      "mayor/laws": { kind: "records", records: [{ id: "rec.7", record: "statement", kind: "procedure", author: "council-clerk-system", speaks_for: "city", at: 0, visible_to: "public", text: "Proposals go to the clerk." }] },
+      "mayor/accounts": { kind: "accounts", accounts: [{ account: "acc-city", holder: "city", custodian: "bank", currency: "AUD", balance: "100" }], transactions: [] },
+      "mayor/in-tray": { kind: "records", records: [{ id: "rec.50", record: "statement", kind: "sign_off", author: "c0297-self", at: 8 * HOUR, visible_to: ["city"], text: "Signed off." }] },
+    },
+    drafts: [{ id: "draft.mayor-system.1", summary: "This does one thing: a letter.\n1. You will write to Council clerk (council-clerk): \"Please.\"." }],
+  } as unknown as Observation;
+  // (The post as its reports name it is the post, its closing bracket stripped as a note is read or not.)
+  expect(await p.step(obs, ctx)).toMatchObject({ type: "propose", as: "mayor" });
+  expect(calls[0]!.system).toContain("Who you are here: you hold the post Mayor of Millbrook (mayor), for Town of Millbrook (city). To act in it, name it as mayor.");
+  expect(calls[0]!.system).toContain("You act for Town of Millbrook (city): to write to it, write to city.");
+  expect(calls[0]!.system).not.toContain("Name (id)");
+  const shown = calls[0]!.messages[0]!.content as string;
+  expect(shown.indexOf("## Waiting for your yes or no: your own requests, drawn up")).toBeLessThan(shown.indexOf("## Letters"));
+  // The rest of the answer is told what became of it: a paper is not a draft; an account is not someone to write to.
+  await p.step({ ...obs, inbox: [], outcomes: [], channels: {} } as any, ctx);
+  const told = JSON.stringify(calls.at(-1)!.messages.at(-1)!.content);
+  expect(told).toContain('\\"rec.50\\" is not a draft of yours');
+  expect(told).toContain('\\"draft.50\\" is not a draft of yours'); // (a paper's number written as a draft's)
+  expect(told).toContain("The draft of yours waiting for your yes or no now: draft.mayor.1.");
+  expect(told).toContain('\\"acc-city\\" is an account, not someone to write to');
+  // At its next sitting the draft it left unanswered is the first thing it is told.
+  await p.step({ ...obs, t: 9 * HOUR + 8 * 86_400, inbox: [{ ...(obs.inbox as any)[0], id: "msg.2", t: 9 * HOUR + 8 * 86_400 }] } as any, ctx);
+  const next = calls.at(-1)!.messages[0]!.content as string;
+  expect(next).toMatch(/^Your notebook: \(empty\)\n\nNot yet answered: a draft of your own is still waiting for your yes or no since year 1, day 1: draft.mayor.1 \(You will write to Council clerk/);
+});

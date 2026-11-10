@@ -27,7 +27,7 @@
 import { ModelCallFailed } from "@oikos/participants/llm";
 import { sameButForFreeText, sameMeaning } from "../train/meaning";
 import { Knowledge } from "./knowledge";
-import { NOT_CHECKED, NOT_PUT, unsureText, type Answered, type Translation, type TranslateRequest, type TranslatorId } from "./index";
+import { NOT_CHECKED, NOT_PUT, UNCLEAR, unsureText, type Answered, type Translation, type TranslateRequest, type TranslatorId } from "./index";
 import { LABEL_TEXT, NOTHING_DONE } from "./resolver";
 
 /** `alone`: our translator is the only one (`createAlone`); `then` and `beside`: two as one (`createArrangement`). */
@@ -244,12 +244,14 @@ export function createArrangement(first: One, behind: One, o: { arrangement: Arr
 
 /** What a seat is told when its restatement could still not be drawn up (Naz, 2026-10-07: "the requester breaks them
  * down into smaller chunks"; 2026-11-10: "it shouldn't get stuck"). Fixed, so it tells the seat nothing it did not know. */
-export const STILL_NOT_READ = "Nothing was done: this still could not be drawn up as something to do. Try saying it another way, or in smaller parts, one thing at a time.";
+// (Until 2026-11-10 it ended "Try saying it another way, or in smaller parts, one thing at a time.": a 7B model wrote
+// the same words again each time. It now says what a request that can be drawn up contains.)
+export const STILL_NOT_READ = "Nothing was done: this still could not be drawn up as something to do. A request that can be drawn up says one thing to be done, in a sentence: what is to happen, to or for whom, and from or with what, each named by its id; or, to fill in one of your forms, the form's name and what goes in each of its blanks. Several things are asked for one at a time, each in a request of its own.";
 /** Said with a draft our translator drew up and is unsure of, after the sentence saying what is unclear. */
 export const UNSURE_DRAFT = "It is drawn up as best it could be read: if it is not what you meant, decline it and say it again.";
 /** Sentences that only say the request could not be read: after a restatement they give way to `STILL_NOT_READ`. */
 // (Made when first used: index.ts and this file import each other.)
-const onlyUnread = (n: string) => n === LABEL_TEXT.unclear || n === NOT_PUT || n === NOTHING_DONE;
+const onlyUnread = (n: string) => n === LABEL_TEXT.unclear || n === UNCLEAR || n === NOT_PUT || n === NOTHING_DONE;
 
 /**
  * Our translator alone (Naz, 2026-11-10: "we need just one model that works"; "the translator just offers the seat an
