@@ -90,7 +90,7 @@ Look at papers                              Paper: rec.12   (fields one to a lin
 Confirm draft.a.3: it is right.   /   Decline draft.a.4
 Notebook: rec.12 paid.   /   Notebook afresh: ...   /   Notebook change: <passage> => <new words>
 Done for 3 days   /   Done for now          Hold: complaint
-Stop for good: ...                           (the way out; "Leave:" is read as words, never as it)
+Stop for good: ...                           (the way out, like "Leave:" or a plain sentence: asked about, taken only on a clear yes)
 ```
 
 - The headings are the seat's own means (the same as its tools), never a list of the world's acts (P2); how to write

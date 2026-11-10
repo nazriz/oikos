@@ -12004,6 +12004,19 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   as written, a note with no heading at all is one `Do:`, words before the first heading are the seat's own words beside
   it. What cannot be read whole is an unread answer saying what, in plain words (asked once more, as ever). A debrief's
   answer (a given shape) is still asked as JSON in text mode: not yet a note.
+- **How the opt-out reads in text mode** (the coordinator's ruling, 2026-11-10; VISION 15: the way out is always open).
+  A `Stop for good:` part, a `Leave:` line (outside a letter), or a sentence outside a letter that plainly says the seat
+  wants to stop or leave for good (`WANTS_OUT` in note.ts) is never kept as mere words and never acted on at once: it is
+  passed on as the way out with no statement, so the participant asks the one question the tool route asks
+  (`wayOutAsked`), with its two answers spelled out ("Yes, I stop for good." or "No, I carry on.", then the note). The
+  seat leaves only on a clear yes on the first line of its next note (`CLEAR_YES`). Its note again, a sign-off ("Leave: I
+  will resume this task..."), or anything else is not a yes: any way-out use in it is set aside as words, the seat
+  carries on, and at its next sitting it is told once that it did not say it means to stop and can say so at any time.
+  Each question and answer is in the log (`opt_out_asked`, `opt_out_confirmed`, `opt_out_not_confirmed` with the
+  answer). Why: in run a a 7B model ended notes with "Leave:" as a sign-off and, asked, wrote its note again; under the
+  tool route's rule (the option used again is a yes) all three seats left. Ignoring "Leave:" instead (run b's rule) would
+  ignore a seat that meant it. The not-confirmed note and the sentence at the next sitting apply to the tool route too
+  (participants/src/llm/participant.ts, in the asking exchange).
 - **Local models in experiments**: `ollama/` and `local/` (OIKOS_LOCAL_BASE_URL) are seated without a key or a limit (free
   to call); `OIKOS_LOCAL_CONTEXT` gives the context window checked before each call. experiments/open-weight/local.ts is
   the free local test.
