@@ -11871,3 +11871,27 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   unit its post (then many of these wakes stop at the source, and the rule here matters less); the generator's words are
   next changed with a hash change anyway (then write the stationery's sentence and the providers' names there, and drop
   the read-time rewrites).
+
+## 2026-11-10 · The pilot viewer opens experiment forks (branch of `viewer`; plan "Now" step 1)
+
+- **What:** `oikos pilot-view <experiment-dir | seed-dir> [--arm NAME] [--out file.html | folder]` writes one page per
+  model arm and seed (`seed-7.sonnet.html`), with an `index.html` when there are several; `--arm` with a `.html` out
+  writes one file. One file per arm rather than a switcher: each stays under the 10 MB rule on its own (round 5's seed 7:
+  Sonnet 6.0 MB, Haiku 5.7 MB, prompts whole), and the overview links the other arms. The `code` arm of the same seed
+  is the twin of "Seat vs twin" (the same town forked on the same day, code in the same seats); it gets no page.
+- **How:** `logLines` reads an `.oklog` through `oikos-kernel export` (only read), so every reader of logs can take a
+  fork's log; `runOf`, `debriefsBeside` and `citizensBeside` know the extension (before, `debriefsBeside` of an `.oklog`
+  returned the log itself). The seats are those of `<arm>.calls.jsonl` and `<arm>.json`, their posts from
+  `template-seats.json` (they take them at the fork, so the header does not hold them); model, framing and translator
+  arrangement from the log's `steward` notes. A fork's sitting shows the whole prompt (standing instructions, logged once
+  by hash, and the day's part), each turn's words and calls verbatim with what came back, the translator that drafted
+  (from `translation_route`: ours, or the fallback, and why ours withheld).
+- **Empty sittings:** a seat's `empty_sitting` note (from 71ccaa6f) is listed as a sitting skipped without a call. For
+  older forks, a held sitting is marked empty when the wake was by news with no letter, result or draft for it, and the
+  sitting asked for, sent or answered nothing (only looks, notebook, done for now). Round 5's Sonnet fork: 252 such
+  sittings, 334 calls; the decision of 2026-11-10 above counted 240 and 315 by the participant's own rule. Recorded, not
+  chased: the inference cannot see whether a look found something new.
+- **Not shown:** `<arm>.calls.jsonl` holds each call's cost and tokens, not its prompt; prompts come from the log's
+  transcripts. Debrief words come from `<arm>.debriefs.jsonl`, under the same keep-back rule as before.
+- **Revisit if:** a fork's page passes 10 MB with prompts whole (then excerpts shorten, and the page says so), or the
+  calls file starts carrying prompts.

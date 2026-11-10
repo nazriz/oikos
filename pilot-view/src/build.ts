@@ -72,25 +72,43 @@ function maps(header: any) {
 
 const SEAT_TOOLS_HIDDEN = new Set(["notebook"]);
 
-export async function buildView(dir: string, opts: { twin?: string | false; caps?: Partial<Caps>; log?: (s: string) => void; debriefs?: false } = {}): Promise<ViewData> {
+/** An experiment fork (orchestrator/src/experiment.ts): the arm's log, its seats and their posts (bound at the fork, so
+ * not in the log's header), the code arm's log as the twin, and what the folder says of the experiment. */
+export interface ForkInput { log: string; name: string; seats: { [seat: string]: string | undefined }; twinLog?: string; info: ViewData }
+
+export async function buildView(dir: string, opts: { twin?: string | false; caps?: Partial<Caps>; log?: (s: string) => void; debriefs?: false; fork?: ForkInput } = {}): Promise<ViewData> {
   const say = opts.log ?? (() => {});
   let caps: Caps = { ...CAPS, ...opts.caps };
-  const log = logOf(dir);
-  const pilotName = basename(resolve(dir));
+  const fork = opts.fork;
+  const log = fork?.log ?? logOf(dir);
+  const pilotName = fork?.name ?? basename(resolve(dir));
   // (The explorer passes debriefs: false: it reads no debrief, docs/design/renderer.md 1.)
   const deb = opts.debriefs === false ? undefined : new DebriefCollector(log);
   // The header is needed before the pass (which seats sat), and is the log's first line.
   const first = await (async () => { const { logLines } = await import("../../orchestrator/src/logs"); for await (const l of logLines(log)) return JSON.parse(l); })();
   const m = maps(first.body);
+  // (A fork's seats take their posts at the fork: the header's config is the base run's, from before.)
+  if (fork) for (const [seat, post] of Object.entries(fork.seats)) {
+    if (!m.seats.includes(seat)) m.seats.push(seat);
+    const p = post ? m.positions.get(post) : undefined;
+    if (p) p.holder = seat;
+  }
   say(`reading ${basename(log)}`);
   const seatPositions = new Set([...m.positions].filter(([, p]) => p.holder && m.seats.includes(p.holder)).map(([id]) => id));
+  // (A fork's code arm is read beside it, at the same time.)
+  const forkTwin = opts.twin !== false && fork?.twinLog ? (say(`reading the code arm ${basename(fork.twinLog)}`), ingest(fork.twinLog, { seats: new Set(m.seats), positions: seatPositions, twin: true, entityOfPosition: m.entityOfPosition, holderOfAccount: m.holderOfAccount, full: false }).catch((e) => e as Error)) : undefined;
   const raw = await ingest(log, { seats: new Set(m.seats), positions: seatPositions, entityOfPosition: m.entityOfPosition, holderOfAccount: m.holderOfAccount, full: true, ...(deb ? { debriefs: deb, wants: DebriefCollector.wants } : {}) });
   const days = Math.max(1, Math.ceil((raw.end?.t ?? raw.lastT) / 86_400));
   const cur = m.currency;
   const fmt = (x: any) => money(x, cur);
 
   let twinRaw: Raw | undefined, twinDir: string | undefined;
-  if (opts.twin !== false) {
+  if (opts.twin !== false && fork?.twinLog) {
+    // (A fork's twin is the experiment's code arm: the same town forked on the same day, code in the same seats.)
+    const t = await forkTwin!;
+    if (t instanceof Error) say(`twin not read: ${t.message}`);
+    else { twinRaw = t; twinDir = fork.twinLog; }
+  } else if (opts.twin !== false && !fork) {
     twinDir = findTwin(dir, log, typeof opts.twin === "string" ? opts.twin : undefined);
     if (twinDir && existsSync(twinDir)) {
       try {
@@ -108,7 +126,7 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
 
   const pilotFile = (() => { const p = join(dir, "PILOT.txt"); if (!existsSync(p)) return {} as any; const t = readFileSync(p, "utf8"); const at = t.indexOf("\n{"); let queue: any; try { queue = JSON.parse(t.slice(at < 0 ? t.indexOf("{") : at + 1)); } catch { /* (by hand) */ } return { note: (at < 0 ? t : t.slice(0, at)).trim(), queue }; })();
   const batch = readJson(join(dir, "batch.json"));
-  const summary = readJson(log.replace(/\.jsonl(\.zst)?$/, ".summary.json"));
+  const summary = readJson(log.replace(/\.(jsonl(\.zst)?|oklog)$/, ".summary.json"));
   const cfg = first.body.config ?? {};
   const llm = raw.llm?.llm ?? {};
   const framing = new Map<string, any>();
@@ -136,10 +154,13 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
     const ending = draft ? "draft_offered" : fail ? endingOf(fail.call, String(fail.reason ?? ""), fail.asked_back === true ? true : undefined).ending : "no_result";
     const act = actsByDraft.get(id);
     const by = route ? (route.used === "first" ? "ours" : "fallback") : "single";
+    // (Which translator drafted it: the route's own record of each model where there is one, else the calls made for it.)
+    const calls = raw.translatorCalls.get(id) ?? [];
+    const usedModel = route ? String((route.used === "first" ? route.first?.model : route.behind?.model) ?? modelOf(route.used === "first" ? "first" : "behind")) : calls.at(-1)?.model ?? llm.translator?.model ?? "";
     requests.set(id, {
-      id, seat: mm[1], n: Number(mm[2]), t: rt?.t ?? draft?.t ?? 0, words: clip(rt?.words ?? "", 1500), attempts: rt?.attempts ?? 0, retries: raw.retries.get(id) ?? 0,
-      by, usedModel: route ? (route.used === "first" ? modelOf("first") : modelOf("behind")) : llm.translator?.model ?? "",
-      route: route ? { used: route.used, why: route.why, agree: route.agree, first: route.first ? { result: route.first.result, label: route.first.label, ms: route.first.ms, sure: route.first.sure_ppm, withheld: route.first.withheld, wrote: clip(route.first.wrote ?? route.first.call, 600) } : undefined, behind: route.behind ? { result: route.behind.result, call: clip(route.behind.call, 600) } : undefined } : undefined,
+      id, seat: raw.reqSeat.get(id) ?? mm[1], n: Number(mm[2]), t: rt?.t ?? draft?.t ?? 0, words: clip(rt?.words ?? "", 1500), attempts: rt?.attempts ?? 0, retries: raw.retries.get(id) ?? 0,
+      by, usedModel, translators: [...new Set(calls.map((c) => c.model))],
+      route: route ? { used: route.used, why: route.why, agree: route.agree, first: route.first ? { model: route.first.model, result: route.first.result, label: route.first.label, ms: route.first.ms, sure: route.first.sure_ppm, withheld: route.first.withheld, wrote: clip(route.first.wrote ?? route.first.call, 600) } : undefined, behind: route.behind ? { model: route.behind.model, result: route.behind.result, call: clip(route.behind.call, 600) } : undefined } : undefined,
       ending,
       draft: draft ? { call: clip(draft.call, 1500), proposal: clip(draft.proposal, 1500), summary: clip(draft.summary, 2500), ok: draft.check?.ok !== false } : undefined,
       failure: fail ? { reason: clip(fail.reason, 800), call: clip(fail.call, 600), askedBack: fail.asked_back === true } : undefined,
@@ -160,17 +181,23 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
     const trs = raw.transcripts.filter((t) => t.subject === seat && t.purpose === "participant").sort((a, b) => a.seq - b.seq);
     const sittings: ViewData[] = [];
     let curS: ViewData | undefined, prevTr: Transcript | undefined;
+    const wakes = raw.woken.filter((w) => w.subject === seat);
+    let wi = 0, lastWake: (typeof wakes)[number] | undefined;
     for (const tr of trs) {
       if (tr.turn === 1 || !curS) {
-        curS = { t: tr.t, day: dayOf(tr.t), stamp: stamp(tr.t), model: `${tr.provider}/${tr.model}`, reading: clip(readingOf(tr.opening ?? ""), caps.reading), readingLen: readingOf(tr.opening ?? "").length, notebookBefore: tr.notebook, turns: [], cost: 0, calls: 0, requests: [], direct: [], notes: [] };
+        // (What woke it: the participant's last observation before the sitting's first call.)
+        while (wi < wakes.length && wakes[wi]!.seq < tr.seq) lastWake = wakes[wi++];
+        const opening = tr.opening ?? "";
+        curS = { t: tr.t, day: dayOf(tr.t), stamp: stamp(tr.t), model: `${tr.provider}/${tr.model}`, reading: clip(readingOf(opening), caps.reading), readingLen: readingOf(opening).length, notebookBefore: tr.notebook, system: tr.systemSha, ...(fork ? { prompt: clip(opening, caps.reading), promptLen: opening.length } : {}), woken: lastWake && lastWake.t <= tr.t && lastWake.t > tr.t - 86_400 ? { for: lastWake.wokeFor, inbox: lastWake.inbox, outcomes: lastWake.outcomes, drafts: lastWake.drafts } : undefined, turns: [], cost: 0, calls: 0, requests: [], direct: [], notes: [] };
         sittings.push(curS); prevTr = undefined;
       }
       // What the seat looked up at its previous turn comes back as this turn's tool results.
       const resultBy = new Map(tr.results.map((r) => [r.id, r.text]));
-      if (prevTr) for (const tu of curS.turns.at(-1)!.tools) if (tu.id && resultBy.has(tu.id)) tu.result = clip(lookBody(resultBy.get(tu.id)!), caps.result);
+      if (prevTr) for (const tu of curS.turns.at(-1)!.tools) if (tu.id && resultBy.has(tu.id)) { const text = resultBy.get(tu.id)!; tu.result = clip(tu.name === "look" && !fork ? lookBody(text) : text, caps.result); }
+      if (tr.shown && curS.turns.length) curS.turns.at(-1)!.shownAfter = clip(tr.shown, caps.result);
       const tools = (tr.output as any[]).filter((x) => x?.type === "tool_use").map((x) => ({ id: x.id, name: x.name, input: toolsLine(x.input) }));
       for (const tu of tools) addMentions(JSON.stringify(tu.input), 2);
-      curS.turns.push({ turn: tr.turn, say: clip((tr.output as any[]).filter((x) => x?.type === "text").map((x) => x.text).join("\n"), caps.say), tools });
+      curS.turns.push({ turn: tr.turn, say: clip((tr.output as any[]).filter((x) => x?.type === "text").map((x) => x.text).join("\n"), caps.say), tools, ...(tr.systemSha && tr.systemSha !== curS.system ? { system: tr.systemSha } : {}) });
       curS.calls++;
       prevTr = tr;
     }
@@ -186,18 +213,30 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
       const s = sittingAt(a.t);
       if (s) s.direct.push({ seq: a.seq, t: a.t, status: a.status, blocks: a.blocks.map((b) => ({ ...b, text: clip(b.text, 400) })), effects: a.effects.slice(0, 8), consequences: a.consequences.slice(0, 6).map((c) => ({ ...c, byName: nameOf(c.by), text: clip(c.text, 400) })) });
     }
-    for (const n of raw.notes) if (n.subject === seat) { const s = sittingAt(n.t); if (s) s.notes.push({ kind: n.kind, data: clip(n.data, 300) }); }
+    for (const n of raw.notes) if (n.subject === seat && n.kind !== "empty_sitting") { const s = sittingAt(n.t); if (s) s.notes.push({ kind: n.kind, data: clip(n.data, 300) }); }
+    // Empty sittings: woken, shown nothing new, and it did nothing. A seat from 2026-11-10 on holds no sitting for such a
+    // wake and makes no call (noted `empty_sitting`): those are listed as skipped. Before, they were held, and are known
+    // here from what the log has: woken by news with no letter, result or draft for it, and in the sitting nothing
+    // asked for, sent, made or answered (only looks, its notebook and "done for now").
+    const QUIET = new Set(["look", "notebook", "done_for_now"]);
+    for (const s of sittings) s.empty = !!s.woken && s.woken.for === "news" && !s.woken.inbox && !s.woken.outcomes && !s.woken.drafts && !s.requests.length && !s.direct.length && s.turns.every((t: ViewData) => t.tools.every((x: ViewData) => QUIET.has(x.name)));
+    const held = sittings.length;
+    for (const n of raw.notes) if (n.subject === seat && n.kind === "empty_sitting") sittings.push({ t: n.t, day: dayOf(n.t), stamp: stamp(n.t), skipped: true, empty: true, woken: { for: n.data?.woke_for ?? "news" }, backAt: n.data?.back_at, turns: [], cost: 0, calls: 0, requests: [], direct: [], notes: [] });
+    if (sittings.length > held) sittings.sort((a, b) => a.t - b.t || (a.skipped ? 1 : 0) - (b.skipped ? 1 : 0));
     // The notebook: what it held at each sitting's opening, and what the seat wrote into it.
     const notebookAdds: { day: number; text: string }[] = [];
     for (const s of sittings) for (const tu of s.turns.flatMap((t: ViewData) => t.tools)) if (tu.name === "notebook") { const text = tu.input.add ?? tu.input.text ?? tu.input.replace ?? JSON.stringify(tu.input); notebookAdds.push({ day: s.day, text: clip(text, 3000) }); addMentions(String(text), 2); }
-    const last = sittings.at(-1);
+    const last = sittings.filter((s) => !s.skipped).at(-1);
     const dr = debriefOut.seats.find((x) => x.seat === seat);
     const titleOf = m.titles.get(seat) ?? [...m.positions.values()].find((p) => p.holder === seat)?.title ?? nameOf(seat);
-    const reqStats = { requests: myReqs.length, drafts: myReqs.filter((r) => r.ending === "draft_offered").length, confirmed: myReqs.filter((r) => r.signoff === "confirmed").length, declined: myReqs.filter((r) => r.signoff === "declined").length, askedBack: myReqs.filter((r) => r.ending === "asked_back").length, refused: myReqs.filter((r) => r.ending === "refused").length };
+    // (Came to nothing: no act of it was carried out, whatever the reason: no draft, a draft declined or unanswered, an act refused.)
+    const reqStats = { requests: myReqs.length, drafts: myReqs.filter((r) => r.ending === "draft_offered").length, confirmed: myReqs.filter((r) => r.signoff === "confirmed").length, declined: myReqs.filter((r) => r.signoff === "declined").length, askedBack: myReqs.filter((r) => r.ending === "asked_back").length, refused: myReqs.filter((r) => r.ending === "refused").length, ours: myReqs.filter((r) => r.by === "ours").length, fallback: myReqs.filter((r) => r.by === "fallback").length, nothing: myReqs.filter((r) => r.act?.status !== "applied").length };
+    const steward = raw.stewards.get(seat);
     seatsOut.push({
-      id: seat, title: titleOf, model: llm.participants?.[seat]?.adapter ?? (trs[0] ? `${trs[0].provider}/${trs[0].model}` : null), framing: framing.get(seat)?.disclosure,
+      id: seat, title: titleOf, model: steward?.adapter ?? llm.participants?.[seat]?.adapter ?? (trs[0] ? `${trs[0].provider}/${trs[0].model}` : null), framing: steward?.framing?.disclosure ?? framing.get(seat)?.disclosure, framingReason: steward?.framing?.reason ?? framing.get(seat)?.reason,
+      post: steward?.post, empty: sittings.filter((s) => s.empty && !s.skipped).length, emptyCalls: sum(sittings.filter((s) => s.empty && !s.skipped).map((s) => s.calls)), skipped: sittings.filter((s) => s.skipped).length,
       calls: trs.length, cost: sum(usageBy((u) => u.subject === seat && u.purpose === "participant").map((u) => u.cost)) / 1e6, debriefCost: sum(usageBy((u) => u.subject === seat && u.purpose === "debrief").map((u) => u.cost)) / 1e6,
-      sittings: sittings.length, tools: trs.flatMap((t) => (t.output as any[]).filter((x) => x?.type === "tool_use").map((x) => x.name)).reduce((o: any, n: string) => ((o[n] = (o[n] ?? 0) + 1), o), {}),
+      sittings: sittings.filter((s) => !s.skipped).length, tools: trs.flatMap((t) => (t.output as any[]).filter((x) => x?.type === "tool_use").map((x) => x.name)).reduce((o: any, n: string) => ((o[n] = (o[n] ?? 0) + 1), o), {}),
       acts: myActs.length, ...reqStats,
       sittingList: sittings, notebook: { final: last ? (notebookAdds.length ? last.notebookBefore ?? "" : last.notebookBefore ?? "") : "", adds: notebookAdds },
       opted_out: raw.optOuts.find((o) => o.participant === seat) ?? null,
@@ -208,7 +247,7 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
   // The notebook as the seat last saw it plus what it added after: the last opening is from before the last sitting's own
   // adds, so the final text is that opening followed by that sitting's adds.
   for (const s of seatsOut) {
-    const lastS = s.sittingList.at(-1);
+    const lastS = s.sittingList.filter((x: ViewData) => !x.skipped).at(-1);
     if (lastS) {
       const lastAdds = lastS.turns.flatMap((t: ViewData) => t.tools).filter((x: ViewData) => x.name === "notebook").map((x: ViewData) => String(x.input.add ?? x.input.text ?? ""));
       s.notebook.final = [lastS.notebookBefore ?? "", ...lastAdds].filter(Boolean).join("\n");
@@ -233,8 +272,9 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
   const share = (xs: Req[]) => ({ requests: xs.length, drafts: xs.filter((r) => r.ending === "draft_offered").length, confirmed: xs.filter((r) => r.signoff === "confirmed").length, declined: xs.filter((r) => r.signoff === "declined").length, unanswered: xs.filter((r) => r.signoff === "unanswered").length, askedBack: xs.filter((r) => r.ending === "asked_back").length, refused: xs.filter((r) => r.ending === "refused").length });
   const fbWhy: { [k: string]: number } = {};
   for (const r of fb) fbWhy[r.route?.why ?? "?"] = (fbWhy[r.route?.why ?? "?"] ?? 0) + 1;
+  const forkArrangement = [...raw.stewards.values()].find((s) => s.translator?.first)?.translator;
   const translator = {
-    arrangement: arrangement ? { kind: arrangement.arrangement, first: modelOf("first"), behind: modelOf("behind") } : null, model: llm.translator?.model ?? null, version: llm.translator_version ?? llm.translator?.version ?? null,
+    arrangement: arrangement ? { kind: arrangement.arrangement, first: modelOf("first"), behind: modelOf("behind") } : forkArrangement ? { kind: forkArrangement.arrangement, first: forkArrangement.first, behind: forkArrangement.behind } : null, model: llm.translator?.model ?? null, version: llm.translator_version ?? llm.translator?.version ?? [...raw.stewards.values()][0]?.translator_version ?? null,
     requests: reqList.length, ours: share(ours), fallback: share(fb), single: share(reqList.filter((r) => r.by === "single")), fallbackWhy: fbWhy,
     calls: trUsage.length, usd: sum(trUsage.map((u) => u.cost)) / 1e6,
     meanMsOurs: ours.length ? Math.round(sum(ours.map((r) => r.route?.first?.ms ?? 0)) / ours.length) : null,
@@ -242,7 +282,7 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
 
   // ---------- alerts
   const alerts: string[] = [];
-  const untilS = pilotFile.queue?.until as number | undefined;
+  const untilS = (pilotFile.queue?.until ?? (fork?.info?.untilDay ? fork.info.untilDay * 86_400 : undefined)) as number | undefined;
   const endText = raw.end ? `${raw.end.reason}${raw.end.detail ? ` (${raw.end.detail})` : ""}` : "no end written";
   const reachedUntil = untilS !== undefined ? (raw.end?.t ?? raw.lastT) >= untilS : null;
   if (!raw.end) alerts.push("The log has no end entry: the run was cut short or is still going.");
@@ -332,13 +372,14 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
     town: cfg.meta?.name ?? null, description: cfg.meta?.description ?? null, profile, seed: cfg.seed ?? batch?.config_seed ?? null,
     people: batch?.spec?.citizens ?? null, days: Math.round(((raw.end?.t ?? raw.lastT) / 86_400) * 10) / 10, untilDays: untilS !== undefined ? Math.round(untilS / 86400) : null,
     end: endText, finished: !!raw.end && reachedUntil !== false,
-    framing: [...new Set(m.seats.map((s) => framing.get(s)?.disclosure).filter(Boolean))], framingReason: [...framing.values()][0]?.reason ?? null,
+    framing: [...new Set(seatsOut.map((s) => s.framing).filter(Boolean))], framingReason: seatsOut.find((s) => s.framingReason)?.framingReason ?? null,
     started: batch?.started ?? null, wallMinutes: batch?.wall_ms ? Math.round(batch.wall_ms / 60000) : null,
     cost: { usd: totalMicro / 1e6, calls: raw.usage.length, limit: llm.spending_limit_microusd ? llm.spending_limit_microusd / 1e6 : null, byModel },
-    seats: seatsOut.map((s) => ({ id: s.id, title: s.title, model: s.model, calls: s.calls, sittings: s.sittings, cost: s.cost, requests: s.requests, confirmed: s.confirmed, declined: s.declined, acts: s.acts })),
+    seats: seatsOut.map((s) => ({ id: s.id, title: s.title, model: s.model, calls: s.calls, sittings: s.sittings, cost: s.cost, requests: s.requests, confirmed: s.confirmed, declined: s.declined, acts: s.acts, ours: s.ours, fallback: s.fallback, nothing: s.nothing, empty: s.empty, emptyCalls: s.emptyCalls, skipped: s.skipped, framing: s.framing, post: s.post })),
+    experiment: fork?.info ?? null,
     translator, alerts, logLines: raw.lines, twinFound: !!twin,
     generated: { by: "oikos pilot-view", log: basename(log) },
   };
-  const data: ViewData = { overview, seats: seatsOut.map(({ sittingList, ...rest }) => ({ ...rest, sittings: sittingList.map((s: ViewData) => ({ ...s, turns: s.turns.map((t: ViewData) => ({ ...t, tools: t.tools.filter((x: ViewData) => !SEAT_TOOLS_HIDDEN.has(x.name) || true) })) })) })), actors, twin, town };
+  const data: ViewData = { overview, seats: seatsOut.map(({ sittingList, ...rest }) => ({ ...rest, sittings: sittingList.map((s: ViewData) => ({ ...s, turns: s.turns.map((t: ViewData) => ({ ...t, tools: t.tools.filter((x: ViewData) => !SEAT_TOOLS_HIDDEN.has(x.name) || true) })) })) })), actors, twin, town, systems: Object.fromEntries([...raw.systems].filter(([k]) => seatsOut.some((s) => s.sittingList.some((x: ViewData) => x.system === k || x.turns.some((t: ViewData) => t.system === k))))) };
   return data;
 }
