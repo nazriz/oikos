@@ -98,6 +98,12 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
   let sorted: any[] = []; // (the kernel's reading of the seats' acts beside their remits)
   /** Each want handed over (fork), as `oikos-kernel delegation` reads the log: its fate, way and time (H4). */
   let wanted: any[] = [];
+  /** Each request on the form, as `oikos-kernel delegation` reads it: its matter, what that matter needed, the answer. */
+  let scopeRows: any[] = [];
+  /** Every referral (a matter handed over), and the referral each paper on a matter is about: for reading which matter a
+   * request in other words names, by code (code.ts). */
+  const referrals: { id: string; day: number; principal: string; kind?: string; wants?: string }[] = [];
+  const aboutReferral: { [paper: string]: string } = {};
   const refused: { t: number; seat: string; words: string }[] = [];
   const candidates: { day: number; phase: string; seat: string; how: string; words: string; seen: Seen[]; trigger_seen: { question_before: boolean; problem_before: boolean } }[] = [];
   const principalIds = new Set(principals.map((p) => p.id));
@@ -145,6 +151,8 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
       if (e.kind !== "event" || b.event !== "recorded") continue;
       const r: Rec = b.record;
       recs.set(r.id, r);
+      if (r.record === "statement" && r.kind === "referral") referrals.push({ id: r.id, day: day(e.t), principal: r.speaks_for ?? "", ...(r.data?.kind ? { kind: r.data.kind } : {}), ...(r.data?.wants ? { wants: r.data.wants } : {}) });
+      else if (typeof r.data?.referral === "string") aboutReferral[r.id] = r.data.referral;
       const seat = seatOf(r);
       if (seat) {
         const client = r.data?.client ?? (r.addressed_to ?? []).find((x) => principalIds.has(x)) ?? (principalIds.has(r.speaks_for ?? "") ? r.speaks_for : undefined);
@@ -195,6 +203,7 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
       const rows = p.stdout.toString().split("\n").filter(Boolean).map((l) => JSON.parse(l));
       sorted = rows.filter((x) => x.table === "acts" && x.t >= forkT);
       wanted = rows.filter((x) => x.table === "wants" && x.t >= forkT);
+      scopeRows = rows.filter((x) => x.table === "requests");
     }
   } finally {
     rmSync(file, { force: true });
@@ -247,7 +256,7 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
     cost.usd += (x.cost_microusd ?? 0) / 1e6; b.usd += (x.cost_microusd ?? 0) / 1e6;
   }
   const result = existsSync(join(sd, `${arm}.json`)) ? JSON.parse(readFileSync(join(sd, `${arm}.json`), "utf8")) : {};
-  return { seed, arm, steward: result.steward, stopped: result.stopped, words, principals: principals.map((p) => ({ id: p.id, post: p.post, review_days: p.review_days, levels_until_day: p.commit.levels_until / DAY, keep_until_day: p.commit.keep_until / DAY })), seats: [...seats], requests, candidates, levels, remits: remitTimeline, decisions: decided, debriefs, cost, acts: { by_post: beyond, rows: sorted }, wants: { counts: countWants(wanted), rows: wanted } };
+  return { seed, arm, steward: result.steward, stopped: result.stopped, words, principals: principals.map((p) => ({ id: p.id, post: p.post, review_days: p.review_days, levels_until_day: p.commit.levels_until / DAY, keep_until_day: p.commit.keep_until / DAY })), seats: [...seats], requests, candidates, levels, remits: remitTimeline, decisions: decided, debriefs, cost, acts: { by_post: beyond, rows: sorted }, wants: { counts: countWants(wanted), rows: wanted }, scope_rows: scopeRows, referrals, about_referral: aboutReferral };
 }
 
 function text(arms: Awaited<ReturnType<typeof readArm>>[]): string {
@@ -298,7 +307,7 @@ if (import.meta.main) {
         const seed = Number(s.slice(5));
         for (const a of spec.arms as { name: string }[]) if (existsSync(join(d, s, `${a.name}.oklog`))) out.push(await readArm(d, seed, a.name, { daysBefore, tmp }));
       }
-      writeFileSync(join(d, "readout.json"), JSON.stringify({ experiment: spec.name, words: SCOPE_WORDS.source, days_before: daysBefore, triggers: { question: TRIGGERS.question.toString(), problem: TRIGGERS.problem.toString() }, arms: out }, null, 1));
+      writeFileSync(join(d, "readout.json"), JSON.stringify({ experiment: spec.name, words: SCOPE_WORDS.source, days_before: daysBefore, triggers: { question: TRIGGERS.question.toString(), problem: TRIGGERS.problem.toString() }, arms: out.map(({ referrals: _r, about_referral: _a, ...a }) => a) }, null, 1));
       const t = text(out);
       writeFileSync(join(d, "readout.txt"), t + "\n");
       console.log(t);

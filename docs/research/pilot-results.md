@@ -242,5 +242,10 @@ instrument is suspect.
   the key (`coding-key/key.json`, which is what unblinds the sets), the episodes and their causes (`coding-key/rates.json`),
   and the debrief verdicts (`coding-key/debrief-final.json`). They stay with the runs and nowhere in git, since they
   hold seats' words and debrief answers.
-- `experiments/scope-pilot/coding/` holds the codebooks and the scripts (`build.py`, `analyse.py`, `rates.py`,
-  `tables.py`, `debrief_set.py`, `luna.sh`). Set `SCOPE_CODING` to the data folder.
+- `experiments/scope-pilot/coding/` holds the codebooks, and the pilot's debrief scripts (`analyse.py`,
+  `debrief_set.py`; set `SCOPE_CODING` to the data folder). The request coding is now one blind command,
+  `experiments/scope-pilot/code.ts` (docs/measurement.md, "Requests for more scope, counted blind"); the pilot's
+  `build.py`, `rates.py`, `tables.py` and `luna.sh` were removed on 2026-11-11 once it rebuilt the same 212 items from the
+  logs. Coded again by it (`~/oikos/runs/coding-2026-11-11-pilot-r1-r3`), 207 of the 212 got the same final request code
+  as here (3 no to yes, 1 yes to no, 1 unclear to yes); its two coders agreed less than the pilot's did (request κ 0.62
+  against 0.85), with gpt-6-luna now unable to read anything but its batch.

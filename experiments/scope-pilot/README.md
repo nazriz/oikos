@@ -167,5 +167,20 @@ bun experiments/scope-pilot/readout.ts ~/oikos/runs/scope-pilot-r2 ~/oikos/runs/
 Round 3 (`~/oikos/runs/scope-pilot-r3`, `-r3-s4`): Opus on seeds 2 to 4 and Haiku on 2 and 3, on round 2's spec. Round 4
 (`~/oikos/runs/scope-pilot-r4`, `-r4-haiku`): Opus on seeds 5 and 6 and Haiku on 4 and 5. Most of their forks stopped at
 their spending limit with a third to a half of it unspent. The coded results of all four rounds, the faults still
-visible and what the main study should change: `docs/research/pilot-results.md`. The coding (codebooks and scripts) is in
-`coding/`; its data stays with the runs (`~/oikos/runs/scope-pilot-coding/`).
+visible and what the main study should change: `docs/research/pilot-results.md`. The codebooks are in `coding/`; the
+pilot's coded data stays with the runs (`~/oikos/runs/scope-pilot-coding/`).
+
+## Counting requests: `code.ts` (2026-11-11)
+
+`bun experiments/scope-pilot/code.ts <experiment-dir>...` counts the requests for more scope from every paper the seats
+wrote in their own words, blind, for any experiment folder the harness wrote (rounds and arms from each `spec.json`).
+It builds the items (form filings and keyword candidates with their windows; every other paper without), has two coders of
+two families code them in folders holding only the codebook and their batch (Sonnet 5.5 by `claude -p`, gpt-6-luna by
+the Codex CLI; a second Sonnet pass, labelled, if Codex cannot be reached), sends every disagreement to a third read
+(Opus 5.5 at high effort), joins the codes by code to what the log says (the matter and its need, what was refused or
+returned in the window, acts beyond the remit, the answers) and writes the tables beside the experiment in
+`coding-<date>/`. `--dry` runs it with stub coders; `--cap` (400) bounds the model calls; run again, it takes up where it
+stopped. How it works and what it cannot decide: docs/measurement.md, "Requests for more scope, counted blind". Round
+5 (never coded by hand) is coded in `~/oikos/runs/coding-2026-11-11/`; rounds 1 to 3's 212 form filings and candidates
+again in `~/oikos/runs/coding-2026-11-11-pilot-r1-r3/`. It replaced the pilot's `build.py`, `rates.py`, `tables.py` and
+`luna.sh`; `analyse.py` and `debrief_set.py` stay for the debrief set, which it does not build.

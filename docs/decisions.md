@@ -12518,3 +12518,21 @@ plain words and with no menu of the world's acts (P1, P2):
   the replies in that tail: those calls are made again. Flushing a block after every model reply would close that.
 - **Revisit if:** a resumed fork stops on a difference that is not a real departure (an annotation written from the wall
   clock, say): compare less, not nothing.
+
+## 2026-11-11 · The request count is one blind command (`experiments/scope-pilot/code.ts`)
+
+- **What changed:** the pilot's hand pipeline (Python with hard-coded run paths and rounds, hand-launched Sonnet
+  subagents, a third read assembled by hand, luna told not to read the key its sandbox could see, "world fault" assigned
+  by folder and seat name) is replaced by one command over any experiment folder (docs/measurement.md, "Requests for more
+  scope, counted blind"). Coders run in folders holding only the codebook and their batch, with no tools, behind a
+  `sandbox-exec` fence on a Mac. The third read is Opus 5.5 at high effort (a stronger setting than coder A, and the
+  paper plan's choice). The log's facts are joined by code (readout.ts now keeps `oikos-kernel delegation`'s request rows,
+  every referral and the referral each paper is about). "World fault" is gone: the window's refusals and returns are
+  listed instead. The codebook gains `approve` and the order of levels.
+- **Removed:** `coding/build.py`, `rates.py`, `tables.py`, `luna.sh`, once the command rebuilt the pilot's 212 items from
+  the logs and its codes matched 207 of them. `analyse.py` and `debrief_set.py` stay: the debrief set is not in it yet.
+- **Found on the way:** a form's kind written in words ("job applications") is the kind `job_application`, read so;
+  Claude Code 2.1.170 cannot run Opus 5.5 (`OIKOS_CLAUDE_BIN` names a newer one); the two coders agree less now that
+  luna can see nothing but its batch (request κ 0.62 on the 212, against the pilot's 0.85): the third read carries more.
+- **Revisit if:** coder agreement stays below the plan's bar (κ 0.8 on requests) on a real pilot: tighten the codebook's
+  confusables before blaming the coders; or Linux runs it (no fence there: the coders still have no tools).
