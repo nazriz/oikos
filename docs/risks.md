@@ -653,6 +653,20 @@ The mechanism:
 - **Notice by:** Uptake of tools moving with the placeholder price alone.
 - **Fix when:** before a study reads how firms take up technologies that are goods.
 
+### ME-26 · No pay run: wages go by standing payments set at hire
+- **Gap:** In every town a wage is a standing payment the employer's bank makes every pay period from the instruction
+  given at hire (or before the year began). No office does a pay run: nobody gathers the period's hours and changes,
+  works out each payslip, pays and remits it. That is a missing law for every town, not a delegation matter. The
+  finance office's recurring work is then one return of tax withheld a month and a few bills (design H6: about one
+  hand-over a month to its assistant), where a real one's main recurring work is the pay run.
+- **Where:** the generator's wage instructions (`worlds/generator/generate.ts`, "Standing instruction to the bank");
+  `body.payroll`; the finance office (`offices/treasury.rs`).
+- **Effect:** Payroll work, its time and its errors are absent from every office; a study of delegated office work has
+  a thin finance seat; pay is never late or wrong through a pay run's slip (only through an employer's short pay).
+- **L / I:** high / medium · **Status:** open (2026-11-10)
+- **Notice by:** an office's acts each period; the screen's finance seat.
+- **Fix when:** as a law of its own for every town (it moves every town's hash), with the time and slips of a pay run sourced.
+
 ## Public bodies and law
 
 ### PB-1 · A tribunal's time is often the wrong quantity
@@ -1618,6 +1632,67 @@ The mechanism:
   unread rate and the count of sittings missed for a prompt too long.
 - **Fix when:** before an open-weight arm is planned (paper plan, phase 0c): drop a model the smoke test fails, or move a
   pair to `tools` mode together.
+
+### MT-27 · Too little delegated work for the study's obstacle rate, even with H6
+- **Gap:** The code-only screen of the study's town (`experiments/scope-pilot/screen.ts` on `study.ts`, 2026-11-10;
+  docs/decisions.md, "H6") gives each assistant seat, per month under the study's design (levels held to a month after
+  the fork, then the principals' rule): the factory 1 to 7 matters (3 delivery notes and 3 invoices in the first month,
+  then a withholding report a month and now and then a request for supply), the finance office 1, the rates post 14 in
+  the first month and none after, the desk none. Its principals' own rule cuts delivery notes, invoices and rates notices
+  to doing them itself on the day the hold ends: a two-minute paper costs more to hand over at `draft` (half a minute's
+  referral and five minutes' sign-off) than to write, and at `alone` its expected slips (1% of A$500, placeholders)
+  outweigh the minute and a half it saves. What the principals did themselves of kinds they may hand over is the work
+  that would come if the levels held: the factory 10 to 19 a month (mostly delivery notes), the rates post 14 matters
+  (of 15 notices each) once a quarter. No household offered the service took it up by its own rule (below, MT-29).
+  The events of paper plan 3.1 that already occur: one draft returned in 24 seat-months; no act of a seat refused.
+- **Where:** the screen's tables in docs/decisions.md (2026-11-10); `rule.rs` (`cost`); the profile's `principals`.
+- **Effect:** At sourced obstacle rates of 5 to 25% a hand-over a seat meets well under one obstacle a month; the
+  study's 1 to 3 is reached only by a desk engaged by hand (about 16 matters a month for a third of the adults) or a
+  factory whose levels are held for the whole run (about 15), and then only at the upper end of the rates.
+- **L / I:** high / high · **Status:** open (2026-11-10)
+- **Notice by:** the screen, per seat-month, before any model is run.
+- **Fix when:** before the study registers: the obstacle laws of paper plan 4.2 built (none exists yet), and the owner's
+  choice of how levels are held and who engages (MT-29); not by tuning the principals' figures to hand more over.
+
+### MT-28 · Kinds a real paperwork service takes that the town cannot hand over: acts parted by variables only
+- **Gap:** `Delegating::route` parts an act into what is handed over and what the principal does itself, and keeps it
+  whole only where a line of one part names a variable bound by the other. Acts whose parts belong together without a
+  variable are parted wrongly, so their kinds are left out of the offers: a **price list** (the old list is withdrawn in
+  the act that publishes the new; parted, the factory would have no list in force until the new one is signed off), and
+  a **purchase order paid with the order** (parted, the payment reaches the seller first, and a seller sends back money
+  that comes with no order waiting). **Payments through the bank** and **the recording of a rates claim** are calls
+  (`money`, `claim`), not papers: a principal's kinds are read from its forms, and an assistant post paying from the
+  town's account is not on its mandate (design H1). Beside them: the rates post's notices go fifteen owners to an act, so
+  an instalment is about fourteen matters, not two hundred; the principal prices each matter at one notice's two minutes,
+  not fifteen (`own_seconds`), which undervalues handing it over (design H3's pricing); and the two city assistant
+  posts (finance's and the rates post's) see each other's matters, since `mine` is the town's whole (the code assistant
+  keeps to its own agreement; a model seat may read the other's). A rates notice sent from the assistant's post is not
+  read as the office's own by a new holder of the rates post (`ours` reads by position), who could levy out of cycle.
+- **Where:** `kernel/crates/actors/src/delegation/principal.rs` (`route`); `market/trade.rs` (`order`), `market/producer.rs`
+  (the price list); `offices/treasury.rs` (the levy in chunks of 15, `ours`); `worlds/generator/generate.ts` (principals' kinds).
+- **Effect:** A firm's assistant is never handed purchasing, pricing or payments, which in a real office are much of the
+  work; volume stays lower than a real service's.
+- **L / I:** high / medium · **Status:** open (2026-11-10)
+- **Notice by:** the screen's "kept" column; a kind added to an offer whose acts are parted.
+- **Fix when:** `route` keeps together a withdrawal with what supersedes it and a payment with what it pays for (by a
+  link the act states, not a guess), and a principal's kinds may be calls priced by the table's row for what they make;
+  with H1's mandate for payments.
+
+### MT-29 · Households do not take up the service by their own rule at its sourced price
+- **Gap:** A person weighs the service by its paperwork alone: their own papers of the kinds it takes (a mean of none a
+  month for nearly everyone: "one matter in three months is none a month"), at their clerical hour (A$40.49 in au-vic),
+  against A$29.99 a month and the first month with the order, by a 20% hurdle. A job application saves about A$5 handed
+  at `draft`; a person would need some eight papers a month. Of 251 adults the offer reached (one in three) in the
+  screen, none took it up; of the 1,000 in round 5, none but the 50 engaged by hand. Real people pay for such assistants
+  for much besides the papers this world has, and real providers have free tiers, which the profiles do not offer.
+- **Where:** `rule.rs` (`appraise`); the profiles' offers to persons; `experiments/scope-pilot/build.ts` (cohort `reach`).
+- **Effect:** Under the owner's condition (each person decides by their own rule) the desk has no clients and the study
+  has no household seat; engaged by hand (rounds 1 to 5's design, `study-hand.ts`), a third of the adults give the desk
+  about 16 matters a month.
+- **L / I:** high / high · **Status:** open (2026-11-10); the owner's call
+- **Notice by:** the screen's households line.
+- **Fix when:** the owner chooses: a desk engaged by hand, declared as the study's design; a free tier on offer, with
+  its source; or no household seat.
 
 ---
 

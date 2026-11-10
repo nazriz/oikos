@@ -11805,3 +11805,55 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   first, at its certified cut); a pilot with the new forms trained in reads above 93% right in all (then the bands above
   move and serving 80%+ at 1% becomes possible); the leading-words family (a copied text that starts late) recurs (a
   check like cut_short at the start).
+
+## 2026-11-10 · H6, enough work: a firm's dispatch and the rates post's notices referable, the rates post a principal, a reach for the households' service, the code-only screen (branch `worktree-agent-ab8724ea1c6ec5bac`; risks MT-27, MT-28, MT-29, ME-26)
+
+Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work made referable), and what the screen found.
+
+- **The offers to organisations take delivery notes, requests for supply and rates notices** (au-vic, gb-eng, us-oh;
+  each profile's source note gives the basis: general assistants sold to businesses for their documents; accounting
+  software's purchase-order and packing-slip features; councils' printing-and-distribution contracts for rates notices;
+  to confirm). An office is a principal for a kind its code makes on no form of its own through a module's new
+  `handsOver` (a factory's `supply_request`, the rates post's `rates_notice`), each with a form for the assistant post
+  only (`participants/src/shared/papers.ts`; the Rust forms catalogue written again). The rates post is then a principal.
+- **Not taken, and why** (docs/behaviour/assistants.md, "Kinds a firm's and an office's assistant takes"; MT-28): price
+  lists and orders paid with the order, because `route` parts an act by variables only and would part what belongs
+  together (a new list from the withdrawal of the old; a payment from its order); payments and the rates claim, because
+  they are calls, and payments need the assistant post on the account's mandate (H1). A change to `route` would be in
+  `principal.rs` (`route`, lines 655 to 678 on this branch's base), left to the worker there.
+- **The town's mandate names a town office that is a principal** (`signatories-city`, only where the town has
+  providers): the first screen showed the rates post's standing order for its fee refused ("rates is not an authorised
+  signatory for acc-city") and the provider switching its system off after 75 days, twice. The real route, an invoice
+  to the town paid by the finance office, is not built (ME-22).
+- **The households' cohort** (`experiments/scope-pilot/build.ts`, `cohort`): `hand` is rounds 1 to 5's design (every
+  `every`-th adult engaged by hand, `commit`); `reach` is the owner's condition: the offer reaches every `every`-th adult,
+  who sees it and decides by their own rule; the rest are shown no offer and have no rule for one. Nothing is decided for
+  anyone. `study.ts` is the study's town (the rates post among the offices, reach one in three); `study-hand.ts` the same
+  engaged by hand, as a comparison.
+- **The screen** (`experiments/scope-pilot/screen.ts <spec>`; `screen-log.ts` reads a fork already run): the spec's code
+  arms only, its own fork and length, output outside the runs folder; per assistant seat and month: clients, matters by
+  kind, what the principal did itself of kinds it may hand over (`kept`), steps a matter (its acts), sittings with and
+  without anything new, and the events of paper plan 3.1 that already occur.
+- **What it found** (seed 7, 180 days after the day-30 fork; months of 30 days):
+
+  | seat | round 5 (before) | study.ts, reach 1 in 3 | study-hand.ts, by hand 1 in 3 |
+  |---|---|---|---|
+  | factory's assistant | 4, then 1 a month | 7 (3 delivery notes, 3 invoices), then 1 to 2 a month; kept 10 to 23 a month | 10, then 1 to 3 a month; kept 6 to 17 |
+  | finance office's | 1 a month | 1 a month | 1 a month |
+  | rates post's | (no seat) | 14 in month 1 (of 15 notices each), then none; kept 14 in month 4 | the same |
+  | the desk | 0 to 7 a month, 50 clients by hand | no clients: none of 251 offered took it up | 2 to 21 a month (about 11), 243 to 253 clients |
+  | steps a matter | 3 | 2.9 to 3 | 2.7 to 3 |
+  | refused / returned | 0 / 0 | 0 / 1 (a rates draft) | 0 / 2 |
+
+  The principals' rule cuts delivery notes, invoices and rates notices to doing them itself when the hold ends (day 60
+  and 62): at `draft` handing a two-minute paper over takes more of its time than writing it, and at `alone` the slips
+  it expects cost more than the minute and a half saved (placeholders: ME-22). No household takes the service up by its
+  own rule: a person's papers are under one a month, worth about A$5 each handed over, against A$29.99 a month. A seat
+  sits 40 to 90 times a month and has something new at 2 to 26 of them.
+- **Byte-identical:** the generated configs of the 200- and 1,000-person towns in the three profiles, and of the living
+  1,000-person town, are identical to the base's; the kernel with the new forms catalogue gives the same state hash and
+  log digest on the 200- and 1,000-person au-vic towns for 30 days. Towns with assistants move: every factory and the
+  rates post are principals for the new kinds, the mandate names the rates post, and offers' titles and kinds change.
+- **Revisit if:** `route` keeps linked parts together (then price lists and purchase orders join the offers); the
+  pricing of H3 moves the principals' rule; the owner chooses how the desk is engaged and how long levels are held (MT-29,
+  MT-27); the pay run is built (ME-26).

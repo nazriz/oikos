@@ -283,6 +283,12 @@ export interface BehaviourModule {
   opens?: (params: { [k: string]: any }, entity: string) => Opening[];
   /** The papers it issues, each as a form of the office's own stationery (docs/behaviour/office-papers.md). */
   issues?: Issued[];
+  /** Papers its own code makes in its routine work that are not on the office's stationery (a factory's request to a
+   * utility for supply, a rating office's rates notices): each as a form, for an assistant post the office hands that
+   * kind of matter to, and so that a provider's offer that takes the kind makes the office a principal for it
+   * (docs/behaviour/assistants.md, "Kinds a firm's and an office's assistant takes"). Read only where a town has
+   * providers of assistants: the office's own holder is not given these forms. */
+  handsOver?: Issued[];
   /** What of the office's own the forms it issues carry, from its parameters: the values of each "@name" in `issues`. */
   issuesWith?(params: { [k: string]: any }): { [name: string]: unknown };
   /** The office's own staff, where it employs any, from its parameters: what one of them is called (the role its
