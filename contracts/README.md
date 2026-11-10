@@ -885,3 +885,17 @@ code-only town is unchanged to the byte (the 300-person town, 90 days: the same 
   `look_first`, `needs_calculation`, `unknown_form` and `unclear` keep their own.
 - **A date with its day first** (`"day 22 of year 1"`) is read as the same date as `"year 1, day 22"`, for `first` and
   `until` and for a form's date field (both resolvers; `contracts/test/when.json`).
+
+## Obstacles (2026-11-11; docs/design/obstacles.md; docs/decisions.md, "Obstacles B1" and after; under the owner's blanket approval of contract changes, 2026-10-11, and the lead's approval of the design, 2026-11-11)
+
+Additions with defaults: every record on file reads as before, and a town where no obstacle law is configured is
+unchanged to the byte.
+
+- **B1, the record and the reader:** the decision annotation with `domain: "obstacle"` (`law`: `acceptance` |
+  `authority` | `record` | `approval`; `paper`, the paper sent back or awaited; `principal`; `counterparty`; `need`;
+  `clears_by`; `slip`), written by the actor whose law makes the obstacle, read only by measures. `ScopeRequest.only`
+  (a referral: the level asked for that matter alone) and `ScopeRequest.authority` (a body the principal is asked to
+  give the assistant its authority with). `Report.needs` (`Need`: `authority` {`for`, `with`, `kinds`}, `record`,
+  `correction`). `oikos-kernel delegation` gains the table `obstacles` (each with its matter and `met_at`, the time
+  the paper that told of it reached an assistant's seat) and, on each request, `obstacle` and `axes` (matters, kinds,
+  level, access, means: `within` | `beyond`; the term and the words are the coders').

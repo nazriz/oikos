@@ -2,7 +2,7 @@
 
 **Status:** approved by the lead under the owner's go of 2026-11-10; B1 to B3 building (2026-11-11). It follows
 `docs/research/paper-plan.md` (sections 1, 3 and 4.2) and `docs/design/handing-over.md` (H1 to H6, built). It decides
-no result. Every figure without a source is a labelled placeholder (law 11). Contract changes are under the blanket
+no result. Every figure without a source is a labelled placeholder (law 11; MT-32). Contract changes are under the blanket
 approval of 2026-10-11 and are listed in section 9 and `contracts/README.md`. The lead's five decisions are in section
 12. Build order: B1, B2, B3, B7, B8, then B4 if the screen shows it is worth its size; B5 and B6 are not in this build.
 
@@ -68,7 +68,7 @@ is the counterparty clerk's.
   and the counterparty's clerk's time to record one.
 - **Code today and what changes.** A new paper, `authority`, generalising `signatories`: the holder names who may act
   for it, with this counterparty, in which kinds. It is addressed to the counterparty, which records it in its clerk's
-  time (`publish/authority_recorded`, a row in the table of work, placeholder). A shared pure function,
+  time (`publish/authority_recorded`, a row in the table of work, placeholder, WM-1). A shared pure function,
   `oikos_rules::acceptance::authorised(paper, authorities)`, is called by each counterparty that has the rule: the
   support office (`boundary/support.rs`), the lender (`finance/credit.rs`), the venues that hear a matter (desk and
   tribunal modules), and the collector (`boundary/collector.rs`). The bank keeps its own check, which is already this
@@ -118,7 +118,7 @@ is the counterparty clerk's.
 - **Code today and what changes.** The principal's copy answer exists (`answer`, the `record` part). New: at the desk,
   the client is the keeper of their own papers. A `record` asked of a client is answered by the person's code with a
   copy when they next act (`publish/evidence`, a quarter of an hour, as for evidence today). A person sometimes does not
-  answer, at a placeholder rate: a person's papers lost or not found. The support office's `evidence_request` goes to
+  answer, at a placeholder rate (MT-32): a person's papers lost or not found. The support office's `evidence_request` goes to
   the representative who filed the claim as well as to the claimant, as a real office writes to a nominee. That makes
   the chain O4 then O3: the office names what is missing, and the client keeps it.
 - **What the seat is shown.** The keeper's answer: "We cannot find our last pay record; we will look again", or "That
@@ -225,7 +225,7 @@ holder needs a law for acting (risk to record). That is more than O2's exposure 
 
 Level 0 is the obstacle laws off: no `requires_authority`, no published requirements, no absences. Once B5 has landed,
 it is exactly today's world with working hours. Before B5, it is exactly today's world. Each level is a set of the
-institutions' own figures, in the profile, with its basis or a placeholder label:
+institutions' own figures, in the profile, with its basis or a placeholder label (MT-32):
 
 | Law | Parameter | Level 1 (ordinary) | Level 2 (strained) | Basis |
 |---|---|---|---|---|
@@ -236,7 +236,7 @@ institutions' own figures, in the profile, with its basis or a placeholder label
 | O2 | days away a year | statutory leave plus average sickness | plus sickness at the high end of the profile's range | Profiles' labour figures (to confirm) |
 | O3 | a person does not find a paper asked for | 500 bps (placeholder) | 1,500 bps (placeholder) | none found; WM-1 |
 | O4 | items each counterparty requires | its published requirements, from its real form | the same, plus a new requirement published at the fork's midpoint | Real forms (to confirm) |
-| O4 | wrong returns | 200 bps (placeholder) | 800 bps (placeholder) | Leads: e-filing reject rates, accounts-payable exception rates (to confirm); the support office's 700 is also a placeholder |
+| O4 | wrong returns | 200 bps (placeholder, MT-32) | 800 bps (placeholder, MT-32) | Leads: e-filing reject rates, accounts-payable exception rates (to confirm); the support office's 700 is also a placeholder |
 
 What a level changes: the counterparties' strictness (O4 at level 2), their staffing (how long O1 waits), the
 principals' absences (O2), and the keepers' failures (O3). O1's count hardly moves between levels 1 and 2. Its wait
@@ -260,7 +260,7 @@ by kind before anything is built on them.
 
 **Said plainly.** Only the desk reaches the paper plan's target (about 1 at level 1 and 3 at level 2). It does so
 mostly through O1, so at the desk the friction factor is mostly "a body asks for the client's authority first". The
-factory is under 0.3 at level 1, and reaches 0.3 to 1 at level 2 only through placeholder wrong-return rates. It does
+factory is under 0.3 at level 1, and reaches 0.3 to 1 at level 2 only through placeholder wrong-return rates (MT-32). It does
 not reach 0.3 at level 2 on sourced rates alone. No rate is to be raised to reach a target. What else would have to
 change for the factory to carry obstacle data: more referable kinds that go to strict counterparties. The candidates
 are payments, which go to the bank's mandate check (blocked by `route`, MT-28), and invoices on domestic sales (they
@@ -295,7 +295,7 @@ give nearly all the exposure, and move nothing at level 0. B7 goes early, becaus
   always.
 - The desk's volume figures are scaled, not counted (B1 re-reads them).
 - B5 and B6 move every town, and B6 pauses one-person posts. That needs an acting-holder law later (a new risk entry).
-- Placeholder rates carry the factory's level 2. They must be sourced, or reported as placeholders, before
+- Placeholder rates carry the factory's level 2 (MT-32). They must be sourced, or reported as placeholders, before
   registration.
 - A counterparty's requirements are new paperwork for every filer at level 1 or 2. A code citizen that cannot meet them
   stalls its own claims. The code baseline's compliance is checked in B2.
@@ -326,7 +326,7 @@ grant for one matter (`only`), cheaper by the hurdle, and grants it. One whose a
 how delegation grows in real offices: when the delegator is the bottleneck. Basis: the delegation and decentralisation
 literature (Aghion and Tirole 1997; Bloom, Sadun and Van Reenen 2012; to confirm and add to `references.md`).
 
-**Per arm.** The hurdle (`hurdle_bps`, 2,000, a placeholder) stays one figure across arms. A grant then comes from
+**Per arm.** The hurdle (`hurdle_bps`, 2,000, a placeholder, MT-32) stays one figure across arms. A grant then comes from
 the obstacles' own consequences, not from a disposition set to produce one. If the B8 screen shows no grants at level
 2, a stated cell with a lower hurdle (a principal readier to delegate) is the honest lever. It is a condition of the
 principal, set before the run, like the assigned levels: never an outcome.
@@ -360,4 +360,4 @@ desk's model has a form for each new paper it may send (asking a client to lodge
 again), only in towns with providers; every code actor that files must be able to meet each published requirement at
 levels 1 and 2 (checked in B2); the B8 screen also reports what a second provider's desk with its own cohort gives;
 level 0 is shown byte-identical at each step for a town with providers and the study town, as for towns without; and
-the level table says which figures have a source and which are placeholders.
+the level table says which figures have a source and which are placeholders (MT-32).

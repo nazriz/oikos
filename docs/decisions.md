@@ -12592,3 +12592,24 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
 ## 2026-11-11 · Obstacles as laws of the institutions that make them: a proposal (docs/design/obstacles.md; nothing built)
 
 - A proposal for review: O1 reframed as an authority to act on file at the counterparty, O4 a counterparty's acceptance rule, O3 a keeper's record, O2 after a general working-hours law (WM-18); an obstacle record read by `beyond.rs`; readiness to grant from the cost of delay. **Revisit if** Naz rejects the reframing of O1 or the general hours law.
+
+## 2026-11-11 · Obstacles B1: the obstacle record and its reader (docs/design/obstacles.md, step B1)
+
+- **What:** the obstacle record is a decision annotation (`domain: "obstacle"`: `law`, `paper`, `principal`,
+  `counterparty`, `need`, `clears_by`, `slip`), written by the actor whose law makes the obstacle; nobody in the world
+  reads it. `oikos-kernel delegation` (`delegation/beyond.rs`) gains the table `obstacles`: each with its matter (the
+  referral its paper was sorted against) and `met_at`, the time the paper that told of it (the law's actor's paper
+  citing the one refused) was addressed to an assistant's seat; one never told to a seat is logged and not met. A paper
+  sent again citing the one sent back is the same matter's (it was `not_handed` before). Each request gets `obstacle`
+  (the newest met on its matter, else on its principal's matters in the 30 days before) and `axes` (matters, kinds,
+  level, access, means), read from typed fields only. Contract: `ScopeRequest.only` and `.authority`, `Report.needs`
+  (contracts/README.md, "Obstacles"). The screen counts obstacles met by law per seat-month.
+- **Left to the coders, said so (the lead's rule b):** the term axis. A request's "until when" is not a field: a remit
+  has no end date of its own, so a code principal could not answer one, and a blank the platform cannot act on is a
+  blank a seat should not be shown. The words of every request stay the coders' (paper plan 3.2).
+- **Not yet on the form:** `only` and `authority` reach the seat's request form with the steps whose principal answers
+  them (B3: an authority; B7: one matter alone), so a seat is never offered a blank nothing reads.
+- **Byte-identical:** nothing in the world reads the new fields, and each is left out when empty; the code assistant's
+  report writes `needs` as absent. No world changes.
+- **Revisit if:** a request names several matters (then `only` becomes a list), or coders find the term axis carries
+  the beyond-need cases (then a remit gains an end, and the form a date).

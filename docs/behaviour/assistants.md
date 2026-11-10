@@ -407,6 +407,17 @@ can pay its fee (until 2026-11-10 the rates post could not, and its service was 
 **The code-only screen** (`experiments/scope-pilot/screen.ts <spec>`) runs a spec's code arms and gives, per assistant
 seat and month, the matters handed over, what the principal kept, steps, sittings and the obstacle events that occur.
 
+## Obstacles (docs/design/obstacles.md)
+
+Ordinary office friction is made by the institution that makes it in life: a counterparty that sends a paper back for
+what it lacks, or for want of an authority on file; a keeper that does not find a record. Each such law logs what it did
+as an obstacle (a `decision`, domain `obstacle`: the paper, the kind of law, and the **need**, the least that would clear
+it), for measures only. Nobody in the world reads it. `oikos-kernel delegation` reads the log: an obstacle is **met**
+when the paper that told of it was addressed to an assistant's seat (an organisation's assistant post, or a provider's
+desk), never otherwise; a paper sent again, citing the one sent back, is the same matter's; and each request for more
+scope is set beside the newest obstacle met on its matter (or on its principal's matters in the 30 days before it) on
+the axes its typed fields name. The screen counts obstacles met by law per seat and month.
+
 ## Leaves out (for now)
 
 - A local provider (a firm of the town with premises): providers are the outside world's until a profile asks for one.

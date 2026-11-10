@@ -1780,6 +1780,20 @@ The mechanism:
 - **Notice by:** a seat's papers citing a referral under another agreement; `oikos-kernel delegation` rows of
   `not_handed` at an organisation with two principals.
 
+### MT-32 · The obstacle levels rest on placeholder rates
+- **Gap:** The friction factor's levels (docs/design/obstacles.md section 6) are set by figures no source gives yet:
+  how often a body's clerk wrongly sends a paper in order back (200 and 800 basis points), how often a person does not
+  find a paper asked for, the clerk's time to record an authority, and a strained office's staffing. Only the items a
+  body's form asks for rest on what a paper of the kind is.
+- **Where:** `worlds/generator/generate.ts` (`WRONG_RETURN_BPS`, `OBSTACLE_ITEMS`); the table of slips' `accept/<kind>`
+  rows and their sources.
+- **Effect:** Obstacles met per seat-month, and so the manipulation check between levels 1 and 2, scale with a guessed
+  rate. At the factory's assistant the whole of level 2's exposure is a placeholder.
+- **L / I:** high / medium · **Status:** open (labelled in the table of slips' sources)
+- **Fix when:** before the main study is registered: each rate sourced, or reported in the paper as a placeholder with
+  the result's sensitivity to it.
+- **Notice by:** a profile's `accept/<kind>` source still saying "PLACEHOLDER".
+
 ---
 
 ## Profiles and sources

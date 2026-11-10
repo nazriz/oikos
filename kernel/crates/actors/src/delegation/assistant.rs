@@ -137,7 +137,7 @@ impl Assisting {
     }
 
     fn report(&self, m: &Mine, referral: &str, done: bool, created: BTreeMap<String, String>, why: Option<String>) -> Step<Then> {
-        let r = Report { referral: referral.to_string(), done, created, why: why.clone(), way: self.ways.get(referral).cloned() };
+        let r = Report { referral: referral.to_string(), done, created, why: why.clone(), way: self.ways.get(referral).cloned(), needs: None };
         let words = if done { format!("Done: {referral}.") } else { format!("Not done: {referral} ({}).", why.as_deref().unwrap_or("")) };
         because(words.clone(), vec![self.say_to(m, Report::KIND, &words, referral, papers::data(&r))])
     }
