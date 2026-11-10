@@ -12588,3 +12588,44 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
   (an in-tray the sessions do not count); the code assistant's acting at any hour is read as a difference between arms
   (then give it the office's hours too, by the same rule, and accept the hash change in towns with providers); MT-31 is
   fixed (then the agreement chain in `whoLines` may become the post alone).
+
+## 2026-11-12 · What a claude -p seat call costs, and why (16 Haiku calls on the owner's subscription)
+
+The first pilot's estimate ($75 an arm) carried over rates fitted to the 2026-11-10 Haiku check, whose desk prompt was
+then about five times today's. Measured instead: three seat prompts captured from a mock dry run of `first-pilot.ts`
+(a desk sitting with matters, the factory's assistant with one matter, a desk sitting with only results and letters;
+captured by a temporary hook in `callModel`, not kept) sent through `ClaudeCodeAdapter` as the harness sends them,
+`claude-code/claude-haiku-5-5`, its plan sign-in (no API key). 16 calls: each twice back to back, again six minutes
+later, three at `--effort low`, two on seat prompts not yet sent (cold), one with an empty prompt. Kept in the
+scratchpad of the session (`probe.jsonl`, every call's whole usage and `modelUsage`).
+- **Claude Code reckons Haiku 5.5 at $5 a million in, $6.25 written to the cache, $0.50 read and $25 out**, to the
+  cent on all 16 calls (Sonnet 5.5's one earlier call fits the same rates to the cent): fifty times the API's price for
+  Haiku. That price is the whole of why a call costs what it does; nothing in how we call it multiplies the tokens.
+- **The prompt written anew each sitting.** Claude Code writes an hour's cache (`ephemeral_1h`), shared between separate
+  `claude -p` processes: the same seat's next call, back to back or six minutes later, read its prompt from the cache
+  (11,000 to 46,000 read, 400 to 2,600 written). A seat sits once a working day, so each sitting's first call writes the
+  seat's prompt again, about 12,000 tokens, $0.07 to $0.08 of a cold call's $0.12 to $0.14.
+- **No hidden context to speak of.** An empty prompt came to 180 tokens in; the seat prompts' first turn (about 12,200
+  tokens) is our system prompt, tools and observation at about 2.8 characters a token, with the answer schema's tool.
+  Claude Code's own side call to Haiku 4.5 (a title) costs $0.001 a call.
+- **The answer's tokens are mostly reasoning.** 500 to 2,400 tokens out a call, $0.013 to $0.061, for an answer of about
+  200 (688 characters measured): the rest is thinking at the default effort. At `--effort low`, the same three warm
+  prompts came to 1,015, 1,403 and 510 tokens out against 1,403, 2,245 and 1,069 at the default ($0.042 against
+  $0.062 a call); one cold call at low effort reasoned no less (1,893 out). Not adopted: the seats run at each model's
+  default effort, and a lower one changes how the model decides, for a saving of about $5 an arm.
+- **Turns.** 2 to 7 inside one call (the answer schema's tool, and its retries), each re-reading the prompt from the
+  cache at $0.50 a million: $0.006 a turn, a few cents a call at most.
+- **Nothing material can be cut** without changing what the seat is shown or how it may answer: the cache already works
+  within a sitting and across processes; a daily sitting's prompt has to be written once (keeping it warm would take a
+  call each hour); there is no output cap but the effort.
+- **Fixed:** the run's `cost.json` summed what was written to the cache only in all, not by purpose (`callRecorder`'s
+  `by`), so a seat's calls read as cache reads and output alone (the 2026-11-10 check's 8 seat calls wrote about
+  254,000 tokens it did not show); now by purpose too. Each call's line also keeps what Claude Code reckoned it at and
+  its turns. `orchestrator/prices.json` has Claude Code's exact rates.
+- **The new estimate** (`first-pilot.ts`'s header): a sitting's first call $0.13, its later ones $0.064, about 1.9 calls a
+  sitting: $0.19 a sitting, 260 sittings, about $49, with the debriefs about $52 an arm for Haiku, and for Sonnet by
+  the same table about $52 (its reasoning tokens under Claude Code are the unknown). Limits $78 an arm (half again).
+  About 11 s a call. A Codex arm (`codex/gpt-6.1-sol`, the owner's flat-rate subscription) is added, labelled as not on
+  equal terms (the Codex CLI puts its own instructions under ours): about 490 sitting calls and 52 debrief questions.
+- **Revisit if:** the pilot's first sittings average far from $0.19 (read their `cost.json` by purpose); Claude Code
+  changes its reckoning or its cache's hour; a seat sits more than once a working day.
