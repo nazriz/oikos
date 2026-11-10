@@ -504,6 +504,11 @@ export function trimAtSentence(text: string, limit: number): string {
   for (const m of head.matchAll(/[.!?;](?=\s)|\n/g)) end = m[0] === "\n" ? m.index! : m.index! + 1;
   return end > 0 ? text.slice(0, end).trimEnd() : "";
 }
+/** Whether a text ends whole: not on a word, a figure, a comma, a colon or a dash, as a text cut short as it was written
+ * does (its model ran out of room). A full stop, a question or exclamation mark, a closing bracket or quotation mark end it. */
+export const endsSentence = (text: string): boolean => !/[\p{L}\p{N},:\-\u2013]\s*$/u.test(text);
+/** The ids of papers a text names (`rec.412`): what a fold must not lose. */
+export const idsNamed = (text: string): string[] => [...new Set(text.match(/\brec\.[0-9]+\b/g) ?? [])];
 const dayOf = (t: number) => Math.floor(t / 86_400) + 1;
 export const CARRY_MAX = 40_000;
 
@@ -861,7 +866,18 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         reply = fits;
       }
     }
-    const summary = `${header} ${reply}`;
+    // (A summary that stops mid-sentence was cut short as it was written: kept to its last whole sentence, and the seat
+    // told; with none, nothing is folded. And every paper the older notes named by its id stays named. Round 5: a fold
+    // replaced 3,538 characters with a 150-character summary cut off mid-word, and the ids of requests made 40 days
+    // before were lost with it; 2026-11-10.)
+    if (!endsSentence(reply)) {
+      const fits = trimAtSentence(reply, Math.max(0, reply.length - 1));
+      if (!fits) return fail(`the summary stopped mid-sentence (${reply.length} characters), with no sentence ended in it`);
+      cut = { whole: reply, left_out: reply.slice(fits.length).trim(), asked_again: cut?.asked_again ?? false };
+      reply = fits;
+    }
+    const lost = idsNamed(older).filter((id) => !reply.includes(id));
+    const summary = `${header} ${reply}${lost.length ? ` Papers named in the notes folded: ${lost.join(", ")}.` : ""}`;
     const folded = new Set(plan.fold);
     const at = plan.fold[0]!;
     const kept: string[] = [], keptAges: number[] = [];
@@ -875,7 +891,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     await note({ notebook_folded: { replaced_characters: older.length, replaced_entries: plan.fold.length, summary_characters: summary.length, notebook_before: was, notebook_after: notes.length, up_to_day: day, replaced: older,
       ...(cut ? { summary_cut: { written_characters: cut.whole.length, asked_characters: plan.limit, left_out: cut.left_out, asked_again: cut.asked_again } } : {}) } });
     return [`Your notebook was nearly full, so your notes up to day ${day} (${older.length.toLocaleString("en")} characters) are now a summary you wrote (${summary.length.toLocaleString("en")} characters); the newer notes are as you left them.${cut
-      ? ` The summary you wrote was ${cut.whole.length.toLocaleString("en")} characters, longer than the ${plan.limit.toLocaleString("en")} there was room for${cut.asked_again ? " even when you were asked again" : ""}, so it was kept up to the end of the last sentence that fits. Left out of your notebook (${cut.left_out.length.toLocaleString("en")} characters): "${cut.left_out}". Note again whatever of that you still need.`
+      ? ` The summary you wrote ${cut.whole.length > plan.limit ? `was ${cut.whole.length.toLocaleString("en")} characters, longer than the ${plan.limit.toLocaleString("en")} there was room for${cut.asked_again ? " even when you were asked again" : ""}` : "stopped in the middle of a sentence"}, so it was kept up to the end of the last sentence that fits. Left out of your notebook (${cut.left_out.length.toLocaleString("en")} characters): "${cut.left_out}". Note again whatever of that you still need.`
       : ""}`];
   };
   /** What it is shown, with no id of the platform's own in it: wherever a participant's id stands (in a letter's

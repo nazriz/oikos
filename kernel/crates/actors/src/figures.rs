@@ -6,3 +6,11 @@
 //! into a module's parameters, lowers its file's count.
 //!
 //! Empty at its start (2026-11-08): the actors' 1,300 or so literals are still where they are written, counted by file.
+
+/// convention: how many of its own papers a principal keeps to hand to send a copy of when its assistant asks for one
+/// by name (a bound on what it holds, not a behaviour; docs/behaviour/assistants.md, "Answers to requests").
+pub const KEPT_OWN_PAPERS: usize = 64;
+
+/// convention: how many letters a principal remembers having acknowledged, so that one is acknowledged once (a bound on
+/// what it holds).
+pub const KEPT_ACKNOWLEDGED: usize = 512;

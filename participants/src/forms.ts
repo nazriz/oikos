@@ -42,7 +42,7 @@ export interface FormWrites {
 export interface FormClaim { when?: { [field: string]: string }; position: "right" | "liberty" | "power" | "immunity"; holder: string; about: unknown; basis?: string }
 /** The claim a form records, as the act that records it has it. */
 export interface WrittenClaim { position: FormClaim["position"]; holder: string; about: unknown; basis?: string }
-export interface FormData { form: string; office?: string; submit_as: string; submit_to: string[]; fields: { [name: string]: FormFieldSpec }; writes?: FormWrites }
+export interface FormData { form: string; office?: string; submit_as: string; submit_to: string[]; fields: { [name: string]: FormFieldSpec }; writes?: FormWrites; copies?: string }
 
 /** A field as the form reads it: an amount (a decimal string), a length of time, a date or a count (a number), a
  * list (its ids), or words. */

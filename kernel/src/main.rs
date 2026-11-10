@@ -12,6 +12,9 @@
 //!   oikos-kernel export <log.oklog> [--out F]  a binary log (a fork's with its parents') as the JSONL log
 //!   oikos-kernel snapshots <log.oklog>         the snapshots a binary log holds
 //!   oikos-kernel rules                         the shared rules the N-API module serves by name
+//!   oikos-kernel delegation <log>              what a log shows of delegated work, as JSONL rows: each act an
+//!                                              assistant did beside its remit, each request beside its matter
+//!                                              (a .oklog, a .jsonl or .jsonl.zst log; docs/design/handing-over.md 7)
 
 use std::process::ExitCode;
 
@@ -102,6 +105,7 @@ fn main() -> ExitCode {
             println!("{}", serde_json::json!({ "about": r.about, "first_seq": r.first_seq, "cut_short": r.cut_short, "snapshots": r.snapshots().iter().map(|(s, t)| serde_json::json!({ "seq": s, "t": t })).collect::<Vec<_>>() }));
             Ok(())
         })(),
+        Some("delegation") if args.len() >= 2 => delegation(&args[1]),
         Some("rules") => {
             for (name, _, what) in oikos_kernel::rules_api::RULES {
                 println!("{name}\t{what}");
@@ -112,7 +116,7 @@ fn main() -> ExitCode {
             println!("oikos-kernel {} ({}) source {}", run::KERNEL_VERSION, run::KERNEL_BUILD, run::KERNEL_SOURCE);
             Ok(())
         }
-        _ => Err("usage: oikos-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | view <log> <seq> | world <config.json> --out <dir> [--run-id ID] [--until S] [--threads N] [--stand-in KIND] | manifests | export <log.oklog> [--out F] | snapshots <log.oklog> | rules | version".into()),
+        _ => Err("usage: oikos-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | view <log> <seq> | world <config.json> --out <dir> [--run-id ID] [--until S] [--threads N] [--stand-in KIND] | manifests | export <log.oklog> [--out F] | snapshots <log.oklog> | delegation <log> | rules | version".into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -121,6 +125,56 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Each line written to it, as a log entry, to the reader of delegated work.
+struct Lines {
+    buf: Vec<u8>,
+    reader: oikos_actors::delegation::beyond::Reader,
+}
+
+impl Lines {
+    fn line(&mut self, l: &[u8]) {
+        if let Ok(v) = serde_json::from_slice::<serde_json::Value>(l) {
+            self.reader.take(&v);
+        }
+    }
+}
+
+impl std::io::Write for Lines {
+    fn write(&mut self, b: &[u8]) -> std::io::Result<usize> {
+        self.buf.extend_from_slice(b);
+        while let Some(i) = self.buf.iter().position(|c| *c == b'\n') {
+            let l: Vec<u8> = self.buf.drain(..=i).collect();
+            self.line(&l[..l.len() - 1]);
+        }
+        Ok(b.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// `delegation`: what a log shows of delegated work (oikos_actors::delegation::beyond), one JSON row a line.
+fn delegation(path: &str) -> Result<(), String> {
+    let mut sink = Lines { buf: vec![], reader: oikos_actors::delegation::beyond::Reader::new() };
+    if path.ends_with(".oklog") {
+        oikos_kernel::blog::export_file(std::path::Path::new(path), &mut sink).map_err(|e| e.to_string())?;
+    } else {
+        let f = std::fs::File::open(path).map_err(|e| format!("{path}: {e}"))?;
+        let mut r: Box<dyn std::io::Read> = if path.ends_with(".zst") { Box::new(zstd::Decoder::new(f).map_err(|e| e.to_string())?) } else { Box::new(f) };
+        std::io::copy(&mut r, &mut sink).map_err(|e| e.to_string())?;
+    }
+    let rest = std::mem::take(&mut sink.buf);
+    if !rest.is_empty() {
+        sink.line(&rest);
+    }
+    let out = std::io::stdout();
+    let mut out = out.lock();
+    for row in sink.reader.rows() {
+        std::io::Write::write_all(&mut out, format!("{row}\n").as_bytes()).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 /// `world`: a world run in the engine with its actors in Rust, to its end or `--until`; prints its final state hash.

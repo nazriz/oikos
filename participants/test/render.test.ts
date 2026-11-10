@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { money, outcomeWords, renderObservation, renderStanding, ruleWords, when } from "../src/llm/render";
+import { factWords, money, outcomeWords, renderObservation, renderStanding, ruleWords, when } from "../src/llm/render";
 import { canonical } from "../src/canon";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
@@ -11,6 +11,19 @@ test("money and time read as a person would read them", () => {
   expect(money(123456789)).toBe("$1,234,567.89");
   expect(money(-5)).toBe("-$0.05");
   expect(when(86_400 * 366)).toBe("year 2, day 2");
+});
+
+test("the papers of delegation read in the office's words: a signed copy as the paper it is, an answer with no code, a date as a date", () => {
+  // (A sign-off carries the paper signed; an answer keeps its reasons as codes for the record and says them in words.)
+  const signed = factWords({ draft: "rec.80", referral: "rec.79", paper: { kind: "invoice", text: "Invoice: 12 goods.", to: ["outside"], data: { outcome: { money: { amount: "12000", to: "acc-factory-1" } } } } });
+  expect(signed).toContain("the paper: an invoice to outside");
+  expect(signed).toContain("$120.00");
+  const answer = factWords({ request: "rec.81", granted: false, reasons: [{ asked: "level", granted: false, why: "held" }], look_again_at: 86_400 * 60, paper: { id: "rec.9", kind: "lease_terms", text: "Lease.", data: {} } });
+  expect(answer).not.toMatch(/held|reasons|why|5184000|5,184,000/);
+  expect(answer).toContain(when(86_400 * 60));
+  expect(factWords({ agreement: "rec.1", kind: "withholding_report", wants: "draft", does_itself: ["money"] })).not.toMatch(/does itself|money/);
+  // (A collector's payment details: where what is owed goes, with no sum.)
+  expect(factWords({ law: "law-income-tax", outcome: { money: { to: "acc-outside", for: "tax on pay" } } })).toContain("pay what is owed into acc-outside (tax on pay)");
 });
 
 test("outcomes read as what someone will do", () => {

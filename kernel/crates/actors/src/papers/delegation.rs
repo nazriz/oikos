@@ -27,6 +27,8 @@ pub const KINDS: &[&str] = &[
     GoAhead::KIND,
     Report::KIND,
     ScopeRequest::KIND,
+    ScopeAnswer::KIND,
+    Acknowledgement::KIND,
     Handover::KIND,
 ];
 
@@ -196,6 +198,9 @@ pub struct Remit {
     /// already handed over stays at the level it was handed at otherwise (the remit governs what is handed from then on).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub takes_back: Vec<String>,
+    /// The request for more scope this remit grants, where it grants one (so that the grant and the request are linked).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answers: Option<String>,
 }
 impl Paper for Remit {
     const KIND: &'static str = "remit";
@@ -220,6 +225,11 @@ pub struct Referral {
     /// given under (the scope pilot's desk, which took its post a month after its clients' remits, could not find them).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub remit: Option<String>,
+    /// The kinds of the same act the principal does itself (a payment that goes with a return): told, so that its
+    /// assistant knows what is not its to do (the scope pilot's W5: a seat asked for the means to pay what its principal
+    /// was paying already).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub does_itself: Vec<String>,
 }
 impl Paper for Referral {
     const KIND: &'static str = "referral";
@@ -283,6 +293,11 @@ impl Paper for Draft {
 pub struct SignOff {
     pub draft: String,
     pub referral: String,
+    /// The paper signed, as it is to go (`kind`, `text`, `to`, `visible`, `data`, `basis`), where the draft carried one
+    /// written on a form: the signed copy its assistant sends as it stands (the form `send_signed`). A draft of calls
+    /// (the code assistant's) carries none: it sends its calls.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paper: Option<Value>,
 }
 impl Paper for SignOff {
     const KIND: &'static str = "sign_off";
@@ -358,9 +373,87 @@ pub struct ScopeRequest {
     pub access: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
     pub limit: Option<i64>,
+    /// A record of the principal's the assistant asks for by name (access to one thing: a copy).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record: Option<String>,
+    /// The matter in hand that needs it (a referral), where the request says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matter: Option<String>,
 }
 impl Paper for ScopeRequest {
     const KIND: &'static str = "scope_request";
+}
+
+/// Why a part of a request for more scope was granted or not, as a typed word (the words of the answer say it in the
+/// office's own terms; a seat is never shown the word itself as a code).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Why {
+    /// Granted as asked.
+    Granted,
+    /// A copy of the record asked for is sent with the answer.
+    Sent,
+    /// The principal's own word holds the level until a day (its remit's `hold_until`, or a delegation decided by hand).
+    Held,
+    /// By the principal's own figures the asked level would cost it more than the one in force.
+    CostsMore,
+    /// Not a kind of matter of the principal's own.
+    NotOurs,
+    /// The service does not take that kind, or not at that level.
+    NotOffered,
+    /// The record named is not the principal's, or not one it has.
+    NotOursToGive,
+    /// What a post is shown is not changed on request: a named record is.
+    NotChanged,
+    /// No limit is set on what the assistant may pay; or one higher than the brief's is not given.
+    NoLimit,
+    OverLimit,
+    /// The request named nothing the principal can act on (a kind and a level, a record, a limit).
+    NothingNamed,
+}
+
+/// One part of a request for more scope, and what the principal made of it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Part {
+    /// `level` (a kind at a level), `record`, `access`, `limit`, or `words` (nothing typed).
+    pub asked: String,
+    pub granted: bool,
+    pub why: Why,
+}
+
+/// The principal's answer to a request for more scope: each part asked and what it made of it (a remit it grants is a
+/// remit of its own that cites the request, `Remit.answers`), a copy of a record it sends, and when it will look at a held level again. Its words are the
+/// office's own; `basis` is the request.
+///
+/// Written by: the `Delegating` principal (or a seat on its form). Addressed to the assistant as its other papers are.
+/// Read by: the assistant; the readout.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScopeAnswer {
+    pub request: String,
+    pub granted: bool,
+    /// Each part asked and why (`reasons`: for the record; a seat reads the answer's words, never these codes).
+    #[serde(default, skip_serializing_if = "Vec::is_empty", rename = "reasons")]
+    pub parts: Vec<Part>,
+    /// A copy of the record asked for, as it stands (`id`, `kind`, `text`, `data`), as a paper (`paper`).
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "paper")]
+    pub copy: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int", rename = "look_again_at")]
+    pub look_again: Option<i64>,
+}
+impl Paper for ScopeAnswer {
+    const KIND: &'static str = "scope_answer";
+}
+
+/// The principal's acknowledgement of a letter from its assistant that is not on one of the papers of delegation: it
+/// says it has it, and what the principal acts on. A code principal does not read words; saying so is its procedure.
+///
+/// Written by: the `Delegating` principal. Addressed to the assistant; `basis` is the letter.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Acknowledgement {
+    pub of: String,
+}
+impl Paper for Acknowledgement {
+    const KIND: &'static str = "acknowledgement";
 }
 
 /// What passes at the end of a service: the matters still open, and the notes on them where the records term gives

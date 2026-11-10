@@ -912,7 +912,7 @@ impl World {
             ParticipantKind::Person => (oikos_time::Actor::Person, None),
             ParticipantKind::System => (oikos_time::Actor::System, p.template.as_deref()),
         };
-        if let Err(k) = self.s.act_times.program(actor, template, blocks.iter().map(|b| (b.name(), b.makes()))) {
+        if let Err(k) = self.s.act_times.program(actor, template, blocks.iter().flat_map(|b| b.steps())) {
             return Ok(Check { ok: false, refusal: Some(refusal_info(&refuse(RefusalCode::Unpriced, format!("nobody priced {k} for {participant}")))) });
         }
         let mut scratch = self.state.clone();
@@ -1575,7 +1575,7 @@ fn act_skill<'a>(s: &'a Statics, b: &Block) -> Option<(&'a crate::config::ActSki
 /// How long an act takes this doer (the world's table of work, `oikos_time`); for a person (`body`), each step with a
 /// skill scaled by the person's skill as it stands (foundations-2 E4). No skills in the world: the table's time.
 fn act_program(s: &Statics, st: &State, actor: oikos_time::Actor, template: Option<&str>, body: Option<&str>, blocks: &[Block]) -> Result<i64, String> {
-    let steps = blocks.iter().map(|b| (b.name(), b.makes()));
+    let steps = blocks.iter().flat_map(|b| b.steps());
     let Some(body) = body.filter(|_| actor == oikos_time::Actor::Person && !s.config.catalogue.act_skills.is_empty()) else {
         return s.act_times.program(actor, template, steps);
     };
@@ -1590,6 +1590,10 @@ fn act_program(s: &Statics, st: &State, actor: oikos_time::Actor, template: Opti
             }
             None => secs,
         });
+        // (The composing of a paper it carries whole: the table's time, no skill of its own.)
+        for (name, m) in b.steps().into_iter().skip(1) {
+            sum = sum.saturating_add(s.act_times.seconds(actor, template, name, m.as_deref()).ok_or_else(|| m.clone().unwrap_or_else(|| name.to_string()))?);
+        }
     }
     Ok(sum.max(1))
 }
@@ -1614,7 +1618,7 @@ fn draw_hosted(s: &Statics, st: &mut State, participant: &str, by: &[Id], blocks
     for w in &doers {
         if let Some((id, _)) = hosted(st, w) {
             let tpl = st.participants.get(*w).and_then(|p| p.template);
-            let own = s.act_times.program(oikos_time::Actor::System, tpl.as_deref(), blocks.iter().map(|b| (b.name(), b.makes()))).unwrap_or(0);
+            let own = s.act_times.program(oikos_time::Actor::System, tpl.as_deref(), blocks.iter().flat_map(|b| b.steps())).unwrap_or(0);
             *secs.entry(id).or_insert(0) += (own + doers.len() as i64 - 1) / doers.len() as i64;
         }
     }

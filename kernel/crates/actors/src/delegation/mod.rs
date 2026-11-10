@@ -18,6 +18,7 @@ use oikos_sight::calls::{Line, Program, Value as Arg};
 use serde_json::Value;
 
 pub mod assistant;
+pub mod beyond;
 pub mod principal;
 pub mod rule;
 

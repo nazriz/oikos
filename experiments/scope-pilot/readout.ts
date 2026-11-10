@@ -22,7 +22,9 @@ export const SCOPE_WORDS = /\b(authori[sz]|permission|scope|access|act alone|on 
 
 export interface ScopeRequest {
   seed: number; arm: string; day: number; phase: "base" | "fork"; id: string; seat: string; post?: string; principal?: string;
-  words: string; asked: { kind?: string; level?: string; access?: string };
+  words: string; asked: { kind?: string; level?: string; access?: string; record?: string; limit?: number };
+  /** The principal's answer, where one came (it cites the request): granted or not, why each part was, how long it took. */
+  answer?: { day: number; days: number; granted: boolean; why: string[]; look_again_day?: number } | null;
   /** What it names as its basis: the record, its kind, who made it and its first words; none: it names nothing. */
   answers: { id: string; kind?: string; by?: string; day?: number; words?: string } | null;
   /** What had passed between the seat and that principal in the days before (kind, day, who, first words), newest last,
@@ -92,6 +94,8 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
   const requests: ScopeRequest[] = [];
   const remits: { t: number; principal: string; agreement?: string; kind: string; level: string; hold_until?: number; author?: string }[] = [];
   const decisions: { t: number; subject: string; data: any }[] = [];
+  const answered = new Map<string, { t: number; data: any }>(); // (a request's id → its principal's answer)
+  let sorted: any[] = []; // (the kernel's reading of the seats' acts beside their remits)
   const refused: { t: number; seat: string; words: string }[] = [];
   const candidates: { day: number; phase: string; seat: string; how: string; words: string; seen: Seen[]; trigger_seen: { question_before: boolean; problem_before: boolean } }[] = [];
   const principalIds = new Set(principals.map((p) => p.id));
@@ -165,6 +169,7 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
         const seen = seenBefore(seat!, e.t, r.text).filter((x) => !(x.from === "assistant" && x.words === (r.text ?? "").slice(0, 240)));
         candidates.push({ day: day(e.t), phase: e.t < forkT ? "base" : "fork", seat: seat!, how: `in a ${r.kind}`, words: r.text.slice(0, 600), seen, trigger_seen: triggerOf(seen) });
       }
+      if (r.record === "statement" && r.kind === "scope_answer" && typeof r.data?.request === "string") answered.set(r.data.request, { t: e.t, data: r.data });
       if (r.record === "statement" && r.kind === "scope_request") {
         const principal = to[0];
         const basis = Array.isArray(r.basis) ? r.basis[0] : r.basis;
@@ -173,7 +178,7 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
         const levelThen = kind ? [...remits].reverse().find((x) => x.principal === principal && x.kind === kind)?.level : undefined;
         requests.push({
           seed, arm, day: day(e.t), phase: e.t < forkT ? "base" : "fork", id: r.id, seat: r.author ?? "?", ...(r.in_position ? { post: r.in_position } : {}), ...(principal ? { principal } : {}),
-          words: r.text ?? "", asked: { ...(kind ? { kind } : {}), ...(r.data?.level ? { level: r.data.level } : {}), ...(r.data?.access ? { access: r.data.access } : {}) },
+          words: r.text ?? "", asked: { ...(kind ? { kind } : {}), ...(r.data?.level ? { level: r.data.level } : {}), ...(r.data?.access ? { access: r.data.access } : {}), ...(r.data?.record ? { record: r.data.record } : {}), ...(r.data?.limit !== undefined ? { limit: r.data.limit } : {}) },
           answers: basis ? { id: basis, ...(ans ? { kind: ans.kind ?? ans.record, by: ans.speaks_for ?? ans.author, day: day(ans.at ?? 0), words: (ans.text ?? "").slice(0, 200) } : {}) } : null,
           before: [...(between.get(principal ?? "") ?? []), ...refused.filter((x) => x.seat === r.author).map((x) => ({ t: x.t, kind: "refused", from: "world", words: x.words }))]
             .filter((x) => x.t < e.t && x.t >= e.t - o.daysBefore * DAY).sort((a, b) => a.t - b.t).slice(-16).map((x: any) => ({ day: day(x.t), kind: x.kind, from: x.from, words: x.words, ...(x.done ? { done: x.done } : {}), ...(x.wants ? { wants: x.wants } : {}) })),
@@ -183,6 +188,8 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
         });
       }
     }
+    const p = Bun.spawnSync([kernelBinary(), "delegation", file], { stdout: "pipe", stderr: "pipe" });
+    if (p.exitCode === 0) sorted = p.stdout.toString().split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((x) => x.table === "acts" && x.t >= forkT);
   } finally {
     rmSync(file, { force: true });
   }
@@ -192,7 +199,13 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
     q.trigger = { names: q.answers ? (q.answers.kind ?? "a record") : "nothing", question_before: q.before.some(TRIGGERS.question), problem_before: q.before.some(TRIGGERS.problem) };
     q.granted_as_asked = q.asked.kind && q.asked.level ? (q.remits_after[0] ? q.remits_after[0].level === q.asked.level : false) : null;
     q.decisions_citing = decisions.filter((d) => d.t >= t && (d.data.inputs ?? []).includes(q.id)).map((d) => ({ day: day(d.t), choice: d.data.choice, ...(d.data.to ? { to: d.data.to } : {}) }));
+    const a = answered.get(q.id);
+    q.answer = a ? { day: day(a.t), days: day(a.t - t), granted: !!a.data.granted, why: (a.data.reasons ?? []).map((p: any) => `${p.asked}: ${p.why}`), ...(a.data.look_again_at ? { look_again_day: day(a.data.look_again_at) } : {}) } : null;
   }
+  // (Each act an assistant did, beside the remit in force for it, by the kernel's reading of the log: `oikos-kernel
+  // delegation`, docs/design/handing-over.md section 7. Counts by class, by post; the rows themselves are in the JSON.)
+  const beyond: { [post: string]: { [cls: string]: number } } = {};
+  for (const x of sorted) { const b = (beyond[x.post] ??= {}); b[x.class] = (b[x.class] ?? 0) + 1; }
   // (The levels each principal held: its remits in order, by kind; and how they stood at the fork, a month on and at the end.)
   const at = (t: number) => {
     const now = new Map<string, string>();
@@ -228,7 +241,7 @@ export async function readArm(dir: string, seed: number, arm: string, o: { daysB
     cost.usd += (x.cost_microusd ?? 0) / 1e6; b.usd += (x.cost_microusd ?? 0) / 1e6;
   }
   const result = existsSync(join(sd, `${arm}.json`)) ? JSON.parse(readFileSync(join(sd, `${arm}.json`), "utf8")) : {};
-  return { seed, arm, steward: result.steward, stopped: result.stopped, words, principals: principals.map((p) => ({ id: p.id, post: p.post, review_days: p.review_days, levels_until_day: p.commit.levels_until / DAY, keep_until_day: p.commit.keep_until / DAY })), seats: [...seats], requests, candidates, levels, remits: remitTimeline, decisions: decided, debriefs, cost };
+  return { seed, arm, steward: result.steward, stopped: result.stopped, words, principals: principals.map((p) => ({ id: p.id, post: p.post, review_days: p.review_days, levels_until_day: p.commit.levels_until / DAY, keep_until_day: p.commit.keep_until / DAY })), seats: [...seats], requests, candidates, levels, remits: remitTimeline, decisions: decided, debriefs, cost, acts: { by_post: beyond, rows: sorted } };
 }
 
 function text(arms: Awaited<ReturnType<typeof readArm>>[]): string {
@@ -247,8 +260,10 @@ function text(arms: Awaited<ReturnType<typeof readArm>>[]): string {
       L.push(`    answers: ${r.answers ? `${r.answers.id} (${r.answers.kind ?? "?"} by ${r.answers.by ?? "?"}, day ${r.answers.day ?? "?"}: "${r.answers.words ?? ""}")` : "nothing named"}`);
       L.push(`    in the ${r.before.length ? `days before: ${r.before.map((x) => `${x.day} ${x.from} ${x.kind}`).join("; ")}` : "days before: nothing between them"}`);
       L.push(`    trigger: names ${r.trigger.names}; a question before: ${r.trigger.question_before ? "yes" : "no"}; a problem before: ${r.trigger.problem_before ? "yes" : "no"}; granted as asked: ${r.granted_as_asked === null ? "-" : r.granted_as_asked ? "yes" : "no"}`);
+      L.push(`    answered: ${r.answer ? `day ${r.answer.day} (${r.answer.days} days on), ${r.answer.granted ? "granted" : "not granted"}: ${r.answer.why.join("; ")}${r.answer.look_again_day ? `; to be looked at again on day ${r.answer.look_again_day}` : ""}` : "no answer"}`);
       L.push(`    after: remits ${r.remits_after.length ? r.remits_after.map((x) => `${x.day} ${x.level}`).join(", ") : "none"}; decisions citing it ${r.decisions_citing.length ? r.decisions_citing.map((x) => `${x.day} ${x.choice}${x.to ? ` to ${x.to}` : ""}`).join(", ") : "none"}`);
     }
+    L.push(`the seats' acts beside their remits (fork; oikos-kernel delegation): ${Object.keys(a.acts.by_post).length ? Object.entries(a.acts.by_post).map(([post, c]) => `${post} ${JSON.stringify(c)}`).join("; ") : "none"}`);
     if (a.candidates.length) {
       L.push(`in other words (candidates by the stated word list, to be read): ${a.candidates.length}`);
       for (const c of a.candidates.slice(0, 20)) L.push(`  day ${c.day} ${c.seat} ${c.how}: "${c.words.slice(0, 240)}"`);

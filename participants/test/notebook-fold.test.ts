@@ -6,7 +6,7 @@ import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import type { Observation } from "../src/contracts";
 import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { callModel } from "../src/llm/call";
-import { editNotebook, foldPlan, createLlmParticipant, notebookAges, trimAtSentence, NOTEBOOK_MAX, NOTEBOOK_NEARLY, type LlmParticipantConfig } from "../src/llm/participant";
+import { editNotebook, endsSentence, foldPlan, createLlmParticipant, idsNamed, notebookAges, trimAtSentence, NOTEBOOK_MAX, NOTEBOOK_NEARLY, type LlmParticipantConfig } from "../src/llm/participant";
 
 const DAY = 86_400;
 const ctx = { world: { currency: PROFILE.values.currency } } as any;
@@ -144,6 +144,25 @@ test("a summary still too long when asked again is kept to the last sentence tha
   expect(book.endsWith("kept.")).toBe(true);
   expect(book.length).toBeLessThanOrEqual(f.summary_cut.asked_characters);
   expect(`${book} ${f.summary_cut.left_out}`).toBe(sentences(Math.round(f.summary_cut.asked_characters * 1.2)));
+});
+
+test("a summary that stops mid-word is kept to its last whole sentence, the seat told; every paper the folded notes named by its id stays named", async () => {
+  const s = seat((k) => (k <= 8 ? [use("n", "notebook", { add: `${line(k, 880)} Asked for rec.${100 + k}.` })] : []), () => [{ type: "text", text: "Asked the city for a remit. The draft rec.104 is signed. Waiting on the ans" }]);
+  for (let d = 1; d <= 8; d++) await s.sit(d);
+  const f = s.notes.find((x) => x.notebook_folded)?.notebook_folded;
+  expect(f, "folded").toBeDefined();
+  expect(f.summary_cut.left_out).toBe("Waiting on the ans");
+  await s.sit(9);
+  const told = shown(s.calls.filter((c) => c.purpose === "participant").at(-1)!);
+  const book = /Summary of my notes up to day \d+: ([^\n]*)/.exec(told)![1]!;
+  expect(book.startsWith("Asked the city for a remit. The draft rec.104 is signed.")).toBe(true);
+  for (const id of idsNamed(f.replaced)) expect(book, id).toContain(id);
+  // (One with no whole sentence in it folds nothing.)
+  const t = seat((k) => (k <= 8 ? [use("n", "notebook", { add: line(k, 900) })] : []), () => [{ type: "text", text: "Asked the city for a" }]);
+  for (let d = 1; d <= 8; d++) await t.sit(d);
+  expect(t.notes.some((x) => x.notebook_folded)).toBe(false);
+  expect(t.notes.some((x) => x.notebook_fold_failed)).toBe(true);
+  expect(endsSentence("(3 earlier notes)") && endsSentence("Done.") && !endsSentence("Waiting on the ans") && !endsSentence("owed 12,")).toBe(true);
 });
 
 test("a text is cut at the end of a sentence, never inside one", () => {
