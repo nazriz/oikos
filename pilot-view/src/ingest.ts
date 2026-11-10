@@ -7,7 +7,9 @@ import { logLines } from "../../orchestrator/src/logs";
 import type { DebriefCollector } from "../../orchestrator/src/debriefs";
 import { dayOf, requestWords, summariseBlocks, notebookOf, type BlockSummary } from "./parse";
 
-export interface Transcript { t: number; seq: number; subject: string; purpose: string; turn: number; ref?: string; model?: string; provider?: string; opening?: string; notebook?: string; results: { id: string; text: string }[]; output: any[]; request?: string }
+export interface Transcript { t: number; seq: number; subject: string; purpose: string; turn: number; ref?: string; model?: string; provider?: string; opening?: string; notebook?: string; results: { id: string; text: string }[]; output: any[]; request?: string; systemSha?: string; shown?: string }
+/** What a seat was woken with (the participant's `observation` annotation): why, and how much came. */
+export interface Woken { t: number; seq: number; subject: string; wokeFor: string; inbox: number; outcomes: number; drafts: number }
 export interface Usage { t: number; subject: string; purpose: string; model?: string; provider?: string; cost: number; input: number; output: number }
 export interface Effect { type: string; text: string; id?: string; t: number }
 export interface SeatAct { seq: number; t: number; participant: string; as: string; blocks: BlockSummary[]; draft?: string; reasoning?: string; action?: string; status: "pending" | "applied" | "refused"; appliedAt?: number; refusal?: { code: string; detail: string }; effects: Effect[]; consequences: { t: number; by: string; kind: string; text: string; id: string }[] }
@@ -24,6 +26,15 @@ export interface Raw {
   daily: { acts: number[]; refused: number[]; payments: number[]; moved: number[]; papers: number[]; messages: number[]; worked: number[]; kinds: Map<string, number[]> };
   census: { t: number; counters: any }[];
   people: { arrived: number[]; left: number[]; died: number[]; created: number[] };
+  /** Standing instructions (the system part of a call), by their hash: a transcript logs one the first time it is used. */
+  systems: Map<string, string>;
+  woken: Woken[];
+  /** An experiment fork's steward notes, by seat (model, framing, post, translator arrangement). */
+  stewards: Map<string, any>;
+  /** The seat a request (draft id) is from, as the log says it (a draft's id need not name the seat). */
+  reqSeat: Map<string, string>;
+  /** The translator that answered each attempt at a request, in order (model, and what it wrote or why it withheld). */
+  translatorCalls: Map<string, { model: string; out: any }[]>;
 }
 
 const BULK = new Set(["request", "order", "delivery_note", "supply_request", "invoice", "hours_notice", "hours_reply", "price_list"]);
@@ -55,6 +66,7 @@ export async function ingest(path: string, o: IngestOptions): Promise<Raw> {
   const raw: Raw = {
     header: undefined, lastT: 0, lines: 0, transcripts: [], usage: [], drafts: new Map(), failures: new Map(), signoffs: new Map(), routes: new Map(), retries: new Map(), requestText: new Map(), notes: [], failedCalls: [], optOuts: [], seatActs: [], otherKinds: new Map(),
     actors: new Map(), daily: { acts: [], refused: [], payments: [], moved: [], papers: [], messages: [], worked: [], kinds: new Map() }, census: [], people: { arrived: [], left: [], died: [], created: [] },
+    systems: new Map(), woken: [], stewards: new Map(), reqSeat: new Map(), translatorCalls: new Map(),
   };
   const actor = (id: string): Actor => raw.actors.get(id) ?? (raw.actors.set(id, { id, acts: 0, blocks: {}, roles: {}, authored: {}, sent: { n: 0, amt: 0 }, received: { n: 0, amt: 0 }, days: [], first: [], last: [] }), raw.actors.get(id)!);
   const note = (a: Actor, t: number, what: string) => {
@@ -74,7 +86,11 @@ export async function ingest(path: string, o: IngestOptions): Promise<Raw> {
     if (isCommand) cur = null;
     // ---- annotations
     if (line.includes('"kind":"annotation"')) {
-      if (line.includes('"annotation":"transcript"')) {
+      if (line.includes('"annotation":"observation"')) {
+        if (!o.full || !seatList.some((s) => line.includes(`"subject":"${s}"`))) continue;
+        const e = JSON.parse(line), ob = e.body.data?.observation ?? {};
+        if (o.seats.has(e.body.subject)) raw.woken.push({ t: e.t, seq: e.seq, subject: e.body.subject, wokeFor: String(ob.woke_for ?? "?"), inbox: (ob.inbox ?? []).length, outcomes: (ob.outcomes ?? []).length, drafts: (ob.drafts ?? []).length });
+      } else if (line.includes('"annotation":"transcript"')) {
         if (!o.full) continue;
         const isSeat = seatList.some((s) => line.includes(`"subject":"${s}"`));
         const isTranslator = line.includes('"purpose":"translator"');
@@ -82,16 +98,23 @@ export async function ingest(path: string, o: IngestOptions): Promise<Raw> {
         if (!isTranslator && !line.includes('"purpose":"participant"')) continue; // (debriefs are read apart, with their keep-back rules)
         const e = JSON.parse(line), d = e.body.data ?? {};
         const tr: Transcript = { t: e.t, seq: e.seq, subject: e.body.subject, purpose: d.purpose, turn: d.turn ?? 1, ref: d.ref, model: d.model, provider: d.provider, results: [], output: d.output ?? [] };
+        // (A call's standing instructions are logged whole the first time they are used, and by their hash after.)
+        if (d.system_sha256) { tr.systemSha = d.system_sha256; if (typeof d.system === "string" && d.system && !raw.systems.has(d.system_sha256)) raw.systems.set(d.system_sha256, d.system); }
+        else if (typeof d.system === "string" && d.system) { const k = `s${raw.systems.size}`; raw.systems.set(k, d.system); tr.systemSha = k; }
         if (isTranslator) {
           tr.request = typeof d.input === "string" ? requestWords(d.input) : "";
           const rt = raw.requestText.get(tr.ref ?? "");
           if (tr.ref) raw.requestText.set(tr.ref, { t: rt?.t ?? e.t, words: rt?.words ?? tr.request, attempts: (rt?.attempts ?? 0) + 1 });
           tr.output = (tr.output as any[]).map((x) => (x?.type === "tool_use" ? { name: x.name, input: x.input } : x));
+          if (tr.ref) { const l = raw.translatorCalls.get(tr.ref) ?? raw.translatorCalls.set(tr.ref, []).get(tr.ref)!; l.push({ model: `${d.provider}/${d.model}`, out: (tr.output as any[])[0]?.input ?? (tr.output as any[])[0]?.text ?? null }); }
         } else if (typeof d.input === "string") {
           tr.opening = d.input;
           tr.notebook = notebookOf(d.input);
         } else if (Array.isArray(d.input)) {
           tr.results = (d.input as any[]).filter((m) => m?.type === "tool_result").map((m) => ({ id: String(m.tool_use_id ?? ""), text: typeof m.content === "string" ? m.content : Array.isArray(m.content) ? m.content.map((x: any) => x?.text ?? "").join("\n") : "" }));
+          // (Anything else the seat was shown with the results: a text part of the message.)
+          const other = (d.input as any[]).filter((m) => m?.type !== "tool_result").map((m) => (typeof m === "string" ? m : m?.text ?? JSON.stringify(m))).join("\n");
+          if (other) tr.shown = other;
         }
         raw.transcripts.push(tr);
       } else if (line.includes('"annotation":"usage"')) {
@@ -99,20 +122,24 @@ export async function ingest(path: string, o: IngestOptions): Promise<Raw> {
         raw.usage.push({ t: e.t, subject: b.subject, purpose: b.purpose, model: b.model, provider: b.provider, cost: b.cost_microusd ?? 0, input: b.input_tokens ?? 0, output: b.output_tokens ?? 0 });
       } else if (line.includes('"annotation":"draft"')) {
         const b = JSON.parse(line).body, d = b.draft ?? {};
+        if (d.id && d.participant) raw.reqSeat.set(d.id, d.participant);
         if (d.id) raw.drafts.set(d.id, { id: d.id, participant: d.participant, call: d.call, proposal: d.proposal, summary: d.summary, check: d.check, translator: d.translator, t: num(line, "t") });
       } else if (line.includes('"annotation":"translation_failure"')) {
         const b = JSON.parse(line).body, d = b.data ?? {};
+        if (d.draft && b.subject) raw.reqSeat.set(d.draft, b.subject);
         if (d.draft) raw.failures.set(d.draft, { call: d.call, reason: d.reason, proposal: d.proposal, asked_back: d.asked_back === true, invalid: d.invalid });
       } else if (line.includes('"annotation":"signoff"')) {
         const e = JSON.parse(line);
         raw.signoffs.set(e.body.draft, { decision: e.body.decision, t: e.t });
       } else if (line.includes('"annotation":"note"')) {
-        if (line.includes('"translation_route"')) { const d = JSON.parse(line).body.data.translation_route; raw.routes.set(String(d.draft), d); }
+        if (line.includes('"translation_route"')) { const b = JSON.parse(line).body, d = b.data.translation_route; raw.routes.set(String(d.draft), d); if (b.subject && b.subject !== "orchestrator") raw.reqSeat.set(String(d.draft), b.subject); }
         else if (line.includes('"translation_retry"')) { const d = JSON.parse(line).body.data.translation_retry; raw.retries.set(String(d.draft), (raw.retries.get(String(d.draft)) ?? 0) + 1); }
+        else if (line.includes('"steward"') && line.includes('"subject":"orchestrator"')) { const s = JSON.parse(line).body.data?.steward; if (s?.seat) raw.stewards.set(String(s.seat), s); }
         else if (seatList.some((s) => line.includes(`"subject":"${s}"`))) {
           const e = JSON.parse(line), d = e.body.data ?? {};
           const kind = Object.keys(d)[0] ?? "note";
-          if (["no_turn", "back_for_papers", "papers_held", "sitting_missed", "prompt_trimmed", "look_cut", "not_sent", "malformed_tool_use", "dropped_tool_use", "participant_error", "notebook_not_changed", "notebook_folded", "prompt_too_long"].includes(kind)) raw.notes.push({ t: e.t, subject: e.body.subject, kind, data: d[kind] });
+          if (kind === "empty_sitting") raw.notes.push({ t: e.t, subject: e.body.subject, kind, data: d[kind] });
+          else if (["no_turn", "back_for_papers", "papers_held", "sitting_missed", "prompt_trimmed", "look_cut", "not_sent", "malformed_tool_use", "dropped_tool_use", "participant_error", "notebook_not_changed", "notebook_folded", "prompt_too_long"].includes(kind)) raw.notes.push({ t: e.t, subject: e.body.subject, kind, data: d[kind] });
         }
       } else if (line.includes('"annotation":"model_call_failed"')) {
         const b = JSON.parse(line).body; raw.failedCalls.push({ t: num(line, "t"), subject: String(b.subject ?? b.data?.subject ?? "?"), purpose: String(b.data?.purpose ?? b.purpose ?? "?"), why: String(b.data?.error ?? b.data?.reason ?? "").slice(0, 200) });

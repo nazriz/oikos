@@ -6,10 +6,12 @@
 // data). Whatever reads a folder takes each run once, its current log; a stopped log is read only when named.
 
 import { closeSync, createReadStream, createWriteStream, existsSync, fsyncSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { pipeline } from "node:stream/promises";
 import zlib from "node:zlib";
+import { kernelBinary } from "./kernel";
 
 const STOPPED = /\.stopped-\d+\.jsonl(\.zst)?$/;
 
@@ -19,15 +21,15 @@ export const isStoppedLog = (file: string) => STOPPED.test(file);
 /** Is this file a run's current log (not its anchors, not a derived file, not what a resumed run left behind)? */
 /** The file beside a run's log that holds what its seats said in their debriefs (VISION 15, point 7): kept with the
  * run for ever, as the log is, and never published as it stands, since it holds what seats asked to be kept back. */
-export const debriefsBeside = (log: string) => log.replace(/\.jsonl(\.zst)?$/, ".debriefs.jsonl");
+export const debriefsBeside = (log: string) => log.replace(/\.(jsonl(\.zst)?|oklog)$/, ".debriefs.jsonl");
 
 /** The file beside a run's log that holds its citizens' decisions, captured for training (docs/citizen-data.md). */
-export const citizensBeside = (log: string) => log.replace(/\.jsonl(\.zst)?$/, ".citizens.jsonl.zst");
+export const citizensBeside = (log: string) => log.replace(/\.(jsonl(\.zst)?|oklog)$/, ".citizens.jsonl.zst");
 
 export const isLog = (file: string) => (file.endsWith(".jsonl") || file.endsWith(".jsonl.zst")) && !/\.debriefs\.jsonl$/.test(file) && !/\.calls\.jsonl$/.test(file) && !/\.citizens\.jsonl\.zst$/.test(file) && !/\.anchors\.jsonl(\.zst)?$/.test(file) && !/translator-corpus\.jsonl$/.test(file) && !isStoppedLog(file);
 
 /** A run's id from its log file's name. */
-export const runOf = (file: string) => file.split("/").at(-1)!.replace(/\.jsonl(\.zst)?$/, "");
+export const runOf = (file: string) => file.split("/").at(-1)!.replace(/\.(jsonl(\.zst)?|oklog)$/, "");
 
 /** The runs in a folder, each once: its current log (the plain one, where a run has both), in name order. */
 export function currentLogs(dir: string): string[] {
@@ -42,8 +44,13 @@ export function logsOf(dir: string, runId: string): string[] {
   return readdirSync(dir).filter((f) => f === `${runId}.jsonl` || f === `${runId}.jsonl.zst` || (f.startsWith(`${runId}.stopped-`) && isStoppedLog(f))).sort().map((f) => join(dir, f));
 }
 
-/** A log's lines, one at a time (a log can be gigabytes). */
+/** A log's lines, one at a time (a log can be gigabytes). An experiment's fork log (`<arm>.oklog`, the kernel's own
+ * binary log: orchestrator/src/experiment.ts) is read as the kernel exports it (`oikos-kernel export`), only read. */
 export function logLines(path: string): AsyncIterable<string> {
+  if (path.endsWith(".oklog")) {
+    const p = spawn(kernelBinary(), ["export", path], { stdio: ["ignore", "pipe", "ignore"] });
+    return createInterface({ input: p.stdout!, crlfDelay: Infinity });
+  }
   const raw = createReadStream(path);
   const input = path.endsWith(".zst") ? raw.pipe(zlib.createZstdDecompress()) : raw;
   return createInterface({ input, crlfDelay: Infinity });

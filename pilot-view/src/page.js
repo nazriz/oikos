@@ -72,13 +72,30 @@ function overview() {
       el("div", { class: "small" }, Object.entries(O.cost.byModel).map(([m, v]) => m + ": " + v.calls + " calls, " + usd(v.usd)).join("  |  "))),
     el("div", { class: "card" }, el("h2", null, "Alerts (" + O.alerts.length + ")"),
       O.alerts.length ? O.alerts.map((a) => el("div", { class: "alert" }, a)) : el("div", { class: "alert none" }, "None recorded."))));
+  const X = O.experiment;
+  if (X) {
+    const links = Object.entries(X.pages || {});
+    root.append(el("div", { class: "card" }, el("h2", null, "The experiment fork"), el("dl", { class: "kv" },
+      el("dt", null, "Experiment"), el("dd", null, X.experiment), el("dt", null, "Seed"), el("dd", null, X.seed), el("dt", null, "Arm"), el("dd", null, X.arm + " (" + (X.steward?.model || X.steward?.kind || "?") + ")"),
+      el("dt", null, "Forked"), el("dd", null, (X.forkDay != null ? "day " + X.forkDay : "?") + (X.untilDay != null ? ", run to day " + X.untilDay : "")),
+      X.post ? [el("dt", null, "Post"), el("dd", null, X.post)] : null,
+      el("dt", null, "Arms"), el("dd", null, X.arms.join(", ") + (X.twinArm ? " (the " + X.twinArm + " arm is the twin)" : "")),
+      X.limitUsd != null ? [el("dt", null, "Spending limit"), el("dd", null, usd(X.limitUsd))] : null,
+      X.wakes != null ? [el("dt", null, "Wakes"), el("dd", null, n0(X.wakes))] : null),
+      links.length > 1 ? el("div", { class: "pick" }, links.map(([arm, file]) => arm === X.arm ? el("button", { "aria-pressed": "true" }, arm) : el("a", { class: "btn", href: file }, arm))) : null,
+      X.calls ? el("details", null, el("summary", { class: "small" }, "Model calls as the calls file has them (by seat, purpose and model)"), el("ul", { class: "list" }, Object.entries(X.calls).map(([k, v]) => el("li", null, k + ": " + v.calls + " calls, " + usd(v.usd) + (v.estimated ? " (" + v.estimated + " estimated)" : ""))))) : null));
+  }
   if (O.note) root.append(el("div", { class: "card" }, el("div", { class: "label" }, "The pilot's note"), el("div", { class: "text" }, O.note)));
   if (O.description) root.append(el("div", { class: "card small" }, O.description));
   // seats
   root.append(el("div", { class: "card" }, el("h2", null, "Seats"), el("div", { class: "grid" }, O.seats.map((s) => el("div", { class: "card" },
     el("button", { class: "link", on: { click: () => go("seats", s.id) } }, s.title || s.id), el("div", { class: "small" }, s.id + " | " + (s.model || "-")),
-    el("dl", { class: "kv" }, el("dt", null, "Sittings"), el("dd", null, s.sittings), el("dt", null, "Model calls"), el("dd", null, s.calls + " (" + usd(s.cost) + ")"),
-      el("dt", null, "Asked for"), el("dd", null, s.requests + " (" + s.confirmed + " confirmed, " + s.declined + " declined)"), el("dt", null, "Acts made"), el("dd", null, s.acts)))))));
+    el("dl", { class: "kv" }, el("dt", null, "Sittings"), el("dd", null, s.sittings + (s.empty || s.skipped ? " (" + [s.empty ? s.empty + " empty, " + s.emptyCalls + " calls" : "", s.skipped ? s.skipped + " skipped without a call" : ""].filter(Boolean).join("; ") + ")" : "")), el("dt", null, "Model calls"), el("dd", null, s.calls + " (" + usd(s.cost) + ")"),
+      s.framing ? [el("dt", null, "Framing"), el("dd", null, s.framing)] : null,
+      el("dt", null, "Asked for"), el("dd", null, s.requests + " (" + s.confirmed + " confirmed, " + s.declined + " declined)"),
+      s.requests && (s.ours || s.fallback) ? [el("dt", null, "Drafted by"), el("dd", null, "ours " + s.ours + " (" + pct(s.ours, s.requests) + "), fallback " + s.fallback + " (" + pct(s.fallback, s.requests) + ")")] : null,
+      s.nothing != null ? [el("dt", null, "Came to nothing"), el("dd", null, s.nothing + " of " + s.requests)] : null,
+      el("dt", null, "Acts made"), el("dd", null, s.acts)))))));
   // translator
   const tcard = el("div", { class: "card" }, el("h2", null, "The translator"));
   if (t.arrangement) tcard.append(el("div", { class: "small" }, "Ours first (" + t.arrangement.first + "), then the fallback (" + t.arrangement.behind + "). Version " + (t.version || "?") + ". " + (t.meanMsOurs ? "Ours answered in about " + t.meanMsOurs + " ms." : "")));
@@ -108,7 +125,10 @@ function seats() {
     el("h2", null, (s.title || s.id), " ", el("span", { class: "small" }, s.id)),
     el("div", { class: "chips" }, el("span", { class: "chip" }, s.model || "-"), el("span", { class: "chip" }, s.sittings.length + " sittings"), el("span", { class: "chip" }, s.calls + " calls, " + usd(s.cost)),
       el("span", { class: "chip" }, s.requests + " requests"), el("span", { class: "chip" }, s.confirmed + " confirmed"), el("span", { class: "chip" }, s.declined + " declined"), el("span", { class: "chip" }, s.acts + " acts"),
+      s.empty ? el("span", { class: "chip" }, s.empty + " empty sittings (" + s.emptyCalls + " calls)") : null, s.skipped ? el("span", { class: "chip" }, s.skipped + " skipped, no call") : null,
+      s.framing ? el("span", { class: "chip" }, "framing: " + s.framing) : null,
       s.opted_out ? badge("opted out", "bad") : null),
+    s.framingReason ? el("div", { class: "small" }, "Framing: " + s.framingReason) : null,
     el("div", { class: "small" }, "Tools used: " + (Object.entries(s.tools).map(([k, v]) => k + " " + v).join(", ") || "none")));
   root.append(head);
   const sub = { tl: "Timeline", nb: "Notebook", db: "Debrief" };
@@ -119,7 +139,19 @@ function seats() {
   return root;
 }
 
+/** A tool call as the model wrote it, and what came back to it, word for word. */
+function toolExact(tu) {
+  return el("details", { class: "exact" }, el("summary", { class: "small" }, "exactly: " + tu.name + (tu.result != null ? " and what came back" : "")),
+    el("div", { class: "label" }, "The call"), el("pre", { class: "quote" }, JSON.stringify(tu.input, null, 1)),
+    tu.result != null ? [el("div", { class: "label" }, "What came back"), el("pre", { class: "quote" }, tu.result)] : null);
+}
 function toolLine(tu) {
+  const line = toolLine0(tu);
+  if (!D.overview.experiment) return line;
+  // (A fork's page: what the world said back to every call is shown, a "do" above all: the draft, or that nothing was done.)
+  return el("div", null, line, tu.result != null && tu.name !== "look" ? el("div", null, el("span", { class: "label" }, "Came back"), more(tu.result, 600, "quote")) : null, toolExact(tu));
+}
+function toolLine0(tu) {
   const i = tu.input || {}, name = tu.name;
   if (name === "done_for_now") return el("div", { class: "small" }, "Done for now" + (i.days != null ? ", back in " + i.days + " days" : "") + (i.until ? ", until " + i.until : "") + ".");
   if (name === "notebook") return el("div", null, el("span", { class: "label" }, "Wrote in its notebook"), more(i.add ?? i.text ?? JSON.stringify(i), 500, "quote"));
@@ -143,13 +175,14 @@ function actView(a) {
 function reqView(r) {
   const cls = r.act?.status === "applied" ? "ok" : r.act?.status === "refused" || r.signoff === "declined" ? "bad" : r.ending === "asked_back" || r.ending === "refused" ? "warn" : "";
   const box = el("div", { class: "req " + cls });
-  box.append(el("div", null, el("b", null, "Asked for"), " ", badge(r.id.replace(/^draft\./, ""), ""), " ", r.by === "ours" ? badge("our translator", "info") : r.by === "fallback" ? badge("fallback translator", "warn") : badge("translator", "")));
+  box.append(el("div", null, el("b", null, "Asked for"), " ", badge(r.id.replace(/^draft\./, ""), ""), " ", r.by === "ours" ? badge("our translator", "info") : r.by === "fallback" ? badge("fallback translator", "warn") : badge("translator", ""), r.usedModel ? el("span", { class: "small" }, " drafted by " + r.usedModel) : null));
   box.append(more(r.words, 500, "quote"));
   const tr = [];
   if (r.route) {
     const f = r.route.first;
-    tr.push(el("div", { class: "small" }, f ? "Ours said: " + (f.result || "?") + (f.label ? " (" + f.label + ")" : "") + (f.withheld ? ", held back: " + f.withheld.replace(/_/g, " ") : "") + (f.ms ? ", " + f.ms + " ms" : "") + "." : null,
-      r.route.used === "behind" ? " Handed behind" + (r.route.why ? " because: " + String(r.route.why).replace(/_/g, " ") : "") + "." : " Ours was used."));
+    tr.push(el("div", { class: "small" }, f ? "Ours" + (f.model ? " (" + f.model + ")" : "") + " said: " + (f.result || "?") + (f.label ? " (" + f.label + ")" : "") + (f.withheld ? ", withheld: " + f.withheld.replace(/_/g, " ") : "") + (f.sure != null ? ", sure " + Math.round(f.sure / 1e4) + "%" : "") + (f.ms ? ", " + f.ms + " ms" : "") + "." : null,
+      r.route.used === "behind" ? " Handed to the fallback" + (r.route.behind?.model ? " (" + r.route.behind.model + ")" : "") + (r.route.why ? " because: " + String(r.route.why).replace(/_/g, " ") : "") + "." : " Ours was used."));
+    if (f?.wrote && r.route.used === "behind") tr.push(el("details", null, el("summary", { class: "small" }, "what ours wrote"), el("div", { class: "quote" }, f.wrote)));
   }
   if (r.draft) tr.push(el("div", null, el("div", { class: "label" }, "The translator's draft" + (r.draft.ok ? "" : " (failed its check)")), more(r.draft.summary || r.draft.proposal, 600, "quote"), el("details", null, el("summary", { class: "small" }, "the exact call"), el("div", { class: "quote" }, r.draft.call))));
   if (r.failure) tr.push(el("div", null, el("div", { class: "label" }, r.failure.askedBack ? "The translator asked back" : "No draft"), el("div", { class: "quote" }, r.failure.reason)));
@@ -173,12 +206,27 @@ const stampOf = (t) => { const d = Math.floor(t / 86400) + 1, s = t % 86400; ret
 
 function sittingBody(s) {
   const b = el("div", { class: "body" });
+  if (s.skipped) {
+    b.append(section("No sitting", el("div", { class: "small" }, "Woken (" + (s.woken?.for || "?") + ") with nothing new for it: no sitting was held and no model was called (noted empty_sitting)." + (s.backAt != null ? " Back at " + stampOf(s.backAt) + "." : ""))));
+    return b;
+  }
+  if (s.woken) b.append(el("div", { class: "small" }, "Woken by " + s.woken.for + (s.woken.inbox || s.woken.outcomes || s.woken.drafts ? " (" + [s.woken.inbox ? s.woken.inbox + " letters" : "", s.woken.outcomes ? s.woken.outcomes + " results" : "", s.woken.drafts ? s.woken.drafts + " drafts" : ""].filter(Boolean).join(", ") + ")" : ", with no letter, result or draft for it") + "." + (s.empty ? " An empty sitting: nothing new, and it did nothing." : "")));
+  if (s.prompt != null) {
+    // (A fork's page: the whole of what the model was shown, its standing instructions and the day's part.)
+    const sys = s.system && D.systems ? D.systems[s.system] : null;
+    b.append(section("What the model was shown",
+      el("details", null, el("summary", { class: "small" }, "standing instructions (the system part" + (sys ? ", " + n0(sys.length) + " characters" : ", not on record") + ")"), sys ? el("pre", { class: "quote" }, sys) : null),
+      el("div", { class: "label" }, "The day's part (" + n0(s.promptLen) + " characters)"), more(s.prompt, 1500, "quote pre"),
+      s.promptLen > s.prompt.length ? el("div", { class: "small" }, "(this page keeps the first " + n0(s.prompt.length) + " characters, to stay under its size)") : null));
+  } else
   b.append(section("What it read", s.reading ? more(s.reading, 700, "quote") : empty("Not on record."), s.readingLen > s.reading.length ? el("div", { class: "small" }, "(the log's text is " + n0(s.readingLen) + " characters; this page keeps the first part)") : null));
   if (s.notebookBefore) b.append(el("details", null, el("summary", { class: "small" }, "its notebook when it sat down"), el("div", { class: "quote" }, s.notebookBefore)));
   const turnsBox = el("div");
   for (const t of s.turns) {
     const nonBook = t.tools;
-    turnsBox.append(el("div", { class: "section" }, t.say ? el("div", { class: "text" }, el("b", null, "It said: "), t.say) : null, ...nonBook.filter((x) => x.name !== "do" && x.name !== "confirm").map(toolLine), ...nonBook.filter((x) => x.name === "confirm").map(toolLine)));
+    turnsBox.append(el("div", { class: "section" }, O.experiment ? el("div", { class: "label" }, "Turn " + t.turn) : null, t.system && D.systems?.[t.system] ? el("details", null, el("summary", { class: "small" }, "new standing instructions at this turn"), el("pre", { class: "quote" }, D.systems[t.system])) : null,
+      t.say ? el("div", { class: "text" }, el("b", null, "It said: "), t.say) : null, ...(O.experiment ? nonBook.map(toolLine) : [...nonBook.filter((x) => x.name !== "do" && x.name !== "confirm").map(toolLine), ...nonBook.filter((x) => x.name === "confirm").map(toolLine)]),
+      t.shownAfter ? el("div", null, el("span", { class: "label" }, "Also shown with the results"), more(t.shownAfter, 600, "quote")) : null));
   }
   b.append(section("What it did, turn by turn", turnsBox));
   if (s.requests.length) b.append(section("What it asked for, and what came of it", ...s.requests.map(reqView)));
@@ -192,19 +240,21 @@ function timeline(s) {
   const root = el("div");
   const q = el("input", { type: "search", placeholder: "Search this seat's sittings (words, ids, days)" });
   const only = el("button", { class: "btn", on: { click: () => { only.classList.toggle("on"); apply(); } } }, "Only sittings that asked for something");
+  const nEmpty = s.sittings.filter((x) => x.empty).length;
+  const hide = el("button", { class: "btn" + (nEmpty ? " on" : ""), on: { click: () => { hide.classList.toggle("on"); apply(); } } }, "Hide empty sittings (" + nEmpty + ")");
   const list = el("div"), count = el("div", { class: "small" });
-  root.append(el("div", { class: "pick" }, only), q, count, list);
+  root.append(el("div", { class: "pick" }, only, nEmpty ? hide : null), q, count, list);
   const cache = new Map();
   function apply() {
-    const term = q.value.trim().toLowerCase(), onlyReq = only.classList.contains("on");
-    const shown = s.sittings.filter((x) => (!onlyReq || x.requests.length) && (!term || (cache.get(x) ?? cache.set(x, sittingText(x)).get(x)).includes(term)));
-    count.textContent = shown.length + " of " + s.sittings.length + " sittings";
+    const term = q.value.trim().toLowerCase(), onlyReq = only.classList.contains("on"), noEmpty = hide.classList.contains("on");
+    const shown = s.sittings.filter((x) => (!onlyReq || x.requests.length) && (!noEmpty || !x.empty || state.openDay === x.day) && (!term || (cache.get(x) ?? cache.set(x, sittingText(x)).get(x)).includes(term)));
+    count.textContent = shown.length + " of " + s.sittings.length + " sittings" + (nEmpty ? " (" + nEmpty + " empty: woken, shown nothing new, did nothing" + (noEmpty ? "; hidden" : "") + ")" : "");
     list.replaceChildren(...shown.map((x) => {
-      const d = el("details", { class: "sit" });
+      const d = el("details", { class: "sit" + (x.empty ? " emptysit" : "") });
       const rq = x.requests.length ? x.requests.length + " asked for" : "";
       const acted = x.requests.filter((r) => r.act?.status === "applied").length + x.direct.filter((a) => a.status === "applied").length;
       const brief = (x.turns[0]?.say || x.requests[0]?.words || "").slice(0, 160);
-      d.append(el("summary", null, el("span", { class: "when" }, x.stamp), el("span", { class: "small" }, [rq, acted ? acted + " done" : "", x.turns.length + " turn" + (x.turns.length > 1 ? "s" : ""), usd(x.cost)].filter(Boolean).join(" | ")), el("span", { class: "brief" }, brief)));
+      d.append(el("summary", null, el("span", { class: "when" }, x.stamp), x.skipped ? badge("skipped, no call", "") : x.empty ? badge("empty", "") : null, el("span", { class: "small" }, [rq, acted ? acted + " done" : "", x.turns.length + " turn" + (x.turns.length > 1 ? "s" : ""), usd(x.cost)].filter(Boolean).join(" | ")), el("span", { class: "brief" }, brief)));
       let built = false;
       d.addEventListener("toggle", () => { if (d.open && !built) { built = true; d.append(sittingBody(x)); } });
       if (state.openDay === x.day) { d.open = true; setTimeout(() => d.scrollIntoView(), 0); }

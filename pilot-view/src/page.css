@@ -86,3 +86,7 @@ details.sit .body { padding: 0 14px 12px; }
 .empty { color: var(--muted); font-style: italic; }
 
 td:first-child { min-width: 6.5em; }
+pre.quote { font: .85rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; max-height: 32em; overflow: auto; }
+details.exact > summary { cursor: pointer; }
+details.sit.emptysit > summary { opacity: .65; }
+a.btn { display: inline-block; font-size: .9rem; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; color: var(--accent); text-decoration: none; background: var(--card); }

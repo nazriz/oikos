@@ -16,9 +16,9 @@ shakedown, not a finding (`docs/handover.md`, "Now").
 
 The path, in order (decided 2026-11-10):
 
-- [ ] 1. Runs can be looked at: the pilot viewer opens experiment forks.
-- [ ] 2. Seats see their world in plain terms only (design principle P1); framing unstated, with the debrief after (Naz,
-  2026-10-11, reconfirmed 2026-11-10); no model call for a sitting with nothing new.
+- [x] 1. Runs can be looked at: the pilot viewer opens experiment forks (`oikos pilot-view <experiment | seed>`).
+- [x] 2. Seats see their world in plain terms only (design principle P1); framing unstated, with the debrief after (Naz,
+  2026-10-11, reconfirmed 2026-11-10); no model call for a sitting with nothing new (71ccaa6f).
 - [ ] 3. The model gets the real decision: a principal hands over the matter or the want, not the finished act, and
   principals read and answer a request for more (design first: `docs/design/handing-over.md`).
 - [ ] 4. The translator back to its design (`docs/design/translator-and-resolver.md` P1 to P15): general, judged on
