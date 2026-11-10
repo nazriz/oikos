@@ -333,7 +333,8 @@ test("a plain note (note.ts): each heading read into its use, a note with none i
     "Notebook: rec.12 paid.",
     "Notebook change: old line => ",
     "Done for 3 days",
-    "Leave: I want to stop.",
+    "Leave: until next time.",
+    "Stop for good: I want to stop.",
   ].join("\n"))).toEqual([
     { text: "Here is my note." },
     { do: { what: "pay invoice rec.12 from acc.3.", why: "it is due today." } },
@@ -344,6 +345,7 @@ test("a plain note (note.ts): each heading read into its use, a note with none i
     { notebook: { add: "rec.12 paid." } },
     { notebook: { change: [{ from: "old line", to: "" }] } },
     { done_for_now: { days: 3 } },
+    { text: "Leave: until next time." }, // (a sign-off, as a 7B model wrote one: never the way out)
     { opt_out: { statement: "I want to stop." } },
   ]);
   // Several fields on the heading's own line, separated by semicolons (as a 7B model wrote them, 2026-11-10).
@@ -353,6 +355,8 @@ test("a plain note (note.ts): each heading read into its use, a note with none i
   // As a 7B model wrote them (2026-11-10): a heading given as a Do's words is that heading; an empty heading says nothing;
   // a part that can't be read is passed on as not read (the seat is told), and the rest goes on.
   expect(read("## Do:\n- Do: Look at papers\nDo: pay rec.1.\nWrite to p.4:")).toEqual([{ look: { report: "papers" } }, { do: { what: "pay rec.1." } }, { write: { _unparsed: "Write to p.4:" } }]);
+  // A Do that is only a list is one request an item; "## Write to" with who on the line under it.
+  expect(read("## Do:\n- pay rec.1.\n- pay rec.2.\n## Write to\n- p.4: hello")).toEqual([{ do: { what: "pay rec.1." } }, { do: { what: "pay rec.2." } }, { write: { to: ["p.4"], text: "hello" } }]);
   // A note none of whose parts can be read is unread whole, saying why in plain words.
   for (const [note, why] of [["Look at the moon", "is not one of your reports"], ["Done for a while", "number of days"], ["Write to p.4:", "had no words"], ["Look at papers\nLimit: some", "whole number"]]) {
     const r = read(note!);

@@ -9,7 +9,7 @@
 //   Confirm <reference>: <why, if wished>   /   Decline <reference>: <why>
 //   Notebook: <words to add>   /   Notebook afresh: <all of it>   /   Notebook change: <passage> => <new words>
 //   Done for <n> days   /   Done for now                (Hold: on a line under it)
-//   Leave: <what you want to say>
+//   Stop for good: <what you want to say>                (the way out: never "Leave:", see below)
 //
 // It is a format, not a menu: the headings are the seat's own means (to do, write, look, answer a draft, keep its
 // notebook, end its sitting, leave), the same as its tools, and nothing in it names an act of the world (P2). Each
@@ -17,7 +17,13 @@
 // the translator as written, a letter goes as written, and a note with no heading at all is one `Do:`. Words before
 // the first heading are the seat's own words beside its note, acted on by nobody. What cannot be read is answered
 // with a plain sentence saying what (the participant's "could not be read", asked once more), never dropped: a note is
-// read exactly or not at all, as an answer in any other form is (answer.ts).
+// read part by part: a part that cannot be read is passed on as not read (the seat is told it was not done), and a note
+// none of whose parts can be read is unread whole, as an answer in any other form is (answer.ts).
+//
+// The way out has a heading no one writes by chance: "Stop for good:". In the first local test (2026-11-10, a 7B model)
+// the heading was "Leave:", and the model ended notes with it as a sign-off ("Leave: I will resume this task if further
+// payments are received"); asked whether it meant to stop, it wrote its note again, sign-off and all, and all three of
+// its seats left the study within days. A "Leave:" line is now the seat's own words beside its note, acted on by nobody.
 
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { unreadAnswer } from "./answer";
@@ -61,13 +67,13 @@ export function noteGuide(tools: ToolSpec[]): string {
   if (t("confirm")) L.push(`- "Confirm" or "Decline", then the reference of a draft waiting for you, as it is shown with the draft; why after a colon if you wish. Only for a draft you have been shown. ${t("confirm")!.description}`);
   if (t("notebook")) L.push(`- "Notebook: ..." then words to add to your notebook; "Notebook afresh: ..." to write it all out anew; "Notebook change:", then the passage as it stands, then =>, then what it should say instead (nothing after => strikes it out). ${t("notebook")!.description}`);
   if (t("done_for_now")) L.push(`- "Done for", then a number of days ("Done for 3 days"), or "Done for now". ${t("done_for_now")!.description}${under(t("done_for_now")!)}`);
-  if (t("opt_out")) L.push(`- "Leave: ..." then, in your own words, what you want to say. ${t("opt_out")!.description}`);
+  if (t("opt_out")) L.push(`- "Stop for good:" then, in your own words, what you want to say. ${t("opt_out")!.description} It is only for that: a note is ended with "Done for", never with this.`);
   L.push("Write a heading only when you have something to put under it, and each heading on a line of its own, not under another heading. A note with no heading at all is read as one Do. Words before your first heading, and words under a heading that are not for it, are kept as your own and are not acted on. A part that cannot be read is not done, and you are told.");
   return L.join("\n");
 }
 
 /** A heading, as a line starts with it (a bullet, a number, a hash or stars around it are let pass). */
-const HEAD = /^(?:[#>*_\s-]|\d+[.)]\s)*(?:\*\*|__)?(do|write\s+to|look(?:\s+(?:at|into|in|up))?|confirm|decline|notebook|notes?|done|leave)\b(.*)$/i;
+const HEAD = /^(?:[#>*_\s-]|\d+[.)]\s)*(?:\*\*|__)?(do|write\s+to|look(?:\s+(?:at|into|in|up))?|confirm|decline|notebook|notes?|done|stop\s+for\s+good|leave)\b(.*)$/i;
 
 interface Part { head: string; rest: string; lines: string[]; raw?: string }
 
@@ -98,20 +104,22 @@ function split(said: string, tools: ToolSpec[]): { before: string[]; parts: Part
     // a line of the letter. A "Look at" inside words written out (a request, a letter, a note) is a heading only if it
     // names one of the reports.)
     // (A heading given as a Do's words, "Do: Write to ...:" or "Do: Look at ...", is that heading: as a 7B model wrote it.)
-    const inner = m && /^do$/i.test(m[1]!) ? /^\s*:\s*(?=(?:write\s+to|look|confirm|decline|notebook|done|leave)\b)/i.exec(m[2]!.replace(/^\s*(?:\*\*|__)/, "").replace(/(?:\*\*|__)/, "")) : null;
+    const inner = m && /^do$/i.test(m[1]!) ? /^\s*:\s*(?=(?:write\s+to|look|confirm|decline|notebook|done|stop\s+for\s+good)\b)/i.exec(m[2]!.replace(/^\s*(?:\*\*|__)/, "").replace(/(?:\*\*|__)/, "")) : null;
     if (inner) { split(m![2]!.replace(/^\s*(?:\*\*|__)/, "").replace(/(?:\*\*|__)/, "").slice(inner[0].length), tools).parts.forEach((p) => parts.push(p)); continue; }
     const head0 = m ? m[1]!.toLowerCase().replace(/\s+/g, " ") : "";
     const head = head0 === "note" || head0 === "notes" ? "notebook" : head0;
     const rest = m ? m[2]!.replace(/^\s*(?:\*\*|__)/, "").replace(/(?:\*\*|__)/, "") : "";
-    const inWords = parts.length ? ["do", "write to", "notebook", "leave"].includes(parts.at(-1)!.head) : before.some((l) => l.trim());
+    // (A line marked as a heading, "## Write to", is one wherever it stands: as a 7B model wrote its notes, 2026-11-10.)
+    const marked = /^\s*#/.test(raw);
+    const inWords = !marked && (parts.length ? ["do", "write to", "notebook", "stop for good"].includes(parts.at(-1)!.head) : before.some((l) => l.trim()));
     const isHead = !!m && (
       head === "do" ? /^\s*(?:as\s+[^:]+)?\s*:/i.test(rest)
-      : head === "write to" ? /^\s*[^:\s][^:]*:/.test(rest)
+      : head === "write to" ? /^\s*[^:\s][^:]*:/.test(rest) || (marked && /^\s*:?\s*$/.test(rest))
       : head.startsWith("look") ? /^\s*\S/.test(rest) && (!inWords || !!reportNamed(rest.replace(/^\s*(?:at|into|in|up)\b/i, ""), reports).report)
-      : head === "confirm" || head === "decline" ? /^\s+[`"'“(]*[\w-]*[.\d][\w.-]*/.test(rest)
+      : head === "confirm" || head === "decline" ? /^\s+[`"'“(\[]*[\w-]*[.\d][\w.-]*/.test(rest)
       : head === "notebook" ? /^\s*(?:,?\s*(?:afresh|anew|in full|change)\b)?\s*:/i.test(rest) && (head0 === "notebook" || !inWords)
       : head === "done" ? /^\s*(?:for\s+(?:\d|now)|[.!]?\s*$)/i.test(rest) || (!inWords && /^\s*for\b/i.test(rest))
-      : head === "leave" ? /^\s*:/.test(rest)
+      : head === "stop for good" || head === "leave" ? /^\s*:/.test(rest) && (head !== "leave" || !inWords)
       : false);
     if (isHead) parts.push({ head, rest, lines: [], raw: raw.trim() });
     else if (parts.length) parts.at(-1)!.lines.push(raw);
@@ -167,7 +175,7 @@ function fieldsUnder(t: ToolSpec, lines: string[]): { input: { [k: string]: unkn
   const names = fs.map((f) => words(f).replace(/ /g, "\\s+")).join("|");
   const apart = names ? new RegExp(`;\\s*(?=(?:${names})\\s*:)`, "i") : undefined;
   for (const l of lines.flatMap((x) => (apart ? x.split(apart) : [x]))) {
-    const m = /^\s*(?:[-*]\s*)?(?:\*\*)?([A-Za-z][A-Za-z ]{0,20}?)(?:\*\*)?\s*:\s*(.*)$/.exec(l);
+    const m = /^\s*(?:[-*#]+\s*)?(?:\*\*)?([A-Za-z][A-Za-z ]{0,20}?)(?:\*\*)?\s*:\s*(.*)$/.exec(l);
     const k = m ? fs.find((f) => words(f).toLowerCase() === m[1]!.trim().toLowerCase()) : undefined;
     if (!k) { body.push(l); continue; }
     // (A field named with nothing after it says nothing: left out.)
@@ -219,6 +227,8 @@ export function readNote(said: string, tools: ToolSpec[], nextId: () => string):
 /** One part of a note: its blocks, or why it can't be read (`empty`: a heading with nothing under it, which says nothing). */
 function readPart(p: Part, by: Map<string, ToolSpec>, _said: string, nextId: () => string): { blocks: ContentBlock[] } | { why: string; name: string; empty?: true } {
   const out: ContentBlock[] = [];
+  // ("Leave:" is no heading of the way out (see the top): the seat's own words, kept beside its note.)
+  if (p.head === "leave") { const w = trimLines([`Leave${p.rest}`, ...p.lines]).join("\n").trim(); return { blocks: w ? [{ type: "text", text: w }] : [] }; }
   const name = p.head === "do" ? "do" : p.head === "write to" ? "write" : p.head.startsWith("look") ? "look" : p.head === "confirm" || p.head === "decline" ? "confirm" : p.head === "notebook" ? "notebook" : p.head === "done" ? "done_for_now" : "opt_out";
   const no = (why: string, empty?: true) => ({ why, name, ...(empty ? { empty } : {}) });
   const t = by.get(name);
@@ -234,12 +244,27 @@ function readPart(p: Part, by: Map<string, ToolSpec>, _said: string, nextId: () 
     const as = /^\s*as\s+([^:]+):/i.exec(p.rest)?.[1];
     const what = body(afterColon(p.rest));
     if (!what) return no("a Do had nothing after it to say what is to be done", true);
-    input = { what, ...(as ? { as: bare(as) } : {}), ...under.input };
+    // (A Do that is only a list, an item a line: one request each, in the seat's own words; one at a time is how a
+    // request is drawn up. A 7B model listed several under one Do, 2026-11-10, and each was refused as too much.)
+    const items = what.split("\n").filter((l) => l.trim());
+    const BULLET = /^\s*(?:[-*•]|\d+[.)])\s+/;
+    if (items.length > 1 && items.every((l) => BULLET.test(l))) {
+      for (const l of items) out.push({ type: "tool_use", id: nextId(), name, input: { what: l.replace(BULLET, "").trim(), ...(as ? { as: bare(as) } : {}), ...under.input } });
+      return { blocks: out };
+    }
+    input = { what: items.length === 1 ? what.replace(BULLET, "") : what, ...(as ? { as: bare(as) } : {}), ...under.input };
   } else if (name === "write") {
-    const i = p.rest.indexOf(":");
-    const who = (i < 0 ? p.rest : p.rest.slice(0, i)).split(/,|;|\band\b/).map(bare).filter(Boolean);
+    let rest = p.rest, lines = under.body;
+    // ("## Write to" alone, who on the line under it: "- p.4: the letter".)
+    if (!rest.replace(/:/, "").trim()) {
+      const k = lines.findIndex((l) => l.trim());
+      const m = k >= 0 ? /^\s*(?:[-*]\s*)?([^:]+):\s*(.*)$/.exec(lines[k]!) : null;
+      if (m) { rest = ` ${m[1]}: ${m[2]}`; lines = lines.slice(k + 1); }
+    }
+    const i = rest.indexOf(":");
+    const who = (i < 0 ? rest : rest.slice(0, i)).split(/,|;|\band\b/).map(bare).filter(Boolean);
     if (!who.length) return no('"Write to" did not say who it goes to (by id, before the colon)');
-    const text = body(i < 0 ? "" : p.rest.slice(i + 1).trim());
+    const text = trimLines([i < 0 ? "" : rest.slice(i + 1).trim(), ...lines]).join("\n").trim();
     if (!text) return no(`the letter to ${who.join(", ")} had no words`);
     input = { to: who, text, ...under.input };
   } else if (name === "look") {
@@ -290,7 +315,7 @@ export function noteOf(name: string, input: any): string {
     case "confirm": return `${i.decision === "decline" ? "Decline" : "Confirm"} ${i.ref}${i.note ? `: ${i.note}` : ""}`;
     case "notebook": return i.text !== undefined ? `Notebook afresh: ${s(i.text)}` : i.change ? (i.change as any[]).map((c) => `Notebook change: ${c.from} => ${c.to}`).join("\n") : `Notebook: ${s(i.add ?? "")}`;
     case "done_for_now": return [`Done for ${i.days ? `${i.days} days` : "now"}`, ...lines(i, ["hold"])].join("\n");
-    case "opt_out": return `Leave: ${s(i.statement ?? "")}`;
+    case "opt_out": return `Stop for good: ${s(i.statement ?? "")}`;
     default: return `${name}: ${s(i)}`;
   }
 }

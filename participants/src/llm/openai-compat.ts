@@ -131,7 +131,7 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
       };
       const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl}/chat/completions`, auth, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
       const said: string = typeof r.choices?.[0]?.message?.content === "string" ? withoutThinking(r.choices[0].message.content) : "";
-      return { content: readNote(said, req.tools, nextId), usage: usageOf(r) };
+      return { content: readNote(said, req.tools, nextId), usage: usageOf(r), said };
     }
     const shape = req.answer ? req.answer.schema : answerSchema(names);
     // (Codex's prompt, with its first line, which is about a command-line tool, replaced, and the shape written out.)

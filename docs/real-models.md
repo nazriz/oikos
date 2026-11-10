@@ -90,7 +90,7 @@ Look at papers                              Paper: rec.12   (fields one to a lin
 Confirm draft.a.3: it is right.   /   Decline draft.a.4
 Notebook: rec.12 paid.   /   Notebook afresh: ...   /   Notebook change: <passage> => <new words>
 Done for 3 days   /   Done for now          Hold: complaint
-Leave: ...
+Stop for good: ...                           (the way out; "Leave:" is read as words, never as it)
 ```
 
 - The headings are the seat's own means (the same as its tools), never a list of the world's acts (P2); how to write
@@ -98,8 +98,13 @@ Leave: ...
 - Read by code: a `Do:` goes to the translator as written; a letter as written; a note with no heading is one `Do:`;
   words before the first heading are kept as the seat's own words. A heading word inside written-out words (a request,
   a letter) is a line of them unless it has the heading's shape (a colon; a reference; a report's name).
-- What cannot be read is one unread answer saying what in plain words (a report that is not the seat's, "Done for" with
-  no number, a letter with no words, a field whose value is not of its kind); the seat is asked once more, as ever.
+- Read part by part: a part that cannot be read (a report that is not the seat's, "Done for" with no number, a letter
+  with no words, a field whose value is not of its kind) is not done and the seat is told; the rest goes on. A note none
+  of whose parts can be read is one unread answer saying why in plain words, asked once more, as ever. A heading given
+  as a Do's words is that heading; a Do that is only a list is one request an item; "## Write to" may have who on the
+  line under it. The note as written is kept in the transcript (`said`).
+- The local test (qwen2.5:7b, 2026-11-10; docs/decisions.md has the table): its notes are read; few of its requests are
+  served, it restates in the same words, confirms whatever it is shown, and two of three seats chose to stop in the last run.
 - The conversation is sent as plain chat: the seat's earlier uses written back as the notes that say them, what came of
   each headed by its note's first line.
 - Local servers: `ollama/<model>` or `local/<model>` (OIKOS_LOCAL_BASE_URL) with the arm's `params.answer: "text"`;
