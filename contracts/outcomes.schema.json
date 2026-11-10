@@ -145,6 +145,7 @@
         "form": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label" },
         "office": { "description": "The office (a position) whose form it is, where it is one office's and not its whole organisation's: a direction that office takes. A call names such a form's office as its `to`.", "$ref": "#/$defs/Id" },
         "writes": { "description": "For a paper of the office's own: how it is written from the fields. Without it, the fields are the statement's data, it is addressed to `submit_to`, and it cites the form.", "$ref": "#/$defs/FormWrites" },
+        "copies": { "description": "For a form that sends a signed copy as it stands (an assistant's `send_signed`): \"=name\", the field naming a sign-off that carries the paper signed (`data.paper`: kind, text, to, visible, data, basis). The paper is published exactly as signed, in the name of whoever it is made for; nothing of it is written from the fields. Both resolvers, held to contracts/test/forms.json.", "type": "string", "pattern": "^=[a-z_][a-z0-9_]{0,31}$" },
         "submit_as": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label" },
         "submit_to": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Id" } },
         "fields": {

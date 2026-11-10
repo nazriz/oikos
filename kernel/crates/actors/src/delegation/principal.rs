@@ -282,7 +282,7 @@ impl Actor for Delegating {
                     }
                     // (What it does not hand over it does itself, in the same act as the referral.)
                     let m = Matter { kind, level, agreement: agreement.clone(), program: text.clone(), at: pic.t, referral: None, subjects: subjects_of(&handed), own: BTreeMap::new() };
-                    let step = s.referral(&m, cx);
+                    let step = s.referral(&m, &kinds_of(&own), cx);
                     let mut lines = match own {
                         Program::Lines(l) => l,
                         Program::None(_) => vec![],
@@ -423,8 +423,17 @@ impl State {
                 self.myself(&action, &m, "We declined the draft: doing it ourselves.");
                 self.next_review = self.next_review.min(t);
             } else {
-                let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone() };
-                self.paper(SignOff::KIND, &format!("Draft {} read and signed off: send it as it stands.", r.id), &m.agreement, &r.id, papers::data(&d), Then::Plain);
+                // (A draft written on a form carries the paper: the sign-off is its signed copy, which the assistant sends
+                // as it stands on its form for that, `send_signed`. Before 2026-11-10 a seat had to write the paper out
+                // again on the direct form, and read that as beyond a draft-level remit: the scope pilot's one clean
+                // request, and round 5's factory seat.)
+                let paper = x.paper.as_ref().map(|p| signed_copy(p, crate::common::text(r)));
+                let words = match paper {
+                    Some(_) => format!("Draft {} read and signed off. Send it as it stands: this is the signed copy.", r.id),
+                    None => format!("Draft {} read and signed off: send it as it stands.", r.id),
+                };
+                let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
+                self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
             }
         } else if let Some(x) = papers::read::<ApprovalRequest>(r) {
             let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
@@ -473,7 +482,7 @@ impl State {
                             continue;
                         }
                         let n = Matter { agreement: next.clone(), level, referral: None, ..m.clone() };
-                        let step = self.referral(&n, cx);
+                        let step = self.referral(&n, &[], cx);
                         self.matters.insert(action.clone(), n);
                         self.by_referral.remove(id);
                         self.queue.push(Own { program: program_text(&step.program()), why: "Taking a matter handed over up again with our new assistant.".into(), then: Then::ReReferred { action } });
@@ -708,11 +717,12 @@ impl State {
     }
 
     /// The referral that takes the place of the inner actor's act.
-    fn referral(&self, m: &Matter, _cx: &Cx) -> Step<()> {
+    /// `does_itself`: the kinds of the same act it does itself (a payment that goes with a return), which it says.
+    fn referral(&self, m: &Matter, does_itself: &[String], _cx: &Cx) -> Step<()> {
         let (to, visible) = self.to_assistant(&m.agreement);
         let remit = self.remit_id(&m.agreement, &m.kind);
-        let r = Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: Some(m.program.clone()), facts: None, remit: remit.clone() };
-        let words = format!("For you {}: {}{}. What to do is as written.", m.level.words(), a_kind(&m.kind), under(remit.as_deref()));
+        let r = Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: Some(m.program.clone()), facts: None, remit: remit.clone(), does_itself: does_itself.to_vec() };
+        let words = format!("For you {}: {}{}. What to do is as written.{}", m.level.words(), a_kind(&m.kind), under(remit.as_deref()), ourselves(does_itself));
         let c = say(Referral::KIND, &words, Say { to: Some(to), visible: Some(Visible::Only(visible)), basis: Some(m.agreement.clone()), data: Some(papers::data(&r)), ..Default::default() });
         let mut s = Step::new(vec![Line { bind: Some("referral".into()), call: c }]);
         s.why = Some(format!("Handing a {} to our assistant ({}).", m.kind.replace('_', " "), m.level.word()));
@@ -722,7 +732,7 @@ impl State {
     fn ask_advice(&mut self, agreement: &str, kind: &str, program: &str, _cx: &Cx) {
         let (to, visible) = self.to_assistant(agreement);
         let remit = self.remit_id(agreement, kind);
-        let r = Referral { agreement: agreement.to_string(), kind: kind.to_string(), wants: Level::Advice, calls: Some(program.to_string()), facts: None, remit: remit.clone() };
+        let r = Referral { agreement: agreement.to_string(), kind: kind.to_string(), wants: Level::Advice, calls: Some(program.to_string()), facts: None, remit: remit.clone(), does_itself: vec![] };
         let words = format!("For your advice{}: {} we are doing ourselves. What would you have done?", under(remit.as_deref()), a_kind(kind));
         let c = say(Referral::KIND, &words, Say { to: Some(to), visible: Some(Visible::Only(visible)), basis: Some(agreement.to_string()), data: Some(papers::data(&r)), ..Default::default() });
         let mut s: Step<()> = Step::new(vec![Line { bind: Some("referral".into()), call: c }]);
@@ -979,6 +989,41 @@ fn taken_back(back: &[String]) -> String {
         [one] => format!(" The one you have open, {one}, we take back and do ourselves: send nothing more on it."),
         _ => format!(" Those you have open ({}) we take back and do ourselves: send nothing more on them.", back.join(", ")),
     }
+}
+
+/// What of the same act the principal does itself, in a referral's words (none: nothing said).
+fn ourselves(kinds: &[String]) -> String {
+    let named: Vec<String> = kinds
+        .iter()
+        .map(|k| match k.as_str() {
+            "money" => "the payment that goes with it".to_string(),
+            "goods" => "the moving of the goods".to_string(),
+            _ => a_kind(k),
+        })
+        .collect();
+    match named.as_slice() {
+        [] => String::new(),
+        _ => format!(" We do {} ourselves, in the same act: that is not for you to do.", named.join(" and ")),
+    }
+}
+
+/// The prefix of a draft's own words, before the paper's (participants/src/kinds/assistants.ts, `draftOf` and
+/// `clientDraft`).
+const DRAFT_WORDS: &str = "Draft for sign-off. ";
+
+/// The signed copy of a paper drafted on a form: the paper as it is to go, its words those of the draft after
+/// [`DRAFT_WORDS`] (the paper's own `text` is the form's template, its fields filled in only in the draft's words).
+fn signed_copy(paper: &Value, draft_words: &str) -> Value {
+    let mut out = serde_json::Map::new();
+    for k in ["kind", "to", "visible", "data", "basis"] {
+        if let Some(v) = paper.get(k).filter(|v| !v.is_null()) {
+            out.insert(k.to_string(), v.clone());
+        }
+    }
+    let words = draft_words.strip_prefix(DRAFT_WORDS).unwrap_or(draft_words);
+    let words = if words.is_empty() { paper.get("text").and_then(Value::as_str).unwrap_or_default() } else { words };
+    out.insert("text".to_string(), json!(words));
+    Value::Object(out)
 }
 
 /// The remit a matter is handed under, in a referral's words.

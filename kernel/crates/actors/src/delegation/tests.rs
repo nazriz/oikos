@@ -140,6 +140,7 @@ fn what_is_not_handed_over_is_done_by_the_principal_in_the_same_act_as_the_refer
     let sent = h.sent.iter().rev().find(|p| p.contains("kind=referral")).unwrap();
     let calls = sent.split("\"calls\":\"").nth(1).and_then(|x| x.split("\",\"kind\"").next()).unwrap_or_default();
     assert!(calls.contains("notice_to_vacate") && !calls.contains("acc-tribunal"), "the notice is handed over, the payment is not: {calls}");
+    assert!(sent.contains("\"does_itself\":[\"money\"]") && sent.contains("We do the payment that goes with it ourselves"), "and the assistant is told the payment is not its to make (the scope pilot's W5): {sent}");
 }
 
 #[test]
@@ -169,9 +170,14 @@ fn a_draft_on_a_form_is_read_by_the_paper_it_would_send() {
     assert!(out.contains("kind=declined"), "to someone else: not what was asked: {out}");
     h.wake(36 * DAY + 3600, world(vec![]));
     let referral = last_referral(&h);
-    let same = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "notice_to_vacate", "text": "Please go.", "to": ["t1"] } }));
+    let mut same = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "notice_to_vacate", "text": "Please {go}.", "to": ["t1"], "basis": "lease-1" } }));
+    same["text"] = json!("Draft for sign-off. Please go.");
     let out = all(&h.wake(37 * DAY + 3600, world(vec![same])));
     assert!(out.contains("kind=sign_off"), "the same paper to the same tenant, in its own words: signed off: {out}");
+    // (The sign-off is the signed copy, as it is to go, in the draft's own words: what its assistant sends as it stands.)
+    let line = out.lines().find(|l| l.contains("kind=sign_off")).unwrap_or_default();
+    let copy = line.split("\"paper\":").nth(1).unwrap_or_default();
+    assert!(["\"basis\":\"lease-1\"", "\"kind\":\"notice_to_vacate\"", "\"text\":\"Please go.\"", "\"to\":[\"t1\"]"].iter().all(|x| copy.contains(x)), "the signed copy: {line}");
 }
 
 #[test]

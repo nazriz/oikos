@@ -194,7 +194,7 @@ const assistantChannels = (also: string[] = []) => [
   K.mine("terms", ASSISTANT_TERMS, { title: "The service you work under: its delivery, briefs and remits" }),
   K.mine("matters", ASSISTANT_MATTERS, { title: "Matters handed to you, and the answers to what you asked" }),
   K.mine("file", [...new Set([...ASSISTANT_SEES, ...ASSISTANT_PAPERS, ...also])], { title: "Your file: the matters handed to you, your papers on them and what you sent, looked up on request (look, with what to find)", on_request: true }),
-  K.board("laws", ["law", "charter"], { title: "The town's laws and charter, published: looked up on request (look, with what to find), for the law a matter rests on" }),
+  K.board("laws", ["law", "charter", "payment_details"], { title: "The town's laws and charter, and where what they charge is paid, published: looked up on request (look, with what to find), for the law a matter rests on" }),
   K.lookUp("who", { title: WHO }),
 ];
 
@@ -526,7 +526,9 @@ export function stationeryForm(office: string, entity: string, x: Issued, own: {
   const whose = holder ? `Filled in by the ${holder.charAt(0).toLowerCase()}${holder.slice(1)}, of the office's own accord (nobody's direction or leave is needed)` : "A paper of the office's own";
   return { id: `form-${office}-${x.form}`.replace(/_/g, "-"), record: "statement", author: "genesis", at: 0, visible_to: [entity], speaks_for: entity, kind: "form",
     text: `${x.title}. ${x.does ? `${x.does} ` : ""}${sent ? `${sent} ` : ""}${whose}: filled in, it is issued as the form sets it out.`,
-    data: { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: x.fields,
+    // (A form that sends a signed copy writes nothing from its fields: the copy is the paper.)
+    data: x.copies ? { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: x.fields, copies: x.copies }
+      : { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: x.fields,
       writes: { ...writes, text: writes.text.replace(/\{@([a-z_][a-z0-9_]*)\}/g, (_, name: string) => String(own[name] ?? "")) } } };
 }
 
@@ -2425,6 +2427,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     text: `Tax on pay. ${chargesInWords(taxLaw.charges, V.currency, payees(taxLaw.charges))}. ${withholdingInWords({ period_days: V.pay_period_days, work_days: WORK_DAYS })} ${returnsInWords(taxLaw)}${taxLaw.charges.some((c) => c.itemised) ? " A charge reported worker by worker is reported naming each worker and their pay in the period." : ""}`,
     adico: { attribute: "employers", deontic: "must", aim: "withhold income tax from each pay and report and pay it over", condition: "on the days the returns fall due" },
     data: { tax: "income", charges: taxLaw.charges, returns: returnsOf(taxLaw) } });
+  // Where the tax on pay is paid, as a collector publishes its payment details (the scope pilot's W5: an assistant filing a
+  // return could not find the account the tax goes into; the law names the payee, not the account). Published, read by
+  // asking to be paid (a money outcome with no payer). Only in a town with providers of assistants for now: in every town
+  // it would move every town's hash, so it goes there with the next change that moves them all (docs/decisions.md,
+  // 2026-11-10, "Handing over H1").
+  if (AS && taxLaw.charges.length) for (const account of [...new Set(taxLaw.charges.filter((c) => c.collector === "outside").map((c) => c.account))].sort())
+    records.push({ id: `payment-details-${account}`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "payment_details", basis: taxLaw.id,
+      text: `Payment details: tax on pay owed to ${payeeName(account)} under ${taxLaw.id} is paid into account ${account}.`,
+      data: { law: taxLaw.id, outcome: { money: { to: account, for: "tax on pay" } } } });
   // The support law (the outside world's, as the income tax is): the payments, published for anyone to read; the
   // payments office applies it, and people claim under it.
   if (PAYMENTS.length) records.push({ id: "law-support", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
@@ -3456,7 +3467,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const kinds = [...issued].filter((k) => takes.has(k)).sort();
       if (!m || !kinds.length || pos.entity === "outside" || !accounts.some((a) => a.id === `acc-${pos.entity}`)) continue;
       const post = `${pos.id}-assistant`;
-      positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: assistantChannels(kinds) });
+      // (The account it pays from and its keeper: the organisation's own, so its post may be shown it. Before 2026-11-10 a
+      // seat could not name the bank to ask it to pay from it: "You don't know who keeps account acc-factory-1".)
+      positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: [...assistantChannels(kinds), { id: "account", kind: "accounts" }] });
       assistantPosts.push({ post, entity: pos.entity, code: m.code, kinds });
       Object.assign(m.params, { delegation: { post, account: `acc-${pos.entity}`, hour_value: hourValue,
         kinds: Object.fromEntries(kinds.map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost }])),

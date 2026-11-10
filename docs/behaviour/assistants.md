@@ -142,6 +142,31 @@ time, as every office has. Before, the matters were set out whole at every sitti
 its seats asked to check what they had been handed, and whether a paper had gone, and could not; and the collector of the
 tax on pay, which a referral names only by its id (`outside`), could not be named on a form.
 
+**Sending what was signed off** (2026-11-10). A code principal that signs off a draft written on a form sends back the
+signed copy: the paper as it is to go (its kind, words, addressees, who sees it, its data and what it cites), in the
+sign-off itself. Its assistant sends it on its form `send_signed`, naming the sign-off: the paper goes exactly as
+signed, in the name of whom it works for (for a client, `for` them), and nothing of it can be written differently; to
+change anything, it drafts again for sign-off (contracts: FormData `copies`, held by both resolvers to
+`contracts/test/forms.json`). Before, a seat at `draft` had to write the paper out again on the principal's direct form,
+and read that as beyond its remit: the pilot's one request with no world fault (round 2), and round 5's factory seat.
+A draft of calls (the code assistant's) carries no paper, and the code assistant sends its calls, as before.
+
+**What the principal does itself, said** (2026-11-10). Where a matter comes in an act part of which the principal does
+itself (the payment that goes with a return of tax withheld, the moving of goods with an invoice), the referral says so
+in words and names those kinds (`does_itself`): "We do the payment that goes with it ourselves, in the same act: that
+is not for you to do." Before, a finance office's seat filing a return asked for the account and the authority to pay
+it (the scope pilot's W5), when the office was paying it already.
+
+**The account it pays from, and where tax is paid** (2026-11-10). An organisation's assistant post is shown the
+organisation's accounts and who keeps them (an `accounts` channel: the organisation's own, so nothing here is a god's
+view): a seat could not name the bank to ask it to pay ("You don't know who keeps account acc-factory-1"). Whether the
+bank acts on what that post writes is the bank's rule, as for any post: where the account holder has named signatories
+(the town's mandate names its finance officer alone), an instruction from any other post is declined, and the
+principal adds its assistant's post only by a new mandate of its own (docs/behaviour/bank-payment-system.md). The tax
+collector publishes where the tax on pay is paid (`payment_details`, on the laws board an assistant looks into): the
+law names the payee, not the account. **Only in a town with providers for now**: published in every town it would move
+every town's hash, so it goes there with the next change that moves them all.
+
 **In-house for an organisation.** An organisation's assistant is the system delivered to it, in its own post: the
 principal's papers to it (brief, remits, referrals, sign-offs, go-aheads) are addressed to the organisation itself and
 seen by it alone, and so are the system's own papers back. The provider runs the system, but its other systems are not

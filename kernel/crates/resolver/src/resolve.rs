@@ -1446,6 +1446,29 @@ impl Resolver<'_> {
         if !missing.is_empty() {
             return ask(format!("The {form_name} needs: {}.", missing.join(", ")));
         }
+        // A signed copy sent as it stands (contracts: FormData `copies`): the paper the named sign-off carries, in the name
+        // of whoever it is made for. Nothing of it is written again, so nothing of it can differ from what was signed.
+        if let Some(field) = spec["copies"].as_str().and_then(|x| x.strip_prefix('=')) {
+            let me = self.id(c, "for")?.unwrap_or_else(|| self.me.clone());
+            let id = data.get(field).and_then(Json::as_str).unwrap_or_default().to_string();
+            let Some(paper) = self.k.signed.get(id.as_str()) else {
+                return ask(format!("You have no signed copy on file as {id}: name the sign-off that came back with the paper signed."));
+            };
+            let mut block = Map::new();
+            block.insert("block".into(), json!("publish"));
+            block.insert("kind".into(), paper["kind"].clone());
+            block.insert("text".into(), json!(slice16(paper["text"].as_str().unwrap_or_default(), 16384)));
+            for (from, to) in [("to", "addressed_to"), ("data", "data"), ("visible", "visible_to"), ("basis", "basis")] {
+                if let Some(v) = paper.get(from).filter(|v| !v.is_null()) {
+                    block.insert(to.into(), v.clone());
+                }
+            }
+            block.insert("speaks_for".into(), json!(me));
+            if let Some(r) = bind {
+                block.insert("ref".into(), json!(r));
+            }
+            return Ok(vec![Json::Object(block)]);
+        }
         // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement
         // the rest of the world reads. It does not cite the form.
         if spec["writes"].is_object() {

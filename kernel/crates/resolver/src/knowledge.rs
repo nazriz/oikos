@@ -170,6 +170,10 @@ pub struct Knowledge {
     pub lots: Lots,
     /// Forms seen, by id (their statement records; shared likewise).
     pub forms: BTreeMap<Arc<str>, Arc<Value>>,
+    /// Signed copies seen: a sign-off's id -> the paper it signed, as it is to go (`kind`, `text`, `to`, `visible`,
+    /// `data`, `basis`). What a form that sends a signed copy (`copies`) sends.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub signed: BTreeMap<Arc<str>, Arc<Value>>,
     /// Statements seen that are addressed to someone: who each is addressed to (whoever acts on it). What a hold on
     /// one is addressed to.
     pub addressed: Addressed,
@@ -271,6 +275,8 @@ pub struct RecordFacts {
     form: Option<(Arc<str>, Arc<Value>)>,
     /// A lot: its id, and its cells.
     lot: Option<(Arc<str>, Arc<[String]>)>,
+    /// A sign-off that carries the paper it signed: its id, and the paper.
+    signed: Option<(Arc<str>, Arc<Value>)>,
     /// Someone asking to be paid names where the money should go: who, and the account.
     stated: Option<(String, String)>,
     /// A statement addressed to someone: its id, and who it is addressed to.
@@ -323,6 +329,7 @@ impl RecordFacts {
                 }
             }
             match s(&r["kind"]) {
+                Some("sign_off") if r["data"]["paper"].is_object() => facts.signed = Some((id, Arc::new(r["data"]["paper"].clone()))),
                 Some("form") => facts.form = Some((id, Arc::new(r.clone()))),
                 Some("lot") => {
                     if let Some(cells) = r["data"]["cells"].as_array() {
@@ -393,7 +400,7 @@ impl Registers {
     /// The map a seat that knows of no lot makes of this list, if every record in it is a lot and nothing more
     /// (learning them one by one from nothing gives exactly this map: each lot's cells, the last said of each).
     fn of(&mut self, list: &[Arc<RecordFacts>]) -> Option<Lots> {
-        if list.len() < A_REGISTER || !list.iter().all(|f| f.lot.is_some() && f.withdraws.is_none() && f.declares.is_none() && f.form.is_none() && f.stated.is_none() && f.addressed.is_none() && f.routines.is_empty()) {
+        if list.len() < A_REGISTER || !list.iter().all(|f| f.lot.is_some() && f.withdraws.is_none() && f.declares.is_none() && f.form.is_none() && f.signed.is_none() && f.stated.is_none() && f.addressed.is_none() && f.routines.is_empty()) {
             return None;
         }
         if let Some((_, lots)) = self.lists.iter().find(|(known, _)| known.len() == list.len() && known.iter().zip(list).all(|(a, b)| Arc::ptr_eq(a, b))) {
@@ -676,6 +683,9 @@ impl Knowledge {
         }
         if let Some((id, cells)) = &facts.lot {
             self.lots.insert(id.clone(), cells.clone());
+        }
+        if let Some((id, paper)) = &facts.signed {
+            self.signed.insert(id.clone(), paper.clone());
         }
         if let Some((who, to)) = &facts.stated {
             self.stated.entry(who.clone()).or_default().insert(to.clone());

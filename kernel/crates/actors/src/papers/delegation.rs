@@ -220,6 +220,11 @@ pub struct Referral {
     /// given under (the scope pilot's desk, which took its post a month after its clients' remits, could not find them).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub remit: Option<String>,
+    /// The kinds of the same act the principal does itself (a payment that goes with a return): told, so that its
+    /// assistant knows what is not its to do (the scope pilot's W5: a seat asked for the means to pay what its principal
+    /// was paying already).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub does_itself: Vec<String>,
 }
 impl Paper for Referral {
     const KIND: &'static str = "referral";
@@ -283,6 +288,11 @@ impl Paper for Draft {
 pub struct SignOff {
     pub draft: String,
     pub referral: String,
+    /// The paper signed, as it is to go (`kind`, `text`, `to`, `visible`, `data`, `basis`), where the draft carried one
+    /// written on a form: the signed copy its assistant sends as it stands (the form `send_signed`). A draft of calls
+    /// (the code assistant's) carries none: it sends its calls.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paper: Option<Value>,
 }
 impl Paper for SignOff {
     const KIND: &'static str = "sign_off";
