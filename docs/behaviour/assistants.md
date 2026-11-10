@@ -427,6 +427,13 @@ person sends their own unmatched paper again as it was; the code assistant sends
 lacks an item, or wants an authority, as not done with what would clear it (`Report.needs`). A model at a desk sends a
 returned paper again on its form `send_again`.
 
+**An authority on file (O1, 2026-11-11).** At the same levels the lender and the support office act on a loan
+application or a benefit claim sent for a person from someone else's post only once that person has given them an
+authority naming the post, and their clerk has recorded it. The desk's code reports such a paper not done, naming the
+authority; the person's code gives it, once for each body and post, where it keeps that kind with the desk; once the
+body records it (telling the person and the post), the desk sends the paper again. A model at the desk may ask its
+client for the one authority on its request form (`authority`: the body).
+
 ## Leaves out (for now)
 
 - A local provider (a firm of the town with premises): providers are the outside world's until a profile asks for one.

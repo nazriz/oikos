@@ -783,7 +783,7 @@ impl Support {
         for c in waiting {
             let Some(who) = c.speaks_for.clone() else { continue };
             // (One that falls short of what we publish we need goes back, saying what is missing.)
-            if let Some((why, call)) = crate::common::intake::check(&self.book, &self.me, &self.requires, &c, cx) {
+            if let Some((why, call)) = self.intake.take(&self.book, &self.me, &self.requires, &c, cx) {
                 self.decided.insert(c.id.to_string());
                 steps.push(because(why, vec![call]));
                 continue;
@@ -808,6 +808,7 @@ impl Support {
                 }
             }
             self.decided.insert(c.id.to_string());
+            self.intake.done(c.id.as_str());
             self.decided_on.entry(c.id.to_string()).or_default().push(t);
             if matches!(&wait, Some((Wait::Lapsed(_), _))) {
                 self.lapsed_claims.insert(c.id.to_string());

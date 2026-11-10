@@ -212,7 +212,12 @@ const OBSTACLE_ITEMS: Record<string, { field: string; says: string }[]> = {
 };
 // (How often a body's clerk wrongly sends back a paper in order, by obstacle level, WRONG_RETURN_BPS, is in the registry.)
 /** A body's requirements at an obstacle level, as its `requires` parameter (none at level 0). */
-const obstacleRequires = (level: number, kinds: string[]) => (level > 0 ? { requires: { items: Object.fromEntries(kinds.filter((k) => OBSTACLE_ITEMS[k]).map((k) => [k, OBSTACLE_ITEMS[k]])), basis: "docs/design/obstacles.md, O4: the items its form asks for (to confirm against the place's forms)." } } : {});
+/** The kinds a body acts on for a person only on their own word or an authority they gave it (docs/design/obstacles.md,
+ * O1), at levels 1 and 2. Basis: a support agency acts for someone else only under a nominee or similar arrangement the
+ * claimant lodges on its form; a lender takes an application through a broker only with the applicant's consent (the
+ * place's agency and lenders, to confirm). What such a body is, not a place's figure. */
+const AUTHORITY_KINDS = ["loan_application", "benefit_claim"];
+const obstacleRequires = (level: number, kinds: string[]) => (level > 0 ? { requires: { items: Object.fromEntries(kinds.filter((k) => OBSTACLE_ITEMS[k]).map((k) => [k, OBSTACLE_ITEMS[k]])), authority: kinds.filter((k) => AUTHORITY_KINDS.includes(k)), basis: "docs/design/obstacles.md, O4 and O1: the items its form asks for, and the papers it acts on for someone else only with their authority (to confirm against the place's forms)." } } : {});
 /** The channels an assistant's post gains where obstacle laws are on: what the bodies it writes to publish they require, as
  * it comes; papers sent back to it, and authorities recorded for its clients. */
 const obstacleChannels = (level: number) => (level > 0 ? [K.published("requirements", ["requirements"], { title: "What the bodies you write to need on the papers sent to them, as each publishes it" }), K.mine("returned", ["paper_returned", "authority_recorded"], { title: "Papers sent back to you, saying what is missing" })] : []);

@@ -986,6 +986,24 @@ impl State {
             words.push("We do not change what your post is shown on request. Name the record you need and we will send a copy, if it is ours.".into());
             parts.push(Part { asked: "access".into(), granted: false, why: Why::NotChanged });
         }
+        // An authority with a body, for the assistant's post (docs/design/obstacles.md, O1): given for the kinds asked, or
+        // the matter's, where it keeps them with the assistant; a paper of its own to the body, in its own time.
+        if let Some(with) = x.authority.clone().filter(|w| !w.trim().is_empty()) {
+            let kinds: Vec<String> = kind.clone().into_iter().filter(|k| hands_over(self.remit(&x.agreement, k))).collect();
+            let post = r.position.as_deref().map(String::from);
+            let why = match post.filter(|_| !kinds.is_empty()) {
+                Some(post) => {
+                    self.lodge(&with, &post, &kinds, id);
+                    words.push(format!("We are giving {with} our authority for you in {}.", kinds.iter().map(|k| plural(&k.replace('_', " "))).collect::<Vec<_>>().join(" and ")));
+                    Why::Lodged
+                }
+                None => {
+                    words.push(format!("We give {with} no authority for you: name a kind of matter we hand you, or the matter it is for."));
+                    Why::NotLodged
+                }
+            };
+            parts.push(Part { asked: "authority".into(), granted: why == Why::Lodged, why });
+        }
         if x.limit.is_some() {
             let set = self.book.all(Brief::KIND).filter_map(|b| papers::read::<Brief>(b)).filter(|b| b.agreement == x.agreement).filter_map(|b| b.limit).last();
             let why = match set {
@@ -1005,7 +1023,7 @@ impl State {
             parts.push(Part { asked: "words".into(), granted: false, why: Why::NothingNamed });
         }
         // (Granted: a new remit, or a copy sent. A level it holds already is no grant.)
-        let granted = remit.is_some() || copy.is_some();
+        let granted = remit.is_some() || copy.is_some() || parts.iter().any(|p| p.why == Why::Lodged);
         if let Some(p) = parts.iter_mut().find(|p| p.asked == "level" && p.why == Why::Granted) {
             p.granted = remit.is_some();
         }

@@ -906,3 +906,6 @@ unchanged to the byte.
   to the giver and the posts named). The modules' parameter `requires` (bank.lending, world.transfers). FormData
   `copies` reads a paper sent back as it reads a sign-off (both resolvers; `contracts/test/forms.json`); the form
   `send_again`. The world spec's `obstacles` (0, 1, 2; generator only). Rows of the table of slips `accept/<kind>`.
+- **B3, an authority on file (O1):** at levels 1 and 2 a body's `requires.authority` names the kinds it acts on for a
+  person only on their own word or an authority they gave it. `ScopeRequest.authority` reaches the request form (one
+  plain blank: the body); the principal answers it by giving the authority, `reasons` `lodged` or `not_lodged`.

@@ -529,6 +529,10 @@ pub enum Why {
     OverLimit,
     /// The request named nothing the principal can act on (a kind and a level, a record, a limit).
     NothingNamed,
+    /// An authority given to the body named, for the assistant's post (docs/design/obstacles.md, O1).
+    Lodged,
+    /// No authority given: the kind is not one the principal keeps with the assistant.
+    NotLodged,
 }
 
 /// One part of a request for more scope, and what the principal made of it.

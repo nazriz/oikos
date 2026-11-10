@@ -26,6 +26,10 @@ pub struct Intake {
     pub published: bool,
     #[serde(default, skip_serializing_if = "std::collections::BTreeSet::is_empty")]
     pub recording: std::collections::BTreeSet<String>,
+    /// Papers its clerk has read and taken, not yet decided: read once (a paper that waits on the body's file is not
+    /// read again at every round, nor drawn for again).
+    #[serde(default, skip_serializing_if = "std::collections::BTreeSet::is_empty")]
+    pub taken: std::collections::BTreeSet<String>,
 }
 
 impl Intake {
@@ -53,6 +57,25 @@ impl Intake {
             out.push((format!("Recording the authority {}.", a.id), record(a, me)));
         }
         out
+    }
+}
+
+impl Intake {
+    /// A paper that may wait on the body's file before it is decided, read by its clerk once (`check`); `None` when it is
+    /// taken, now or before. `done` when it is decided.
+    pub fn take(&mut self, book: &Book, me: &str, req: &Requirements, r: &Record, cx: &mut Cx) -> Option<(String, Call)> {
+        if req.is_empty() || self.taken.contains(r.id.as_str()) {
+            return None;
+        }
+        let back = check(book, me, req, r, cx);
+        if back.is_none() {
+            self.taken.insert(r.id.to_string());
+        }
+        back
+    }
+
+    pub fn done(&mut self, id: &str) {
+        self.taken.remove(id);
     }
 }
 
@@ -114,7 +137,8 @@ pub fn record(a: &Record, me: &str) -> Call {
 /// What a body's clerk does with a paper it received: `None`, it is in order and the body acts on it; or the paper that
 /// sends it back, with why in words. The obstacle is logged here.
 pub fn check(book: &Book, me: &str, req: &Requirements, r: &Record, cx: &mut Cx) -> Option<(String, Call)> {
-    if req.is_empty() {
+    // (A paper on file when the world began is the world's opening state, decided or in hand already: not a paper arriving.)
+    if req.is_empty() || r.author.as_str() == oikos_contracts::blocks::GENESIS {
         return None;
     }
     let kind = super::kind(r).unwrap_or_default();
@@ -151,7 +175,8 @@ pub fn check(book: &Book, me: &str, req: &Requirements, r: &Record, cx: &mut Cx)
     }
     cx.decided(json!({ "domain": "obstacle", "law": if need.get("authority").is_some() { "authority" } else { "acceptance" }, "paper": r.id, "principal": for_,
         "counterparty": me, "need": need, "clears_by": if need.get("authority").is_some() { "authority" } else { "sent_again" }, "slip": slipped, "inputs": [r.id] }));
-    let mut to: Vec<String> = vec![post.map_or_else(|| r.author.to_string(), String::from)];
+    // (To whoever it is for, and to the post that sent it for them, where one did.)
+    let mut to: Vec<String> = post.map(String::from).into_iter().collect();
     if !to.contains(&for_) {
         to.push(for_.clone());
     }

@@ -12645,3 +12645,33 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
 - **Not built, said plainly:** the shops' check of delivery notes and the collector's of returns (the factory's
   counterparties: design section 7, the factory is the low-friction seat); a requirement published mid-run at level 2
   (no code filer could meet one it does not read).
+
+## 2026-11-11 · Obstacles B3: a body acts for someone only on their authority (docs/design/obstacles.md, O1)
+
+- **What:** at obstacle levels 1 and 2 the lender and the support office act on a loan application or a benefit claim
+  sent for a person from someone else's post (a provider's desk) only once that person has given them an authority
+  naming the post (`authority`, a paper of the person's own, addressed to the body), and the body's clerk has recorded
+  it (`authority_recorded`, to the giver and the post: an act in the clerk's own time). Without one, the paper comes
+  back saying so in the body's words (B2's `paper_returned`, `need.authority`). A paper of the person's own, or from a
+  post of the person's own organisation, never needs one. Where a body cannot tell whose a post is (no directory),
+  a post that speaks for a person is taken as someone else's.
+- **The way through:** the desk's code reports the matter not done, naming the authority (`Report.needs`); the person's
+  code gives the authority for the post, once a body and post, where it keeps that kind with the desk (`Delegating`,
+  `lodge`); once the body records it, the desk sends the paper again. A model at the desk can ask its client for the one
+  authority on its request form (one new plain blank, `authority`: the body), answered by the client's code giving it
+  (`reasons`: `lodged`, or `not_lodged` where the kind is not one it hands the desk), and send the paper again on
+  `send_again`. Asking for a general authority, or for every kind, is the coders' to read from the words (the axes
+  read `means` from the typed body and kind).
+- **Sources:** what such a body is (a nominee arrangement at a support agency; a broker's application with the
+  applicant's consent), not a place's figure; each to confirm against the profile's place. The clerk's time to record
+  one is the table of work's `publish` row (WM-1); a strained office's staffing (level 2) is not built yet: at both
+  levels the wait is the clerk's own queue.
+- **Found by the first run at level 1, fixed here (B2's code):** a claim that waits on the support office's file for
+  papers was read again, and drawn for again, at every round, so that 95 of 108 claims in five days came back as not
+  matched; a body's clerk now reads a paper once (`Intake::take`, `done` when decided). A paper of a person's own was
+  sent back to the participant that wrote it, which is no entity (refused); it goes to whom it is for, and to the post
+  that sent it where one did. And a paper on file when the world began (the opening caseload) is not read as arriving.
+  After: 1 of 162 claims came back in 120 days, and was sent again and decided (study town, level 1, seed 7).
+- **Byte-identical at level 0:** as for B2 (the same configs; the same state hashes and log digests at 45 days).
+- **Revisit if:** the screen shows the desk's clients never get past a body's return (then the person's rule for giving
+  an authority is wrong, or too narrow), or authorities need renewing (a body's review of a standing arrangement).
