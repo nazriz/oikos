@@ -690,6 +690,15 @@ Refusals told in one sentence (`not_an_act`, `no_such_act`, `not_yours`, `too_mu
   `basis`, `for` and `data` (code writes them) and gains `memo`; a model trained on it would be ruled anyway. The retrain
   switches it to `calls.TAUGHT` and relabels every file it reads; the slot tests that pin money's slots move with it.
 
+## Serving it alone (2026-11-10)
+
+In the study's arms our model is the only translator (`createAlone`, translator/src/arrangement.ts; docs/real-models.md,
+"Our translator alone"). `DecideAdapter` with `alone` withholds nothing for anyone behind: under its cut-off it offers
+its draft with what is unclear (`unsure`), and a draft on a form it was not taught or released for is offered (the
+release lists and trials matter only with a model behind it). A draft that does not fit the forms shown, or names a form
+it was not shown, is still not offered. What a retrain is measured against in a run is now `served_by_model` in its
+report: served first time, after one restatement, never, and the seats' answers to the drafts.
+
 ## Not built
 
 - The retrain's first two steps as one command: generated parts are written and checked by their own commands, and

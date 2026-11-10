@@ -35,8 +35,10 @@ import { ModelSeat, waitingAdapter } from "./seat-host";
 import type { ExperimentSpec, SeatFactories, SeatFactory } from "./experiment";
 
 export interface SeatsSpec {
-  /** The translator: ours first (`decide/<model>`), the general one behind (a seat model's name). Absent: the arm's model alone. */
-  translator?: { first?: string; behind?: string; arrangement?: "then" | "beside" };
+  /** The translator: ours first (`decide/<model>`), the general one behind (a seat model's name). Absent: the arm's model
+   * alone. `alone`: ours (`first`) with no model behind it, for every arm (arrangement.ts, `createAlone`; the study's
+   * arms, Naz, 2026-11-10). */
+  translator?: { first?: string; behind?: string; arrangement?: "then" | "beside" | "alone" };
   /** What the seats are told of what the town is (default `unstated`); an arm may name its own. */
   framing?: FramingSpec;
   budget?: {
@@ -77,6 +79,9 @@ export const PLAN_PROVIDERS = new Set(["anthropic", "claude-code", "codex"]);
  * a monthly credit drawn per token, with top-ups by card). Seated only with `allow_paid_api`, the owner's go-ahead, and
  * always under a spending limit (USD) at the host's published prices. */
 const PAID = new Set(["openai", "openai-compat"]);
+/** A model on this machine (an OpenAI-compatible server: ollama, or llama-server as `local` with OIKOS_LOCAL_BASE_URL):
+ * free to call (its compute is the machine's), so seated without a key or a limit. */
+const LOCAL = new Set(["ollama", "local"]);
 
 export const mockModels = (spec: ExperimentSpec) => !!spec.seats?.mock_models || process.env.OIKOS_EXPERIMENT_MOCK_MODELS === "1";
 
@@ -88,7 +93,7 @@ export function modelProblems(spec: ExperimentSpec): string[] {
     const provider = m.split("/")[0]!;
     if (NEVER.test(m) && !(what.startsWith("arm ") && allowedSeat(spec, m))) out.push(`${what}: ${m} is never used here (the largest Claude model, Fable and gpt-6-astra are not${what.startsWith("arm ") ? ", unless seats.allow_models names it on the API's credit with the owner's word" : ""})`);
     if (PAID.has(provider) && !spec.seats?.allow_paid_api) out.push(`${what}: ${m} is a paid API; seats go through what the owner has (anthropic/, claude-code/, codex/) unless the owner's go-ahead sets seats.allow_paid_api`);
-    if (!PLAN_PROVIDERS.has(provider) && !PAID.has(provider) && provider !== "mock" && !(translator && provider === "decide")) out.push(`${what}: provider ${provider} is not one an experiment seats (anthropic, claude-code, codex${translator ? ", decide for our own translator" : ""})`);
+    if (!PLAN_PROVIDERS.has(provider) && !PAID.has(provider) && !LOCAL.has(provider) && provider !== "mock" && !(translator && provider === "decide")) out.push(`${what}: provider ${provider} is not one an experiment seats (anthropic, claude-code, codex, ollama, local${translator ? ", decide for our own translator" : ""})`);
   };
   for (const a of spec.arms) if (a.steward.kind === "model") check(`arm ${a.name}`, a.steward.model);
   // (A host that meters concurrency in units, a model's call costing its `concurrency_cost`: one worker's calls at once,
@@ -105,6 +110,7 @@ export function modelProblems(spec: ExperimentSpec): string[] {
   check("seats.translator.first", spec.seats?.translator?.first, true);
   check("seats.translator.behind", spec.seats?.translator?.behind);
   if (spec.seats?.translator?.first && !spec.seats.translator.first.startsWith("decide/")) out.push(`seats.translator.first is our own trained translator (decide/<model>), not ${spec.seats.translator.first}`);
+  if (spec.seats?.translator?.arrangement === "alone" && (!spec.seats.translator.first || spec.seats.translator.behind)) out.push("seats.translator alone is our own (first: decide/<model>) with nobody behind it: name first, and no behind");
   return out;
 }
 
@@ -151,8 +157,8 @@ export function budgetProblems(spec: ExperimentSpec): string[] {
     const priced = provider === "claude-code" ? prices[`anthropic/${m.split("/").slice(1).join("/").split("@")[0]}`] : prices[m];
     // (A flat-rate subscription's seat costs nothing a call, unless a priced translator drafts its requests.)
     const behind = spec.seats?.translator?.behind;
-    const free = provider === "codex" && (!behind || behind.startsWith("codex/") || behind.startsWith("decide/"));
-    if (provider !== "codex" && !priced) out.push(`arm ${a.name}: no published price for ${m} (orchestrator/prices.json)`);
+    const free = (provider === "codex" || LOCAL.has(provider)) && (!behind || behind.startsWith("codex/") || behind.startsWith("decide/") || LOCAL.has(behind.split("/")[0]!));
+    if (provider !== "codex" && !LOCAL.has(provider) && !priced) out.push(`arm ${a.name}: no published price for ${m} (orchestrator/prices.json)`);
     if (!free && limits[a.name] === undefined) out.push(`arm ${a.name}: ${m} costs money and has no spending limit (seats.budget: fork_usd, arm_usd or experiment_usd)`);
   }
   return out;
@@ -163,19 +169,19 @@ export function priceOf(model: string): Price {
   const table = { ...PRICES, ...priceTable() };
   const [provider, ...rest] = model.split("/");
   const name = rest.join("/");
-  if (provider === "codex" || provider === "decide") return { input: 0, output: 0, cache_read: 0, cache_write: 0 };
+  if (provider === "codex" || provider === "decide" || LOCAL.has(provider!)) return { input: 0, output: 0, cache_read: 0, cache_write: 0 };
   if (provider === "claude-code") return table[`anthropic/${name.split("@")[0]}`] ?? table[model]!;
   return table[model] ?? { input: 0, output: 0 };
 }
 
 // (One adapter of a model per process: our trained translator is a Python process, and a CLI's adapter keeps nothing.)
 const adapters = new Map<string, LlmAdapter>();
-function adapterFor(model: string, first = false, atOnce = 4): LlmAdapter {
-  const key = `${model}${first ? "#first" : ""}`;
+function adapterFor(model: string, first: boolean | "alone" = false, atOnce = 4, answer?: "tools" | "text"): LlmAdapter {
+  const key = `${model}${first ? `#${first === "alone" ? "alone" : "first"}` : ""}${answer ? `#${answer}` : ""}`;
   let a = adapters.get(key);
   if (!a) {
     // (No limit is given here: each fork's own is held by its seat's calls, below. A price is all chooseModel needs.)
-    const made = chooseModel(model, { budgetUsd: 0, first }).adapter;
+    const made = chooseModel(model, { budgetUsd: 0, ...(first === "alone" ? { alone: true } : first ? { first: true } : {}), ...(answer ? { answer } : {}), ...(process.env.OIKOS_LOCAL_BASE_URL && model.startsWith("local/") ? { baseUrl: process.env.OIKOS_LOCAL_BASE_URL } : {}) }).adapter;
     a = first ? made : atMost(made, gate(model.split("/")[0]!, atOnce));
     adapters.set(key, a);
   }
@@ -246,16 +252,20 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
     // (In a dry run the mock plays every model, priced as the model it plays, so the limits bite as they would. Each
     // attempt at a call is recorded, inside the wait for a shut window: a wait is a refused call, then another.)
     const atOnce = spec.seats?.calls_at_once ?? 4;
-    const seatAdapter = dry ? mockFor(a.model) : wait(rec.wrap(adapterFor(a.model, false, atOnce), a.model));
+    // (How a local model answers: its arm's `params.answer`, "text" for a plain note, else through tools.)
+    const answer = steward.params?.answer === "text" || steward.params?.answer === "tools" ? steward.params.answer as "text" | "tools" : undefined;
+    const seatAdapter = dry ? mockFor(a.model) : wait(rec.wrap(adapterFor(a.model, false, atOnce, answer), a.model));
     prices[`${seatAdapter.provider}/${seatAdapter.model}`] = priceOf(a.model);
     const t = spec.seats?.translator;
+    const alone = t?.arrangement === "alone";
     const behindName = t?.behind ?? a.model;
-    const behind = dry ? rec.wrap(mockFor(behindName), behindName) : wait(rec.wrap(adapterFor(behindName, false, atOnce), behindName));
-    prices[`${behind.provider}/${behind.model}`] = priceOf(behindName);
+    // (Ours alone: nobody behind it, so no adapter for one.)
+    const behind = alone ? undefined : dry ? rec.wrap(mockFor(behindName), behindName) : wait(rec.wrap(adapterFor(behindName, false, atOnce), behindName));
+    if (behind) prices[`${behind.provider}/${behind.model}`] = priceOf(behindName);
     let first: LlmAdapter | undefined;
     if (t?.first) {
       // (Our own translator answers in the dry run too: it calls no model, and a dry run is the arrangement as it will run.)
-      first = rec.wrap(adapterFor(t.first, true), t.first);
+      first = rec.wrap(adapterFor(t.first, alone ? "alone" : true), t.first);
       prices[`${first.provider}/${first.model}`] = priceOf(t.first);
     }
     if (dry && t?.first && !process.env.OIKOS_TRANSLATOR_MODELS) throw new Error(`seats.translator.first ${t.first}: set OIKOS_TRANSLATOR_MODELS to the folder of trained models`);
@@ -263,7 +273,7 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
     if (!existsSync(a.dir)) mkdirSync(a.dir, { recursive: true });
     const seat = new ModelSeat({
       world: a.world, config, seat: a.seat, post: a.post, seed: a.seed, model: a.model, adapter: seatAdapter,
-      translator: { behind, ...(first ? { first, arrangement: t?.arrangement ?? "then" } : {}) }, prices,
+      translator: { ...(behind ? { behind } : {}), ...(first ? { first, arrangement: t?.arrangement ?? "then" } : {}) }, prices,
       ...(fork.budget ? { budget: fork.budget } : {}),
       framing: steward.framing ?? spec.seats?.framing ?? "unstated", ...(a.effort ? { effort: a.effort } : {}), ...(typeof steward.params?.max_tokens === "number" ? { maxTokens: steward.params.max_tokens } : {}),
       ...(a.brain ? { brain: a.brain } : {}), ...(dry ? { record: (x: LlmAdapter) => rec.wrap(x, a.model) } : {}), debriefsFile, untilT: spec.untilDay * 86_400, ...(a.cast ? { cast: a.cast } : {}),
@@ -272,7 +282,7 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
     return Object.assign(seat, { calls: () => rec.summary() });
   };
   const wait = (x: LlmAdapter) => waitingAdapter(x, { waitMs: 15 * 60_000, maxWaitMs: (spec.seats?.wait_for_window_hours ?? 12) * 3_600_000 });
-  return { anthropic: make, "claude-code": make, codex: make, ...(spec.seats?.allow_paid_api ? { openai: make, "openai-compat": make } : {}) };
+  return { anthropic: make, "claude-code": make, codex: make, ollama: make, local: make, ...(spec.seats?.allow_paid_api ? { openai: make, "openai-compat": make } : {}) };
 }
 
 /** The config with a system delivered during the run added as its template makes it (its controller, framing and

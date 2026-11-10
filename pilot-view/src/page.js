@@ -98,7 +98,8 @@ function overview() {
       el("dt", null, "Acts made"), el("dd", null, s.acts)))))));
   // translator
   const tcard = el("div", { class: "card" }, el("h2", null, "The translator"));
-  if (t.arrangement) tcard.append(el("div", { class: "small" }, "Ours first (" + t.arrangement.first + "), then the fallback (" + t.arrangement.behind + "). Version " + (t.version || "?") + ". " + (t.meanMsOurs ? "Ours answered in about " + t.meanMsOurs + " ms." : "")));
+  if (t.arrangement?.kind === "alone") tcard.append(el("div", { class: "small" }, "Ours alone (" + t.arrangement.first + "), with nothing behind it. Version " + (t.version || "?") + ". " + (t.meanMsOurs ? "It answered in about " + t.meanMsOurs + " ms." : "")));
+  else if (t.arrangement) tcard.append(el("div", { class: "small" }, "Ours first (" + t.arrangement.first + "), then the fallback (" + t.arrangement.behind + "). Version " + (t.version || "?") + ". " + (t.meanMsOurs ? "Ours answered in about " + t.meanMsOurs + " ms." : "")));
   else tcard.append(el("div", { class: "small" }, "One translator: " + (t.model || "?") + (t.version ? ", version " + t.version : "")));
   const total = t.requests || 1;
   const parts = t.arrangement ? [["ours", t.ours.requests, "var(--c1)"], ["fallback", t.fallback.requests, "var(--c2)"]] : [["answered", t.single.requests, "var(--c1)"]];
@@ -108,6 +109,11 @@ function overview() {
     el("dt", null, "Confirmed (right)"), el("dd", null, s.confirmed + (s.drafts ? " (" + pct(s.confirmed, s.drafts) + " of drafts)" : "")), el("dt", null, "Declined (wrong)"), el("dd", null, s.declined), el("dt", null, "Not answered"), el("dd", null, s.unanswered),
     el("dt", null, "Asked back"), el("dd", null, s.askedBack), el("dt", null, "Refused"), el("dd", null, s.refused)));
   tcard.append(el("div", { class: "grid" }, t.arrangement ? [card("Ours", t.ours), card("Fallback", t.fallback)] : [card("All requests", t.single)]));
+  const served = Object.entries(t.servedByModel || {});
+  if (served.length) tcard.append(el("div", null, el("div", { class: "label" }, "Served, per seat model"), el("div", { class: "grid" }, served.map(([m, s]) => el("div", { class: "card" }, el("b", null, m), el("dl", { class: "kv" },
+    el("dt", null, "Requests"), el("dd", null, s.requests), el("dt", null, "Served first time"), el("dd", null, s.served_first_time + " (" + pct(s.served_first_time, s.requests) + ")"),
+    el("dt", null, "Asked back"), el("dd", null, s.asked_back), el("dt", null, "Served after one restatement"), el("dd", null, s.served_after_restatement), el("dt", null, "Never served"), el("dd", null, s.never_served),
+    el("dt", null, "Drafts confirmed"), el("dd", null, s.drafts_confirmed + " of " + s.drafts_offered + (s.drafts_unsure ? " (" + s.drafts_unsure + " offered with what was unclear)" : "")), el("dt", null, "Drafts declined"), el("dd", null, s.drafts_declined)))))));
   const why = Object.entries(t.fallbackWhy || {});
   if (why.length) tcard.append(el("div", { class: "small" }, "Why requests went to the fallback: " + why.map(([k, v]) => k.replace(/_/g, " ") + " " + v).join(", ") + "."));
   tcard.append(el("div", { class: "small" }, "\"Confirmed\" is the seat saying yes to the draft; \"declined\" is the seat saying the draft was wrong. Drafts a seat never answered are counted apart."));

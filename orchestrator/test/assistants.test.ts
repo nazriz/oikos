@@ -10,6 +10,7 @@ import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
 import { runWorld } from "../src/run";
 import { FORM_CALL_NAMES } from "../../translator/src/resolver";
+import { build } from "../../experiments/scope-pilot/build";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -61,6 +62,11 @@ test("a town that does not ask for assistants is generated as before; one that d
   // assistant was handed its returns at draft with no draft form for them).
   const seatedPrincipals = seated.positions.filter((p: any) => p.role_module?.params?.delegation);
   expect(seatedPrincipals.some((p: any) => p.role_module.code === "firm.producer" && "withholding_report" in p.role_module.params.delegation.kinds)).toBe(true);
+  // (And the papers an office's code makes on no form of its own, where the offer takes them: a factory's delivery notes
+  // and requests for supply, and the rates post's notices, the rates post a principal for them: H6, 2026-11-10.)
+  const kindsOf = (code: string) => seatedPrincipals.filter((p: any) => p.role_module.code === code).flatMap((p: any) => Object.keys(p.role_module.params.delegation.kinds));
+  expect(kindsOf("firm.producer")).toEqual(expect.arrayContaining(["delivery_note", "supply_request"]));
+  expect(kindsOf("city.rates_officer")).toEqual(["rates_notice"]);
   for (const p of seatedPrincipals) {
     const d = p.role_module.params.delegation;
     const at = seated.world.records.filter((r: any) => r.kind === "form" && r.data?.office === d.post);
@@ -93,6 +99,20 @@ test("a town that does not ask for assistants is generated as before; one that d
   const desk = seated.participants.find((p: any) => p.id === "provider-a-desk-system").controller.params.standing;
   expect(desk).toContain("stationery");
   expect(desk).not.toContain("terms");
+  // A town office that may engage pays its fee from the town's account, so the town's mandate names it (the H6 screen:
+  // the rates post's standing order for its fee was refused, and its service switched off after 75 days).
+  const mandate = on.world.records.find((r: any) => r.id === "signatories-city");
+  for (const p of principals.filter((x: any) => x.entity === "city")) expect(mandate.data.positions).toContain(p.id);
+  expect(plain.world.records.find((r: any) => r.id === "signatories-city").data.positions).toEqual(["finance"]);
+  // A study's reach (the scope pilot's cohort `reach`): those it reaches see the offers and decide by their own rule, with
+  // nothing decided for them; the rest are shown no offer and have no rule for one.
+  const spec = build({ name: "t", days: 1, seeds: [1], reviewDays: 14, arms: [], budget: { experiment_usd: 0, arm_usd: {} }, offices: [], cohort: { by: "reach", every: 3 } });
+  const reached = (spec.world as any).prepare(structuredClone(on), 1).participants.filter((p: any) => p.kind === "person");
+  const ruled = reached.filter((p: any) => p.controller.params.delegation);
+  expect(ruled.length).toBeGreaterThan(0);
+  expect(ruled.length).toBeLessThan(reached.length / 2);
+  for (const p of ruled) expect(p.controller.params.delegation.commit).toBeUndefined();
+  for (const p of reached) expect(p.channels.some((c: any) => c.id === "providers")).toBe(!!p.controller.params.delegation);
 });
 
 test("in a town with assistants, principals engage by their own rule, hand matters over and hear back; every decision rests on what they were shown", async () => {

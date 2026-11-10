@@ -1431,10 +1431,12 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
               if (!text(again.input?.statement)) await note({ opt_out_as_given: JSON.stringify(again).slice(0, 4000) });
               return away(), { type: "opt_out", statement: optOutStatement(again.input) };
             }
+            // Not a yes: it carries on, its answer on record, and it is told once, at its next sitting, that the way out stays open.
+            await note({ opt_out_not_confirmed: { answer: JSON.stringify(second.res.content.map((b) => (b.type === "tool_use" ? b.name : b.type === "text" ? b.text.slice(0, 300) : ""))).slice(0, 2000) } });
             if (second.unread) {
               // No answer could be read: it stays, nothing is done, and it is told so (and that the question stands).
               unreadTwice = wayOut(c.framing.disclosure).unread;
-            }
+            } else unreadTwice = `you did not say that you mean to ${wayOut(c.framing.disclosure).called}, so you carry on as before. If you do mean to, you can say so at any time`;
             got = second;
           }
           res = got.res;

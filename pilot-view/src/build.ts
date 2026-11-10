@@ -278,6 +278,8 @@ export async function buildView(dir: string, opts: { twin?: string | false; caps
     requests: reqList.length, ours: share(ours), fallback: share(fb), single: share(reqList.filter((r) => r.by === "single")), fallbackWhy: fbWhy,
     calls: trUsage.length, usd: sum(trUsage.map((u) => u.cost)) / 1e6,
     meanMsOurs: ours.length ? Math.round(sum(ours.map((r) => r.route?.first?.ms ?? 0)) / ours.length) : null,
+    // (Per seat model: requests served first time, after one restatement, never; the seats' answers to the drafts.)
+    servedByModel: raw.served.byModel(),
   };
 
   // ---------- alerts

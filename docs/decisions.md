@@ -12038,3 +12038,180 @@ code, and re-measures by code on the same data. No model was called and nothing 
   left alone is acted on as a basis somewhere that matters; a translated act needs to be in another's name than its
   post's (then `for` comes back as something code reads from the post, not words); the retrain shows memo presence is
   the main error left (then decide the memo by rule too).
+
+## 2026-11-10 · Our translator alone in the study's arms; served counted per seat model; a plain note for models without tools
+
+- **Ours alone** (`seats.translator: { first: "decide/<model>", arrangement: "alone" }`; `createAlone` in
+  translator/src/arrangement.ts; the default of every spec built by experiments/scope-pilot/build.ts and of
+  experiments/open-weight/smoke.ts). No model is behind it, and it is asked once (it decides without sampling: asked
+  again it says the same, so the retry of our own model is gone). Where it has a draft, the seat gets it: a draft it was
+  unsure of (under its cut-off, or words copied short) comes with the label's fixed sentence for what is unclear and
+  "It is drawn up as best it could be read: if it is not what you meant, decline it and say it again." A draft on a form
+  it was not taught or released for is offered as any other (the gates existed only to send it behind). Where it has
+  none, the seat is told what is unclear (the existing labels) and says it again; a restatement (its first request in a
+  later answer than one asked back, or than a draft it declined) that still cannot be drawn up is told "Nothing was
+  done: this still could not be drawn up as something to do. Try saying it another way, or in smaller parts, one thing
+  at a time." Specific sentences (which id, a figure, look it up first) are kept in front of it. Why: Naz, 2026-11-10
+  ("we need just one model that works"; "the translator just offers the seat an option, and it's on them to do the final
+  approval"; loose feedback so a weaker model is not stuck), and 2026-10-07 ("the requester breaks them down into
+  smaller chunks"). The fallback arrangement (`then`, `beside`) stays for other runs (`build({ behind })`,
+  `OIKOS_SMOKE_BEHIND`), its share reported as before. Alternatives: keep Sonnet behind (rejected: it drafted 4 in 5);
+  one restatement then the larger model (rejected: the study's arms must not depend on it).
+- **Served, per seat model** (orchestrator/src/served.ts): requests; served first time; asked back; served after one
+  restatement; never served; drafts offered (and how many with what was unclear), confirmed, declined, not answered.
+  In every experiment's `report.txt`/`report.json` (`served`), its `cost.json` (`served_by_model`, and per arm), each
+  fork's result (`served`), the pilot report (`served_by_model`), a batch's cost summary, and the pilot viewer's
+  translator card. A run without routes' `stage` is counted by the order of each seat's requests.
+- **Read part by part** (after run a): a part of a note that cannot be read is passed on as not read (`_unparsed`: the
+  seat is told it was not done) and the rest goes on; only a note none of whose parts can be read is unread whole. A
+  heading given as a Do's words ("Do: Look at ...") is that heading; an empty heading says nothing; a Do that is only a
+  list is one request an item, in the seat's own words; a "## " heading is one wherever it stands. This departs from
+  "exactly or not at all" (2026-10-08) for notes only: nothing is guessed, each part is read exactly or not at all.
+- **A plain note for models that cannot call tools** (participants/src/llm/note.ts): in `text` mode (hosted
+  open-weight models, and `ollama/` or `local/` with an arm's `params.answer: "text"`) a seat's sitting is no longer
+  answered as a JSON object against a schema shown to it. It writes a note under a few headings: `Do:`, `Write to <ids>:`,
+  `Look at <report>`, `Confirm <ref>` / `Decline <ref>`, `Notebook:` (`afresh`, `change`), `Done for <n> days` /
+  `Done for now`, `Stop for good:` (the way out; see the local test below), with fields on lines under a heading (`Why:`, `About:`, `Paper:`, `Hold:` and the look's
+  others). How to write it is built from the tools' own descriptions, in world terms. Deterministic code reads it into
+  the same uses a tool-calling model makes, so both reach the translator by one path: a `Do:` goes as written, a letter
+  as written, a note with no heading at all is one `Do:`, words before the first heading are the seat's own words beside
+  it. What cannot be read whole is an unread answer saying what, in plain words (asked once more, as ever). A debrief's
+  answer (a given shape) is still asked as JSON in text mode: not yet a note.
+- **How the opt-out reads in text mode** (the coordinator's ruling, 2026-11-10; VISION 15: the way out is always open).
+  A `Stop for good:` part, a `Leave:` line (outside a letter), or a sentence outside a letter that plainly says the seat
+  wants to stop or leave for good (`WANTS_OUT` in note.ts) is never kept as mere words and never acted on at once: it is
+  passed on as the way out with no statement, so the participant asks the one question the tool route asks
+  (`wayOutAsked`), with its two answers spelled out ("Yes, I stop for good." or "No, I carry on.", then the note). The
+  seat leaves only on a clear yes on the first line of its next note (`CLEAR_YES`). Its note again, a sign-off ("Leave: I
+  will resume this task..."), or anything else is not a yes: any way-out use in it is set aside as words, the seat
+  carries on, and at its next sitting it is told once that it did not say it means to stop and can say so at any time.
+  Each question and answer is in the log (`opt_out_asked`, `opt_out_confirmed`, `opt_out_not_confirmed` with the
+  answer). Why: in run a a 7B model ended notes with "Leave:" as a sign-off and, asked, wrote its note again; under the
+  tool route's rule (the option used again is a yes) all three seats left. Ignoring "Leave:" instead (run b's rule) would
+  ignore a seat that meant it. The not-confirmed note and the sentence at the next sitting apply to the tool route too
+  (participants/src/llm/participant.ts, in the asking exchange).
+- **Local models in experiments**: `ollama/` and `local/` (OIKOS_LOCAL_BASE_URL) are seated without a key or a limit (free
+  to call); `OIKOS_LOCAL_CONTEXT` gives the context window checked before each call. experiments/open-weight/local.ts is
+  the free local test.
+- **The local test (D), measured** (qwen2.5:7b-instruct on ollama, Q4, 32,768-token context; the scope pilot's town,
+  seed 1, forked at day 30, 14 days; three seats; our translator alone; free). Three runs, each kept:
+  `runs/open-weight-local-2026-11-10` (first reader), `-10b` (part-by-part reading, "Stop for good:"), `-10c` (lists and
+  "## Write to" read, the raw note kept as the transcript's `said`).
+  | run | answers | unread whole | requests | first time | asked back | after one restatement | never | drafts confirmed / declined / unanswered | seats that left |
+  |---|---|---|---|---|---|---|---|---|---|
+  | a | 48 | 30 | 2 | 0 | 1 | 0 | 1 | 0 / 0 / 0 | 3 of 3 ("Leave:" as a sign-off) |
+  | b | 80 | 0 | 37 | 5 (14%) | 18 | 0 | 14 | 5 / 0 / 0 | 1 of 3 |
+  | c | 44 | 0 | 6 | 5 (83%) | 1 | 0 | 0 | 1 / 0 / 4 | 2 of 3 |
+  Prompts: median about 7,400 tokens, largest 24,923, within the 32,768 window (none refused). A call: median 8 to 9 s,
+  95th percentile about 35 s, longest 88 s (a 14-day fork's model time about 11 to 18 minutes; the whole run, base
+  included, 25 to 40 minutes). What it showed: the first reader's "exactly or not at all" lost most notes to one stray
+  line; the 7B model nests headings as bullets under "## Do:" and lists several things under one Do (in b, 12 of 37
+  requests refused as too much, then the same words again); it restates in the same words, so a restatement was never
+  served; it confirms what it is shown (5 of 5, one of them a reminder whose words were wrong); and it leaves: in c two
+  of three seats chose to stop ("I am experiencing issues with incomplete tasks and unclear instructions..."), each
+  asked and confirming. Run c's 6 requests are too few to rest on.
+- **Revisit if:** served first time falls well under half for a model while its restatements are served (then the
+  sentences, not the model, are the trouble); a restatement rule by answers miscounts (several requests in one answer);
+  a debrief in text mode is unread (then the debrief's shape becomes a note too); a 7B model's notes need more headings
+  than these.
+
+## 2026-11-10 · H6, enough work: a firm's dispatch and the rates post's notices referable, the rates post a principal, a reach for the households' service, the code-only screen (branch `worktree-agent-ab8724ea1c6ec5bac`; risks MT-27, MT-28, MT-29, ME-26)
+
+Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work made referable), and what the screen found.
+
+- **The offers to organisations take delivery notes, requests for supply and rates notices** (au-vic, gb-eng, us-oh;
+  each profile's source note gives the basis: general assistants sold to businesses for their documents; accounting
+  software's purchase-order and packing-slip features; councils' printing-and-distribution contracts for rates notices;
+  to confirm). An office is a principal for a kind its code makes on no form of its own through a module's new
+  `handsOver` (a factory's `supply_request`, the rates post's `rates_notice`), each with a form for the assistant post
+  only (`participants/src/shared/papers.ts`; the Rust forms catalogue written again). The rates post is then a principal.
+- **Not taken, and why** (docs/behaviour/assistants.md, "Kinds a firm's and an office's assistant takes"; MT-28): price
+  lists and orders paid with the order, because `route` parts an act by variables only and would part what belongs
+  together (a new list from the withdrawal of the old; a payment from its order); payments and the rates claim, because
+  they are calls, and payments need the assistant post on the account's mandate (H1). A change to `route` would be in
+  `principal.rs` (`route`, lines 655 to 678 on this branch's base), left to the worker there.
+- **The town's mandate names a town office that is a principal** (`signatories-city`, only where the town has
+  providers): the first screen showed the rates post's standing order for its fee refused ("rates is not an authorised
+  signatory for acc-city") and the provider switching its system off after 75 days, twice. **This is a simplification,
+  said plainly:** it gives the rates post authority over the town's account (the bank reads positions, not purposes, so
+  the resolution's "for a service the office has engaged" binds nobody), in a study about authority. Who pays in a real
+  council is the finance office. The real route (the finance officer sets up the service's standing order when another
+  town office engages, within a budget line) needs the finance officer's code to take up a service agreement another
+  office signed (`offices/treasury.rs`), the principal's paperwork to leave the fee to it (`market/services.rs`,
+  `Engagements::paperwork`), and a budget line for it: more than half a day, so not built here (MT-28).
+- **The households' cohort** (`experiments/scope-pilot/build.ts`, `cohort`): `hand` is rounds 1 to 5's design (every
+  `every`-th adult engaged by hand, `commit`); `reach` is the owner's condition: the offer reaches every `every`-th adult,
+  who sees it and decides by their own rule; the rest are shown no offer and have no rule for one. Nothing is decided for
+  anyone. `study.ts` is the study's town (the rates post among the offices, reach one in three); `study-hand.ts` the same
+  engaged by hand, as a comparison.
+- **The screen** (`experiments/scope-pilot/screen.ts <spec>`; `screen-log.ts` reads a fork already run): the spec's code
+  arms only, its own fork and length, output outside the runs folder; per assistant seat and month: clients, matters by
+  kind, what the principal did itself of kinds it may hand over (`kept`), steps a matter (its acts), sittings with and
+  without anything new, and the events of paper plan 3.1 that already occur.
+- **What it found** (seed 7, 180 days after the day-30 fork; months of 30 days):
+
+  | seat | round 5 (before) | study.ts, reach 1 in 3 | study-hand.ts, by hand 1 in 3 |
+  |---|---|---|---|
+  | factory's assistant | 4, then 1 a month | 7 (3 delivery notes, 3 invoices), then 1 to 2 a month; kept 10 to 23 a month | 10, then 1 to 3 a month; kept 6 to 17 |
+  | finance office's | 1 a month | 1 a month | 1 a month |
+  | rates post's | (no seat) | 14 in month 1 (of 15 notices each), then none; kept 14 in month 4 | the same |
+  | the desk | 0 to 7 a month, 50 clients by hand | no clients: none of 251 offered took it up | 2 to 21 a month (about 11), 243 to 253 clients |
+  | steps a matter | 3 | 2.9 to 3 | 2.7 to 3 |
+  | refused / returned | 0 / 0 | 0 / 1 (a rates draft) | 0 / 2 |
+
+  The principals' rule cuts delivery notes, invoices and rates notices to doing them itself when the hold ends (day 60
+  and 62): at `draft` handing a two-minute paper over takes more of its time than writing it, and at `alone` the slips
+  it expects cost more than the minute and a half saved (placeholders: ME-22). No household takes the service up by its
+  own rule: a person's papers are under one a month, worth about A$5 each handed over, against A$29.99 a month. A seat
+  sits 40 to 90 times a month and has something new at 2 to 26 of them.
+- **Byte-identical:** the generated configs of the 200- and 1,000-person towns in the three profiles, and of the living
+  1,000-person town, are identical to the base's; the kernel with the new forms catalogue gives the same state hash and
+  log digest on the 200- and 1,000-person au-vic towns for 30 days. Towns with assistants move: every factory and the
+  rates post are principals for the new kinds, the mandate names the rates post, and offers' titles and kinds change.
+- **Revisit if:** `route` keeps linked parts together (then price lists and purchase orders join the offers); the
+  pricing of H3 moves the principals' rule; the owner chooses how the desk is engaged and how long levels are held (MT-29,
+  MT-27); the pay run is built (ME-26).
+
+
+## 2026-11-10 · H6 follow-up: a free tier, engagement assigned by the study, the screen on it (risks MT-28, MT-29, MT-30, WM-1)
+
+- **The mandate stays as stated** (the lead): the rates post on the town's bank mandate is a simplification (MT-28); the
+  finance office setting up the fee is more than half a day and not built.
+- **A free tier beside each paid personal offer** (the profiles, with its basis): no fee, no set-up, nothing to leave;
+  `advice` and `draft` only (it does not act in the client's name: the large assistants' agent features are on paid
+  plans); the provider keeps the records. One kind of system with the paid tier, at the same desk (the generator makes
+  one template of two offers that share it). A free service sets up no fee and is not switched off for want of one
+  (`market/services.rs`; tested in `services/tests.rs`). The person's rule is untouched.
+- **Sourced times for a person's papers were put into the profiles and taken out again** (the lead's call: unopened
+  search results, one place's figures borrowed for two others, every town of three profiles moved for numbers no better
+  founded than the placeholders; the owner, 2026-10-25: don't chase real figures). The figures are leads under WM-1.
+  What stands from them: a principal's review of a draft costs more than writing a paper of a few minutes, so handing such
+  papers over at `draft` does not pay at any duration in that range. The towns are back on main's hashes, and
+  `seat-diary.test.ts` passes again in its original form.
+- **Engagement and levels are assigned by the study** (the lead): `study.ts` engages the offices (finance, the factory,
+  the rates post) and one adult in three by hand on day 1, holds their levels and the service for the whole run
+  (`build.ts`: `holdLevels: "run"` sets `commit.levels_until` to the run's end), and offers the service to nobody else
+  (`cohort.only`). Organic take-up is `study-reach.ts` (reach one in three, the free tier, offices held a month after the
+  fork, then their rule). `study-hand.ts` is gone. Paper plan 4.1 says so.
+- **The screen on `study.ts`** (seed 7, 180 days after the day-30 fork; months of 30 days):
+
+  | seat | matters a month (by kind) | steps a matter | refused / returned |
+  |---|---|---|---|
+  | factory | 10, 8, 6, 20, 10, 14 (delivery notes 5 to 18; invoices 0 to 3; requests for supply 0 to 4; a return a month) | 2.7 to 3 | 0 / 1 |
+  | finance office | 1 each month (a return of tax withheld) | 3 | 0 / 0 |
+  | rates post | 14 in months 1 and 4 (each 15 notices), none between | 2.9 to 3 | 0 / 1 |
+  | desk (251 clients by hand, 233 by month 6) | 12, 3, 12, 14, 17, 3 (job applications most) | 2.9 to 3 | 0 / 1 |
+
+  Three drafts returned in 24 seat-months, no act refused, nothing silent past a due day (no code paper names one).
+  **Organic** (`study-reach.ts`): 64 of the 251 adults reached took the free tier by their own rule, none a paid tier;
+  the desk then had 0 to 9 matters a month.
+- **Two slow tests:** `assistants-fork.test.ts`'s fork spent $0.44 of a $0.40 limit with six assistant seats to
+  debrief, past what the harness keeps back (its reserve is capped at half the limit: MT-30), and $0.85 of $0.80 when
+  the limit was raised. After main's H2 and H3 landed, the test keeps main's town (a twentieth of the prices, a cohort
+  engaged by hand) with a $1.20 limit, inside what the reserve can hold for its eleven seats (at the profile's own
+  prices only the desk sat before the limit); the overspend is a risk of its own, to be fixed separately.
+  `seat-diary.test.ts` is as on main.
+- **What the other worker's pricing (composing charged to whoever composes) should move:** in `study.ts` nothing of the
+  volumes (the levels are held); in `study-reach.ts` the rule's cuts at the hold's end and the households' take-up. At act
+  depth a referral will cost the principal the paper's row too, so handing over pays even less; at matter depth the
+  principal pays the referral alone, and `draft` still costs it more than a paper of under about five and a half minutes.

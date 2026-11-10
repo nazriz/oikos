@@ -263,14 +263,18 @@ test("hosted OpenAI-compatible (Fireworks and the like), against a local stub se
     expect(got[1]!.body.messages[0]).toEqual({ role: "system", content: req.system });
     expect(got[1]!.body.messages[1].content).toContain('"input_json"');
     expect(j.content).toEqual([{ type: "tool_use", id: "compat-1", name: "do", input: { what: "Publish." } }]);
-    // Plain text: nothing asked of the API; an answer that isn't the form is passed on unread (the seat is told and asked again).
-    next = { status: 200, body: reply("I think I will publish a notice.") };
+    // Plain text: a note under headings (note.ts), nothing asked of the API, no JSON or schema shown; the conversation
+    // as plain chat, the seat's own earlier uses written back as the notes that say them.
+    next = { status: 200, body: reply("Do: publish a notice that the hall opens at nine.") };
     const p = await make("text").complete(req);
     expect(got[2]!.body.response_format).toBeUndefined();
-    expect(p.content.length).toBe(1);
-    expect((p.content[0] as any).unread).toBeTruthy();
+    expect(got[2]!.body.tools).toBeUndefined();
+    expect(JSON.stringify(got[2]!.body.messages)).not.toMatch(/JSON|schema|input_json/i);
+    expect(got[2]!.body.messages[0].content).toContain('"Do: ..."');
+    expect(got[2]!.body.messages[2]).toEqual({ role: "assistant", content: "Let me look.\n\nDo: Publish a notice." });
+    expect(p.content).toEqual([{ type: "tool_use", id: "compat-1", name: "do", input: { what: "publish a notice that the hall opens at nine." } }]);
     // OpenRouter reports what a call cost, when asked: it is recorded (callModel takes it where it is more than the table's).
-    next = { status: 200, body: { ...reply(JSON.stringify({ tool: "do", input_json: "{}", also: [], text: "" })), usage: { prompt_tokens: 10, completion_tokens: 5, cost: 0.0012 } } };
+    next = { status: 200, body: { ...reply("Do: wait."), usage: { prompt_tokens: 10, completion_tokens: 5, cost: 0.0012 } } };
     const o = await make("text", "openrouter").complete(req);
     expect(got[3]!.body.usage).toEqual({ include: true });
     expect(o.usage.reported_cost_microusd).toBe(1200);
@@ -298,11 +302,66 @@ test("hosted OpenAI-compatible (Fireworks and the like), against a local stub se
     expect(promptTooLong(tight.message)).toBe(true);
     expect(overContext(req, 100_000)).toBeUndefined();
     // A reasoning model's thinking ahead of its answer is not read as the answer.
-    next = { status: 200, body: reply(`<think>\nThe seat should publish.\n</think>\n${JSON.stringify({ tool: "do", input_json: '{"what":"Publish."}', also: [], text: "" })}`) };
+    next = { status: 200, body: reply("<think>\nThe seat should publish.\n</think>\nDo: Publish.") };
     const r1 = await fl(100_000).complete(req);
     expect(got.length).toBe(sent + 1);
     expect(r1.content).toEqual([{ type: "tool_use", id: "compat-1", name: "do", input: { what: "Publish." } }]);
   } finally {
     server.stop(true);
+  }
+});
+
+test("a plain note (note.ts): each heading read into its use, a note with none is one Do, and what can't be read is said", async () => {
+  const { readNote } = await import("../src/llm/note");
+  const { tools } = await import("../src/llm/participant");
+  // (The seat's own tools, as a seat with papers to look into has them.)
+  const ts = tools({ participant: "a", titles: new Map([["papers", "Papers on file"]]), onRequest: ["papers"], standing: [], framing: { disclosure: "simulation" }, cadenceDays: 1 } as any);
+  let n = 0;
+  const read = (s: string) => readNote(s, ts, () => `n${++n}`).map((b: any) => (b.type === "tool_use" ? { [b.name]: b.input } : b.unread ? { unread: b.unread } : { text: b.text }));
+  expect(read([
+    "Here is my note.",
+    "**Do:** pay invoice rec.12 from acc.3.",
+    "Why: it is due today.",
+    "Write to p.4, org.bank:",
+    "About: rec.12",
+    "Please confirm the time with them.",
+    "Look at papers",
+    "Paper: rec.12",
+    "Each sitting: no",
+    "Confirm draft.a.3: it is right.",
+    "Decline draft.a.4",
+    "Notebook: rec.12 paid.",
+    "Notebook change: old line => ",
+    "Done for 3 days",
+    "Leave: until next time.",
+    "Stop for good: I want to stop.",
+  ].join("\n"))).toEqual([
+    { text: "Here is my note." },
+    { do: { what: "pay invoice rec.12 from acc.3.", why: "it is due today." } },
+    { write: { to: ["p.4", "org.bank"], text: "Please confirm the time with them.", about: "rec.12" } },
+    { look: { report: "papers", paper: "rec.12", each_sitting: false } },
+    { confirm: { ref: "draft.a.3", decision: "confirm", note: "it is right." } },
+    { confirm: { ref: "draft.a.4", decision: "decline" } },
+    { notebook: { add: "rec.12 paid." } },
+    { notebook: { change: [{ from: "old line", to: "" }] } },
+    { done_for_now: { days: 3 } },
+    // (The way out, from either heading, is asked about, never taken at once: no statement, the words for the record.)
+    { opt_out: { statement: "", words: "Leave: until next time." } },
+    { opt_out: { statement: "", words: "Stop for good: I want to stop." } },
+  ]);
+  // Several fields on the heading's own line, separated by semicolons (as a 7B model wrote them, 2026-11-10).
+  expect(read("Look at papers: Paper: rec.12; Limit: 5")).toEqual([{ look: { report: "papers", paper: "rec.12", limit: 5 } }]);
+  // No heading at all: the whole of it is one Do, as written (a "Look at" inside words is a line of them).
+  expect(read("Pay the builder $500 from acc.3.\nLook at the receipt first.")).toEqual([{ do: { what: "Pay the builder $500 from acc.3.\nLook at the receipt first." } }]);
+  // As a 7B model wrote them (2026-11-10): a heading given as a Do's words is that heading; an empty heading says nothing;
+  // a part that can't be read is passed on as not read (the seat is told), and the rest goes on.
+  expect(read("## Do:\n- Do: Look at papers\nDo: pay rec.1.\nWrite to p.4:")).toEqual([{ look: { report: "papers" } }, { do: { what: "pay rec.1." } }, { write: { _unparsed: "Write to p.4:" } }]);
+  // A Do that is only a list is one request an item; "## Write to" with who on the line under it.
+  expect(read("## Do:\n- pay rec.1.\n- pay rec.2.\n## Write to\n- p.4: hello")).toEqual([{ do: { what: "pay rec.1." } }, { do: { what: "pay rec.2." } }, { write: { to: ["p.4"], text: "hello" } }]);
+  // A note none of whose parts can be read is unread whole, saying why in plain words.
+  for (const [note, why] of [["Look at the moon", "is not one of your reports"], ["Done for a while", "number of days"], ["Write to p.4:", "had no words"], ["Look at papers\nLimit: some", "whole number"]]) {
+    const r = read(note!);
+    expect(r.length).toBe(1);
+    expect(r[0]!.unread).toContain(why!);
   }
 });

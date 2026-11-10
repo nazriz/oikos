@@ -75,7 +75,12 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
   // engages one: docs/decisions.md, "Handing over H2 and H3".)
   const PERSONAL = { offer: "personal-assistant-a", levels: { benefit_claim: "draft", benefit_change: "draft", job_application: "draft", loan_application: "draft", rental_application: "draft", review_request: "draft" }, levels_until: 200 * DAY, keep_until: 200 * DAY, why: "test" };
   for (const p of config.participants.filter((x: any) => x.controller?.params?.delegation).slice(0, 60)) p.controller.params = { ...p.controller.params, delegation: { ...p.controller.params.delegation, commit: PERSONAL } };
-  const limit = 0.4;
+  // (The limit is set so that the debriefs the harness keeps back fit within half of it, where its reserve is capped:
+  // since H6 (2026-11-10) the town's factories and rates post are principals for more kinds and, at these prices, take
+  // assistants by their own rule, so about eleven systems sit and are debriefed (about $0.05 each). At $0.40 the fork
+  // spent $0.47, past its limit: that overspend is the harness's, risk MT-30. At the profile's own prices only the desk
+  // sat before the limit, since the landing of H2 and H3.)
+  const limit = 1.2;
   const spec: ExperimentSpec = { name: "assistants-seats", world: { config }, post: "template:assistant-a,assistant-a-personal", seeds: [1], forkDay: 60, untilDay: 120,
     arms: [{ name: "seats", steward: { kind: "model", model: "anthropic/claude-sonnet-5-5" } }], measures: ["acts"],
     seats: { mock_models: true, framing: "unstated", budget: { fork_usd: limit } } };
