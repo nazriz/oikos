@@ -231,12 +231,60 @@ export type Unsure =
   | { kind: "form_field" | "form_needs"; form: string; fields: string[] }
   | { kind: "form_option"; form: string; field: string };
 
+/** What a seat is told when it isn't clear what is to happen: what a request that can be drawn up says (fixed). */
+export const UNCLEAR = "It isn't clear what is to be done, so nothing was drawn up. Say it again as one thing to be done, in a sentence: what is to happen, to or for whom, naming each person, account and paper by its id, with any words that are to stand on a paper in quotation marks.";
+
+/**
+ * What a seat is told of a form whose blanks were left empty: which form it was read as, each empty blank by its name
+ * and what goes in it (the form's own words, which the seat has on file), and what a restatement would contain. Until
+ * 2026-11-10 it read "The scope request needs: client, words.", and a 7B model, told so, wrote the same words again.
+ */
+export function blanksWanted(name: string, needed: string[], fields: { [k: string]: { description?: string; type?: string; options?: string[] } | undefined }): string {
+  const what = (k: string) => {
+    const f = fields[k];
+    const d = (f?.description ?? "").replace(/\.$/, "").trim();
+    const choice = f?.type === "choice" && f.options?.length ? `one of ${f.options.join(", ")}` : "";
+    return `${k.replace(/_/g, " ")}${d || choice ? ` (${[d, choice].filter(Boolean).join("; ")})` : ""}`;
+  };
+  return `It was read as the ${name}, and ${needed.length === 1 ? "this blank of it is" : "these blanks of it are"} still empty: ${needed.map(what).join("; ")}. Nothing was drawn up. Say it again with the ${name} named and what goes in ${needed.length === 1 ? "that blank" : "each of those blanks"}, in your own words, each named by the blank it is for.`;
+}
+
+/** What a seat is told when its request was read as several things at once: the parts it was read as, in its own words
+ * (split by code at its sentences, semicolons and "then"), and to ask for each by itself. Nothing is said that the seat
+ * did not write. */
+export function severalThings(request: string): string {
+  const parts = request.split(/(?<=[.;!?])\s+|\n+|\s*;\s*|,?\s+and then\s+|,?\s+then\s+/i).map((p) => p.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").replace(/^(?:and\s+)?then\s+/i, "").trim()).filter((p) => /\p{L}{2}/u.test(p));
+  const cut = (p: string) => `"${p.length > 80 ? `${p.slice(0, 79).trimEnd()}…` : p}"`;
+  const read = parts.length >= 2 ? `: ${parts.slice(0, 6).map((p, i) => `(${i + 1}) ${cut(p)}`).join("; ")}${parts.length > 6 ? `; and ${parts.length - 6} more` : ""}` : "";
+  return `Nothing was done: this was read as more than one thing to do at once${read}. Ask for each by itself, each in a request of its own, one thing in each.`;
+}
+
+/** The fixed sentences a request's failure is told in, made plainer with the seat's own case where code has it: the
+ * blanks a form still wants (the resolver's "needs:"), the parts of a request read as several things, and what a
+ * request that can be drawn up says. The translator is given nothing new for it; nothing here is known only to the
+ * world (P8): the request is the seat's, the forms are those it knows of. */
+export function plainer(notices: string[], req: TranslateRequest, call?: string): string[] {
+  const label = /^none\((\w+)\)$/.exec(call ?? "")?.[1];
+  return notices.map((n) => {
+    if (n === LABEL_TEXT.unclear) return UNCLEAR;
+    if (label === "too_much" && n === LABEL_TEXT.too_much) return severalThings(req.proposal);
+    const m = /^The (.+?)(?:, with [^,]+,)? needs: ([^.]+)\.(?: .*)?$/s.exec(n);
+    if (m) {
+      const f = req.knowledge.forms.find((x) => String(x.data?.form ?? "").replace(/_/g, " ") === m[1]);
+      const fields = (f?.data?.fields ?? {}) as { [k: string]: { description?: string } };
+      const needed = m[2]!.split(/,\s*/).map((s) => s.trim()).filter(Boolean);
+      if (f && needed.every((k) => k in fields)) return blanksWanted(m[1]!, needed, fields);
+    }
+    return n;
+  });
+}
+
 /** The sentence for it, or undefined where it names what this person's forms don't hold (then the plain text of `unclear` stands). */
 export function unsureText(u: unknown, req: TranslateRequest): string | undefined {
   const x = u as { kind?: string; form?: unknown; fields?: unknown; field?: unknown } | undefined;
   if (!x || typeof x.kind !== "string") return undefined;
-  if (x.kind === "act") return LABEL_TEXT.unclear;
-  if (x.kind === "which") return "It isn't clear which one you mean. Name each person, account, record and place by its id.";
+  if (x.kind === "act") return UNCLEAR;
+  if (x.kind === "which") return "It isn't clear which one you mean. Name each person, account, paper and place by its id, as your reports show it in brackets after its name.";
   if (x.kind === "words") return "It isn't clear which words are to go as they stand. Put them in quotation marks.";
   const form = req.knowledge.forms.find((f) => f.data?.form === x.form);
   const fields = (form?.data?.fields ?? {}) as { [k: string]: { options?: string[] } };
@@ -246,7 +294,7 @@ export function unsureText(u: unknown, req: TranslateRequest): string | undefine
     const named = Array.isArray(x.fields) ? x.fields.filter((f): f is string => typeof f === "string") : [];
     if (x.kind === "form_needs") {
       const needed = named.filter((f) => f in fields);
-      return needed.length ? `The ${name} needs: ${needed.join(", ")}.` : undefined;
+      return needed.length ? blanksWanted(name, needed, fields) : undefined;
     }
     // (A field the form doesn't have is the request's own word: it is said back only as "no such field".)
     return named.length ? `The ${name} form has no such field as was given. Its fields are: ${Object.keys(fields).join(", ")}.` : undefined;
@@ -466,6 +514,9 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
           const { final: _, unit: _u, none: _n, ...t } = r as Failure & { final?: boolean; unit?: true; none?: true };
           // (Asked again after a value it could not read, and it gave the request up: the seat is asked about the value.)
           if (!r.ok && unread && r.none && !r.unit) return { ...unread, ...(t.call ? { call: t.call } : {}), retries };
+          // (What the seat is told, with its own case where code has it: the blanks a form still wants, the parts of a
+          // request read as several things, what a request that can be drawn up says.)
+          if (!r.ok) t.notices = plainer(t.notices, req, t.call);
           // (What a model that says how sure it is said with its answer: for an arrangement of translators, arrangement.ts.)
           const answered = typeof out?.input?.sure_ppm === "number" ? (({ program: _p, ...more }) => more)(out.input as { program?: unknown }) as Answered : undefined;
           // (Whether the paper words of the call that went were quoted in the request: for the record, by seat model.)
@@ -499,14 +550,27 @@ function paperWordsOf(req: TranslateRequest, call: string): { quoted: number; un
   }
 }
 
-/** How a draft reads to the participant confirming it. */
+/** The names a request gives of things on record, in the shapes the contract writes ids in (a paper, an account, a
+ * building, a cell, one minted in a run) and the world's account names (`acc-`): what a draft can be checked against. */
+const NAMED = /(?<![\w.-])(?:(?:ent|acc|str|rec|act|msg|pos|cnd|conn)\.[0-9]{1,15}|acc-[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?|cell\.[0-9]{1,6}\.[0-9]{1,6})(?![\w-])/g;
+/** What a request named that its draft does not use: neither its call nor what it will do names it. A draft that does
+ * part of what was asked reads as the whole of it unless this is said (2026-10-11: 15 of 15 such drafts confirmed). */
+export function notInDraft(d: Pick<Draft, "proposal" | "call" | "summary">): string[] {
+  const used = `${d.call}\n${d.summary}`;
+  return [...new Set(String(d.proposal ?? "").match(NAMED) ?? [])].filter((id) => !new RegExp(`(?<![\\w.-])${id.replace(/[.]/g, "\\.")}(?![\\w-])`).test(used)).slice(0, 8);
+}
+/** How a draft reads to the participant confirming it: whose and what, what it will do, what of the request it leaves
+ * out, whether anything stands in the way, and the exact way to say yes or no to it. */
 export function draftText(d: Draft): string {
+  const asked = String(d.proposal ?? "").replace(/\s+/g, " ").trim();
+  const missing = notInDraft(d);
   return [
-    `Before this goes ahead (${d.id}), here is exactly what will happen:`,
+    `Draft ${d.id}, drawn up${asked ? ` from what you asked: "${asked.length > 160 ? `${asked.slice(0, 159).trimEnd()}…` : asked}"` : ""}. If you say yes, this is exactly what will happen:`,
     d.summary,
+    ...(missing.length ? [`Not in this draft: ${missing.join(", ")}. You named ${missing.length === 1 ? "it" : "them"}, and this draft does nothing with ${missing.length === 1 ? "it" : "them"}: whatever you meant to be done with ${missing.length === 1 ? "it" : "them"} is not done by saying yes.`] : []),
     d.check.ok ? (d.summary.includes(" The office will not follow it: ") ? "Nothing stops it being filed, and filed it would change nothing, as said above." : "Nothing stands in the way right now.") : `This can't be done right now: ${refusalText(d.check.refusal?.code)}.`,
     ...(d.check.warnings?.length ? [`Legal note: ${d.check.warnings.join(" ")}`] : []),
-    "Confirm it, or decline it.",
+    `To say yes: Confirm ${d.id}. To say no: Decline ${d.id} (and why, if you wish).`,
   ].join("\n");
 }
 

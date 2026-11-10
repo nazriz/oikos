@@ -25,7 +25,7 @@ async function town(name: string, grant: (app: { id: string; lot: string; type: 
     participant: (req: LlmRequest) => {
       if (req.subject !== "planning-system") return [use("done_for_now", { days: 1 })];
       const text = req.messages.map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content))).join("\n");
-      const waiting = /\((draft\.planning\.\d+)\)|Before this goes ahead \((draft\.planning\.\d+)\)/.exec(text);
+      const waiting = /\((draft\.planning\.\d+)\)|Draft (draft\.planning\.\d+), drawn up/.exec(text);
       if (waiting) return [use("confirm", { ref: waiting[1] ?? waiting[2], decision: "confirm" }), use("done_for_now", { days: 1 })];
       const app = /\[(rec\.\d+)\] permit application from (\S+?)[,:]?\s[^\n]*?lot: (lot-\d+-\d+)[^\n]*?structure type: (\w+)/.exec(text) ?? /\[(rec\.\d+)\] permit application from (\S+?)[,:]?\s[^\n]*?structure type: (\w+)[^\n]*?lot: (lot-\d+-\d+)/.exec(text);
       if (decided || !app) return [use("done_for_now", { days: 1 })];

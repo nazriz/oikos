@@ -67,12 +67,13 @@ export function noteGuide(tools: ToolSpec[]): string {
   ];
   const t = (name: string) => by.get(name);
   if (t("do")) L.push(`- "Do: ..." then what you do, in plain words. ${t("do")!.description}${under(t("do")!)}`);
-  if (t("write")) L.push(`- "Write to", then who it goes to by id (several separated by commas), then a colon, then the letter, on the same line or the lines below. ${t("write")!.description}${under(t("write")!)}`);
+  // (It read "then who it goes to by id", and a 7B model wrote "Write to acc-c0497 by id:", 2026-11-10.)
+  if (t("write")) L.push(`- "Write to", then whom it goes to: a person, an organisation or a post, each as the id in brackets after its name in your reports (several separated by commas), then a colon, then the letter, on the same line or the lines below. ${t("write")!.description}${under(t("write")!)}`);
   if (t("look")) {
     const report = propsOf(t("look"))["report"];
     L.push(`- "Look at", then which, by its id${report?.enum ? ` (${report.enum.join(", ")})` : ""}. ${t("look")!.description}${under(t("look")!)}${propsOf(t("look"))["find"] ? ' Each thing to find is written as what, how it compares and the value, such as "Find: kind = complaint"; several are separated by semicolons.' : ""}`);
   }
-  if (t("confirm")) L.push(`- "Confirm" or "Decline", then the reference of a draft waiting for you, as it is shown with the draft; why after a colon if you wish. Only for a draft you have been shown. ${t("confirm")!.description}`);
+  if (t("confirm")) L.push(`- "Confirm" (yes) or "Decline" (no), then the reference of one of your own drafts waiting for your yes or no, as it is shown with it; why after a colon if you wish. ${t("confirm")!.description}`);
   if (t("notebook")) L.push(`- "Notebook: ..." then words to add to your notebook; "Notebook afresh: ..." to write it all out anew; "Notebook change:", then the passage as it stands, then =>, then what it should say instead (nothing after => strikes it out). ${t("notebook")!.description}`);
   if (t("done_for_now")) L.push(`- "Done for", then a number of days ("Done for 3 days"), or "Done for now". ${t("done_for_now")!.description}${under(t("done_for_now")!)}`);
   if (t("opt_out")) L.push(`- "Stop for good:" then, in your own words, what you want to say. ${t("opt_out")!.description} It is only for that: a note is ended with "Done for", never with this.`);
@@ -303,7 +304,8 @@ function readPart(p: Part, by: Map<string, ToolSpec>, _said: string, nextId: () 
       if (m) { rest = ` ${m[1]}: ${m[2]}`; lines = lines.slice(k + 1); }
     }
     const i = rest.indexOf(":");
-    const who = (i < 0 ? rest : rest.slice(0, i)).split(/,|;|\band\b/).map(bare).filter(Boolean);
+    // (Whom, with "by id" said after it let pass: as the guide once read and a 7B model wrote, 2026-11-10.)
+    const who = (i < 0 ? rest : rest.slice(0, i)).split(/,|;|\band\b/).map((x) => bare(x.replace(/\s+by\s+id\s*$/i, ""))).filter(Boolean);
     if (!who.length) return no('"Write to" did not say who it goes to (by id, before the colon)');
     const text = trimLines([i < 0 ? "" : rest.slice(i + 1).trim(), ...lines]).join("\n").trim();
     if (!text) return no(`the letter to ${who.join(", ")} had no words`);

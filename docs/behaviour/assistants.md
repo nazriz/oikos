@@ -143,6 +143,12 @@ time, as every office has. Before, the matters were set out whole at every sitti
 its seats asked to check what they had been handed, and whether a paper had gone, and could not; and the collector of the
 tax on pay, which a referral names only by its id (`outside`), could not be named on a form.
 
+**How the post reads to a small model** (2026-11-10). The service's terms (the delivery's offer) are set out as
+sentences: what it takes on and at which levels, the fee, what leaving costs and the notice, what the provider claims of
+its work (its own claim), and what becomes of the records. The seat's own drafts for its yes or no stand apart from its
+principal's papers (a sign-off, a remit, a form is never confirmed), and its file says what came of each of its papers
+(docs/real-models.md, "What every seat is shown, made plain").
+
 **Sending what was signed off** (2026-11-10). A code principal that signs off a draft written on a form sends back the
 signed copy: the paper as it is to go (its kind, words, addressees, who sees it, its data and what it cites), in the
 sign-off itself. Its assistant sends it on its form `send_signed`, naming the sign-off: the paper goes exactly as

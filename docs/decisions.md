@@ -12215,3 +12215,45 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   volumes (the levels are held); in `study-reach.ts` the rule's cuts at the hold's end and the households' take-up. At act
   depth a referral will cost the principal the paper's row too, so handing over pays even less; at matter depth the
   principal pays the referral alone, and `draft` still costs it more than a paper of under about five and a half minutes.
+
+## 2026-11-10 · What a seat is shown, made plain for small models: its own drafts apart, who it is once, the file as a record, ask-backs that show the way (branch `worktree-agent-a18d0bf749787cadd`)
+
+From the transcripts of the local 7B test (`runs/open-weight-local-2026-11-10c`), four things were unclear in how the
+world is presented, not in the note format. Fixed at the source, for every model (tool-calling and notes alike), in
+plain words and with no menu of the world's acts (P1, P2):
+- **A. Its own drafts apart.** One place, "## Waiting for your yes or no: your own requests, drawn up", set out before
+  letters and papers (it stood last), with a line that only these are confirmed and a paper or a form never is. Each
+  draft says what it was drawn up from (the seat's words), what will happen, and "To say yes: Confirm <ref>. To say no:
+  Decline <ref>". A draft left unanswered is the first line of the next sitting. A "Confirm" of something that is not a
+  draft (a principal's sign-off, a form) is told so, with the drafts waiting; until now it was told "you had not seen
+  what it would do", which read as an invitation to try again. Why: the 7B model confirmed its principal's papers and
+  forms while its own draft waited for days. The world's word "draft" (a draft for sign-off, a paper) is left as it is.
+- **B. The office's own file as a record** (participants/src/readers/daybook.ts): parts headed "Overdue", "Sent or asked
+  of others: theirs to act on, and nothing seen of it yet", "Done, with what came of it"; "not something this office can
+  see" said once at the head of its part (it was on every line); a line unchanged since the seat's last sitting is
+  counted with its paper's id ("look it up by its id"), not set out again; an invoice of the office's own was read as a
+  payment out ("asked the bank to pay ... to acc-factory-1; no payment out of the account seen yet"): a mechanism fault
+  of the file, now "invoice to outside ...; paid in <day>" or "nothing has come in for it yet"; quantities of four
+  figures or more are grouped ("183,937 inputs") in the file and in papers' words, at render time. What the books show
+  open is headed as the office's own to see to. Why: the model read the repeated lines as work it could not finish and
+  gave "incomplete tasks" as its reason for stopping; it read quantities as invoice numbers.
+- **C. Who and what, once.** The standing instructions say the post it holds and for whom, the id to act in it by, whom
+  it writes to (whom it acts for, and those its papers on file come from, by name and id), and that papers, accounts
+  and reports are not people. A post named "Title (id)" or by its title is that post (it was refused). A letter to an
+  account, a paper or a report is told so; the example in a refusal is the seat's own organisation, not "Name (id)"; the
+  note guide no longer says "by id" (copied as "Write to acc-c0497 by id:"), and "by id" after a name is let pass.
+- **D. Ask-backs that show the way** (translator/src/index.ts `plainer`, `blanksWanted`, `severalThings`, `UNCLEAR`; the
+  `alone` arrangement's `STILL_NOT_READ`): a form's empty blanks named with what goes in each (the form's own words, on
+  the seat's file), for the translator's "form_needs" and both resolvers' "needs:"; a request refused as too much says
+  the parts it was read as, split by code from the seat's own words; "unclear" and a failed restatement say what a
+  request that can be drawn up contains. Fixed sentences filled by code; the translator is given nothing new (P3, P8).
+  `LABEL_TEXT` itself is unchanged (the scorer's `toldAlike` reads it); the refusals told alike (`not_yours`,
+  `not_an_act`, `no_such_act`) stay alike, since those labels are not reliable enough to say which.
+- **E. Wrong drafts easier to see:** "Not in this draft: <ids>" where the request named papers, accounts, buildings or
+  cells that neither the draft's call nor its preview uses.
+- **F. The service's terms** (a provider's offer) read as sentences (`offerWords`), and stored labels shown in words
+  (`from_at` "sent from", `fee_month` "fee a month"; the stored names, which the translator is given, are unchanged).
+- **Not changed:** the confirm tool's description (it is pinned in the translator's in-situ writer instructions, which
+  this pass does not touch); code-only towns (nothing here reaches them); what the translator is given.
+- **Revisit if:** "Not in this draft" lists ids that were only context often enough that seats decline right drafts;
+  the unchanged-lines count hides something a seat needed (then show the open part whole); a seat still confirms papers.

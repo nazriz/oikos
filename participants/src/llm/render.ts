@@ -135,7 +135,17 @@ let booksWhole = new Set<string>();
 const BOOKS_WORDS_MAX = 60_000;
 let cuts = 0;
 const clip = (s: string, max = 400) => (inFull || s.length <= max ? s : (cuts++, s.slice(0, max) + "…"));
-const words = (label: string) => label.replace(/_/g, " ");
+/** A detail's or a blank's name as it is shown, where the stored name reads stiffly ("from at"): plain words. The stored
+ * names are the store's and the forms' own, and stay as they are (the translator is given those). */
+const SHOWN_AS: { [stored: string]: string } = { from_at: "sent from", fee_month: "fee a month", notice_days: "notice in days", hold_until: "fixed until", answer_by: "to be answered by", period_end: "period ended", first_pay: "first pay day" };
+const words = (label: string) => SHOWN_AS[label] ?? label.replace(/_/g, " ");
+/**
+ * Whole numbers of four figures or more in words, grouped as a person writes them ("183,937 inputs"), so that a quantity
+ * never reads like a reference (a 7B model read "Invoice rec.1078: 183937 inputs" as invoice 183937, 2026-11-10). Ids,
+ * sums, decimals and anything joined to a letter or a dot are left as they are. Render time only: the paper's words
+ * as stored are unchanged.
+ */
+export const grouped = (s: string): string => s.replace(/(?<![\w.\p{Sc},/:-])\d{4,}(?![\w.,/:-]*\d)(?![\w])/gu, (n) => n.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 const cap = (x: string) => words(x).replace(/^./, (c) => c.toUpperCase());
 const num = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 /** A name as someone might write it, for matching: case, underscores and hyphens don't matter. */
@@ -177,6 +187,7 @@ function factWordsOf(raw: unknown, fields?: FieldKinds, under?: string): string 
   for (const [k, v] of Object.entries(o)) {
     if (v === undefined || ON_RECORD.has(k)) continue;
     if (k === "outcome" && v !== null && typeof v === "object" && !Array.isArray(v)) parts.push(`${words(k)}: ${outcomeWords(v, whole(o.every) ? Number(o.every) : undefined)}`);
+    else if (k === "offer" && isOffer(v)) last.push(`the offer: ${offerWords(v)}`);
     else if (k === "calls" && typeof v === "string") last.push(`what is to be done: ${programWords(v)}`);
     else if (v === carried && v !== null && typeof v === "object" && !Array.isArray(v)) last.push(`the paper: ${paperWords(v as any)}`);
     // (Lengths of time by what each is for, kept in seconds: a provider's offer says how long its system takes over each kind.)
@@ -188,6 +199,35 @@ function factWordsOf(raw: unknown, fields?: FieldKinds, under?: string): string 
   }
   return [...parts, ...last].join("; ");
 }
+/** Whether a detail is a provider's offer of a service (its kinds of matter, its fee a month): said as sentences. */
+const isOffer = (v: unknown): v is { [k: string]: any } => !!v && typeof v === "object" && !Array.isArray(v) && Array.isArray((v as any).kinds) && whole((v as any).fee_month);
+const RECORDS_KEPT: { [k: string]: string } = { provider: "the provider keeps the records of the work", principal: "the records of the work are the client's", on_request: "the records of the work are given to the client when asked for" };
+/**
+ * A provider's offer of a service, in sentences, as its paper would set it out (docs/behaviour/assistants.md, "What a
+ * provider sells"): what it takes on, at what levels, what it costs and what leaving takes, what the provider claims of
+ * its work, and what becomes of the records. Until 2026-11-10 it read as a list of its details ("claim slip: 1%;
+ * ...; references: 0"). Whatever else the offer holds is said after, by name.
+ */
+export function offerWords(o: { [k: string]: any }): string {
+  const list = (xs: unknown) => (Array.isArray(xs) ? xs.map((x) => words(String(x))).join(", ") : "");
+  const said = new Set(["id", "title", "for", "template", "kinds", "levels", "seconds", "claim_slip_bps", "fee_month", "setup", "exit", "notice_days", "term_days", "records", "provider", "account", "references"]);
+  const s: string[] = [];
+  s.push(`${typeof o.title === "string" ? `"${o.title}"` : "A service"}${typeof o.provider === "string" ? `, sold by ${writer(o.provider)}` : ""}${o.for === "persons" ? ", for persons (served from the provider's own desk)" : o.for === "organisations" ? ", for organisations (a system delivered to the client, which works only for it)" : ""}.`);
+  if (Array.isArray(o.kinds) && o.kinds.length) s.push(`It takes these kinds of matter: ${list(o.kinds)}${Array.isArray(o.levels) && o.levels.length ? `, at these levels: ${list(o.levels)}` : ""}.`);
+  const fee = `It costs ${sumOf(o.fee_month)} a month${whole(o.setup) ? `, with ${Number(o.setup) ? `${sumOf(o.setup)} to set it up` : "nothing to set it up"}` : ""}${typeof o.account === "string" ? `, paid into ${o.account}` : ""}.`;
+  s.push(fee);
+  const leave = [whole(o.exit) ? (Number(o.exit) ? `leaving costs ${sumOf(o.exit)}` : "leaving costs nothing") : "", whole(o.notice_days) ? `notice is ${num(Number(o.notice_days))} days` : "", whole(o.term_days) && Number(o.term_days) ? `the term is ${num(Number(o.term_days))} days` : ""].filter(Boolean);
+  if (leave.length) s.push(`${leave.join("; ").replace(/^./, (c) => c.toUpperCase())}.`);
+  const claims = [whole(o.claim_slip_bps) ? `that ${percent(Number(o.claim_slip_bps), 10_000)} of the matters its system does go wrong` : "",
+    o.seconds && typeof o.seconds === "object" && Object.keys(o.seconds).length && Object.values(o.seconds).every(whole) ? `that a matter of each kind takes it: ${Object.entries(o.seconds).map(([k, x]) => `${words(k)}, ${duration(Number(x))}`).join("; ")}` : ""].filter(Boolean);
+  if (claims.length) s.push(`The provider claims ${claims.join(", and ")} (its own claim).`);
+  if (typeof o.records === "string") s.push(`${(RECORDS_KEPT[o.records] ?? `records: ${words(o.records)}`).replace(/^./, (c) => c.toUpperCase())}.`);
+  if (whole(o.references)) s.push(Number(o.references) ? `It has ${num(Number(o.references))} client${Number(o.references) === 1 ? "" : "s"}.` : "It has no clients yet.");
+  const rest = Object.fromEntries(Object.entries(o).filter(([k]) => !said.has(k)));
+  if (Object.keys(rest).length) s.push(`${factWords(rest)}.`);
+  return s.join(" ");
+}
+
 /** A paper a draft would send, in words: what kind of paper, to whom, citing what, its words and its details. */
 function paperWords(p: { kind?: unknown; to?: unknown; basis?: unknown; text?: unknown; data?: unknown; [k: string]: unknown }): string {
   const to = Array.isArray(p.to) ? p.to.join(", ") : typeof p.to === "string" ? p.to : "";
@@ -241,12 +281,14 @@ function callWords(c: Call): string {
 /** A statement's details: for a form, its blanks (formWords); for any other paper, its details in words, filled in on
  * the form it was made on where that is known (`fields`: what each detail is). */
 const dataWords = (r: { kind: string; data?: unknown }, fields?: FieldKinds) => (r.kind === "form" ? "" : r.data === null || r.data === undefined || typeof r.data !== "object" ? ""
+  // (A provider's offer, published as itself: its sentences.)
+  : isOffer(r.data) ? offerWords(r.data)
   // (What a matter asks to be done, or the paper a draft would send, is the matter: said whole, as a form is.)
   : clip(factWords(r.data, fields), typeof (r.data as any).calls === "string" || (r.data as any).paper ? 4_000 : 400));
 
 /** What each kind of blank on a form takes, in words. */
 const BLANK: { [type: string]: string } = { record: "a paper, by its id", entity: "a person or an organisation, by id", account: "an account, by its id", amount: "a sum of money", date: "a date", duration: "a length of time",
-  count: "a number", lot: "a lot, by its id", list: "a list", structure_type: "a kind of building", cell: "a cell of ground, by its id", position: "a post, by its id" };
+  count: "a number", lot: "a lot, by its id", list: "a list", structure_type: "a kind of building", structure: "a building, by its id", cell: "a cell of ground, by its id", position: "a post, by its id" };
 /** The boilerplate the generator writes on an office's own stationery, as a person would say it. */
 const OWN_FORM = /Filled in by the ([^,]+), of the office's own accord \(nobody's direction or leave is needed\): filled in, it is issued as the form sets it out\./;
 /**
@@ -384,7 +426,7 @@ function describe(r: Record, readings?: { [id: string]: Reading }): string {
         named ? `voted for: ${voters(r.data.voted_for)}; voted against: ${voters(r.data.voted_against)}` : ""].filter(Boolean).join("; ");
       const rule = ruleWords(r);
       if (r.kind === "form") return formWords(r, `[${r.id}] form from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}`) + (rule ? ` ${rule}` : "");
-      return `[${r.id}] ${words(r.kind)} from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${clip(r.text, booksWhole.has(r.id) ? BOOKS_WORDS_MAX : 1000)}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${citedWords(r)}` : ""}${rule ? `. ${rule}` : ""}`;
+      return `[${r.id}] ${words(r.kind)} from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${grouped(clip(r.text, booksWhole.has(r.id) ? BOOKS_WORDS_MAX : 1000))}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${citedWords(r)}` : ""}${rule ? `. ${rule}` : ""}`;
     }
     case "claim":
       return `[${r.id}] ${r.holder} ${POSITION[r.position] ?? r.position}${r.counterparty ? ` against ${r.counterparty}` : ""}: ${details(r.about) || "(no details)"}${r.basis ? `, citing ${citedWords(r)}` : ""}${from}`;
@@ -624,7 +666,7 @@ function listLine(r: Record, readings?: { [id: string]: Reading }): string {
   const cut = (x: string) => (x.length > GIST_MAX ? `${x.slice(0, GIST_MAX)}…` : x);
   let gist: string;
   switch (r.record) {
-    case "statement": gist = r.kind === "request" && r.data?.outcome ? `asks ${(r.addressed_to ?? []).join(", ") || "someone"} to ${outcomeWords(r.data.outcome, r.data.every)}` : `${r.addressed_to?.length ? `to ${r.addressed_to.join(", ")}: ` : ""}"${cut(r.text)}"`; break;
+    case "statement": gist = r.kind === "request" && r.data?.outcome ? `asks ${(r.addressed_to ?? []).join(", ") || "someone"} to ${outcomeWords(r.data.outcome, r.data.every)}` : `${r.addressed_to?.length ? `to ${r.addressed_to.join(", ")}: ` : ""}"${grouped(cut(r.text))}"`; break;
     case "agreement": gist = `between ${r.terms.parties.join(" and ")}: ${cut(r.terms.commitments.map((x) => `${x.who} will ${x.does?.outcome ? outcomeWords(x.does.outcome, x.every, x.who) : "do what its terms say"}`).join("; ") || "no commitments")}${readingWords(readings?.[r.id])}`; break;
     case "claim": gist = `${r.holder} ${POSITION[r.position] ?? r.position}${r.counterparty ? ` against ${r.counterparty}` : ""}${r.about?.object ? `: ${r.about.object}` : ""}`; break;
     case "signature": gist = `${r.as} signed ${r.agreement}`; break;
@@ -862,6 +904,10 @@ export interface RenderOptions {
   formFields?: Map<string, FieldKinds>;
 }
 
+/** The heading of the one place a seat's own drafts stand, waiting for its yes or no, and the line under it. */
+export const WAITING_HEAD = "## Waiting for your yes or no: your own requests, drawn up";
+export const WAITING_SAYS = "Each is something you asked for, drawn up so that you can check it before anything happens. Nothing in it is done until you say yes. Only these are answered with Confirm or Decline: a paper someone sent you (rec. and a number) or a form is never confirmed.";
+
 /** What a look that finds nothing says: of papers looked up, and of a report with nothing new in it. */
 export const NOTHING_FOUND = "Nothing found.";
 export const NOTHING_NEW = "Nothing new there since you last looked.";
@@ -892,6 +938,13 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   for (const x of obs.outcomes) out.push(...outcomeLines(x, o.lastAction ?? "What you did", obs.t));
   // (What it is told stands as it is said: a note about something it asked to be done says which, in its own words.)
   for (const n of obs.notices ?? []) out.push(n.text);
+  // Its own requests, drawn up and waiting for its yes or no: one place, headed so, before anything others sent (a
+  // paper of someone else's is never answered so). A 7B model confirmed its principal's sign-offs and forms and left its
+  // own draft unanswered for days, 2026-11-10: the drafts stood last, under a heading that read like any other paper's.
+  if (obs.drafts.length) {
+    out.push("", WAITING_HEAD, WAITING_SAYS);
+    for (const d of obs.drafts) out.push(o.draftText ? o.draftText(d) : `(${d.id}) ${d.summary}`);
+  }
   if (obs.inbox.length) {
     out.push("", "## Letters");
     // A letter is signed: by the post it was written in and whose post that is, or by the person or organisation.
@@ -1054,10 +1107,6 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   }
   // Somewhere it looked that isn't there to be seen (a report it no longer has): said.
   for (const [id, asked] of o.looked ?? []) if (!(id in obs.channels)) out.push("", `## ${title(id)}`, asked.sent ? SET_OUT : (obs.asking ?? []).some((a) => a === id || a.endsWith(`/${id}`)) ? WAITING_ON_KEEPER : "Nothing could be seen there.");
-  if (obs.drafts.length) {
-    out.push("", "## Waiting for you to confirm");
-    for (const d of obs.drafts) out.push(o.draftText ? o.draftText(d) : `(${d.id}) ${d.summary}`);
-  }
   return out.join("\n");
 }
 

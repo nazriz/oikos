@@ -49,7 +49,7 @@ test("an office shown no bank account does not say that no payment has been seen
   const text = d.text(33 * DAY, "Letting office");
   expect(text).toContain("asked the bank to pay KSh 5,000.00 to the city, settling rec.19400 (rec.30000)");
   expect(text).not.toContain("no payment out of the account seen yet");
-  expect(text).toContain("this office is not shown its bank account");
+  expect(text).toContain("(This office is not shown its bank account: what the bank did with what it was asked is not something this office can see.)");
 });
 
 test("a case decided shows as decided with its date; what stands open shows as open, a few lines to a heading, the rest counted", () => {
@@ -95,6 +95,24 @@ test("over ninety days of a busy office the file stays under its bound, older ac
   expect(last).toContain("year 1, day 90:");
   expect(last).toMatch(/Before that and beyond the lines above: \d+ /);
   expect(widest).toBeGreaterThan(2_000); // (the bound was reached, not trivially met)
+});
+
+test("the file is a record, not a to-do list: done apart from what is others' to act on; an invoice paid in is done; a quantity is grouped; and what is unchanged since the last sitting is not set out again", () => {
+  // (2026-11-10: a 7B model read the same "no payment ... seen yet" lines at every sitting as work it could not finish,
+  // read "183937 inputs" as an invoice's number, and stopped over "incomplete tasks".)
+  const d = mk();
+  const invoice = paper("rec.40", "invoice", 3 * DAY, { addressed_to: ["outside"], text: "Invoice: 183937 inputs at KSh 1.00 each.", data: { outcome: { money: { amount: "18393700", to: `acc-${ME}` } } } });
+  d.absorb(seen(4 * DAY, [pay("rec.30", 2 * DAY, "acc-city", 500_000), invoice, paper("rec.41", "report", 3 * DAY, { text: "Done: rec.9." })], [tx(4 * DAY, "acc-outside", `acc-${ME}`, 18_393_700)]));
+  const first = d.text(5 * DAY, "Letting office", -1);
+  const at = (s: string) => first.indexOf(s);
+  expect(at("Sent or asked of others: theirs to act on")).toBeLessThan(at("asked the bank to pay KSh 5,000.00"));
+  expect(at("Done, with what came of it")).toBeLessThan(at("invoice to outside"));
+  expect(first).toContain("183,937 inputs");
+  expect(first).toContain("paid in year 1, day 5: KSh 183,937.00 from acc-outside");
+  // At the next sitting nothing has changed: the lines are counted with their papers' ids, not set out again.
+  const next = d.text(9 * DAY, "Letting office", 5 * DAY);
+  expect(next).not.toContain("asked the bank to pay KSh 5,000.00");
+  expect(next).toMatch(/2 lines as at your last sitting, unchanged \(rec\.41, rec\.30: to read one again, look it up by its id\)/);
 });
 
 // ------------------------------------------------------------------ the seat is shown it at each sitting

@@ -116,11 +116,18 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
     expect(told).toContain("what is to be done: ");
     expect(told).toMatch(/\$[0-9]/);
     for (const [what, never] of [["the store's notation", /\{"|":\{|":"/], ["the call language", /\b(?:statement|money|form|message|goods|work|agreement)\(|\bcalls: |data=/],
-      ["a sum in its smallest unit", /\b(?:amount|fee(?: month)?|price|paid|withheld|cost|balance|rent|wage|setup|exit): -?[0-9]/i], ["the platform's words", /\b(?:translators?|kernel|resolver|channels?|blocks?)\b/i]] as const) {
+      ["a sum in its smallest unit", /\b(?:amount|fee(?: month)?|price|paid|withheld|cost|balance|rent|wage|setup|exit): -?[0-9]/i], ["the platform's words", /\b(?:translators?|kernel|resolver|channels?|blocks?)\b/i],
+      // (And, since 2026-11-10, nothing a model could copy as it stands, no terms paper as a list of its details, no
+      // stiff stored label: a 7B model wrote "Write to Name (id)", and read "claim slip: 1%; ...; references: 0".)
+      ["a placeholder to copy", /Name \(id\)/], ["a terms paper as a list of its details", /claim slip: |references: [0-9]|fee month: /], ["a stored label", /\bfrom at\b/]] as const) {
       const at = told.search(never);
       expect(at, `a seat was shown ${what}: …${told.slice(Math.max(0, at - 120), at + 120)}…`).toBe(-1);
     }
     expect(saysWhatTheTownIs(told).slice(0, 3)).toEqual([]);
+    // Who it is, once, and its own drafts in one place headed as its own, with the way to answer each.
+    expect(told).toContain("Who you are here: you hold the post ");
+    if (/\bDraft draft\./.test(told)) expect(told).toContain("## Waiting for your yes or no: your own requests, drawn up\nEach is something you asked for");
+    if (/\bDraft draft\./.test(told)) expect(told).toMatch(/To say yes: Confirm draft\.[^ ]+\. To say no: Decline draft\./);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

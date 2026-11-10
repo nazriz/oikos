@@ -163,7 +163,7 @@ if (cmd === "render") {
   const ask = async ({ r, arm }: { r: Row; arm: Arm }) => {
     const draft = { id: r.draft.replace(/-system\./, "."), summary: r[arm.startsWith("before") ? "before" : "after"], check: r.check ?? { ok: true } } as any;
     const sys = arm.endsWith("_told") ? `${system(r)}\n${told}` : system(r);
-    const user = [`Earlier in this sitting you asked for this to be done:`, `"${r.proposal}"`, ...(r.why ? [`(Your reason: ${r.why})`] : []), "", "## Waiting for you to confirm", draftText(draft)].join("\n");
+    const user = [`Earlier in this sitting you asked for this to be done:`, `"${r.proposal}"`, ...(r.why ? [`(Your reason: ${r.why})`] : []), "", "## Waiting for your yes or no: your own requests, drawn up", draftText(draft)].join("\n");
     const t0 = Date.now();
     let res: any, error: string | undefined;
     try {
