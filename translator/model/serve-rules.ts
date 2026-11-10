@@ -2,12 +2,13 @@
 // goes in code). Each is a property of the answer and the request alone, the same for every base and every writer; an
 // answer that fails one is asked back, never altered.
 import { calls } from "@oikos/participants";
+import { PAPER_WORDS, quotedFor } from "../src/rules";
 
 /** The fields whose copied words are said as they stand (a message, a statement, an agreement's terms, what a payment
  * is for, a form's field typed text of three words or more: a shorter one is a label, "waste"): what is sent or filed
  * must not stop part way through a sentence of the request. */
 const WHOLE_WORDS: { [fn: string]: string[] } = { message: ["text"], statement: ["text"], agreement: ["text", "terms"], money: ["for", "memo"] };
-const textFieldsOf = (forms: string[]) => {
+export const textFieldsOf = (forms: string[]) => {
   const s = new Set<string>();
   for (const l of forms) for (const m of l.matchAll(/([a-z_]+) \(text(?:, required)?\)/g)) s.add(m[1]!);
   return s;
@@ -69,25 +70,22 @@ export function cutShort(request: string, program: string, forms: string[] = [],
   return undefined;
 }
 
-/** The spans a request puts in quotation marks (straight or curly), each as written between them, of eight characters
- * or more (a shorter one is a name or a label, not a paper's words). */
-export function quotedSpans(request: string): string[] {
-  return [...request.matchAll(/"([^"]{8,}?)"|“([^”]{8,}?)”/g)].map((m) => (m[1] ?? m[2])!);
-}
-const plain = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-/** Copied words longer than this many characters are a paper's words, and must be quoted to be copied. */
+export { quotedSpans } from "../src/rules";
+/** Copied words longer than this many characters are a paper's words, and must be quoted to be copied, where the
+ * ask-back is on. */
 export const QUOTE_FROM = 25;
 
 /**
  * The quote rule (2026-11-10, docs/decisions.md "One right call"): a paper's own words are the words the request puts
  * in quotation marks, and code copies them. Where the answer's copied words (a letter's or a statement's text, an
  * agreement's terms, a form's field of text) overlap exactly one quoted span of the request, that span is what goes,
- * exactly as quoted; where words longer than `QUOTE_FROM` characters overlap none, the request is asked back ("Put
- * them in quotation marks."): where unquoted words begin and end is a reading the copy cannot settle, and two careful
- * readers placed it differently. A payment's memo is a description, not a paper's words, and is not ruled. Returns the
- * program with the quoted spans in place (`quoted`: whether any was), or `ask` with the field.
+ * exactly as quoted. With `ask` (off unless a serving setting says so: the coordinator, 2026-11-10, because on past
+ * data it would ask back about a quarter of right answers, and nobody has yet seen how seats write once told to
+ * quote), words longer than `QUOTE_FROM` characters that overlap none are asked back ("Put them in quotation marks.").
+ * A payment's memo is a description, not a paper's words, and is not ruled. Returns the program with the quoted spans
+ * in place (`quoted`: whether any was), or `ask` with the field.
  */
-export function quoteRule(request: string, program: string, forms: string[] = []): { program: string; quoted: boolean } | { ask: string } {
+export function quoteRule(request: string, program: string, forms: string[] = [], o: { ask?: boolean } = {}): { program: string; quoted: boolean } | { ask: string } {
   let p: calls.Program;
   try {
     p = calls.parseProgram(program);
@@ -96,7 +94,6 @@ export function quoteRule(request: string, program: string, forms: string[] = []
   }
   if ("none" in p) return { program, quoted: false };
   const typed = textFieldsOf(forms);
-  const spans = quotedSpans(request);
   let quoted = false;
   let ask: string | undefined;
   const visit = (c: calls.Call): calls.Call => {
@@ -106,18 +103,17 @@ export function quoteRule(request: string, program: string, forms: string[] = []
         args[k] = { call: visit(v.call) };
         continue;
       }
-      const paper = "text" in v && c.fn !== "money" && (WHOLE_WORDS[c.fn]?.includes(k) || (c.fn === "form" && typed.has(k)));
+      const paper = "text" in v && (PAPER_WORDS[c.fn]?.includes(k) || (c.fn === "form" && typed.has(k)));
       if (!paper) {
         args[k] = v;
         continue;
       }
-      const t = plain(v.text);
-      const hits = t ? spans.filter((q) => { const x = plain(q); return !!x && (x.includes(t) || t.includes(x)); }) : [];
-      if (hits.length === 1) {
-        args[k] = { text: hits[0]! };
+      const q = quotedFor(request, v.text);
+      if (q !== undefined) {
+        args[k] = { text: q };
         quoted = true;
       } else {
-        if (v.text.trim().length > QUOTE_FROM) ask ??= k;
+        if (o.ask && v.text.trim().length > QUOTE_FROM) ask ??= k;
         args[k] = v;
       }
     }

@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
-import { recordTest, ruled } from "./rules";
+import { paperWords, recordTest, ruled } from "./rules";
 
 export const TRANSLATOR_VERSION = "0.10.0"; // 0.10.0: one right call (docs/decisions.md, 2026-11-10): basis=, for= and statement data= are no longer written (code sets the records cited and the capacity; a paper code reads goes on its form, or is no_such_act where none is listed); a payment's purpose is memo=; sentences and worked examples changed to match, nothing else. 0.9.5: the call language gained since taught (docs/design/translator-round-3.md, section 1; docs/decisions.md, 2026-10-14), sentences and worked examples only, nothing removed: a payment drawn on a line of the budget carries line=; hours= on an agreement; a notice of something held again and again is one statement with practice= and on=, an offer anyone may take up one statement with offer=. 0.9.4: the rulings of 2026-10-10 on what readers disagreed over (docs/decisions.md), sentences and worked examples only: what a payment's for= is and is not; where a letter's text ends and what re= is; a payment together with its report is one program of two lines; an act made to hang on something still to be found out is look_first, and telling someone else to act on things described is a message; an amount that needs a count is needs_calculation; unknown_form only where a form is named, an office's own decision or notice with no form listed is a statement, sending someone unnamed is no_such_act; no first= on a single payment made now; a paragraph on agreements; 0.9.3: a figure named with something to be taken off or added that is not given as a figure is an amount to be worked out, never copied (one sentence and its bracket in needs_calculation, two worked examples); telling an office, a post or a person to do something is a message to them where no form is listed for it, never no_such_act (one sentence in no_such_act, one worked example); what per_request is (the gloss of money); 0.9.2: when a payment or a job done again and again starts (first=) is a date or a length of time, copied as the request wrote it (one rule, one line of the syntax, one worked example; the standing-work rule's words for first= and until= say the same); 0.9.1: a form listed as a direction to the person's own office is marked so in the list, and the standing-work rule says the office's own order to its staff is never that form; a worked example each of a direction on a form and of an own paper on a form; 0.9.0: a direction to an office and a paper of one's own office go on the form listed for them; work done again and again is a standing order (work with every=)
 
@@ -445,7 +445,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
   }
   return {
     id: tid,
-    async translate(req: TranslateRequest): Promise<Translation & { retries?: { call?: string; reason: string }[]; answered?: Answered }> {
+    async translate(req: TranslateRequest): Promise<Translation & { retries?: { call?: string; reason: string }[]; answered?: Answered; paper_words?: { quoted: number; unquoted: number } }> {
       const messages: LlmMessage[] = [{ role: "user", content: translatorContext(req) }];
       const retries: { call?: string; reason: string }[] = [];
       // (An attempt that failed on a value it could not read: what the seat is asked if the next attempt does no
@@ -464,7 +464,9 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
           if (!r.ok && unread && r.none && !r.unit) return { ...unread, ...(t.call ? { call: t.call } : {}), retries };
           // (What a model that says how sure it is said with its answer: for an arrangement of translators, arrangement.ts.)
           const answered = typeof out?.input?.sure_ppm === "number" ? (({ program: _p, ...more }) => more)(out.input as { program?: unknown }) as Answered : undefined;
-          return { ...(r.ok ? r : t), ...(retries.length ? { retries } : {}), ...(answered ? { answered } : {}) };
+          // (Whether the paper words of the call that went were quoted in the request: for the record, by seat model.)
+          const words = r.ok ? paperWordsOf(req, r.draft.call) : undefined;
+          return { ...(r.ok ? r : t), ...(retries.length ? { retries } : {}), ...(answered ? { answered } : {}), ...(words ? { paper_words: words } : {}) };
         }
         if (r.unit) {
           const { final: _, unit: _u, none: _n, ...t } = r;
@@ -482,6 +484,17 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
   };
 }
 
+/** Whether the paper words of `call` were quoted in the request (rules.ts `paperWords`), with the text fields of the
+ * forms the seat knows. */
+function paperWordsOf(req: TranslateRequest, call: string): { quoted: number; unquoted: number } | undefined {
+  try {
+    const text = new Set(req.knowledge.forms.flatMap((f) => Object.entries((f.data?.fields ?? {}) as { [k: string]: { type?: string } }).filter(([, x]) => x?.type === "text").map(([k]) => k)));
+    return paperWords(req.proposal, calls.parseProgram(call), text);
+  } catch {
+    return undefined;
+  }
+}
+
 /** How a draft reads to the participant confirming it. */
 export function draftText(d: Draft): string {
   return [
@@ -497,4 +510,4 @@ export { createArrangement, STANDS, type Arrangement, type Arranged, type Route,
 export { Knowledge } from "./knowledge";
 export { Preview } from "./preview";
 export { LABEL_TEXT, RESOLVER, resolve, type Resolution } from "./resolver";
-export { idsIn, ON_ITS_FORM, recordTest, ruled, type Ruled } from "./rules";
+export { idsIn, ON_ITS_FORM, paperWords, quotedSpans, recordTest, ruled, type Ruled } from "./rules";

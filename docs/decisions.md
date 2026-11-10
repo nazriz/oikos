@@ -12005,8 +12005,11 @@ code, and re-measures by code on the same data. No model was called and nothing 
   1,280 rows, where no seat had been told:** 292 keys have unquoted paper words over 25 characters, so a model that
   answered every request as its key would have 292 asked back (23%); the rule catches 18 of the 32 copied-text errors.
   A higher threshold barely helps (100 characters: 262 and 17; 300: 55 and 7): unquoted paper words in real requests
-  are long. What matters is how often seats quote once told: read it in the first pilot, and drop the ask-back (keep the
-  exact copy of a quoted span) if they do not.
+  are long. **So the ask-back is off by default** (the coordinator, the same day): a serving setting turns it on
+  (`DecideOptions.askUnquoted`, or `OIKOS_DECIDE_ASK_UNQUOTED=1`); the exact copy of a quoted span stands. Each draft
+  records whether its paper words were quoted (a `paper_words` note, `{ draft, quoted, unquoted }`, from
+  `translator/src/rules.ts` `paperWords`), so a run's report can give the share quoted by seat model; the ask-back is
+  decided after the first pilot.
 - **E. Refusals.** `not_yours` and `too_much` are told in the one sentence of `not_an_act` and `no_such_act`, now "Nothing
   was done. ..." (both resolvers; `look_first`, `needs_calculation`, `unknown_form` and `unclear` stay apart). Told
   alike, they are one answer to the scorer. Small on this data: the refusal disagreements are mostly an act against
@@ -12022,8 +12025,9 @@ code, and re-measures by code on the same data. No model was called and nothing 
   basis 142 / 1, 16 / 0; for (on whose behalf) 105 / 0, 2 / 0; a payment's memo there or not 0 / 0, 21 / 21; data 31 / 36,
   8 / 8; copied text 11 / 5, 32 / 32; refusals 45 / 45, 27 / 26; draft route 23 / 23, 9 / 9; a value two ways 49 / 39,
   7 / 6; other 36 / 37, 21 / 23. The audit's estimate for A to C was 146 and 89; the model's is not reached because its
-  21 memo errors are a payment's purpose written or not, which renaming does not decide (the pipeline's own label step
-  already does not compare it; the v4 scorer does: aligning them is the owner's call, and would leave about 104).
+  21 memo errors are a payment's purpose written or not, which renaming does not decide. The exact scorer stays strict
+  (the coordinator, the same day); the fair score, which leaves copied free text and a memo's presence out, is given
+  beside it: 98 wrong before, 81 after.
 - **The draft route (cause 6)** was largely answered by the hand-over forms (`draft_<form>`, `draft_for_client`,
   `send_signed`, landed today); the data here predates them, so what is left of it is for the next pilot to show.
 - **Contract changes** (contracts/README.md, "One right call"): `money(memo=...)`; calls.md's "What code sets"; the four

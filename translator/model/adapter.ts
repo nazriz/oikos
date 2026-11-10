@@ -300,6 +300,9 @@ export interface DecideOptions {
   unreleased?: boolean;
   /** The serving checks on copied words (serve-rules.ts): on unless false (or OIKOS_DECIDE_NO_CHECKS is set). */
   checks?: boolean;
+  /** The quote rule's ask-back for a paper's words quoted nowhere (serve-rules.ts `quoteRule`): off unless true (or
+   * OIKOS_DECIDE_ASK_UNQUOTED=1). The exact copy of a quoted span is made either way. */
+  askUnquoted?: boolean;
 }
 
 export class DecideAdapter implements LlmAdapter {
@@ -468,7 +471,7 @@ export class DecideAdapter implements LlmAdapter {
     // the seat said they begin and end; others that stop part way through the request's sentence, or before
     // sentences of it nothing else of the answer accounts for, are asked back: what is sent might not be what was said.
     const checks = !withheld && (this.o.checks ?? !process.env.OIKOS_DECIDE_NO_CHECKS) && !/^none\(\w+\)$/.test(program);
-    const q = checks ? quoteRule(oneLine(request), program, forms) : undefined;
+    const q = checks ? quoteRule(oneLine(request), program, forms, { ask: this.o.askUnquoted ?? process.env.OIKOS_DECIDE_ASK_UNQUOTED === "1" }) : undefined;
     if (q && "ask" in q) {
       withheld = "unquoted";
       program = "none(unclear)";

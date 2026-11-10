@@ -679,9 +679,10 @@ Refusals told in one sentence (`not_an_act`, `no_such_act`, `not_yours`, `too_mu
   are records is read from the file itself (every id any of its programs cites as a basis, and every minted `rec.`).
   `bun translator/model/relabel.ts measure --rejects <rejects.jsonl>... --set <rows> <answers>... --out <dir>`: the
   readers' disagreements and a model's errors before and after, and what the serving rules (C, D) would ask back.
-- **The quote rule** is a serving check (`translator/model/serve-rules.ts` `quoteRule`, withheld `unquoted`, one of
-  `SERVING_CHECKS`): a paper's words the request quotes are copied as quoted; longer than 25 characters and quoted
-  nowhere, the request is asked back ("Put them in quotation marks."). The seat's `do` tool says so.
+- **The quote rule** (`translator/model/serve-rules.ts` `quoteRule`): a paper's words the request quotes are copied as
+  quoted. Its ask-back (longer than 25 characters and quoted nowhere: withheld `unquoted`, one of `SERVING_CHECKS`,
+  "Put them in quotation marks.") is off unless `askUnquoted` or `OIKOS_DECIDE_ASK_UNQUOTED=1`; each draft's
+  `paper_words` note says whether its paper words were quoted. The seat's `do` tool says to quote them.
 - **Kept in git** (moved from run folders, their worktree paths removed; run folders through `OIKOS_RUNS`):
   `translator/train/v3/join-v3.ts`, `implied.ts`, `pilot-rows.ts` (translator v3's join), and
   `translator/model/round4/serve.py`, `fit.py` (round 4's offline serving and the style-blind calibrator).

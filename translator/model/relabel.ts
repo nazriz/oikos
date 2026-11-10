@@ -19,6 +19,9 @@ import { LABEL_TEXT } from "../src/resolver";
 import { ruled } from "../src/rules";
 import { quoteRule } from "./serve-rules";
 import { right } from "./v4-right";
+import { sameMeaning } from "../train/meaning";
+import { formOfLine } from "../train/blind";
+import { toldAlike } from "../src/resolver";
 
 /** The label a refusal is written as: the first label told in the same words. */
 export function oneLabel(label: string): string {
@@ -78,17 +81,22 @@ if (import.meta.main) {
     report.readers = { disagreed_in_the_pipeline: rejects.length, differ_by_the_scorer_now: readers.before.length, differ_after: readers.after.length };
     // The model: its own answer against the key, on every real row it was scored on.
     const model = { before: [] as any[], after: [] as any[], rows: 0 };
+    const rowOf = new Map<string, any>();
     for (const s of sets) for (const a of s.answers) {
       const r = s.rows.get(a.id);
       if (!r) continue;
       model.rows++;
+      rowOf.set(r.request, r);
       const own = "own" in a ? a.own : a.program;
       const ok = "own" in a ? a.own_ok : a.ok;
       if (!ok) model.before.push([own ?? "none(unclear)", r.program, r.request]);
       const [x, y] = [relabel(own ?? "none(unclear)", r.request, records), relabel(r.program, r.request, records)];
       if (!right(x, y!, r)) model.after.push([x, y, r.request]);
     }
-    report.model = { rows: model.rows, wrong_before: model.before.length, wrong_after: model.after.length };
+    // (Beside the exact score, the fair one as the project reports it: copied free text left out of the comparison, a
+    // payment's memo there or not among it: train/meaning.ts `freeText: false`.)
+    const fair = (x: any[]) => x.filter(([a, b, request]) => { const r = rowOf.get(request); try { return !sameMeaning(a ?? "none(unclear)", b ?? "none(unclear)", { ...(r?.currency ? { currency: r.currency } : {}), forms: (r?.forms ?? []).map(formOfLine).filter(Boolean), freeText: false } as never) && !toldAlike(a, b); } catch { return true; } }).length;
+    report.model = { rows: model.rows, wrong_before: model.before.length, wrong_after: model.after.length, fair_wrong_before: fair(model.before), fair_wrong_after: fair(model.after) };
     // As served (C and D): a program that composes data is asked back (rules.ts), and so is a paper's words longer
     // than a phrase that the request quotes nowhere (serve-rules.ts `quoteRule`); a quoted span is copied exactly.
     // What would then be asked back: of the model's answers, the wrong and the right; and of the keys (what a model
@@ -97,7 +105,7 @@ if (import.meta.main) {
       const x = relabel(p ?? "none(unclear)", r.request, records)!;
       if (/^\s*none\(/.test(x)) return x;
       if (/\bstatement\([^\n]*\bdata=/.test(x) && /^statement|\nstatement/.test(x)) return undefined;
-      const q = quoteRule(r.request.replace(/[\r\n]/g, " "), x, r.forms ?? []);
+      const q = quoteRule(r.request.replace(/[\r\n]/g, " "), x, r.forms ?? [], { ask: true });
       return "ask" in q ? undefined : q.program;
     };
     const served = { wrong: 0, wrong_asked_back: 0, right_asked_back: 0, keys_asked_back: 0, keys_asked_back_by_quotes: 0 };

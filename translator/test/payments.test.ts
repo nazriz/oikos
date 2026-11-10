@@ -128,6 +128,10 @@ test("what code sets, a translator does not choose: the records cited by rule, n
   const proposal = "Pay acc-c0003 XYZ 10 from acc-city for wages, under agreement rec.1225 and law-income-tax, settling rec.7.";
   const r = await createTranslator(scripted(['money(amount="XYZ 10", basis=rec.99, for="wages", from=acc-city, settles=rec.7, to=acc-c0003)']), ok, () => undefined).translate({ draftId: "d1", participant: "finance-system", as: "finance", proposal, knowledge: k });
   expect(r.ok && r.draft.call).toBe('money(amount="XYZ 10", basis=["rec.1225","law-income-tax"], from=acc-city, memo="wages", settles=rec.7, to=acc-c0003)');
+  expect(r.paper_words).toBeUndefined();
+  // Whether a letter's words were quoted is on the translation, for the run's note (the quote rule's ask-back waits on it).
+  const said = await createTranslator(scripted(['message(text="Your pay goes in on Friday.", to=acc-c0003)']), ok, () => undefined).translate({ draftId: "d2", participant: "finance-system", as: "finance", proposal: 'Write to acc-c0003: "Your pay goes in on Friday."', knowledge: k });
+  expect(said.ok && said.paper_words).toEqual({ quoted: 1, unquoted: 0 });
   // A record no argument takes and the seat was never shown, written as no minted record is, is not cited; nor is
   // anything on a line that cites nothing (a letter), and nobody's name is written as whose behalf it is.
   const p = (program: string, request: string) => { const x = ruled(calls.parseProgram(program), request, recordTest(k)); return x.ok ? calls.programText(x.program) : x.ask; };

@@ -92,3 +92,40 @@ export const recordTest = (k: { records: ReadonlySet<string>; forms: { id: strin
   const forms = new Set(k.forms.map((f) => f.id));
   return (id) => /^rec\.[0-9]{1,15}$/.test(id) || (k.records.has(id) && !forms.has(id));
 };
+
+/** The spans a request puts in quotation marks (straight or curly), each as written between them, of eight characters
+ * or more (a shorter one is a name or a label, not a paper's words). */
+export function quotedSpans(request: string): string[] {
+  return [...request.matchAll(/"([^"]{8,}?)"|“([^”]{8,}?)”/g)].map((m) => (m[1] ?? m[2])!);
+}
+/** The arguments whose copied words are a paper's or a letter's own (a payment's memo is a description, not these). */
+export const PAPER_WORDS: { [fn: string]: string[] } = { message: ["text"], statement: ["text"], agreement: ["text", "terms"] };
+const plain = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+/** The quoted span of `request` that copied words `text` overlap, where exactly one does. */
+export function quotedFor(request: string, text: string): string | undefined {
+  const t = plain(text);
+  const hits = t ? quotedSpans(request).filter((q) => { const x = plain(q); return !!x && (x.includes(t) || t.includes(x)); }) : [];
+  return hits.length === 1 ? hits[0] : undefined;
+}
+
+/**
+ * Whether a program's paper words were quoted in its request (the quote rule, recorded before its ask-back is decided:
+ * docs/decisions.md, "One right call"): of the arguments that copy a paper's or a letter's own words (`PAPER_WORDS`,
+ * and a form's fields of type text, `textFields`), how many the request quoted and how many it did not. Undefined
+ * where there are none. For the record only: a run's report gives the share quoted by seat model.
+ */
+export function paperWords(request: string, p: calls.Program, textFields: ReadonlySet<string> = new Set()): { quoted: number; unquoted: number } | undefined {
+  if (!("lines" in p)) return undefined;
+  let quoted = 0, unquoted = 0;
+  const visit = (c: calls.Call): void => {
+    for (const [k, v] of Object.entries(c.args)) {
+      if ("call" in v) visit(v.call);
+      else if ("text" in v && (PAPER_WORDS[c.fn]?.includes(k) || (c.fn === "form" && textFields.has(k)))) {
+        if (quotedFor(request, v.text) === undefined) unquoted++;
+        else quoted++;
+      }
+    }
+  };
+  p.lines.forEach((l) => visit(l.call));
+  return quoted + unquoted ? { quoted, unquoted } : undefined;
+}
