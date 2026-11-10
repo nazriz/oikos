@@ -1,6 +1,6 @@
 // The pure parts of scripts/merge.ts: keeping both sides of a conflict, and which failures are accepted as flakes.
 import { expect, test } from "bun:test";
-import { flakeCandidate, hasMarkers, keepBoth, readFailures } from "./merge";
+import { flakeCandidate, hasMarkers, keepBoth, mergeMessage, readFailures, SUBJECT_MAX, TRAILER } from "./merge";
 
 const conflict = "a\n<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> branch\nb\n<<<<<<< HEAD\n1\n||||||| base\n0\n=======\n2\n>>>>>>> x\nz";
 
@@ -78,4 +78,12 @@ test("main status: a failure in main blocks, a later success or a cancelled run 
     expect(blocker(undefined, () => true)).toBeUndefined();
   } finally { rmSync(dir, { recursive: true, force: true }); }
   expect(fromRuns([{ conclusion: "", headSha: "x" }, { conclusion: "failure", headSha: "y" }, { conclusion: "success", headSha: "z" }])).toMatchObject({ sha: "y", status: "failure" });
+});
+test("mergeMessage: the subject keeps to 72 characters; a long --message goes in the body, whole", () => {
+  const subject = (m: string) => m.split("\n")[0]!;
+  expect(mergeMessage("b")).toBe(`Merge b\n\n${TRAILER}`);
+  expect(subject(mergeMessage("x".repeat(100))).length).toBe(SUBJECT_MAX);
+  expect(mergeMessage("b", "Short and done\n\nmore")).toBe(`Short and done\n\nmore\n\n${TRAILER}`);
+  const long = "y".repeat(300);
+  expect(mergeMessage("b", long)).toBe(`Merge b\n\n${long}\n\n${TRAILER}`);
 });

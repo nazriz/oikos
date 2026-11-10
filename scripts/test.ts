@@ -25,14 +25,23 @@
 // them runs the canaries instead, the rest left to CI. They run in the gate and say their times; the budget does not count them.
 // Where the release kernel is not current, the gate builds the `gate` profile in seconds and
 // points the tests at it. `--tier gate|slow` runs one tier whole. `--list` prints the choice and stops.
+// `--gate --merge` is scripts/merge.ts's: where the gate would run the canaries and leave the rest to CI (a change that
+// reaches more than SLOW_MOST slow files, the kernel, the contracts, or anything in FULL_ON), the whole slow tier instead,
+// so a landing cannot turn main red (2026-11-10: main was red 17 times in 23 days, each time from a slow file the gate left
+// to CI). A change that reaches few slow files keeps the fast path.
 // `--root DIR` runs the *.test.ts under DIR instead of the repo (used by scripts/test-runner.test.ts; no preconditions).
+// Each file's last time is the machine's (~/.oikos/test-times.json, OIKOS_TEST_TIMES), over the tracked seed
+// scripts/test-times.json, which only `--time-new` writes: a run no longer dirties the checkout it runs in.
+// At the end of every run, a linked worktree's own `runs/test-*` scratch is removed (disk-tidy.ts, testScratch) unless
+// another run in the same checkout is still going, or OIKOS_KEEP_TEST_SCRATCH=1. It warns at the start under 60 GB free.
 
 import { Glob } from "bun";
 import { cpus, homedir, loadavg } from "node:os";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { realpathSync } from "node:fs";
 import { buildJobs, defaultPriority, insideSlot, poolSize, take, usedBy, type Used } from "./slots";
+import { lowDisk, testScratch } from "./disk-tidy";
 
 const repo = join(import.meta.dir, "..");
 const args = process.argv.slice(2);
@@ -46,6 +55,7 @@ const timeNew = bool("time-new");
 const noBuild = bool("no-build");
 // (`--gate` is the merge's and every agent's: `bun run test:changed`. `--affected` is its old name.)
 const affected = [bool("gate"), bool("affected")].some(Boolean);
+const mergeMode = bool("merge");
 const tierFlag = flag("tier") ?? "all";
 if (!["gate", "slow", "all"].includes(tierFlag)) { console.log(`--tier is gate, slow or all, not ${tierFlag}`); process.exit(2); }
 const list = bool("list");
@@ -70,9 +80,14 @@ function allowed(running: number): number {
   return Math.max(1, Math.min(maxJobs, free));
 }
 
-// How long each file took last time (kept beside this script): the slowest go first, so the run ends when they do.
-const timesPath = join(repo, "scripts", "test-times.json");
-const times: Record<string, number> = !custom && existsSync(timesPath) ? JSON.parse(readFileSync(timesPath, "utf8")) : {};
+// How long each file took last time: the slowest go first, so the run ends when they do. The machine's record
+// (OIKOS_TEST_TIMES, ~/.oikos/test-times.json, written by every whole-tier run, CI's included) over the tracked seed
+// (scripts/test-times.json, for a fresh machine and the tiers backstop; only `--time-new` writes it). Until 2026-11-10 every
+// run rewrote the tracked file, so every worktree looked dirty and worktree-clean.ts refused to remove it.
+const seedPath = join(repo, "scripts", "test-times.json");
+const timesPath = process.env.OIKOS_TEST_TIMES ?? join(homedir(), ".oikos", "test-times.json");
+const readTimes = (p: string): Record<string, number> => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return {}; } };
+const times: Record<string, number> = custom ? {} : { ...readTimes(seedPath), ...readTimes(timesPath) };
 /** The times as recorded before this run (`times` is updated as files end): the budget reads the machine's load from them. */
 const recorded: Record<string, number> = { ...times };
 // The tiers (scripts/test-tiers.json, under --root its own): the slow tier is named file by file, with why; every other
@@ -111,7 +126,10 @@ function preconditions(gate = false) {
   // the changed file is no part of, so each is not asked to be newer by itself; the stamp records a build made here
   // that cargo found nothing to do in.)
   const stamp = join(repo, "kernel/target/.oikos-built");
-  const built = () => Math.max(...[kernel, wasm, stamp].map((p) => statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? 0));
+  // (Not the wasm module's time: the gate's build writes it fresh in the release folder, and with it counted an old release
+  // kernel passed as current once a gate had built here, and the next run used it: 2026-11-10, 70 files failed on a
+  // kernel from 25 October.)
+  const built = () => Math.max(...[kernel, stamp].map((p) => statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? 0));
   const stale = () => [kernel, wasm].some((p) => !existsSync(p)) || built() < src.t;
   if (!stale()) return;
   if (gate) return gateBuild();
@@ -245,17 +263,21 @@ const slowPick = affected && pick && !docsOnly && slowAll.length ? reasons(slowA
 const kernelOrContracts = !!pick?.changedFiles.some((f) => f.startsWith("kernel/") || /^contracts\/(?!.*\.md$)/.test(f));
 const reached = slowAll.filter((f) => slowPick?.why.has(f));
 const broad = reached.length > SLOW_MOST;
-const slowChosen = slowAll.filter((f) => (broad ? canaries.includes(f) : reached.includes(f)) || (kernelOrContracts && kernelCanaries.includes(f)));
-if (broad) console.log(`--gate: the change reaches ${reached.length} of the slow tier's files, more than ${SLOW_MOST}: the canaries instead (scripts/test-tiers.json), the rest in CI after the push.`);
+// (--merge: where the canaries would stand in for the rest, the whole slow tier: the merge pushes only what CI will pass.)
+const wholeSlow = mergeMode && affected && !docsOnly && (broad || kernelOrContracts || !!fullWhy);
+const slowChosen = wholeSlow ? slowAll : slowAll.filter((f) => (broad ? canaries.includes(f) : reached.includes(f)) || (kernelOrContracts && kernelCanaries.includes(f)));
+if (wholeSlow) console.log(`--gate --merge: ${broad ? `the change reaches ${reached.length} of the slow tier's files, more than ${SLOW_MOST}` : fullWhy ? `${fullWhy} changed` : "the kernel or the contracts changed"}: the whole slow tier (${slowAll.length} files) with the gate, before the push.`);
+else if (broad) console.log(`--gate: the change reaches ${reached.length} of the slow tier's files, more than ${SLOW_MOST}: the canaries instead (scripts/test-tiers.json), the rest in CI after the push.`);
 const slowChosenSet = new Set(slowChosen);
 if (slowChosen.length) {
   console.log(`--gate: and ${slowChosen.length} of the slow tier's ${slowAll.length} files, which the change reaches (their times are reported, not counted against the gate's budget):`);
-  for (const f of slowChosen) console.log(`  + ${f} (about ${Math.round(times[f] ?? 0)}s, slow tier): ${broad || !slowPick?.why.has(f) ? `a canary (${tiers.canary?.[f]?.why ?? ""})${!broad ? ": the kernel or the contracts changed" : ""}` : slowPick.why.get(f)}`);
+  for (const f of slowChosen) console.log(`  + ${f} (about ${Math.round(times[f] ?? 0)}s, slow tier): ${wholeSlow ? "the whole slow tier (--merge)" : broad || !slowPick?.why.has(f) ? `a canary (${tiers.canary?.[f]?.why ?? ""})${!broad ? ": the kernel or the contracts changed" : ""}` : slowPick.why.get(f)}`);
 }
 // The kernel's own tests: under --gate, when the kernel or the contracts it compiles in changed, and then only the crates
 // the change reaches (undefined: all of them; null: none).
 const contractsChanged = !!pick?.changedFiles.some((f) => /^contracts\/(?!.*\.md$)/.test(f));
 const kernelWhich: string[] | undefined | null = !filters.length && !custom && !timeNew && !list && tierFlag !== "slow" && (!pick || pick.kernel || contractsChanged) ? (pick && !contractsChanged ? kernelCrates(pick.changedFiles) : undefined) : null;
+if (!custom && !list) { const low = lowDisk(repo); if (low) console.log(`\n${low}\n`); }
 if (!custom && !list) preconditions(affected);
 const files = [...all, ...slowChosen]
   .filter((f) => slowChosenSet.has(f) || !sel || (affected && BACKSTOPS.includes(f)) || (!docsOnly && (times[f] ?? Infinity) < FAST_SECONDS) || sel.why.has(f))
@@ -276,8 +298,33 @@ let done = 0;
 for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"] as const) process.on(sig, () => {
   for (const c of children) try { c.kill(); } catch {}
   console.log(`\nstopped by signal ${sig} after ${done} of ${files.length} files (not a failure of the tests, and no result)`);
+  clearScratch();
   process.exit(143);
 });
+
+// This run is live in this checkout (a marker in ~/.oikos/test-live): the last run out clears the scratch.
+const liveDir = join(homedir(), ".oikos", "test-live");
+const liveMark = join(liveDir, String(process.pid));
+if (!custom && !list) try { mkdirSync(liveDir, { recursive: true }); writeFileSync(liveMark, realpathSync(repo)); } catch { /* none: clear anyway */ }
+/** The worktree's test scratch (runs/test-*), unless another run here is still going or it is asked to stay. */
+function clearScratch() {
+  if (custom || list) return;
+  try { rmSync(liveMark, { force: true }); } catch { /* gone */ }
+  if (process.env.OIKOS_KEEP_TEST_SCRATCH) return;
+  let others = false;
+  try {
+    const here = realpathSync(repo);
+    for (const f of readdirSync(liveDir)) {
+      const pid = Number(f);
+      let alive = false;
+      try { process.kill(pid, 0); alive = true; } catch (e) { alive = (e as NodeJS.ErrnoException).code === "EPERM"; }
+      if (!alive) { rmSync(join(liveDir, f), { force: true }); continue; }
+      if (readFileSync(join(liveDir, f), "utf8") === here) others = true;
+    }
+  } catch { /* no markers */ }
+  if (others) return;
+  for (const d of testScratch(repo)) try { rmSync(d, { recursive: true, force: true }); } catch { /* in use: next time */ }
+}
 
 const t0 = performance.now();
 let failed = 0;
@@ -406,7 +453,17 @@ if (!custom && !list) try {
   writeFileSync(join(dir, `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}.json`), JSON.stringify({ at: new Date().toISOString(), root: repo, head, mode, wallSecs: Math.round((performance.now() - t0) / 100) / 10, failed, files: record }, null, 1) + "\n");
   for (const old of readdirSync(dir).filter((f) => f.endsWith(".json")).sort().slice(0, -200)) rmSync(join(dir, old), { force: true });
 } catch { /* a record is a convenience: never a failure */ }
-if (!custom && ((!filters.length && !fast && !changed) || timeNew)) writeFileSync(timesPath, JSON.stringify(Object.fromEntries(Object.entries(times).sort()), null, 1) + "\n");
+// (The machine's record: re-read and overlaid with this run's times, written whole by a rename, so runs at once lose nothing
+// but each other's same file. `--time-new` also adds the new files to the tracked seed, to be committed.)
+const sorted = (o: Record<string, number>) => JSON.stringify(Object.fromEntries(Object.entries(o).sort()), null, 1) + "\n";
+const ranTimes = Object.fromEntries(Object.keys(record).map((f) => [f, times[f]!]));
+if (!custom && ((!filters.length && !fast && !changed) || timeNew)) try {
+  mkdirSync(dirname(timesPath), { recursive: true });
+  writeFileSync(`${timesPath}.${process.pid}`, sorted({ ...readTimes(timesPath), ...ranTimes }));
+  renameSync(`${timesPath}.${process.pid}`, timesPath);
+} catch { /* a convenience: never a failure */ }
+if (!custom && timeNew) writeFileSync(seedPath, sorted({ ...readTimes(seedPath), ...ranTimes }));
+clearScratch();
 for (const b of bad) console.log(b);
 // (A gate file that ran long belongs in the slow tier: a new file comes in untimed, and nothing else would say so.)
 const long = Object.entries(record).filter(([f, r]) => !isSlowTier(f) && r.secs > 90).map(([f, r]) => `${f} (${r.secs}s)`);
