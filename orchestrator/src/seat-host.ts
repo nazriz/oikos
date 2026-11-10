@@ -14,7 +14,7 @@
 import { appendFileSync } from "node:fs";
 import { calls, forms, inCalendar, inCurrency, modules, Randomness, View, type DayBook, type Observation, type ParticipantAction, type ParticipantContext, type Roster, type Tally } from "@oikos/participants";
 import {
-  applyFraming, createLlmParticipant, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, keptBackFor, seatsEndNeedMicroUsd, LLM_PARTICIPANT_VERSION, MOCK_VERSION, mockPolicies, MockAdapter, ModelCallFailed, ModelUnreachable,
+  applyFraming, createLlmParticipant, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, reserveOrRefuse, seatsEndNeedMicroUsd, LLM_PARTICIPANT_VERSION, MOCK_VERSION, mockPolicies, MockAdapter, ModelCallFailed, ModelUnreachable,
   SpendingLimitReached, stepsOf, UsageLimitReached, type Budget, type DebriefInput, type FramingSpec, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price,
 } from "@oikos/participants/llm";
 import { createAlone, createArrangement, createTranslator, draftText, Knowledge, NOT_CHECKED, TRANSLATOR_VERSION, type Draft, type Route } from "@oikos/translator";
@@ -150,7 +150,7 @@ export class ModelSeat {
       const shared = o.budget as Budget & { seats?: number };
       const seats = (shared.seats = (shared.seats ?? 0) + 1);
       const need = seatsEndNeedMicroUsd(endCosts(), { seats, seatModel, ...(o.prices[seatModel] ? { seatPrice: o.prices[seatModel] } : {}), calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2) });
-      o.budget.keptBackMicroUsd = keptBackFor(o.budget.limitMicroUsd, need.microusd).microusd;
+      o.budget.keptBackMicroUsd = reserveOrRefuse(o.budget.limitMicroUsd, need.microusd, seats);
       this.keptBack = o.budget.keptBackMicroUsd;
     }
     // (A step's usage, kept for its thinking: run.ts reckons a pilot seat's from its participant calls the same way.)

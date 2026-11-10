@@ -482,7 +482,8 @@
                     "practice",
                     "assertion",
                     "registry",
-                    "carries"
+                    "carries",
+                    "carries_count"
                   ]
                 }
               }

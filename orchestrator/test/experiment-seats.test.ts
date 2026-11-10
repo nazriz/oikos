@@ -165,7 +165,7 @@ test.skipIf(!have)("a model steward in a fork, played by the mock: drafts confir
       { name: "sonnet-told", steward: { kind: "model", model: "claude-code/claude-sonnet-5-5", framing: "simulation" } },
       { name: "haiku-poor", steward: { kind: "model", model: "claude-code/claude-haiku-5-5" } },
     ],
-    seats: { mock_models: true, budget: { arm_usd: { sonnet: 50, "sonnet-told": 50, "haiku-poor": 0.001 } } },
+    seats: { mock_models: true, budget: { arm_usd: { sonnet: 50, "sonnet-told": 50, "haiku-poor": 0.025 } } }, // (A limit that covers its debrief and little more: the enough-work screen)
     measures: ["acts", "records:weather_warning", "log_entries"],
   };
   const out = join(root, "runs", "test-experiment-seats");
@@ -222,8 +222,9 @@ test.skipIf(!have)("a model steward in a fork, played by the mock: drafts confir
   expect(get2("sonnet").calls!.attempt).toBe(2);
   expect(existsSync(join(seed1, "sonnet.interrupted-1.oklog"))).toBe(true);
   expect(existsSync(join(seed1, "haiku-poor.interrupted-1.json"))).toBe(true);
-  expect(get2("haiku-poor").calls!.earlier_microusd).toBeGreaterThan(0);
-  expect(get2("haiku-poor").stopped?.by).toBe("SpendingLimitReached");
+  // (Taken up again with what its earlier attempt spent off its limit, what is left cannot cover its debrief: it does not
+  // start, and says so. Until 2026-11-10 it ran on half a reserve, and could overspend: found by the enough-work screen.)
+  expect(get2("haiku-poor").error).toContain("cannot cover the debriefs of 1 seat");
   // The fork's log says who held the post from the fork, how, and under what limit.
   const kernel = join(root, "kernel/target/release/oikos-kernel");
   const jsonl = join(out, "seed-1", "sonnet.jsonl");

@@ -1251,6 +1251,7 @@ impl Resolver<'_> {
         let assertion = Self::json_(c, "assertion")?;
         let registry = Self::json_(c, "registry")?;
         let carries = Self::str_(c, "carries")?.map(|k| as_label(&k)).filter(|k| !k.is_empty());
+        let carries_count = Self::str_(c, "carries_count")?.and_then(|n| n.trim().parse::<u32>().ok()).filter(|n| *n > 1);
         let mut v = vec![
             ("block", some("publish")),
             ("kind", some(kind)),
@@ -1265,6 +1266,7 @@ impl Resolver<'_> {
             ("assertion", assertion),
             ("registry", registry),
             ("carries", carries.map(Json::from)),
+            ("carries_count", carries_count.map(Json::from)),
         ];
         v.extend(common);
         Ok(vec![obj(v)])

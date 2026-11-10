@@ -26,6 +26,18 @@ fn handed(wants: &str, agreement: &str) -> Vec<Value> {
     ]
 }
 
+/// Handed what happened, the code assistant works the paper out from the facts, as its principal's code would have.
+#[test]
+fn handed_what_happened_it_composes_the_paper_from_the_facts() {
+    let mut h = assistant(None);
+    let mut papers = handed("alone", "agr.1");
+    papers[2] = statement("rec.ref", 34 * DAY, ME, "referral", &[PROV], json!({ "agreement": "agr.1", "kind": "invoice", "wants": "alone", "depth": "matter",
+        "facts": { "goods": "goods", "quantity": 20, "sent_from": "works", "to": "outside", "unit_price": "10000", "paid_into": "acc-ll", "under": "rec.16" } }));
+    let out = all(&h.wake(34 * DAY + 3600, world(papers)));
+    let inv = out.lines().find(|l| l.contains("kind=invoice")).unwrap_or_else(|| panic!("{out}"));
+    assert!(inv.starts_with("invoice = statement(") && inv.contains("\"amount\":\"200000\"") && inv.contains("basis=rec.16") && inv.contains("to=[\"outside\"]"), "{inv}");
+}
+
 fn acted(out: &str) -> bool {
     out.lines().any(|l| l.starts_with("statement(basis=lease-1"))
 }

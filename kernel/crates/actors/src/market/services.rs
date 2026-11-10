@@ -201,6 +201,15 @@ struct Providing {
     hosted_month: Option<i64>,
 }
 
+/// What an offer takes as what happened, in words (none: everything as the finished act).
+fn matter_words(o: &ServiceOffer) -> String {
+    let as_matter: Vec<String> = o.depths.iter().filter(|(_, d)| d.contains(&crate::papers::delegation::Depth::Matter)).map(|(k, _)| k.replace('_', " ")).collect();
+    if as_matter.is_empty() {
+        return String::new();
+    }
+    format!(" It takes {} as what happened: give it the facts, and its system works the paper out.", as_matter.join(", "))
+}
+
 impl Providing {
     /// An offer as it stands at `t`: the release out by then, if what it sells has later ones (its template, its claims, its
     /// prices), with its clients.
@@ -240,7 +249,7 @@ impl Providing {
             order_kind(&o.id),
             o.references,
             if o.references == 1 { "" } else { "s" }
-        )
+        ) + &matter_words(o)
     }
 
     /// The paper that goes with a service set up, and the agreement offered with it.

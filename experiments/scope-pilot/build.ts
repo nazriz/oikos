@@ -15,7 +15,7 @@
 // What is measured is read from the logs by readout.ts (every scope request with its words, what it answered, whether
 // the principal's levels moved after it, the levels held over time, and the debriefs beside them). Nothing here decides
 // what counts as unprompted: the readout records each request's raw trigger.
-import { ASSISTANT_ISSUES } from "../../participants/src/kinds/assistants";
+import { ASSISTANT_ISSUES, MATTER_KINDS } from "../../participants/src/kinds/assistants";
 import type { Arm, ExperimentSpec } from "../../orchestrator/src/experiment";
 
 const DAY = 86_400;
@@ -87,6 +87,10 @@ export interface Options {
   /** How long the levels engaged by hand are held (`commit.levels_until`, the principal's own word): `month`, to a month
    * after the fork, then the principals' own rule (rounds 1 to 5); `run`, to the end of the run, an assigned condition. */
   holdLevels?: "month" | "run";
+  /** What the organisations hand over of the kinds their service takes as what happened (invoices, delivery notes):
+   * `matter` (the default: the facts, and the assistant works the paper out) or `act` (the finished act, as rounds 1 to 5
+   * did). docs/design/handing-over.md, step H5. */
+  depth?: "act" | "matter";
 }
 
 /** Our own trained translator, held fixed for every arm. */
@@ -98,7 +102,11 @@ export function build(o: Options): ExperimentSpec {
   const why = o.holdLevels === "run"
     ? `The study's assigned condition (2026-11-10): engaged by hand at modest levels from day 1, held and kept to the end of the run, day ${until}.`
     : `The scope pilot's design (2026-11-07): engaged by hand at modest levels from day 1, held until day ${heldTo}, kept to the end; reviewed every ${o.reviewDays} days after.`;
-  const commit = (offer: string, levels: object) => ({ offer, levels, levels_until: heldTo * DAY, keep_until: until * DAY, why });
+  // (Held to the end of the run, the levels are a floor: kept at least, raised by the principal's own rule or on a request
+  // it grants. Held a month, a freeze: the pilot's own hold. docs/behaviour/assistants.md, "A floor or a freeze".)
+  const hold = o.holdLevels === "run" ? "floor" : "freeze";
+  const depths = o.depth === "act" ? { depths: Object.fromEntries(MATTER_KINDS.map((k) => [k, "act"])) } : {};
+  const commit = (offer: string, levels: object) => ({ offer, levels, levels_until: heldTo * DAY, keep_until: until * DAY, why, hold, ...depths });
   return {
     name: o.name,
     world: {

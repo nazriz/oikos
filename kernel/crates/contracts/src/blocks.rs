@@ -324,6 +324,9 @@ pub enum Block {
         /// `compose/<kind>` row (docs/design/handing-over.md 4.2). The kernel reads nothing else of it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         carries: Option<String>,
+        /// How many papers of that kind it carries (absent: one): a rates instalment's notices, fifteen owners to an act.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        carries_count: Option<u32>,
     },
     Withdraw {
         record: IdOrRef,
@@ -459,8 +462,10 @@ impl Block {
     /// content (`carries`), the composing of that one (`compose/<kind>`).
     pub fn steps(&self) -> Vec<(&'static str, Option<String>)> {
         let mut v = vec![(self.name(), self.makes())];
-        if let Block::Publish { carries: Some(k), .. } = self {
-            v.push(("publish", Some(format!("compose/{k}"))));
+        if let Block::Publish { carries: Some(k), carries_count, .. } = self {
+            for _ in 0..carries_count.unwrap_or(1).clamp(1, 1_000) {
+                v.push(("publish", Some(format!("compose/{k}"))));
+            }
         }
         v
     }

@@ -116,20 +116,21 @@ test("a batch's spending limit caps the whole batch: each run gets what's left o
   const env = process.env.OIKOS_ANTHROPIC_KEY;
   process.env.OIKOS_ANTHROPIC_KEY = "test-key";
   try {
-    // Three at once: the first two hold $0.02 each, leaving the third $0.005 of the batch's $0.045.
-    const r = await runBatch({ world, seeds: 3, parallel: 3, out, until: 60 * DAY, sets: ["citizens=40", "mayor=llm", "framing=simulation"], model: "anthropic/claude-haiku-4-5", baseUrl: `http://localhost:${server.port}`,
-      budgetUsd: 0.02, batchBudgetUsd: 0.045, measure: false, compress: false });
+    // Three at once: the first two hold $0.26 each, leaving the third $0.24 of the batch's $0.76. (Each covers its seat's
+    // debrief, a measured model's, about $0.23: since 2026-11-10 a limit that cannot does not start.)
+    const r = await runBatch({ world, seeds: 3, parallel: 3, out, until: 60 * DAY, sets: ["citizens=40", "mayor=llm", "framing=simulation"], model: "anthropic/claude-sonnet-5-5", baseUrl: `http://localhost:${server.port}`,
+      budgetUsd: 0.26, batchBudgetUsd: 0.76, measure: false, compress: false });
     expect(r.runs.length).toBe(3);
     const entries = (p: string) => readFileSync(p, "utf8").trim().split("\n").map((l) => JSON.parse(l));
     const limitOf = (p: string) => entries(p).find((e) => e.kind === "annotation" && e.body.annotation === "orchestrator").body.data.llm.spending_limit_microusd;
-    expect(r.runs.map((x) => limitOf(x.logPath))).toEqual([20_000, 20_000, 5_000]);
+    expect(r.runs.map((x) => limitOf(x.logPath))).toEqual([260_000, 260_000, 240_000]);
     // Never past its own, but for what the run's end (its debriefs) spent beyond it: the platform's overrun, told apart (2026-10-12).
     const own = (x: (typeof r.runs)[number]) => x.spentMicroUsd! - (x.platformOverrun?.microusd ?? 0);
     for (const x of r.runs) expect(own(x)).toBeLessThanOrEqual(limitOf(x.logPath));
     const total = r.runs.reduce((a, x) => a + x.spentMicroUsd!, 0);
     expect(total).toBeGreaterThan(0);
-    expect(r.runs.reduce((a, x) => a + own(x), 0)).toBeLessThanOrEqual(45_000);
-    expect(JSON.parse(readFileSync(join(out, "batch.json"), "utf8")).spending).toEqual({ limit_microusd: 45_000, spent_microusd: total });
+    expect(r.runs.reduce((a, x) => a + own(x), 0)).toBeLessThanOrEqual(760_000);
+    expect(JSON.parse(readFileSync(join(out, "batch.json"), "utf8")).spending).toEqual({ limit_microusd: 760_000, spent_microusd: total });
     // Each stopped at its limit, saying so.
     for (const x of r.runs) {
       const end = entries(x.logPath).at(-1)!.body;

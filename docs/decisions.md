@@ -11967,6 +11967,54 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
 - **Revisit if:** a principal is asked for a record older than its 64 kept (then the principal's files are a channel it
   looks into); the compose share gets a source; a seat reads an answer's words as a refusal of what was granted.
 
+## 2026-11-10 · A fork's reserve for debriefs is all they need, or the run does not start (risk MT-30, fixed)
+
+- **What:** the reserve a run or a fork keeps back of its spending limit for debriefs is now all of what they are
+  expected to cost (`keptBackFor`: at least a twentieth of the limit, at most the limit), no longer at most half of it.
+  Where the limit cannot cover the debriefs at all, the run does not start, and says so in plain words (`reserveOrRefuse`:
+  "the spending limit of 0.40 USD cannot cover the debriefs of 6 seats, which are expected to cost ... USD: raise the
+  limit, or seat fewer"). Why: a fork of six seats at about 0.048 USD each on a 0.40 limit spent 0.44; the half-limit cap
+  let the work spend into what the debriefs needed. The debriefs are still sized from the measured table with its
+  margin, so a debrief dearer than the table says still runs over, as the platform's overrun.
+- **Revisit if:** seats are made during a fork in numbers that the reserve sized at its start does not cover (a seat made
+  later adds its own share, and one the limit cannot cover then stops the run at that seat's making).
+
+## 2026-11-10 · A level decided by hand is a floor, not a freeze (the lead's decision of 2026-11-10)
+
+- **What:** a delegation decided by hand (`commit`) now holds its levels as a floor by default (`commit.hold`: `floor` or
+  `freeze`). As a floor, its remit carries `at_least` with `hold_until`: the principal keeps the kind with its assistant at
+  least at that level until the day, its rule may raise it and may grant a request for more, and a request below the
+  floor is declined as such (`reasons`: `below_floor`), in its own words ("We have agreed to keep invoices with you at
+  least ... until ..."). As a freeze (the pilot's month-long hold) nothing changes before the day and a request is
+  declined with it ("we look at levels again on that day"). Why: the study assigns who has an assistant, at what level,
+  for the whole run; a run-long freeze would refuse every request, and the study would have no grants to set beside
+  refusals. Contract: `Remit.at_least`, `Commit.hold`, the reason `below_floor`. What the rule then grants is recorded,
+  not tuned.
+- **Revisit if:** the study wants a ceiling too (a kind its principal will not raise), or a floor per request.
+
+## 2026-11-10 · Handing over H5, first kinds: invoices and delivery notes as what happened (docs/design/handing-over.md, step H5)
+
+- **What:** a remit names a depth beside its level (`act`: the finished act; `matter`: what happened). An offer says
+  which kinds it takes as what happened (`ServiceOffer.depths`; the generator gives an organisation's offers the kinds
+  the engine composes, `MATTER_KINDS`: invoices and delivery notes). At `matter`, the principal's referral carries the
+  facts it reads from the act its own code would have sent (`delegation/compose.rs`, `facts_of`: an invoice's goods,
+  quantity, where they went from, the unit price, the account; a delivery note's order, what was ordered and delivered,
+  the refund, the terms, where the goods went), never the figures the paper works out (the amount, what is owed). The
+  code assistant works the paper out from the facts by the same reckoning (`compose`); a model in the seat is shown the
+  facts and works it out itself. A draft is read on the kind's material details and addressees (`differs`), never its
+  words; a decline names the detail ("The draft is not as we have it: outcome money amount."). At `matter` the referral
+  carries no composing, so the rule weighs the kind without the principal's composing time: the depth is what makes
+  handing a short paper over worth anything (the enough-work screen: at act depth principals took short papers back).
+  The act it would have sent is on record (`handed`, with its depth).
+- **Withdrawals go with the paper they belong to:** an act that publishes a paper and withdraws another is one matter
+  (a price list and the one it replaces), so nothing stands withdrawn while a draft waits.
+- **Not yet:** a matter whose act is a payment (a purchase order paid with the order, a payment to the bank, a rates
+  claim): its own step, with the bank mandate (H1's note). The rates post's acts priced by what they carry: with the
+  rates kinds, once the enough-work branch's offers are in.
+- **Byte-identical:** towns without providers (the check below).
+- **Revisit if:** a kind's facts cannot be read from its act often (then it goes as the finished act, and the rule says
+  so); a seat at `matter` composes figures the principal never declines (then the material details are too few).
+
 ## 2026-11-10 · One right call: basis and for by rule, a payment's memo, no composed data, quotes, refusals told alike (no model called)
 
 The method of VISION section 5, used: four rounds of translator failures were answered with more data and serving
@@ -12215,3 +12263,14 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   volumes (the levels are held); in `study-reach.ts` the rule's cuts at the hold's end and the households' take-up. At act
   depth a referral will cost the principal the paper's row too, so handing over pays even less; at matter depth the
   principal pays the referral alone, and `draft` still costs it more than a paper of under about five and a half minutes.
+
+## 2026-11-10 · A matter priced by what it carries; the study's run-long hold a floor (enough-work screen findings)
+
+- **What:** an act of several papers of a kind (the rates post's: fifteen owners' notices to an act) is one matter, and
+  is priced by what it carries: the referral's `carries_count` prices the composing of each paper (contracts: Publish
+  `carries_count`, `statement(..., carries_count=N)`), and the principal's rule counts each paper of its kinds, not each
+  act (it weighed a rates instalment as 14 two-minute notices, not about 200). The study's assigned condition
+  (`experiments/scope-pilot/study.ts`, `holdLevels: "run"`) holds its levels as a floor (`commit.hold: "floor"`); the
+  pilot's month-long hold stays a freeze. `build.ts` takes `depth` (`matter`, the default, or `act`) for the screen's
+  comparison.
+- **Revisit if:** a principal's act mixes kinds whose papers are counted unevenly.

@@ -207,11 +207,24 @@ procedure.) Both come to the seat with its matters, and stay in its file, where 
 later. Before, a request only brought the review forward, nothing answered it, and a letter was never answered: the
 scope pilot. Test: `a_request_is_answered_part_by_part_and_a_letter_is_acknowledged`.
 
+**What happened, not the finished act** (2026-11-10, `delegation/compose.rs`). A remit names a depth beside its level:
+`act` (the finished act, as before) or `matter` (what happened). Where its service takes a kind as what happened (the
+offer's `depths`: an organisation's invoices and delivery notes), a principal hands those over so: its referral sets out
+the facts (the goods, how many, from where, to whom, the unit price, the account; for a delivery note the order, what was
+ordered and delivered, the refund, the terms, where they went) and not the paper: what it comes to and what is owed are
+the assistant's to work out. Its own code's act stays with it, on record, and a draft is read against it on the kind's
+material details and whom it goes to, never its words; a draft that differs is declined, the detail named. The code
+assistant works the paper out by the same reckoning the principal's code uses; a model is shown the facts. Since the
+composing is the assistant's, the principal's rule does not count it as its own time at that depth. A withdrawal in the
+same act goes with the paper (a price list and the one it replaces are one matter). Test:
+`a_matter_handed_over_as_what_happened_carries_its_facts_and_its_draft_is_read_on_its_material_details`,
+`handed_what_happened_it_composes_the_paper_from_the_facts`.
+
 **Composing a finished act is the principal's time** (2026-11-10). A referral that hands over the finished act carries
 it (`carries=<kind>`, contracts: Publish `carries`) and is priced with that kind's `compose/<kind>` row: half the paper's
 own time, a placeholder (WM-1), the rest being writing it out and sending it. The rule counts that composing as the
 principal's own at every level that hands the act over (`compose_seconds`). Before, the referral cost half a minute and
-the rule counted the whole of the paper's time as saved, though the principal had worked out the act itself. So fewer
+the rule counted the whole of the paper's time as saved, though the principal had worked out the act itself. An act of several papers (a rates instalment's act, fifteen owners' notices) is one matter, priced by what it carries (`carries_count`: each notice's composing), and its rule counts each paper, not each act. So fewer
 services pay by the rule; that is recorded, not tuned. Each act handed over is on record as what the principal would
 have done (`decision`, choice `handed`, with its program): read by measures, never by anyone in the world.
 
@@ -245,6 +258,16 @@ until 2026-11-08 a factory remitted notices to vacate), held until the day given
 or replace the service before the day it said. After those days its rule weighs everything as ever, on its review days
 and whenever the assistant asks for more scope. Nothing else in the world reads it. Test:
 `kernel/crates/actors/src/delegation/tests.rs`, `a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after`.
+
+**A floor or a freeze** (`commit.hold`, 2026-11-10). By default the levels decided are a **floor**: the principal has
+agreed to keep each kind with its assistant at least at that level until the day given (a service's committed term and
+scope, as a contract has). Its remit says so ("We have agreed to keep them with you at least at draft until ...";
+`Remit.at_least` with `hold_until`). Its rule weighs the kind as ever on its review days and may raise it, never below
+the floor, and a request for more is weighed and may be granted; a request to go below is declined as the floor, with
+its day. As a **freeze** (`hold: "freeze"`: the scope pilot's month-long hold, and a study cell) it does not look at the
+levels again before the day, and a request is declined with it ("we look at levels again on that day"). Why: for the
+study who has an assistant and at what level is assigned for the whole run, and as a freeze every request would be
+refused, leaving no grants to compare. Test: `a_level_decided_by_hand_as_a_floor_is_kept_at_least_and_its_rule_may_raise_it_or_grant_more`.
 
 **A set-up of nothing is paid as placed.** An order whose total is nothing (au-vic's offers to organisations cost
 nothing to set up) is set up at once: before 2026-11-07 the seller waited for a payment that never came and declined the

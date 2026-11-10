@@ -148,6 +148,17 @@ fn what_is_not_handed_over_is_done_by_the_principal_in_the_same_act_as_the_refer
 }
 
 #[test]
+fn an_act_of_several_papers_is_one_matter_priced_by_what_it_carries() {
+    // (A rates instalment's act carries many owners' notices: one referral, its composing priced for each.)
+    let two = format!("{NOTICE}\nstatement(kind=notice_to_vacate, text=\"Please leave.\", to=[\"t2\"], basis=lease-2)");
+    let (mut h, _, remit) = engaged_doing(&two);
+    let out = all(&h.wake(34 * DAY + 3600, world(vec![remit])));
+    let refs: Vec<&str> = out.lines().filter(|l| l.contains("kind=referral")).collect();
+    assert_eq!(refs.len(), 1, "{out}");
+    assert!(refs[0].contains("carries=notice_to_vacate") && refs[0].contains("carries_count=\"2\""), "{}", refs[0]);
+}
+
+#[test]
 fn a_draft_not_as_asked_is_declined_and_done_by_the_principal_and_one_as_asked_is_signed_off() {
     let (mut h, _, mut remit) = engaged();
     remit["data"]["level"] = json!("draft");
@@ -259,7 +270,7 @@ fn a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after(
     // (A study's design: the principal has decided to take this offer, notices at draft, for 60 days, and to keep the
     // service for 90; the offer is far too dear for its rule ever to take.)
     let script: Vec<Value> = (1..=120).map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
-    let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 60 * DAY, "keep_until": 90 * DAY, "why": "the study's design" });
+    let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 60 * DAY, "keep_until": 90 * DAY, "why": "the study's design", "hold": "freeze" });
     let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
         "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "commit": commit } }));
     let inner = crate::stub::Script.create(&h.ctx).unwrap();
@@ -291,7 +302,7 @@ fn a_delegation_decided_by_hand_is_taken_and_held_and_its_rule_takes_over_after(
     }
     let line = answered.lines().find(|l| l.contains("kind=scope_answer")).unwrap_or_else(|| panic!("an answer: {answered}"));
     assert!(line.contains("basis=rec.ask") && line.contains("\"request\":\"rec.ask\"") && line.contains("\"why\":\"held\"") && line.contains(&format!("\"look_again_at\":{}", 60 * DAY)), "{line}");
-    assert!(line.contains("We keep notice to vacates at draft for sign-off until year 1, day 61. After that we will look at it again."), "the hold in the office's words: {line}");
+    assert!(line.contains("We keep notice to vacates at draft for sign-off until year 1, day 61: we look at levels again on that day."), "the hold in the office's words: {line}");
     let d = h.decisions.iter().find(|d| d["choice"] == "answered").expect("the answer's decision");
     assert_eq!((d["answers"].clone(), d["granted"].clone()), (json!("rec.ask"), json!(false)));
     let mut after = String::new();
@@ -319,6 +330,91 @@ fn a_remit_that_hands_a_kind_over_no_longer_takes_back_what_is_open_of_it() {
     let ask = statement("rec.ask", 35 * DAY + 7200, ME, "approval_request", &[ME], json!({ "referral": referral, "gist": "the notice" }));
     let late = all(&h.wake(36 * DAY + 3600, world(vec![ask])));
     assert!(!late.contains("kind=go_ahead") && !late.lines().any(|l| l.starts_with("statement(basis=lease-1")), "and says nothing more on it, nor does it twice: {late}");
+}
+
+#[test]
+fn a_level_decided_by_hand_as_a_floor_is_kept_at_least_and_its_rule_may_raise_it_or_grant_more() {
+    // (A study's assignment for the whole run: notices at least at draft for 120 days. Cheap errors, so its rule would
+    // sooner go alone: it may, above the floor; it does not go below it, and a request to go below is declined as such.)
+    let script: Vec<Value> = (1..=100).map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
+    let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 120 * DAY, "keep_until": 120 * DAY, "why": "the study's design" });
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "commit": commit } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    h.wake(DAY + 3600, world(vec![offer_rec(10_000)]));
+    let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).unwrap() as i64 + 1);
+    h.wake(32 * DAY + 3600, world(set_up(&order)));
+    h.wake(33 * DAY + 3600, world(vec![signed()]));
+    let first = h.sent.iter().rev().find(|p| p.contains("kind=remit")).cloned().unwrap_or_default();
+    assert!(first.contains("\"level\":\"draft\"") && first.contains("\"at_least\":\"draft\"") && first.contains(&format!("\"hold_until\":{}", 120 * DAY)), "{first}");
+    assert!(first.contains("We have agreed to keep them with you at least at draft until year 1, day 121"), "{first}");
+    let remit = |id: &str, at: i64, level: &str| json!({ "id": id, "record": "statement", "author": "ll-system", "speaks_for": ME, "at": at, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [PROV], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "notice_to_vacate", "level": level, "hold_until": 120 * DAY, "at_least": "draft" } });
+    let mut out = String::new();
+    for d in 34..=70 {
+        out.push_str(&all(&h.wake(d * DAY + 3600, world(if d == 34 { vec![remit("rec.f1", 34 * DAY, "draft")] } else { vec![] }))));
+    }
+    let raised = out.lines().find(|l| l.contains("kind=remit")).unwrap_or_else(|| panic!("its rule raises it above the floor: {out}"));
+    assert!(raised.contains("\"level\":\"alone\"") && raised.contains("\"at_least\":\"draft\""), "above the floor, the floor kept: {raised}");
+    // (Asked to go below the floor: declined as the floor, with its day. Asked for draft, at the floor: weighed, and kept.)
+    let below = statement("rec.ask1", 71 * DAY, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "level": "advice" }));
+    let at = statement("rec.ask2", 71 * DAY, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "level": "draft" }));
+    let mut ans = all(&h.wake(71 * DAY + 3600, world(vec![remit("rec.f2", 70 * DAY, "alone"), below, at])));
+    ans.push_str(&all(&h.wake(72 * DAY + 3600, world(vec![]))));
+    let one = ans.lines().find(|l| l.contains("kind=scope_answer") && l.contains("rec.ask1")).unwrap_or_else(|| panic!("{ans}"));
+    assert!(one.contains("\"why\":\"below_floor\"") && one.contains("We have agreed to keep notice to vacates with you at least to draft for sign-off until year 1, day 121."), "{one}");
+    let two = ans.lines().find(|l| l.contains("kind=scope_answer") && l.contains("rec.ask2")).unwrap_or_else(|| panic!("{ans}"));
+    assert!(two.contains("\"why\":\"costs_more\""), "{two}");
+}
+
+/// An export as the producer makes it: the goods sent, and the invoice for them.
+const EXPORT: &str = "goods(at=outside, carried=yes, from_at=works, kind=goods, quantity=\"20\", to=outside)\ninvoice = statement(basis=rec.16, data={\"from_at\":\"works\",\"kind\":\"goods\",\"outcome\":{\"money\":{\"amount\":\"200000\",\"for\":\"20 goods exported\",\"to\":\"acc-ll\"}},\"quantity\":20}, kind=invoice, text=\"Invoice: 20 goods at $100.00 each, $2,000.00.\", to=[\"outside\"], visible=[\"ll\",\"outside\"])";
+
+#[test]
+fn a_matter_handed_over_as_what_happened_carries_its_facts_and_its_draft_is_read_on_its_material_details() {
+    // (A service that takes invoices as what happened: its system works the paper out. The principal's rule weighs that
+    // without its composing, and its remit says the depth.)
+    let script: Vec<Value> = (1..=40).map(|d| json!({ "at": d * DAY + 3600, "call": EXPORT })).collect();
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "invoice": { "own_seconds": 1800, "error_cost": 1000, "compose_seconds": 900 } }, "hour_value": 4000, "review_days": 30 } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    let mut o = offer();
+    o["kinds"] = json!(["invoice"]);
+    o["seconds"] = json!({ "invoice": 60 });
+    o["depths"] = json!({ "invoice": ["act", "matter"] });
+    for d in 1..=30 {
+        h.wake(d * DAY + 3600, world(if d == 1 { vec![statement("rec.off", 0, PROV, "service_offer", &[], o.clone())] } else { vec![] }));
+    }
+    let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).expect("it engages") as i64 + 1);
+    let mut up = set_up(&order);
+    up[0]["data"]["offer"] = o;
+    h.wake(32 * DAY + 3600, world(up));
+    h.wake(33 * DAY + 3600, world(vec![signed()]));
+    let remit = h.sent.iter().rev().find(|p| p.contains("kind=remit")).cloned().unwrap_or_default();
+    assert!(remit.contains("\"depth\":\"matter\""), "{remit}");
+    let rec = json!({ "id": "rec.remit", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 33 * DAY, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [ME], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "invoice", "level": "draft", "depth": "matter" } });
+    let out = all(&h.wake(34 * DAY + 3600, world(vec![rec])));
+    let line = out.lines().find(|l| l.contains("kind=referral")).unwrap_or_else(|| panic!("{out}"));
+    assert!(line.contains("\"facts\":{") && !line.contains("\"calls\"") && !line.contains("carries=") && line.contains("\"unit_price\":\"10000\"") && !line.contains("200000"), "the facts, not the paper: {line}");
+    assert!(out.lines().any(|l| l.starts_with("goods(")), "the goods it sends itself: {out}");
+    assert!(h.decisions.iter().any(|d| d["choice"] == "handed" && d["depth"] == "matter"), "the act it would have sent, on record");
+    // (A draft as its own code would have sent it, in other words: signed off. One that invoices for more: declined,
+    // the detail named.)
+    let referral = last_referral(&h);
+    let same = statement("rec.d1", 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "invoice", "text": "Our invoice for the 20 goods.", "to": ["outside"],
+        "data": { "kind": "goods", "quantity": 20, "from_at": "works", "outcome": { "money": { "amount": "200000", "to": "acc-ll", "for": "export" } } } } }));
+    let out = all(&h.wake(35 * DAY + 3600, world(vec![same])));
+    assert!(out.contains("kind=sign_off"), "{out}");
+    h.wake(36 * DAY + 3600, world(vec![]));
+    let referral = last_referral(&h);
+    let more = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "invoice", "text": "Invoice.", "to": ["outside"],
+        "data": { "kind": "goods", "quantity": 20, "from_at": "works", "outcome": { "money": { "amount": "250000", "to": "acc-ll" } } } } }));
+    let out = all(&h.wake(37 * DAY + 3600, world(vec![more])));
+    let no = out.lines().find(|l| l.contains("kind=declined")).unwrap_or_else(|| panic!("{out}"));
+    assert!(no.contains("outcome money amount"), "{no}");
 }
 
 #[test]
