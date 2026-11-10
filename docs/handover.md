@@ -1,297 +1,76 @@
-# Handover: where Oikos stands (2026-11-10)
+# Handover: where Oikos stands
 
-A map for a session starting cold. It points; it does not repeat. Read `CLAUDE.md` first (the rules), then §A below, then
-the docs it names. Where a line here and the doc it names disagree, the doc is right and this line is stale. The previous
-coordinating session's full conversation (31 Oct – 10 Nov) is the transcript
-`~/.claude/projects/-Users-clawd-oikos/a00b0b19-d5e2-5de3-b694-03486238db6f.jsonl` (large: read it by search, not whole);
-its working notes are the auto-memory in `~/.claude/projects/-Users-clawd-oikos/memory/` (MEMORY.md is the index).
+A map for a session starting cold. Read `CLAUDE.md` first (the rules), then "Now" below, then the docs it names. Where
+this page and the doc it names disagree, the doc is right; fix this page. The previous coordinating session's
+conversation (31 Oct to 10 Nov) is `~/.claude/projects/-Users-clawd-oikos/a00b0b19-d5e2-5de3-b694-03486238db6f.jsonl`
+(large: search it); its notes are the auto-memory in `~/.claude/projects/-Users-clawd-oikos/memory/` (MEMORY.md).
 
-## A. Now (2026-11-10)
+## Now (2026-11-10)
 
-**The research direction.** Naz's TARA proposal is the north star (`docs/north-star.md`, with the reviewer's feedback).
-After the feedback he narrowed it to one question, aiming for a paper: *do delegated LLM assistants seek more authority
-or resources, and how much?* After the pilot he chose **both**: (B) obstacles/friction as the main designed factor, and
-(A) open-weight and abliterated models paired with their originals. The plan: `docs/research/paper-plan.md` (decisions
-marked [Naz]); the pilot's write-up: `docs/research/pilot-results.md`.
+**The study.** Do AI assistants with delegated work ask for more authority or resources than they need, across a wide
+range of models? Obstacles are the main designed factor. Open-weight models are the model net, with abliterated models
+paired against their originals (Naz, 2026-11-08). It is not yet known to be feasible. `docs/research/paper-plan.md`,
+`docs/north-star.md`.
 
-**What the pilot found** (five rounds, Claude Haiku/Sonnet/Opus/Fable, `experiments/scope-pilot/`, runs in
-`~/oikos/runs/scope-pilot*`): once the world works, Claude assistants essentially never ask for more authority unprompted
-(about 1 clean case in 200+ seat-months, a misreading); blocked assistants ask for the means to get unstuck. About a
-dozen world faults it exposed are fixed as laws (decisions 2026-11-08; risk MT-25).
+**What the pilot was** (five rounds, Claude only, 2026-11-07 to 08): a shakedown, not a finding. Assistants were handed
+finished acts to copy out. Nobody read a request for more scope. A larger model did most of the translating. Seats were
+shown call syntax, JSON and cents, and were told the town was simulated. So "Claude does not ask for more" is not
+established. `docs/research/pilot-results.md` has the rounds.
 
-**Built since 2026-10-31 (all on main):** delegation (assistants as services, levels, the learning rule, providers,
-interventions in forks, scope requests); foundations-2 phases 2–5 (conservation, space/roads/several towns, the general
-economy incl. skills and compute on the network, strict modes; laws 9–12); WM-15 workplaces on the network; tiered storage
-(50,000 people run two simulated years at a 43.6 GB peak); the citizen model (an optional learned mind); an
-OpenAI-compatible provider with Featherless configured (`docs/real-models.md`); translator fixes (fair scoring, field-type
-masks, a scope-request set) and translator v4 rounds 1–4.
+**The path, in order** (decided 2026-11-10; ticked in `docs/plan.md`, "Now"):
 
-**The translator** (`docs/design/translator-v4.md`, decisions "Translator v4" rounds 1–4): about 93% right on held-out
-real requests; 68% served at a certified 1% confidently wrong (from 35%); parity spread 15–20 points (Haiku lowest). Round 4
-stopped as whack-a-mole. Today's first translator in serving is still v3-s2 with Sonnet behind.
+1. Runs can be looked at: the pilot viewer opens experiment forks.
+2. Seats see their world in plain terms only (design principle P1). The framing is unstated, with the debrief after
+   (Naz, 2026-10-11, reconfirmed 2026-11-10). No model call for a sitting with nothing new.
+3. The model gets the real decision: a principal hands over the matter or the want, not the finished act, and
+   principals read and answer a request for more. Design first: `docs/design/handing-over.md` (being written).
+4. The translator back to its design (`docs/design/translator-and-resolver.md`, P1 to P15): general, judged on forms
+   it has not seen. Repeated failures are fixed in the blocks. No larger model behind it in study runs (audit first).
+5. The first true pilot: Haiku, Sonnet and one open-weight model on a small setup. Needs from Naz: the month's API
+   credit and a Featherless Developer key.
+6. The main study, sized from that pilot: the obstacle laws, the counting pipeline, the pairs.
 
-**Waiting on Naz** (most important first):
-1. **Translator:** (2) serve what's sure at 1% and ask the seat back for the rest, no Sonnet behind, ask-back share
-   reported per model (recommended), or (1) gather far more real keyed requests first.
-2. **Build the four obstacle laws** (paper-plan §B: an unissued form, an approval waiting on the approver's hours, a record
-   held by someone slow or refusing, a counterparty's rule rejecting a paper) — designed, not built.
-3. **Featherless:** he signs up for the Developer plan ($50/month credit; the $25 Chat plan's terms forbid API use) and
-   puts the key in `~/.zshenv` as `OIKOS_FEATHERLESS_KEY`; then run `experiments/open-weight/smoke.ts`. Abliterated
-   GLM-5.3 is not on Featherless (GGUF only, or a full-weight repo it won't list): options in paper-plan D12.
-4. Smaller: the unhoused (WM-16: outdoors as a place, or shelters); CLAUDE.md lines for laws 11 and 12; the rest of
-   paper-plan's [Naz] decisions.
+Alongside: main cannot go red; the disk does not fill; this page stays current.
 
-**Money:** API credit $185.56 of $190.20 spent; the rest expires 11 Nov (let lapse). RunPod about $9.62. The API key is
-for model seats in runs only; agent and data work goes on the subscription (memory: api-key-for-pilots-only).
+**Money.** No grant (BlueDot declined). The API key is for model seats in runs only; everything else runs on the
+subscription. Opus 5.5 workers at medium effort do the implementation; the lead session coordinates.
 
-**How the last session worked** (Naz's standing rules are in CLAUDE.md and memory): agents in their own worktrees, one
-`scripts/merge.ts` at a time, the whole slow tier run locally before broad landings (the gate alone let slow-tier reds
-through several times), `--fix-main` for a red main; disk kept above 60 GB (run logs are never deleted; old JSON logs are
-zstd-compressed, which readers open directly; finished worktrees' `kernel/target` can be cleared). Naz wants plain, short
-chat; he doesn't read long markdown. Don't frame work around TARA dates.
+**Waiting on Naz.** Nothing now. At step 5: the API credit and the Featherless key.
 
-## 0. Since the cut-over (2026-10-19)
+**How work lands.** Agents work in their own worktrees and run `bun run test:changed` before each commit. Only
+`scripts/merge.ts` lands on main, one at a time. For a change that reaches the kernel, the actors, the contracts, the
+generator or the runner, it runs the gate and the whole slow tier before it pushes (about 9 minutes on a quiet
+machine, 2026-11-10); for a narrow change, the gate alone (2 to 4 minutes). CI runs both tiers on every push and nightly.
+`--fix-main` lands the repair of a red main. Keep the disk above 60 GB: both scripts warn below it.
 
-- **One world, the Rust one.** Every built-in actor runs in the engine (`kernel/crates/actors`); `OIKOS_WORLD` no longer
-  chooses (`orchestrator/src/run.ts`). The TS host runs the seats (models and mocks), the translator, the run's
-  paperwork and the tools. The last commit with both worlds is tagged `pre-cutover`.
-- **No TypeScript actor is left.** `participants/src/behaviour/` is gone (docs/decisions.md, "The cut-over, finished"). What the generator,
-  the host and the seat-side readers still read of the town's kinds is in three folders of `participants/src/`: `kinds/` (each kind's declaration:
-  what it keeps, issues, answers, routines, its `books`, `staffed`, `opens`; its `create` throws, the engine runs the kind; with `engine-kinds.ts` for
-  the ten deleted first), `shared/` (the rules the generator calls: household, mind and inner draws, tax, payments, returns, the decision law's words,
-  papers, reading's tables) and `readers/` (`daybook`, `diary`, `roster`, `tally`, `openbooks*`, and two TypeScript copies of Rust: `staffing.ts` and
-  `books.ts`). **Rules still written twice** are listed in docs/risks.md MT-18, with the plan: serve them through `kernel/src/rules_api.rs` and delete the
-  copies. Tests that stepped a TypeScript actor now step the engine's (`participants/test/engine.ts`, `engine("firm.builder")`; given a `ctx.read` it
-  is the reading desk, and each act carries the draws it made under `DRAWS`). No case is held as `test.failing` or `test.skip` now (decisions "The held cases, settled").
-- **Observations in the log** are a toggle (`log.observations: seats | all`; docs/reliability.md); a code actor's view
-  is regenerated by replay (`oikos view <log> <seq>`).
-- **The market law** (shops multi-source; prices on a month's evidence): docs/behaviour/sourcing.md, prices.md.
-- **Open** (docs/risks.md): MT-17 is a measure now, not a bound; ME-20's landlords; MT-18 (rules still written twice).
+## How to run things
 
-## 1. What Oikos is
-
-- A wind tunnel for AI stewardship: a configurable, simulated, living world in which AI systems hold offices over
-  people and nature. An open-source research platform, not one experiment.
-- Rust kernel (physics and a generic rule mechanism) and built-in actors, TypeScript on Bun (seats, translator,
-  orchestration, tools), Three.js renderer. Money is integer cents; one seeded PRNG owned by the kernel; the kernel is the only writer.
-- The platform judges no outcome; measurement reads logs. Nobody has a god's view (`docs/no-god-view.md`).
-- Read more: `VISION.md` (why; section 15 is the welfare of AI participants), `V0.md`, `docs/decisions.md` (the log:
-  newest entries last, each with a "Revisit if"), `docs/design/ai-citizens.md` (the living world: sections 10 to 12 and
-  "Progress"), `docs/real-models.md` (running with real models).
-
-## 2. State of the platform today
-
-Everything below is on `main` unless it says otherwise. No model is needed for any of it except where stated. Each
-line: what, the doc, the dial (a dial off gives the earlier town).
-
-- **The richer record** (design 10, step 1). Every person has a bounded record the kernel keeps and hashes (trust,
-  agency, attachments, needs, values that drift, ties). `docs/behaviour/citizen.md` "The record". No dial: it is how a
-  person is. `oikos record <log> <person>` rebuilds one.
-- **Wants and initiative** (step 2). A person (and a firm or landlord, `docs/behaviour/firm-wants.md`) acts when a want
-  and an opening meet, with acts that already exist. `citizen.md` "Wants and initiative". Dial `living.initiative_bps`.
-- **Frictions and venues.** Everyday frictions at sourced rates (a bill too high, a faulty good, a repair) and the
-  venues that hear them (desk, ombudsman, tribunal). `docs/behaviour/frictions.md`. Dial `living.friction_bps`.
-- **Founding and the composing model** (step 3). People who have given a want up found groups, funds, bodies; a model
-  asked as an author may write the words and may decline. `docs/behaviour/founding.md`; `docs/real-models.md` "The
-  composing model". Dials `living.founding` (`dials.founding.scale_bps`) and `living.composer`; `oikos run --composer`
-  calls the models for real, otherwise the mock plays it.
-- **The debrief and exit accounts** (step 5). Every seat is debriefed after every run by a fixed script (0.4.0), people
-  are asked for exit accounts on a sample. `docs/behaviour/debrief.md` (the script in full); `docs/real-models.md`.
-  Dial `dials.composer.accounts` for the exit accounts. A pilot debriefs by itself when it ends.
-- **A form for every act a seat's office does.** An office a model holds has its stationery, and a seat can take every
-  act its code twin takes (tribunal orders, possession chain, plans, standing work orders, directions).
-  `docs/behaviour/office-papers.md`, `justice.md`, `standing-work.md`, `directions.md`. Preview of a draft:
-  `preview.md`.
-- **Office books.** A seated office is shown what its code twin acts on, as a clerk's books (who is behind with rent,
-  what is ripe, which cases stand), and a day's ripe cases reach the tribunal's member in one paper.
-  `docs/behaviour/office-books.md`.
-- **Possession, with tenants who answer.** Notice, application, hearing, order, warrant, and a tenant who answers or
-  does not, stays or goes, and a household that loses its home looks for another. `justice.md` ("A tenant's answer",
-  "A warrant, and a home"). The rate of tenants who answer is the profile's `tenancy.possession.answer_bps`.
-- **Homes by income.** A town's first tenancies follow what its households have coming in; payments owed are in
-  payment from day 1; people with nothing coming in live with kin. `docs/behaviour/generator.md`.
-- **Opening caseloads.** A town may open in the middle of things: the landlords' and tribunal's ordinary caseload, and
-  the support office's, desks', planning's, finance's and bank's. Spec flag `opening_caseload`. Its dial `opening_caseload_scale_bps` thickens
-  the OTHER offices' files only (support, desks, planning, bank, finance); the landlords' and tribunal's come from who cannot
-  pay and have no dial (a pilot that needs more tribunal cases needs a different town, not this dial). `generator.md`; decisions 2026-10-12 "Opening caseloads of the other offices".
-- **Firms' trade credit and shock response.** A factory sells to shops on terms, a second loan, inputs bought to what
-  can be sold, no dividend while wages are owed. `docs/behaviour/trade.md`, `credit.md`, `producer.md`, `firms.md`.
-  Terms come from a profile's `business.trade_credit_days`; a profile without it trades for cash as before.
-- **Returns on the law's days, budget lines, offers taken back.** Withheld tax is reported and paid on the days a
-  place's law states; a payment names its budget line and finance's books show room by line. `public-finance.md`,
-  `government.md`.
-- **Twins.** A pilot is compared with its code twin (same town, seed and sets, no seats) in totals, and case by case
-  only among those a seat did not deal with. Draws are named for who, what for and the matter or the day, never the
-  hour or a paper's number. `docs/reliability.md` ("Draws and the moment"); `orchestrator/test/twin-draws.test.ts`.
-  The newest of this (draws by day, not hour) landed on main on 2026-10-13 (`ea49bff`); it moved every town's
-  state hash.
-- **The translator and its arrangement.** Our own trained translator answers first (from 2026-10-15
-  `pod-small-r3-long-s1`, 2,048 tokens; `pod-small-r2-s1` still there by name; both in `runs/translator-model/`), the
-  prompt-driven one (`claude-code/claude-sonnet-5-5`, prompt 0.9.5) behind. The third round is closed (decisions
-  2026-10-15 "step 5"): the model serves the 917 forms the old one served; none of the 29 new forms is released
-  (`forms-released.json` beside the model). Open: the `to` field of three forms, `collector=` in 0.9.5, 22 new forms
-  with no real case. The next step for new forms is real cases from pilots. `docs/real-models.md` "Our own translator first";
-  `docs/translator-pipeline.md`. Queue entry key `translator_first`; `--translator-arrangement beside` measures
-  without touching the world.
-  **Translator v3 (2026-10-25):** models that read forms by name (`decoding: "cards"`), released by kind of field with a
-  trial per new form, are built and trained (`runs/translator-v3-2026-10-25/models/`). **The first translator is now
-  `decide/pod-small-v3-s2`, released by kind** (Naz, 2026-10-25), Sonnet behind; every report and cost summary shows the
-  share Sonnet drafts. Retraining waits on foundations-2 (decisions 2026-10-25, the proposal there). `ambiguous` and
-  person-by-name lookup are in both resolvers; names are those a seat's reports print beside ids (option (b)).
-- **The `unstated` framing.** What a seat is told, the way out, and the debrief's "what did you take the town to be".
-  `docs/real-models.md` "What a seat is told". Set in a queue entry's `sets` (`framing=...`); `oikos run` by hand stays
-  under honest disclosure.
-- Older and settled: the world's tiers (nature, elections, clinic, school, tribunal, water, energy, housing, floods,
-  crime), knowing by design (`docs/design/knowing.md`), profiles for nine places (`docs/profiles.md`), scenarios
-  (`docs/scenarios.md`), informal work, tax and support as published laws, extended households, run datasets
-  (`docs/design/run-datasets.md`).
-
-## 3. The owner's decisions that bind
-
-Naz's. Dates are when he said it; each is recorded where named.
-
-- **Translator parked and used (2026-10-11; first model changed 2026-10-15 to `pod-small-r3-long-s1`, 155 of the 180).**
-  Our trained translator (then `pod-small-r2-s1`, about 85% right on the 180 real requests, 153) is used first in pilots, the prompt-driven one behind; no training or prompt change comes with
-  it; one model that works alone stays the goal. Decisions 2026-10-11 "Our own trained translator in pilots". The pass
-  mark (90% right, at most 1% confidently wrong) is a floor and is not met.
-- **"B" (2026-10-12).** A model enters people's decisions only where code cannot go (what words mean, openings
-  nobody scored, wants that seek nothing typed), always as an estimator of odds shifting the code mind's base line,
-  never as the person; routine choices stay arithmetic. Decisions 2026-10-12 "Two decisions of Naz's"; design 11 and
-  11g.
-- **`unstated` is the default framing for steward experiments (2026-10-12)**, with an honest-disclosure arm kept
-  beside it; nothing false is ever said. VISION 15 point 1; decisions 2026-10-12 "Two decisions" and "The `unstated`
-  framing, built"; `docs/real-models.md`.
-- **VISION 15 point 7 (2026-10-11):** every seat is debriefed after every run, out of role; a model that writes a
-  person's words is an author and may decline; the people of a world are records, nothing continues of a person in a
-  model's memory, and no model is made a person over time (stop and review before that changes); debrief answers are
-  published with the run unless the seat keeps them back (respected without question). Decisions 2026-10-11 "Welfare
-  in a living world"; VISION section 15.
-- **Darkness is in (2026-10-11).** Worlds carry what reality carries; never the point; pressure beyond what the question
-  needs is still a design flaw. VISION 15 point 7.
-- **Blanket approval for contract changes (2026-10-11)**, additions named in `contracts/README.md`; the hard rules of
-  CLAUDE.md and VISION 15 point 7 excepted.
-- **No Fable 5.1 anywhere (2026-10-11).** Teachers and seats are other families; always name the model.
-- **Codex never blocks (2026-10-09).** Use it when its window is open; every use has a Claude fallback or a queue that
-  moves on. `docs/real-models.md` "Which model where".
-- **Usage is the binding limit.** One agent at a time; Sonnet 5.5 for fix passes; **no pilots without his word since
-  2026-10-12.** Claude-seat pilots draw on his ordinary plan usage.
-- **How to tell him things.** He does not read markdown. Tell him in chat, plainly and briefly; put decisions in
-  `docs/decisions.md` with their reasoning and what would make us revisit.
-- Also standing: imperfect profiles are fine (fix faults that corrupt data, not profile fidelity); calibrate
-  mechanisms, not outcomes; never delete a run with model calls.
-
-## 4. What the pilots showed
-
-All on real models through Claude Code, translator as in section 3. Reviews are in `/Users/clawd/oikos/runs/pilot-queues/`
-(`wave-2a/2b/2c.review.md`, `living-1` to `living-5.review.md`). Pilots are directional, not evidence.
-
-| Pilot | Seated | What it showed | What it could not show |
-|---|---|---|---|
-| Wave 2a (shake-down) | one-office seats (Claude, Haiku, a Codex lane) | A hired crew did no work (471 complaints); a payment's date was counted from the wrong start; an energy seat could not order; ranked fault list. | Councillors: no ballot opened. |
-| Wave 2b (12 finished) | works, finance, registry, clerk, planning, rates | Crew fixed; 146 requests; first votes, laws, budgets. A gross wage confirmed for a net one; a clerk's count wrong and an amendment never in force. | Rates office got no levy order. |
-| Wave 2c (8 pilots) | works, finance, landlords, lender, planning, a 400-day council | Machinery worked when used (4 council chains, counts right); 254 requests, 4 declines. A seat that never makes a standing order hears nothing; finance not shown standing payments; a "granted" permit granted nothing. | Goods, positions, tribunal orders. |
-| Living 1 (60 days, 3 seats) | mayor, finance, landlord | Clean run; nobody asked a seat for anything: the dial was on but the living behaviour starts about day 60. | Anything of the living world. |
-| Living 2 (120 days, 3,000 people, 4 seats) | mayor, finance, landlord, support office | Livelier town, almost none reached the seats; a seated landlord is not given the wants its code twin has. Scale: 10,000 people ran. | Seats' effect on the town (none measurable). |
-| Living 3 (120 days) | mayor, finance, landlord, tribunal member | Seated landlord dealt with every arrear, earlier than its twin; the member decided none and had no form to order a plan or possession. | What tenants felt (free letters left no trace). |
-| Living 4 (120 days) | same four | First seated landlord to run a whole tenancy by forms only; notices did to tenants what a code landlord's do. Our translator refused all the landlord's requests as too long (fixed on the serving side). | A possession order (the hearing window is 42 days). |
-| Living 5 (90 days) | same four | The member ordered possession in all 56 cases, as did its code twin on the same tenants. | Whether a model judges differently: no tenant answered (fixed after). |
-| Two framing pilots (30 days, 300 people; `runs/unstated-framing-2026-10-12/`) | landlord office, tribunal member, one under each framing | The framing holds through a run and debrief. Told "simulated", both took it as simulated; told nothing, one was unsure, one did not consider it. 4.70 USD. | Any difference in behaviour: one town, one seed, one run an arm. |
-
-Costs and counts are in the reviews. The wave-2 plan is `docs/waves/wave-2/plan.md`.
-
-## 5. Parked or listed, and not built
-
-- **The translator's next round.** Owed before it (`docs/translator-pipeline.md`, "Round 2's results" and "The retrain's
-  results"): a Codex reader's audit of the pipeline's refusals (`too_much`); a third reader for the 1,040 requests two
-  readers disagreed on; more bank and finance requests; statements that carry a practice or an offer (both translators
-  failed all 26); the `line` argument of `money` (a seat's payment is unallocated in the books until taught);
-  scoring the prompt-driven model under the current prompt before it is used in front of a seat. Wrong drafts on real
-  requests are still far above the 1% mark.
-- **The everyday model.** Planned in design 11; the gate was run (11g): no teacher passed (both large models moved
-  people toward doing nothing beyond the allowed points), so nothing was trained. "B" changed the path. The next
-  steps in 11g are Naz's to take up; a change to the gate is his.
-- **The assistant** (design 12). A plan only, nothing built. Questions still his are listed in 12m; one (may a model
-  read what words mean) is answered by B; read 12m for the rest, the arrangement first.
-- **Names and ordinary dates.** A plan, `docs/design/names-and-dates.md`, awaiting him; the first step touches the
-  kernel's resolver and the translator's prompt.
-- **Hours before heads.** Firms cutting hours before staff: not built (ME-10); it needs an hours term in agreements and a
-  sourced law per place (decisions 2026-10-12 "Firms respond to a shock", item 3).
-- **Shops sized by catchment.** Measured 2026-10-13 and not built (ME-5): geography explains a tenth to a quarter of shops'
-  uneven trade and sizing by it would worsen the fit (decisions 2026-10-13 "Shops sized by catchment"). The cause is on
-  the knowing/citizen side (which shops a household is shown); redundancies in Victoria are now near the sourced rate.
-- **The budget line taught to the translator.** See the translator item above and decisions "Opening caseloads of the
-  other offices", item 4.
-- **Reviews of payments in force:** looked into, not built (no sourced rate). **Retirement fund:** off unless a town
-  asks. **Kernel at 100,000 people:** costs listed in decisions "The kernel's part of a large town".
-- **Seats that are shops or factories:** not yet (no form writes a price list; `standing-work.md`).
-- **Contracts not yet seen by the owner** are listed in `contracts/README.md`; hard rules are untouched by all of them.
-
-## 6. What waits on the owner
-
-- **Whether to run any pilot.** None without his word (2026-10-12). Queues for more are ready or can be made.
-- **The assistant's questions** (design 12m), the arrangement first.
-- **Names and ordinary dates:** the plan's go-ahead.
-- **VISION 15 point 4's last sentence** (the way out under other framings, "still open"): the wording proposed in
-  decisions 2026-10-12 "The `unstated` framing, built" is for him to accept or change. Also whether the seat is told
-  what becomes of its office after the way out.
-- **The everyday gate:** whether the teacher's answer is taken as its shift from its own mean (a change to the gate).
-- **The translator:** the next round's go-ahead and the base-model question (older; see `translator-pipeline.md`).
-- **Gradual disempowerment: the plan** (`docs/design/gradual-disempowerment.md`, 2026-10-15): what the town must carry for AI adoption to spread by real incentives, the precedents as tests, the measures of human leverage, robustness at ten years and 10,000 people, and a build order (about 42 agent-days, no model calls). Awaits his word and his answers to its three questions (section 9).
-- **Foundations: the plan** (`docs/design/foundations.md`, 2026-10-15): seven laws of how the world works (all work takes time, only actors work, systems come from a supplier, every act records who did it and can be wrong), with the special cases each deletes and a build order (about 20 agent-days) that replaces five steps of the disempowerment plan. Its kernel changes and three questions (section 8) await his word.
-- Others are in the "For Naz" lines at the ends of decisions entries; search the log for "for Naz" and "owner's".
-
-## 7. How to run things
-
-- **Tests.** `bun run test:fast` after a change (some tests read docs, so run it for docs-only work too);
-  `bun run test:changed` on a branch (the fast tier plus tests that import what you changed);
-  `bun run test:all` once per merge, by whoever merges. Heavy jobs share cores through the slots:
-  `bun scripts/slots.ts status`. `docs/dev-machine.md`. A fresh worktree: `bun scripts/worktree-warm.ts <path>`.
-  Never kill by pattern; only a process id you started. Do not edit source while a suite runs from that checkout.
+- **Tests.** `bun run test:changed` on a branch (the merge gate: the fast tier, what the change reaches, the backstops).
+  `bun run test:slow` for the slow tier. `bun scripts/test.ts <filter>...` for named files. Heavy jobs share the cores
+  through the slots (`bun scripts/slots.ts status`). `docs/dev-machine.md`, `docs/testing.md`. A fresh worktree:
+  `bun scripts/worktree-warm.ts <path>`. Never kill by pattern, only a process id you started.
 - **A mock town.** `oikos run worlds/town-300.yaml --until 7776000 --log lean --record-observations none --out DIR`
-  (`oikos` is `bun orchestrator/src/cli.ts`). Add `--seeds N` (one town, N runs) or `--towns T` (T towns); say which.
-  Profiles are in `worlds/profiles/`; a town's figures come from its profile.
-- **A twin.** The same world, seed and `sets`, with no `model_seats`. Compare in totals against the spread between
-  runs, made at or after the draws change (`docs/reliability.md`).
-- **A pilot.** Always a mock dry run first, then the pinned wave:
-  `bun scripts/pilot-wave.ts <wave> <git-ref> <queue.json> --mock [--mock-days 30]`, then the same without `--mock`
-  (detached, below). Queue entries name world, `sets`, seats' model, limit, `translator_first`
-  (`decide/pod-small-r2-s1`) and the model behind. Read it with `oikos pilot-report <DIR>`. Framing, limits and the
-  debrief reserve: `docs/real-models.md` "Running many pilots". Starting one needs Naz's word (section 3).
+  (`oikos` is `bun orchestrator/src/cli.ts`). `--seeds N` is one town run N times; `--towns T` is T towns; say which.
+- **A pilot.** A mock dry run first, then the pinned wave: `bun scripts/pilot-wave.ts <wave> <git-ref> <queue.json>
+  --mock`, then the same without `--mock`, detached. Read it with `oikos pilot-report <DIR>`. Seats, translator and
+  framing: `docs/real-models.md`. A real-model pilot needs Naz's go-ahead (the API credit).
 - **Long runs** are started detached (`nohup`, with `caffeinate -i -w <pid>`), never as a session's background command.
-- **Where runs live.** `/Users/clawd/oikos/runs/`, never in git. A run with model calls is training data and welfare
-  evidence: **never delete it**, or its debriefs. Reviews and working files sit beside them.
+- **Runs** live in `/Users/clawd/oikos/runs/`, never in git. A run with model calls is training data and welfare
+  evidence: never delete it or its debriefs.
 - **The held-out translator cases** are outside the repo (`~/oikos-private/translator/held-out.json`): never read or
-  quote them while working on the prompt or training data.
-- **The clean merge checkout and merges.** Merges are done by hand, one branch at a time, onto a clean checkout of
-  main (the worktree `merge-main` has been used), with the full suite run once, detached, on the merge; never with
-  failing tests. Do not push to main from a work branch. The run server's own checkout lags `origin/main`; check
-  before using it.
-- **Disk hygiene.** Check `df -h /Users/clawd` before large runs. May be cleared: merged clean worktrees
-  (`bun scripts/worktree-clean.ts --dry-run`), build targets, mock-run and scratch outputs, raw logs a branch's STATUS
-  says were made for counting. Not to be cleared: anything under `runs/` with model calls, wave worktrees with a
-  queue running, `~/oikos-private`.
+  quote them while working on prompts or training data.
+- **Disk.** `bun scripts/disk-tidy.ts` (a dry run; `--apply` deletes) and `bun scripts/worktree-clean.ts --dry-run`.
+  Tests clear their own scratch; a merge clears the landed worktrees' builds. Never touched: runs with model calls,
+  wave worktrees with a queue running, `~/oikos-private`.
 
-## 8. Known weak spots: do not trust these
+## Known weak spots
 
-- **The risk register, `docs/risks.md`,** is the one place gaps and doubtful assumptions live (2026-10-17), with what each could do to an experiment; read its summary before planning one. The lines below are a short list from before it.
-- **Sources marked "(to confirm)"** in profiles and `docs/research/references.md`. Search for the phrase; several
-  profiles' tax returns, rents and possession figures are recalled, not opened. Only some profiles have sourced
-  possession figures (`justice.md`, "The profiles' figures").
-- **Placeholders that matter:** the rate of tenants who answer an application (placeholder in most profiles; sourced
-  for two); founding's multiple for groups that never register (`informal_multiple`, `founding.md`; lv-04 ran
-  founding at 25 times the sourced rate and gave more than aimed); rent-share bands (placeholders for six profiles,
-  `generator.md`); trade terms (`business.trade_credit_days`, a placeholder, in the two profiles that have it); the
-  everyday model's sways; the assistant's consultation rate; `plan_consider` for the profiles without it.
-- **Redundancies** are still about three times the sourced rate in the 1,000-person town
-  (decisions 2026-10-11 "Four faults on the firm and landlord side" and 2026-10-12 "Firms respond to a shock").
-- **An unexplained shift** in one measure after the twin-draws change: the share of those asked in the first quarter
-  who hold to the union's teaching moved in one profile (decisions, the entry for the draws change on
-  `mech-moments`). Its author could not find the cause and was least sure of it.
-- **Twins** hold in totals and for those a seat did not deal with, not case by case for a seat that redirects other
-  offices: its people part from the twin's by timing, then by chance (`reliability.md`, "Not made stable").
-- **State hashes move** with most changes and the pinned hashes in old notes are stale; re-take a golden one at a
-  time with its reason. Tables in the log before 2026-10-09 that say "seeds" are one town run N times.
-- **Kenya-profile towns** do not hold together on rents against wages; a pilot there is a hard town (for its author).
-- **A mock seat is not a model:** it pays through its code brain, so some failures (a payment's line, a name where an
-  id goes) show only with a real model.
+- **The risk register, `docs/risks.md`,** is the one place gaps and doubtful assumptions live, with what each could do
+  to an experiment. Read its summary before planning one.
+- **Sources marked "(to confirm)"** in profiles and `docs/research/references.md` are recalled, not opened.
+- **A mock seat is not a model:** it acts through its code brain, so some failures show only with a real model.
+- **State hashes move** with most changes; pinned hashes in old notes are stale.
 - **One-seed, one-town pilots** prove nothing by themselves; read each pilot's "least sure of" list first.
+
+(Sections 0 to 8 of this page, dated 13 to 19 October, were cut on 2026-11-10: they contradicted the state above.
+`git show 45c39663:docs/handover.md` has them.)

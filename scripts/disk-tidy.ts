@@ -29,7 +29,7 @@
 // a day (--target-hours: the folder, its first two levels of folders, none written since) and no running process uses one
 // (none has a file open in it or its working folder there, none names it in its command line or environment). They hold
 // only what cargo builds again.
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import { homedir, userInfo } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { scan, type Tree } from "./worktree-clean";
@@ -251,6 +251,65 @@ export function pruneIncremental(target: string, apply: boolean, o: { windowHour
     }
   }
   return kb;
+}
+
+/** A loud line when the disk holding `path` has less than `minGB` free (scripts/merge.ts and scripts/test.ts say it at their
+ * start): a full disk failed builds and runs in the middle, 2026-11-10, after 250 GB of worktree builds and scratch piled up. */
+export function lowDisk(path: string, minGB = 60): string | undefined {
+  let free: number;
+  try { const s = statfsSync(path); free = (s.bavail * s.bsize) / 1e9; } catch { return undefined; }
+  if (free >= minGB) return undefined;
+  return `WARNING: LOW DISK: ${free.toFixed(0)} GB free on the disk of ${path}, under ${minGB} GB. Builds and runs may fail part way. Free space first: bun scripts/disk-tidy.ts (dry run; --apply deletes), bun scripts/worktree-clean.ts --dry-run.`;
+}
+
+/** Whether `repo` is a linked worktree (its git dir is not the common one): its own `runs/` is the tests' scratch only. */
+function linkedWorktree(repo: string): boolean {
+  const g = (a: string) => Bun.spawnSync(["git", "rev-parse", "--path-format=absolute", a], { cwd: repo, stdout: "pipe", stderr: "pipe" });
+  const dir = g("--git-dir"), common = g("--git-common-dir");
+  return dir.exitCode === 0 && common.exitCode === 0 && dir.stdout.toString().trim() !== common.stdout.toString().trim();
+}
+
+/**
+ * The test scratch of a worktree: the `runs/test-*` folders tests write into the checkout they run in (16 to 18 GB in each
+ * agent tree, 2026-11-10). Only in a linked worktree, whose `runs/` is a folder of its own (not a link) and not the runs
+ * folder (`runsDir`): the main checkout's runs/ is the real one, and nothing there is touched. scripts/test.ts removes
+ * these at the end of every run; scripts/merge.ts for a landed branch's tree.
+ */
+export function testScratch(repo: string, runsDir = process.env.OIKOS_RUNS ?? join(homedir(), "oikos/runs")): string[] {
+  const rd = join(repo, "runs");
+  try {
+    if (!lstatSync(rd).isDirectory() || !linkedWorktree(repo)) return [];
+    if (existsSync(runsDir) && realpathSync(rd) === realpathSync(runsDir)) return [];
+    return readdirSync(rd, { withFileTypes: true }).filter((e) => e.isDirectory() && e.name.startsWith("test-")).map((e) => join(rd, e.name));
+  } catch { return []; }
+}
+
+/**
+ * After a landing: the worktrees whose branch was just pushed to main lose their `kernel/target` and their test scratch,
+ * when nothing is running in them (`uses`, processUses). Their branch is in main, so all that goes is what cargo and the
+ * tests make again. disk-tidy's own rule (`judgeTarget`) does the same, but disk-tidy runs only by hand, and its scan
+ * crashed on a vanished worktree, so in practice a landed tree kept 18 to 30 GB until someone cleaned by hand (2026-11-10).
+ * Never the merge's own tree, a wave copy or a protected one. Returns what it removed (or would, without `apply`).
+ */
+export function clearLanded(repo: string, branches: string[], o: { apply?: boolean; uses?: (path: string) => boolean; runsDir?: string } = {}): { path: string; what: string[] }[] {
+  const want = new Set(branches.map((b) => b.replace(/^origin\//, "").replace(/^refs\/heads\//, "")));
+  const list = Bun.spawnSync(["git", "worktree", "list", "--porcelain"], { cwd: repo, stdout: "pipe", stderr: "pipe" }).stdout.toString();
+  const out: { path: string; what: string[] }[] = [];
+  let uses = o.uses;
+  for (const block of list.split("\n\n")) {
+    const path = /^worktree (.+)$/m.exec(block)?.[1];
+    const branch = /^branch refs\/heads\/(.+)$/m.exec(block)?.[1];
+    if (!path || !branch || !want.has(branch) || !existsSync(path)) continue;
+    const name = path.split("/").pop()!;
+    if (!path.includes("/.claude/worktrees/") || name === "merge-bot" || name.startsWith("wave-") || PROTECTED.includes(name)) continue;
+    uses ??= processUses();
+    if (uses(path)) continue;
+    const what = [join(path, "kernel/target"), ...testScratch(path, o.runsDir)].filter((p) => existsSync(p));
+    if (!what.length) continue;
+    if (o.apply) for (const p of what) rmSync(p, { recursive: true, force: true });
+    out.push({ path, what });
+  }
+  return out;
 }
 
 const gb = (kb: number) => (kb / 1048576).toFixed(2) + " GB";

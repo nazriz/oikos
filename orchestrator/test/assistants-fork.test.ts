@@ -10,6 +10,7 @@ import { generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
 import { DAY, runArm, runBase, type ExperimentSpec } from "../src/experiment";
 import { kernelBinary } from "../src/kernel";
+import { saysWhatTheTownIs } from "@oikos/participants/llm";
 
 const root = join(import.meta.dir, "../..");
 const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town-300.yaml"), "utf8")) as any;
@@ -57,7 +58,7 @@ test("a mock seat in the assistants' kind leaves the code's world to the hash; a
   }
 }, 900_000);
 
-test("model seats in two kinds of assistant: each is a seat, each sees its forms at its first sitting, and together they spend only the fork's limit", async () => {
+test("model seats in two kinds of assistant: each is a seat, each sees its forms at its first sitting, is shown its world in its own terms only, and together they spend only the fork's limit", async () => {
   // (Dry: the mock plays every seat, priced as the model it plays, so the fork's limit bites. Found by the scope pilot's
   // dry run: the desk was played by its twin, seats of a fork had a limit each, and a seat taking a post over saw only
   // what was new since its twin had looked, so no forms.)
@@ -72,7 +73,7 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
   const limit = 0.4;
   const spec: ExperimentSpec = { name: "assistants-seats", world: { config }, post: "template:assistant-a,assistant-a-personal", seeds: [1], forkDay: 60, untilDay: 120,
     arms: [{ name: "seats", steward: { kind: "model", model: "anthropic/claude-sonnet-5-5" } }], measures: ["acts"],
-    seats: { mock_models: true, framing: "simulation", budget: { fork_usd: limit } } };
+    seats: { mock_models: true, framing: "unstated", budget: { fork_usd: limit } } };
   try {
     await runBase(spec, 1, out);
     const r = await runArm(spec, 1, spec.arms[0]!, out);
@@ -92,6 +93,24 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
     }
     expect(first.size).toBe(seats.size);
     for (const [seat, o] of first) expect(o.channels.some((c: any) => (c.records ?? []).some((x: any) => x.kind === "form" && x.data?.form === "scope_request")), `${seat} sees its request form at its first sitting`).toBe(true);
+    // Everything each seat was shown at its sittings (its standing instructions, its forms, the matters handed to it,
+    // drafts, results): the world's terms only (principle 14). A form as a paper form, a matter as the facts it sets down,
+    // money in the town's currency; never the store's notation, the call language, a sum in its smallest unit, or a
+    // word of the platform's; and under `unstated`, nothing of what the town is.
+    const flat = (x: unknown): string => (typeof x === "string" ? x : Array.isArray(x) ? x.map((b: any) => (typeof b === "string" ? b : b?.content !== undefined ? flat(b.content) : b?.text ?? "")).join("\n") : "");
+    const shown = readFileSync(jsonl, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "annotation" && e.body.annotation === "transcript" && e.body.data.purpose === "participant" && seats.has(e.body.subject));
+    // (The mock's own requests, quoted back to it, are its words, not the platform's: the mock is code, and says each
+    // request in the call language.)
+    const told = shown.flatMap((e) => [e.body.data.system ?? "", flat(e.body.data.input)]).join("\n").split("\n").filter((l) => !l.includes("(mock) ")).join("\n");
+    expect(told).toContain("Its blanks:");
+    expect(told).toContain("what is to be done: ");
+    expect(told).toMatch(/\$[0-9]/);
+    for (const [what, never] of [["the store's notation", /\{"|":\{|":"/], ["the call language", /\b(?:statement|money|form|message|goods|work|agreement)\(|\bcalls: |data=/],
+      ["a sum in its smallest unit", /\b(?:amount|fee(?: month)?|price|paid|withheld|cost|balance|rent|wage|setup|exit): -?[0-9]/i], ["the platform's words", /\b(?:translators?|kernel|resolver|channels?|blocks?)\b/i]] as const) {
+      const at = told.search(never);
+      expect(at, `a seat was shown ${what}: …${told.slice(Math.max(0, at - 120), at + 120)}…`).toBe(-1);
+    }
+    expect(saysWhatTheTownIs(told).slice(0, 3)).toEqual([]);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

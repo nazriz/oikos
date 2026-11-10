@@ -8,9 +8,13 @@ and the measurements are in docs/decisions.md ("A shared machine that stays usab
 ## The rule
 
 **The merge gate, not the whole suite.** The suite is in two tiers (`scripts/test-tiers.json`, "Tiers" below). Work on a
-branch runs `bun run test:changed`, which is the merge gate itself (`bun scripts/test.ts --gate`): about a minute and a half
-at most on this machine, seconds for a document. `scripts/merge.ts` runs the same gate, and only it merges to main. CI
-runs both tiers whole on every push to main and nightly, so every assertion runs on every push. Or run `bun scripts/test.ts <filter>...` for the tests you know cover the change; `bun run test:slow` for the slow tier.
+branch runs `bun run test:changed`, which is the merge gate itself (`bun scripts/test.ts --gate`): two to four minutes for
+a change that reaches the kernel or the runner (median 202 s in the merge worktree, 2026-11-10), much less for a narrow
+one, seconds for a document. `scripts/merge.ts`, and only it, merges to main: it runs the same gate, and for a broad
+change (the kernel, the actors, the contracts, the manifests, the runner, or one reaching more than eight slow files,
+such as the generator) the whole slow tier with it before the push (`--gate --merge`; about 9 minutes on a quiet
+machine). CI runs both tiers whole on every push to main and nightly. Or run `bun scripts/test.ts <filter>...` for the
+tests you know cover the change; `bun run test:slow` for the slow tier.
 
 **Never kill by pattern** (`pkill -f`, `killall`): another agent's suite or run matches the same pattern. Kill only a
 process id you started.
@@ -97,6 +101,17 @@ day); an old agent lock is lifted only with `--unlock-pid PID` for that pid. It 
 `bunfig.toml`) points TMPDIR at one folder per test process and a reaper removes it when the process ends, killed or not.
 Not touched: caches in the home folder (huggingface models) and `/private/tmp/claude-*`.
 
+**What keeps the disk from filling by itself (2026-11-10).** 250 GB was reclaimed by hand that day: each agent worktree
+kept its own `kernel/target` (18 to 30 GB) and its tests' `runs/test-*` scratch (16 to 18 GB), and the cleaner had crashed
+on a worktree folder deleted by hand. Now: `scripts/test.ts` removes a linked worktree's own `runs/test-*` at the end of
+every run (not while another run in the same checkout is going, which it knows by markers in `~/.oikos/test-live`; never
+in the main checkout, whose `runs/` is the real one; `OIKOS_KEEP_TEST_SCRATCH=1` keeps it); `scripts/merge.ts`, after
+the push, removes `kernel/target` and the test scratch of the landed branches' worktrees that nothing runs in
+(`clearLanded`); `worktree-clean.ts` skips and prunes records whose folder is gone; the suite's timings go to
+`~/.oikos/test-times.json` (`OIKOS_TEST_TIMES`), over the tracked seed `scripts/test-times.json` that only `--time-new`
+writes, so a run leaves the checkout clean; `.claude/` is ignored. `merge.ts` and `test.ts` warn loudly at their start
+under 60 GB free.
+
 **Stale incremental folders (2026-11-02).** The `gate` profile is incremental on purpose (a one-file change rebuilds in
 about a minute), but cargo never deletes a `target/<profile>/incremental/<crate>-<hash>/` whose hash changed, and one agent
 worktree reached 72 GB, 62 of it incremental. `scripts/disk-tidy.ts --prune-incremental [--apply] [DIR]` removes them: per
@@ -120,7 +135,9 @@ and about 130 s for a non-incremental build, and the tests built and ran. On the
   generator, `run.ts`) runs the canaries instead (`scripts/test-tiers.json`, `canary`: the slow files that pin whole towns,
   their hashes or their invariants, each with why) and leaves the rest to CI; a change to the kernel or the contracts
   runs the canaries marked `kernel` (the invariants and culture-dial). They run in the gate, say their times, and are
-  not counted in its budget.
+  not counted in its budget. **The merge (`--gate --merge`) runs the whole slow tier instead** wherever the gate would
+  fall back to the canaries (more than eight reached, the kernel, the contracts, or a `FULL_ON` file): main went red 17
+  times in 23 days (about 76 hours) from slow files left to CI (docs/decisions.md, 2026-11-10).
 - **The slow tier** is named file by file in `scripts/test-tiers.json`, each with why: towns of a year or more, several
   seeds, the 1,000-person town, anything over about 30 s. `bun scripts/test.ts --tier slow`. CI runs it on every push
   to main and nightly. The year of invariants on several seeds is here (`invariants.test.ts`); the gate has its own
@@ -130,7 +147,7 @@ and about 130 s for a non-incremental build, and the tests built and ran. On the
   `OIKOS_RUN_TRACE=<file>` adds a line per town run (test file, a hash of its options, seconds): it showed the slow tier
   repeats only 1 to 3% of its run time, so no cache of runs was built (docs/decisions.md).
 - `scripts/tiers.test.ts` (a backstop) holds that every test file is in exactly one tier, that the slow tier's files
-  exist and say why, that every gate file took at most the gate's file limit (by `test-times.json`), and that CI runs both tiers.
+  exist and say why, that every gate file took at most the gate's file limit (by the tracked `scripts/test-times.json`), and that CI runs both tiers.
 - **Budgets** (`scripts/test-budgets.json`, 2026-10-24): a gate run fails, after its tests, when the sum of its files' own
   times is over the gate's file-seconds or any file took longer than the file limit (each file's time, never the run's wall:
   a merge does not fail because the machine was busy) (a `BUDGET:` line; merge.ts reads it as a failure, never a
@@ -169,10 +186,19 @@ bun scripts/merge.ts <branch>... [--message "..."] [--no-push] [--full] [--fix-m
 
 It takes the merge lock, then in its own clean worktree (`.claude/worktrees/merge-bot`, made if missing; never
 `merge-main`): fetch; reset to `origin/main`; `git merge --no-ff` each branch in order; the worktree warm-up
-(`scripts/worktree-warm.ts --no-build`, installs); the typecheck alongside **the gate** (`bun scripts/test.ts --gate`, output
-in `merge-bot/merge-test.log`, and each test run of a batch in `merge-test-<n>.log`, the set tested on its first line); restores `scripts/test-times.json`; pushes to `origin main` only if all passed. `--full` runs
-the whole suite on the release kernel instead. Everything it starts has slot priority (`OIKOS_SLOT_PRIORITY=high`): it
-stands ahead of every waiting job and is not capped.
+(`scripts/worktree-warm.ts --no-build`, installs); the typecheck alongside **the gate** (`bun scripts/test.ts --gate
+--merge`: the gate, and the whole slow tier for a broad change, above; output in `merge-bot/merge-test.log`, and each test
+run of a batch in `merge-test-<n>.log`, the set tested on its first line); pushes to `origin main` only if all passed;
+then clears the landed worktrees' builds (above, "Disk tidy"). `--full` runs the whole suite on the release kernel
+instead. Everything it starts has slot priority (`OIKOS_SLOT_PRIORITY=high`): it stands ahead of every waiting job and
+is not capped. It warns at its start under 60 GB free.
+
+What a landing costs (2026-11-10, a quiet machine, load 3 to 12): a broad change, 509 s for the gate tier's 248 files and
+the slow tier's 65 together (94 s of it the gate build of the kernel, 3,872 file-seconds of slow files under 12 slots),
+against the gate's median 202 s before. A batch that fails bisects at that cost per step. A narrow change costs what
+it did. (Considered instead: a staging ref that CI promotes to main. Not chosen: CI runs on this same machine and takes
+a median 24 minutes from a push, so landings would queue behind it, and it needs CI to push to main and a workflow that
+cannot be tried here.)
 
 - **Batch:** `merge.ts a b c` merges the branches in order, tests once, pushes all or none; if that fails it bisects on
   prefixes (`settle`: the shortest failing prefix ends in the branch at fault, which is left out), pushes the rest, and
@@ -182,8 +208,12 @@ stands ahead of every waiting job and is not capped.
   `--fix-main`.
 - **Conflicts:** only `docs/decisions.md` and `docs/research/references.md` are resolved (both sides kept, markers
   stripped, the tree checked for any left). A conflict anywhere else leaves that branch out and says which files.
+- **Fixing a red main:** `--fix-main` lands the repair while main is red; it is tested the same way.
 - **Flakes:** if the gate fails with exactly one failed test file and it is `scripts/slots.test.ts` or
   `orchestrator/test/pilot-wave.test.ts` (timing under load), that file is rerun alone and accepted only if it passes.
+- **Commit subjects** are at most 72 characters: the `commit-msg` hook (`scripts/hooks/commit-msg`, installed with the
+  pre-push hook) refuses a longer one; the detail goes in the body after a blank line. A merge commit's subject is
+  `Merge <branch>`, or `--message`'s first line when it fits; a longer message goes in the body.
 - The merge commit message ends with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. `--no-push` does
   everything but the push. Pure parts are tested in `scripts/merge.test.ts`, the lock and hook in `scripts/merge-lock.test.ts`.
 - `.github/workflows/ci.yml` runs both tiers on every push to main and nightly on the self-hosted runner (`docs/ci-runner.md`);

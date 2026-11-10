@@ -17,7 +17,7 @@
 // the request, and says nothing of what the draft does not touch.
 
 import { basesOf, citedWords, formatMoney, forms, type Block } from "@oikos/participants";
-import { duration, moment, readable, ruleWords, type FieldKinds } from "@oikos/participants/llm";
+import { duration, factWords, moment, readable, ruleWords, type FieldKinds } from "@oikos/participants/llm";
 import type { Knowledge } from "./knowledge";
 
 /** A length of time as people say one (years, days, hours and minutes: never a count of seconds where it is rounder). */
@@ -37,6 +37,10 @@ export class Preview {
   }
 
   /** An amount as the world writes its money. */
+  /** A paper's details in words (render.ts, factWords), its sums in this seat's money. */
+  private facts(x: unknown, fields?: FieldKinds): string {
+    return factWords(x, fields, undefined, (a) => this.sum(a));
+  }
   private sum(amount: string | number): string {
     return formatMoney(amount, this.k.currency);
   }
@@ -153,18 +157,22 @@ export class Preview {
     const data = kinds ? readable(raw, { money: (a) => this.sum(a), fields: kinds }) : this.read(raw, form);
     if (data === null || typeof data !== "object") return String(data);
     const entries = Object.entries(data as object);
-    const flat = entries.every(([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v));
-    return flat ? entries.map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join("; ") : JSON.stringify(data);
+    // (What a matter asks to be done, a program in the call language, is read as the facts it sets down: factWords.)
+    const flat = entries.every(([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v)) && typeof (raw as any).calls !== "string";
+    // (A detail that holds others: in words, each by its name, never the store's notation: principle 14.)
+    return flat ? entries.map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join("; ") : this.facts(raw, kinds ?? (form === undefined ? undefined : (this.k.forms.find((f) => f.id === form)?.data?.fields as FieldKinds | undefined)));
   }
   /** Whatever of `o` the sentence before didn't say (every key but `said`), by name. */
   private also(o: any, said: string[], lead = " Also: "): string {
-    const val = (v: unknown): string => (v === null || typeof v !== "object" ? String(v) : Array.isArray(v) && v.every((x) => x === null || typeof x !== "object") ? v.join(", ") : JSON.stringify(v));
+    const val = (v: unknown): string => (v === null || typeof v !== "object" ? String(v) : Array.isArray(v) && v.every((x) => x === null || typeof x !== "object") ? v.join(", ") : `(${this.facts(v)})`);
     const left = Object.fromEntries(Object.entries(o ?? {}).filter(([k, v]) => !said.includes(k) && v !== undefined));
-    const more = Object.entries(this.read(left) as object).map(([k, v]) => `${k.replace(/_/g, " ")}: ${val(v)}`);
+    // (A detail that holds others is read from what it holds, in words.)
+    const nested = (k: string) => left[k] !== null && typeof left[k] === "object" && !(Array.isArray(left[k]) && (left[k] as unknown[]).every((x) => x === null || typeof x !== "object"));
+    const more = Object.entries(this.read(left) as object).map(([k, v]) => `${k.replace(/_/g, " ")}: ${nested(k) ? `(${this.facts(left[k])})` : val(v)}`);
     return more.length ? `${lead}${more.join("; ")}.` : "";
   }
   private seenBy(v: unknown): string {
-    return v === "public" ? ", publicly" : Array.isArray(v) ? `, seen only by ${v.map((x: string) => this.who(x)).join(", ")}` : v === undefined ? "" : `, visible to ${JSON.stringify(v)}`;
+    return v === "public" ? ", publicly" : Array.isArray(v) ? `, seen only by ${v.map((x: string) => this.who(x)).join(", ")}` : v === undefined ? "" : `, visible to ${String(v)}`;
   }
   /** A law's rule and the condition acts are checked against, as anyone reading the law later is shown them. */
   private rule(b: any): string {
@@ -301,7 +309,7 @@ export class Preview {
     if (o?.account) return `${o.account.close ? `close account ${o.account.close}` : `open an account for ${this.who(o.account.holder)}`}${rep}${more(o.account, o.account.close ? ["close"] : ["holder"])}`;
     if (o?.work) return `do ${o.work.units !== undefined ? `${o.work.units} of ` : ""}${o.work.task}${o.work.hours !== undefined ? `, ${o.work.hours} hours` : ""}${o.work.at ? ` at ${o.work.at}` : ""}${rep}${more(o.work, ["units", "task", "hours", "at"])}`;
     if (o?.attend) return `attend ${o.attend.practice}${o.attend.role ? ` as ${o.attend.role}` : ""}${rep}${more(o.attend, ["practice", "role"])}`;
-    return `do this${rep}: ${JSON.stringify(o)}`;
+    return `do this${rep}: ${this.facts(o)}`;
   }
 
   /** One act: what happens, in a sentence; then a line for each further thing it carries; then whatever no line said
@@ -322,12 +330,12 @@ export class Preview {
   private filled(spec: forms.FormData, fields: { [name: string]: unknown }, skip: string[] = []): string[] {
     const word = (name: string, v: unknown): string => {
       const type = spec.fields[name]?.type;
-      if (Array.isArray(v)) return v.length ? v.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(", ") : "none";
+      if (Array.isArray(v)) return v.length ? v.map((x) => (typeof x === "string" ? x : x !== null && typeof x === "object" ? `(${this.facts(x)})` : String(x))).join(", ") : "none";
       if (type === "amount" && (typeof v === "string" || typeof v === "number") && /^[0-9]+$/.test(String(v))) return this.sum(v);
       if (type === "duration" && typeof v === "number") return span(v);
       if (type === "date" && typeof v === "number") return forms.dateWords(v);
       if (type === "text" && typeof v === "string") return `"${v}"`;
-      return v !== null && typeof v === "object" ? JSON.stringify(this.read(v)) : String(v);
+      return v !== null && typeof v === "object" ? `(${this.facts(v)})` : String(v);
     };
     const given = Object.keys(fields).filter((k) => fields[k] !== undefined && !skip.includes(k));
     const empty = Object.keys(spec.fields).filter((k) => fields[k] === undefined && !skip.includes(k));
@@ -341,10 +349,10 @@ export class Preview {
     const t = o?.terms ?? {};
     const taker = (x: string) => (x === "taker" ? "whoever takes it" : this.who(x));
     // (Whoever takes up an offer and is to be somewhere, with nobody named: they come there themselves.)
-    const parts = ((t.commitments ?? []) as any[]).map((c) => `${taker(c.who)} will ${c.who === "taker" && c.does?.outcome?.occupancy && c.does.outcome.occupancy.who === undefined && !c.does.outcome.occupancy.leave ? `come to ${c.does.outcome.occupancy.in}${c.every ? ` every ${span(c.every)}` : ""}` : c.does?.outcome ? this.outcome(c.does.outcome, c.every, c.who) : `do: ${JSON.stringify(c.does)}`}`);
+    const parts = ((t.commitments ?? []) as any[]).map((c) => `${taker(c.who)} will ${c.who === "taker" && c.does?.outcome?.occupancy && c.does.outcome.occupancy.who === undefined && !c.does.outcome.occupancy.leave ? `come to ${c.does.outcome.occupancy.in}${c.every ? ` every ${span(c.every)}` : ""}` : c.does?.outcome ? this.outcome(c.does.outcome, c.every, c.who) : `do: ${c.does?.text !== undefined && Object.keys(c.does).length === 1 ? `"${c.does.text}"` : this.facts(c.does)}`}`);
     const ends = ((t.termination ?? []) as any[]).map((x) => `${taker(x.party)} may end it on ${Number.isSafeInteger(x.notice) ? span(x.notice) : x.notice}' notice`);
     const rest = this.also(t, ["commitments", "template", "then", "termination"], " (").replace(/\.$/, ")");
-    const open = o?.to !== undefined ? ` Open to: ${this.details(o.to) || JSON.stringify(o.to)}.` : "";
+    const open = o?.to !== undefined ? ` Open to: ${this.details(o.to) || this.facts(o.to)}.` : "";
     const more = `${ends.length ? ` ${ends.join("; ").replace(/^you /, "You ")}.` : ""}${open}${this.also(o, ["terms", "by", "take_up", "available", "to"], " Also: ")}`;
     return `It offers${t.template ? ` a${/^[aeiou]/i.test(String(t.template)) ? "n" : ""} ${t.template} agreement${t.then === "periodic" ? ", periodic after its term" : t.then ? `, then ${t.then}` : ""}` : ""}${o?.by ? `, by ${this.who(o.by)}` : ""}${o?.available !== undefined ? ` (${o.available} available)` : ""}${o?.take_up ? `, taken up by ${o.take_up === "apply" ? "applying" : String(o.take_up).replace(/_/g, " ")}` : ""}: ${parts.join("; ") || "(no terms)"}${rest}.${more}`;
   }
@@ -367,7 +375,7 @@ export class Preview {
       const v = x.visible_to;
       if (v === undefined) return [];
       if (v === "public") return ["Public: anyone may read it."];
-      if (!Array.isArray(v)) return [`Visible to ${JSON.stringify(v)}.`];
+      if (!Array.isArray(v)) return [`Visible to ${String(v)}.`];
       const usual = new Set([x.speaks_for ?? this.me, ...(x.addressed_to ?? [])]);
       if (v.length === usual.size && v.every((y: string) => usual.has(y))) return [];
       return [`Seen only by ${list(v.map((y: string) => this.who(y)))}.`];
@@ -491,7 +499,7 @@ export class Preview {
         for (const c of t.commitments as any[]) {
           const extra = this.also(c, ["who", "does", "every"], " (").replace(/\.$/, ")");
           if (c.does?.outcome) by.set(c.who, [...(by.get(c.who) ?? []), `${this.outcome(c.does.outcome, c.every, c.who)}${extra}`]);
-          else words.push(`${this.who(c.who)}${c.every ? `, every ${span(c.every)}` : ""}: ${c.does?.text !== undefined && Object.keys(c.does).length === 1 ? `"${c.does.text}"` : JSON.stringify(c.does)}${extra}`);
+          else words.push(`${this.who(c.who)}${c.every ? `, every ${span(c.every)}` : ""}: ${c.does?.text !== undefined && Object.keys(c.does).length === 1 ? `"${c.does.text}"` : this.facts(c.does)}${extra}`);
         }
         const sides = [...new Set<string>([...t.parties, ...(t.commitments as any[]).map((c) => c.who)])];
         const cap = (s: string) => (s === "you" ? "You" : s);

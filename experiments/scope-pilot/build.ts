@@ -138,8 +138,10 @@ export function build(o: Options): ExperimentSpec {
     seats: {
       // (One translator for every arm, held fixed: ours first, Sonnet 5.5 on the API behind it. Its calls are the arm's.)
       translator: { first: "decide/pod-small-v3-s2", behind: "anthropic/claude-sonnet-5-5", arrangement: "then" },
-      // (Honest disclosure, the generator's words for an assistant seat: it is told the town is simulated and for whom it works.)
-      framing: "simulation",
+      // (The owner's decision, 2026-10-11, reconfirmed 2026-11-10: the seats are not told what the town is ("I'm concerned
+      // that it will alter the outcomes. I think the debrief would be enough"). A seat that asks is told the truth
+      // (framing.ts, TRUE_ANSWER), and the debrief says it, as ever. Rounds 1 to 5 ran under honest disclosure.)
+      framing: "unstated",
       budget: o.budget,
       ...(o.allow?.length ? { allow_models: o.allow } : {}),
       wait_for_window_hours: 12,

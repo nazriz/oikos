@@ -6,6 +6,18 @@ phone included. Default output is `<pilot>.html` in the working folder; it refus
 read (the log through `orchestrator/src/logs.ts`, `batch.json`, `PILOT.txt`, the debriefs file beside the log); a test
 checks the folder's files are unchanged in size and time. No model is called. About 15 s for a 90-day 3,000-person pilot.
 
+## Experiment forks
+`oikos pilot-view <experiment-dir | seed-dir> [--arm NAME] [--out file.html | folder]` reads an experiment's forks
+(orchestrator/src/experiment.ts): one page per model arm and seed (`seed-7.sonnet.html`) and an `index.html`, in
+`--out` (a folder; by default `<experiment>/`); one arm (`--arm`) with `--out x.html` writes that file. An `.oklog` is
+read through `oikos-kernel export` (`OIKOS_KERNEL`, or the repo's built kernel). The `code` arm is the twin; `--no-twin`
+skips it. On a fork's page each sitting shows the whole prompt (standing instructions and the day's part), each turn's
+words and tool calls verbatim with what came back, the translator that drafted each request (ours or the fallback, and
+why ours withheld), confirmed or declined, and the act. **Empty sittings** (woken, shown nothing new, did nothing) are
+marked and hidden by default, with a count per seat; a sitting a newer seat skipped without a call (`empty_sitting`) is
+listed as skipped. For older forks "empty" is inferred from the log (a wake by news with no letter, result or draft, and
+only looks, notebook and done for now). About a minute a page for round 5 (the arm and the code arm read together).
+
 ## What it shows
 - **Overview:** town, profile, seed, days, framing, cost and calls, each seat with its model, the translator's share
   (ours or the fallback, drafts confirmed, declined, not answered, asked back, why requests went behind), alerts (an

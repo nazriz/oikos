@@ -33,11 +33,11 @@ test("a works seat with no crew is told so, at its first sitting and when it cha
   expect(shown[0]).toMatch(/Vacant: [1-9]\d*\./);
   expect(shown[0]).toContain("There is nobody in post, so the work that is the staff's is done by nobody. The office takes on its own staff, beginning with an advertisement on its job advertisement form (form-works-job-advertisement).");
 
-  // Its own forms, a line each: what the paper does, and that it is the office-holder's to fill in.
+  // Its own forms, each with what the paper does, and that it is the office-holder's to fill in.
   const system: string = sittings.find((e) => e.body.data.system)!.body.data.system;
   const ad = system.split("\n").find((l) => l.startsWith("- [form-works-job-advertisement]"))!;
   expect(ad).toContain("Job advertisement. How the office takes on staff of its own: it puts the posts on the jobs board at the wage given");
-  expect(ad).toContain("Filled in by the works manager, of the office's own accord (nobody's direction or leave is needed)");
+  expect(ad).toContain("The works manager fills it in, on the office's own account: nobody's direction or leave is needed.");
   expect(system.split("\n").find((l) => l.startsWith("- [form-works-disposal-docket]"))).toContain("Goes with a load of waste taken to the landfill");
 
   // A standing work order with nobody to carry it out: the preview says so before it is confirmed, and its result after.
