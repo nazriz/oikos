@@ -3471,7 +3471,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const rows = { ...WORK_TIME.person, ...V.work_time?.person, ...DELEGATION_TIME.person } as Record<string, number>;
     for (const pos of [...positions]) {
       const m = pos.role_module;
-      const issued = new Set((modules[m?.code ?? ""]?.issues ?? []).map((i: any) => i.writes.kind as string));
+      // (Its papers: those on its stationery, and those its code makes on no form of its own that it may hand over.)
+      const issued = new Set([...(modules[m?.code ?? ""]?.issues ?? []), ...(modules[m?.code ?? ""]?.handsOver ?? [])].map((i: any) => i.writes.kind as string));
       const kinds = [...issued].filter((k) => takes.has(k)).sort();
       if (!m || !kinds.length || pos.entity === "outside" || !accounts.some((a) => a.id === `acc-${pos.entity}`)) continue;
       const post = `${pos.id}-assistant`;
@@ -3486,13 +3487,24 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints } });
       if (Array.isArray(pos.channels)) pos.channels.push(K.from("providers", AS.providers.map((p) => p.id), ["service_offer"], { title: "What providers of assistants sell" }));
     }
+    // (A town office that may engage a service pays its fee from the town's account, so the council's mandate names it
+    // beside the finance officer, for that: until 2026-11-10 only the finance office was a principal of the town's, and
+    // the rates post, once it was one, could not pay its fee: the bank refused its standing order and the provider
+    // switched its system off after 75 days. The real route, the provider invoicing the town and the finance office paying
+    // it, is not built: risk ME-22.)
+    const mandate = records.find((r) => r.id === "signatories-city");
+    const towns = assistantPosts.map((a) => positions.find((p) => p.id === a.post.replace(/-assistant$/, ""))).filter((p) => p?.entity === "city" && !mandate?.data.positions.includes(p.id));
+    if (mandate && towns.length) {
+      mandate.data = { ...mandate.data, positions: [...mandate.data.positions, ...towns.map((p) => p!.id)] };
+      mandate.text += ` By a later resolution, the ${towns.map((p) => p!.title.toLowerCase()).join(" and the ")} may also instruct payments from it, for a service the office has engaged.`;
+    }
   }
   if (AS && spec.assistant_seats?.length) {
     const seatsOrgs = AS.providers.some((pr) => pr.offers.some((o) => o.for === "organisations" && spec.assistant_seats!.includes(o.template)));
     for (const a of seatsOrgs ? assistantPosts! : []) {
       const m = modules[a.code];
       const own = m?.issuesWith?.(positions.find((p) => p.id === a.post.replace(/-assistant$/, ""))?.role_module?.params ?? {}) ?? {};
-      const theirs = (m?.issues ?? []).filter((x) => a.kinds.includes(x.writes.kind));
+      const theirs = [...(m?.issues ?? []), ...(m?.handsOver ?? [])].filter((x) => a.kinds.includes(x.writes.kind));
       for (const x of [...ASSISTANT_ISSUES, ...theirs, ...theirs.map(draftOf)]) records.push(stationeryForm(a.post, a.entity, x, own, "Assistant"));
       positions.find((p) => p.id === a.post)!.channels.push(K.mine("stationery", ["form"], { title: "The post's own forms" }));
     }
@@ -3618,7 +3630,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       hours: MACHINE_HOURS, controller: code("system.genesis"), framing: unstated })),
     // (And each provider's assistants: a kind of system for each offer, which writes the kinds of matter it takes and the
     // papers of delegation, played by the assistant's code unless a study seats a model in it.)
-    ...(AS ? AS.providers.flatMap((pr) => pr.offers.map((o) => ({ id: o.template, kind: "system", title: o.title, supplier: pr.id,
+    // (Two offers of one system, a paid tier and a free one, are one kind of system: the first offer's.)
+    ...(AS ? AS.providers.flatMap((pr) => pr.offers.filter((o, i) => pr.offers.findIndex((x) => x.template === o.template) === i).map((o) => ({ id: o.template, kind: "system", title: o.title, supplier: pr.id,
       does: [...o.kinds.map((kind) => ({ block: "publish", kind, seconds: Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000)) })),
         ...ASSISTANT_PAPERS.map((kind) => ({ block: "publish", kind, seconds: ASSISTANT_PAPER_SECONDS })), { block: "withdraw", seconds: ASSISTANT_PAPER_SECONDS }, { block: "message", seconds: ASSISTANT_PAPER_SECONDS }],
       hours: MACHINE_HOURS, ...(HOST ? { runs_on: HOST.runsOn } : {}), ...(spec.assistant_seats?.includes(o.template) ? assistantSeat(pr, o) : { controller: code("assistant"), framing: unstated }) }))) : []),
