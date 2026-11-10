@@ -899,3 +899,10 @@ unchanged to the byte.
   `correction`). `oikos-kernel delegation` gains the table `obstacles` (each with its matter and `met_at`, the time
   the paper that told of it reached an assistant's seat) and, on each request, `obstacle` and `axes` (matters, kinds,
   level, access, means: `within` | `beyond`; the term and the words are the coders').
+- **B2, a body's requirements (O4):** the papers `requirements` (a body's public notice of what it needs on papers sent
+  to it; data `requires`: `items` by kind, `authority`, `basis`), `paper_returned` (`returned`, the paper sent back;
+  `need`; `paper`, a copy of it as it was, citing it, which a form may send again as it stands) and `authority` /
+  `authority_recorded` (a person's authority for posts to act for them with a body, for kinds; the body's record of it,
+  to the giver and the posts named). The modules' parameter `requires` (bank.lending, world.transfers). FormData
+  `copies` reads a paper sent back as it reads a sign-off (both resolvers; `contracts/test/forms.json`); the form
+  `send_again`. The world spec's `obstacles` (0, 1, 2; generator only). Rows of the table of slips `accept/<kind>`.

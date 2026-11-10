@@ -35,6 +35,25 @@ export const ASSISTANT_ISSUES: Issued[] = [
     writes: { kind: "handover", text: "{notes}", basis: "=agreement", to: ["=client"], visible: ["=self", "=client"], data: { agreement: "=agreement" } } },
 ];
 
+/**
+ * An assistant's stationery where the bodies it writes to send papers back (docs/design/obstacles.md, O1 and O4; the
+ * world's `obstacles` level above 0): the request form gains one plain blank, the body the client is asked to give
+ * their authority with; and a form sends a paper a body sent back again exactly as it was (`copies`: the copy the
+ * returned paper carries). Elsewhere the stationery is as before, to the byte.
+ */
+export function withObstacles(issues: Issued[]): Issued[] {
+  const out = issues.map((x) => (x.form !== "scope_request" ? x : {
+    ...x,
+    fields: { ...x.fields, authority: f("entity", "A body you ask them to give their authority with, for you to act for them there, if any.") },
+    writes: { ...x.writes!, data: { ...(x.writes!.data as object), authority: "=authority" } },
+  }));
+  out.push({ form: "send_again", title: "Sending a paper again as it was, after a body sent it back",
+    does: "Sends the paper a body sent back exactly as it was, to whom it went, citing it: once the authority it wanted is on file, or where the body could not match it. Nothing in it can be changed: to change anything, write it again.",
+    fields: { returned: f("record", "The paper that sent it back.", req) }, copies: "=returned",
+    writes: { kind: "paper_again", text: "Sent again." } } as Issued);
+  return out;
+}
+
 /** The kinds of paper a matter can be handed over for as what happened (the facts, and the assistant works the paper out):
  * the ones the engine composes (kernel/crates/actors/src/delegation/compose.rs, `MATTER_KINDS`: one list, held by a test
  * there). docs/design/handing-over.md, step H5. */

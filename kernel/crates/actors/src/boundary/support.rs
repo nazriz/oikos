@@ -255,6 +255,8 @@ impl Kind for Transfers {
                 lapsed_claims: BTreeSet::new(),
                 audited: Audited::new(&me),
                 casework: ctx.param("casework", None)?,
+                requires: ctx.param("requires", oikos_rules::acceptance::Requirements::default())?,
+                intake: Default::default(),
                 me,
             },
         )
@@ -340,6 +342,12 @@ struct Support {
     /// decision takes an officer's minutes in the officers' hours. Absent: whoever acts does it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     casework: Option<Casework>,
+    /// What it requires of the claims sent to it, as it publishes it (docs/design/obstacles.md, O1 and O4): none, it
+    /// takes every claim as it comes.
+    #[serde(default, skip_serializing_if = "oikos_rules::acceptance::Requirements::is_empty")]
+    requires: oikos_rules::acceptance::Requirements,
+    #[serde(default, skip_serializing_if = "crate::common::intake::Intake::is_default")]
+    intake: crate::common::intake::Intake,
 }
 
 /// The office's casework, and who does it.
@@ -766,8 +774,20 @@ impl Support {
             vec![]
         };
         waiting.sort_by(|a, b| made_at(a).cmp(&made_at(b)).then_with(|| filed_before(&a.id, &b.id)));
+        // What it requires of the claims sent to it, said once; and the authorities given it, recorded.
+        if working {
+            for (why, call) in self.intake.routine(&self.book, &self.me, &self.requires) {
+                steps.push(because(why, vec![call]));
+            }
+        }
         for c in waiting {
-            let Some(who) = c.speaks_for else { continue };
+            let Some(who) = c.speaks_for.clone() else { continue };
+            // (One that falls short of what we publish we need goes back, saying what is missing.)
+            if let Some((why, call)) = crate::common::intake::check(&self.book, &self.me, &self.requires, &c, cx) {
+                self.decided.insert(c.id.to_string());
+                steps.push(because(why, vec![call]));
+                continue;
+            }
             let payment = data(&c).s("payment").unwrap_or("").to_string();
             let rule = ours.iter().find(|r| r.id == payment);
             let age = data(&c).get("born_at").and_then(|x| x.as_i64()).map_or(-1, |b| (t - b).div_euclid(self.year));

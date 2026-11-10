@@ -418,6 +418,15 @@ desk), never otherwise; a paper sent again, citing the one sent back, is the sam
 scope is set beside the newest obstacle met on its matter (or on its principal's matters in the 30 days before it) on
 the axes its typed fields name. The screen counts obstacles met by law per seat and month.
 
+**A body that sends papers back (O4, 2026-11-11).** Where the world's `obstacles` level is above 0, the lender and the
+support office publish what they need on the papers sent to them (`requirements`: the items their forms ask for) and
+their clerk reads each paper against it (`actors::common::intake`, the rule `oikos_rules::acceptance`). A paper that does
+not give an item comes back naming it (`paper_returned`, to whoever sent it and whom it is for); one in order comes back
+wrongly at the world's rate for the check (`accept/<kind>`, a placeholder: MT-32), and is taken when it is sent again. A
+person sends their own unmatched paper again as it was; the code assistant sends again what it sent, and reports one that
+lacks an item, or wants an authority, as not done with what would clear it (`Report.needs`). A model at a desk sends a
+returned paper again on its form `send_again`.
+
 ## Leaves out (for now)
 
 - A local provider (a firm of the town with premises): providers are the outside world's until a profile asks for one.

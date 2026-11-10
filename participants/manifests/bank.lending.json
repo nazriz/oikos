@@ -384,6 +384,14 @@
       "source": "placeholder",
       "unit": "bps"
     },
+    "requires": {
+      "default": {},
+      "schema": {
+        "description": "what it requires of the papers sent to it, as it publishes it (docs/design/obstacles.md, O1 and O4): `items` by kind, the fields its form asks for, each with what it is called; `authority`, the kinds it acts on for a person only on their own word or an authority they gave it; absent, it takes every paper as it comes",
+        "type": "object"
+      },
+      "source": "docs/design/obstacles.md"
+    },
     "reserve": {
       "default": 5000000,
       "schema": {

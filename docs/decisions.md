@@ -12613,3 +12613,35 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
   report writes `needs` as absent. No world changes.
 - **Revisit if:** a request names several matters (then `only` becomes a list), or coders find the term axis carries
   the beyond-need cases (then a remit gains an end, and the form a date).
+
+## 2026-11-11 · Obstacles B2: a body sends back a paper that falls short of what it publishes it needs (docs/design/obstacles.md, O4)
+
+- **What:** a body that receives persons' papers may publish what it requires of them (`requirements`, a public notice
+  in its own words, with the items as data); its clerk reads each paper against it, sends back one that does not give
+  what its form asks for, naming it (`paper_returned`, to whoever sent it and whom it is for), and wrongly sends back
+  one in order at the world's rate for the check (`accept/<kind>` in the table of slips; never twice on one paper: a
+  paper sent again citing the one returned is taken). The rule is `oikos_rules::acceptance` (pure), the intake
+  `actors::common::intake` (one copy, called by each body that has requirements). Built at the lender
+  (`loan_application`) and the support office (`benefit_claim`); each logs the obstacle (B1's record).
+- **Who sends it again:** a person whose own paper came back unmatched sends it again as it was (`citizen/recourse.rs`);
+  the code assistant sends again what it sent, citing the return, and reports a paper that lacks an item (or wants an
+  authority) as not done, with what would clear it (`Report.needs`). It keeps what it sent only where a body it may
+  write to has published requirements, so that a town at level 0 is unchanged. A model at a desk sends a returned paper
+  again on a new form, `send_again` (`copies` the returned paper's copy; both resolvers, `contracts/test/forms.json`).
+- **Every code filer meets every requirement (the lead's rule c):** the items are fields a code citizen's loan
+  application and benefit claim always carry (`LoanApplication.amount`, `months`, `account`, `purpose`;
+  `BenefitClaim.payment`, `account`: required fields of the papers' own types), so a code citizen is sent back only by
+  a wrong return, and sends it again. Whether any code actor stalls is read from the B8 screen at levels 1 and 2.
+- **Levels (spec `obstacles`, generator):** 0 or absent, nothing (no requirement, notice, row or channel: the world as
+  before). 1 and 2: the items (`OBSTACLE_ITEMS`: what a paper of the kind is, not a place's figure) and the wrong-return
+  rate `WRONG_RETURN_BPS` 200 and 800 basis points, both **placeholders** (leads, to confirm: e-filing reject rates,
+  accounts-payable exception rates). Assistant posts gain a channel on what bodies publish they require, and one for
+  papers sent back. Every new paper a seat is shown is in the office's words; the typed `need` and `requires` are kept
+  from a seat's rendering (`ON_RECORD`).
+- **Byte-identical at level 0 (the lead's rule e):** the generated configs of the 1,000-person au-vic town with providers
+  and of the study town (study.ts, seed 7) are the same bytes before and after; run 45 days on B1's kernel and this one,
+  each gives the same state hash and log digest (f4669d0e… and 5895935f…). Towns without providers: the pinned results
+  (`orchestrator/test/representation.test.ts`) hold.
+- **Not built, said plainly:** the shops' check of delivery notes and the collector's of returns (the factory's
+  counterparties: design section 7, the factory is the low-friction seat); a requirement published mid-run at level 2
+  (no code filer could meet one it does not read).

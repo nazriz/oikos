@@ -48,6 +48,14 @@
       },
       "default": 31536000,
       "source": "placeholder"
+    },
+    "requires": {
+      "schema": {
+        "type": "object",
+        "description": "what it requires of the papers sent to it, as it publishes it (docs/design/obstacles.md, O1 and O4): `items` by kind, the fields its form asks for, each with what it is called; `authority`, the kinds it acts on for a person only on their own word or an authority they gave it; absent, it takes every paper as it comes"
+      },
+      "default": {},
+      "source": "docs/design/obstacles.md"
     }
   },
   "perceives": [],
