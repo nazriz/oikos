@@ -68,7 +68,7 @@ export async function screenLog(log: string, config: any, o: { forkDay: number; 
   const incomingAt = new Map<string, number[]>(); // post -> times new papers reached it
   const observed = new Map<string, number[]>(); // system -> its sittings
   const engaged: Screen["households"]["engaged"] = [];
-  const deliveries = new Map<string, { person: string; at: number; ended?: number }>(); // order -> a desk's client
+  const deliveries = new Map<string, { person: string; provider: string; at: number; ended?: number }>(); // order -> a desk's client
   const isSeat = (post: string | undefined) => !!post && post in seats;
   const toSeat = (r: any): string | undefined => {
     // (An organisation's papers to its assistant are its own, in its principal's post; a person's go to the provider.)
@@ -113,7 +113,7 @@ export async function screenLog(log: string, config: any, o: { forkDay: number; 
     const r = b.record ?? {};
     if (r.kind === "service_delivery" && providers.has(r.speaks_for) && r.data?.order) {
       const person = (r.addressed_to ?? [])[0];
-      if (person && offered.some((p: any) => p.person === person)) deliveries.set(r.data.order, { person, at: t });
+      if (person && offered.some((p: any) => p.person === person)) deliveries.set(r.data.order, { person, provider: r.speaks_for, at: t });
     }
     if (r.kind === "service_ended" && r.data?.order && deliveries.has(r.data.order)) deliveries.get(r.data.order)!.ended = t;
     // (What an assistant wrote: in its post, by its system.)
@@ -157,13 +157,12 @@ export async function screenLog(log: string, config: any, o: { forkDay: number; 
   // Clients: an organisation's seat serves its own organisation; a desk, the persons with a service of it in force.
   for (const [post, rows] of Object.entries(seats)) rows.forEach((m, k) => {
     const end = from + (k + 1) * MONTH;
-    if (post.endsWith("-desk")) m.clients = [...deliveries.entries()].filter(([, d]) => d.at < end && (d.ended === undefined || d.ended >= from + k * MONTH) && post === `${providerOfDesk(post)}-desk`).length;
+    if (post.endsWith("-desk")) m.clients = [...deliveries.entries()].filter(([, d]) => d.at < end && (d.ended === undefined || d.ended >= from + k * MONTH) && post === `${d.provider}-desk`).length;
     else m.clients = m.sittings || m.steps || Object.keys(m.matters).length ? 1 : 0;
   });
   return { spec: o.spec, seed: o.seed, arm: o.arm, fork_day: o.forkDay, days: o.days,
     households: { offered: offered.length, took_up: new Set(engaged.filter((x) => !x.committed).map((x) => x.who)).size, by_hand: byHand, engaged }, seats };
 }
-const providerOfDesk = (post: string) => post.replace(/-desk$/, "");
 
 export function screenText(s: Screen): string {
   const lines = [`${s.spec}, seed ${s.seed}, arm ${s.arm}: ${s.days} days after the fork on day ${s.fork_day}`,

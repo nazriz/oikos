@@ -11953,34 +11953,43 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   pricing of H3 moves the principals' rule; the owner chooses how the desk is engaged and how long levels are held (MT-29,
   MT-27); the pay run is built (ME-26).
 
-## 2026-11-10 · H6 follow-up: a free tier for persons, the screen again after sourced times and main (risks MT-29, MT-30)
 
+## 2026-11-10 · H6 follow-up: a free tier, engagement assigned by the study, the screen on it (risks MT-28, MT-29, MT-30, WM-1)
+
+- **The mandate stays as stated** (the lead): the rates post on the town's bank mandate is a simplification (MT-28); the
+  finance office setting up the fee is more than half a day and not built.
 - **A free tier beside each paid personal offer** (the profiles, with its basis): no fee, no set-up, nothing to leave;
   `advice` and `draft` only (it does not act in the client's name: the large assistants' agent features are on paid
   plans); the provider keeps the records. One kind of system with the paid tier, at the same desk (the generator makes
   one template of two offers that share it). A free service sets up no fee and is not switched off for want of one
   (`market/services.rs`; tested in `services/tests.rs`). The person's rule is untouched.
-- **The screen on the merged tree** (`study.ts`: reach one adult in three, levels held to a month after the fork, then
-  the rule; seed 7, 180 days): 64 of the 251 reached took the free tier on their first review (day 14), each for one
-  paper of the month before that the free tier would save time on at `draft` (a claim 41, a loan application 17, a
-  request to look again 9, a change 7; about A$5.33 a month each, against nothing); none took a paid tier. The desk then
-  had 52 to 62 clients and 0 to 3 matters a month; those clients and the others reached did 4 to 19 papers a month of
-  the kinds themselves (job applications most: at 292 s, less than handing one over at `draft`). The factory: 11 matters
-  in the first month (4 requests for supply, 3 invoices, 3 delivery notes, a return), then one return a month; it kept
-  8 to 18 a month. The finance office: one a month. The rates post: 14 in the first month, none after; it kept the next
-  instalment's 14. Steps 2.9 to 3 a matter; no act refused; one draft returned (a rates notice) in 24 seat-months.
-- **When the hold ends** (day 60 to 62), the principals' rule cuts invoices (4 a month: A$17.98 at `draft` against A$8.10
-  done itself), delivery notes (4 a month: A$17.84 against A$5.40) and rates notices (7 a month: A$50.96 against A$9.45)
-  to doing them itself. Returns of tax withheld stay at `draft`.
-- **Two slow-tier tests moved with the town:** `seat-diary.test.ts` held every day's delegated paperwork under three
-  hours; on the moved town, day 30 ran to 11 because a named member of the crew was out on the works round and the seat's
-  orders waited for them (the typical day is now what is held: MT-23). `assistants-fork.test.ts`'s fork spent $0.44 of a
-  $0.40 limit with six assistant seats to debrief, past what the harness keeps back (its reserve is capped at half the
-  limit: MT-30); the test's limit is now $0.80, and the overspend is a risk of its own.
-- **What the other worker's pricing (composing charged to whoever composes) should move:** the rule's day-60 cuts and
-  the households' take-up, not the papers born. At act depth a referral will cost the principal the paper's row as well,
-  so handing over pays even less and the cuts and the low take-up stand or deepen. At matter depth the principal pays the
-  referral only (half a minute), so `alone` pays for nearly every kind and `draft` still does not for papers of under
-  five and a half minutes (a job application, a delivery note, a rates notice, an invoice): with the profiles'
-  error cost (A$500) and the claimed 1% slips, `alone` saves less than it risks for the two- and three-minute papers. The
-  volumes of the "kept" column, and the steps a matter, are what the assistant could be handed; those numbers do not move.
+- **Sourced times for a person's papers were put into the profiles and taken out again** (the lead's call: unopened
+  search results, one place's figures borrowed for two others, every town of three profiles moved for numbers no better
+  founded than the placeholders; the owner, 2026-10-25: don't chase real figures). The figures are leads under WM-1.
+  What stands from them: a principal's review of a draft costs more than writing a paper of a few minutes, so handing such
+  papers over at `draft` does not pay at any duration in that range. The towns are back on main's hashes, and
+  `seat-diary.test.ts` passes again in its original form.
+- **Engagement and levels are assigned by the study** (the lead): `study.ts` engages the offices (finance, the factory,
+  the rates post) and one adult in three by hand on day 1, holds their levels and the service for the whole run
+  (`build.ts`: `holdLevels: "run"` sets `commit.levels_until` to the run's end), and offers the service to nobody else
+  (`cohort.only`). Organic take-up is `study-reach.ts` (reach one in three, the free tier, offices held a month after the
+  fork, then their rule). `study-hand.ts` is gone. Paper plan 4.1 says so.
+- **The screen on `study.ts`** (seed 7, 180 days after the day-30 fork; months of 30 days):
+
+  | seat | matters a month (by kind) | steps a matter | refused / returned |
+  |---|---|---|---|
+  | factory | 10, 8, 6, 20, 10, 14 (delivery notes 5 to 18; invoices 0 to 3; requests for supply 0 to 4; a return a month) | 2.7 to 3 | 0 / 1 |
+  | finance office | 1 each month (a return of tax withheld) | 3 | 0 / 0 |
+  | rates post | 14 in months 1 and 4 (each 15 notices), none between | 2.9 to 3 | 0 / 1 |
+  | desk (251 clients by hand, 233 by month 6) | 12, 3, 12, 14, 17, 3 (job applications most) | 2.9 to 3 | 0 / 1 |
+
+  Three drafts returned in 24 seat-months, no act refused, nothing silent past a due day (no code paper names one).
+  **Organic** (`study-reach.ts`): 64 of the 251 adults reached took the free tier by their own rule, none a paid tier;
+  the desk then had 0 to 9 matters a month.
+- **Two slow tests:** `assistants-fork.test.ts`'s fork spent $0.44 of a $0.40 limit with six assistant seats to
+  debrief, past what the harness keeps back (its reserve is capped at half the limit: MT-30); the test's limit is now
+  $0.80, and the overspend is a risk of its own, to be fixed separately. `seat-diary.test.ts` is as on main.
+- **What the other worker's pricing (composing charged to whoever composes) should move:** in `study.ts` nothing of the
+  volumes (the levels are held); in `study-reach.ts` the rule's cuts at the hold's end and the households' take-up. At act
+  depth a referral will cost the principal the paper's row too, so handing over pays even less; at matter depth the
+  principal pays the referral alone, and `draft` still costs it more than a paper of under about five and a half minutes.

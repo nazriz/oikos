@@ -82,12 +82,8 @@ test("a seat has its crew do the paperwork by naming them: on their time and not
   // day 21's 310 minutes of 2026-10-24 was the seat held on its own time until each order began, so its orders queued
   // behind a busy member of the crew; fixed by foundations-2 P1 the next day. MT-23.)
   const spans = Array.from({ length: 58 }, (_, i) => spanOf(theirs, i + 1)).filter((x) => x.acts > 0).map((x) => x.span);
-  // (The typical day, not every day: on a day a named member of the crew is out on the works round for hours, the
-  // seat's next orders wait for them to begin, and the day's paperwork runs into the evening. Every day was held until
-  // 2026-11-10, when the sourced times of a person's papers (H6) moved the town and day 30 of 58 ran to 11 hours that
-  // way: MT-23.)
   expect(spans.length).toBeGreaterThan(20);
-  expect([...spans].sort((x, y) => x - y)[Math.floor(spans.length / 2)]!).toBeLessThan(3 * 3_600);
+  expect(Math.max(...spans)).toBeLessThan(3 * 3_600);
   // Someone who is not at work cannot do it, and the kernel says so (the seat is told in the town's words).
   // (Until 2026-10-25 this was looked for in the run above, where it came of a crew member named before they were in.
   // Since market realism the 600-person town's works crew are four with no home, who sleep at the hall (the town has

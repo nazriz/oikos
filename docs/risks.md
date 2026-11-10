@@ -118,6 +118,26 @@ The mechanism:
 - **Notice by:** days-to-decision against a place's real waits; a result that changes when the table is scaled 2 to 4 times.
 - **Fix when:** before any result is read in absolute time or cost, and before any automation or adoption
   experiment; for au-vic (the TARA town) first, since nothing sources it yet.
+- **Leads for a person's delegable papers (2026-11-10, design H6; not in any profile).** Found through web search, no
+  source opened; all to confirm, and each US except the Universal Credit claim. Put into the profiles for a day and taken
+  out again (the lead's call: unopened figures, borrowed between places, moved every town for nothing better founded):
+  - a job application: 4 min 52 s, a timed audit of Fortune 500 online applications (InFlight, as reported); other
+    studies 4 min 42 s to 13 min; it excludes preparing a CV (to confirm);
+  - a loan application: 10 to 20 minutes, lenders' and consumer-finance pages (LendEDU, NerdWallet, Finder): marketing,
+    not a burden estimate (to confirm);
+  - a benefit claim, England: a Universal Credit online claim about 20 minutes for one person, about an hour for a couple
+    (councils' guides, 20 to 40 minutes; a DWP-hosted development page) (to confirm);
+  - a request to look at a decision again: SSA-561, OMB 0960-0622, 8 minutes on paper, 5 online (Federal Register
+    2024-30764); an SSA page says 18 minutes and a 2024 public comment over an hour (to confirm);
+  - a complaint: CFPB intake form, OMB 3170-0011, about 8 minutes (2011 and 2015 notices); FTC's online complaint about
+    5.3 minutes, its identity-theft form up to 8.5 (to confirm);
+  - a return of tax withheld: IRS Form 941 is put at 10.9 hours an employer a year including record-keeping (Federal
+    Register 2025-01692), not a return's time (to confirm);
+  - nothing found for a change of circumstances, a tribunal application, an invoice made, a delivery note, a request for
+    supply or a rates notice, nor any Australian figure.
+  The finding that stands whatever these are: a principal's review of a draft (five minutes) and its referral (half a
+  minute) cost more than writing a paper of a few minutes, so handing such papers over at `draft` does not pay at any
+  duration in this range (design H6; MT-27).
 
 ### WM-2 · Mechanisms that do not bind (crime, pollution, water, clinic)
 - **Gap:** Several mechanisms run on placeholders sized so that they hardly act: theft is a rare chance (200 bps a
@@ -1690,16 +1710,18 @@ The mechanism:
   for much besides the papers this world has, and real providers have free tiers, which the profiles do not offer.
 - **Where:** `rule.rs` (`appraise`); the profiles' offers to persons; `experiments/scope-pilot/build.ts` (cohort `reach`).
 - **Effect:** Under the owner's condition (each person decides by their own rule) the desk has no clients and the study
-  has no household seat; engaged by hand (rounds 1 to 5's design, `study-hand.ts`), a third of the adults give the desk
+  has no household seat; engaged by hand (rounds 1 to 5's design; `study.ts` since 2026-11-10), a third of the adults give the desk
   about 16 matters a month.
 - **L / I:** high / high · **Status:** open (2026-11-10); the owner's call
 - **Notice by:** the screen's households line.
 - **Fix when:** the owner chooses: a desk engaged by hand, declared as the study's design; a free tier on offer, with
   its source; or no household seat.
-- **Since 2026-11-10 a free tier is on offer** (the profiles): 64 of the 251 adults reached took it up in the screen, on
-  their first review, each for one paper of the month before (41 a claim, 17 a loan application, 9 a request to look
-  again); none took a paid tier. Having taken it, they hand over little (0 to 3 matters a month in all): most papers
-  after are of kinds their rule does not remit (a job application now takes less time than handing it over at `draft`).
+- **Since 2026-11-10 a free tier is on offer** (the profiles): 64 of the 251 adults reached took it up in the screen
+  (`study-reach.ts`), on their first reviews, each for a paper or two of the month before (of 92 engagements, a claim 35,
+  a job application 23, a loan application 18, a request to look again 6); none took a paid tier. Having taken it, they
+  hand over little (0 to 9 matters a month in all): their rule remits only the kinds it saw, and most months they have
+  none. **The study now assigns engagement** (the lead, 2026-11-10: `study.ts`, a third of the adults by hand, levels held
+  for the run, nobody else offered it); organic take-up is the larger study's option.
 
 ### MT-30 · A fork's spending limit is overspent when many seats are to be debriefed
 - **Gap:** The harness keeps back, from a fork's limit, what the end's debriefs are reckoned to cost, but caps that
