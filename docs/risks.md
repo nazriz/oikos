@@ -1752,9 +1752,9 @@ The mechanism:
   capped reserve, the debriefs then cost more than was kept back, and the fork ends over its limit ($0.44 of $0.40).
 - **Where:** `participants/src/llm` (`keptBackFor`, `seatsEndNeedMicroUsd`); `orchestrator/src/run.ts`, `seat-host.ts`.
 - **Effect:** A real run with many seats and a tight limit spends past its hard limit; the debriefs are still asked.
-- **L / I:** medium / medium (money, not results) · **Status:** open (2026-11-10). The test now runs its town at the
-  profile's own prices (few organisations engage, so few seats), its limit as before; at a twentieth of the prices the
-  overspend recurred even at a $0.80 limit ($0.85).
+- **L / I:** medium / medium (money, not results) · **Status:** open (2026-11-10). The test keeps main's town (a
+  twentieth of the prices, about eleven seats once H2 and H3 landed) with a $1.20 limit, inside the reserve's design;
+  at $0.40 it spent $0.47, and at the profile's own prices only the desk sat before the limit.
 - **Notice by:** a fork's calls summing past its limit.
 - **Fix when:** before a run with more than a few seats on a small limit: refuse to start a fork whose end need is over
   half its limit, or stop the sittings earlier.

@@ -12059,8 +12059,9 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   the desk then had 0 to 9 matters a month.
 - **Two slow tests:** `assistants-fork.test.ts`'s fork spent $0.44 of a $0.40 limit with six assistant seats to
   debrief, past what the harness keeps back (its reserve is capped at half the limit: MT-30), and $0.85 of $0.80 when
-  the limit was raised. The test's town now runs at the profile's own prices (persons take the free tier; few
-  organisations engage), with its limit as on main; the overspend is a risk of its own, to be fixed separately.
+  the limit was raised. After main's H2 and H3 landed, the test keeps main's town (a twentieth of the prices, a cohort
+  engaged by hand) with a $1.20 limit, inside what the reserve can hold for its eleven seats (at the profile's own
+  prices only the desk sat before the limit); the overspend is a risk of its own, to be fixed separately.
   `seat-diary.test.ts` is as on main.
 - **What the other worker's pricing (composing charged to whoever composes) should move:** in `study.ts` nothing of the
   volumes (the levels are held); in `study-reach.ts` the rule's cuts at the hold's end and the households' take-up. At act
