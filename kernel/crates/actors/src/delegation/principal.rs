@@ -241,9 +241,11 @@ pub struct State {
     /// (During a review: whether it changed anything.)
     #[serde(default, skip)]
     changed: bool,
-    /// (Where it hands wants over: the bodies on its boards that say what they hear, and their fees, as it last saw
-    /// them: what it reads a draft's addressee against.)
-    #[serde(default, skip)]
+    /// Where it hands wants over: the bodies on its boards that say what they hear, and their fees, as it last saw
+    /// them: what it reads a draft's addressee against. (Saved: a board shows a notice as it comes, so a principal
+    /// restored at a fork would not see it again. Until 2026-11-11 it was not saved, and after the study's fork every
+    /// draft to a body that hears the matter was declined.)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     venues: Vec<(String, Vec<String>, i64)>,
 }
 
@@ -474,8 +476,7 @@ impl State {
         }
         // (A want with its assistant: the bodies that say what they hear, as its boards show them, to read a draft's
         // addressee against.)
-        // (Kept as they come, the newest notice of each body standing, where it hands wants over at all; not saved:
-        // after a restore, what its boards show it next.)
+        // (Kept as they come, the newest notice of each body standing, where it hands wants over at all.)
         if self.p.kinds.keys().any(|k| is_want(k)) {
             for r in pic.all_records() {
                 let RecordBody::Statement { offer: Some(o), .. } = &r.body else { continue };
