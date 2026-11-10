@@ -112,7 +112,11 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
   // alone; with 0.77.0 written in, each is the hash it was. 6123ac0b..., e310a127..., fd53b87f... until then.)
   // (Re-taken on 2026-11-08 at the scope pilot's world faults, the config hashes only: the generator's version (0.79.0) in
   // the description alone, the towns having no assistants. 42ca7058..., 50c1e33a..., 4c849e00... until then.)
-  ? { "au-vic-2026": "efde801fb99443f6", "gb-eng-2026": "d8370e0f52315a86", "ke-nakuru-2026": "a023b11de4141c6f" }
+  // (Re-taken on 2026-11-10 at the sourced times for a person's delegable papers (WM-1, H6), config hashes and Rust states
+  // both: au-vic and gb-eng's tables of work gained rows for job applications, loan applications, requests to look again and
+  // complaints (and gb-eng's claims); ke-nakuru did not move. efde801f... and d8370e0f... for the configs, 1895f02c... and
+  // 402f7523... for the states, until then.)
+  ? { "au-vic-2026": "e7c185fac61f75b3", "gb-eng-2026": "875a80309ad33ecb", "ke-nakuru-2026": "a023b11de4141c6f" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -189,8 +193,8 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // main's d8300873..., e9564040..., 7bf5ae46..., until then.)
 // (Re-taken on 2026-11-07 at WM-15, as the configs above; 2ee01f8c..., 7abe89a6..., 4be8a863... until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "1895f02c0fa9fc1c99621394b4b32edeba7309a1f93ff20424243cd8a1f6b20f",
-  "gb-eng-2026": "402f7523b185099564ea106cd303bc2862a8f4f6f767cacd3ed8c3bff5df9639",
+  "au-vic-2026": "6948cf9292db6930e307ba329e27c1eaa443c78a68c5c54084a84e119bb47537",
+  "gb-eng-2026": "453a60cc06cf5c80ee66126025d7636952485fab5df95554022ad6bf88ca75c9",
   "ke-nakuru-2026": "3a1ff10ca4df6eb93265bf430be66e695b15b9cf94dc01c353b1106f5aaa37a7",
 };
 

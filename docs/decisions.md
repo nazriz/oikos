@@ -11862,3 +11862,33 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
 - **Revisit if:** `route` keeps linked parts together (then price lists and purchase orders join the offers); the
   pricing of H3 moves the principals' rule; the owner chooses how the desk is engaged and how long levels are held (MT-29,
   MT-27); the pay run is built (ME-26).
+
+## 2026-11-10 · Sourced times for a person's delegable papers (WM-1; the H6 follow-up)
+
+The act times that decide whether handing a paper over saves anything were the generator's placeholders (15 minutes
+for any paper with no row of its own). For the kinds an assistant can be handed, the profiles' tables of work now carry
+what sources give, each with its source under `work_time.sources` (a range recorded, its centre taken):
+
+| kind | us-oh | gb-eng | au-vic | source |
+|---|---|---|---|---|
+| job application | 292 s | 292 s (borrowed) | 292 s (borrowed) | a timed audit of Fortune 500 online applications, 4 min 52 s; other studies 4 min 42 s to 13 min |
+| loan application | 900 s | 900 s (borrowed) | 900 s (borrowed) | lenders' and consumer-finance pages, 10 to 20 minutes (marketing, not a burden estimate) |
+| benefit claim | 1,140 s (already) | 1,200 s | placeholder | gb-eng: Universal Credit online claim about 20 minutes for one person (councils' guides 20 to 40) |
+| review request | 480 s | 480 s (borrowed) | 480 s (borrowed) | SSA-561 request for reconsideration, OMB 0960-0622: 8 minutes on paper, 5 online |
+| complaint | 480 s | 480 s (borrowed) | 480 s (borrowed) | CFPB intake form, OMB 3170-0011: about 8 minutes; FTC's online complaint about 5.3 |
+
+All were seen through search and not opened (each marked "to confirm"). **No source was found** for a benefit change, a
+tribunal application, an invoice, a delivery note, a request for supply, a rates notice or a return of tax withheld (an
+IRS figure for Form 941 is a year's burden including record-keeping, not a return's), nor any Australian figure: those
+rows keep their placeholders, labelled as before. Borrowed rows say whose they are.
+
+- **What moves:** every town of these three profiles (their tables of work change), in the time people spend on these
+  papers: a job application takes a third of what it did, a request to look again and a complaint about half, a claim
+  in gb-eng a third more. A loan application is as before (the placeholder and the source agree). Towns of other
+  profiles are unchanged. Pins re-taken for it: `culture-dial.test.ts` (au-vic's and gb-eng's config hashes and Rust
+  states; ke-nakuru's did not move) and `scripts/fixtures/representation-results.json` (all six towns' 30-day results).
+- **For delegation:** a job application now takes less of a person's time than handing it over at `draft` does (half a
+  minute's referral and five minutes' sign-off), so a person's rule finds even less to save. That is the measure fixed,
+  not a volume aimed at.
+- **Revisit if:** a primary source is opened (replace the row); an Australian or English figure is found for a borrowed
+  row; a source is found for the kinds still on placeholders.
