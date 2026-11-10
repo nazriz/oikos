@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { MockAdapter } from "@oikos/participants/llm";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
-import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, LABEL_TEXT, NOT_CHECKED, NOT_PUT, translatorContext, translatorSystem, unsureText } from "../src/index";
+import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, LABEL_TEXT, NOT_CHECKED, NOT_PUT, notInDraft, plainer, translatorContext, translatorSystem, UNCLEAR, unsureText } from "../src/index";
 
 const law = { id: "law-planning", record: "statement", author: "genesis", at: 0, visible_to: "public", kind: "law", text: "No building without a permit.",
   adico: { deontic: "must_not" }, formal: { language: "cel", condition: "block.block == 'construct' && !holds_liberty(actor, 'build', block.lot)" } } as any;
@@ -48,7 +48,10 @@ test("a draft carries the call, the resolver, a mechanical preview, the dry run 
   expect(r.draft.check).toEqual({ ok: false, refusal: { code: "insufficient_funds" }, warnings: ['This appears to go against law-planning: "No building without a permit."'] });
   expect(r.hash).toBe(draftHash(r.draft));
   const text = draftText(r.draft);
-  expect(text).toContain("here is exactly what will happen");
+  expect(text).toContain('Draft d1, drawn up from what you asked: "We\'ll build a park on p1 ourselves.". If you say yes, this is exactly what will happen:');
+  expect(text).toContain("To say yes: Confirm d1. To say no: Decline d1");
+  // What the request named that the draft does nothing with is said (an id it uses, in its call or preview, is not).
+  expect(notInDraft({ proposal: "Pay rec.52 from acc-1 to acc-9, and file a report on rec.60.", call: "money(to=acc-9, amount=\"310\", from=acc-1, settles=rec.52)", summary: "" })).toEqual(["rec.60"]);
   expect(text).toContain("This can't be done right now: the account doesn't have enough money.");
   expect(text).toContain("Legal note:");
 });
@@ -113,7 +116,7 @@ test("a call put together wrongly, no call at all, and a check that fails are to
   expect((checked as any).retries).toHaveLength(1);
   expect(NOT_CHECKED).not.toContain("may not help");
   // A request that really is unclear still reads as before.
-  expect(await createTranslator(io("none(unclear)"), ok, type).translate(req)).toMatchObject({ ok: false, notices: ["It isn't clear what should happen. Could you say it more plainly?"] });
+  expect(await createTranslator(io("none(unclear)"), ok, type).translate(req)).toMatchObject({ ok: false, notices: [UNCLEAR] });
 });
 
 test("asked back, a translator may say what was unclear: one of a few fixed sentences, and of a form only what the person's own forms hold", async () => {
@@ -123,10 +126,16 @@ test("asked back, a translator may say what was unclear: one of a few fixed sent
       data: { form: "council_proposal", submit_as: "proposal", submit_to: ["city"], fields: { proposal: { type: "text", required: true }, kind: { type: "choice", required: true, options: ["law", "budget", "other"] }, parks: { type: "amount" } } } }] } } } as any);
   const req = { draftId: "d1", participant: "mayor-system", as: "mayor", proposal: "Table it.", knowledge: k };
   const says = (unsure: unknown) => unsureText(unsure, req);
-  expect(says({ kind: "which" })).toBe("It isn't clear which one you mean. Name each person, account, record and place by its id.");
+  expect(says({ kind: "which" })).toBe("It isn't clear which one you mean. Name each person, account, paper and place by its id, as your reports show it in brackets after its name.");
   expect(says({ kind: "words" })).toBe("It isn't clear which words are to go as they stand. Put them in quotation marks.");
-  expect(says({ kind: "act" })).toBe(LABEL_TEXT.unclear);
-  expect(says({ kind: "form_needs", form: "council_proposal", fields: ["proposal", "kind"] })).toBe("The council proposal needs: proposal, kind.");
+  expect(says({ kind: "act" })).toBe(UNCLEAR);
+  // (A form's empty blanks, each with what goes in it, and what a restatement says: told "The council proposal needs:
+  // proposal, kind." a 7B model wrote the same words again, 2026-11-10.)
+  expect(says({ kind: "form_needs", form: "council_proposal", fields: ["proposal", "kind"] })).toBe("It was read as the council proposal, and these blanks of it are still empty: proposal; kind (one of law, budget, other). Nothing was drawn up. Say it again with the council proposal named and what goes in each of those blanks, in your own words, each named by the blank it is for.");
+  // The resolver's own "needs:" is said the same way, and a request read as several things says the parts it was read as.
+  expect(plainer(["The council proposal needs: proposal."], req)[0]).toStartWith("It was read as the council proposal, and this blank of it is still empty: proposal.");
+  expect(plainer([LABEL_TEXT.too_much], { ...req, proposal: "Pay rec.4 from acc-1. Then write to city about it." }, "none(too_much)")[0]).toBe('Nothing was done: this was read as more than one thing to do at once: (1) "Pay rec.4 from acc-1."; (2) "write to city about it.". Ask for each by itself, each in a request of its own, one thing in each.');
+  expect(plainer([LABEL_TEXT.too_much], req, "none(not_yours)")).toEqual([LABEL_TEXT.too_much]);
   expect(says({ kind: "form_option", form: "council_proposal", field: "kind" })).toBe("On the council proposal form, kind is one of: law, budget, other.");
   expect(says({ kind: "form_field", form: "council_proposal", fields: ["staff"] })).toBe("The council proposal form has no such field as was given. Its fields are: proposal, kind, parks.");
   // Nothing is said of a form this person hasn't got, of a field their form doesn't have, or in words of the translator's own.
@@ -139,12 +148,12 @@ test("asked back, a translator may say what was unclear: one of a few fixed sent
   let asked = 0;
   const adapter = new MockAdapter("mock", { translator: () => { asked++; return [{ type: "tool_use", id: "1", name: "call", input: { program: "none(unclear)", unsure: { kind: "form_needs", form: "council_proposal", fields: ["proposal"] } } }]; } });
   const r = await createTranslator({ adapter, annotate: async () => {}, now: () => 0 }, ok, () => undefined).translate(req);
-  expect(r).toMatchObject({ ok: false, notices: ["The council proposal needs: proposal."] });
+  expect(r).toMatchObject({ ok: false, notices: [says({ kind: "form_needs", form: "council_proposal", fields: ["proposal"] })] });
   expect(asked).toBe(1);
   // What can't be said (a form they haven't got) leaves the plain refusal, asked again as before.
   asked = 0;
   const hidden = new MockAdapter("mock", { translator: () => { asked++; return [{ type: "tool_use", id: "1", name: "call", input: { program: "none(unclear)", unsure: { kind: "form_needs", form: "secret_levy", fields: ["rate"] } } }]; } });
   const plain = await createTranslator({ adapter: hidden, annotate: async () => {}, now: () => 0 }, ok, () => undefined).translate(req);
-  expect(plain).toMatchObject({ ok: false, notices: [LABEL_TEXT.unclear] });
+  expect(plain).toMatchObject({ ok: false, notices: [UNCLEAR] });
   expect(asked).toBe(2);
 });

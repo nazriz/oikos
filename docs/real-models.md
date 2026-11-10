@@ -41,7 +41,7 @@ A seat's only memory from one sitting to the next is its notebook: 8,000 charact
 - **Nothing dropped silently.** The limit is said in characters and in words. A summary longer than asked (990, 964 and 1,054 characters for 803, 835 and 954 in the third living pilot, where all three folds failed) is asked for once more, in a second counted call that says how long it was; the shorter of the two is taken. If that is still too long it is kept up to the end of the last sentence that fits, and the seat is told how long it was and shown what was left out, to note again if it needs it (`summary_cut` in the note `notebook_folded`). An answer that is empty, cannot be read, does not come, or has no sentence ending within the room there is changes nothing: the notebook stays as it was, the seat is told, and a note `notebook_fold_failed` is recorded; it is not asked again for three sittings. A fold done is a note `notebook_folded` with what was replaced (lengths, and the text), and the call's own transcript carries the same notes. Fewer than 600 characters of older notes, or all of one time, are not folded.
 - A write that would overflow is still refused as before (the seat told, `notebook_not_changed`); with folding it should be rare. The pilot report counts folds and failed folds per seat.
 
-- **The office's own file (2026-10-13).** The notebook is not the only thing a seat has at a sitting. After the report it is shown its office's own file: what the office sent, filed and paid in the last 40 days with what followed each, what came into its account, and what stands open on its books, made by code from its own papers and accounts, in at most 4,500 characters (docs/behaviour/office-books.md, "The office's own file"). Mean first-turn prompt in the mock living-6 line-up grew by about 1,100 to 3,100 characters per sitting (see docs/decisions.md). The standing instructions are unchanged.
+- **The office's own file (2026-10-13).** The notebook is not the only thing a seat has at a sitting. After the report it is shown its office's own file: what the office sent, filed and paid in the last 40 days with what followed each, what came into its account, and what stands open on its books, made by code from its own papers and accounts, in at most 4,500 characters (docs/behaviour/office-books.md, "The office's own file"). Mean first-turn prompt in the mock living-6 line-up grew by about 1,100 to 3,100 characters per sitting (see docs/decisions.md). The standing instructions are unchanged. Since 2026-11-10 it is a record, not a to-do list: what is done with what came of it, apart from what was sent or asked of others (theirs to act on), and what is overdue; an office shown no bank account is told once that what the bank did is not something it can see; a line unchanged since the seat last sat is counted with its paper's id, not set out again; an invoice of its own shows as paid in or not; and a quantity is grouped ("183,937 inputs") so that it never reads as a reference.
 
 ## The translator's test set
 
@@ -116,6 +116,26 @@ Stop for good: ...                           (the way out, like "Leave:" or a pl
   again with backoff, and one that outlasts the retries stops the run as a usage limit does (`UsageLimitReached`):
   resume it with `oikos resume <log>`. Fireworks' and Together's exact wording for these is to confirm.
 - **Tests** run against a local stub server only (`participants/test/adapters.test.ts`); no host has been called.
+
+### What every seat is shown, made plain (2026-11-10)
+
+From the 7B model's transcripts (docs/decisions.md, "What a seat is shown, made plain for small models"), for every
+model, tool-calling and notes alike:
+- **Its own drafts, in one place.** "## Waiting for your yes or no: your own requests, drawn up" stands before letters
+  and papers, with a line saying that only these are confirmed. Each draft says what it was drawn up from (the seat's
+  words), what will happen, "Not in this draft: ..." for ids the request named and the draft does not use, and "To say
+  yes: Confirm draft.x.1. To say no: Decline draft.x.1". A draft left unanswered is the first thing said at the next
+  sitting. A "Confirm" of a paper or a form is told it is not a draft, with the drafts waiting.
+- **Who it is, once.** Its standing instructions say the post it holds and for whom, the id to act in it by, whom it
+  writes to (whom it acts for, and those its papers on file come from), and that papers, accounts and reports are not
+  people. A post named "Title (id)" or by its title is that post. A letter to an account, a paper or a report is told
+  so, with an example from the seat's own case (no "Name (id)" anywhere).
+- **Ask-backs that show the way.** A form's empty blanks are named with what goes in each; a request read as several
+  things says which, in the seat's words; "unclear" and the restatement that still fails say what a request that can
+  be drawn up contains. Fixed sentences filled by code from the request and the seat's forms (translator/src/index.ts
+  `plainer`); the translator is given nothing new.
+- **Plain papers.** A provider's offer reads as sentences; stored labels such as `from_at` are shown in words ("sent
+  from"); the stored names are unchanged.
 
 ### Featherless (2026-11-08)
 

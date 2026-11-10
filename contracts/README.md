@@ -851,6 +851,12 @@ without providers of assistants is unchanged to the byte.
   `ScopeRequest.record` and `.matter`, and two new papers, `scope_answer` (the request, granted or not, `reasons` for the
   record, a copy as `paper`, `look_again_at`) and `acknowledgement` (`of`: the letter acknowledged).
 - **Papers published:** `payment_details` (a collector's account for what a law charges), in towns with providers.
+- **Publish `carries_count`** (2026-11-10): how many papers of the carried kind (absent: one), each priced by the compose row; `statement(..., carries_count=N)`.
+- **Depth and floors** (2026-11-10, steps H5 and the lead's floor): `Depth` (`act` | `matter`); `ServiceOffer.depths`
+  (the kinds an offer takes as what happened); `Remit.depth` and `Referral.depth` (absent: `act`), a referral at
+  `matter` carrying `facts` and no `calls`; `Remit.at_least` (a floor kept until `hold_until`; absent: a freeze);
+  `Commit.hold` (`floor` | `freeze`) and `Commit.depths`; the reason `below_floor`.
+
 
 ## One right call: what code sets, a payment's memo, refusals told alike (2026-11-10; docs/decisions.md, "One right call"; under the owner's blanket approval of contract changes, 2026-10-11)
 

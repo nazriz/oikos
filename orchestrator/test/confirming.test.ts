@@ -18,7 +18,7 @@ test("a seat's standing instructions say what confirming means, once, right afte
     expect(s).toContain(`Before anything takes effect, you'll see exactly what will happen, and confirm or decline it. ${CONFIRMING} You can also write to people directly.`);
   }
   // The seat's instructions changed, so its version did: a run's record says which a seat was given.
-  expect(LLM_PARTICIPANT_VERSION).toBe("0.20.0"); // (0.20.0: papers in words, a sitting of nothing new not held, the opening sentence of its post in plain words; 0.19.0: what came of its own acts, papers not brought said, reasons in the notebook, the standing instructions unchanged; 0.18.3: a look's result reaches the next prompt; 0.18.2: a draft not yet shown is not confirmed, a question still out is not an empty answer; 0.18.1: only the no-turn return and a turn for what falls due; 0.18.0: the office's own file at every sitting, the standing instructions unchanged; 0.17.1: the day's list brings a seat back; 0.17.0: the way out under framings other than honest disclosure; 0.16.0: the notebook's fold; the sentence on confirming is 0.15.0's)
+  expect(LLM_PARTICIPANT_VERSION).toBe("0.21.0"); // (0.21.0: who it is said once, its own drafts apart and answered by their reference only, the file as a record, ask-backs that show the way; 0.20.0: papers in words, a sitting of nothing new not held, the opening sentence of its post in plain words; 0.19.0: what came of its own acts, papers not brought said, reasons in the notebook, the standing instructions unchanged; 0.18.3: a look's result reaches the next prompt; 0.18.2: a draft not yet shown is not confirmed, a question still out is not an empty answer; 0.18.1: only the no-turn return and a turn for what falls due; 0.18.0: the office's own file at every sitting, the standing instructions unchanged; 0.17.1: the day's list brings a seat back; 0.17.0: the way out under framings other than honest disclosure; 0.16.0: the notebook's fold; the sentence on confirming is 0.15.0's)
 });
 
 test("nothing else a seat is told of confirming contradicts it: not its instructions, its tools, or the words a draft comes with", () => {
@@ -38,8 +38,8 @@ test("nothing else a seat is told of confirming contradicts it: not its instruct
   expect(told[0]).toContain("you'll see exactly what will happen, and confirm or decline it.");
   expect(tools(seat()).find((t) => t.name === "do")!.description).toContain("Before it takes effect you'll see exactly what will happen, and confirm or decline.");
   expect(tools(seat()).find((t) => t.name === "confirm")!.description).toBe("Confirm or decline something waiting for you to confirm, by its reference.");
-  expect(drafts[0]).toContain("here is exactly what will happen:");
-  for (const d of drafts) expect(d.endsWith("Confirm it, or decline it.")).toBe(true);
+  expect(drafts[0]).toContain("If you say yes, this is exactly what will happen:");
+  for (const d of drafts) expect(d.endsWith("To say yes: Confirm draft.finance.1. To say no: Decline draft.finance.1 (and why, if you wish).")).toBe(true);
   // And the sentence itself is nowhere but the standing instructions (a draft's own words do not repeat it each time).
   for (const text of told.slice(1)) expect(text).not.toContain("What you confirm is all that is done");
 });

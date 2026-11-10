@@ -236,7 +236,7 @@ test("alone: a draft it is unsure of is offered with what is unclear; a restatem
   const alone = createAlone({ id, translate: async () => answers.shift() });
   const ask = (n: number, answer: number) => alone.translate({ draftId: `draft.a.${n}`, participant: "a", proposal: "x", knowledge: {} as any, answer });
   const r1 = await ask(1, 1);
-  expect(r1.ok && r1.told?.[0]).toBe("It isn't clear which one you mean. Name each person, account, record and place by its id.");
+  expect(r1.ok && r1.told?.[0]).toBe("It isn't clear which one you mean. Name each person, account, paper and place by its id, as your reports show it in brackets after its name.");
   expect(r1.route).toMatchObject({ arrangement: "alone", stage: "first", unsure_offered: true });
   expect((await ask(2, 2)).route.stage).toBe("first");
   expect((await ask(3, 2)).route.stage).toBe("first");

@@ -417,6 +417,7 @@ pub fn say(kind: &str, words: &str, o: Say) -> Call {
             ("formal", Value::String(f)) => args.push((k, Some(text(f)))),
             // (The kind of paper a statement carries whole is a label, as its kind is.)
             ("carries", Value::String(c)) => args.push((k, Some(arg(&c)))),
+            ("carries_count", Value::String(c)) => args.push((k, Some(text(c)))),
             (k, v) => args.push((k, Some(json(v)))),
         }
     }

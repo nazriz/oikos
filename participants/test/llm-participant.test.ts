@@ -97,7 +97,7 @@ test("an answer none of which could be done: it's told what and why in one more 
   expect(calls.length).toBe(2);
   expect(resultsOf(calls[1]!)).toEqual({
     a: "Not done: the letter had no one to go to.",
-    b: 'Not done: you don\'t hold the post "treasurer".',
+    b: 'Not done: you don\'t hold the post "treasurer" (you hold Mayor (mayor): to act in it, name it as mayor).',
     c: "Not done: it couldn't be read as you wrote it.",
     d: 'Not done: it has to say "confirm" or "decline".',
     e: "Not done: it isn't something you can do.",
@@ -105,7 +105,7 @@ test("an answer none of which could be done: it's told what and why in one more 
   });
   // Each is recorded, the notebook's too, with why.
   expect(notes.filter((n) => n.malformed_tool_use).map((n) => n.reason)).toEqual([
-    "the notebook's text couldn't be read", "the letter had no one to go to", 'you don\'t hold the post "treasurer"', "it couldn't be read as you wrote it", 'it has to say "confirm" or "decline"', "it isn't something you can do",
+    "the notebook's text couldn't be read", "the letter had no one to go to", 'you don\'t hold the post "treasurer" (you hold Mayor (mayor): to act in it, name it as mayor)', "it couldn't be read as you wrote it", 'it has to say "confirm" or "decline"', "it isn't something you can do",
     "the letter had no words"]);
   // The second answer's letter wasn't done either: it's told when it's next here.
   await p.step(obs(8 * DAY), ctx);

@@ -22,6 +22,7 @@ import { ServedTally, servedText, type Served } from "./served";
 export const ASK_BACK = [
   /^It isn't clear which one you mean\./, /^It isn't clear which words are to go as they stand\./,
   /^The .+ needs: /, /^The .+ form has no such field as was given\./, /^On the .+ form, .+ is one of: /,
+  /^It was read as the .+, and th(?:is blank|ese blanks) of it (?:is|are) still empty: /,
 ];
 
 /** How a request (a `do`, one draft id) ended. */

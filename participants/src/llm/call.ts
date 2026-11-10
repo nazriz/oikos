@@ -94,11 +94,20 @@ export function seatsEndNeedMicroUsd(costs: EndCosts, o: { seats: number; seatMo
   return endNeedMicroUsd(costs, { seats: o.seats, seatModel: o.seatModel, ...(o.seatPrice ? { seatPrice: o.seatPrice } : {}), seatReckoned: reckonedEndMicroUsd({ seats: 1, ...(o.seatPrice ? { seatPrice: o.seatPrice } : {}), calls: o.calls, promptChars: o.promptChars, answerTokens: o.answerTokens }) });
 }
 
-/** What is kept back of the limit for a need: never under a twentieth of the limit, never over half of it (a run must be
- * able to start). Where the need is over the half, `short` says so by how much: the run says it at its start. */
+/** What is kept back of the limit for a need: all of the need, never under a twentieth of the limit, never over the limit.
+ * Where the need is over the limit, `short` says by how much, and the run does not start (`reserveOrRefuse`). Until
+ * 2026-11-10 it was never over half the limit, and a fork of many seats on a small limit overspent: six seats at about
+ * 0.048 USD each against 0.40 spent 0.44 (risk MT-30, fixed). */
 export function keptBackFor(limitMicroUsd: number, need: number): { microusd: number; short_microusd: number } {
-  const microusd = Math.min(Math.floor(limitMicroUsd / 2), Math.max(Math.floor(limitMicroUsd / 20), need));
-  return { microusd, short_microusd: Math.max(0, need - microusd) };
+  const microusd = Math.min(limitMicroUsd, Math.max(Math.floor(limitMicroUsd / 20), need));
+  return { microusd, short_microusd: Math.max(0, need - limitMicroUsd) };
+}
+
+/** The reserve for a need, or a refusal in plain words where the limit cannot cover the debriefs at all. */
+export function reserveOrRefuse(limitMicroUsd: number, need: number, seats: number): number {
+  const kept = keptBackFor(limitMicroUsd, need);
+  if (kept.short_microusd > 0) throw new Error(`the spending limit of ${(limitMicroUsd / 1e6).toFixed(2)} USD cannot cover the debriefs of ${seats} seat${seats === 1 ? "" : "s"}, which are expected to cost ${(need / 1e6).toFixed(2)} USD: raise the limit, or seat fewer`);
+  return kept.microusd;
 }
 
 /** Thrown instead of making a call that could exceed the run's spending limit. The run stops, and says why. */

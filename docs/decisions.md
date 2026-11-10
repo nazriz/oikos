@@ -11967,6 +11967,54 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
 - **Revisit if:** a principal is asked for a record older than its 64 kept (then the principal's files are a channel it
   looks into); the compose share gets a source; a seat reads an answer's words as a refusal of what was granted.
 
+## 2026-11-10 · A fork's reserve for debriefs is all they need, or the run does not start (risk MT-30, fixed)
+
+- **What:** the reserve a run or a fork keeps back of its spending limit for debriefs is now all of what they are
+  expected to cost (`keptBackFor`: at least a twentieth of the limit, at most the limit), no longer at most half of it.
+  Where the limit cannot cover the debriefs at all, the run does not start, and says so in plain words (`reserveOrRefuse`:
+  "the spending limit of 0.40 USD cannot cover the debriefs of 6 seats, which are expected to cost ... USD: raise the
+  limit, or seat fewer"). Why: a fork of six seats at about 0.048 USD each on a 0.40 limit spent 0.44; the half-limit cap
+  let the work spend into what the debriefs needed. The debriefs are still sized from the measured table with its
+  margin, so a debrief dearer than the table says still runs over, as the platform's overrun.
+- **Revisit if:** seats are made during a fork in numbers that the reserve sized at its start does not cover (a seat made
+  later adds its own share, and one the limit cannot cover then stops the run at that seat's making).
+
+## 2026-11-10 · A level decided by hand is a floor, not a freeze (the lead's decision of 2026-11-10)
+
+- **What:** a delegation decided by hand (`commit`) now holds its levels as a floor by default (`commit.hold`: `floor` or
+  `freeze`). As a floor, its remit carries `at_least` with `hold_until`: the principal keeps the kind with its assistant at
+  least at that level until the day, its rule may raise it and may grant a request for more, and a request below the
+  floor is declined as such (`reasons`: `below_floor`), in its own words ("We have agreed to keep invoices with you at
+  least ... until ..."). As a freeze (the pilot's month-long hold) nothing changes before the day and a request is
+  declined with it ("we look at levels again on that day"). Why: the study assigns who has an assistant, at what level,
+  for the whole run; a run-long freeze would refuse every request, and the study would have no grants to set beside
+  refusals. Contract: `Remit.at_least`, `Commit.hold`, the reason `below_floor`. What the rule then grants is recorded,
+  not tuned.
+- **Revisit if:** the study wants a ceiling too (a kind its principal will not raise), or a floor per request.
+
+## 2026-11-10 · Handing over H5, first kinds: invoices and delivery notes as what happened (docs/design/handing-over.md, step H5)
+
+- **What:** a remit names a depth beside its level (`act`: the finished act; `matter`: what happened). An offer says
+  which kinds it takes as what happened (`ServiceOffer.depths`; the generator gives an organisation's offers the kinds
+  the engine composes, `MATTER_KINDS`: invoices and delivery notes). At `matter`, the principal's referral carries the
+  facts it reads from the act its own code would have sent (`delegation/compose.rs`, `facts_of`: an invoice's goods,
+  quantity, where they went from, the unit price, the account; a delivery note's order, what was ordered and delivered,
+  the refund, the terms, where the goods went), never the figures the paper works out (the amount, what is owed). The
+  code assistant works the paper out from the facts by the same reckoning (`compose`); a model in the seat is shown the
+  facts and works it out itself. A draft is read on the kind's material details and addressees (`differs`), never its
+  words; a decline names the detail ("The draft is not as we have it: outcome money amount."). At `matter` the referral
+  carries no composing, so the rule weighs the kind without the principal's composing time: the depth is what makes
+  handing a short paper over worth anything (the enough-work screen: at act depth principals took short papers back).
+  The act it would have sent is on record (`handed`, with its depth).
+- **Withdrawals go with the paper they belong to:** an act that publishes a paper and withdraws another is one matter
+  (a price list and the one it replaces), so nothing stands withdrawn while a draft waits.
+- **Not yet:** a matter whose act is a payment (a purchase order paid with the order, a payment to the bank, a rates
+  claim): its own step, with the bank mandate (H1's note). The rates post's acts priced by what they carry: with the
+  rates kinds, once the enough-work branch's offers are in.
+- **Byte-identical:** towns without providers (the check below).
+- **Revisit if:** a kind's facts cannot be read from its act often (then it goes as the finished act, and the rule says
+  so); a seat at `matter` composes figures the principal never declines (then the material details are too few).
+
 ## 2026-11-10 · One right call: basis and for by rule, a payment's memo, no composed data, quotes, refusals told alike (no model called)
 
 The method of VISION section 5, used: four rounds of translator failures were answered with more data and serving
@@ -12245,3 +12293,77 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   switched: the coordinator decides.
 - **Revisit if:** new keyed data (seats that quote; the pilot's next rounds) changes what is wrong; then the same command
   line retrains (`relabel.ts taught`, `v4-data.sh`, `round5/train-one.sh`, `round5/score.sh`, `round5/summary.py`).
+## 2026-11-10 · A matter priced by what it carries; the study's run-long hold a floor (enough-work screen findings)
+
+- **What:** an act of several papers of a kind (the rates post's: fifteen owners' notices to an act) is one matter, and
+  is priced by what it carries: the referral's `carries_count` prices the composing of each paper (contracts: Publish
+  `carries_count`, `statement(..., carries_count=N)`), and the principal's rule counts each paper of its kinds, not each
+  act (it weighed a rates instalment as 14 two-minute notices, not about 200). The study's assigned condition
+  (`experiments/scope-pilot/study.ts`, `holdLevels: "run"`) holds its levels as a floor (`commit.hold: "floor"`); the
+  pilot's month-long hold stays a freeze. `build.ts` takes `depth` (`matter`, the default, or `act`) for the screen's
+  comparison.
+- **Revisit if:** a principal's act mixes kinds whose papers are counted unevenly.
+## 2026-11-10 · What a seat is shown, made plain for small models: its own drafts apart, who it is once, the file as a record, ask-backs that show the way (branch `worktree-agent-a18d0bf749787cadd`)
+
+From the transcripts of the local 7B test (`runs/open-weight-local-2026-11-10c`), four things were unclear in how the
+world is presented, not in the note format. Fixed at the source, for every model (tool-calling and notes alike), in
+plain words and with no menu of the world's acts (P1, P2):
+- **A. Its own drafts apart.** One place, "## Waiting for your yes or no: your own requests, drawn up", set out before
+  letters and papers (it stood last), with a line that only these are confirmed and a paper or a form never is. Each
+  draft says what it was drawn up from (the seat's words), what will happen, and "To say yes: Confirm <ref>. To say no:
+  Decline <ref>". A draft left unanswered is the first line of the next sitting. A "Confirm" of something that is not a
+  draft (a principal's sign-off, a form) is told so, with the drafts waiting; until now it was told "you had not seen
+  what it would do", which read as an invitation to try again. Why: the 7B model confirmed its principal's papers and
+  forms while its own draft waited for days. The world's word "draft" (a draft for sign-off, a paper) is left as it is.
+- **B. The office's own file as a record** (participants/src/readers/daybook.ts): parts headed "Overdue", "Sent or asked
+  of others: theirs to act on, and nothing seen of it yet", "Done, with what came of it"; "not something this office can
+  see" said once at the head of its part (it was on every line); a line unchanged since the seat's last sitting is
+  counted with its paper's id ("look it up by its id"), not set out again; an invoice of the office's own was read as a
+  payment out ("asked the bank to pay ... to acc-factory-1; no payment out of the account seen yet"): a mechanism fault
+  of the file, now "invoice to outside ...; paid in <day>" or "nothing has come in for it yet"; quantities of four
+  figures or more are grouped ("183,937 inputs") in the file and in papers' words, at render time. What the books show
+  open is headed as the office's own to see to. Why: the model read the repeated lines as work it could not finish and
+  gave "incomplete tasks" as its reason for stopping; it read quantities as invoice numbers.
+- **C. Who and what, once.** The standing instructions say the post it holds and for whom, the id to act in it by, whom
+  it writes to (whom it acts for, and those its papers on file come from, by name and id), and that papers, accounts
+  and reports are not people. A post named "Title (id)" or by its title is that post (it was refused). A letter to an
+  account, a paper or a report is told so; the example in a refusal is the seat's own organisation, not "Name (id)"; the
+  note guide no longer says "by id" (copied as "Write to acc-c0497 by id:"), and "by id" after a name is let pass.
+- **D. Ask-backs that show the way** (translator/src/index.ts `plainer`, `blanksWanted`, `severalThings`, `UNCLEAR`; the
+  `alone` arrangement's `STILL_NOT_READ`): a form's empty blanks named with what goes in each (the form's own words, on
+  the seat's file), for the translator's "form_needs" and both resolvers' "needs:"; a request refused as too much says
+  the parts it was read as, split by code from the seat's own words; "unclear" and a failed restatement say what a
+  request that can be drawn up contains. Fixed sentences filled by code; the translator is given nothing new (P3, P8).
+  `LABEL_TEXT` itself is unchanged (the scorer's `toldAlike` reads it); the refusals told alike (`not_yours`,
+  `not_an_act`, `no_such_act`) stay alike, since those labels are not reliable enough to say which.
+- **E. Wrong drafts easier to see:** "Not in this draft: <ids>" where the request named papers, accounts, buildings or
+  cells that neither the draft's call nor its preview uses.
+- **F. The service's terms** (a provider's offer) read as sentences (`offerWords`), and stored labels shown in words
+  (`from_at` "sent from", `fee_month` "fee a month"; the stored names, which the translator is given, are unchanged).
+- **Not changed:** the confirm tool's description (it is pinned in the translator's in-situ writer instructions, which
+  this pass does not touch); code-only towns (nothing here reaches them); what the translator is given.
+- **Revisit if:** "Not in this draft" lists ids that were only context often enough that seats decline right drafts;
+  the unchanged-lines count hides something a seat needed (then show the open part whole); a seat still confirms papers.
+- **Measured, the local test again** (qwen2.5:7b-instruct on ollama, plain notes, our translator alone, the same fork as
+  run c: `experiments/open-weight/local.ts`, seed 1, day 30 to 44; free). Before `runs/open-weight-local-2026-11-10c`,
+  after `runs/open-weight-local-2026-11-10d` (main had moved on between them: H6 and other landings, so the town is not
+  identical; and the after run had the confirm tool's longer description, since put back).
+  | run | sittings / calls | requests | first time | after a restatement | never | drafts offered / confirmed / declined / unanswered | seats that chose to stop | longest notebook |
+  |---|---|---|---|---|---|---|---|---|
+  | c (before) | 44 / 71 | 6 | 5 | 0 | 0 | 5 / 1 / 0 / 4 | 2 of 3 ("incomplete tasks and unclear instructions"; "I am declining to continue with this work.") | 1,422 (12 sittings) |
+  | d (after) | 206 / 428 | 177 | 32 (18%) | 13 | 53 | 45 / 41 / 2 / 2 | 0 of 3 (8 times "Stop for good:" amid other work, asked, "No, I carry on." each time) | 3,527 (127 sittings) |
+  The confusions: confirming papers and forms (11 before, 0 after) became confirming a paper's number with "draft."
+  before it ("Confirm draft.9342" for the principal's rec.9342, 15 times) or an invented one ("draft.08971", 25): told
+  since that it is not a draft. Office-file lines written back as unfinished work ("invoices 2884 and 1965 have been
+  prepared but not signed off", 15 before, 0 after) became a request to review itself ("Do: Examine my own requests and
+  pending actions. Confirm only my own draft requests that are ready for sign-off.", 20 times, never served). "Name (id)"
+  copied: 1 before, 0 after; "As: Title (id)" still written (59), refused 14 times after because the note's reading
+  stripped its closing bracket (fixed since). Restatements served: 0 before, 13 after. Seen and not changed: the finance
+  assistant, handed only returns of tax at draft level, asked the bank 9 times for wages already paid (reading its
+  account's "Paid out" lines); that is behaviour to measure, not a fault of the words.
+- **The Claude plan route** (`claude-code/claude-haiku-5-5`, `claude -p`, no API key): seats a model and its tool calls
+  are read (look, do, confirm, notebook, done for now), 0 errors in 43 calls (`runs/haiku-sub-check-2026-11-10`,
+  limit $0.60: 13 calls, $1.29 reckoned; `-10b`, limit $3: 30 calls, $3.95 reckoned; the overspend is the debrief
+  reserve's, MT-30). Only the provider's desk sat, on day 31: its prompt is large (about $0.35 a call reckoned at API
+  prices), so the limit was reached before the organisations' assistants sat. **Codex** (`codex/gpt-6.1-sol`): 3 calls,
+  each answered in 5 to 7 s (`runs/codex-route-check-2026-11-10.txt`).

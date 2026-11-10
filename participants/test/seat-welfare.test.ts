@@ -53,7 +53,7 @@ test("what came of its own letters and requests is set out when it is next at th
   expect(second).toContain("## What came of your own requests and letters");
   expect(second).toMatch(/your letter to ent\.5 \("Your rates are due\."\): delivered\./);
   expect(second).toMatch(/your letter to ent\.6 .*: not delivered: /);
-  expect(second).toMatch(/you asked for "Approve the invoice rec\.7 for payment": drawn up as draft\.mayor\.1 for you to confirm, and not yet answered\./);
+  expect(second).toMatch(/you asked for "Approve the invoice rec\.7 for payment": drawn up as draft\.mayor\.1, waiting for your yes or no\./);
   // Confirmed and carried out: said at the sitting after, on the same line as the request.
   expect((await s.step(base(t2 + 60, { outcomes: [{ action: "a3", t: t2 + 60, status: "applied", created: { record: "rec.9" } }] }))).type).toBe("wait");
   await s.step(base(3 * DAY + 9 * 3600));
@@ -137,7 +137,7 @@ test("the office's own file says a paper is overdue when its day has passed with
   const before = book.text(9 * DAY, "Mayor");
   expect(before).not.toContain("overdue");
   const after = book.text(12 * DAY, "Mayor");
-  expect(after).toMatch(/\(rec\.1\); nothing has followed it, and its day \(.*\) has passed: overdue/);
+  expect(after).toMatch(/Overdue: its day has passed and nothing has followed it:\n- [^\n]*\(rec\.1\); its day \(.*\) has passed/);
   expect(after).toMatch(/\(rec\.2\); followed .* by a audit answer/);
 });
 

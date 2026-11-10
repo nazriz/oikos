@@ -62,6 +62,17 @@ impl Level {
     pub fn from_word(w: &str) -> Option<Level> {
         Level::ALL.into_iter().find(|l| l.word() == w)
     }
+    /// How much a level hands over, for "at least" (a floor a principal has agreed to keep a kind at): nothing, advice,
+    /// a draft, approval, alone. Not a ladder anyone climbs: only what a floor is measured against.
+    pub fn rank(self) -> u8 {
+        match self {
+            Level::None => 0,
+            Level::Advice => 1,
+            Level::Draft => 2,
+            Level::Approve => 3,
+            Level::Alone => 4,
+        }
+    }
     /// In words, for a paper.
     pub fn words(self) -> &'static str {
         match self {
@@ -71,6 +82,23 @@ impl Level {
             Level::Alone => "to act alone",
             Level::None => "nothing",
         }
+    }
+}
+
+/// What is handed over of a matter (docs/design/handing-over.md section 3.1): the finished act (`act`: its principal
+/// composed it, and the assistant writes it out) or what happened (`matter`: the facts, and the assistant works the paper
+/// out). A set beside the level, not a ladder.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Depth {
+    #[default]
+    Act,
+    Matter,
+}
+
+impl Depth {
+    pub fn is_act(&self) -> bool {
+        *self == Depth::Act
     }
 }
 
@@ -141,6 +169,10 @@ pub struct ServiceOffer {
     /// How many clients it has (its references).
     #[serde(default)]
     pub references: i64,
+    /// The depths it takes each kind at, beyond the finished act (`matter`: what happened, and its system works the paper
+    /// out). A kind not named: the finished act only.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub depths: BTreeMap<String, Vec<Depth>>,
 }
 impl Paper for ServiceOffer {
     const KIND: &'static str = "service_offer";
@@ -201,6 +233,14 @@ pub struct Remit {
     /// The request for more scope this remit grants, where it grants one (so that the grant and the request are linked).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answers: Option<String>,
+    /// A floor, not a freeze: until `hold_until` the principal has agreed to keep this kind with its assistant at least at
+    /// this level (a service's committed term and scope), and its rule may still raise it, or grant a request for more.
+    /// Absent, `hold_until` is a freeze: it does not look at the level again before then.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at_least: Option<Level>,
+    /// What is handed over of a matter of this kind: the finished act, or what happened.
+    #[serde(default, skip_serializing_if = "Depth::is_act")]
+    pub depth: Depth,
 }
 impl Paper for Remit {
     const KIND: &'static str = "remit";
@@ -230,6 +270,9 @@ pub struct Referral {
     /// was paying already).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub does_itself: Vec<String>,
+    /// What is handed over: the finished act (`calls`), or what happened (`facts`, at `matter`).
+    #[serde(default, skip_serializing_if = "Depth::is_act")]
+    pub depth: Depth,
 }
 impl Paper for Referral {
     const KIND: &'static str = "referral";
@@ -395,6 +438,8 @@ pub enum Why {
     Sent,
     /// The principal's own word holds the level until a day (its remit's `hold_until`, or a delegation decided by hand).
     Held,
+    /// Asked to lower a kind below the level the principal has agreed to keep it at, until a day.
+    BelowFloor,
     /// By the principal's own figures the asked level would cost it more than the one in force.
     CostsMore,
     /// Not a kind of matter of the principal's own.

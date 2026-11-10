@@ -71,7 +71,7 @@ test("what could not go is told at once, in the seat's terms, and nothing else i
   expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "sign", draft: "draft.mayor-system.1", decision: "reject", note: long.slice(0, TEXT_MAX) });
   await p.step(obs(9 * HOUR), ctx);
   const r = resultsOf(calls[1]!);
-  expect(r.a).toBe(`Not done: "Council Clerk" isn't an id: a letter goes to people and organisations by the ids your reports give them, the word in brackets after a name, as in "Name (id)" (to find one, look them up in who's who).`);
+  expect(r.a).toBe(`Not done: "Council Clerk" isn't an id: a letter goes to people and organisations by the ids your reports give them, the word in brackets after a name (such as city, for whom you act; to find someone, look them up in who's who).`);
   expect(r.b).toBe("Not done: the letter ran to 20,000 characters, and a letter can be at most 16,384.");
   expect(r.e).toBe("Not done: it ran to 20,000 characters, and what you ask for can be at most 16,384.");
   expect(notes.filter((n) => n.malformed_tool_use).length).toBe(3);
@@ -150,7 +150,7 @@ test("a letter to someone named as a report names them, Name (id), goes to that 
   expect(await p.step(sent(9 * HOUR), ctx)).toEqual({ type: "message", to: ["bank", "finance"], as: "mayor", text: "Noted.", re: "rec.44" });
   await p.step(sent(9 * HOUR), ctx);
   const r = resultsOf(calls[1]!);
-  expect(r.c).toBe(`Not done: "Millbrook Savings Bank" isn't an id: a letter goes to people and organisations by the ids your reports give them, the word in brackets after a name, as in "Name (id)" (to find one, look them up in who's who).`);
+  expect(r.c).toBe(`Not done: "Millbrook Savings Bank" isn't an id: a letter goes to people and organisations by the ids your reports give them, the word in brackets after a name (such as city, for whom you act; to find someone, look them up in who's who).`);
   // (Brackets that hold no id are not one.)
   expect(r.d).toContain(`"the works (depot, probably)" isn't an id`);
 });

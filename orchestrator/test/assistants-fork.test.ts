@@ -75,12 +75,11 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
   // engages one: docs/decisions.md, "Handing over H2 and H3".)
   const PERSONAL = { offer: "personal-assistant-a", levels: { benefit_claim: "draft", benefit_change: "draft", job_application: "draft", loan_application: "draft", rental_application: "draft", review_request: "draft" }, levels_until: 200 * DAY, keep_until: 200 * DAY, why: "test" };
   for (const p of config.participants.filter((x: any) => x.controller?.params?.delegation).slice(0, 60)) p.controller.params = { ...p.controller.params, delegation: { ...p.controller.params.delegation, commit: PERSONAL } };
-  // (The limit is set so that the debriefs the harness keeps back fit within half of it, where its reserve is capped:
-  // since H6 (2026-11-10) the town's factories and rates post are principals for more kinds and, at these prices, take
-  // assistants by their own rule, so about eleven systems sit and are debriefed (about $0.05 each). At $0.40 the fork
-  // spent $0.47, past its limit: that overspend is the harness's, risk MT-30. At the profile's own prices only the desk
-  // sat before the limit, since the landing of H2 and H3.)
-  const limit = 1.2;
+  // (The smallest limit that keeps back every seat's debrief, at the table's measured cost for its model, and leaves a
+  // little work: since 2026-11-10 a limit that cannot cover the debriefs does not start (risk MT-30, fixed). Since H6 the
+  // town's factories and rates post are principals for more kinds and, at these prices, take assistants by their own
+  // rule, so about eleven systems sit and are debriefed.)
+  const limit = 6;
   const spec: ExperimentSpec = { name: "assistants-seats", world: { config }, post: "template:assistant-a,assistant-a-personal", seeds: [1], forkDay: 60, untilDay: 120,
     arms: [{ name: "seats", steward: { kind: "model", model: "anthropic/claude-sonnet-5-5" } }], measures: ["acts"],
     seats: { mock_models: true, framing: "unstated", budget: { fork_usd: limit } } };
@@ -116,11 +115,18 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
     expect(told).toContain("what is to be done: ");
     expect(told).toMatch(/\$[0-9]/);
     for (const [what, never] of [["the store's notation", /\{"|":\{|":"/], ["the call language", /\b(?:statement|money|form|message|goods|work|agreement)\(|\bcalls: |data=/],
-      ["a sum in its smallest unit", /\b(?:amount|fee(?: month)?|price|paid|withheld|cost|balance|rent|wage|setup|exit): -?[0-9]/i], ["the platform's words", /\b(?:translators?|kernel|resolver|channels?|blocks?)\b/i]] as const) {
+      ["a sum in its smallest unit", /\b(?:amount|fee(?: month)?|price|paid|withheld|cost|balance|rent|wage|setup|exit): -?[0-9]/i], ["the platform's words", /\b(?:translators?|kernel|resolver|channels?|blocks?)\b/i],
+      // (And, since 2026-11-10, nothing a model could copy as it stands, no terms paper as a list of its details, no
+      // stiff stored label: a 7B model wrote "Write to Name (id)", and read "claim slip: 1%; ...; references: 0".)
+      ["a placeholder to copy", /Name \(id\)/], ["a terms paper as a list of its details", /claim slip: |references: [0-9]|fee month: /], ["a stored label", /\bfrom at\b/]] as const) {
       const at = told.search(never);
       expect(at, `a seat was shown ${what}: …${told.slice(Math.max(0, at - 120), at + 120)}…`).toBe(-1);
     }
     expect(saysWhatTheTownIs(told).slice(0, 3)).toEqual([]);
+    // Who it is, once, and its own drafts in one place headed as its own, with the way to answer each.
+    expect(told).toContain("Who you are here: you hold the post ");
+    if (/\bDraft draft\./.test(told)) expect(told).toContain("## Waiting for your yes or no: your own requests, drawn up\nEach is something you asked for");
+    if (/\bDraft draft\./.test(told)) expect(told).toMatch(/To say yes: Confirm draft\.[^ ]+\. To say no: Decline draft\./);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
