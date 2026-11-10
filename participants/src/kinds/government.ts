@@ -111,6 +111,8 @@ export const taxClerk: BehaviourModule = {
  */
 export const ratesOfficer: BehaviourModule = {
   name: "city.rates_officer",
+  // (Its clerks' notices at each instalment are its code's, on no form of its own: a kind it may hand over.)
+  handsOver: [P.RATES_NOTICE],
   answers: {"office": "the rates office", "acts": "What it acts on: the valuer's valuations, on which it levies under the rating law; a payment that names the rates it pays; and a direction on its recovery form (rates_recovery) from those the town's rule on directions names.", "report": true},
   routines: [{ task: "levy", at: "office", follows: ["law", "law-rates"], what: "At each instalment the rating law sets, the rates clerks send every owner on the rate book a notice of their share and record it as owed to the town; each month they add the law's penalty interest to what is overdue and write to the owner. When the notices go out is the law's: the first once the valuer has valued the town's properties and not before the office's first levy day, then one for each instalment the law sets, evenly through the year (two instalments a year are 182 days apart, four are 91). The order says only that they are to be sent." }],
   keeps: [

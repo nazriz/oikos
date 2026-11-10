@@ -12041,3 +12041,104 @@ Run data: `~/oikos/runs/translator-v4-r4-2026-11-08/` (scripts in `scripts/`).
   sentences, not the model, are the trouble); a restatement rule by answers miscounts (several requests in one answer);
   a debrief in text mode is unread (then the debrief's shape becomes a note too); a 7B model's notes need more headings
   than these.
+
+## 2026-11-10 · H6, enough work: a firm's dispatch and the rates post's notices referable, the rates post a principal, a reach for the households' service, the code-only screen (branch `worktree-agent-ab8724ea1c6ec5bac`; risks MT-27, MT-28, MT-29, ME-26)
+
+Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work made referable), and what the screen found.
+
+- **The offers to organisations take delivery notes, requests for supply and rates notices** (au-vic, gb-eng, us-oh;
+  each profile's source note gives the basis: general assistants sold to businesses for their documents; accounting
+  software's purchase-order and packing-slip features; councils' printing-and-distribution contracts for rates notices;
+  to confirm). An office is a principal for a kind its code makes on no form of its own through a module's new
+  `handsOver` (a factory's `supply_request`, the rates post's `rates_notice`), each with a form for the assistant post
+  only (`participants/src/shared/papers.ts`; the Rust forms catalogue written again). The rates post is then a principal.
+- **Not taken, and why** (docs/behaviour/assistants.md, "Kinds a firm's and an office's assistant takes"; MT-28): price
+  lists and orders paid with the order, because `route` parts an act by variables only and would part what belongs
+  together (a new list from the withdrawal of the old; a payment from its order); payments and the rates claim, because
+  they are calls, and payments need the assistant post on the account's mandate (H1). A change to `route` would be in
+  `principal.rs` (`route`, lines 655 to 678 on this branch's base), left to the worker there.
+- **The town's mandate names a town office that is a principal** (`signatories-city`, only where the town has
+  providers): the first screen showed the rates post's standing order for its fee refused ("rates is not an authorised
+  signatory for acc-city") and the provider switching its system off after 75 days, twice. **This is a simplification,
+  said plainly:** it gives the rates post authority over the town's account (the bank reads positions, not purposes, so
+  the resolution's "for a service the office has engaged" binds nobody), in a study about authority. Who pays in a real
+  council is the finance office. The real route (the finance officer sets up the service's standing order when another
+  town office engages, within a budget line) needs the finance officer's code to take up a service agreement another
+  office signed (`offices/treasury.rs`), the principal's paperwork to leave the fee to it (`market/services.rs`,
+  `Engagements::paperwork`), and a budget line for it: more than half a day, so not built here (MT-28).
+- **The households' cohort** (`experiments/scope-pilot/build.ts`, `cohort`): `hand` is rounds 1 to 5's design (every
+  `every`-th adult engaged by hand, `commit`); `reach` is the owner's condition: the offer reaches every `every`-th adult,
+  who sees it and decides by their own rule; the rest are shown no offer and have no rule for one. Nothing is decided for
+  anyone. `study.ts` is the study's town (the rates post among the offices, reach one in three); `study-hand.ts` the same
+  engaged by hand, as a comparison.
+- **The screen** (`experiments/scope-pilot/screen.ts <spec>`; `screen-log.ts` reads a fork already run): the spec's code
+  arms only, its own fork and length, output outside the runs folder; per assistant seat and month: clients, matters by
+  kind, what the principal did itself of kinds it may hand over (`kept`), steps a matter (its acts), sittings with and
+  without anything new, and the events of paper plan 3.1 that already occur.
+- **What it found** (seed 7, 180 days after the day-30 fork; months of 30 days):
+
+  | seat | round 5 (before) | study.ts, reach 1 in 3 | study-hand.ts, by hand 1 in 3 |
+  |---|---|---|---|
+  | factory's assistant | 4, then 1 a month | 7 (3 delivery notes, 3 invoices), then 1 to 2 a month; kept 10 to 23 a month | 10, then 1 to 3 a month; kept 6 to 17 |
+  | finance office's | 1 a month | 1 a month | 1 a month |
+  | rates post's | (no seat) | 14 in month 1 (of 15 notices each), then none; kept 14 in month 4 | the same |
+  | the desk | 0 to 7 a month, 50 clients by hand | no clients: none of 251 offered took it up | 2 to 21 a month (about 11), 243 to 253 clients |
+  | steps a matter | 3 | 2.9 to 3 | 2.7 to 3 |
+  | refused / returned | 0 / 0 | 0 / 1 (a rates draft) | 0 / 2 |
+
+  The principals' rule cuts delivery notes, invoices and rates notices to doing them itself when the hold ends (day 60
+  and 62): at `draft` handing a two-minute paper over takes more of its time than writing it, and at `alone` the slips
+  it expects cost more than the minute and a half saved (placeholders: ME-22). No household takes the service up by its
+  own rule: a person's papers are under one a month, worth about A$5 each handed over, against A$29.99 a month. A seat
+  sits 40 to 90 times a month and has something new at 2 to 26 of them.
+- **Byte-identical:** the generated configs of the 200- and 1,000-person towns in the three profiles, and of the living
+  1,000-person town, are identical to the base's; the kernel with the new forms catalogue gives the same state hash and
+  log digest on the 200- and 1,000-person au-vic towns for 30 days. Towns with assistants move: every factory and the
+  rates post are principals for the new kinds, the mandate names the rates post, and offers' titles and kinds change.
+- **Revisit if:** `route` keeps linked parts together (then price lists and purchase orders join the offers); the
+  pricing of H3 moves the principals' rule; the owner chooses how the desk is engaged and how long levels are held (MT-29,
+  MT-27); the pay run is built (ME-26).
+
+
+## 2026-11-10 · H6 follow-up: a free tier, engagement assigned by the study, the screen on it (risks MT-28, MT-29, MT-30, WM-1)
+
+- **The mandate stays as stated** (the lead): the rates post on the town's bank mandate is a simplification (MT-28); the
+  finance office setting up the fee is more than half a day and not built.
+- **A free tier beside each paid personal offer** (the profiles, with its basis): no fee, no set-up, nothing to leave;
+  `advice` and `draft` only (it does not act in the client's name: the large assistants' agent features are on paid
+  plans); the provider keeps the records. One kind of system with the paid tier, at the same desk (the generator makes
+  one template of two offers that share it). A free service sets up no fee and is not switched off for want of one
+  (`market/services.rs`; tested in `services/tests.rs`). The person's rule is untouched.
+- **Sourced times for a person's papers were put into the profiles and taken out again** (the lead's call: unopened
+  search results, one place's figures borrowed for two others, every town of three profiles moved for numbers no better
+  founded than the placeholders; the owner, 2026-10-25: don't chase real figures). The figures are leads under WM-1.
+  What stands from them: a principal's review of a draft costs more than writing a paper of a few minutes, so handing such
+  papers over at `draft` does not pay at any duration in that range. The towns are back on main's hashes, and
+  `seat-diary.test.ts` passes again in its original form.
+- **Engagement and levels are assigned by the study** (the lead): `study.ts` engages the offices (finance, the factory,
+  the rates post) and one adult in three by hand on day 1, holds their levels and the service for the whole run
+  (`build.ts`: `holdLevels: "run"` sets `commit.levels_until` to the run's end), and offers the service to nobody else
+  (`cohort.only`). Organic take-up is `study-reach.ts` (reach one in three, the free tier, offices held a month after the
+  fork, then their rule). `study-hand.ts` is gone. Paper plan 4.1 says so.
+- **The screen on `study.ts`** (seed 7, 180 days after the day-30 fork; months of 30 days):
+
+  | seat | matters a month (by kind) | steps a matter | refused / returned |
+  |---|---|---|---|
+  | factory | 10, 8, 6, 20, 10, 14 (delivery notes 5 to 18; invoices 0 to 3; requests for supply 0 to 4; a return a month) | 2.7 to 3 | 0 / 1 |
+  | finance office | 1 each month (a return of tax withheld) | 3 | 0 / 0 |
+  | rates post | 14 in months 1 and 4 (each 15 notices), none between | 2.9 to 3 | 0 / 1 |
+  | desk (251 clients by hand, 233 by month 6) | 12, 3, 12, 14, 17, 3 (job applications most) | 2.9 to 3 | 0 / 1 |
+
+  Three drafts returned in 24 seat-months, no act refused, nothing silent past a due day (no code paper names one).
+  **Organic** (`study-reach.ts`): 64 of the 251 adults reached took the free tier by their own rule, none a paid tier;
+  the desk then had 0 to 9 matters a month.
+- **Two slow tests:** `assistants-fork.test.ts`'s fork spent $0.44 of a $0.40 limit with six assistant seats to
+  debrief, past what the harness keeps back (its reserve is capped at half the limit: MT-30), and $0.85 of $0.80 when
+  the limit was raised. After main's H2 and H3 landed, the test keeps main's town (a twentieth of the prices, a cohort
+  engaged by hand) with a $1.20 limit, inside what the reserve can hold for its eleven seats (at the profile's own
+  prices only the desk sat before the limit); the overspend is a risk of its own, to be fixed separately.
+  `seat-diary.test.ts` is as on main.
+- **What the other worker's pricing (composing charged to whoever composes) should move:** in `study.ts` nothing of the
+  volumes (the levels are held); in `study-reach.ts` the rule's cuts at the hold's end and the households' take-up. At act
+  depth a referral will cost the principal the paper's row too, so handing over pays even less; at matter depth the
+  principal pays the referral alone, and `draft` still costs it more than a paper of under about five and a half minutes.

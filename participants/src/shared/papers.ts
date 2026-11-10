@@ -203,6 +203,23 @@ export const FINANCE: Issued[] = [
     writes: { kind: "withholding_report", text: "Withheld from wages, owed: {withheld}; paid now: {paid}.", basis: "=law", to: ["=collector"], visible: ["=self", "=collector"], data: { account: "=account", paid: "#paid", period_end: "=period_end", withheld: "#withheld" } } },
 ];
 
+// ------------------------------------------------------------------ papers an office's code makes, handed to an assistant
+
+/** A workplace's request to its utility for a supply, or a larger one (common/supply.rs writes it): the paper a firm's
+ * assistant writes where its principal hands the kind over (`handsOver`). */
+export const SUPPLY_REQUEST: Issued = { form: "supply_request", title: "A request to a utility for supply at a workplace",
+  does: "Asks the utility for a supply of energy or water at a workplace of ours, or for a larger one on a connection we have: so much a day. The utility connects it or sets it, in its own time.",
+  fields: { utility: f("entity", "The utility asked.", req), kind: f("choice", "What is to be supplied.", { ...req, options: ["energy", "water"] }), home: f("space", "The workplace.", req),
+    account: f("account", "The account its bills are paid from.", req), rate: f("count", "How much a day.", req), up_to: f("count", "The most a day.", req), connection: f("text", "Our connection there, where we have one.") },
+  writes: { kind: "supply_request", text: "Supply request: {rate} a day of {kind} at {home}.", to: ["=utility"], visible: ["=self", "=utility"], data: { account: "=account", home: "=home", kind: "=kind", connection: "=connection", rate: "#rate", up_to: "#up_to" } } };
+
+/** A rates notice to an owner (offices/treasury.rs writes it, with the claim recorded beside it by the rating office). */
+export const RATES_NOTICE: Issued = { form: "rates_notice", title: "A rates notice to an owner",
+  does: "Tells an owner their share of the rates on what they own, as last valued, under the rating law: how much, on which lots, by when and into which account. It records nothing: the town's claim against the owner is recorded by the rating office.",
+  fields: { owner: f("entity", "The owner.", req), amount: f("amount", "The rates due.", req), lots: f("list", "The lots they are on.", req), due: f("date", "When they are due by.", req),
+    account: f("account", "The account they are paid into.", req), law: f("record", "The rating law they are levied under.", req) },
+  writes: { kind: "rates_notice", text: "Rates notice: {amount} on {lots}, due by {due}, into {account}.", basis: "=law", to: ["=owner"], visible: ["=self", "=owner"], data: { amount: "#amount", lots: "=lots", due: "=due", account: "=account" } } };
+
 // ------------------------------------------------------------------ the tribunal
 
 export const TRIBUNAL_MEMBER: Issued[] = [

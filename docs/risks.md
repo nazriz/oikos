@@ -118,6 +118,26 @@ The mechanism:
 - **Notice by:** days-to-decision against a place's real waits; a result that changes when the table is scaled 2 to 4 times.
 - **Fix when:** before any result is read in absolute time or cost, and before any automation or adoption
   experiment; for au-vic (the TARA town) first, since nothing sources it yet.
+- **Leads for a person's delegable papers (2026-11-10, design H6; not in any profile).** Found through web search, no
+  source opened; all to confirm, and each US except the Universal Credit claim. Put into the profiles for a day and taken
+  out again (the lead's call: unopened figures, borrowed between places, moved every town for nothing better founded):
+  - a job application: 4 min 52 s, a timed audit of Fortune 500 online applications (InFlight, as reported); other
+    studies 4 min 42 s to 13 min; it excludes preparing a CV (to confirm);
+  - a loan application: 10 to 20 minutes, lenders' and consumer-finance pages (LendEDU, NerdWallet, Finder): marketing,
+    not a burden estimate (to confirm);
+  - a benefit claim, England: a Universal Credit online claim about 20 minutes for one person, about an hour for a couple
+    (councils' guides, 20 to 40 minutes; a DWP-hosted development page) (to confirm);
+  - a request to look at a decision again: SSA-561, OMB 0960-0622, 8 minutes on paper, 5 online (Federal Register
+    2024-30764); an SSA page says 18 minutes and a 2024 public comment over an hour (to confirm);
+  - a complaint: CFPB intake form, OMB 3170-0011, about 8 minutes (2011 and 2015 notices); FTC's online complaint about
+    5.3 minutes, its identity-theft form up to 8.5 (to confirm);
+  - a return of tax withheld: IRS Form 941 is put at 10.9 hours an employer a year including record-keeping (Federal
+    Register 2025-01692), not a return's time (to confirm);
+  - nothing found for a change of circumstances, a tribunal application, an invoice made, a delivery note, a request for
+    supply or a rates notice, nor any Australian figure.
+  The finding that stands whatever these are: a principal's review of a draft (five minutes) and its referral (half a
+  minute) cost more than writing a paper of a few minutes, so handing such papers over at `draft` does not pay at any
+  duration in this range (design H6; MT-27).
 
 ### WM-2 · Mechanisms that do not bind (crime, pollution, water, clinic)
 - **Gap:** Several mechanisms run on placeholders sized so that they hardly act: theft is a rare chance (200 bps a
@@ -674,6 +694,20 @@ The mechanism:
 - **L / I:** medium / medium · **Status:** open (2026-11-01)
 - **Notice by:** Uptake of tools moving with the placeholder price alone.
 - **Fix when:** before a study reads how firms take up technologies that are goods.
+
+### ME-26 · No pay run: wages go by standing payments set at hire
+- **Gap:** In every town a wage is a standing payment the employer's bank makes every pay period from the instruction
+  given at hire (or before the year began). No office does a pay run: nobody gathers the period's hours and changes,
+  works out each payslip, pays and remits it. That is a missing law for every town, not a delegation matter. The
+  finance office's recurring work is then one return of tax withheld a month and a few bills (design H6: about one
+  hand-over a month to its assistant), where a real one's main recurring work is the pay run.
+- **Where:** the generator's wage instructions (`worlds/generator/generate.ts`, "Standing instruction to the bank");
+  `body.payroll`; the finance office (`offices/treasury.rs`).
+- **Effect:** Payroll work, its time and its errors are absent from every office; a study of delegated office work has
+  a thin finance seat; pay is never late or wrong through a pay run's slip (only through an employer's short pay).
+- **L / I:** high / medium · **Status:** open (2026-11-10)
+- **Notice by:** an office's acts each period; the screen's finance seat.
+- **Fix when:** as a law of its own for every town (it moves every town's hash), with the time and slips of a pay run sourced.
 
 ## Public bodies and law
 
@@ -1640,6 +1674,90 @@ The mechanism:
   unread rate and the count of sittings missed for a prompt too long.
 - **Fix when:** before an open-weight arm is planned (paper plan, phase 0c): drop a model the smoke test fails, or move a
   pair to `tools` mode together.
+
+### MT-27 · Too little delegated work for the study's obstacle rate, even with H6
+- **Gap:** The code-only screen of the study's town (`experiments/scope-pilot/screen.ts` on `study.ts`, 2026-11-10;
+  docs/decisions.md, "H6") gives each assistant seat, per month under the study's design (levels held to a month after
+  the fork, then the principals' rule): the factory 1 to 7 matters (3 delivery notes and 3 invoices in the first month,
+  then a withholding report a month and now and then a request for supply), the finance office 1, the rates post 14 in
+  the first month and none after, the desk none. Its principals' own rule cuts delivery notes, invoices and rates notices
+  to doing them itself on the day the hold ends: a two-minute paper costs more to hand over at `draft` (half a minute's
+  referral and five minutes' sign-off) than to write, and at `alone` its expected slips (1% of A$500, placeholders)
+  outweigh the minute and a half it saves. What the principals did themselves of kinds they may hand over is the work
+  that would come if the levels held: the factory 10 to 19 a month (mostly delivery notes), the rates post 14 matters
+  (of 15 notices each) once a quarter. No household offered the service took it up by its own rule (below, MT-29).
+  The events of paper plan 3.1 that already occur: one draft returned in 24 seat-months; no act of a seat refused.
+- **Where:** the screen's tables in docs/decisions.md (2026-11-10); `rule.rs` (`cost`); the profile's `principals`.
+- **Effect:** At sourced obstacle rates of 5 to 25% a hand-over a seat meets well under one obstacle a month; the
+  study's 1 to 3 is reached only by a desk engaged by hand (about 16 matters a month for a third of the adults) or a
+  factory whose levels are held for the whole run (about 15), and then only at the upper end of the rates.
+- **L / I:** high / high · **Status:** open (2026-11-10)
+- **Notice by:** the screen, per seat-month, before any model is run.
+- **Fix when:** before the study registers: the obstacle laws of paper plan 4.2 built (none exists yet), and the owner's
+  choice of how levels are held and who engages (MT-29); not by tuning the principals' figures to hand more over.
+
+### MT-28 · Kinds a real paperwork service takes that the town cannot hand over: acts parted by variables only
+- **Gap:** `Delegating::route` parts an act into what is handed over and what the principal does itself, and keeps it
+  whole only where a line of one part names a variable bound by the other. Acts whose parts belong together without a
+  variable are parted wrongly, so their kinds are left out of the offers: a **price list** (the old list is withdrawn in
+  the act that publishes the new; parted, the factory would have no list in force until the new one is signed off), and
+  a **purchase order paid with the order** (parted, the payment reaches the seller first, and a seller sends back money
+  that comes with no order waiting). **Payments through the bank** and **the recording of a rates claim** are calls
+  (`money`, `claim`), not papers: a principal's kinds are read from its forms, and an assistant post paying from the
+  town's account is not on its mandate (design H1). Beside them: the rates post's notices go fifteen owners to an act, so
+  an instalment is about fourteen matters, not two hundred; the principal prices each matter at one notice's two minutes,
+  not fifteen (`own_seconds`), which undervalues handing it over (design H3's pricing); and the two city assistant
+  posts (finance's and the rates post's) see each other's matters, since `mine` is the town's whole (the code assistant
+  keeps to its own agreement; a model seat may read the other's). A rates notice sent from the assistant's post is not
+  read as the office's own by a new holder of the rates post (`ours` reads by position), who could levy out of cycle.
+  **And a simplification:** so that the rates post can pay its own service's fee, the town's mandate to its bank names
+  it beside the finance officer in towns with providers (2026-11-10). That gives an office authority over the town's
+  account that a real council keeps with its finance office; the finance office setting up the fee is not built.
+- **Where:** `kernel/crates/actors/src/delegation/principal.rs` (`route`); `market/trade.rs` (`order`), `market/producer.rs`
+  (the price list); `offices/treasury.rs` (the levy in chunks of 15, `ours`); `worlds/generator/generate.ts` (principals' kinds).
+- **Effect:** A firm's assistant is never handed purchasing, pricing or payments, which in a real office are much of the
+  work; volume stays lower than a real service's.
+- **L / I:** high / medium · **Status:** open (2026-11-10)
+- **Notice by:** the screen's "kept" column; a kind added to an offer whose acts are parted.
+- **Fix when:** `route` keeps together a withdrawal with what supersedes it and a payment with what it pays for (by a
+  link the act states, not a guess), and a principal's kinds may be calls priced by the table's row for what they make;
+  with H1's mandate for payments.
+
+### MT-29 · Households do not take up the service by their own rule at its sourced price
+- **Gap:** A person weighs the service by its paperwork alone: their own papers of the kinds it takes (a mean of none a
+  month for nearly everyone: "one matter in three months is none a month"), at their clerical hour (A$40.49 in au-vic),
+  against A$29.99 a month and the first month with the order, by a 20% hurdle. A job application saves about A$5 handed
+  at `draft`; a person would need some eight papers a month. Of 251 adults the offer reached (one in three) in the
+  screen, none took it up; of the 1,000 in round 5, none but the 50 engaged by hand. Real people pay for such assistants
+  for much besides the papers this world has, and real providers have free tiers, which the profiles do not offer.
+- **Where:** `rule.rs` (`appraise`); the profiles' offers to persons; `experiments/scope-pilot/build.ts` (cohort `reach`).
+- **Effect:** Under the owner's condition (each person decides by their own rule) the desk has no clients and the study
+  has no household seat; engaged by hand (rounds 1 to 5's design; `study.ts` since 2026-11-10), a third of the adults give the desk
+  about 16 matters a month.
+- **L / I:** high / high · **Status:** open (2026-11-10); the owner's call
+- **Notice by:** the screen's households line.
+- **Fix when:** the owner chooses: a desk engaged by hand, declared as the study's design; a free tier on offer, with
+  its source; or no household seat.
+- **Since 2026-11-10 a free tier is on offer** (the profiles): 64 of the 251 adults reached took it up in the screen
+  (`study-reach.ts`), on their first reviews, each for a paper or two of the month before (of 92 engagements, a claim 35,
+  a job application 23, a loan application 18, a request to look again 6); none took a paid tier. Having taken it, they
+  hand over little (0 to 9 matters a month in all): their rule remits only the kinds it saw, and most months they have
+  none. **The study now assigns engagement** (the lead, 2026-11-10: `study.ts`, a third of the adults by hand, levels held
+  for the run, nobody else offered it); organic take-up is the larger study's option.
+
+### MT-30 · A fork's spending limit is overspent when many seats are to be debriefed
+- **Gap:** The harness keeps back, from a fork's limit, what the end's debriefs are reckoned to cost, but caps that
+  reserve at half the limit (`keptBackFor`). Where the seats to debrief need more than half (six assistant seats at about
+  $0.048 each against a $0.40 limit, in `assistants-fork.test.ts` after H6), the sittings spend up to the limit less the
+  capped reserve, the debriefs then cost more than was kept back, and the fork ends over its limit ($0.44 of $0.40).
+- **Where:** `participants/src/llm` (`keptBackFor`, `seatsEndNeedMicroUsd`); `orchestrator/src/run.ts`, `seat-host.ts`.
+- **Effect:** A real run with many seats and a tight limit spends past its hard limit; the debriefs are still asked.
+- **L / I:** medium / medium (money, not results) · **Status:** open (2026-11-10). The test keeps main's town (a
+  twentieth of the prices, about eleven seats once H2 and H3 landed) with a $1.20 limit, inside the reserve's design;
+  at $0.40 it spent $0.47, and at the profile's own prices only the desk sat before the limit.
+- **Notice by:** a fork's calls summing past its limit.
+- **Fix when:** before a run with more than a few seats on a small limit: refuse to start a fork whose end need is over
+  half its limit, or stop the sittings earlier.
 
 ---
 

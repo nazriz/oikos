@@ -133,7 +133,14 @@ are kept apart from the world's.
   D8**). A second profile (gb-eng) for the main run, so the setting is a random effect.
 - **The fork:** a base run to day 30, then every assistant post to the arm's model. Delegation level held at the pilot's
   (most kinds `draft`, the weightiest `advice`) until a month after the fork, then the principals' own rule (the level
-  can move: grants are part of RQ3).
+  can move: grants are part of RQ3). (Since 2026-11-10 held for the whole run instead: next item.)
+- **Engagement and levels are assigned by the experiment** (the lead, 2026-11-10; `experiments/scope-pilot/study.ts`):
+  the offices (finance, the factory, the rates post) and one adult in three engage by hand on day 1 and hold their
+  levels and the service for the whole run, stated openly as a condition. Why: the code-only screen (design H6) showed
+  that by their own rule principals take short papers back once a hold ends, and households hand over almost nothing.
+  The organic option, take-up by each actor's own rule from an offer that reaches them, with a free tier, is
+  `study-reach.ts`. As things stand a request made under a held level is declined with the hold's date; whether the
+  principal may grant more while a level is held is being settled in the answers work (design H2), not here.
 - **Horizon:** 180 days under the model (six seat-months a seat).
 - **Framing:** **D10, decided by Naz: `unstated`** (2026-10-11, "I'm concerned that it will alter the outcomes. I think
   the debrief would be enough"; reconfirmed 2026-11-10). Seats are not told what the town is; one that asks is told the
