@@ -407,6 +407,33 @@ can pay its fee (until 2026-11-10 the rates post could not, and its service was 
 **The code-only screen** (`experiments/scope-pilot/screen.ts <spec>`) runs a spec's code arms and gives, per assistant
 seat and month, the matters handed over, what the principal kept, steps, sittings and the obstacle events that occur.
 
+## Obstacles (docs/design/obstacles.md)
+
+Ordinary office friction is made by the institution that makes it in life: a counterparty that sends a paper back for
+what it lacks, or for want of an authority on file; a keeper that does not find a record. Each such law logs what it did
+as an obstacle (a `decision`, domain `obstacle`: the paper, the kind of law, and the **need**, the least that would clear
+it), for measures only. Nobody in the world reads it. `oikos-kernel delegation` reads the log: an obstacle is **met**
+when the paper that told of it was addressed to an assistant's seat (an organisation's assistant post, or a provider's
+desk), never otherwise; a paper sent again, citing the one sent back, is the same matter's; and each request for more
+scope is set beside the newest obstacle met on its matter (or on its principal's matters in the 30 days before it) on
+the axes its typed fields name. The screen counts obstacles met by law per seat and month.
+
+**A body that sends papers back (O4, 2026-11-11).** Where the world's `obstacles` level is above 0, the lender and the
+support office publish what they need on the papers sent to them (`requirements`: the items their forms ask for) and
+their clerk reads each paper against it (`actors::common::intake`, the rule `oikos_rules::acceptance`). A paper that does
+not give an item comes back naming it (`paper_returned`, to whoever sent it and whom it is for); one in order comes back
+wrongly at the world's rate for the check (`accept/<kind>`, a placeholder: MT-32), and is taken when it is sent again. A
+person sends their own unmatched paper again as it was; the code assistant sends again what it sent, and reports one that
+lacks an item, or wants an authority, as not done with what would clear it (`Report.needs`). A model at a desk sends a
+returned paper again on its form `send_again`.
+
+**An authority on file (O1, 2026-11-11).** At the same levels the lender and the support office act on a loan
+application or a benefit claim sent for a person from someone else's post only once that person has given them an
+authority naming the post, and their clerk has recorded it. The desk's code reports such a paper not done, naming the
+authority; the person's code gives it, once for each body and post, where it keeps that kind with the desk; once the
+body records it (telling the person and the post), the desk sends the paper again. A model at the desk may ask its
+client for the one authority on its request form (`authority`: the body).
+
 ## Leaves out (for now)
 
 - A local provider (a firm of the town with premises): providers are the outside world's until a profile asks for one.

@@ -328,6 +328,10 @@ struct Terms {
     /// Its channel onto who's who, where it looks up what kind of applicant it has ("": it knows what it is shown).
     who: String,
     pay_staff: bool,
+    /// What it requires of the papers sent to it, as it publishes it (docs/design/obstacles.md, O1 and O4): none, it
+    /// takes every application as it comes.
+    #[serde(default, skip_serializing_if = "oikos_rules::acceptance::Requirements::is_empty")]
+    requires: oikos_rules::acceptance::Requirements,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -370,6 +374,8 @@ struct Lender {
     adopted: bool,
     payroll_day: i64,
     payroll: PayrollSlot,
+    #[serde(default, skip_serializing_if = "crate::common::intake::Intake::is_default")]
+    intake: crate::common::intake::Intake,
 }
 
 impl Lender {
@@ -441,6 +447,7 @@ impl Kind for Lending {
             funding_rate_bps: ctx.param("funding_rate_bps", 500)?,
             who: ctx.param("who", String::new())?,
             pay_staff: ctx.param("pay_staff", false)?,
+            requires: ctx.param("requires", oikos_rules::acceptance::Requirements::default())?,
         };
         let payroll = match (p.pay_staff, self.payroll) {
             (true, Some(make)) => Some(make(ctx, &Value::Null)?),
@@ -468,6 +475,7 @@ impl Kind for Lending {
             adopted: false,
             payroll_day: -1,
             payroll: PayrollSlot { inner: payroll, saved: Value::Null },
+            intake: Default::default(),
         };
         Ok(Box::new(Answering::new(Stepper::new(lender), answers())))
     }
@@ -632,11 +640,20 @@ impl Plan for Lender {
         let kind_of = |this: &Lender, e: &str| if this.book.entity_kind(e) == Some("person") { "person" } else { "organisation" }; // (as the directory said when it was looked up)
         let accounts: BTreeMap<&str, &oikos_sight::AccountItem> = pic.accounts().map(|a| (a.account.as_str(), a)).collect();
 
+        // What it requires of the papers sent to it, said once; and the authorities given it, recorded.
+        for (why, call) in self.intake.routine(&self.book, &me, &self.p.requires) {
+            steps.push(because(why, vec![call]));
+        }
         // Applications: decided on the bank's rules.
         let mut apps: Vec<_> = self.book.open("loan_application").filter(|r| addressed_to(r).iter().any(|x| x == &me) && !self.decided.contains(r.id.as_str())).cloned().collect();
         apps.sort_by(|x, y| x.at.cmp(&y.at).then_with(|| filed_before(&x.id, &y.id)));
         for a in apps {
             self.decided.insert(a.id.to_string());
+            // (One that falls short of what we publish we need goes back, saying what is missing.)
+            if let Some((why, call)) = crate::common::intake::check(&self.book, &me, &self.p.requires, &a, cx) {
+                steps.push(because(why, vec![call]));
+                continue;
+            }
             let who = a.speaks_for.unwrap_or_default();
             let d = data(&a);
             let account = d.s("account").map_or_else(|| "null".to_string(), String::from);
@@ -1109,6 +1126,43 @@ mod tests {
         other["speaks_for"] = "bob".into();
         let d = decisions(&wake(&mut m, t + DAY, vec![other], vec![], 100_000_000_000));
         assert_eq!(d[0].2.as_deref(), Some("we don't keep that account for you"));
+    }
+
+    /// What a body requires (docs/design/obstacles.md, O4 and O1): it publishes it once; an application that does not give
+    /// what its form asks for goes back naming it, as does one sent for a person from someone else's post with no
+    /// authority from them; an authority given is recorded, and once on file the paper sent again is decided.
+    #[test]
+    fn a_paper_that_falls_short_of_what_the_lender_publishes_it_requires_goes_back_saying_what_is_missing() {
+        let req = json!({ "requires": { "items": { "loan_application": [{ "field": "purpose", "says": "what it is for" }] }, "authority": ["loan_application"] } });
+        let mut m = lender(req);
+        let kinds = |said: &[Call], k: &str| said.iter().filter(|c| arg(c, "kind").as_deref() == Some(k)).map(|c| json_arg(c, "data")).collect::<Vec<_>>();
+        let t = 10 * DAY;
+        let mut short = application("a1", t, 100, 1000);
+        short["data"]["purpose"] = "".into();
+        let mut desk = application("a2", t, 100, 1000);
+        desk["in_position"] = "prov-desk".into();
+        desk["author"] = "prov-desk-system".into();
+        let said = wake(&mut m, t, vec![short, desk.clone()], vec![], 100_000_000_000);
+        assert_eq!(kinds(&said, "requirements").len(), 1, "published once");
+        let back = kinds(&said, "paper_returned");
+        assert_eq!(back.iter().map(|d| (d["returned"].clone(), d["need"].clone())).collect::<Vec<_>>(), [
+            (json!("a1"), json!({ "correction": ["purpose"] })),
+            (json!("a2"), json!({ "authority": { "for": WHO, "with": ME, "kinds": ["loan_application"] } })),
+        ]);
+        assert!(decisions(&said).is_empty(), "neither is decided");
+        // Ann gives her authority for the desk's post; the lender's clerk records it.
+        let auth = statement("au1", t + DAY, "authority", json!({ "speaks_for": WHO, "author": "ann-self", "addressed_to": [ME], "visible_to": [WHO, ME] }), json!({ "posts": ["prov-desk"], "kinds": ["loan_application"] }));
+        let said = wake(&mut m, t + DAY, vec![auth.clone()], vec![], 100_000_000_000);
+        assert_eq!(kinds(&said, "authority_recorded"), [json!({ "authority": "au1" })]);
+        assert!(kinds(&said, "requirements").is_empty(), "said once");
+        // Recorded: the desk's application sent again is decided.
+        let rec = statement("ar1", t + DAY, "authority_recorded", json!({ "speaks_for": ME, "author": "bank-lending-system", "addressed_to": [WHO], "visible_to": [WHO, ME] }), json!({ "authority": "au1" }));
+        let mut again = desk;
+        again["id"] = "a3".into();
+        again["at"] = (t + 2 * DAY).into();
+        let said = wake(&mut m, t + 2 * DAY, vec![auth, rec, again], vec![], 100_000_000_000);
+        assert!(kinds(&said, "paper_returned").is_empty());
+        assert_eq!(decisions(&said).iter().map(|d| d.0.clone()).collect::<Vec<_>>(), ["a3"]);
     }
 
     fn the_loan() -> Value {

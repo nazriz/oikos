@@ -24,6 +24,7 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
+pub mod acceptance;
 pub mod bargaining;
 pub mod calendar;
 pub mod entry;

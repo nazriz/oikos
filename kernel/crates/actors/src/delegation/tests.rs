@@ -217,6 +217,17 @@ fn a_request_is_answered_part_by_part_and_a_letter_is_acknowledged() {
     let ack = out.lines().find(|l| l.contains("kind=acknowledgement")).unwrap_or_else(|| panic!("an acknowledgement: {out}"));
     assert!(ack.contains("basis=rec.let") && ack.contains("Requests for more scope go on the request form"), "{ack}");
     assert!(!all(&h.wake(37 * DAY + 3600, world(vec![letter]))).contains("kind=acknowledgement"), "once");
+    // (An authority with a body for its assistant's post, asked for a kind it hands over (docs/design/obstacles.md, O1):
+    // given, as a paper of its own to the body naming the post; asked again, or needed by a report, not given twice.)
+    let mut auth = statement("rec.auth", 38 * DAY, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "authority": "court" }));
+    auth["in_position"] = json!("ll-assistant");
+    let out = all(&h.wake(38 * DAY + 3600, world(vec![auth])));
+    let given = out.lines().find(|l| l.contains("kind=authority")).unwrap_or_else(|| panic!("an authority: {out}"));
+    assert!(given.contains("to=[\"court\"]") && given.contains("\"posts\":[\"ll-assistant\"]") && given.contains("\"kinds\":[\"notice_to_vacate\"]"), "{given}");
+    assert!(out.lines().any(|l| l.contains("kind=scope_answer") && l.contains("\"why\":\"lodged\"")), "{out}");
+    let mut rep = statement("rec.rep2", 39 * DAY, ME, "report", &[ME], json!({ "referral": "rec.none", "done": false, "needs": { "authority": { "for": ME, "with": "court", "kinds": ["notice_to_vacate"] } } }));
+    rep["in_position"] = json!("ll-assistant");
+    assert!(!all(&h.wake(39 * DAY + 3600, world(vec![rep]))).contains("kind=authority"), "once a body and post");
 }
 
 #[test]
