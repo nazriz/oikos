@@ -11987,8 +11987,10 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   **Organic** (`study-reach.ts`): 64 of the 251 adults reached took the free tier by their own rule, none a paid tier;
   the desk then had 0 to 9 matters a month.
 - **Two slow tests:** `assistants-fork.test.ts`'s fork spent $0.44 of a $0.40 limit with six assistant seats to
-  debrief, past what the harness keeps back (its reserve is capped at half the limit: MT-30); the test's limit is now
-  $0.80, and the overspend is a risk of its own, to be fixed separately. `seat-diary.test.ts` is as on main.
+  debrief, past what the harness keeps back (its reserve is capped at half the limit: MT-30), and $0.85 of $0.80 when
+  the limit was raised. The test's town now runs at the profile's own prices (persons take the free tier; few
+  organisations engage), with its limit as on main; the overspend is a risk of its own, to be fixed separately.
+  `seat-diary.test.ts` is as on main.
 - **What the other worker's pricing (composing charged to whoever composes) should move:** in `study.ts` nothing of the
   volumes (the levels are held); in `study-reach.ts` the rule's cuts at the hold's end and the households' take-up. At act
   depth a referral will cost the principal the paper's row too, so handing over pays even less; at matter depth the

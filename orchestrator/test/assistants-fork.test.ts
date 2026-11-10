@@ -64,17 +64,15 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
   // what was new since its twin had looked, so no forms.)
   const out = join(root, "runs", "test-assistants-seats");
   rmSync(out, { recursive: true, force: true });
+  // (At the profile's own prices: persons take the free tier and the desk is a seat; organisations, now principals for
+  // more kinds since H6, do not engage by their own rule at these prices, so few systems are seated. At a twentieth of the
+  // prices six were, and their debriefs overran what the harness keeps back, which is capped at half the limit: MT-30.)
   const P = structuredClone(loadProfile(base.profile)) as any;
-  for (const pr of P.values.assistants.providers) for (const o of pr.offers) { o.fee_month = Math.round(o.fee_month / 20); o.setup = Math.round(o.setup / 20); }
   const config = generateFrom({ ...base, assistants: true, assistant_seats: ["assistant-a", "assistant-a-personal"] }, P) as any;
   // (One office has decided by hand to take provider A's assistant on day 1, so that an organisation's system is a seat by the fork.)
   const office = config.positions.find((p: any) => p.role_module?.params?.delegation && p.role_module.code === "firm.landlord");
   office.role_module.params = { ...office.role_module.params, delegation: { ...office.role_module.params.delegation, commit: { offer: "letting-assistant-a", levels: { notice_to_vacate: "draft", rent_increase: "draft", repair_order: "draft", rental_listing: "draft" }, levels_until: 200 * DAY, keep_until: 200 * DAY, why: "test" } } };
-  // (The limit is set so that the debriefs the harness keeps back fit within half of it, as its reserve is capped there:
-  // with six assistant systems seated (since H6 the town's factories and rates post are principals too, and take an
-  // assistant at these prices), 0.4 left the six debriefs about 0.29 against a reserve of 0.2, and the fork spent 0.44.
-  // That overspend is the harness's, not this town's: risk MT-30.)
-  const limit = 0.8;
+  const limit = 0.4;
   const spec: ExperimentSpec = { name: "assistants-seats", world: { config }, post: "template:assistant-a,assistant-a-personal", seeds: [1], forkDay: 60, untilDay: 120,
     arms: [{ name: "seats", steward: { kind: "model", model: "anthropic/claude-sonnet-5-5" } }], measures: ["acts"],
     seats: { mock_models: true, framing: "unstated", budget: { fork_usd: limit } } };
