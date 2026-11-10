@@ -451,7 +451,8 @@ export const isId = (s: string) => /^([a-z][a-z0-9_-]{0,63}|(ent|acc|str|rec|act
  * in, "Name (id)" (a seat is shown "Town of Millbrook (city)", and wrote to exactly that: 2026-10-09). */
 const bare = (s: string) => {
   const t = s.trim().replace(/^\[(.*)\]$/, "$1").trim();
-  const named = /\(\s*\[?([^()\[\]\s]+)\]?\s*\)$/.exec(t);
+  // (Its closing bracket may be gone: a note's reading strips a trailing one, "Assistants' desk (provider-a-desk", 2026-11-10.)
+  const named = /\(\s*\[?([^()\[\]\s]+)\]?\s*\)?$/.exec(t);
   return named && !isId(t) && isId(named[1]!) ? named[1]! : t;
 };
 /** What a draft will do, in one line: the first thing its preview says it does (for a line that says it is still waiting). */
@@ -1666,10 +1667,12 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           // a 7B model "confirmed" its principal's sign-offs and forms and was told it had not seen what they would do,
           // 2026-11-10.)
           const waitingNow = (obs.drafts as any[]).map((d) => d?.id).filter((x): x is string => typeof x === "string");
-          if (use.name === "confirm" && text(i?.ref) && !/^\[?draft\./.test(i.ref.trim()) && !waitingNow.includes(i.ref.trim())) {
+          // (A paper's number written with "draft." before it is no draft's reference either: the same model, told so, wrote
+          // "Confirm draft.9342" for its principal's paper rec.9342, a draft for sign-off, in the after run of 2026-11-10.)
+          if (use.name === "confirm" && text(i?.ref) && (i.decision === "confirm" || i.decision === "decline") && !/^\[?draft\.[^.\s\]]+\.[0-9]+\]?$/.test(i.ref.trim()) && !waitingNow.includes(i.ref.trim())) {
             const ref = i.ref.trim().replace(/^\[(.*)\]$/, "$1");
             const which = waitingNow.length ? `The ${waitingNow.length === 1 ? "draft" : "drafts"} of yours waiting for your yes or no now: ${inWorld(waitingNow.join(", "))}.` : "No draft of yours is waiting for your yes or no now.";
-            const why = `${quote(ref)} is not a draft of yours: only your own requests, drawn up and waiting for your yes or no (their references start with "draft."), are confirmed or declined. A paper someone sent you or a form is never confirmed: to act on it, say what you do (a form, by filling it in)`;
+            const why = `${quote(ref)} is not a draft of yours: only your own requests, drawn up and waiting for your yes or no, are confirmed or declined, each by the reference it is shown with. A paper someone sent you (a sign-off, a draft for sign-off, a remit) or a form is never confirmed: to act on it, say what you do (a form, by filling it in)`;
             notDone.set(use.id, { now: `Not done: ${why}. ${which}`, later: `When you were last here, your answer on ${quote(ref)} was not taken: ${why}.` });
             await note({ confirm_not_a_draft: JSON.stringify(use).slice(0, 2000) });
             continue;

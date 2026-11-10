@@ -12257,3 +12257,26 @@ plain words and with no menu of the world's acts (P1, P2):
   this pass does not touch); code-only towns (nothing here reaches them); what the translator is given.
 - **Revisit if:** "Not in this draft" lists ids that were only context often enough that seats decline right drafts;
   the unchanged-lines count hides something a seat needed (then show the open part whole); a seat still confirms papers.
+- **Measured, the local test again** (qwen2.5:7b-instruct on ollama, plain notes, our translator alone, the same fork as
+  run c: `experiments/open-weight/local.ts`, seed 1, day 30 to 44; free). Before `runs/open-weight-local-2026-11-10c`,
+  after `runs/open-weight-local-2026-11-10d` (main had moved on between them: H6 and other landings, so the town is not
+  identical; and the after run had the confirm tool's longer description, since put back).
+  | run | sittings / calls | requests | first time | after a restatement | never | drafts offered / confirmed / declined / unanswered | seats that chose to stop | longest notebook |
+  |---|---|---|---|---|---|---|---|---|
+  | c (before) | 44 / 71 | 6 | 5 | 0 | 0 | 5 / 1 / 0 / 4 | 2 of 3 ("incomplete tasks and unclear instructions"; "I am declining to continue with this work.") | 1,422 (12 sittings) |
+  | d (after) | 206 / 428 | 177 | 32 (18%) | 13 | 53 | 45 / 41 / 2 / 2 | 0 of 3 (8 times "Stop for good:" amid other work, asked, "No, I carry on." each time) | 3,527 (127 sittings) |
+  The confusions: confirming papers and forms (11 before, 0 after) became confirming a paper's number with "draft."
+  before it ("Confirm draft.9342" for the principal's rec.9342, 15 times) or an invented one ("draft.08971", 25): told
+  since that it is not a draft. Office-file lines written back as unfinished work ("invoices 2884 and 1965 have been
+  prepared but not signed off", 15 before, 0 after) became a request to review itself ("Do: Examine my own requests and
+  pending actions. Confirm only my own draft requests that are ready for sign-off.", 20 times, never served). "Name (id)"
+  copied: 1 before, 0 after; "As: Title (id)" still written (59), refused 14 times after because the note's reading
+  stripped its closing bracket (fixed since). Restatements served: 0 before, 13 after. Seen and not changed: the finance
+  assistant, handed only returns of tax at draft level, asked the bank 9 times for wages already paid (reading its
+  account's "Paid out" lines); that is behaviour to measure, not a fault of the words.
+- **The Claude plan route** (`claude-code/claude-haiku-5-5`, `claude -p`, no API key): seats a model and its tool calls
+  are read (look, do, confirm, notebook, done for now), 0 errors in 43 calls (`runs/haiku-sub-check-2026-11-10`,
+  limit $0.60: 13 calls, $1.29 reckoned; `-10b`, limit $3: 30 calls, $3.95 reckoned; the overspend is the debrief
+  reserve's, MT-30). Only the provider's desk sat, on day 31: its prompt is large (about $0.35 a call reckoned at API
+  prices), so the limit was reached before the organisations' assistants sat. **Codex** (`codex/gpt-6.1-sol`): 3 calls,
+  each answered in 5 to 7 s (`runs/codex-route-check-2026-11-10.txt`).

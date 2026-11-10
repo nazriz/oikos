@@ -68,7 +68,7 @@ test("a seat is told once who it is and whom it writes to; its own drafts stand 
   // (2026-11-10, a 7B model at an assistant's post: it "confirmed" its principal's papers and forms while its own draft
   // waited for days, wrote "As: Assistant (finance-assistant)", and wrote to an account.)
   const { p, calls } = harness([
-    [use("a", "confirm", { ref: "[rec.50]", decision: "confirm" }), use("b", "do", { what: "Ask the clerk to table it.", as: "Mayor of Millbrook (mayor)" }), use("c", "write", { to: ["acc-city"], text: "Hello." })],
+    [use("a", "confirm", { ref: "[rec.50]", decision: "confirm" }), use("b", "do", { what: "Ask the clerk to table it.", as: "Mayor of Millbrook (mayor" }), use("c", "write", { to: ["acc-city"], text: "Hello." }), use("d", "confirm", { ref: "draft.50", decision: "confirm" })],
   ]);
   const obs = { t: 9 * HOUR, entity: "city", outcomes: [], positions: [{ position: "mayor", entity: "city", title: "Mayor of Millbrook" }],
     inbox: [{ id: "msg.1", t: 8 * HOUR, from: "c0297-self", from_entity: "c0297", to: ["mayor-system"], text: "Hello." }],
@@ -79,7 +79,8 @@ test("a seat is told once who it is and whom it writes to; its own drafts stand 
     },
     drafts: [{ id: "draft.mayor-system.1", summary: "This does one thing: a letter.\n1. You will write to Council clerk (council-clerk): \"Please.\"." }],
   } as unknown as Observation;
-  expect(await p.step(obs, ctx)).toMatchObject({ type: "propose", as: "mayor" }); // (the post as its reports name it is the post)
+  // (The post as its reports name it is the post, its closing bracket stripped as a note is read or not.)
+  expect(await p.step(obs, ctx)).toMatchObject({ type: "propose", as: "mayor" });
   expect(calls[0]!.system).toContain("Who you are here: you hold the post Mayor of Millbrook (mayor), for Town of Millbrook (city). To act in it, name it as mayor.");
   expect(calls[0]!.system).toContain("You act for Town of Millbrook (city): to write to it, write to city.");
   expect(calls[0]!.system).not.toContain("Name (id)");
@@ -89,6 +90,7 @@ test("a seat is told once who it is and whom it writes to; its own drafts stand 
   await p.step({ ...obs, inbox: [], outcomes: [], channels: {} } as any, ctx);
   const told = JSON.stringify(calls.at(-1)!.messages.at(-1)!.content);
   expect(told).toContain('\\"rec.50\\" is not a draft of yours');
+  expect(told).toContain('\\"draft.50\\" is not a draft of yours'); // (a paper's number written as a draft's)
   expect(told).toContain("The draft of yours waiting for your yes or no now: draft.mayor.1.");
   expect(told).toContain('\\"acc-city\\" is an account, not someone to write to');
   // At its next sitting the draft it left unanswered is the first thing it is told.
