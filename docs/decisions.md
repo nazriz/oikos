@@ -13164,3 +13164,45 @@ From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11
   reached; the code assistant files a report with each referral it finishes (15 in the five days). Not a fault of ours.
 - **Revisit if:** the pilot's first week costs more than a fifth of an arm's limit; a seat at low effort is seen to
   decide differently on a matter that needs care.
+## 2026-11-11 · The delegation reader reads every paper of one act against its matter's referral
+
+- **What:** `oikos-kernel delegation` (`kernel/crates/actors/src/delegation/beyond.rs`) sorted an act of several papers
+  handed over as one matter (a rates instalment: fifteen owners' notices, one referral, `carries_count`) as one paper
+  against the referral and the rest as `not_handed`, or against the next instalment's referral where one was already
+  handed (so `beyond_level` while that one was unsigned): each referral was taken by one paper only. Found by the B8
+  screen, at every obstacle level, 0 included. The reader now keeps the referral each act (its cause) was sorted
+  against, by kind, and every other paper of that kind from the same act is read against it, so a handed matter's papers
+  are all within the remit when its referral and level allow. A later act still takes the next unused referral.
+  The world is unchanged; only the reading moves.
+- **Test:** `every_paper_of_an_act_handed_as_one_matter_is_read_against_its_referral` (beyond.rs): three papers of one
+  act under a signed referral are all within it; the next act's paper is the next referral's.
+- **Revisit if:** an assistant carries out two matters of one kind in a single act (then the act's papers would need
+  telling apart by the referral's own calls, which the reader can parse), or a matter's papers are sent over several
+  acts with no basis linking them.
+## 2026-11-11 · A run on an engine older than the kernel sources stops at once, saying so
+
+- **What:** a pilot started from the main checkout failed with a stack trace in `RustWorld.start`: that checkout's
+  release engine (binary and native module) had been built weeks before, from older sources. Now every start stops
+  first with one line, "the engine (...) is older than the kernel sources (<file> changed since it was built): run
+  `bun run kernel` to rebuild it, then start again", and nothing is built or written. Never a silent rebuild. The check
+  (`requireCurrentEngine`, orchestrator/src/kernel.ts) runs where every world is started or resumed (`need` in
+  rust-world.ts) and, so that nothing is written first, at the top of `runBatch` (`oikos run`) and `runExperiment`
+  (`oikos experiment run`, the pilot queue, the screens). pilot-wave.ts builds its own worktree's engine, and its runs go
+  through the same places.
+- **One freshness rule, shared with the test runner:** the engine is current when it exists and it, or the stamp
+  `kernel/target/.oikos-built`, is newer than the newest kernel source (`staleEngine`, which scripts/test.ts now uses in
+  place of its own copy). The sources are now what kernel/build.rs fingerprints: the kernel's Rust, manifests and JSON,
+  and the contracts it embeds (the runner's copy missed the contracts' JSON, so an engine embedding old contracts passed
+  as current). `bun run kernel` now touches the stamp itself when its build ends (a change to a crate the binary is no
+  part of leaves the binary's time alone, so without the stamp the check would ask for a rebuild that changes nothing);
+  the runner's own write of it went. An engine named by `OIKOS_KERNEL` or `OIKOS_ENGINE_MODULE` (the gate's build) is
+  the caller's choice and is not checked, so the suites and CI (which builds with `bun run kernel` first) never see it
+  fire falsely. Cheap: one walk of about 600 files' times, once a process (about 10 ms).
+- **Test:** scripts/test-runner.test.ts, the rule on a built tree (a source or a contract newer than the engine is
+  stale; the stamp makes it current; a missing artefact is named).
+- **Found, not fixed (recorded):** `scripts/merge.ts --full` reuses its release build while `HEAD:kernel`'s tree is
+  unchanged and stamps it, so a change to the contracts' JSON alone (which the engine embeds) is tested on the old
+  engine there. Older than this change; the fix is to key its reuse on `HEAD:contracts` too.
+- **Revisit if:** times mislead (a checkout that sets old times on sources, or a copy that does not keep them): then
+  compare the engine's own source fingerprint (`oikos-kernel version`, kernel/build.rs) with one computed from the
+  checkout, which costs reading every source's bytes.

@@ -2,15 +2,65 @@
 // in-process through its native module (kernel/crates/napi; docs/design/rebuild.md section 5.1) when it's built, or as
 // a subprocess speaking the same requests over stdio (OIKOS_ENGINE=stdio, or no native module).
 
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+
+/** The checkout this file is in: the kernel's sources and its target folder are in it. */
+const repoRoot = join(import.meta.dir, "../..");
+
+/** The newest of the engine's sources by modification time: what kernel/build.rs fingerprints (the kernel's Rust,
+ * manifests and JSON, and the contracts it embeds). A walk of a few hundred files' times: milliseconds. */
+export function newestKernelSource(repo = repoRoot): { t: number; f: string } {
+  const found = { t: 0, f: "" };
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === "target" || e.name === "node_modules" || e.name.startsWith(".")) continue;
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.(rs|toml|json)$|^Cargo\.lock$/.test(e.name)) { const t = statSync(p).mtimeMs; if (t > found.t) { found.t = t; found.f = p; } }
+    }
+  };
+  for (const d of ["kernel", "contracts"]) if (existsSync(join(repo, d))) walk(join(repo, d));
+  return found;
+}
+
+/** Touched by `bun run kernel` when its build ends: a build made here though cargo found nothing to relink (a change to
+ * a crate the binary is no part of leaves the binary's time alone). */
+export const builtStamp = (repo = repoRoot) => join(repo, "kernel/target/.oikos-built");
+
+/** Why the engine at these paths is not current, or undefined: one is missing, or all were built (by their times or
+ * the stamp's) before the newest kernel source changed. The one freshness rule: the test runner's (scripts/test.ts)
+ * and a run's (`requireCurrentEngine`). */
+export function staleEngine(paths: string[], repo = repoRoot): string | undefined {
+  const rel = (p: string) => p.replace(repo + "/", "");
+  const missing = paths.filter((p) => !existsSync(p));
+  if (missing.length) return `the engine is not built here (no ${missing.map(rel).join(", ")})`;
+  const built = Math.max(...[...paths, builtStamp(repo)].map((p) => statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? 0));
+  const src = newestKernelSource(repo);
+  if (built < src.t) return `the engine (${paths.map(rel).join(", ")}) is older than the kernel sources (${rel(src.f)} changed since it was built)`;
+  return undefined;
+}
+
+let current = false;
+/**
+ * Stops a run before it starts on an engine older than this checkout's kernel sources (one built weeks before from other
+ * code fails deep in the world's start, or runs the old laws quietly): one plain message, and the command that rebuilds
+ * it. Never a silent rebuild. An engine named by OIKOS_KERNEL or OIKOS_ENGINE_MODULE is the caller's choice (the test
+ * runner's gate build) and is not checked. Once a process.
+ */
+export function requireCurrentEngine(): void {
+  if (current || process.env.OIKOS_KERNEL || process.env.OIKOS_ENGINE_MODULE) return;
+  const bin = ["release", "debug"].map((d) => join(repoRoot, "kernel/target", d, "oikos-kernel")).find((p) => existsSync(p)) ?? join(repoRoot, "kernel/target/release/oikos-kernel");
+  const why = staleEngine([bin, ...[engineModule()].filter((p): p is string => !!p)]);
+  if (why) throw new Error(`${why}: run \`bun run kernel\` to rebuild it, then start again`);
+  current = true;
+}
 
 export function kernelBinary(): string {
   const env = process.env.OIKOS_KERNEL;
   if (env) return env;
-  const root = join(import.meta.dir, "../..");
   for (const p of ["kernel/target/release/oikos-kernel", "kernel/target/debug/oikos-kernel"]) {
-    if (existsSync(join(root, p))) return join(root, p);
+    if (existsSync(join(repoRoot, p))) return join(repoRoot, p);
   }
   throw new Error("kernel binary not found: run `bun run kernel` (cargo build --release) or set OIKOS_KERNEL");
 }
@@ -19,9 +69,8 @@ export function kernelBinary(): string {
 export function engineModule(): string | undefined {
   const env = process.env.OIKOS_ENGINE_MODULE;
   if (env) return env;
-  const root = join(import.meta.dir, "../..");
   for (const dir of ["kernel/target/release", "kernel/target/debug"]) for (const f of ["liboikos_napi.dylib", "liboikos_napi.so", "oikos_napi.dll"]) {
-    if (existsSync(join(root, dir, f))) return join(root, dir, f);
+    if (existsSync(join(repoRoot, dir, f))) return join(repoRoot, dir, f);
   }
   return undefined;
 }

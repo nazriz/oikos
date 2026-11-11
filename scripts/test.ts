@@ -37,11 +37,12 @@
 
 import { Glob } from "bun";
 import { cpus, homedir, loadavg } from "node:os";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { realpathSync } from "node:fs";
 import { buildJobs, defaultPriority, insideSlot, poolSize, take, usedBy, type Used } from "./slots";
 import { lowDisk, testScratch } from "./disk-tidy";
+import { staleEngine } from "../orchestrator/src/kernel";
 
 const repo = join(import.meta.dir, "..");
 const args = process.argv.slice(2);
@@ -105,15 +106,6 @@ const FAST_SECONDS = 10;
 
 // ---- Preconditions: do what is cheap and safe, or stop at once with one line saying what to run.
 function stop(what: string): never { console.log(`PRECONDITION: ${what}`); process.exit(2); }
-function newest(dir: string, found = { t: 0, f: "" }): { t: number; f: string } {
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    if (e.name === "target" || e.name === "node_modules" || e.name.startsWith(".")) continue;
-    const p = join(dir, e.name);
-    if (e.isDirectory()) newest(p, found);
-    else if (/\.rs$|Cargo\.(toml|lock)$/.test(e.name)) { const t = statSync(p).mtimeMs; if (t > found.t) { found.t = t; found.f = p; } }
-  }
-  return found;
-}
 function run(cmd: string[], cwd: string) { return Bun.spawnSync(cmd, { cwd, stdout: "inherit", stderr: "inherit" }).exitCode === 0; }
 function preconditions(gate = false) {
   if (!existsSync(join(repo, "node_modules")) && !run(["bun", "install"], repo)) stop("`bun install` failed in the repo root");
@@ -121,22 +113,17 @@ function preconditions(gate = false) {
   if (existsSync(cel) && !existsSync(join(cel, "node_modules/@bufbuild/cel")) && !run(["bun", "install"], cel)) stop("`bun install --cwd docs/research/cel-check` failed");
   const kernel = process.env.OIKOS_KERNEL ?? join(repo, "kernel/target/release/oikos-kernel");
   const wasm = process.env.OIKOS_LAW_MODULE ?? join(repo, "kernel/target/wasm32-unknown-unknown/release/oikos_law.wasm");
-  const src = newest(join(repo, "kernel"));
-  // Current: both are there, and something was built since the newest source changed. (Cargo leaves alone an artefact
-  // the changed file is no part of, so each is not asked to be newer by itself; the stamp records a build made here
-  // that cargo found nothing to do in.)
-  const stamp = join(repo, "kernel/target/.oikos-built");
-  // (Not the wasm module's time: the gate's build writes it fresh in the release folder, and with it counted an old release
-  // kernel passed as current once a gate had built here, and the next run used it: 2026-11-10, 70 files failed on a
-  // kernel from 25 October.)
-  const built = () => Math.max(...[kernel, stamp].map((p) => statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? 0));
-  const stale = () => [kernel, wasm].some((p) => !existsSync(p)) || built() < src.t;
-  if (!stale()) return;
+  // Current: both are there, and something was built since the newest source changed (the one freshness rule, shared
+  // with a run's start: orchestrator/src/kernel.ts `staleEngine`; the stamp `bun run kernel` touches records a build made
+  // here that cargo found nothing to relink in). (Not the wasm module's time: the gate's build writes it fresh in the
+  // release folder, and with it counted an old release kernel passed as current once a gate had built here, and the next
+  // run used it: 2026-11-10, 70 files failed on a kernel from 25 October.)
+  const why = existsSync(wasm) ? staleEngine([kernel], repo) : `the law wasm module is missing (${wasm})`;
+  if (!why) return;
   if (gate) return gateBuild();
-  if (noBuild) stop(`the kernel binary or the law wasm module is missing or older than ${src.f.replace(repo + "/", "")}: run \`bun run kernel\``);
+  if (noBuild) stop(`${why}: run \`bun run kernel\``);
   console.log("building the kernel and the law module (bun run kernel)...");
   if (!run(["bun", "run", "kernel"], repo) || [kernel, wasm].some((p) => !existsSync(p))) stop("`bun run kernel` did not produce a kernel binary and law wasm module: run it and read its errors");
-  if (!process.env.OIKOS_KERNEL && !process.env.OIKOS_LAW_MODULE) writeFileSync(stamp, "");
 }
 /**
  * The gate's kernel, when the release build is not current (a kernel change, or a checkout last built at another

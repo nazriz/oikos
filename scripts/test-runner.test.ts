@@ -2,10 +2,11 @@
 // `--root`: a pass, a plain failure (never rerun), a timeout that passes alone (rerun), a timeout that never does.
 
 import { expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GATE_ARGS } from "./merge";
+import { staleEngine } from "../orchestrator/src/kernel";
 
 const runner = join(import.meta.dir, "test.ts");
 
@@ -217,3 +218,20 @@ test("--gate: a change to a file a slow-tier test imports pulls that slow test i
     expect(ran.out).toMatch(/^ok +t\/slow-town\.test\.ts/m);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 120_000);
+
+test("an engine is stale once a kernel source or an embedded contract changed after its build, and current once `bun run kernel` built or stamped since (the runner's rule and a run's start)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "oikos-engine-"));
+  try {
+    const at = (p: string, s: number) => { mkdirSync(join(dir, p, ".."), { recursive: true }); writeFileSync(join(dir, p), "x"); utimesSync(join(dir, p), s, s); };
+    const bin = join(dir, "kernel/target/release/oikos-kernel");
+    at("kernel/crates/a/src/lib.rs", 1_000);
+    at("kernel/target/release/oikos-kernel", 2_000);
+    at("kernel/target/release/build/out.rs", 9_000); // (a build's own output is no source)
+    expect(staleEngine([bin], dir)).toBeUndefined();
+    at("contracts/blocks.schema.json", 3_000);
+    expect(staleEngine([bin], dir)).toMatch(/older than the kernel sources \(contracts\/blocks\.schema\.json/);
+    at("kernel/target/.oikos-built", 4_000); // (cargo had nothing to relink: the build's stamp says it was made)
+    expect(staleEngine([bin], dir)).toBeUndefined();
+    expect(staleEngine([join(dir, "kernel/target/release/liboikos_napi.dylib")], dir)).toMatch(/not built here/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
