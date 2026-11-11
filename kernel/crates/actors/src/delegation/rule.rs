@@ -34,6 +34,14 @@ pub struct KindFacts {
     pub error_cost: i64,
     #[serde(default)]
     pub compose_seconds: i64,
+    /// What a day's delay of a matter of this kind costs it (cents): the matter's own consequence, as the world says it
+    /// (a day of a payment claimed not yet coming; docs/design/obstacles.md section 10). None: no delay is costed.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub late_cost_day: i64,
+}
+
+fn is_zero(n: &i64) -> bool {
+    *n == 0
 }
 
 /// A kind as the rule weighs it: its facts, and how many a month it does.
@@ -50,6 +58,12 @@ pub struct Kind {
 pub struct Seen {
     pub n: i64,
     pub bad: i64,
+    /// How long the matters it handed over waited on it, from a draft or a request to go ahead coming in to its answer
+    /// (seconds, summed), and how many: what its own review adds to a matter's time.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub waited: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub waits: i64,
     /// The records the counts come from (the newest few), for the decision's inputs.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub from: Vec<String>,
@@ -57,6 +71,20 @@ pub struct Seen {
 
 impl Seen {
     pub const KEEP: usize = 16;
+    /// A matter waited `secs` on its answer.
+    pub fn waited_for(&mut self, secs: i64) {
+        self.waited += secs.max(0);
+        self.waits += 1;
+    }
+
+    /// The days its answers have taken, on average, in thousandths (0 where it has answered none).
+    pub fn wait_milli_days(&self) -> i64 {
+        if self.waits <= 0 {
+            return 0;
+        }
+        (i128::from(self.waited) * crate::figures::MILLI / (i128::from(self.waits) * i128::from(crate::DAY))) as i64
+    }
+
     pub fn saw(&mut self, bad: bool, record: &str) {
         self.n += 1;
         if bad {
@@ -114,6 +142,22 @@ fn time_cost(per_month: i64, seconds: i64, hour_value: i64) -> i128 {
 /// What a kind of matter costs it a month at a level, with the assistant slipping `slip_bps` of the time (cents).
 /// `Level::None` is doing it itself.
 pub fn cost(level: Level, k: &Kind, slip_bps: i64, w: &Weights) -> i128 {
+    cost_waiting(level, k, slip_bps, w, 0)
+}
+
+/// `cost`, with what a matter's wait on its own answer costs where the kind's delay is costed: at `draft` and
+/// `approve`, each matter waits on the principal's answer `wait_milli_days` thousandths of a day, at the kind's
+/// `late_cost_day` (docs/design/obstacles.md section 10: a principal that is the bottleneck finds handing over more
+/// cheaper). Nothing else in the rule moves.
+pub fn cost_waiting(level: Level, k: &Kind, slip_bps: i64, w: &Weights, wait_milli_days: i64) -> i128 {
+    let waiting = |c: i128| c + (i128::from(k.per_month.max(0)) * i128::from(wait_milli_days.max(0)) * i128::from(k.facts.late_cost_day.max(0)) + crate::figures::MILLI / 2) / crate::figures::MILLI;
+    match level {
+        Level::Draft | Level::Approve => waiting(cost_at(level, k, slip_bps, w)),
+        _ => cost_at(level, k, slip_bps, w),
+    }
+}
+
+fn cost_at(level: Level, k: &Kind, slip_bps: i64, w: &Weights) -> i128 {
     let v = i128::from(k.per_month.max(0));
     let p = i128::from(slip_bps.clamp(0, 10_000));
     let err = i128::from(k.facts.error_cost.max(0));
@@ -214,7 +258,7 @@ mod tests {
         Weights { hour_value: 4_000, seconds: Seconds::default(), finds_bps: 8_000, prior_matters: 20, hurdle_bps: 2_000, horizon_months: 12 }
     }
     fn k(per_month: i64, err: i64) -> Kind {
-        Kind { facts: KindFacts { own_seconds: 1_800, error_cost: err, compose_seconds: 0 }, per_month }
+        Kind { facts: KindFacts { own_seconds: 1_800, error_cost: err, compose_seconds: 0, ..Default::default() }, per_month }
     }
     const ALL: [Level; 4] = [Level::Advice, Level::Draft, Level::Approve, Level::Alone];
 
@@ -239,10 +283,20 @@ mod tests {
         // Dearer still, with slips common: doing it oneself.
         assert_eq!(best(&ALL, &k(10, 50_000_000), 5_000, &w()).0, Level::None);
         // Composing a finished act stays the principal's: with all of the time in composing, handing it over saves none.
-        let all = Kind { facts: KindFacts { own_seconds: 1_800, error_cost: 1_000, compose_seconds: 1_800 }, per_month: 10 };
+        let all = Kind { facts: KindFacts { own_seconds: 1_800, error_cost: 1_000, compose_seconds: 1_800, ..Default::default() }, per_month: 10 };
         assert_eq!(best(&ALL, &all, 100, &w()).0, Level::None);
         // Only what is offered can be chosen.
         assert_eq!(best(&[Level::Advice], &k(10, 1_000), 100, &w()).0, Level::None, "advice never saves time");
+        // The cost of delay (docs/design/obstacles.md section 10): where a matter's day of delay is costed and its own
+        // answers have kept matters waiting, going alone becomes cheaper than a draft; with no wait, or no cost, nothing moves.
+        let mut dear = k(10, 50_000);
+        dear.facts.late_cost_day = 5_000;
+        let mut waited = Seen::default();
+        waited.waited_for(2 * 86_400);
+        assert_eq!(waited.wait_milli_days(), 2_000);
+        assert!(cost_waiting(Level::Draft, &dear, 500, &w(), 0) < cost_waiting(Level::Alone, &dear, 500, &w(), 0), "no wait: the draft");
+        assert!(cost_waiting(Level::Draft, &dear, 500, &w(), waited.wait_milli_days()) > cost_waiting(Level::Alone, &dear, 500, &w(), waited.wait_milli_days()), "two days' wait a matter: alone");
+        assert_eq!(cost_waiting(Level::Draft, &k(10, 50_000), 500, &w(), 2_000), cost(Level::Draft, &k(10, 50_000), 500, &w()), "a delay nobody costs moves nothing");
     }
 
     #[test]

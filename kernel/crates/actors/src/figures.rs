@@ -14,3 +14,6 @@ pub const KEPT_OWN_PAPERS: usize = 64;
 /// convention: how many letters a principal remembers having acknowledged, so that one is acknowledged once (a bound on
 /// what it holds).
 pub const KEPT_ACKNOWLEDGED: usize = 512;
+
+/// convention: thousandths, the unit a wait in days is kept in (a principal's answers, docs/design/obstacles.md section 10).
+pub const MILLI: i128 = 1_000;
