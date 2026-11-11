@@ -78,8 +78,9 @@ export const REMEDY_ANSWER: Issued = {
   form: "remedy_answer", title: "Answer to a request to put something right",
   does: "Answers someone who has asked the office in writing to put something right: yes or no, and where money is owed them and paid, how much. It does nothing by itself: what puts the thing right (a payment, a repair ordered, a paper withdrawn) is done besides.",
   fields: { request: f("record", "The request answered.", req), asker: f("entity", "Who asked.", req), matter: f("text", "What it is about, in the word the request uses.", req), granted: f("choice", "Whether it will be put right.", { ...req, options: YES_NO }),
-    amount: f("amount", "Where money is owed them and paid: how much."), reason: f("text", "Where it is refused: why.") },
-  writes: { kind: "remedy_answer", text: "Answer to your request {request}: {granted}.", basis: "=request", to: ["=asker"], visible: ["=asker", "=self"], data: { request: "=request", matter: "=matter", granted: "?granted", amount: "#amount", reason: "=reason" } } };
+    amount: f("amount", "Where money is owed them and paid: how much."), reason: f("text", "Where it is refused: why."),
+    decision: f("record", "Where it asked for a decision to be looked at again: the decision."), review: f("text", "Where a decision was looked at again: what came of it, in a word (upheld, varied, set aside).") },
+  writes: { kind: "remedy_answer", text: "Answer to your request {request}: {granted}.", basis: "=request", to: ["=asker"], visible: ["=asker", "=self"], data: { request: "=request", matter: "=matter", granted: "?granted", amount: "#amount", reason: "=reason", decision: "=decision", review: "=review" } } };
 
 /** The answer to a body that hears grievances, told of an application against the office (frictions.ts, `Respondent`). */
 const venueAnswer = (form: string, kind: string, title: string): Issued => ({
@@ -199,8 +200,8 @@ export const ELECTORAL: Issued[] = [
 /** The return of tax withheld from wages, in totals (tax.ts writes it with a line for each charge besides: a table, which no form of fields holds). */
 export const FINANCE: Issued[] = [
   { form: "withholding_return", title: "Return of tax withheld from wages, to a collector", does: "Reports to a collector what has been withheld from the wages paid in a period and what is paid over with it. It moves no money: what is paid over is paid besides, by a payment to each collector's account. The office's books count what is withheld and not yet paid over from the day of the last return. The law on tax from pay lists its returns and the day each falls due by; one return reports the charges the law names for it, and the books say which return falls due next.",
-    fields: { collector: f("entity", "The collector reported to.", req), account: f("account", "The account the wages were paid from.", req), period_end: f("date", "The day the period ended.", req), withheld: f("amount", "What was withheld in the period, in all.", req), paid: f("amount", "What is paid over now, in all.", req), law: f("record", "The law it is withheld under: the tax law that lists the return (it names the charges each return reports; report them in that return, not in another).") },
-    writes: { kind: "withholding_report", text: "Withheld from wages, owed: {withheld}; paid now: {paid}.", basis: "=law", to: ["=collector"], visible: ["=self", "=collector"], data: { account: "=account", paid: "#paid", period_end: "=period_end", withheld: "#withheld" } } },
+    fields: { collector: f("entity", "The collector reported to.", req), account: f("account", "The account the wages were paid from.", req), period_end: f("date", "The day the period ended.", req), withheld: f("amount", "What was withheld in the period, in all.", req), paid: f("amount", "What is paid over now, in all.", req), period_from: f("date", "The day the period began."), period_to: f("date", "The day after the period, as the law counts it."), return: f("text", "The return, by the name the tax law gives it."), due: f("date", "The day the return falls due by, as the law says."), law: f("record", "The law it is withheld under: the tax law that lists the return (it names the charges each return reports; report them in that return, not in another).") },
+    writes: { kind: "withholding_report", text: "Withheld from wages, owed: {withheld}; paid now: {paid}.", basis: "=law", to: ["=collector"], visible: ["=self", "=collector"], data: { account: "=account", paid: "#paid", period_end: "=period_end", withheld: "#withheld", period_from: "=period_from", period_to: "=period_to", return: "=return", due: "=due" } } },
 ];
 
 // ------------------------------------------------------------------ papers an office's code makes, handed to an assistant
@@ -426,24 +427,30 @@ export const EDITOR: Issued[] = [
 export const ORDER: Issued = { form: "order", title: "An order to a supplier, paid with the order",
     does: "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting. The seller delivers once an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
     fields: { seller: f("entity", "Whom it is ordered from.", req), kind: f("text", "What is ordered.", req), quantity: f("count", "How many.", req), unit_price: f("amount", "The price of each, as the seller advertises it.", req),
-      deliver_to: f("entity", "Who is to receive them.", req), at: f("structure", "Where they are to be delivered.", req), account: f("account", "The account the order is paid from.", req), retry_of: f("record", "An earlier order this one repeats."), for_days: f("count", "How many days the order may be served over.") },
+      deliver_to: f("entity", "Who is to receive them.", req), at: f("structure", "Where they are to be delivered.", req), account: f("account", "The account the order is paid from.", req), retry_of: f("record", "An earlier order this one repeats."), for_days: f("count", "How many days the order may be served over."),
+      pay_in_days: f("count", "Where it is bought on the seller's terms of trade: the days it is paid within, from delivery.") },
     writes: { kind: "order", text: "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. Paid with this order.", to: ["=seller"], visible: ["=self", "=seller"],
-      data: { kind: "=kind", quantity: "=quantity", unit_price: "#unit_price", deliver_to: "=deliver_to", at: "=at", account: "=account", retry_of: "=retry_of", for_days: "=for_days" } } };
+      data: { kind: "=kind", quantity: "=quantity", unit_price: "#unit_price", deliver_to: "=deliver_to", at: "=at", account: "=account", retry_of: "=retry_of", for_days: "=for_days", pay_in_days: "=pay_in_days" } } };
 
 export const TRADE: Issued[] = [
   ORDER,
   { form: "delivery_note", title: "A delivery note for an order served",
     fields: { order: f("record", "The order.", req), buyer: f("entity", "Who ordered.", req), kind: f("text", "What was ordered.", req), ordered: f("count", "How many were ordered.", req), delivered: f("count", "How many were delivered.", req), refund: f("amount", "What was refunded for those not delivered.", req),
       unit_price: f("amount", "The price charged for each delivered, where it was not the order's own (a price risen since: the money paid bought fewer)."),
-      declined: f("choice", "Where nothing was delivered because the order was not paid for, or the buyer had not paid what it owed on earlier ones.", { options: ["unpaid", "overdue"] }) },
-    writes: { kind: "delivery_note", text: "Delivered: {delivered} of {ordered} {kind} (order {order}).", basis: "=order", to: ["=buyer"], visible: ["=buyer", "=self"], data: { order: "=order", kind: "=kind", ordered: "=ordered", delivered: "=delivered", refund: "#refund", unit_price: "#unit_price", declined: "=declined" } } },
+      declined: f("choice", "Where nothing was delivered because the order was not paid for, or the buyer had not paid what it owed on earlier ones.", { options: ["unpaid", "overdue"] }),
+      price_each: { type: "amount", description: "Where it is sold on terms: the price of each delivered, which what is owed is worked out from.", read: "int(owed) / delivered" },
+      owed: { type: "amount", description: "Where it is sold on terms: what is owed for those delivered.", worked: "delivered * int(price_each)" },
+      pay_in_days: f("count", "Where it is sold on terms: the days it is to be paid within."), pay_to: f("account", "Where it is sold on terms: the account it is to be paid into.") },
+    writes: { kind: "delivery_note", text: "Delivered: {delivered} of {ordered} {kind} (order {order}).", basis: "=order", to: ["=buyer"], visible: ["=buyer", "=self"], data: { order: "=order", kind: "=kind", ordered: "=ordered", delivered: "=delivered", refund: "#refund", unit_price: "#unit_price", declined: "=declined", owed: "#owed", pay_in_days: "=pay_in_days", pay_to: "=pay_to" } } },
   { form: "wage_offer", title: "An answer to a union's wage claim",
     fields: { union: f("entity", "The union that made the claim.", req), claim: f("record", "The claim answered.", req), rise_bps: f("count", "The rise offered, in hundredths of a percent.", req), why: f("text", "Why that much.") },
     writes: { kind: "wage_offer", text: "We offer a rise of {rise_bps} hundredths of a percent, in answer to {claim}.", basis: "=claim", to: ["=union"], visible: ["=self", "=union"], data: { employer: "=self", claim: "=claim", rise_bps: "=rise_bps", why: "=why" } } },
   { form: "export_invoice", title: "An invoice for goods sent to a buyer",
     fields: { buyer: f("entity", "Who is invoiced.", req), offer: f("record", "The buyer's standing offer it is sent under."), kind: f("text", "What was sent.", req), quantity: f("count", "How many.", req), from_at: f("structure", "Where they were sent from.", req),
-      amount: f("amount", "The sum invoiced.", req), account: f("account", "The account it is to be paid into.", req), memo: f("text", "What the payment is for, in a few words.", req) },
-    writes: { kind: "invoice", text: "Invoice: {quantity} {kind}, {amount}.", basis: "=offer", to: ["=buyer"], visible: ["=self", "=buyer"], data: { kind: "=kind", quantity: "=quantity", from_at: "=from_at", outcome: { money: { to: "=account", amount: "=amount", for: "=memo" } } } } },
+      unit_price: { type: "amount", description: "The price of each, which the sum is worked out from.", read: "int(amount) / quantity" },
+      amount: { type: "amount", required: true, description: "The sum invoiced: how many, at the price of each.", worked: "quantity * int(unit_price)" }, account: f("account", "The account it is to be paid into.", req),
+      memo: { type: "text", required: true, role: "words", description: "What the payment is for, in a few words: how many of what, sent.", worked: "string(quantity) + ' ' + kind + ' exported'" } },
+    writes: { kind: "invoice", text: "Invoice: {quantity} {kind} at {unit_price} each, {amount}.", basis: "=offer", to: ["=buyer"], visible: ["=self", "=buyer"], data: { kind: "=kind", quantity: "=quantity", from_at: "=from_at", outcome: { money: { to: "=account", amount: "=amount", for: "=memo" } } } } },
   { form: "crime_report", title: "A report of goods taken, to the police",
     fields: { kind: f("text", "What was taken.", req), quantity: f("count", "How many.", req), at: f("structure", "Where from.", req), value: f("amount", "What it was worth.", req), account: f("account", "The account to be paid into if it is recovered.", req) },
     writes: { sends: [{ to: ["@police"], why: "The police investigate what is reported to them." }], kind: "crime_report", text: "Report: {quantity} {kind} taken from {at}.", to: ["@police"], visible: ["=self", "@police"], data: { kind: "=kind", quantity: "=quantity", at: "=at", value: "#value", account: "=account" } } },
@@ -482,9 +489,10 @@ export const SUPPORT: Issued[] = [
   { form: "benefit_decision", title: "Decision on a claim for support", does: "Says what is decided on a claim, to the claimant. A claim granted on it is paid by the office's staff each period from then, at the sum and for the time the decision gives, while the office's standing order for paying claims is in force; a claim refused on it is not paid. It moves no money by itself.",
     fields: { claim: f("record", "The claim decided.", req), claimant: f("entity", "Who made the claim.", req), payment: f("text", "Which payment of the support law the claim is for, as the claim names it.", req),
       granted: f("choice", "Whether it is granted.", { ...req, options: YES_NO }), reason: f("text", "Why not, where it is refused."),
-      amount: f("amount", "Where granted: the sum paid each period."), every: f("duration", "Where granted: the period it is paid by."), until: f("date", "Where granted for a time: the day the payment ends.") },
+      amount: f("amount", "Where granted: the sum paid each period."), every: f("duration", "Where granted: the period it is paid by."), until: f("date", "Where granted for a time: the day the payment ends."),
+      on_review: f("record", "Where it decides a request to look at a decision again: the request."), replaces: f("record", "Where it replaces an earlier decision: that decision.") },
     writes: { kind: "benefit_decision", text: "Claim {claim}: granted {granted}.", basis: "=claim", to: ["=claimant"], visible: ["=claimant", "=self"],
-      data: { claim: "=claim", payment: "=payment", granted: "?granted", reason: "=reason", amount: "#amount", every: "=every", until: "=until" } } },
+      data: { claim: "=claim", payment: "=payment", granted: "?granted", reason: "=reason", amount: "#amount", every: "=every", until: "=until", on_review: "=on_review", replaces: "=replaces" } } },
 ];
 
 // ------------------------------------------------------------------ the taxpayer's account (world.tax_collector; risk PB-23)
@@ -517,14 +525,15 @@ export const TAX_ACCOUNT_REQUEST: Issued = {
 export const TAX_COLLECTOR: Issued[] = [
   { form: "tax_credit_decision", title: "Decision on a claim for tax paid and not owed", does: "Says what is decided on a taxpayer's claim, to the taxpayer: a refund granted (and how much), a credit that may be set against its next return, or a refusal and why. A refund granted on it is paid by a payment from the collector's account into the account the claim names; it moves no money by itself.",
     fields: { claim: f("record", "The claim decided.", req), taxpayer: f("entity", "Who made the claim.", req), use: f("choice", "What was asked for.", { ...req, options: ["refund", "set_off"] }),
-      granted: f("choice", "Whether it is granted.", { ...req, options: YES_NO }), amount: f("amount", "Where granted: how much."), reason: f("text", "Why not, or why less than was asked.") },
+      granted: f("choice", "Whether it is granted.", { ...req, options: YES_NO }), amount: f("amount", "Where granted: how much."), reason: f("text", "Why not, or why less than was asked."),
+      asked: f("amount", "How much the claim asked for."), on_review: f("record", "Where it decides a request to look at a decision again: the request."), replaces: f("record", "Where it replaces an earlier decision: that decision.") },
     writes: { kind: "tax_credit_decision", text: "Claim {claim}: granted {granted}.", basis: "=claim", to: ["=taxpayer"], visible: ["=taxpayer", "=self"],
-      data: { claim: "=claim", taxpayer: "=taxpayer", use: "=use", granted: "?granted", amount: "#amount", reason: "=reason" } } },
+      data: { claim: "=claim", taxpayer: "=taxpayer", use: "=use", asked: "#asked", granted: "?granted", amount: "#amount", reason: "=reason", on_review: "=on_review", replaces: "=replaces" } } },
   { form: "tax_statement", title: "Statement of a taxpayer's account", does: "Tells a taxpayer how its own account stands: what its returns say was owed, what was received from it, what was repaid, and what is owing or in credit. It changes nothing on the account.",
     fields: { taxpayer: f("entity", "Whose account.", req), owed: f("amount", "Owed on its returns, in all.", req), paid: f("amount", "Received from it, in all.", req), refunded: f("amount", "Repaid to it, in all."),
-      credit: f("amount", "In credit by (nothing: 0)."), outstanding: f("amount", "Owing (nothing: 0).") },
+      credit: f("amount", "In credit by (nothing: 0)."), outstanding: f("amount", "Owing (nothing: 0)."), to_set_off: f("amount", "Of the credit, what is kept to set against its next return."), as_of: f("date", "The day the account stands so.") },
     writes: { kind: "tax_statement", text: "Statement of account: owed {owed}, paid {paid}; in credit {credit}.", to: ["=taxpayer"], visible: ["=taxpayer", "=self"],
-      data: { taxpayer: "=taxpayer", owed: "#owed", paid: "#paid", refunded: "#refunded", credit: "#credit", outstanding: "#outstanding" } } },
+      data: { taxpayer: "=taxpayer", as_of: "=as_of", owed: "#owed", paid: "#paid", refunded: "#refunded", outstanding: "#outstanding", credit: "#credit", to_set_off: "#to_set_off" } } },
 ];
 
 // ------------------------------------------------------------------ a tenant's answer, and a place's own order form
@@ -640,9 +649,10 @@ export const AUDIT_ANSWER: Issued = {
   form: "audit_answer", title: "Answer to the audit office's request for a named item",
   does: "Answers the audit office's public request under the audit law, by the day it gives: the count of your decisions of a kind in a period, one of them by its number with its file, or your payments for the period against the bank's record. Say only what your books show. It does nothing else by itself.",
   fields: { request: f("record", "The request this answers.", req), auditor: f("entity", "The audit office.", req), audit: f("text", "The audit's key, as the request gives it.", req), ask: f("choice", "What was asked for.", { ...req, options: ["count", "nth", "statement"] }),
-    nth: f("count", "For a decision by its number: which."), count: f("count", "For a count: how many."), statement: f("text", "The books' entries asked for, in words.") },
+    nth: f("count", "For a decision by its number: which."), count: f("count", "For a count: how many."), statement: f("text", "The books' entries asked for, in words."),
+    found: f("choice", "For a decision by its number: whether there is one.", { options: YES_NO }), file: f("text", "For a decision by its number: its file, as the books keep it.") },
   writes: { kind: "audit_answer", text: "Answer to audit request {request}: {statement}", basis: "=request", to: ["=auditor"], visible: ["=auditor", "=self"],
-    data: { request: "=request", audit: "=audit", ask: "=ask", nth: "=nth", count: "=count" } },
+    data: { request: "=request", audit: "=audit", ask: "=ask", nth: "=nth", count: "=count", found: "?found", file: "=file", statement: "=statement" } },
 };
 
 export const AUDIT: Issued[] = [
@@ -650,7 +660,7 @@ export const AUDIT: Issued[] = [
     does: "Asks, in public, a body the audit law names for one thing: the count of its decisions of a kind in a period, one of them by its number, or its statement of payments for the period. The body must answer by the day given; asking for more than one thing is more than one request. It examines nothing by itself.",
     fields: { body: f("entity", "The body asked.", req), audit: f("text", "The audit's key (the body, the check and the period).", req), ask: f("choice", "What is asked for.", { ...req, options: ["count", "nth", "statement"] }),
       kind: f("text", "For decisions: the kind of decision."), nth: f("count", "For one decision: its number in the period (from 1)."), begins: f("date", "The period's first day.", req), ends: f("date", "The day the period ends.", req), answer_by: f("date", "The day the body must answer by.", req) },
-    writes: { kind: "audit_request", text: "Audit request: {ask} for the period from {begins} to {ends}. To be answered by {answer_by}.", visible: "public", data: { audit: "=audit", ask: "=ask", kind: "=kind", nth: "=nth", from: "=begins", to: "=ends", answer_by: "=answer_by" } } },
+    writes: { kind: "audit_request", text: "Audit request: {ask} for the period from {begins} to {ends}. To be answered by {answer_by}.", visible: "public", data: { audit: "=audit", body: "=body", ask: "=ask", kind: "=kind", nth: "=nth", from: "=begins", to: "=ends", answer_by: "=answer_by" } } },
   { form: "audit_finding", title: "Audit finding on one item (the audit office's working paper)",
     does: "Records what the examination of one item found, in the law's terms: that the decision agrees or does not agree with the law and the procedure published for its kind, or that it cannot be told from the file. A finding is the audit office's own working paper; the report is what is published. It reverses and fines nothing.",
     fields: { body: f("entity", "The body.", req), audit: f("text", "The audit's key.", req), item: f("record", "The decision or statement examined.", req), nth: f("count", "Its number in the period."), agrees: f("choice", "Whether it agrees with the law.", { options: YES_NO }), says: f("text", "What was found, in the law's terms.", req) },
@@ -659,7 +669,11 @@ export const AUDIT: Issued[] = [
     does: "Publishes what the audit of a body for a period found: how many decisions there were, how many were examined, how many agree with the law and how many do not (with the particulars of each, as the findings give them), or whether the accounts reconcile. It is public, by the law; the council, the bodies that hear complaints and the body audited read it. It reverses and fines nothing: what follows is for people, by the review and appeal the law already gives.",
     fields: { body: f("entity", "The body audited.", req), audit: f("text", "The audit's key.", req), check: f("choice", "What was checked.", { ...req, options: ["decisions", "accounts"] }), period: f("count", "The period's number.", req), begins: f("date", "The period's first day.", req), ends: f("date", "The day it ends.", req),
       population: f("count", "For decisions: how many were made in the period."), sample: f("count", "For decisions: how many were examined."), agreed: f("count", "How many agree with the law."), not_agreed: f("count", "How many do not."), not_checked: f("count", "How many could not be told from the file."),
-      particulars: f("text", "Where any do not agree: each decision and what was found, in the law's terms.") },
+      particulars: f("text", "Where any do not agree: each decision and what was found, in the law's terms."),
+      kind: f("text", "For decisions: the kind of decision."), due: f("date", "The day the body had to answer by."), not_found: f("count", "For decisions: how many asked for could not be found."), not_answered: f("count", "How many requests the body did not answer in time."),
+      disagreements: f("text", "Where any do not agree: each, as the findings give it."), reconciles: f("choice", "For accounts: whether the books and the bank's record agree.", { options: YES_NO }), matched: f("count", "For accounts: payments that agree."),
+      in_books_not_bank: f("text", "For accounts: payments in the books and not in the bank's record."), in_bank_not_books: f("text", "For accounts: payments in the bank's record and not in the books."), differ: f("text", "For accounts: payments that differ in the sum.") },
     writes: { kind: "audit_report", text: "Audit of {body}, {check}, {begins} to {ends}: {population} made, {sample} examined; {agreed} agree with the law, {not_agreed} do not, {not_checked} could not be told from the file. {particulars}", visible: "public",
-      data: { body: "=body", audit: "=audit", check: "=check", period: "#period", from: "=begins", to: "=ends", population: "#population", sample: "#sample", agreed: "#agreed", not_agreed: "#not_agreed", not_checked: "#not_checked" } } },
+      data: { body: "=body", audit: "=audit", check: "=check", kind: "=kind", period: "#period", from: "=begins", to: "=ends", due: "=due", population: "#population", sample: "#sample", agreed: "#agreed", not_agreed: "#not_agreed", not_checked: "#not_checked",
+        not_found: "#not_found", not_answered: "#not_answered", disagreements: "=disagreements", reconciles: "?reconciles", matched: "#matched", in_books_not_bank: "=in_books_not_bank", in_bank_not_books: "=in_bank_not_books", differ: "=differ" } } },
 ];

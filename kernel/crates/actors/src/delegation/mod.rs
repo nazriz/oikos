@@ -19,7 +19,6 @@ use serde_json::Value;
 
 pub mod assistant;
 pub mod beyond;
-pub mod compose;
 pub mod principal;
 pub mod rule;
 

@@ -8,7 +8,7 @@
 
 import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
-import { ASSISTANT_ISSUES, withObstacles, MATTER_KINDS, clientDraft, clientDraftOf, clientPapers, wantPapers, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { ASSISTANT_ISSUES, withObstacles, clientDraft, clientDraftOf, clientPapers, wantPapers, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
 import { COMPOSE_BPS, SCOPE_ANSWER_SECONDS, WRONG_RETURN_BPS } from "./registry";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
@@ -553,6 +553,18 @@ function ownFilled(t: unknown, own: { [name: string]: unknown }): unknown {
  * A form of an office's own stationery (docs/behaviour/office-papers.md), from its module's declaration (`issues`):
  * filled in, it is the paper itself, written as the form says. Seen by the office's organisation alone.
  */
+/** A form as an office's own code reads it (docs/design/broad-seats.md, G2): its blanks with their roles and rules, and
+ * how it writes its paper with the office's own details filled in (`@name`). What a matter handed over as what happened
+ * is read back on, and what its assistant composes on. */
+export function formSpec(x: Issued, own: { [name: string]: unknown }): { form: string; title: string; fields: Issued["fields"]; writes: Issued["writes"] } {
+  const { sends: _s, ...writes } = ownFilled(x.writes, own) as Issued["writes"];
+  return { form: x.form, title: x.title, fields: x.fields, writes: { ...writes, text: writes.text.replace(/\{@([a-z_][a-z0-9_]*)\}/g, (_, name: string) => String(own[name] ?? "")) } };
+}
+
+/** A form's blanks as whoever fills it in is shown them: what each is and asks for (the roles and rules a code office
+ * reads its papers by are its own working, kept off the form). */
+const shownFields = (fields: Issued["fields"]) => Object.fromEntries(Object.entries(fields).map(([k, { role: _r, worked: _w, read: _d, ...f }]) => [k, f]));
+
 export function stationeryForm(office: string, entity: string, x: Issued, own: { [name: string]: unknown }, holder?: string): any {
   const filled = ownFilled(x.writes, own) as Issued["writes"];
   // Whom the form itself sends every paper to, and why: only those this office has (one it lacks is left out), and
@@ -570,8 +582,8 @@ export function stationeryForm(office: string, entity: string, x: Issued, own: {
   return { id: `form-${office}-${x.form}`.replace(/_/g, "-"), record: "statement", author: "genesis", at: 0, visible_to: [entity], speaks_for: entity, kind: "form",
     text: `${x.title}. ${x.does ? `${x.does} ` : ""}${sent ? `${sent} ` : ""}${whose}: filled in, it is issued as the form sets it out.`,
     // (A form that sends a signed copy writes nothing from its fields: the copy is the paper.)
-    data: x.copies ? { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: x.fields, copies: x.copies }
-      : { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: x.fields,
+    data: x.copies ? { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: shownFields(x.fields), copies: x.copies }
+      : { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: shownFields(x.fields),
       writes: { ...writes, text: writes.text.replace(/\{@([a-z_][a-z0-9_]*)\}/g, (_, name: string) => String(own[name] ?? "")) } } };
 }
 
@@ -2814,7 +2826,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         seconds: Object.fromEntries(o.kinds.map((k) => [k, Math.max(1, Math.round((personPaper(k) * o.speed_bps) / 10_000))])), claim_slip_bps: o.claim_slip_bps,
         fee_month: o.fee_month, setup: o.setup, exit: o.exit, notice_days: o.notice_days, term_days: o.term_days, records: o.records,
         // (An organisation's assistant takes the kinds the engine composes as what happened too: docs/design/handing-over.md, H5.)
-        ...(o.for === "organisations" && o.kinds.some((k) => MATTER_KINDS.includes(k)) ? { depths: Object.fromEntries(o.kinds.filter((k) => MATTER_KINDS.includes(k)).sort().map((k) => [k, ["act", "matter"]])) } : {}),
+        // (An organisation's assistant takes every kind as what happened too, composing on its principal's own form for
+        // it: docs/design/broad-seats.md, G2. A kind whose paper does not read back on the principal's form goes as the
+        // finished act, by the principal's own reading.)
+        ...(o.for === "organisations" ? { depths: Object.fromEntries([...o.kinds].sort().map((k) => [k, ["act", "matter"]])) } : {}),
         // (A person's desk takes a want as what the person is after: docs/design/handing-over.md, H4.)
         ...(o.for === "persons" && o.kinds.some((k) => WANT_PAPER[k]) ? { depths: Object.fromEntries(o.kinds.filter((k) => WANT_PAPER[k]).sort().map((k) => [k, ["want"]])) } : {}) })) }));
   }
@@ -3544,7 +3559,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // seat could not name the bank to ask it to pay from it: "You don't know who keeps account acc-factory-1".)
       positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: [...assistantChannels(kinds), ...obstacleChannels(OB), { id: "account", kind: "accounts" }] });
       assistantPosts.push({ post, entity: pos.entity, code: m.code, kinds });
-      Object.assign(m.params, { delegation: { post, account: `acc-${pos.entity}`, hour_value: hourValue,
+      // (Its own form for each kind it may hand over, with its own details: what its matters are read back on and
+      // composed on. docs/design/broad-seats.md, G2.)
+      const own = modules[m.code]?.issuesWith?.(m.params) ?? {};
+      const forms = Object.fromEntries(kinds.flatMap((k) => { const x = [...(modules[m.code]?.issues ?? []), ...(modules[m.code]?.handsOver ?? [])].find((i: any) => i.writes.kind === k); return x ? [[k, formSpec(x, own)]] : []; }));
+      Object.assign(m.params, { delegation: { post, account: `acc-${pos.entity}`, hour_value: hourValue, ...(Object.keys(forms).length ? { forms } : {}),
         kinds: Object.fromEntries(kinds.map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost, compose_seconds: composeOf(k) }])),
         seconds: { referral: rows["publish/referral"], sign_off: rows["publish/sign_off"], go_ahead: rows["publish/go_ahead"] },
         finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
@@ -3561,6 +3580,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     if (mandate && towns.length) {
       mandate.data = { ...mandate.data, positions: [...mandate.data.positions, ...towns.map((p) => p!.id)] };
       mandate.text += ` By a later resolution, the ${towns.map((p) => p!.title.toLowerCase()).join(" and the ")} may also instruct payments from it, for a service the office has engaged.`;
+    }
+    // (A payment goes with the papers it is part of, to whoever the office hands them to: docs/design/broad-seats.md, G1.
+    // So the mandate names each town office's assistant's post too, for the payments that go with its papers: the
+    // finance office's return goes with the tax it reports. A simplification: in life the office would lodge the change
+    // of mandate itself when it hands such papers over (design H1), which is not built; risk MT-28.)
+    const helpers = assistantPosts.filter((a) => a.entity === "city" && !mandate?.data.positions.includes(a.post));
+    if (mandate && helpers.length) {
+      mandate.data = { ...mandate.data, positions: [...mandate.data.positions, ...helpers.map((a) => a.post)] };
+      mandate.text += ` The assistant's post of each office named may instruct the payments that go with the papers the office hands it.`;
     }
   }
   if (AS && spec.assistant_seats?.length) {
@@ -3701,7 +3729,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // papers of delegation, played by the assistant's code unless a study seats a model in it.)
     // (Two offers of one system, a paid tier and a free one, are one kind of system: the first offer's.)
     ...(AS ? AS.providers.flatMap((pr) => pr.offers.filter((o, i) => pr.offers.findIndex((x) => x.template === o.template) === i).map((o) => ({ id: o.template, kind: "system", title: o.title, supplier: pr.id,
-      does: [...papersOf(o.kinds).map((kind) => ({ block: "publish", kind, seconds: Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000)) })),
+      // (An organisation's assistant also writes the payment instructions that go with the papers it is handed: the tax
+      // with a return. docs/design/broad-seats.md, G1: until then a payment always stayed with the principal.)
+      does: [...[...papersOf(o.kinds), ...(o.for === "organisations" ? ["request"] : [])].map((kind) => ({ block: "publish", kind, seconds: Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000)) })),
         ...ASSISTANT_PAPERS.map((kind) => ({ block: "publish", kind, seconds: ASSISTANT_PAPER_SECONDS })), { block: "withdraw", seconds: ASSISTANT_PAPER_SECONDS }, { block: "message", seconds: ASSISTANT_PAPER_SECONDS }],
       hours: MACHINE_HOURS, ...(HOST ? { runs_on: HOST.runsOn } : {}), ...(spec.assistant_seats?.includes(o.template) ? assistantSeat(pr, o) : { controller: code("assistant"), framing: unstated }) }))) : []),
     ...["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated })),

@@ -119,7 +119,10 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
       ["a sum in its smallest unit", /\b(?:amount|fee(?: month)?|price|paid|withheld|cost|balance|rent|wage|setup|exit): -?[0-9]/i], ["the platform's words", /\b(?:translators?|kernel|resolver|channels?|blocks?)\b/i],
       // (And, since 2026-11-10, nothing a model could copy as it stands, no terms paper as a list of its details, no
       // stiff stored label: a 7B model wrote "Write to Name (id)", and read "claim slip: 1%; ...; references: 0".)
-      ["a placeholder to copy", /Name \(id\)/], ["a terms paper as a list of its details", /claim slip: |references: [0-9]|fee month: /], ["a stored label", /\bfrom at\b/]] as const) {
+      ["a placeholder to copy", /Name \(id\)/], ["a terms paper as a list of its details", /claim slip: |references: [0-9]|fee month: /], ["a stored label", /\bfrom at\b/],
+      // (Since 2026-11-11, docs/design/broad-seats.md G2: a day something falls due is a day, never a time of day, and
+      // several papers' details are not brackets inside brackets.)
+      ["a due day with a time of day", /\bdue(?: by)?: [^;)\n]*, [0-9]{2}:[0-9]{2}/], ["brackets inside brackets", /\(\(/]] as const) {
       const at = told.search(never);
       expect(at, `a seat was shown ${what}: …${told.slice(Math.max(0, at - 120), at + 120)}…`).toBe(-1);
     }

@@ -32,6 +32,10 @@
           "required": true,
           "type": "text"
         },
+        "pay_in_days": {
+          "description": "Where it is bought on the seller's terms of trade: the days it is paid within, from delivery.",
+          "type": "count"
+        },
         "quantity": {
           "description": "How many.",
           "required": true,
@@ -61,6 +65,7 @@
           "deliver_to": "=deliver_to",
           "for_days": "=for_days",
           "kind": "=kind",
+          "pay_in_days": "=pay_in_days",
           "quantity": "=quantity",
           "retry_of": "=retry_of",
           "unit_price": "#unit_price"
@@ -88,6 +93,10 @@
           "required": true,
           "type": "entity"
         },
+        "decision": {
+          "description": "Where it asked for a decision to be looked at again: the decision.",
+          "type": "record"
+        },
         "granted": {
           "description": "Whether it will be put right.",
           "options": [
@@ -110,6 +119,10 @@
           "description": "The request answered.",
           "required": true,
           "type": "record"
+        },
+        "review": {
+          "description": "Where a decision was looked at again: what came of it, in a word (upheld, varied, set aside).",
+          "type": "text"
         }
       },
       "form": "remedy_answer",
@@ -118,10 +131,12 @@
         "basis": "=request",
         "data": {
           "amount": "#amount",
+          "decision": "=decision",
           "granted": "?granted",
           "matter": "=matter",
           "reason": "=reason",
-          "request": "=request"
+          "request": "=request",
+          "review": "=review"
         },
         "kind": "remedy_answer",
         "text": "Answer to your request {request}: {granted}.",

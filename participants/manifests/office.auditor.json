@@ -55,6 +55,7 @@
           "answer_by": "=answer_by",
           "ask": "=ask",
           "audit": "=audit",
+          "body": "=body",
           "from": "=begins",
           "kind": "=kind",
           "nth": "=nth",
@@ -150,17 +151,53 @@
           "required": true,
           "type": "choice"
         },
+        "differ": {
+          "description": "For accounts: payments that differ in the sum.",
+          "type": "text"
+        },
+        "disagreements": {
+          "description": "Where any do not agree: each, as the findings give it.",
+          "type": "text"
+        },
+        "due": {
+          "description": "The day the body had to answer by.",
+          "type": "date"
+        },
         "ends": {
           "description": "The day it ends.",
           "required": true,
           "type": "date"
         },
+        "in_bank_not_books": {
+          "description": "For accounts: payments in the bank's record and not in the books.",
+          "type": "text"
+        },
+        "in_books_not_bank": {
+          "description": "For accounts: payments in the books and not in the bank's record.",
+          "type": "text"
+        },
+        "kind": {
+          "description": "For decisions: the kind of decision.",
+          "type": "text"
+        },
+        "matched": {
+          "description": "For accounts: payments that agree.",
+          "type": "count"
+        },
         "not_agreed": {
           "description": "How many do not.",
           "type": "count"
         },
+        "not_answered": {
+          "description": "How many requests the body did not answer in time.",
+          "type": "count"
+        },
         "not_checked": {
           "description": "How many could not be told from the file.",
+          "type": "count"
+        },
+        "not_found": {
+          "description": "For decisions: how many asked for could not be found.",
           "type": "count"
         },
         "particulars": {
@@ -176,6 +213,14 @@
           "description": "For decisions: how many were made in the period.",
           "type": "count"
         },
+        "reconciles": {
+          "description": "For accounts: whether the books and the bank's record agree.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
+        },
         "sample": {
           "description": "For decisions: how many were examined.",
           "type": "count"
@@ -189,11 +234,21 @@
           "audit": "=audit",
           "body": "=body",
           "check": "=check",
+          "differ": "=differ",
+          "disagreements": "=disagreements",
+          "due": "=due",
           "from": "=begins",
+          "in_bank_not_books": "=in_bank_not_books",
+          "in_books_not_bank": "=in_books_not_bank",
+          "kind": "=kind",
+          "matched": "#matched",
           "not_agreed": "#not_agreed",
+          "not_answered": "#not_answered",
           "not_checked": "#not_checked",
+          "not_found": "#not_found",
           "period": "#period",
           "population": "#population",
+          "reconciles": "?reconciles",
           "sample": "#sample",
           "to": "=ends"
         },

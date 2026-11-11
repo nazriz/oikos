@@ -87,11 +87,21 @@ pub struct FormField {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub options: Vec<String>,
     pub description: String,
+    /// Its role in a matter handed over as what happened (`fact`, `decided`, `worked`, `words`), where the form says;
+    /// otherwise as `form_papers::role` reads it (docs/design/broad-seats.md, G2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    /// How it is worked out from the other blanks: a rule in the law reader's terms (integers and words only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worked: Option<String>,
+    /// For a blank the paper does not show: how it is read from the others (the price of each behind a sum).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read: Option<String>,
 }
 
 impl FormField {
     pub fn new(type_: &str, description: &str) -> Self {
-        FormField { type_: type_.into(), required: false, options: vec![], description: description.into() }
+        FormField { type_: type_.into(), required: false, options: vec![], description: description.into(), role: None, worked: None, read: None }
     }
     pub fn required(mut self) -> Self {
         self.required = true;

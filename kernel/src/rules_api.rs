@@ -63,6 +63,14 @@ pub const RULES: &[(&str, Rule, &str)] = &[
         "{law: PlanLaw, plan_months}: papers.ts possessionOrderFor",
     ),
     (
+        "forms.read_back",
+        |a| {
+            let paper: serde_json::Map<String, Value> = arg(a, "paper")?;
+            to(oikos_rules::form_papers::read_back(a.get("spec").unwrap_or(&Value::Null), &paper, &arg::<String>(a, "me")?, arg(a, "now")?))
+        },
+        "{spec, paper, me, now}: the blanks a paper was written with on a form, or null (docs/design/broad-seats.md, G2)",
+    ),
+    (
         "forms.staffing_own",
         |a| {
             let s = |k: &str| a.get(k).and_then(Value::as_str);

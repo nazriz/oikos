@@ -1470,7 +1470,20 @@ impl Resolver<'_> {
             if let Some(r) = bind {
                 block.insert("ref".into(), json!(r));
             }
-            return Ok(vec![Json::Object(block)]);
+            // (The payments the signed copy carries go with it, in the same act, citing what signed them: a matter is the
+            // paperwork of its act, and the sign-off covered both. docs/design/broad-seats.md, G1. Payments only: an
+            // instruction to a keeper, nothing else.)
+            let mut out = vec![Json::Object(block)];
+            if let Some(with) = paper.get("with").and_then(Json::as_str) {
+                let Ok(Program::Lines(lines)) = calls::parse_program(with) else { return ask("The signed copy's payment could not be read: draft it again.") };
+                for l in lines.iter().filter(|l| l.call.fn_ == "money") {
+                    let mut call = l.call.clone();
+                    call.args.retain(|(k, _)| k != "basis");
+                    call.args.push(("basis".into(), Value::Id(id.clone())));
+                    out.extend(self.money(&call, None)?);
+                }
+            }
+            return Ok(out);
         }
         // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement
         // the rest of the world reads. It does not cite the form.
@@ -1581,25 +1594,7 @@ fn not_an_id(x: &str, what: &str) -> String {
     }
 }
 
-/// A length of time in words, as people say one: whole days where it is whole days ("14 days", "1 day"); else whole
-/// hours ("8 hours"); else hours and minutes ("1 hour 30 minutes", "45 minutes"); seconds only where nothing rounder
-/// fits. (The participants' forms write the same: `durationWords`.)
-pub fn duration_words(seconds: i64) -> String {
-    let n = |x: i64, word: &str| if x == 1 { format!("1 {word}") } else { format!("{x} {word}s") };
-    if seconds % 86_400 == 0 {
-        return n(seconds / 86_400, "day");
-    }
-    if seconds < 0 {
-        return n(seconds, "second");
-    }
-    if seconds % 3_600 == 0 {
-        return n(seconds / 3_600, "hour");
-    }
-    if seconds % 60 == 0 {
-        return if seconds > 3_600 { format!("{} {}", n(seconds / 3_600, "hour"), n((seconds % 3_600) / 60, "minute")) } else { n(seconds / 60, "minute") };
-    }
-    n(seconds, "second")
-}
+pub use oikos_rules::form_papers::duration_words;
 
 /// Seconds as whole days, to the nearest (half a day and over rounds up; a negative span mirrors it). Exact integers:
 /// no floating point anywhere results depend on it (until 2026-10-05 this was a float division, rounded; the same

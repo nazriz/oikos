@@ -100,6 +100,10 @@
           "required": true,
           "type": "text"
         },
+        "pay_in_days": {
+          "description": "Where it is bought on the seller's terms of trade: the days it is paid within, from delivery.",
+          "type": "count"
+        },
         "quantity": {
           "description": "How many.",
           "required": true,
@@ -129,6 +133,7 @@
           "deliver_to": "=deliver_to",
           "for_days": "=for_days",
           "kind": "=kind",
+          "pay_in_days": "=pay_in_days",
           "quantity": "=quantity",
           "retry_of": "=retry_of",
           "unit_price": "#unit_price"

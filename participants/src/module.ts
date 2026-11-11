@@ -173,6 +173,13 @@ export interface FormField {
   required?: boolean;
   options?: string[];
   description: string;
+  /** Its role in a matter handed over as what happened (docs/design/broad-seats.md, G2): `fact`, `decided`, `worked` or
+   * `words`; absent, as its type and its place in the paper say (kernel/crates/rules/src/form_papers.rs, `role`). */
+  role?: "fact" | "decided" | "worked" | "words";
+  /** How it is worked out from the other blanks: a rule in the law reader's terms (integers and words only). */
+  worked?: string;
+  /** For a blank the paper does not show: how it is read from the others (the price of each behind a sum). */
+  read?: string;
 }
 
 /**

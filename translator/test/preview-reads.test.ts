@@ -72,7 +72,8 @@ test("the papers a seat is shown read the same way: no smallest units, seconds o
   const onFile = renderStanding(obs, new Set(["laws"]));
   // (In words: each detail by its name, what is inside one in brackets after it; never the store's notation.)
   expect(onFile).toContain("(figures: (notice: 60 days; review: 360 days))");
-  expect(onFile).toContain("(brackets: ((from: £0.00; rate: 0%); (from: £12,570.00; rate: 20%)); levy: 8%; levy from: £12,570.00; rate: 0.5959%; due days: 30; instalments: 4)");
+  // (A list of details each with details of its own, numbered in turn: not brackets inside brackets, since 2026-11-11.)
+  expect(onFile).toContain("(brackets: 1. from: £0.00, rate: 0%; 2. from: £12,570.00, rate: 20%; levy: 8%; levy from: £12,570.00; rate: 0.5959%; due days: 30; instalments: 4)");
   expect(onFile).toContain("(prices: (apartments: £3,205,536.00; park: £61,086.00); demolition: (park: £2,072.40); min order: 100)");
   for (const raw of ["5184000", "rate_bps", "320553600", "rate_ppm", '"value"', '{"']) expect(onFile).not.toContain(raw);
   // As they come, and in a list: a ballot's closing, a benefit's amount and period.

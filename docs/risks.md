@@ -1717,7 +1717,7 @@ The mechanism:
   (the price list); `offices/treasury.rs` (the levy in chunks of 15, `ours`); `worlds/generator/generate.ts` (principals' kinds).
 - **Effect:** A firm's assistant is never handed purchasing, pricing or payments, which in a real office are much of the
   work; volume stays lower than a real service's.
-- **L / I:** high / medium · **Status:** open (2026-11-10)
+- **L / I:** high / medium · **Status:** open (2026-11-10); parting by variables replaced 2026-11-11 (docs/design/broad-seats.md, G1): an act's paperwork goes as one matter, a payment with the papers of its act (an order paid with the order, the tax with a return), to the assistant, whose system now writes payment instructions and whose post (for a town office) is on the town's mandate (a simplification of H1's mandate the office would lodge). Still open: claims recorded stay the principal's (the keeper's act), price lists and payments are not in the offers (G3), and the rates post's `ours` by position.
 - **Notice by:** the screen's "kept" column; a kind added to an offer whose acts are parted.
 - **Fix when:** `route` keeps together a withdrawal with what supersedes it and a payment with what it pays for (by a
   link the act states, not a guess), and a principal's kinds may be calls priced by the table's row for what they make;
@@ -1783,6 +1783,20 @@ The mechanism:
   the stationery's `to`), if a seat is seen reading the other's drafts.
 - **Notice by:** a seat's papers citing a referral under another agreement; `oikos-kernel delegation` rows of
   `not_handed` at an organisation with two principals.
+
+### MT-33 · The environment office advertises without the number of openings its form writes
+- **Gap:** The form-fit law (docs/design/broad-seats.md, G2) holds that an office's forms can write every paper its own
+  code writes. The environment office's job postings carry no `openings` in their data, which the job advertisement
+  form writes (every other office's postings do), so they do not read back on the form.
+- **Where:** the environment office's posting (`city.environment`); `participants/src/shared/papers.ts`
+  (`job_advertisement`); the census in `orchestrator/test/office-papers-run.test.ts`, which lists it as the one known
+  exception.
+- **Effect:** A matter of the environment office's postings would go as the finished act, not as what happened; a model
+  holding the office writes postings with the openings, the code without. No study seats it.
+- **L / I:** high / low · **Status:** open (2026-11-11)
+- **Fix when:** with the next change that moves every town's hash (the working-hours law): the code writes `openings`,
+  and the census's exception goes.
+- **Notice by:** the census.
 
 ### MT-32 · The obstacle levels rest on placeholder rates
 - **Gap:** The friction factor's levels (docs/design/obstacles.md section 6) are set by figures no source gives yet:

@@ -1,4 +1,4 @@
-// Offices held by a seat do their paperwork on their own forms, in a run (docs/behaviour/office-papers.md;
+// Offices held by a seat do their paperwork on their own forms, in a run, and the code's own papers fit them (docs/behaviour/office-papers.md;
 // docs/design/call-language-gaps.md B.6). A town with more deaths than life, whose works office has still to take its
 // crew on, with the registrar, the works manager, a landlord and the lender each handed to the mock (the office's own
 // code as its brain, saying each paper as a seat would: on the office's form for it). Every typed paper those offices
@@ -10,7 +10,8 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { modules } from "@oikos/participants";
-import { generate } from "@oikos/worlds/generator/generate";
+import { formSpec, generate } from "@oikos/worlds/generator/generate";
+import { readBack } from "@oikos/worlds/generator/rules";
 import { runWorld } from "../src/run";
 import { officesBy } from "./lib/offices";
 
@@ -47,6 +48,24 @@ test("seats in the registry, the works office, a letting office and the lender i
     }
   }
   expect(plain).toEqual([]);
+
+  // The form-fit law (docs/design/broad-seats.md, G2): an office's forms can write every paper its own code writes. Each
+  // paper a code office made of a kind it has a form for reads back on that form, its own details filled in: so a matter
+  // of it can be handed over as what happened, and a model holding the office can write what the code writes.
+  const misfits: string[] = [];
+  for (const r of records.filter((x) => x.record === "statement" && x.in_position && !SEATS.includes(x.in_position))) {
+    const pos = config.positions.find((p: any) => p.id === r.in_position);
+    const m = modules[pos?.role_module?.code ?? ""];
+    const forms = [...(m?.issues ?? []), ...(m?.handsOver ?? [])].filter((x) => x.writes.kind === r.kind);
+    if (!forms.length) continue;
+    const own = m!.issuesWith?.(pos.role_module.params) ?? {};
+    const paper = Object.fromEntries(["kind", "text", "addressed_to", "visible_to", "basis", "data", "offer", "assertion"].filter((k) => r[k] !== undefined).map((k) => [k, r[k]]));
+    if (!forms.some((x) => readBack(formSpec(x, own), paper, r.speaks_for, r.at))) misfits.push(`${pos.role_module.code}: ${r.kind}`);
+  }
+  // (One known: the environment office's code advertises without the number of openings its form writes, a fault of
+  // the code's, to be put right with the next change that moves every town (risk MT-33); its postings go as the
+  // finished act meanwhile.)
+  expect([...new Set(misfits)]).toEqual(["city.environment: job_posting"]);
 
   // The registrar: each death that was reported is in the register, entered on the form, with the land applied for.
   const died = events.filter((e) => e.event === "person_died").map((e) => e.person as string);

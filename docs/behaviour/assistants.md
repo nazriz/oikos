@@ -64,6 +64,38 @@ kind over (`kernel/crates/actors/src/delegation/principal.rs`):
   delegated, and it does the act itself). Its own code hears of the act when the assistant reports it done (with what the
   assistant's act made), or when it does the matter itself after all (a draft it declined, a matter reported not done, a
   service that ended with the matter open).
+- **A matter is the paperwork of its act** (docs/design/broad-seats.md, G1, 2026-11-11). A withdrawal goes with the
+  paper that replaces what it withdraws, and a payment with the papers of its act (the tax with the return that reports
+  it, a fee with an application, an order paid with the order), to the assistant, who makes it from the account the
+  principal pays from. The body's part of the act stays with the principal and it says so in the referral: goods moved,
+  work, and an entry in a register of its own (a claim recorded), which is the keeper's act of authority, not paperwork
+  sent. Where the act also has papers the principal keeps, a payment stays with it, since which paper it goes with cannot
+  be told. Until 2026-11-11 a payment always stayed with the principal ("we do the payment that goes with it
+  ourselves", the scope pilot's W5), and an order paid with the order would reach the seller after its money (MT-28).
+  The town's mandate to its bank names each town office's assistant's post for these payments (a simplification: the
+  office lodging the change of mandate itself, design H1, is not built). At `draft`, a seat drafts the paper on its
+  principal's form; the principal's sign-off covers the payments too, and its signed copy carries them (`with`), so that
+  sending the signed copy makes them in the same act, each citing the sign-off. The referral and the sign-off say so in
+  words. The reader counts such a payment `within` its matter; one a seat makes of its own is sorted as any act.
+- **What happened, read back on its own form** (docs/design/broad-seats.md, G2, 2026-11-11). Where its remit hands a
+  kind over as what happened (`matter`), the principal reads each paper of the act back on its own form for the kind
+  (its parameters' `forms`: the form its stationery has, its own details filled in; `oikos_rules::form_papers::
+  read_back`), and gives the blanks: every blank but the writer's words and those the form works out by a rule of its
+  own (`worked`, in the law reader's terms: what is owed is what was delivered at the price of each), where the rule
+  gives what its own paper has. Where it does not, the principal gives that figure itself. **A decided blank (a price, a
+  sum, a rise, a finding: a figure, a count or a choice) is the principal's decision, and it hands that decision over
+  with the matter: the assistant writes the paper up, it does not decide it.** What is the assistant's at this depth is
+  the words, when to send, which records to look up, what to follow up, and whether to keep within its remit. A matter
+  of several papers (a rates instalment's notices) gives each paper's blanks. A paper that does not read back on its
+  form, or an act with a line that is not a paper (a payment), goes as the finished act. The code assistant fills the
+  same form through the same writer as a model's draft on it (`form_papers::compose`), each blank as given, those the
+  form works out by its rules, the words as the form puts them. A draft is read back on the same form and checked on
+  every blank but the words (`form_papers::differs`); a decline names each blank that differs as the form describes it.
+  Until 2026-11-11 only invoices and delivery notes could go so, each by a rule of its own (`compose.rs`, gone).
+- **The form-fit law:** an office's forms can write every paper its own code writes, with its own details filled in
+  (`orchestrator/test/office-papers-run.test.ts`, on a town's run). Ten forms that did not (an order or a delivery note
+  on terms, the return of tax withheld, the audit office's papers and the answers to them, the support office's
+  decisions and answers, the collector's statements and decisions) were completed with the blanks their code writes.
 - **What comes back**, dealt with in its own time when its own code waits: a draft read whole (if it is not what was
   asked, the principal finds it unless its reading slips: the person's row `publish/sign_off` in the table of slips) and
   signed off or declined; a request to go ahead answered; a report taken in; advice set beside what it did.
@@ -249,18 +281,18 @@ procedure.) Both come to the seat with its matters, and stay in its file, where 
 later. Before, a request only brought the review forward, nothing answered it, and a letter was never answered: the
 scope pilot. Test: `a_request_is_answered_part_by_part_and_a_letter_is_acknowledged`.
 
-**What happened, not the finished act** (2026-11-10, `delegation/compose.rs`). A remit names a depth beside its level:
-`act` (the finished act, as before) or `matter` (what happened). Where its service takes a kind as what happened (the
-offer's `depths`: an organisation's invoices and delivery notes), a principal hands those over so: its referral sets out
-the facts (the goods, how many, from where, to whom, the unit price, the account; for a delivery note the order, what was
-ordered and delivered, the refund, the terms, where they went) and not the paper: what it comes to and what is owed are
-the assistant's to work out. Its own code's act stays with it, on record, and a draft is read against it on the kind's
-material details and whom it goes to, never its words; a draft that differs is declined, the detail named. The code
-assistant works the paper out by the same reckoning the principal's code uses; a model is shown the facts. Since the
-composing is the assistant's, the principal's rule does not count it as its own time at that depth. A withdrawal in the
-same act goes with the paper (a price list and the one it replaces are one matter). Test:
-`a_matter_handed_over_as_what_happened_carries_its_facts_and_its_draft_is_read_on_its_material_details`,
-`handed_what_happened_it_composes_the_paper_from_the_facts`.
+**What happened, not the finished act** (2026-11-10; read back on the principal's own form since 2026-11-11, G2: see
+"What happened, read back on its own form" above). A remit names a depth beside its level: `act` (the finished act, as
+before) or `matter` (what happened). Where its service takes a kind as what happened (the offer's `depths`: every kind an
+organisation's offer takes), a principal hands those over so: its referral sets out the blanks of its own form for the
+paper, not the paper; what its form works out (what an invoice comes to, what is owed on a delivery note) is the
+assistant's to work out. Its own code's act stays with it, on record, and a draft is read against it on every blank but
+the words; a draft that differs is declined, each blank named. Since the composing is the assistant's, the principal's
+rule does not count it as its own time at that depth. A withdrawal in the same act goes with the paper (a price list and
+the one it replaces are one matter). Tests:
+`a_matter_handed_over_as_what_happened_carries_its_facts_read_back_on_its_form_and_its_draft_is_read_on_them`,
+`handed_what_happened_it_fills_its_principals_form_from_the_blanks_given`; the reading back itself,
+`kernel/crates/rules/src/form_papers.rs` (every form in the catalogue).
 
 **Composing a finished act is the principal's time** (2026-11-10). A referral that hands over the finished act carries
 it (`carries=<kind>`, contracts: Publish `carries`) and is priced with that kind's `compose/<kind>` row: half the paper's

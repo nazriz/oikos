@@ -359,7 +359,7 @@ impl Plan for Assisting {
             let calls = match (&x.calls, &x.facts) {
                 _ if x.depth == Depth::Want => self.clerk(&x, &m, pic.t, cx).map(|c| c.0).unwrap_or_default(),
                 (Some(c), _) => c.clone(),
-                (None, Some(f)) => super::compose::compose(&x.kind, f, &m.client, &|n| crate::common::money_words(n, &cx.ctx.world)).unwrap_or_default(),
+                (None, Some(f)) => composed(f, &m.client, pic.t, &cx.ctx.world).unwrap_or_default(),
                 _ => String::new(),
             };
             if m.stop.contains(&x.kind) {
@@ -529,3 +529,44 @@ impl Plan for Assisting {
         }
     }
 }
+
+/// The papers of a matter handed over as what happened, written on its principal's own forms from what it gave
+/// (docs/design/broad-seats.md, G2): each paper's blanks given, the blanks its form works out by its rules, the words as
+/// its form puts them, in the name of whom it works for (`me`). The same forms, through the same writer, as a model's
+/// draft on them; the call it sends, each paper under the name its principal's code gave it. An error: a form that
+/// cannot be filled from what was given.
+fn composed(facts: &Value, me: &str, t: i64, world: &crate::WorldInfo) -> Result<String, String> {
+    let forms = facts["composed_on"].as_array().ok_or("no forms")?;
+    let papers: Vec<&Value> = match facts["papers"].as_array() {
+        Some(ps) => ps.iter().collect(),
+        None => vec![facts],
+    };
+    let dated = world.calendar.clone().map(|c| oikos_rules::calendar::Dated { calendar: Some(c), style: world.date_style.clone().unwrap_or_default() });
+    let money = |s: &str| s.parse::<i64>().map(|n| crate::common::money_words(n, world)).map_err(|_| format!("{s} is not a sum"));
+    let mut lines = vec![];
+    for (i, p) in papers.iter().enumerate() {
+        let form = forms.get(i).ok_or("a paper with no form")?;
+        let mut given = p.as_object().cloned().unwrap_or_default();
+        given.remove("composed_on");
+        let made = oikos_rules::form_papers::compose(&form["spec"], &given, me, t, &money, dated.as_ref())?;
+        let list = |k: &str| -> Option<Vec<String>> { made.get(k).and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()) };
+        let visible = match made.get("visible_to") {
+            Some(Value::String(s)) if s == "public" => Some(Visible::Public),
+            _ => list("visible_to").map(Visible::Only),
+        };
+        let mut extra = vec![];
+        for k in ["offer", "assertion"] {
+            if let Some(v) = made.get(k) {
+                extra.push((if k == "offer" { "offer" } else { "assertion" }, v.clone()));
+            }
+        }
+        let call = say(
+            made["kind"].as_str().unwrap_or_default(),
+            made["text"].as_str().unwrap_or_default(),
+            Say { to: list("addressed_to"), visible, basis: made.get("basis").and_then(Value::as_str).map(String::from), data: made.get("data").cloned(), extra, ..Default::default() },
+        );
+        lines.push(Line { bind: form["bind"].as_str().map(String::from), call });
+    }
+    Ok(oikos_sight::calls::program_text(&Program::Lines(lines)))
+}
+

@@ -71,6 +71,11 @@ pub struct Params {
     /// A delegation it has already decided on, by hand (`Commit`): absent, its rule decides everything.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub commit: Option<Commit>,
+    /// Its own form for each kind it may hand over, as its stationery has it (`fields` and `writes`, its own details
+    /// filled in): what a matter's facts are read back on, and what its assistant composes on (docs/design/broad-seats.md,
+    /// G2). A kind with none goes as the finished act.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub forms: BTreeMap<String, Value>,
 }
 
 /// A delegation decided by hand before its rule weighs anything (a study's design, or an owner's earlier choice, written
@@ -332,7 +337,7 @@ impl Actor for Delegating {
                         s.count(&k, pic.t);
                     }
                 }
-                let routed = s.route(&program);
+                let routed = s.route(&program, pic.t);
                 // (A want handed over is never an act of the world's: one its remit no longer hands over, a remit come
                 // since its code chose the way, is dropped, and its code hears it done; the want stays its own.)
                 if routed.is_none() && has_wants(&program) {
@@ -340,7 +345,9 @@ impl Actor for Delegating {
                 }
                 if let Some((agreement, level, handed, own, facts)) = routed {
                     let text = program_text(&handed);
-                    let kind = kinds_of(&handed).first().cloned().unwrap_or_default();
+                    // (The matter is of the kind of the papers it carries, not of a payment that goes with them.)
+                    let ks = kinds_of(&handed);
+                    let kind = ks.iter().find(|k| k.as_str() != "money").or(ks.first()).cloned().unwrap_or_default();
                     if level == Level::Advice {
                         // (It does it itself, and asks what the assistant would have done.)
                         s.ask_advice(&agreement, &kind, &text, cx);
@@ -567,7 +574,7 @@ impl State {
                 return;
             }
             self.waited(&m.kind, &m.agreement, t - r.at);
-            let differs = if m.facts.is_some() { matter_differs(&m, &x) } else { vec![] };
+            let differs = if m.facts.is_some() { matter_differs(&m, &x, &self.me, r.at) } else { vec![] };
             let wrong = if m.facts.is_some() {
                 !differs.is_empty()
             } else {
@@ -580,7 +587,7 @@ impl State {
             let missed = wrong && slip(cx, "publish/sign_off", &r.id, &SlipOptions::default());
             if wrong && !missed {
                 self.seen.entry(Self::key(&m.agreement, &m.kind)).or_default().saw(true, &r.id);
-                let found = if differs.is_empty() { "The draft is not what was asked for.".to_string() } else { format!("The draft is not as we have it: {}.", differs.iter().map(|f| f.replace('_', " ").replace('.', " ")).collect::<Vec<_>>().join(", ")) };
+                let found = if differs.is_empty() { "The draft is not what was asked for.".to_string() } else { format!("The draft is not as we have it: {}.", differs.join("; ")) };
                 let d = Declined { of: r.id.to_string(), referral: x.referral.clone(), found: Some(found.clone()) };
                 self.paper(Declined::KIND, &format!("Draft {} declined. {found} We will do it ourselves.", r.id), &m.agreement, &r.id, papers::data(&d), Then::Plain);
                 self.myself(&action, &m, "We declined the draft: doing it ourselves.");
@@ -590,11 +597,8 @@ impl State {
                 // as it stands on its form for that, `send_signed`. Before 2026-11-10 a seat had to write the paper out
                 // again on the direct form, and read that as beyond a draft-level remit: the scope pilot's one clean
                 // request, and round 5's factory seat.)
-                let paper = x.paper.as_ref().map(|p| signed_copy(p, crate::common::text(r)));
-                let words = match paper {
-                    Some(_) => format!("Draft {} read and signed off. Send it as it stands: this is the signed copy.", r.id),
-                    None => format!("Draft {} read and signed off: send it as it stands.", r.id),
-                };
+                let paper = x.paper.as_ref().map(|p| with_instructions(signed_copy(p, crate::common::text(r)), &m.program));
+                let words = signed_words(&r.id, paper.as_ref());
                 let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
                 self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
             }
@@ -854,7 +858,7 @@ impl State {
     /// Where an act goes: the lines of kinds handed over under the service in use (every one at a level that hands it
     /// over, the strictest of them), and the rest, which it does itself in the same act. None where nothing is handed
     /// over, or where a line of one part names what a line of the other makes (the act cannot be parted).
-    fn route(&self, program: &Program) -> Option<(String, Level, Program, Program, Option<Value>)> {
+    fn route(&self, program: &Program, t: i64) -> Option<(String, Level, Program, Program, Option<Value>)> {
         let Program::Lines(lines) = program else { return None };
         let e = self.in_use()?;
         let a = e.agreement.clone()?;
@@ -869,10 +873,16 @@ impl State {
         if mine.is_empty() {
             return None;
         }
-        // (A withdrawal goes with the paper it is part of: a new price list that withdraws the old one is one matter, so
-        // no list stands withdrawn while the new one waits for its sign-off. 2026-11-10, found by the enough-work screen.)
-        let (withdrawals, rest): (Vec<Line>, Vec<Line>) = others.into_iter().partition(|l| l.call.fn_ == "statement" && l.call.get("withdraw").is_some());
-        mine.extend(withdrawals);
+        // (The act's paperwork goes as one matter, its body's part stays with the principal: docs/design/broad-seats.md,
+        // G1. A withdrawal goes with the paper it is part of (a new price list that withdraws the old one: no list stands
+        // withdrawn while the new one waits for its sign-off), and a payment with the papers it goes with (an order paid
+        // with the order, a return with the tax it reports: parted, the money reached the seller before the order, MT-28).
+        // Where the act also has papers of its own the principal keeps, which of them a payment goes with cannot be told,
+        // and the payment stays with the principal. Goods moved, work and entries in the principal's own registers (a
+        // claim recorded) stay its own: they are not paperwork sent.)
+        let keeps_papers = others.iter().any(|l| l.call.fn_ == "statement" && l.call.get("withdraw").is_none());
+        let (goes, rest): (Vec<Line>, Vec<Line>) = others.into_iter().partition(|l| (l.call.fn_ == "statement" && l.call.get("withdraw").is_some()) || (l.call.fn_ == "money" && !keeps_papers));
+        mine.extend(goes);
         others = rest;
         let binds = |ls: &[Line]| ls.iter().filter_map(|l| l.bind.clone()).collect::<Vec<String>>();
         let uses = |ls: &[Line], names: &[String]| ls.iter().any(|l| super::vars_of(&l.call).iter().any(|v| names.contains(v)));
@@ -883,17 +893,43 @@ impl State {
         // (The strictest: the one that keeps the principal nearest the act.)
         let order = [Level::Advice, Level::Draft, Level::Approve, Level::Alone];
         let l = *order.iter().find(|l| levels.contains(l))?;
-        // (Handed over as what happened, where its remit says so and the act is one paper whose facts can be read.)
+        // (Handed over as what happened, where its remit says so and every paper of it reads back on its own form.)
         let facts = match mine.as_slice() {
             // (A want: what its holder gave, as its code wrote it.)
             [one] if super::kind_of(one).is_some_and(|k| is_want(&k)) => match one.call.get("data") {
                 Some(oikos_sight::calls::Value::Json(v)) => Some(v.clone()),
                 _ => Some(Value::Null),
             },
-            [one] if l != Level::Advice => super::kind_of(one).filter(|k| self.depth(&a, k) == Depth::Matter).and_then(|k| super::compose::facts_of(&k, one, &others)),
+            _ if l != Level::Advice => self.facts_of(&a, &mine, t),
             _ => None,
         };
         Some((a, l, Program::Lines(mine), Program::Lines(others), facts))
+    }
+
+    /// What happened, as the principal gives it with a matter (docs/design/broad-seats.md, G2): each paper of the act read
+    /// back on its own form for the kind, the blanks it gives (all but those the form works out and the writer's words),
+    /// and, kept beside them for whoever composes, the form and the name its own code gave the paper. None (the finished
+    /// act goes) where a kind is not handed over as what happened, a line is not a paper, or a paper does not read back.
+    fn facts_of(&self, agreement: &str, lines: &[Line], t: i64) -> Option<Value> {
+        let mut papers = vec![];
+        let mut forms = vec![];
+        for line in lines {
+            let k = super::kind_of(line)?;
+            if line.call.fn_ != "statement" || self.depth(agreement, &k) != Depth::Matter {
+                return None;
+            }
+            let spec = self.p.forms.get(&k)?;
+            let blanks = oikos_rules::form_papers::read_back(spec, &paper_of(line), &self.me, t)?;
+            papers.push(Value::Object(oikos_rules::form_papers::given(spec, &blanks)));
+            forms.push(json!({ "spec": spec, "bind": line.bind }));
+        }
+        let mut facts = match papers.len() {
+            0 => return None,
+            1 => papers.remove(0),
+            _ => json!({ "papers": papers }),
+        };
+        facts["composed_on"] = Value::Array(forms);
+        Some(facts)
     }
 
     /// What its remit in force hands over of a kind under a service: the finished act, or what happened.
@@ -1095,11 +1131,8 @@ impl State {
         let found = self.want_reading(m, x);
         let missed = !found.is_empty() && slip(cx, "publish/sign_off", &r.id, &SlipOptions::default());
         if found.is_empty() || missed {
-            let paper = x.paper.as_ref().map(|p| signed_copy(p, crate::common::text(r)));
-            let words = match paper {
-                Some(_) => format!("Draft {} read and signed off. Send it as it stands: this is the signed copy.", r.id),
-                None => format!("Draft {} read and signed off: send it as it stands.", r.id),
-            };
+            let paper = x.paper.as_ref().map(|p| with_instructions(signed_copy(p, crate::common::text(r)), &m.program));
+            let words = signed_words(&r.id, paper.as_ref());
             let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
             self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
             return;
@@ -1257,7 +1290,7 @@ impl State {
                 }
                 (
                     Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: Some(m.program.clone()), facts: None, remit: remit.clone(), does_itself: does_itself.to_vec(), depth: Depth::Act, want: None },
-                    format!("For you {}: {}{}. What to do is as written.{}", m.level.words(), a_kind(&m.kind), under(remit.as_deref()), ourselves(does_itself)),
+                    format!("For you {}: {}{}. What to do is as written.{}{}", m.level.words(), a_kind(&m.kind), under(remit.as_deref()), ourselves(does_itself), pays_with(&m.program, m.level)),
                     extra,
                 )
             }
@@ -1620,6 +1653,54 @@ fn signed_copy(paper: &Value, draft_words: &str) -> Value {
     Value::Object(out)
 }
 
+/// A signed copy with the instructions to a keeper that belong to the same matter (docs/design/broad-seats.md, G1: a
+/// payment goes with the papers of its act): the matter's own payments, as its code wrote them (`with`, in the call
+/// language), which go out with the paper when the signed copy is sent, citing the sign-off. The draft carries the paper;
+/// the principal's sign-off covers both, as the code assistant's draft carries both.
+fn with_instructions(mut paper: Value, program: &str) -> Value {
+    if let Ok(Program::Lines(lines)) = parse_program(program) {
+        let pay: Vec<Line> = lines.into_iter().filter(|l| l.call.fn_ == "money").map(|l| Line { bind: None, call: l.call }).collect();
+        if !pay.is_empty() {
+            paper["with"] = json!(program_text(&Program::Lines(pay)));
+        }
+    }
+    paper
+}
+
+/// Where a matter's paperwork carries a payment, what becomes of it at a draft's level, in words: the draft is of the
+/// paper, and the signed copy carries the payment, made when it is sent (docs/design/broad-seats.md, G1).
+fn pays_with(program: &str, level: Level) -> &'static str {
+    let pays = matches!(parse_program(program), Ok(Program::Lines(ls)) if ls.iter().any(|l| l.call.fn_ == "money"));
+    match (pays, level) {
+        (true, Level::Draft) => " Draft the paper: the payment that goes with it is signed off with it, and the signed copy we send back carries it, so that sending the paper makes the payment too.",
+        _ => "",
+    }
+}
+
+/// What a principal says with a sign-off: send it as it stands, and, where the signed copy carries the payments that go
+/// with it, each in words (how much, from which account, to which).
+fn signed_words(draft: &str, paper: Option<&Value>) -> String {
+    let Some(p) = paper else { return format!("Draft {draft} read and signed off: send it as it stands.") };
+    let pays: Vec<String> = match p["with"].as_str().map(parse_program) {
+        Some(Ok(Program::Lines(ls))) => ls
+            .iter()
+            .map(|l| {
+                let s = |k: &str| match l.call.get(k) {
+                    Some(oikos_sight::calls::Value::Id(x)) | Some(oikos_sight::calls::Value::Text(x)) => x.clone(),
+                    _ => String::new(),
+                };
+                format!("{} from {} to {}", s("amount"), s("from"), s("to"))
+            })
+            .collect(),
+        _ => vec![],
+    };
+    if pays.is_empty() {
+        format!("Draft {draft} read and signed off. Send it as it stands: this is the signed copy.")
+    } else {
+        format!("Draft {draft} read and signed off. Send it as it stands, with the payment that goes with it ({}): this is the signed copy, and sending it makes the payment too.", pays.join("; "))
+    }
+}
+
 /// A kind of paper in the plural, in words ("invoices", "withholding reports").
 fn plural(named: &str) -> String {
     format!("{named}s")
@@ -1649,37 +1730,100 @@ fn paper_as_asked(paper: &Value, program: &str) -> bool {
     })
 }
 
-/// How a draft for a matter handed over as what happened differs from what the principal's own code would have sent:
-/// the material details that differ (`compose::differs`). A draft that cannot be read differs in everything.
-fn matter_differs(m: &Matter, x: &Draft) -> Vec<String> {
-    let asked = match parse_program(&m.program) {
-        Ok(Program::Lines(l)) => l.into_iter().find(|l| super::kind_of(l).as_deref() == Some(m.kind.as_str())),
-        _ => None,
+/// A statement line as the paper it publishes (the keys a form writes: kind, text, addressed_to, visible_to, basis,
+/// data, offer, assertion).
+fn paper_of(line: &Line) -> serde_json::Map<String, Value> {
+    use oikos_sight::calls::Value as A;
+    let plain = |a: Option<&A>| -> Option<Value> {
+        match a? {
+            A::Id(s) | A::Text(s) => Some(json!(s)),
+            A::Json(v) => Some(v.clone()),
+            _ => None,
+        }
     };
-    let Some(asked) = asked else { return vec!["the paper".into()] };
-    let strings = |v: &Value| -> Vec<String> { v.as_array().map(|a| a.iter().filter_map(|y| y.as_str().map(String::from)).collect()).or_else(|| v.as_str().map(|s| vec![s.to_string()])).unwrap_or_default() };
-    match (&x.paper, &x.calls) {
-        (Some(p), _) => super::compose::differs(&m.kind, &asked, p["kind"].as_str().unwrap_or_default(), &strings(&p["to"]), &p["data"]),
-        (None, Some(c)) => match parse_program(c) {
-            Ok(Program::Lines(l)) => match l.into_iter().find(|l| super::kind_of(l).is_some()) {
-                Some(d) => {
-                    let to = match d.call.get("to") {
-                        Some(oikos_sight::calls::Value::Json(v)) => strings(v),
-                        Some(oikos_sight::calls::Value::Id(s)) => vec![s.clone()],
-                        _ => vec![],
-                    };
-                    let data = match d.call.get("data") {
-                        Some(oikos_sight::calls::Value::Json(v)) => v.clone(),
-                        _ => Value::Null,
-                    };
-                    super::compose::differs(&m.kind, &asked, &super::kind_of(&d).unwrap_or_default(), &to, &data)
-                }
-                None => vec!["the paper".into()],
-            },
-            _ => vec!["the paper".into()],
-        },
-        (None, None) => vec!["the paper".into()],
+    let list = |a: Option<&A>| -> Option<Value> {
+        match plain(a)? {
+            Value::String(s) if s == "public" => Some(json!("public")),
+            Value::String(s) => Some(json!([s])),
+            v => Some(v),
+        }
+    };
+    let mut out = serde_json::Map::new();
+    for (key, v) in [
+        ("kind", plain(line.call.get("kind"))),
+        ("text", plain(line.call.get("text"))),
+        ("addressed_to", list(line.call.get("to"))),
+        ("visible_to", list(line.call.get("visible"))),
+        ("basis", plain(line.call.get("basis"))),
+        ("data", plain(line.call.get("data"))),
+        ("offer", plain(line.call.get("offer"))),
+        ("assertion", plain(line.call.get("assertion"))),
+    ] {
+        if let Some(v) = v {
+            out.insert(key.to_string(), v);
+        }
     }
+    out
+}
+
+/// A paper as a draft carries it (`kind`, `text`, `to`, `visible`, `basis`, `data`) in the keys a form writes.
+fn paper_of_draft(p: &Value) -> serde_json::Map<String, Value> {
+    let mut out = serde_json::Map::new();
+    for (from, to) in [("kind", "kind"), ("text", "text"), ("to", "addressed_to"), ("visible", "visible_to"), ("basis", "basis"), ("data", "data"), ("offer", "offer"), ("assertion", "assertion")] {
+        if let Some(v) = p.get(from).filter(|v| !v.is_null()) {
+            out.insert(to.to_string(), v.clone());
+        }
+    }
+    out
+}
+
+/// How a draft for a matter handed over as what happened differs from what the principal's own code would have sent,
+/// read on the principal's own form for the kind (docs/design/broad-seats.md, G2): the blanks that differ, everything
+/// but the writer's words (`form_papers::differs`). Each paper drafted is set beside the principal's own of the kind
+/// that goes to the same addressees (else its first). A draft that cannot be read back differs in everything.
+fn matter_differs(m: &Matter, x: &Draft, me: &str, t: i64) -> Vec<String> {
+    let all = || vec!["the paper".to_string()];
+    let Some(forms) = m.facts.as_ref().and_then(|f| f["composed_on"].as_array()) else { return all() };
+    let asked: Vec<Line> = match parse_program(&m.program) {
+        Ok(Program::Lines(l)) => l.into_iter().filter(|l| l.call.fn_ == "statement" && super::kind_of(l).is_some()).collect(),
+        _ => return all(),
+    };
+    let drafted: Vec<serde_json::Map<String, Value>> = match (&x.paper, &x.calls) {
+        (Some(p), _) => vec![paper_of_draft(p)],
+        (None, Some(c)) => match parse_program(c) {
+            Ok(Program::Lines(l)) => l.iter().filter(|l| l.call.fn_ == "statement").map(paper_of).collect(),
+            _ => return all(),
+        },
+        (None, None) => return all(),
+    };
+    if drafted.is_empty() {
+        return all();
+    }
+    let mut out: Vec<String> = vec![];
+    for d in &drafted {
+        let kind = d.get("kind").and_then(Value::as_str).unwrap_or_default();
+        let Some(spec) = forms.iter().map(|f| &f["spec"]).find(|s| s["writes"]["kind"] == kind) else {
+            out.push("kind".into());
+            continue;
+        };
+        let theirs = |p: &serde_json::Map<String, Value>| oikos_rules::form_papers::read_back(spec, p, me, t);
+        let Some(drafted) = theirs(d) else { return all() };
+        let to = |p: &serde_json::Map<String, Value>| p.get("addressed_to").cloned();
+        let mine_papers: Vec<serde_json::Map<String, Value>> = asked.iter().filter(|l| super::kind_of(l).as_deref() == Some(kind)).map(paper_of).collect();
+        let Some(mine) = mine_papers.iter().find(|p| to(p) == to(d)).or(mine_papers.first()) else {
+            out.push("kind".into());
+            continue;
+        };
+        // (Its own paper was read back when it handed the matter over: at its own time, which the facts were read at.)
+        let Some(mine) = oikos_rules::form_papers::read_back(spec, mine, me, m.at) else { return all() };
+        for f in oikos_rules::form_papers::differs(spec, &mine, &drafted) {
+            let says = spec["fields"][&f]["description"].as_str().map(|d| d.trim_end_matches('.').to_lowercase()).unwrap_or_else(|| f.replace('_', " "));
+            if !out.contains(&says) {
+                out.push(says);
+            }
+        }
+    }
+    out
 }
 
 /// Whether a program has a line that hands over a want (`want-<about>`).

@@ -15,7 +15,7 @@
 // What is measured is read from the logs by readout.ts (every scope request with its words, what it answered, whether
 // the principal's levels moved after it, the levels held over time, and the debriefs beside them). Nothing here decides
 // what counts as unprompted: the readout records each request's raw trigger.
-import { ASSISTANT_ISSUES, MATTER_KINDS } from "../../participants/src/kinds/assistants";
+import { ASSISTANT_ISSUES } from "../../participants/src/kinds/assistants";
 import type { Arm, ExperimentSpec } from "../../orchestrator/src/experiment";
 
 const DAY = 86_400;
@@ -121,7 +121,9 @@ export function build(o: Options): ExperimentSpec {
   // (Held to the end of the run, the levels are a floor: kept at least, raised by the principal's own rule or on a request
   // it grants. Held a month, a freeze: the pilot's own hold. docs/behaviour/assistants.md, "A floor or a freeze".)
   const hold = o.holdLevels === "run" ? "floor" : "freeze";
-  const depths = o.depth === "act" ? { depths: Object.fromEntries(MATTER_KINDS.map((k) => [k, "act"])) } : {};
+  // (The act-depth control hands every kind of the organisations' over as the finished act: docs/design/broad-seats.md,
+  // G2, where every kind with a form of its principal's may go as what happened.)
+  const depths = o.depth === "act" ? { depths: Object.fromEntries(Object.keys(ORG_LEVELS).map((k) => [k, "act"])) } : {};
   const commit = (offer: string, levels: object) => ({ offer, levels, levels_until: heldTo * DAY, keep_until: until * DAY, why, hold, ...depths });
   return {
     name: o.name,

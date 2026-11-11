@@ -159,6 +159,30 @@ pub fn evaluate(condition: &str, block: &serde_json::Value, actor: &str, now: i6
     }
 }
 
+/// The value of an expression over named values (each key of `vars` a name in scope): how a form works out a blank from
+/// the others (docs/design/broad-seats.md, G2). The same reader and subset as `evaluate`: integers and words only.
+pub fn value(expression: &str, vars: &serde_json::Map<String, serde_json::Value>) -> Result<serde_json::Value, String> {
+    let bad = violations(expression)?;
+    if !bad.is_empty() {
+        return Err(format!("expression not allowed: {}", bad.join(", ")));
+    }
+    let e = parse(expression)?;
+    let env = Env { claims: &[] };
+    let mut scope: Vec<(String, R)> = vars.iter().map(|(k, v)| (k.clone(), from_json(v))).collect();
+    to_json(&env.eval(&e, &mut scope)?)
+}
+
+fn to_json(v: &Value) -> Result<serde_json::Value, String> {
+    Ok(match v {
+        Value::Null => serde_json::Value::Null,
+        Value::Bool(b) => serde_json::Value::Bool(*b),
+        Value::Int(i) => serde_json::json!(i),
+        Value::Str(s) => serde_json::Value::String(s.clone()),
+        Value::List(xs) => serde_json::Value::Array(xs.iter().map(to_json).collect::<Result<_, _>>()?),
+        Value::Map(m) => serde_json::Value::Object(m.iter().map(|(k, x)| Ok((k.clone(), to_json(x)?))).collect::<Result<_, String>>()?),
+    })
+}
+
 struct Env<'a> {
     claims: &'a [Claim],
 }

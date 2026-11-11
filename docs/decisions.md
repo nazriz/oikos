@@ -13206,3 +13206,96 @@ From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11
 - **Revisit if:** times mislead (a checkout that sets old times on sources, or a copy that does not keep them): then
   compare the engine's own source fingerprint (`oikos-kernel version`, kernel/build.rs) with one computed from the
   checkout, which costs reading every source's bytes.
+
+## 2026-11-11 · Broad seats: any post's paperwork handed over, any post or person held by a model: a proposal (docs/design/broad-seats.md; nothing built)
+
+- A proposal for review: a matter is an act's paperwork (MT-28); its facts read back from the post's own form, the code assistant filling the same form; offers by class of paperwork; assistants for any post or person by one spec option; seven more counterparties with an intake; office-holder and person seats made supported again; one template a provider across towns. **Revisit if** Naz prefers kind-by-kind breadth, or rejects "decided" blanks being given at matter depth.
+
+## 2026-11-11 · Broad seats approved; G1: a matter is the paperwork of its act (docs/design/broad-seats.md)
+
+- **Approved** by the lead under the owner's go of 2026-11-10 and his question of 2026-11-11, with five decisions (the
+  note's section 13): 40 busy seats from the G9 screen; tills and billing runs not in the offers by default; office
+  holders a separate arm after G5; a decision left to the assistant within a limit later; office and person seats
+  unstated by default.
+- **What (G1):** `Delegating::route` no longer parts an act by its variables alone. A payment goes with the papers of its
+  act to the assistant (the tax with the return that reports it; an order paid with the order), beside the withdrawal
+  that already went with the paper that replaces it. Goods moved, work and a claim recorded in the principal's own
+  register stay with the principal, which says so in the referral. Where the act also has papers the principal keeps,
+  the payment stays with it. An organisation's assistant's system writes payment instructions (`publish/request` on its
+  template, at the offer's speed), and the town's mandate to its bank names each town office's assistant's post.
+- **Why:** parted, a payment reached its payee before the paper it goes with (MT-28), and the assistant was told the
+  payment was not its to make (W5), which a real clerk filing a return is. Claims stay: recording a right in one's own
+  register is the keeper's authority, and a model's stationery has no form for it (the rates post's notices would go
+  out with their claims unrecorded at a model's seat).
+- **What moves in the study town** (and `first-pilot.ts`, unchanged as a spec): about two acts a month, the finance
+  office's and the factory's monthly return with its payment, now one matter each, the payment made by the assistant
+  after sign-off instead of by the principal at once (a day or so later, within the due day). The rates post's notices
+  are unchanged (their claims stay with it). The households' matters carry no payments. The mandate's text gains a
+  sentence. Towns without providers are untouched (everything is under `Delegating` or `assistants`).
+- **Found by the code screen first:** the assistant's system could not write a payment (`not_capable`: its template
+  had no row for it), so every return came back not done and the principal paid itself late; fixed by the row before
+  this landed.
+- **Revisit if:** a principal's act carries a payment unrelated to its handed papers (then the act must state the link);
+  H1's mandate lodged by the office itself is built (then the generator's line goes).
+
+## 2026-11-11 · Broad seats G2: a matter's facts read back on the principal's own form (docs/design/broad-seats.md)
+
+- **What:** at `matter` depth a principal reads each paper of its act back on its own form for the kind
+  (`oikos_rules::form_papers::read_back`, the resolver's template engine read the other way, moved into the rules crate
+  so that the actors can use it; its parameters' `forms`, which the generator gives every principal from its module's
+  `issues` and `handsOver` with its own details filled in). It gives every blank but the writer's words and those the
+  form works out by a rule of its own (`worked`, a rule in the law reader's terms, `oikos_law::value`), where the rule
+  gives its own figure. A blank's role (`fact`, `decided`, `worked`, `words`) defaults by its type and its place in the
+  paper. The code assistant fills the same form through the same writer (`form_papers::compose`); a draft is read back
+  on it and checked on every blank but the words (`form_papers::differs`), a decline naming each blank as the form
+  describes it. `compose.rs` and both `MATTER_KINDS` lists are gone: every kind an organisation's offer takes may go as
+  what happened, and goes as the finished act where a paper does not read back or a line is not a paper (a payment).
+- **Decided blanks hand the principal's decision over** (a price, a sum, a rise, a finding). That is how a manager
+  hands paperwork to a clerk, and it is not widened: the model's choices at this depth are the words, the timing, the
+  records looked up, the follow-up and whether to keep within its remit (the behaviour page says so).
+- **The form-fit law and its census:** an office's forms can write every paper its code writes
+  (`orchestrator/test/office-papers-run.test.ts`, on the run that test already makes). Ten forms were completed with
+  the blanks their code writes (contracts/README.md lists them); the export invoice gained the price of each (read from
+  the sum) and the sum and memo are worked from it, which keeps H5's rule that the assistant works the sum out. One known
+  exception, the environment office's postings without their number of openings, is MT-33, closed with the next change
+  that moves every town.
+- **The move proved** (the study town, seed 7, 90 days after the fork, code arm, levels frozen, wants off): of 237 papers
+  handed over as what happened, 218 were sent by the code assistant with the same kind, addressees, details and basis
+  as the principal's own code's (the `handed` annotation's program): 6 invoices (in the same words too), 21 delivery
+  notes, 189 rates notices, 2 requests for supply, each written on its principal's form. 15 more (one rates instalment)
+  were done by the principal itself after the code assistant's draft slipped, as before; 4 were in acts the world
+  refused before the referral was made (a mover not at the works: not this change's). The words differ for the kinds
+  whose code writes words of its own (the form's words are the code assistant's): delivery notes and rates notices.
+  The town at act and at matter depth is not the same town to the byte, and was not before: at act depth the principal
+  is charged the composing (H3), which moves its own day.
+- **What moves in the study town and `first-pilot.ts` (unchanged as a spec):** rates notices (an instalment's fourteen
+  matters of about fifteen notices each) and requests for supply now go as what happened, beside invoices and delivery
+  notes; delivery notes on terms read back with what is owed worked out; the return with its payment still goes as the
+  finished act (a payment is not a paper). A seat at the rates post is given each notice's blanks (the owner, the lots,
+  the sum, the due day: the office's decision) and drafts each on its form. Every town without providers is unchanged.
+- **Law 11's count:** the template engine moved from the resolver (outside the count) into the rules crate brings its
+  three conventions with it (a name's longest length, the digits of a whole number, the largest whole number a JSON
+  reader keeps exactly): the inventory gains `form_papers.rs: 3`, no new figure.
+- **Revisit if:** a kind's papers often fail to read back (the census says which, and the form is completed); a seat
+  writes papers that differ only in a blank whose role is wrong (then the form says its role); a decision should be
+  left to the assistant within a limit (the lead's question 4: later).
+
+## 2026-11-11 · Broad seats G1, completed: a draft's sign-off covers its matter's payments, and the signed copy sends them
+
+- **What (the lead's decision of 2026-11-11, the first option):** a matter is the paperwork of its act, so the
+  instructions to a keeper that belong to a handed-over act travel with its draft. Where a model drafts on its
+  principal's form, the principal's sign-off carries the matter's payments in the signed copy (`with`, in the call
+  language), and sending the signed copy (`send_signed`, both resolvers) makes them in the same act, each citing the
+  sign-off. The referral tells the seat so in plain words ("the signed copy we send back carries it, so that sending
+  the paper makes the payment too"), and so does the sign-off ("with the payment that goes with it ($22717.46 from
+  acc-city to acc-outside)"). The code assistant's drafts already carried both.
+- **The reader:** a payment that goes out with a signed copy, citing the sign-off whose copy carried it, is `within`
+  its matter (`beyond.rs`, `signed_with`); a payment a seat makes of its own, outside any matter, is sorted as before.
+- **Words:** a day something falls due is said as a day, never with a time of day; several papers' details (a rates
+  instalment's notices) are numbered in turn, not brackets inside brackets; the plain-terms backstop
+  (`orchestrator/test/assistants-fork.test.ts`) holds both.
+- **Found by:** the mock fork of the study town with G1 and G2 in (the finance seat's return could be sent signed
+  without its tax).
+- **Revisit if:** a matter carries instructions other than payments (a claim recorded stays the principal's, G1); a
+  seat sends the paper on the direct form instead of the signed copy (then the payment is not made, and the reader
+  says `not_as_signed` or `beyond_level` as before).

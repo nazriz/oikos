@@ -28,6 +28,14 @@ const call = <T>(n: Native, name: string, args: object): T => JSON.parse(n.rules
 /** Without the absent parts (Rust writes them as null; TS leaves them out). */
 const present = <T extends object>(x: T): T => Object.fromEntries(Object.entries(x).filter(([, v]) => v !== null && v !== undefined)) as T;
 
+/** The blanks a paper was written with on a form (kernel/crates/rules/src/form_papers.rs, `read_back`), or null where
+ * the form cannot write that paper: the engine's alone, no TypeScript twin (docs/design/broad-seats.md, G2). */
+export const readBack = (spec: object, paper: object, me: string, now: number): Record<string, unknown> | null => {
+  const n = native();
+  if (!n) throw new Error("reading a paper back on its form is the engine's: build the kernel (bun run kernel), or set OIKOS_ENGINE_MODULE");
+  return call<Record<string, unknown> | null>(n, "forms.read_back", { spec, paper, me, now });
+};
+
 /** Whether the Rust rules are in use (the module is built and nothing asks for the TypeScript ones). */
 export const rustRulesInUse = (): boolean => rust() !== undefined;
 

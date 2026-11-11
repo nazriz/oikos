@@ -916,7 +916,15 @@ class Resolver {
       if (!paper) throw new Ask(`You have no signed copy on file as ${id}: name the sign-off that came back with the paper signed.`);
       const block: Block = { block: "publish", kind: paper.kind, text: String(paper.text ?? "").slice(0, 16384) } as Block;
       for (const [from, to] of [["to", "addressed_to"], ["data", "data"], ["visible", "visible_to"], ["basis", "basis"]] as const) if (paper[from] !== undefined && paper[from] !== null) (block as any)[to] = paper[from];
-      return [{ ...block, speaks_for: me, ...(bind ? { ref: bind } : {}) } as Block];
+      // (The payments the signed copy carries go with it, in the same act, citing what signed them: a matter is the
+      // paperwork of its act, and the sign-off covered both. docs/design/broad-seats.md, G1. Payments only.)
+      const out: Block[] = [{ ...block, speaks_for: me, ...(bind ? { ref: bind } : {}) } as Block];
+      if (typeof (paper as any).with === "string") {
+        let program: calls.Program;
+        try { program = calls.parseProgram((paper as any).with); } catch { throw new Ask("The signed copy's payment could not be read: draft it again."); }
+        if ("lines" in program) for (const l of program.lines.filter((x) => x.call.fn === "money")) out.push(...this.money({ ...l.call, args: { ...l.call.args, basis: { id } } }));
+      }
+      return out;
     }
     // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement
     // the rest of the world reads. It does not cite the form.
