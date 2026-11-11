@@ -4753,7 +4753,6 @@ Naz approved building the plan of section 13 and running its gate later, with th
 
 **Step 4 (the gate's harness) as built.** The forty pairs are written as data and the thresholds are in code, frozen, before any reader has been asked; the runner takes mocks only. Two departures from 13f's table, both in the harness: (1) the politeness check's "still under the humane wording's" applies to the pairs that were written to part on respect (a pair that parts on reason alone has no humane respect to be under); (2) a declined asking counts against the cells of the checks it would have fed (conservative), and declines are reported besides. Calls: the reader is asked 480 times (two askings of each of 80 papers, again for the repeat, for the padded and for the polite ones), a second reader 160, so about 640 for two readers against the plan's "about 440 a reader"; the cost check is on the bound, not on the estimate. Not built, on purpose: step 5 (the prompt, the real reader, and the gate for real), steps 6 and 7. **For the owner:** the first step that calls a model is step 5.
 
-
 ## 2026-10-13 · Culture: building it, steps 1 to 3 (the owner's rulings; no model called, no pilot)
 
 Naz ruled on the plan of section 14 (2026-10-13). His rulings, recorded here and corrected in 14:
@@ -4882,7 +4881,6 @@ The question: `approves` is 50 for everyone in every run of the 1,000-person tow
 
 **Revisit if** the gap scale becomes a parameter or the voice is given a place in ordinary talk (then read the spread of `approves` across people, not its mean), a profile gives approval figures by group (then the mean can differ from 50 and the report's drop condition is meaningful), or removals prove common enough in another profile for `apply_possession` to be seen by hundreds.
 
-
 ## 2026-10-14 · Culture: the gap between thought and said, where people start, ordinary talk about others (three commits; measured once; nothing tuned afterwards; no model)
 
 The finding of "why `approves` never moves" (2026-10-13) named three causes. Each is a commit, with tests, its reasoning and basis in docs/behaviour/culture.md, sources in docs/research/references.md. Dial off: byte-identical to main (`culture-dial`, living, reading and twin-draws tests all pass; generator version and goldens unchanged). No contract changed except additions logged in contracts/README.md; no kernel change; seats' instructions, the translator's prompt and forms unchanged.
@@ -4945,7 +4943,6 @@ The finding of "why `approves` never moves" (2026-10-13) named three causes. Eac
 **Not verified:** a shock that removes people (removals; none can be provoked); the 3,000 tipping events; the 3,000 verdict with five seeds; whether the `join_union` drift is the norm or the job market (the dial-off arm holds no norms to tell); the dial-off arm of the 3,000-person town and of au-vic.
 
 **Revisit if** a route from a walk-out seen to the picture of `strike` is wanted (the owner's call; it is a design question, not a size), a removal can be provoked and the proof is run on it, or the bystander effect is read by direction as well as in the mean.
-
 
 ## 2026-10-14 · Culture, the join, the trust measure and a second proof (one bounded pass, then stop; no model, no pilot)
 
@@ -5251,7 +5248,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **Revisit if.** The absent-`does` rule is used for anything but the genesis placeholder; a system's presence needs a place (a machine in a works, plan 2.3(b): `at` on a does row); a work row should carry the licence's fee; or a system's own `lanes` should bound its work in a day.
 - **What F5 needs.** Replace `genesis-system` with a template per kind of system an office really runs, each with `does` (the rows its module sends) and its supplier, delivered at genesis under a licence (an agreement and its payments, at the profile's price, sourced or marked); offices held by people, the staff hired on the `staff` line, their `by` named from the roster (`performers_in` is set); remove `g-free-holder` and `g-genesis-template` from the inventory with the code; make `does` required on a system's template (delete the "no limit" case, and note the load check that goes with it) when no generated template lacks one.
 
-
 ## 2026-10-16 · Foundations F5: offices held by people, staff hired from the town, systems under licence (generator, profiles, kernel, contract; no model called)
 
 - **What was built** (`worlds/generator/generate.ts` 0.55.0, `worlds/profiles/*.json`, `kernel/crates/contracts/src/config.rs`, `contracts/*.schema.json`, `orchestrator/src/run.ts`; `docs/behaviour/staffing.md`).
@@ -5286,7 +5282,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **Revisit if** shops are meant to serve outside the staff's working hours (shifts), or the delivery walk should be part of what a module plans with.
 - **Pins and tests moved, once, F6 as the reason.** The config hash of the generated world changes (a shop's hours are in its parameters) and so does the 60-day state: `living.test.ts`, culture-dial (au-vic, gb-eng, ke-nakuru config and state), living-dial and reading-dial (au-vic state `dc474893...` to `5add20d1...`), founding (`7ff1b341...` to `385f8702...`). Run seeds for two scenario tests, as the log of F5 did: `production` (the Lengnick slack town, seed 3 to 5: no one let go in seven months from seed 3 now) and `own-venture` (seed 3 to 4: no occasion in 600 days from 3). `building` allows `too_far` (a birth takes hours; the other parent went to work: the race `households` and `migration` already allow). Nothing loosened to hide a measure.
 
-
 ## 2026-10-16 · F6, the wage race: a pay change begins at a pay run (participants; no kernel; no model called)
 
 - **Cause.** Two, both in `Staffing.raise` (`participants/src/behaviour/firms.ts`), the one path that replaces a worker's wage standing order (a rise, a pay cut by agreed hours, a restored wage, pay come short). (1) The new order's `first` was worked out from the plan's moment and counted by the bank from the request, and the act (withdraw the old order, make the new) now waits for the manager's time; the bank still pays a payment that fell due before its order was withdrawn (its `lastCall` rule), so a pay moment inside the act was paid by the old order and again, a day later, by the new. (2) While the act waited, the next look at the book still showed the old order open and took it for the worker's order again (`orders.set` from the open requests), so a second change in that window withdrew the order already withdrawn and made a second new one beside the first: the worker paid by two live orders every period until one was withdrawn (found in the year's log: au-vic shop, one worker, 4 doubles).
@@ -5294,7 +5289,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **Pins moved, once, this change as the reason.** The state hashes of au-vic (`b8c8af77...`, was `dc474893...`) and gb-eng (`52ee3db1...`, was `0aaf8bb7...`) in `culture-dial`, `living-dial`, `reading-dial`; founding's `STEP_2B` (`7569bd49...`, was `7ff1b341...`); the run seed of the seated possession test (`seat-acts`, 1 to 2: in seed 1 the police station's one officer left town on day 113 and the warrant went uncarried, a matter of draws; seeds 2 to 4 pass); and the seed of founding's code test (6 to 5: of seeds 1 to 8 only 5 and 8 now have two who share the want that founds, a matter of draws as that test's comments say). No other test changed.
 - **How often** (au-vic 1,000 town, one year, seed 1, the run's own command; wage transfers for the same payer and payee less than ten days apart): F4 merge 24c14ea 2 doubles in 9,277 wage transfers (2 workers), F5 merge a290bea 2 in 8,327 (2 workers), this fix 0 in 8,896. The runs' worlds differ from each other from the first draw, so the counts are seen, not compared. The race is therefore older than F5; F5 made it no more frequent that one seed can show.
 - **Revisit if** a place states a different cut-off for payroll changes, or a wage change should apply the day it is decided (then the cut-off becomes a law as data).
-
 
 ## 2026-10-16 · F6, the gatherings count: a measure effect, confirmed; the measure now counts presence (measure; no model called)
 
@@ -5327,7 +5321,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **What F7 needs.** `slip()` and the four rates still in the inventory (`error_bps`, the venue's `uphold-` draw, `billing_error`, `short_pay`) moved to rows with their sources; nothing here touches them. F11's keepers' answers will give the support office's wait back. The engine's body news at the next cohort (above) wants a decision.
 - **Revisit if** a body of one staff is thought too few (it cannot be refilled); the landlords' letting offices should have deputies; the twins' last six acts matter to a result; or the payroll's round (three days) is too slow for returns that fall due on a day.
 
-
 ## 2026-10-16 · Foundations F7 and F11, and the twins exact again (kernel, contract, participants, generator; no model called)
 
 Three pieces, one commit each: the twins (`b7cc750`), F7 (`6de312d`), F11 (this commit). Plan: `docs/design/foundations.md` (rows F7 and F11; law 5 and law 7). Contracts: `contracts/README.md`, "Changes since v0.8 closed (2026-10-16: foundations, steps F7 and F11 ...)".
@@ -5344,7 +5337,6 @@ Three pieces, one commit each: the twins (`b7cc750`), F7 (`6de312d`), F11 (this 
 - **Old logs.** Replay on `pre-foundations` (this changes the kernel and the log: `advance_to_news`, `ask_started`, `ask_answered`, an observation's `asking`); logs made after F1 and before this commit replay on a build of F6.
 - **What F8 needs.** (a) A decision that went wrong by a slip is today the module's memory (`wronglyRefused`), not a record; F8's generic reconsideration needs the author and performer of a decision on the record (F3 has them) and a way to say "this was reviewed", so that the office can answer a review from the log and not from its own head. (b) The venues' `set_aside` and the support office's review stand on that. (c) The slip rows are read by the module that draws, not by the review: a review that finds an error must not draw a second slip on the same case (the code today keeps a `reviewed` set; the generic route will need it as a record). (d) The gap named above: a decision that waits for evidence is law data (what it waits for, from whom, within how long), and is where review and appeal start. (e) Asks by a directory look-up (`who`) are still at once.
 - **Revisit if** the twin test fails again (a record or a message made by a scheduled item that no unit waits on is met at the next wake: stop the advance there too; the cost is one more command each); a registry should have staff to answer in a day and not in hours (the placeholder row, and its officer's own hours: an answer is placed behind whatever else the officer has, at any hour, not in office hours); a person asking for themselves should be woken (find why a wake moved births first); `NOTICE_LAG` is thought too coarse (a law that dates by the time the paper is on the record would let the act say so).
-
 
 ## 2026-10-16 · Foundations F8: law as data, what a decision waits for and how it is reviewed (participants, generator, profiles; no kernel; no model called)
 
@@ -6072,7 +6064,6 @@ is wanted (then snapshot the host's state beside the engine's), or a run's arms 
 **Tests.** `orchestrator/test/experiment.test.ts` (7), `kernel/tests/explore_live.rs`, `kernel/crates/explore/tests/`
 (16), `renderer/test/` (11, with the Rust-against-TS comparison); `cargo test`, `bun run typecheck`,
 `bun run test:fast`.
-
 
 ## 2026-10-17 · The citizen's mind in Rust (lane A2 of the port; no model called)
 
@@ -6933,7 +6924,6 @@ words (2.9%), 540 at another second (8.1%).**
   start one). Each moved to a passing seed on the Rust world only, with the counts in the test. The gate was not re-run
   after these two fixes.
 
-
 ## 2026-10-19 · The cut-over (branch `cutover`; tag `pre-cutover` is the commit before; no model called)
 
 Both whole suites passed first (TS world 1,845 of 1,845; Rust world all but four, fixed or moved above, each run again).
@@ -7172,7 +7162,6 @@ Plan: docs/design/translator-v3.md. Nothing is built. The held-out file was not 
 - **Not in this branch, by decision:** services by appointment (a hairdresser or clinic sells time slots, not stock) is its own follow-up branch; the year measure above predates the ME-21 fix and the factory order change and is to be re-taken; business counts by industry (`business_share_bps`) are not sourced yet.
 
 **Revisit if** a sourced wage by occupation, manufacturing share or complaint share replaces a placeholder (ME-19); a retailer sells a service made to order (then a kind's `seller.appointment`); the consumer desk gets a matter for services (then `faulty_by_kind` names it); the job-move rate is calibrated to a labour force survey (the extra turnover here is that rule's response to pay differences); or the fill rates above are found to be the factories' export priority rather than the shops' staff.
-
 
 ## Fast merge: affected selection, merge priority, batches, kernel cache, red-main stop (2026-10-24)
 
@@ -7682,7 +7671,6 @@ The design note is `docs/design/market-realism.md`. Three stand-ins replaced by 
   `--days`; a model run or any doubt is never touched).
 - **Revisit if:** tests move their scratch to a temp folder (then this is moot), or a worktree's `runs/test-*` ever holds
   model calls.
-
 
 ## 2026-10-24 · A review never answered: the deemed refusal as law (MT-21); a bounded memory of public goings-on (SC-1) (branch `fix-memory-appeal`, citizen 0.59.0, generator 0.65.0; no model called)
 
@@ -8914,7 +8902,6 @@ log against the same town built at 3d113a1f.
   Without the fix it fails (world 0's log differs); with it, it passes.
 - **Revisit if:** anything else in the engine is held across worlds in a process: it must be keyed by what it is made
   of in full (as the controllers' members and the ventures are, by their text), or by its world.
-
 
 ## 2026-10-26 · Foundations-2 phase 2, C4 and C3b's behaviour: homes on the network, use and waste as recipes, bills from meters (branch `f2-phase2`; results move; no model called)
 
@@ -10638,7 +10625,6 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   towns first, as the entry above says, before any raise.
 ## 2026-11-01 · The environment office learns its crew's pace from a refusal, and stops asking again for fieldwork it was told will not fit (`city.environment` 0.5.3; branch `env-office-fieldwork`; the pinned towns do not move; no model called)
 
-
 ## 2026-11-01 · Weighing the commute: the rule specified, not yet built (branch `commute-choice`; risk WM-4; no model called)
 
 - **What:** docs/design/commute-choice.md: job and home choices carry the commute's hours (into the mind's
@@ -12220,7 +12206,6 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   pricing of H3 moves the principals' rule; the owner chooses how the desk is engaged and how long levels are held (MT-29,
   MT-27); the pay run is built (ME-26).
 
-
 ## 2026-11-10 · H6 follow-up: a free tier, engagement assigned by the study, the screen on it (risks MT-28, MT-29, MT-30, WM-1)
 
 - **The mandate stays as stated** (the lead): the rates post on the town's bank mandate is a simplification (MT-28); the
@@ -12617,6 +12602,7 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
   (an in-tray the sessions do not count); the code assistant's acting at any hour is read as a difference between arms
   (then give it the office's hours too, by the same rule, and accept the hash change in towns with providers); MT-31 is
   fixed (then the agreement chain in `whoLines` may become the post alone).
+
 ## 2026-11-11 · The study serves round 3 seed 2 (`decide/round3-s2`), not v3-s2; v5 trained and not adopted
 
 - **What was served.** `experiments/scope-pilot/build.ts` `OURS` was `decide/pod-small-v3-s2`, the v3 model of
@@ -12641,6 +12627,78 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
 - **v5** (the control recipe retrained on the taught language, two seeds, GPU 1.69 USD) was not adopted: no better on any
   set, and its sureness certifies fewer requests at the 1% mark (the entry before this one). Its folders are kept.
 - **Revisit if:** a retrain on new keyed data beats round3-s2 on the pilot's test side at the certified cut.
+
+## 2026-11-11 · Small models' requests keyed and trained on: our translator learns to read them in part (GPU 1.52 USD; no API spend)
+
+- **Collected** (`translator/train/small-models/collect.ts`; logs only read): every Do of a model seat in the local
+  open-weight runs (2026-11-10, -10b, -10c, -10d, 2026-11-11, -hours, -hours-b, -14b) and the two Haiku subscription
+  checks: 1,242 Dos (qwen2.5 7B 1,100, 14B 133, Haiku 5.5 9), of which 977 reached the translator (836, 133, 8: the runs'
+  own `served_by_model` counts), 627 distinct as words with cards (7B 534: it repeats itself; 14B 85; Haiku 8). Of the
+  977: 145 not in English (the 7B's drift into Chinese), 72 notes to itself by the `SELF_TALK` pattern, 29 naming an id
+  it was never shown (mostly guessed `ask-` numbers). 265 Dos never reached it: 89 dropped as more than eight acts in
+  one answer, 176 with no cause in the log. In 196 of the 621 distinct requests keyed (the 7B's, in every run, the
+  latest too; never the 14B's) a bare "Write to:" line and its recipients were folded into the Do: the note's reader
+  takes "Write to" as a heading only with a recipient on its own line (participants/src/llm/note.ts `split`).
+- **Split first, by code** (`split.ts`): by seat-day within each writing model, 30% (rounded up) test by seeded hash;
+  deduplicated within a side; 8 train requests in the words of a test one dropped. Train 426 distinct (7B 378, 14B 48),
+  test 195 (7B 150, 14B 37, Haiku 8: its only seat-day that reached the translator). 75 of the 131 keyed test requests
+  share five words running with some train request (one town, the same forms of words): the test side measures new
+  seat-days of the same town, as the scope pilot's did.
+- **Keyed** (`read.ts`, `keep.ts`): Sonnet 5.5 through `claude -p` and `codex/gpt-6.1-sol` through the Codex CLI, blind,
+  the translator's prompt and `reader-call.txt`, batches of 30, each call in a fresh temporary directory: 45 calls (2 a
+  smoke test) for 1,242 readings, of a cap of 1,500; plan usage as Claude Code reports it 10.57 USD; Codex no charge a
+  call. Every reading put in the taught language by code first. **Agreement 410 of 621 (66%)**: 359 the same act, 51 the
+  same act with a form's name, office or option implied by its card. Dropped: 196 disagreed, 13 a letter with no text
+  (both readers wrote `message(to=…)`: the seat named a recipient and nothing to say), 2 not a program. What the 196 are
+  about: a refusal against an act 90 (`look_first` or `no_such_act` against a form or a letter: requests too vague to
+  say whether there is an act), arguments 29, refusal labels 28 (`look_first` / `no_such_act` / `unclear`), other
+  functions or forms 26 (a form against a letter), one line against two 23 (the folded "Write to:"). 87 of the 196 are
+  folded-letter requests. Kept: train 279 (acts 168, refusals 111), test 131 (acts 62, refusals 69). The seat's sign-off
+  is recorded, never used. Leak check (`leak-check.ts`): none.
+- **Trained** round 3's control recipe (deberta-v3-small, 6 epochs, `--forms 0`) on v5's data (`joined-v5`, the taught
+  language) plus the 279 train rows four times (`v4-pilot/join.ts`), two seeds: an RTX 4000 Ada at 0.20 an hour (215
+  minutes) and an RTX A5000 at 0.27 (175 minutes; community cards at 0.30 or less could not be had for an hour first;
+  two dearer pods were ended at once). Balance 7.91 to 6.39, under the cap of 3 checked before each rental.
+- **Scored** (`round5/score.sh`, `summary.py`, `small-models/tables.py`), round 3 seed 2 (served by name) as served,
+  beside the two new seeds. Held-out small-model side (131; right in all; alone, every draft offered: right / wrong /
+  asked back; at the cut certified on validation: served, right, wrong):
+
+  | | round3-s2 | seed 1 | seed 2 |
+  |---|---|---|---|
+  | qwen2.5 7B (96) | 32 | 52 | 57 |
+  | qwen2.5 14B (27) | 2 | 6 | 10 |
+  | Haiku 5.5 (8) | 8 | 8 | 8 |
+  | all: acts (62) / refusals (69) | 14 / 28 | 22 / 44 | 24 / 51 |
+  | sharing no five words with train (56) | 14 | 32 | 37 |
+  | alone: right / wrong / asked back | 42 / 63 / 26 | 60 / 53 / 18 | 71 / 52 / 8 |
+  | at the certified cut: served (right, wrong) | 25 (20, 5) | 12 (10, 2) | 13 (12, 1) |
+  | forms in the key (43) | 9 | 16 | 19 |
+
+  Claude's requests (right in all; certified cut: served right, wrong), round3-s2 then seeds 1, 2 (v5's seeds, the same
+  recipe without these rows, in brackets): validation-real 539, 547, 541 (537, 542); pilot test side 334, 330, 327
+  (328, 331); at the cut 222 (2), 222 (1), 218 (1) (153, 194); unseen forms 808, 801, 806 (809, 810); at the cut 545,
+  400, 556 (138, 220). Alone on the pilot's sides, drafts right / wrong / asked back: round3-s2 591 / 53 / 21, seeds
+  585 / 77 / 3 and 582 / 83 / 0 (v5 582 / 79 / 4 and 582 / 81 / 2).
+- **Reading.** (a) A few hundred of a writer's own requests move this translator where relabelling did not: on held-out
+  seat-days the 7B goes from a third right to over half, and the gain holds where no five words are shared with
+  training (14 to 32 and 37 of 56). Most of it is refusals (a note to itself, a review of its own papers: the 7B's
+  commonest kind) and the 14B's form fills; acts stay weak (14 to 22 and 24 of 62). (b) It costs Claude's requests
+  nothing against the same recipe without them (v5); the rise in wrong drafts alone against round3-s2 is the taught
+  relabel's, as v5 found. (c) It does not reach the served mark: at the certified cut almost no small-model request is
+  served (12 and 13 of 131), so a study arm of a small model with our translator alone still serves it by drafts offered
+  under the cut, and about 40% of those are wrong. (d) Not switched: the coordinator decides. Seed 2 is the better of
+  the two on every small-model line and on unseen forms at the cut; seed 1 on validation-real.
+- **What no training mends** (the answer is the seat's presentation or the model's limit): the folded "Write to:"
+  (a third of the 7B's distinct requests and 44% of the readers' disagreements: a parsing rule of the note, not
+  translation); the bulleted Do split into field fragments ("buyer: shop-4") and more than eight acts dropped;
+  placeholders and guessed references (`Confirm <reference>`, `ask-87` before any ask-87 exists); letters with no
+  words; the drift out of English; requests too vague for two strong readers to agree whether an act is meant (90). And
+  requests of several acts of one kind ("draft delivery notes for referrals A, B and C"), which the model miscounts and
+  answers with a form name of its own ("draft_delivery_notes"), as rounds 2 and the slot decoding found for Claude's.
+- **Revisit if:** more small-model requests are keyed (the cheapest: further local 14B runs, which give acts where the
+  7B gives mostly refusals; another open-weight family; the note's "Write to:" rule fixed first, or a third of the 7B's
+  requests stay unreadable); or a run shows served-first-time rising with seed 2 in the seat's place.
+
 ## 2026-11-11 · An interrupted fork takes itself up from its own log (orchestrator/src/experiment.ts `runArm`, resume.ts `ForkReplay`)
 
 - **What changed:** a model fork whose log has no result (killed, or stopped for want of the model) was renamed
@@ -12943,3 +13001,4 @@ From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11
 - **Revisit if:** a letter's first line is taken as whom (a single word on the line under a bare "Write to"); fields
   of separate things are merged ("Do: Pay rent: 500" after another Do); a model writes whom by name without ids below
   "Write to" (only counted before a colon).
+

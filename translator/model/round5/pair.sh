@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Translator v5: two seeds served only where both write the same program (round 3's serving), the cut certified on
 # validation (vr + vp + nv) and read on the test side and unseen forms (v4-serve.ts).   round5/pair.sh <A tag> <B tag>
-W=${0:A:h:h:h:h}; R=${OIKOS_RUNS:-/Users/clawd/oikos/runs}/translator-v5-2026-11-10
+W=${0:A:h:h:h:h}; R=${OIKOS_ROUND:-${OIKOS_RUNS:-/Users/clawd/oikos/runs}/translator-v5-2026-11-10}
 A=$1; B=$2
 cd $W
 f() { print $R/scores/$1-$2.decide_*.jsonl; }
