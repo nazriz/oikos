@@ -95,6 +95,13 @@ export interface Options {
    * `matter` (the default: the facts, and the assistant works the paper out) or `act` (the finished act, as rounds 1 to 5
    * did). docs/design/handing-over.md, step H5. */
   depth?: "act" | "matter";
+  /** The obstacle laws' level (docs/design/obstacles.md section 6): 0 or absent, none (the world as before); 1, each
+   * body at its ordinary figure; 2, at the strained end. */
+  obstacles?: 0 | 1 | 2;
+  /** A second provider's desk (docs/design/obstacles.md, B8): the households' cohort split by turns between provider
+   * A's paid personal offer and provider B's, each desk with a cohort of its own (both providers are in the profile's
+   * offers already). Absent: provider A's desk alone, as before. */
+  secondDesk?: boolean;
   /** Whether the households hand over their wants (`want-<about>` at want depth: the desk chooses the way) beside their
    * papers (step H4). Off: they hand over finished papers only, the control. */
   wants?: boolean;
@@ -120,7 +127,7 @@ export function build(o: Options): ExperimentSpec {
     name: o.name,
     world: {
       file: "worlds/town-1000.yaml",
-      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : [])],
+      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : [])],
       prepare(config: any, seed: number) {
         for (const post of o.offices ?? OFFICES) {
           const pos = config.positions.find((x: any) => x.id === post);
@@ -134,7 +141,8 @@ export function build(o: Options): ExperimentSpec {
         const people = config.participants.filter((p: any) => p.kind === "person" && adults.has(p.person) && p.controller?.params?.delegation && !p.shares_body).sort((a: any, b: any) => (a.id < b.id ? -1 : 1));
         const c = o.cohort ?? { by: "hand", every: COHORT_EVERY };
         const cohort = people.filter((_: any, i: number) => i % c.every === seed % c.every);
-        if (c.by === "hand") for (const p of cohort) p.controller = { ...p.controller, params: { ...p.controller.params, delegation: { ...structuredClone(p.controller.params.delegation), review_days: o.reviewDays, commit: commit("personal-assistant-a", o.wants ? { ...PERSON_LEVELS, ...WANT_LEVELS } : PERSON_LEVELS) } } };
+        // (With a second desk, every other member of the cohort engages provider B's paid offer at the same levels.)
+        if (c.by === "hand") cohort.forEach((p: any, i: number) => { p.controller = { ...p.controller, params: { ...p.controller.params, delegation: { ...structuredClone(p.controller.params.delegation), review_days: o.reviewDays, commit: commit(o.secondDesk && i % 2 === 1 ? "personal-assistant-b" : "personal-assistant-a", o.wants ? { ...PERSON_LEVELS, ...WANT_LEVELS } : PERSON_LEVELS) } } }; });
         if (c.by === "reach" || c.only) {
           // (The offer reaches the cohort and nobody else: the rest are shown no provider's offer, and have no rule for one.)
           const reached = new Set(cohort.map((p: any) => p.id));
