@@ -12675,3 +12675,26 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
 - **Byte-identical at level 0:** as for B2 (the same configs; the same state hashes and log digests at 45 days).
 - **Revisit if:** the screen shows the desk's clients never get past a body's return (then the person's rule for giving
   an authority is wrong, or too narrow), or authorities need renewing (a body's review of a standing arrangement).
+
+## 2026-11-11 · Obstacles B7: readiness to grant from the cost of delay (docs/design/obstacles.md section 10)
+
+- **What:** a kind's facts may say what a day's delay of a matter costs the principal (`KindFacts.late_cost_day`), and
+  the principal keeps how long the matters it handed over waited on its own answer (`Seen.waited`, from a draft or a
+  request to go ahead coming in to its reading of it), only for kinds whose delay is costed. Answering a request for a
+  level, its rule weighs `draft` and `approve` with that wait at that cost (`rule::cost_waiting`; the review's rule is
+  unchanged). A request for one matter alone (`ScopeRequest.only`, a new plain blank on the request form at obstacle
+  levels) is weighed as one matter and granted, where it pays by the hurdle, by a remit for that matter alone
+  (`Remit.only`); the kind's own remit stands for every other matter. `oikos-kernel delegation` reads an act on that
+  matter at the level granted for it.
+- **The figure:** for a claim for support, a day of the least payment the place's support law makes (derived from the
+  profile's payments, generator `lateCost`, at levels 1 and 2 only). No other kind's delay is costed: no figure says
+  what a day's delay of a job application or a loan application costs, so none is invented. The hurdle stays one figure
+  across arms (2,000 bps, placeholder, MT-32).
+- **What to expect, said plainly:** a principal answers a draft within minutes of reading it, and a person reads at
+  their next wake, so the wait is short and grants will be few until post-holders keep working hours (the lead's later
+  step). A grant is then the principal's own rule meeting a real delay, never a disposition set to produce one.
+- **Byte-identical at level 0:** nothing is costed and nothing is kept where no kind has a cost of delay; the
+  configs at level 0 are unchanged.
+- **Revisit if:** the screen at level 2 shows no grant at all (then the lower-hurdle cell of section 10, stated as a
+  condition of the principal), or a kind's delay gets a source (a late lodgement penalty in a profile's tax law).
+

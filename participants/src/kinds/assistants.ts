@@ -44,8 +44,8 @@ export const ASSISTANT_ISSUES: Issued[] = [
 export function withObstacles(issues: Issued[]): Issued[] {
   const out = issues.map((x) => (x.form !== "scope_request" ? x : {
     ...x,
-    fields: { ...x.fields, authority: f("entity", "A body you ask them to give their authority with, for you to act for them there, if any.") },
-    writes: { ...x.writes!, data: { ...(x.writes!.data as object), authority: "=authority" } },
+    fields: { ...x.fields, authority: f("entity", "A body you ask them to give their authority with, for you to act for them there, if any."), only: f("record", "The one matter you ask the level for, if for that one alone.") },
+    writes: { ...x.writes!, data: { ...(x.writes!.data as object), authority: "=authority", only: "=only" } },
   }));
   out.push({ form: "send_again", title: "Sending a paper again as it was, after a body sent it back",
     does: "Sends the paper a body sent back exactly as it was, to whom it went, citing it: once the authority it wanted is on file, or where the body could not match it. Nothing in it can be changed: to change anything, write it again.",

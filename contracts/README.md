@@ -909,3 +909,6 @@ unchanged to the byte.
 - **B3, an authority on file (O1):** at levels 1 and 2 a body's `requires.authority` names the kinds it acts on for a
   person only on their own word or an authority they gave it. `ScopeRequest.authority` reaches the request form (one
   plain blank: the body); the principal answers it by giving the authority, `reasons` `lodged` or `not_lodged`.
+- **B7, readiness to grant:** `KindFacts.late_cost_day` (a principal's parameters), `Seen.waited` and `Seen.waits`
+  (its saved state), `Remit.only` (a level for one matter alone, granted on `ScopeRequest.only`, now on the request form
+  at obstacle levels).

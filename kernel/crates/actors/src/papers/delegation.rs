@@ -299,6 +299,10 @@ pub struct Remit {
     /// What is handed over of a matter of this kind: the finished act, or what happened.
     #[serde(default, skip_serializing_if = "Depth::is_act")]
     pub depth: Depth,
+    /// This one matter alone (a referral), granted on a request for it: the level for that matter; the kind's stands
+    /// as it was for every other (docs/design/obstacles.md section 10).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub only: Option<String>,
 }
 impl Paper for Remit {
     const KIND: &'static str = "remit";

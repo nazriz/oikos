@@ -557,6 +557,7 @@ impl State {
                 self.read_for_want(r, &action, &m, &x, t, cx);
                 return;
             }
+            self.waited(&m.kind, &m.agreement, t - r.at);
             let differs = if m.facts.is_some() { matter_differs(&m, &x) } else { vec![] };
             let wrong = if m.facts.is_some() {
                 !differs.is_empty()
@@ -590,7 +591,8 @@ impl State {
             }
         } else if let Some(x) = papers::read::<ApprovalRequest>(r) {
             let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
-            let Some(m) = self.matters.get(&action) else { return };
+            let Some(m) = self.matters.get(&action).cloned() else { return };
+            self.waited(&m.kind, &m.agreement, t - r.at);
             let d = GoAhead { request: r.id.to_string(), referral: x.referral.clone() };
             let agreement = m.agreement.clone();
             self.paper(GoAhead::KIND, &format!("Go ahead with {}.", x.referral), &agreement, &r.id, papers::data(&d), Then::Plain);
@@ -656,6 +658,13 @@ impl State {
                     self.myself(&action, &m, "The service has ended with this matter still open: doing it ourselves.");
                 }
             }
+        }
+    }
+
+    /// A matter of a kind whose delay it costs waited `secs` on its answer (docs/design/obstacles.md section 10).
+    fn waited(&mut self, kind: &str, agreement: &str, secs: i64) {
+        if self.p.kinds.get(kind).is_some_and(|f| f.late_cost_day > 0) {
+            self.seen.entry(Self::key(agreement, kind)).or_default().waited_for(secs);
         }
     }
 
@@ -763,7 +772,7 @@ impl State {
             .rev()
             .filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str()) && !self.book.withdrawn(&r.id))
             .filter_map(|r| papers::read::<Remit>(r))
-            .find(|x| x.agreement == agreement && x.kind == kind)
+            .find(|x| x.agreement == agreement && x.kind == kind && x.only.is_none())
             .map_or(Level::None, |x| x.level)
     }
 
@@ -773,7 +782,7 @@ impl State {
             .all(Remit::KIND)
             .rev()
             .filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str()) && !self.book.withdrawn(&r.id))
-            .find(|r| papers::read::<Remit>(r).is_some_and(|x| x.agreement == agreement && x.kind == kind))
+            .find(|r| papers::read::<Remit>(r).is_some_and(|x| x.agreement == agreement && x.kind == kind && x.only.is_none()))
             .map(|r| r.id.to_string())
     }
 
@@ -804,7 +813,7 @@ impl State {
             .rev()
             .filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str()))
             .filter_map(|r| papers::read::<Remit>(r))
-            .find(|x| x.agreement == agreement && x.kind == kind)
+            .find(|x| x.agreement == agreement && x.kind == kind && x.only.is_none())
     }
 
     /// Whether it has said it will not look at a kind's level again yet (its newest remit's `hold_until`, a freeze).
@@ -951,12 +960,24 @@ impl State {
                 inputs.extend(self.inputs(&e, &[(k.clone(), seen.clone())].into_iter().collect()));
                 let kd = kinds.get(&k).copied().unwrap_or_default();
                 let p = rule::estimate(e.offer.claim_slip_bps, w.prior_matters, &seen);
-                let (c_now, c_want) = (rule::cost(now, &kd, p, &w), rule::cost(level, &kd, p, &w));
-                if (c_now - c_want) * 10_000 > c_want.max(1) * i128::from(w.hurdle_bps.max(0)) {
+                let wait = seen.wait_milli_days();
+                // (Asked for one matter alone, open with it: that one matter weighed.)
+                let one = x.only.clone().filter(|rf| self.by_referral.contains_key(rf));
+                let kd = if one.is_some() { rule::Kind { per_month: 1, ..kd } } else { kd };
+                let (c_now, c_want) = (rule::cost_waiting(now, &kd, p, &w, wait), rule::cost_waiting(level, &kd, p, &w, wait));
+                if let (Some(rf), true) = (one.clone(), (c_now - c_want) * 10_000 > c_want.max(1) * i128::from(w.hurdle_bps.max(0))) {
+                    words.push(format!("For {rf} alone: {}. Our remit for {} stands for every other.", level.words(), plural(&named)));
+                    remit = Some(Remit { agreement: a.clone(), kind: k.clone(), level, hold_until: None, takes_back: vec![], answers: Some(id.to_string()), at_least: None, depth: self.depth_for(&e.offer, &k), only: Some(rf) });
+                    Why::Granted
+                } else if one.is_some() {
+                    let money = |n: i128| money_words(n as i64, &cx.ctx.world);
+                    words.push(format!("By our own figures that matter {} would cost us about {}, against {} as it is, so we keep it as it is.", level.words(), money(c_want), money(c_now)));
+                    Why::CostsMore
+                } else if (c_now - c_want) * 10_000 > c_want.max(1) * i128::from(w.hurdle_bps.max(0)) {
                     let back = if hands_over(level) { vec![] } else { self.take_back(&a, &k) };
                     words.push(format!("From now, {}: {}. It stands until a remit of ours changes it.{}", plural(&named), level.words(), taken_back(&back)));
                     let (at_least, hold_until) = self.floor(&a, &k, t).map_or((None, None), |(f, h)| (Some(f), Some(h)));
-                    remit = Some(Remit { agreement: a.clone(), kind: k.clone(), level, hold_until, takes_back: back, answers: Some(id.to_string()), at_least, depth: self.depth_for(&e.offer, &k) });
+                    remit = Some(Remit { agreement: a.clone(), kind: k.clone(), level, hold_until, takes_back: back, answers: Some(id.to_string()), at_least, depth: self.depth_for(&e.offer, &k), only: None });
                     Why::Granted
                 } else {
                     let money = |n: i128| money_words(n as i64, &cx.ctx.world);
@@ -1032,7 +1053,10 @@ impl State {
         let mut lines = format!("Your request {id}: {}", words.join(" "));
         if let Some(rm) = remit {
             self.changed = true;
-            let rw = format!("From now, {}s: {}. It stands until a remit of ours changes it.{}", rm.kind.replace('_', " "), rm.level.words(), taken_back(&rm.takes_back));
+            let rw = match &rm.only {
+                Some(rf) => format!("For {rf} alone: {}.", rm.level.words()),
+                None => format!("From now, {}s: {}. It stands until a remit of ours changes it.{}", rm.kind.replace('_', " "), rm.level.words(), taken_back(&rm.takes_back)),
+            };
             self.paper(Remit::KIND, &rw, &a, id, papers::data(&rm), Then::Plain);
             lines.push_str(" Our remit says so.");
         }
@@ -1377,7 +1401,7 @@ impl State {
                         let to = if now.rank() < want.rank() { want } else { now };
                         cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": now, "to": to, "committed": why, "at_least": want, "hold_until": until, "inputs": self.inputs(&e, &seen) }));
                         let words = format!("From now, {}s: {}. We have agreed to keep them with you at least at {} until {}; after that, until a remit of ours changes it.", k.replace('_', " "), to.words(), want.word(), crate::common::when_words(until, &cx.ctx.world));
-                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: to, hold_until: Some(until), takes_back: vec![], answers: None, at_least: Some(want), depth: self.depth_for(&e.offer, k) };
+                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: to, hold_until: Some(until), takes_back: vec![], answers: None, at_least: Some(want), depth: self.depth_for(&e.offer, k), only: None };
                         self.changed = true;
                         self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
                         continue;
@@ -1389,7 +1413,7 @@ impl State {
                         cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": self.remit(&a, k), "to": want, "committed": why, "hold_until": until, "inputs": self.inputs(&e, &seen) }));
                         let back = if hands_over(want) { vec![] } else { self.take_back(&a, k) };
                         let words = format!("From now, {}s: {}. This level is fixed until {}. It does not expire: after that day it stays in force until we send a new remit.{}", k.replace('_', " "), want.words(), crate::common::when_words(until, &cx.ctx.world), taken_back(&back));
-                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: Some(until), takes_back: back, answers: None, at_least: None, depth: self.depth_for(&e.offer, k) };
+                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: Some(until), takes_back: back, answers: None, at_least: None, depth: self.depth_for(&e.offer, k), only: None };
                         self.changed = true;
                         self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
                     }
@@ -1424,7 +1448,7 @@ impl State {
                 let back = if hands_over(want) { vec![] } else { self.take_back(&a, k) };
                 let kept = floor.map(|(f, h)| format!(" We have agreed to keep them with you at least at {} until {}.", f.word(), crate::common::when_words(h, &cx.ctx.world))).unwrap_or_default();
                 let words = format!("From now, {}s: {}. It stands until a remit of ours changes it.{kept}{}", k.replace('_', " "), want.words(), taken_back(&back));
-                let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: floor.map(|(_, h)| h), takes_back: back, answers: None, at_least: floor.map(|(f, _)| f), depth: self.depth_for(&e.offer, k) };
+                let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: floor.map(|(_, h)| h), takes_back: back, answers: None, at_least: floor.map(|(f, _)| f), depth: self.depth_for(&e.offer, k), only: None };
                 self.changed = true;
                 self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
             }

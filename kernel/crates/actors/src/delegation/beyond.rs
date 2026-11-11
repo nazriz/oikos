@@ -21,6 +21,8 @@ struct RemitSeen {
     kind: String,
     level: String,
     id: String,
+    /// For one matter alone (a referral): docs/design/obstacles.md section 10.
+    only: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -263,7 +265,7 @@ impl Reader {
             "service_offer" => {
                 self.providers.insert(sf);
             }
-            "remit" => self.remits.push(RemitSeen { t, principal: sf, kind: s(&d["kind"]).unwrap_or_default().into(), level: s(&d["level"]).unwrap_or("none").into(), id }),
+            "remit" => self.remits.push(RemitSeen { t, principal: sf, kind: s(&d["kind"]).unwrap_or_default().into(), level: s(&d["level"]).unwrap_or("none").into(), id, only: s(&d["only"]).map(String::from) }),
             "referral" => {
                 if s(&d["depth"]) == Some("want") {
                     self.wants.push(WantSeen { t, referral: id.clone(), principal: sf.clone(), kind: s(&d["kind"]).unwrap_or_default().into(), about: s(&d["want"]["about"]).unwrap_or_default().into(),
@@ -304,7 +306,7 @@ impl Reader {
 
     /// The newest remit a principal made for a kind by `t`: its level (`none` where there is none).
     fn level(&self, principal: &str, kind: &str, t: i64) -> String {
-        self.remits.iter().rev().find(|x| x.principal == principal && x.kind == kind && x.t <= t).map_or("none".into(), |x| x.level.clone())
+        self.remits.iter().rev().find(|x| x.principal == principal && x.kind == kind && x.t <= t && x.only.is_none()).map_or("none".into(), |x| x.level.clone())
     }
 
     /// A paper of any other kind: sorted if an assistant wrote it in its principal's name.
@@ -370,6 +372,11 @@ impl Reader {
         if let Some(rf) = &referral {
             self.referral_of.insert(id.to_string(), rf.clone());
         }
+        // (Granted a level for this one matter alone: what it was handed at is that level.)
+        let wants = match referral.as_ref().and_then(|rf| self.remits.iter().rev().find(|x| x.only.as_deref() == Some(rf.as_str()) && x.t <= t)) {
+            Some(x) => Some(x.level.clone()),
+            None => wants,
+        };
         let signed = referral.as_ref().and_then(|rf| self.sign_offs.iter().rev().find(|(st, srf, _)| srf == rf && *st <= t).cloned());
         let went = referral.as_ref().is_some_and(|rf| self.go_aheads.iter().any(|(gt, grf)| grf == rf && *gt <= t));
         let as_signed = signed.as_ref().is_none_or(|(_, _, paper)| paper.as_ref().is_none_or(|p| same_paper(p, kind, r)));

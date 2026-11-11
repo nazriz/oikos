@@ -434,6 +434,11 @@ authority; the person's code gives it, once for each body and post, where it kee
 body records it (telling the person and the post), the desk sends the paper again. A model at the desk may ask its
 client for the one authority on its request form (`authority`: the body).
 
+**Readiness to grant from the cost of delay (2026-11-11).** Where a kind's day of delay is costed (at obstacle levels,
+a claim for support: a day of the least payment), the principal counts how long matters waited on its own answer, and
+weighs a request for a higher level, or for one matter alone, with that wait at that cost. A matter granted alone gets a
+remit of its own (`Remit.only`); every other matter of the kind stays as it was.
+
 ## Leaves out (for now)
 
 - A local provider (a firm of the town with premises): providers are the outside world's until a profile asks for one.
