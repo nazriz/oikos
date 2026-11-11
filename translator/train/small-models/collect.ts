@@ -53,7 +53,7 @@ for (const log of logs) {
       const rt = d ? route.get(d) : undefined, f = d ? failure.get(d) : undefined, dr = d ? draft.get(d) : undefined;
       const stage: string | undefined = rt?.stage;
       const outcome = !d ? "never_reached" : dr ? (stage === "restated" ? "served_after_restatement" : "served_first_time") : f ? (stage === "restated" ? "never_served" : "asked_back") : "unknown";
-      const forms = (d && shownForms.get(d)) ?? r.forms ?? x.forms ?? [];
+      const forms: string[] = (d ? shownForms.get(d) : undefined) ?? r.forms ?? x.forms ?? [];
       const named = [...new Set(r.request.match(IDS) ?? [])];
       const unseen = named.filter((id) => !x.shown.includes(id) && !x.system.includes(id) && !forms.some((l) => l.includes(id)));
       rows.push({

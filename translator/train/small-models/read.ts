@@ -13,9 +13,10 @@ import { askReader, Caller, implausiblyUniform } from "../../../orchestrator/src
 const args = process.argv.slice(2);
 const opt = (k: string, d: number) => (args.includes(`--${k}`) ? Number(args[args.indexOf(`--${k}`) + 1]) : d);
 const pos = args.filter((a, i) => !a.startsWith("--") && !args[i - 1]?.startsWith("--"));
-const [split, out, ...readers] = pos;
-if (!split || !out || readers.length !== 2 || readers[0] === readers[1]) throw new Error("usage: bun read.ts <split dir> <out dir> <reader A> <reader B> [--batch N] [--jobs N] [--budget USD] [--cap N]");
+const [split, outArg, ...readers] = pos as [string | undefined, string | undefined, ...string[]];
+if (!split || !outArg || readers.length !== 2 || readers[0] === readers[1]) throw new Error("usage: bun read.ts <split dir> <out dir> <reader A> <reader B> [--batch N] [--jobs N] [--budget USD] [--cap N]");
 if (readers.some((r) => r.includes("gpt-6-astra"))) throw new Error("gpt-6-astra is never used");
+const out: string = outArg;
 const BATCH = opt("batch", 30), JOBS = opt("jobs", 3), CAP = opt("cap", 1500);
 mkdirSync(out, { recursive: true });
 const ledger = join(out, "calls.jsonl");

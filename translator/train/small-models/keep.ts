@@ -72,7 +72,7 @@ const [A, B] = readers as [string, string];
 const aAns = answersOf(A), bAns = answersOf(B);
 const unl = requests.map((r) => ({ id: r.id, request: r.request, forms: r.forms, ...(r.currency ? { currency: r.currency } : {}), from: { writer: `${r.model} (seat)` } }));
 const got = labelled(unl, [{ reader: A, answers: aAns }, { reader: B, answers: bAns }]);
-const aOf = new Map(aAns.map((x: any) => [x.id, x.program])), bOf = new Map(bAns.map((x: any) => [x.id, x.program]));
+const aOf = new Map<string, string>(aAns.map((x: any) => [x.id, x.program])), bOf = new Map<string, string>(bAns.map((x: any) => [x.id, x.program]));
 // Implied by its card (as v4-pilot/keep.ts): both readers write the same act, and what is not in the request's words
 // is only a form's name, its office or one of a field's options, each shown on the form's card.
 const implied: any[] = [];
@@ -96,7 +96,8 @@ function about(a?: string, b?: string): string {
   let pa: calls.Program, pb: calls.Program;
   try { pa = calls.parseProgram(withListsQuoted(a)); pb = calls.parseProgram(withListsQuoted(b)); } catch { return "not_a_program"; }
   if ("none" in pa && "none" in pb) return `refusal labels: ${[pa.none, pb.none].sort().join(" / ")}`;
-  if ("none" in pa || "none" in pb) return `refusal against act: ${"none" in pa ? pa.none : pb.none} / ${("none" in pa ? pb : pa).lines.map((l) => l.call.fn).join("+")}`;
+  if ("none" in pa) return `refusal against act: ${pa.none} / ${"lines" in pb ? pb.lines.map((l) => l.call.fn).join("+") : ""}`;
+  if ("none" in pb) return `refusal against act: ${pb.none} / ${pa.lines.map((l) => l.call.fn).join("+")}`;
   const fa = pa.lines.map((l) => l.call.fn + (l.call.args.form && "id" in l.call.args.form ? `:${l.call.args.form.id}` : "")), fb = pb.lines.map((l) => l.call.fn + (l.call.args.form && "id" in l.call.args.form ? `:${l.call.args.form.id}` : ""));
   if (fa.length !== fb.length) return `lines: ${fa.length} / ${fb.length}`;
   if (fa.join("+") !== fb.join("+")) return `functions or forms: ${fa.join("+")} / ${fb.join("+")}`.replace(/:[\w.-]+/g, (m) => m).slice(0, 120);
