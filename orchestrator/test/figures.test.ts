@@ -75,9 +75,9 @@ test("every profile's town is counted, and no number in any is unbased", () => {
   const found = new Set<string>();
   const used = new Set<number>();
   // (Each profile's plain town, and two living ones, with founding, for the parameters only a living town is given; and one
-  // with skills by use, assistants hosted in the town and the outside's releases, for their figures; and one under the
+  // with skills by use, assistants hosted in the town (with the obstacle laws on) and the outside's releases, for their figures; and one under the
   // scenarios that set a module's parameters, each with its basis.)
-  const towns = [...ids.map((id) => ({ id, extra: {} })), ...LIVING.map((id) => ({ id, extra: { living: { founding: true } } })), { id: LIVING[0]!, extra: { skills: true, tools: true, assistants: true, assistant_seats: ["assistant-a", "assistant-a-personal"], hosting: "local", capability: { tag: "ai", of: ["case-handling-system"], every_days: 182, time_bps: 8000, slip_bps: 8000, price_bps: 10_000 } } }, { id: LIVING[0]!, extra: { scenario: ["export-slump", "energy-price-shock", "falling-system-prices", "election-due"] } }];
+  const towns = [...ids.map((id) => ({ id, extra: {} })), ...LIVING.map((id) => ({ id, extra: { living: { founding: true } } })), { id: LIVING[0]!, extra: { skills: true, tools: true, assistants: true, assistant_seats: ["assistant-a", "assistant-a-personal"], obstacles: 1, hosting: "local", capability: { tag: "ai", of: ["case-handling-system"], every_days: 182, time_bps: 8000, slip_bps: 8000, price_bps: 10_000 } } }, { id: LIVING[0]!, extra: { scenario: ["export-slump", "energy-price-shock", "falling-system-prices", "election-due"] } }];
   for (const { id, extra } of towns) {
     const config = generate({ ...spec, ...extra, citizens: 60, profile: id });
     const r = figuresFor(config, { profile: id });

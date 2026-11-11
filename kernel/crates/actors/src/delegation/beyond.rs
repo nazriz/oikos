@@ -77,6 +77,8 @@ pub struct Reader {
     /// they name is in.
     obstacles: Vec<ObstacleSeen>,
     obstacle_of: BTreeMap<String, usize>,
+    /// The papers an assistant's seat wrote: which seat.
+    wrote: BTreeMap<String, String>,
 }
 
 /// An obstacle as the law that made it logged it (`decision`, domain `obstacle`), with the paper that told of it, once
@@ -96,6 +98,8 @@ struct ObstacleSeen {
     slip: bool,
     /// The paper that told of it, once recorded: (t, id, to whom).
     shown: Option<(i64, String, Vec<String>)>,
+    /// When it reached a seat, and which: the body's paper, or the same passed on by whom the paper was for.
+    met: Option<(i64, String)>,
 }
 
 /// How far back a request that names no matter is set beside an obstacle met on its principal's matters: 30 days.
@@ -201,6 +205,7 @@ impl Reader {
                 clears_by: s(&d["clears_by"]).map(String::from),
                 slip: d["slip"].as_bool().unwrap_or(false),
                 shown: None,
+                met: None,
             });
             return;
         }
@@ -246,6 +251,23 @@ impl Reader {
         let id = s(&r["id"]).unwrap_or_default().to_string();
         let sf = s(&r["speaks_for"]).unwrap_or_default().to_string();
         let d = &r["data"];
+        // (Which seat wrote each paper: an obstacle on it is met when what tells of it reaches that seat.)
+        if let Some(p) = s(&r["in_position"]).filter(|p| self.is_seat(p)) {
+            self.wrote.insert(id.clone(), p.to_string());
+        }
+        // (What tells of an obstacle, reaching a seat: the body's own paper, or its words passed on by whom the paper
+        // was for (a person passes to their desk what a body wrote to them). Addressed to the seat's post, or to the
+        // organisation or provider whose post it is.)
+        let told = bases(r).into_iter().chain(s(&d["returned"]).map(String::from)).filter_map(|b| self.obstacle_of.get(b.as_str()).copied()).collect::<Vec<_>>();
+        for i in told {
+            let paper = self.obstacles[i].paper.clone();
+            let Some(seat) = self.wrote.get(&paper).cloned() else { continue };
+            let ent = self.entity_of.get(&seat).cloned();
+            let to: Vec<&str> = r["addressed_to"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
+            if self.obstacles[i].met.is_none() && to.iter().any(|a| *a == seat || Some(*a) == ent.as_deref()) {
+                self.obstacles[i].met = Some((t, seat));
+            }
+        }
         // (The paper that tells of an obstacle: its law's actor's, citing the paper refused or awaited.)
         for b in bases(r) {
             if let Some(&i) = self.obstacle_of.get(b.as_str()) {
@@ -470,10 +492,10 @@ impl Reader {
             .map(|o| {
                 let matter = self.referral_of.get(&o.paper).or_else(|| self.about.get(&o.paper)).or_else(|| self.paper_want.get(&o.paper)).cloned();
                 let kind = matter.as_ref().and_then(|m| self.referrals.get(m)).map(|x| x.kind.clone());
-                let met = o.shown.as_ref().filter(|(_, _, to)| to.iter().any(|p| self.is_seat(p)));
+                let met = o.met.clone();
                 json!({ "table": "obstacles", "t": o.t, "law": o.law, "by": o.by, "paper": o.paper, "principal": o.principal, "counterparty": o.counterparty,
                     "need": o.need, "clears_by": o.clears_by, "slip": o.slip, "matter": matter, "kind": kind,
-                    "shown_by": o.shown.as_ref().map(|x| x.1.clone()), "met_at": met.map(|x| x.0), "seat": met.and_then(|x| x.2.iter().find(|p| self.is_seat(p)).cloned()) })
+                    "shown_by": o.shown.as_ref().map(|x| x.1.clone()), "met_at": met.as_ref().map(|x| x.0), "seat": met.map(|x| x.1) })
             })
             .collect()
     }
@@ -608,7 +630,7 @@ mod tests {
             e["body"]["record"]["basis"] = json!(paper);
             e
         };
-        let (a, b) = (told(5, "ret1", "dn1", &["mgr-assistant", "f1"]), told(9, "ret2", "dn2", &["f1"]));
+        let (a, b) = (told(5, "ret1", "dn1", &["mgr-assistant", "f1"]), told(9, "ret2", "dn2", &["auditor"]));
         let mut again = rec(6, "dn1b", "delivery_note", "f1", "mgr-assistant", &["shop"], json!({ "order": "o1" }));
         again["body"]["record"]["basis"] = json!(["ret1"]);
         for e in [
@@ -629,7 +651,7 @@ mod tests {
         let rows = r.rows();
         let ob_row = |p: &str| rows.iter().find(|x| x["table"] == "obstacles" && x["paper"] == p).cloned().expect("logged");
         assert_eq!((ob_row("dn1")["met_at"].clone(), ob_row("dn1")["matter"].clone()), (json!(5), json!("rf1")), "met when the paper reached its seat");
-        assert_eq!(ob_row("dn2")["met_at"], Value::Null, "told only to the firm, never to the seat: logged, not met");
+        assert_eq!(ob_row("dn2")["met_at"], Value::Null, "told only to someone else, never to the seat or its organisation: logged, not met");
         let act = rows.iter().find(|x| x["record"] == "dn1b").expect("the paper sent again");
         assert_eq!((act["referral"].clone(), act["class"].clone()), (json!("rf1"), json!("within")));
         let q = rows.iter().find(|x| x["table"] == "requests").expect("the request");

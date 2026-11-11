@@ -250,6 +250,9 @@ pub struct State {
     /// The authorities it has given a body for its assistant's post (`body|post`): docs/design/obstacles.md, O1.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     lodged: BTreeSet<String>,
+    /// The bodies' papers it has passed on to its desk.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    passed: BTreeSet<String>,
 }
 
 pub struct Delegating {
@@ -292,6 +295,7 @@ impl Delegating {
                 changed: false,
                 venues: vec![],
                 lodged: BTreeSet::new(),
+                passed: BTreeSet::new(),
             },
         })
     }
@@ -410,6 +414,7 @@ fn ours(r: &Record, complaints: &[String], book: &Book, from_assistant: &dyn Fn(
     match &r.body {
         RecordBody::Statement { kind, data, .. } => {
             PAPERS.contains(&kind.as_str())
+                || [crate::common::intake::RETURNED, crate::common::intake::RECORDED, crate::common::intake::AUTHORITY].contains(&kind.as_str())
                 || complaints.iter().any(|c| c == kind.as_str())
                 || (kind.as_str() == "order" && data.as_ref().and_then(|d| d.get("kind")).and_then(|k| k.as_str()).is_some_and(|k| k.starts_with("service:")))
         }
@@ -503,6 +508,10 @@ impl State {
         // (An order for a service made in its own name and post, however it came to be made: a delivery for it is its own.)
         if papers::is_kind(r, "order") && r.speaks_for.as_deref() == Some(self.me.as_str()) && r.position.as_deref() == self.position.as_deref() {
             self.eng.ordered(&r.id);
+            return;
+        }
+        if to_me && self.p.post.is_none() && (papers::is_kind(r, crate::common::intake::RETURNED) || papers::is_kind(r, crate::common::intake::RECORDED)) {
+            self.pass_on(r);
             return;
         }
         if let Some(x) = papers::read::<Report>(r) {
@@ -1159,6 +1168,26 @@ impl State {
     }
 
     /// A paper of its own to its assistant, about a service.
+    /// A person's desk is told what a body wrote to the person about a paper the desk sent for them, or an authority the
+    /// body recorded that the person gave for the desk (docs/design/obstacles.md, O1 and O4): the person passes the
+    /// body's paper on, as it stands, to its provider, as a client forwards a letter to their agent. Once each.
+    fn pass_on(&mut self, r: &Arc<Record>) {
+        let d = crate::common::data(r).to_value();
+        let ours = match d["returned"].as_str() {
+            Some(_) => d["from"].is_string(),
+            None => d["authority"].as_str().and_then(|a| self.book.get(a)).is_some_and(|a| a.speaks_for.as_deref() == Some(self.me.as_str())),
+        };
+        let Some(agreement) = self.in_use().and_then(|e| e.agreement.clone()).filter(|_| ours && !self.passed.contains(r.id.as_str())) else { return };
+        self.passed.insert(r.id.to_string());
+        let by = r.speaks_for.as_deref().unwrap_or(r.author.as_str()).to_string();
+        let mut data = d.clone();
+        data["by"] = json!(by);
+        data["for"] = json!(self.me);
+        let kind = crate::common::kind(r).unwrap_or_default().to_string();
+        let words = format!("From {by}: {}", crate::common::text(r));
+        self.paper(&kind, &words, &agreement, &r.id, data, Then::Plain);
+    }
+
     /// Its authority with a body for its assistant's post, for kinds of paper (docs/design/obstacles.md, O1): a paper of
     /// its own to the body, which the body's clerk records in its own time. Seen by the post it names, as an authority
     /// form's agent is told. Once for each body and post.
@@ -1175,7 +1204,7 @@ impl State {
             &words,
             Say {
                 to: Some(vec![with.to_string()]),
-                visible: Some(Visible::Only(vec![self.me.clone(), with.to_string(), post.to_string()])),
+                visible: Some(Visible::Only(vec![self.me.clone(), with.to_string()])),
                 basis: (!basis.is_empty()).then(|| basis.to_string()),
                 data: Some(json!({ "posts": [post], "kinds": kinds })),
                 ..Default::default()
