@@ -12546,3 +12546,74 @@ plain words and with no menu of the world's acts (P1, P2):
 - **v5** (the control recipe retrained on the taught language, two seeds, GPU 1.69 USD) was not adopted: no better on any
   set, and its sureness certifies fewer requests at the 1% mark (the entry before this one). Its folders are kept.
 - **Revisit if:** a retrain on new keyed data beats round3-s2 on the pilot's test side at the certified cut.
+
+## 2026-11-11 · Small models' requests keyed and trained on: our translator learns to read them in part (GPU 1.52 USD; no API spend)
+
+- **Collected** (`translator/train/small-models/collect.ts`; logs only read): every Do of a model seat in the local
+  open-weight runs (2026-11-10, -10b, -10c, -10d, 2026-11-11, -hours, -hours-b, -14b) and the two Haiku subscription
+  checks: 1,242 Dos (qwen2.5 7B 1,100, 14B 133, Haiku 5.5 9), of which 977 reached the translator (836, 133, 8: the runs'
+  own `served_by_model` counts), 627 distinct as words with cards (7B 534: it repeats itself; 14B 85; Haiku 8). Of the
+  977: 145 not in English (the 7B's drift into Chinese), 72 notes to itself by the `SELF_TALK` pattern, 29 naming an id
+  it was never shown (mostly guessed `ask-` numbers). 265 Dos never reached it: 89 dropped as more than eight acts in
+  one answer, 176 with no cause in the log. In 196 of the 621 distinct requests keyed (the 7B's, in every run, the
+  latest too; never the 14B's) a bare "Write to:" line and its recipients were folded into the Do: the note's reader
+  takes "Write to" as a heading only with a recipient on its own line (participants/src/llm/note.ts `split`).
+- **Split first, by code** (`split.ts`): by seat-day within each writing model, 30% (rounded up) test by seeded hash;
+  deduplicated within a side; 8 train requests in the words of a test one dropped. Train 426 distinct (7B 378, 14B 48),
+  test 195 (7B 150, 14B 37, Haiku 8: its only seat-day that reached the translator). 75 of the 131 keyed test requests
+  share five words running with some train request (one town, the same forms of words): the test side measures new
+  seat-days of the same town, as the scope pilot's did.
+- **Keyed** (`read.ts`, `keep.ts`): Sonnet 5.5 through `claude -p` and `codex/gpt-6.1-sol` through the Codex CLI, blind,
+  the translator's prompt and `reader-call.txt`, batches of 30, each call in a fresh temporary directory: 45 calls (2 a
+  smoke test) for 1,242 readings, of a cap of 1,500; plan usage as Claude Code reports it 10.57 USD; Codex no charge a
+  call. Every reading put in the taught language by code first. **Agreement 410 of 621 (66%)**: 359 the same act, 51 the
+  same act with a form's name, office or option implied by its card. Dropped: 196 disagreed, 13 a letter with no text
+  (both readers wrote `message(to=…)`: the seat named a recipient and nothing to say), 2 not a program. What the 196 are
+  about: a refusal against an act 90 (`look_first` or `no_such_act` against a form or a letter: requests too vague to
+  say whether there is an act), arguments 29, refusal labels 28 (`look_first` / `no_such_act` / `unclear`), other
+  functions or forms 26 (a form against a letter), one line against two 23 (the folded "Write to:"). 87 of the 196 are
+  folded-letter requests. Kept: train 279 (acts 168, refusals 111), test 131 (acts 62, refusals 69). The seat's sign-off
+  is recorded, never used. Leak check (`leak-check.ts`): none.
+- **Trained** round 3's control recipe (deberta-v3-small, 6 epochs, `--forms 0`) on v5's data (`joined-v5`, the taught
+  language) plus the 279 train rows four times (`v4-pilot/join.ts`), two seeds: an RTX 4000 Ada at 0.20 an hour (215
+  minutes) and an RTX A5000 at 0.27 (175 minutes; community cards at 0.30 or less could not be had for an hour first;
+  two dearer pods were ended at once). Balance 7.91 to 6.39, under the cap of 3 checked before each rental.
+- **Scored** (`round5/score.sh`, `summary.py`, `small-models/tables.py`), round 3 seed 2 (served by name) as served,
+  beside the two new seeds. Held-out small-model side (131; right in all; alone, every draft offered: right / wrong /
+  asked back; at the cut certified on validation: served, right, wrong):
+
+  | | round3-s2 | seed 1 | seed 2 |
+  |---|---|---|---|
+  | qwen2.5 7B (96) | 32 | 52 | 57 |
+  | qwen2.5 14B (27) | 2 | 6 | 10 |
+  | Haiku 5.5 (8) | 8 | 8 | 8 |
+  | all: acts (62) / refusals (69) | 14 / 28 | 22 / 44 | 24 / 51 |
+  | sharing no five words with train (56) | 14 | 32 | 37 |
+  | alone: right / wrong / asked back | 42 / 63 / 26 | 60 / 53 / 18 | 71 / 52 / 8 |
+  | at the certified cut: served (right, wrong) | 25 (20, 5) | 12 (10, 2) | 13 (12, 1) |
+  | forms in the key (43) | 9 | 16 | 19 |
+
+  Claude's requests (right in all; certified cut: served right, wrong), round3-s2 then seeds 1, 2 (v5's seeds, the same
+  recipe without these rows, in brackets): validation-real 539, 547, 541 (537, 542); pilot test side 334, 330, 327
+  (328, 331); at the cut 222 (2), 222 (1), 218 (1) (153, 194); unseen forms 808, 801, 806 (809, 810); at the cut 545,
+  400, 556 (138, 220). Alone on the pilot's sides, drafts right / wrong / asked back: round3-s2 591 / 53 / 21, seeds
+  585 / 77 / 3 and 582 / 83 / 0 (v5 582 / 79 / 4 and 582 / 81 / 2).
+- **Reading.** (a) A few hundred of a writer's own requests move this translator where relabelling did not: on held-out
+  seat-days the 7B goes from a third right to over half, and the gain holds where no five words are shared with
+  training (14 to 32 and 37 of 56). Most of it is refusals (a note to itself, a review of its own papers: the 7B's
+  commonest kind) and the 14B's form fills; acts stay weak (14 to 22 and 24 of 62). (b) It costs Claude's requests
+  nothing against the same recipe without them (v5); the rise in wrong drafts alone against round3-s2 is the taught
+  relabel's, as v5 found. (c) It does not reach the served mark: at the certified cut almost no small-model request is
+  served (12 and 13 of 131), so a study arm of a small model with our translator alone still serves it by drafts offered
+  under the cut, and about 40% of those are wrong. (d) Not switched: the coordinator decides. Seed 2 is the better of
+  the two on every small-model line and on unseen forms at the cut; seed 1 on validation-real.
+- **What no training mends** (the answer is the seat's presentation or the model's limit): the folded "Write to:"
+  (a third of the 7B's distinct requests and 44% of the readers' disagreements: a parsing rule of the note, not
+  translation); the bulleted Do split into field fragments ("buyer: shop-4") and more than eight acts dropped;
+  placeholders and guessed references (`Confirm <reference>`, `ask-87` before any ask-87 exists); letters with no
+  words; the drift out of English; requests too vague for two strong readers to agree whether an act is meant (90). And
+  requests of several acts of one kind ("draft delivery notes for referrals A, B and C"), which the model miscounts and
+  answers with a form name of its own ("draft_delivery_notes"), as rounds 2 and the slot decoding found for Claude's.
+- **Revisit if:** more small-model requests are keyed (the cheapest: further local 14B runs, which give acts where the
+  7B gives mostly refusals; another open-weight family; the note's "Write to:" rule fixed first, or a third of the 7B's
+  requests stay unreadable); or a run shows served-first-time rising with seed 2 in the seat's place.

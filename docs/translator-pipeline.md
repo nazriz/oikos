@@ -699,6 +699,46 @@ release lists and trials matter only with a model behind it). A draft that does 
 it was not shown, is still not offered. What a retrain is measured against in a run is now `served_by_model` in its
 report: served first time, after one restatement, never, and the seats' answers to the drafts.
 
+## Small models' requests (2026-11-11)
+
+The first keyed requests written by models other than Claude and Codex: the local open-weight runs (qwen2.5 7B and 14B in
+assistant seats, plain-notes mode, our translator alone) and the Haiku subscription checks. Everything is in
+`runs/translator-small-models-2026-11-11/` (the run folders are only read). The scripts are `translator/train/small-models/`,
+one step each, every one resumable:
+
+```
+OIKOS_KERNEL=<kernel binary> bun translator/train/small-models/collect.ts <out>/collect <arm .oklog>...
+bun translator/train/small-models/split.ts <out>/collect <out>/split
+bun translator/train/small-models/read.ts <out>/split <out>/read claude-code/claude-sonnet-5-5 codex/gpt-6.1-sol --cap 1500
+bun translator/train/small-models/keep.ts <out>/split <out>/read <out>/keyed
+bun translator/train/v4-pilot/join.ts <round 3's joined set, taught> <out>/keyed <joined> --repeat 4   (keyed/ needs split.json)
+zsh translator/model/v4-data.sh <joined> <prefix>
+OIKOS_ROUND=<round> DATA=<prefix>-fair zsh translator/model/round5/train-one.sh <name> <seed> <state>
+OIKOS_ROUND=<round> SETS="vr vp nv tp uf sm" zsh translator/model/round5/score.sh <name> <models> <tag>
+OIKOS_ROUND=<round> OIKOS_JOINED=<joined> EXTRA=sm python3 translator/model/round5/summary.py <tag>
+python3 translator/train/small-models/tables.py <round> <tag> <cut> <joined>/train.jsonl
+```
+
+- **collect**: every `do` a model seat made (notes mode turns a note's `Do:` into one), through `in-situ.ts`
+  `situationsOf`; the form cards exactly as in the translator's own input (its transcript); our model's draft, sureness,
+  withheld check and label (the `translation_route` note); the outcome as `served.ts` counts it; the sentence it was asked
+  back with; the seat's sign-off; whether it is English, a note to itself (`SELF_TALK`), or names an id the seat was never
+  shown; and for one that never reached the translator, why if the log says (`dropped_tool_use`).
+- **split** (before any keying): by seat-day within each writing model, 30% (rounded up) test by seeded hash; a request is
+  its words with its cards, deduplicated within a side; a train-side request in the words of a test-side one is dropped.
+- **read**: the pipeline's reader call (`askReader`: the translator's prompt, `reader-call.txt`, batches of 30), each call
+  in a fresh temporary directory of its adapter's own; unanswered requests asked once more.
+- **keep**: each reading first put in the taught language by code (`model/taught.ts`: `basis` and on-behalf `for` by rule,
+  memo, refusals told alike as one label), then `labelled` (readers.ts), a paraphrased text field put back to the request's
+  words and a form's name, office or option implied by its card as v4-pilot/keep.ts does. The seat's sign-off is recorded,
+  never used to settle a key. The rejects carry both readings and what they differ in.
+
+**What it gave** (docs/decisions.md, 2026-11-11, "Small models' requests keyed"): 977 requests that reached the
+translator, 621 distinct; the readers agreed on 410 (66%); 279 train rows, 131 held-out. Round 3's recipe retrained with
+them four times: on the held-out side right in all from 42 of 131 (round3-s2) to 66 and 75; the 7B 32 to 52 and 57 of
+96, the 14B 2 to 6 and 10 of 27; Claude's sets as v5's (the same recipe without them). At the certified cut 12 and 13
+small-model requests are served. Models `round/models/sm-D-deberta-s1`, `-s2`; scores and tables in `round/scores/`.
+
 ## Not built
 
 - The retrain's first two steps as one command: generated parts are written and checked by their own commands, and
