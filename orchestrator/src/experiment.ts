@@ -107,6 +107,9 @@ export interface ExperimentSpec {
   standIn?: string;
   /** The engine's own threads per run (default 1: the harness spreads forks over cores instead). */
   threads?: number;
+  /** A snapshot into each fork's log every so many days (for tools that read what an actor held then: `oikos-kernel
+   * grants`); it changes nothing in the run. Absent: none. */
+  snapshotEveryDays?: number;
   /** The experiment's pre-registration (measure/src/prereg.ts; docs/experiments.md, "Pre-registration"): a file, relative
    * to the spec file's folder (or the working folder). With one, the spec must agree with it and the report presents as
    * primary only what it registered; without one, every comparison is exploratory. */
@@ -556,7 +559,7 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   // are, so it is the town without a model, to the byte. kernel/src/schedule.rs, `keep_to_own`; 2026-11-11.)
   // (A `mock/<policy>` steward is the post's code brain under a policy, sitting as its twin does: as the code's.)
   const keepToOwn = arm.steward.kind === "model" && !arm.steward.model.startsWith("mock/") ? (templ ? templatesOf(spec.post) : [seat]) : [];
-  const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 }, ...(arm.withhold?.length ? { withhold: arm.withhold } : {}), ...(atFork.length ? { at_fork: atFork } : {}), ...(keepToOwn.length ? { seats_keep_to_own: keepToOwn } : {}) });
+  const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 }, ...(spec.snapshotEveryDays ? { snapshot_every_days: spec.snapshotEveryDays } : {}), ...(arm.withhold?.length ? { withhold: arm.withhold } : {}), ...(atFork.length ? { at_fork: atFork } : {}), ...(keepToOwn.length ? { seats_keep_to_own: keepToOwn } : {}) });
   const forkT = w.t();
   // (The stewardship ledger: the base's, taken up with this arm's steward, counting from the fork.)
   const ledger = wantsStewardship(spec) ? (existsSync(f.ledger) ? Ledger.restore(JSON.parse(readFileSync(f.ledger, "utf8")), { from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) }) : new Ledger({ config, from: forkT, steward: stewardOf(seat, arm.steward), ...(spec.institutions ? { institutions: spec.institutions } : {}) })) : undefined;

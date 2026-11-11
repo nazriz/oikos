@@ -265,6 +265,26 @@ pub struct Delegating {
     s: State,
 }
 
+/// What the principal's rule weighed a request at (`State::weigh`).
+struct Weighed {
+    granted: bool,
+    c_now: i128,
+    c_want: i128,
+    slip_bps: i64,
+    wait_milli_days: i64,
+    waits: i64,
+    per_month: i64,
+    late_cost_day: i64,
+    hurdle_bps: i64,
+}
+
+/// Read only (the obstacle screen): what a saved principal's rule would answer at `t` to a request for the next level up
+/// of each kind it hands over (`State::would_answer`). None: the saved actor is not a principal.
+pub fn would_answer(saved: &Value, t: i64) -> Option<Result<Vec<Value>, String>> {
+    let d = saved.get("delegation")?;
+    Some(serde_json::from_value::<State>(d.clone()).map(|s| s.would_answer(t)).map_err(|e| e.to_string()))
+}
+
 impl Delegating {
     pub fn new(ctx: &Ctx, params: Value, inner: Box<dyn Actor>) -> Result<Self, String> {
         let p: Params = serde_json::from_value(params).map_err(|e| format!("{}: delegation: {e}", ctx.participant))?;
@@ -998,19 +1018,14 @@ impl State {
                 words.push(format!("We have agreed to keep {} with you at least {} until {}.", plural(&named), f.words(), date(h)));
                 Why::BelowFloor
             } else {
-                let w = self.p.weights();
                 let e = e.clone().expect("checked above");
-                let kinds = self.kinds_now(t, Some(&e.offer));
                 let seen = self.seen.get(&Self::key(&a, &k)).cloned().unwrap_or_default();
-                inputs.extend(self.inputs(&e, &[(k.clone(), seen.clone())].into_iter().collect()));
-                let kd = kinds.get(&k).copied().unwrap_or_default();
-                let p = rule::estimate(e.offer.claim_slip_bps, w.prior_matters, &seen);
-                let wait = seen.wait_milli_days();
+                inputs.extend(self.inputs(&e, &[(k.clone(), seen)].into_iter().collect()));
                 // (Asked for one matter alone, open with it: that one matter weighed.)
                 let one = x.only.clone().filter(|rf| self.by_referral.contains_key(rf));
-                let kd = if one.is_some() { rule::Kind { per_month: 1, ..kd } } else { kd };
-                let (c_now, c_want) = (rule::cost_waiting(now, &kd, p, &w, wait), rule::cost_waiting(level, &kd, p, &w, wait));
-                if let (Some(rf), true) = (one.clone(), (c_now - c_want) * 10_000 > c_want.max(1) * i128::from(w.hurdle_bps.max(0))) {
+                let wd = self.weigh(&e, &k, now, level, one.is_some(), t);
+                let (c_now, c_want) = (wd.c_now, wd.c_want);
+                if let (Some(rf), true) = (one.clone(), wd.granted) {
                     words.push(format!("For {rf} alone: {}. Our remit for {} stands for every other.", level.words(), plural(&named)));
                     remit = Some(Remit { agreement: a.clone(), kind: k.clone(), level, hold_until: None, takes_back: vec![], answers: Some(id.to_string()), at_least: None, depth: self.depth_for(&e.offer, &k), only: Some(rf) });
                     Why::Granted
@@ -1018,7 +1033,7 @@ impl State {
                     let money = |n: i128| money_words(n as i64, &cx.ctx.world);
                     words.push(format!("By our own figures that matter {} would cost us about {}, against {} as it is, so we keep it as it is.", level.words(), money(c_want), money(c_now)));
                     Why::CostsMore
-                } else if (c_now - c_want) * 10_000 > c_want.max(1) * i128::from(w.hurdle_bps.max(0)) {
+                } else if wd.granted {
                     let back = if hands_over(level) { vec![] } else { self.take_back(&a, &k) };
                     words.push(format!("From now, {}: {}. It stands until a remit of ours changes it.{}", plural(&named), level.words(), taken_back(&back)));
                     let (at_least, hold_until) = self.floor(&a, &k, t).map_or((None, None), |(f, h)| (Some(f), Some(h)));
@@ -1402,6 +1417,56 @@ impl State {
                 (k.clone(), Kind { facts, per_month: self.per_month(k, t) })
             })
             .collect()
+    }
+
+    /// Its rule on a request for `level` of a kind it holds at `now` (`one`: for one matter alone, that matter weighed): the
+    /// two costs a month, with the figures they rest on, and whether the saving clears the hurdle.
+    fn weigh(&self, e: &services::Engagement, k: &str, now: Level, level: Level, one: bool, t: i64) -> Weighed {
+        let w = self.p.weights();
+        let a = e.agreement.clone().unwrap_or_default();
+        let seen = self.seen.get(&Self::key(&a, k)).cloned().unwrap_or_default();
+        let kd = self.kinds_now(t, Some(&e.offer)).get(k).copied().unwrap_or_default();
+        let kd = if one { Kind { per_month: 1, ..kd } } else { kd };
+        let (slip_bps, wait_milli_days) = (rule::estimate(e.offer.claim_slip_bps, w.prior_matters, &seen), seen.wait_milli_days());
+        let (c_now, c_want) = (rule::cost_waiting(now, &kd, slip_bps, &w, wait_milli_days), rule::cost_waiting(level, &kd, slip_bps, &w, wait_milli_days));
+        let granted = (c_now - c_want) * 10_000 > c_want.max(1) * i128::from(w.hurdle_bps.max(0));
+        Weighed { granted, c_now, c_want, slip_bps, wait_milli_days, waits: seen.waits, per_month: kd.per_month, late_cost_day: kd.facts.late_cost_day, hurdle_bps: w.hurdle_bps }
+    }
+
+    /// Read only, for whoever measures (the obstacle screen: docs/design/obstacles.md section 10): what its rule would answer
+    /// now to a request, for each kind it hands over under its service, for the next level up, for the kind and for one
+    /// matter alone; a kind held or at the top says so. It changes nothing and is never read by the world.
+    pub fn would_answer(&self, t: i64) -> Vec<Value> {
+        let Some(e) = self.in_use() else { return vec![] };
+        let a = e.agreement.clone().unwrap_or_default();
+        let kinds = self.kinds_now(t, Some(&e.offer));
+        let mut out = vec![];
+        for k in e.offer.kinds.iter().filter(|k| kinds.contains_key(*k)) {
+            let now = self.remit(&a, k);
+            let next = Level::ALL.into_iter().find(|l| l.rank() > now.rank() && e.offer.levels.contains(l));
+            let row = |only: bool| -> Value {
+                let base = json!({ "principal": self.me, "post": self.position, "kind": k, "now": now, "only": only });
+                let mut v = base.clone();
+                let Some(level) = next else {
+                    v["answer"] = json!("at the top of what the service offers");
+                    return v;
+                };
+                v["asked"] = json!(level);
+                if let Some(h) = self.held_until(&a, k, t) {
+                    v["answer"] = json!("held");
+                    v["until"] = json!(h);
+                    return v;
+                }
+                let wd = self.weigh(e, k, now, level, only, t);
+                v["answer"] = json!(if wd.granted { "granted" } else { "declined" });
+                v["figures"] = json!({ "cost_now": wd.c_now.to_string(), "cost_asked": wd.c_want.to_string(), "hurdle_bps": wd.hurdle_bps, "per_month": wd.per_month,
+                    "slip_bps": wd.slip_bps, "wait_milli_days": wd.wait_milli_days, "waits": wd.waits, "late_cost_day": wd.late_cost_day });
+                v
+            };
+            out.push(row(false));
+            out.push(row(true));
+        }
+        out
     }
 
     /// Its rule, on its review day (docs/design/delegation.md section 5).

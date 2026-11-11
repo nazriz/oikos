@@ -106,6 +106,25 @@ fn main() -> ExitCode {
             Ok(())
         })(),
         Some("delegation") if args.len() >= 2 => delegation(&args[1]),
+        // (Read only, for the obstacle screen: what each principal's rule would answer, at each snapshot the log holds, to a
+        // request for the next level up of each kind it hands over, for the kind and for one matter; docs/design/obstacles.md 10.)
+        Some("grants") if args.len() >= 2 => (|| {
+            let path = std::path::Path::new(&args[1]);
+            let bytes = read(&args[1])?;
+            let r = oikos_kernel::blog::Read::of(&bytes).map_err(|e| e.to_string())?;
+            for (_, t) in r.snapshots() {
+                let snap = oikos_kernel::blog::snapshot_in(path, Some(t))?;
+                for (key, saved) in snap.actors() {
+                    let Some(rows) = oikos_actors::delegation::principal::would_answer(saved, t) else { continue };
+                    for mut row in rows.map_err(|e| format!("{key}: {e}"))? {
+                        row["t"] = serde_json::json!(t);
+                        row["unit"] = serde_json::json!(key);
+                        println!("{row}");
+                    }
+                }
+            }
+            Ok(())
+        })(),
         Some("rules") => {
             for (name, _, what) in oikos_kernel::rules_api::RULES {
                 println!("{name}\t{what}");
@@ -116,7 +135,7 @@ fn main() -> ExitCode {
             println!("oikos-kernel {} ({}) source {}", run::KERNEL_VERSION, run::KERNEL_BUILD, run::KERNEL_SOURCE);
             Ok(())
         }
-        _ => Err("usage: oikos-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | view <log> <seq> | world <config.json> --out <dir> [--run-id ID] [--until S] [--threads N] [--stand-in KIND] | manifests | export <log.oklog> [--out F] | snapshots <log.oklog> | delegation <log> | rules | version".into()),
+        _ => Err("usage: oikos-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | view <log> <seq> | world <config.json> --out <dir> [--run-id ID] [--until S] [--threads N] [--stand-in KIND] | manifests | export <log.oklog> [--out F] | snapshots <log.oklog> | delegation <log> | grants <log.oklog> | rules | version".into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

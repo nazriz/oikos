@@ -7,7 +7,7 @@
 // says who was offered the households' service and who took it up. It decides nothing and pins nothing: what it reads
 // is reported.
 //
-//   bun experiments/scope-pilot/screen.ts <spec.ts> [--out <dir>] [--keep]
+//   bun experiments/scope-pilot/screen.ts <spec.ts> [--out <dir>] [--keep] [--snapshots <days>]
 //
 // The runs go to `--out` (default: a folder in the system's temporary directory, never the runs folder: a screen is not
 // a study's run); its table to `screen.txt` and `screen.json` there. Rounds, seeds, fork and length are the spec's.
@@ -213,7 +213,9 @@ if (import.meta.main) {
   if (!arms.length) throw new Error(`${file}: the spec has no code arm to screen with`);
   const outDir = resolve(at >= 0 ? args[at + 1]! : mkdtempSync(join(tmpdir(), `${spec.name}-screen-`)));
   if (/\/runs(\/|$)/.test(outDir)) throw new Error(`${outDir}: a screen is not a study's run; write it outside the runs folder`);
-  const screened = { ...spec, arms, seats: { ...(spec.seats ?? {}), budget: undefined } } as typeof spec;
+  // (`--snapshots N`: a snapshot into each fork's log every N days, for `oikos-kernel grants`; the run is the same.)
+  const snaps = args.indexOf("--snapshots");
+  const screened = { ...spec, arms, seats: { ...(spec.seats ?? {}), budget: undefined }, ...(snaps >= 0 ? { snapshotEveryDays: Number(args[snaps + 1]) } : {}) } as typeof spec;
   if (!existsSync(join(outDir, "results.json"))) await runExperiment(screened, { out: outDir, parallel: 0, log: (x) => console.error(x) });
   const all: Screen[] = [];
   for (const seed of spec.seeds) for (const a of arms) {
