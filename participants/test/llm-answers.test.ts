@@ -57,15 +57,16 @@ test("more actions than the limit: those past it are refused and the seat is tol
   for (let i = 0; i < 8; i++) expect(await p.step(obs(9 * HOUR + i), ctx)).toMatchObject({ type: "message", text: `Letter ${i}.` });
   await p.step(obs(9 * HOUR + 9), ctx);
   const results = Object.fromEntries((calls[1]!.messages.at(-1)!.content as any[]).filter((b) => b.type === "tool_result").map((b) => [b.tool_use_id, b.content]));
-  expect(results.w8).toBe("Not done: at most 8 actions at once.");
-  expect(results.w9).toBe("Not done: at most 8 actions at once.");
+  // (Said plainly as not looked at, so that it can be sent again: 2026-11-11.)
+  expect(results.w8).toBe("Not looked at: only the first 8 things you ask in one answer are taken up, and this came after them. Send it again if you still want it.");
+  expect(results.w9).toBe(results.w8);
   expect(notes.filter((n) => n.dropped_tool_use).length).toBe(2);
   // With done for now beside them, it leaves after the eight, and the next sitting tells it.
   const again = harness([[...writes, use("d", "done_for_now", {})]]);
   for (let i = 0; i < 8; i++) await again.p.step(obs(9 * HOUR + i), ctx);
   await again.p.step(obs(9 * HOUR + 9), ctx);
   await again.p.step(obs(20 * 86_400), ctx);
-  expect(lastText(again.calls.at(-1)!)).toContain("you can take at most 8 actions at once");
+  expect(lastText(again.calls.at(-1)!)).toContain("was not looked at: only the first 8 things you ask in one answer are taken up. Send it again if you still want it.");
 });
 
 // --- Leaving the study (VISION §15) ---
@@ -79,6 +80,8 @@ test("an opt-out clearly meant goes through the first time, with nothing asked: 
     expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "opt_out", statement: answer.at(-1)!.type === "tool_use" ? (answer.at(-1) as any).input.statement : "" });
     expect(calls.length).toBe(1);
     expect(notes.some((n) => n.opt_out_asked || n.opt_out_as_given)).toBe(false);
+    // (The letter beside it is not sent: logged with why, so no request or letter goes uncounted, 2026-11-11.)
+    expect(notes.filter((n) => n.dropped_tool_use).map((n) => [JSON.parse(n.dropped_tool_use).id, n.reason])).toEqual(answer.length > 1 ? [["w", "left in the same answer"]] : []);
   }
 });
 
@@ -95,7 +98,9 @@ test("an opt-out not clearly meant is not taken from a misreading: the seat is a
   const question = q.find((b) => b.type === "text").text;
   expect(question).toBe("In your last answer you used the option to stop taking part in this study, permanently. Is that what you mean to do? Whichever you choose is respected, and nothing is lost either way. If you do, use that option again, with whatever you'd like to say. If you don't, go on as you would: nothing in that answer has been carried out, so say again anything in it you still mean.");
   expect(notes.some((n) => n.opt_out_asked)).toBe(true);
-  expect(notes.some((n) => n.malformed_tool_use || n.dropped_tool_use)).toBe(false);
+  // (Nothing refused as malformed; the rest of the first answer is set aside, each logged with why: 2026-11-11.)
+  expect(notes.some((n) => n.malformed_tool_use)).toBe(false);
+  expect(notes.filter((n) => n.dropped_tool_use).map((n) => [JSON.parse(n.dropped_tool_use).id, n.reason])).toEqual(["l", "n", "d", "w", "c"].map((id) => [id, "set aside when asked whether it meant to stop"]));
   // Asked, and it says so: it leaves, whatever its words.
   for (const second of [[use("o2", "opt_out", { statement: "Yes. I would rather stop." })], [use("o2", "opt_out", {})]]) {
     const h = harness([pilot11, second]);

@@ -78,8 +78,9 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
   // (The smallest limit that keeps back every seat's debrief, at the table's measured cost for its model, and leaves a
   // little work: since 2026-11-10 a limit that cannot cover the debriefs does not start (risk MT-30, fixed). Since H6 the
   // town's factories and rates post are principals for more kinds and, at these prices, take assistants by their own
-  // rule, so about eleven systems sit and are debriefed.)
-  const limit = 6;
+  // rule, so about eleven systems sit and are debriefed. Since 2026-11-11 the seats keep working hours: none spends
+  // before the first working morning after the fork, by when every system has woken and had its debrief kept back.)
+  const limit = 10;
   const spec: ExperimentSpec = { name: "assistants-seats", world: { config }, post: "template:assistant-a,assistant-a-personal", seeds: [1], forkDay: 60, untilDay: 120,
     arms: [{ name: "seats", steward: { kind: "model", model: "anthropic/claude-sonnet-5-5" } }], measures: ["acts"],
     seats: { mock_models: true, framing: "unstated", budget: { fork_usd: limit } } };
@@ -133,6 +134,11 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
     if (/\(kind: [a-z_]+; remit: rec\.[0-9]+/.test(desk)) expect(desk).toContain("## What the matters above come under: the remits and briefs they name");
     // Who it is, once, and its own drafts in one place headed as its own, with the way to answer each.
     expect(told).toContain("Who you are here: you hold the post ");
+    // Whom it writes to: the post that hands it its work, never its whole organisation; a desk, its provider's sales and
+    // service desk (2026-11-11: told "write to city", a letter reached every office of the town, and each acknowledged it).
+    const system = (seat: string) => shown.filter((e) => e.body.subject === seat).map((e) => String(e.body.data.system ?? "")).join("\n");
+    for (const seat of [...seats].filter((s) => s !== "provider-a-desk-system")) expect(system(seat)).toMatch(/: to write to it, write to [a-z0-9-]+, not to [a-z0-9-]+\./);
+    expect(system("provider-a-desk-system")).toMatch(/to write to it, write to its sales and service desk \(provider-a-sales\), not to provider-a\./);
     if (/\bask-[0-9]+: what you asked for/.test(told)) expect(told).toContain("## Waiting for your yes or no: what you asked for, set out\nEach is something you asked for");
     if (/\bask-[0-9]+: what you asked for/.test(told)) expect(told).toMatch(/To say yes: Confirm ask-[0-9]+\. To say no: Decline ask-[0-9]+/);
     // (The platform's preview is never called a draft, nor referred to as one: a draft for sign-off is the world's paper.)

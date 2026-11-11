@@ -191,7 +191,7 @@ export class Knowledge {
     if (r.record === "statement") {
       if (r.addressed_to?.length) this.addressed.set(r.id, r.addressed_to);
       if (r.kind === "form") this.formsById.set(r.id, r);
-      if (r.kind === "sign_off" && r.data?.paper && typeof r.data.paper === "object" && !Array.isArray(r.data.paper)) this.signed.set(r.id, r.data.paper);
+      if ((r.kind === "sign_off" || r.kind === "paper_returned") && r.data?.paper && typeof r.data.paper === "object" && !Array.isArray(r.data.paper)) this.signed.set(r.id, r.data.paper);
       // Job advertisements, and the applications that answer them: an offer of employment made on one is on its terms.
       if (r.kind === "job_posting") this.jobs.set(r.id, { advertisement: r.id, ...(typeof r.data?.space === "string" && r.data.space ? { space: r.data.space } : {}) });
       if (r.kind === "job_application" && typeof r.data?.posting === "string") this.applications.set(r.id, r.data.posting);

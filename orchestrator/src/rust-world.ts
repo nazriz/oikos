@@ -29,6 +29,10 @@ export interface RustOptions {
   label?: string;
   parent?: string;
   mock_seats?: boolean;
+  /** Seats that keep to their own post (participants, or templates of systems): woken only by what their own channels
+   * show them as it comes, never by an office's acknowledgement (kernel/src/schedule.rs, `keep_to_own`). A fork whose
+   * seats a model holds; a code arm's seats are woken as their code units are. */
+  seats_keep_to_own?: string[];
   /** Acts not carried out (a researcher's intervention: kernel/src/engine.rs `Withhold`; docs/experiments.md). */
   withhold?: { what: string; participant?: string; nth?: number; matter?: string; to?: string; has?: string }[];
   /** Acts carried out at a fork's moment in a participant's name (a researcher's intervention: kernel/src/engine.rs `AtFork`). */

@@ -62,6 +62,8 @@ export interface Usage {
   /** What the provider itself says the call cost, where it says (Claude Code does): recorded as the call's cost where
    * it is more than the tokens come to at the price on file, so a spending limit holds against what is really drawn. */
   reported_cost_microusd?: number;
+  /** How many model turns the provider took inside the one call, where it says (Claude Code's `num_turns`). */
+  turns?: number;
 }
 
 export interface LlmResponse {

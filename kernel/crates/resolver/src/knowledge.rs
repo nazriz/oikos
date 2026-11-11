@@ -329,7 +329,8 @@ impl RecordFacts {
                 }
             }
             match s(&r["kind"]) {
-                Some("sign_off") if r["data"]["paper"].is_object() => facts.signed = Some((id, Arc::new(r["data"]["paper"].clone()))),
+                // (And a paper a body sent back, carrying it as it was: sent again as it stands, docs/design/obstacles.md.)
+                Some("sign_off" | "paper_returned") if r["data"]["paper"].is_object() => facts.signed = Some((id, Arc::new(r["data"]["paper"].clone()))),
                 Some("form") => facts.form = Some((id, Arc::new(r.clone()))),
                 Some("lot") => {
                     if let Some(cells) = r["data"]["cells"].as_array() {

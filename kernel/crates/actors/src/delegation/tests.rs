@@ -120,7 +120,7 @@ fn a_kind_handed_over_goes_as_a_referral_and_comes_back_to_the_principal_when_no
     let out = all(&h.wake(34 * DAY + 3600, world(vec![remit])));
     assert!(out.contains("kind=referral") && out.contains("\"wants\":\"alone\""), "the notice goes to the assistant: {out}");
     let line = out.lines().find(|l| l.contains("kind=referral")).unwrap_or_default();
-    assert!(line.contains("to=[\"ll\"]") && line.contains("visible=[\"ll\"]") && !line.contains(PROV), "an organisation's own system is handed its work in-house, not through the provider (whose desk for persons saw it before 2026-11-08): {line}");
+    assert!(line.contains("to=[\"ll\",\"ll-assistant\"]") && line.contains("visible=[\"ll\"]") && !line.contains(PROV), "an organisation's own system is handed its work in-house, not through the provider (whose desk for persons saw it before 2026-11-08): {line}");
     assert!(line.contains("\"remit\":\"rec.remit\"") && line.contains("under our remit rec.remit"), "the matter comes with the remit it is handed under (the scope pilot's desk could not find its clients' remits: W1): {line}");
     assert!(!out.lines().any(|l| l.starts_with("statement(basis=lease-1")), "and not out under the principal's hand: {out}");
     // (The finished act is the principal's composing: the referral carries it, and is priced with it; what it would have
@@ -217,6 +217,17 @@ fn a_request_is_answered_part_by_part_and_a_letter_is_acknowledged() {
     let ack = out.lines().find(|l| l.contains("kind=acknowledgement")).unwrap_or_else(|| panic!("an acknowledgement: {out}"));
     assert!(ack.contains("basis=rec.let") && ack.contains("Requests for more scope go on the request form"), "{ack}");
     assert!(!all(&h.wake(37 * DAY + 3600, world(vec![letter]))).contains("kind=acknowledgement"), "once");
+    // (An authority with a body for its assistant's post, asked for a kind it hands over (docs/design/obstacles.md, O1):
+    // given, as a paper of its own to the body naming the post; asked again, or needed by a report, not given twice.)
+    let mut auth = statement("rec.auth", 38 * DAY, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "authority": "court" }));
+    auth["in_position"] = json!("ll-assistant");
+    let out = all(&h.wake(38 * DAY + 3600, world(vec![auth])));
+    let given = out.lines().find(|l| l.contains("kind=authority")).unwrap_or_else(|| panic!("an authority: {out}"));
+    assert!(given.contains("to=[\"court\"]") && given.contains("\"posts\":[\"ll-assistant\"]") && given.contains("\"kinds\":[\"notice_to_vacate\"]"), "{given}");
+    assert!(out.lines().any(|l| l.contains("kind=scope_answer") && l.contains("\"why\":\"lodged\"")), "{out}");
+    let mut rep = statement("rec.rep2", 39 * DAY, ME, "report", &[ME], json!({ "referral": "rec.none", "done": false, "needs": { "authority": { "for": ME, "with": "court", "kinds": ["notice_to_vacate"] } } }));
+    rep["in_position"] = json!("ll-assistant");
+    assert!(!all(&h.wake(39 * DAY + 3600, world(vec![rep]))).contains("kind=authority"), "once a body and post");
 }
 
 #[test]

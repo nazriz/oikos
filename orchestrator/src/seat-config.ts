@@ -88,7 +88,10 @@ export function seatConfig(x: SeatConfigInput): SeatConfig {
   // some kinds; and the folders that hold every paper of its organisation's. And whose papers are its office's own
   // doing: its own, and its staff's where they are a post of their own.
   const folderKinds = new Map<string, string[]>(Object.entries((pp.folders ?? {}) as { [id: string]: string[] }).flatMap(([id, ks]) => chans.filter((c) => c.path === id || c.path.endsWith(`/${id}`)).map((c) => [c.path, ks] as [string, string[]])));
-  const own = chans.filter((c) => c.ch.kind === "records" && c.ch.way === "mine" && !c.ch.on_request && !standingIds.includes(c.path));
+  // (Not what it keeps and is not shown as a list, a desk's clients' briefs and remits (`with_matters`): terms, not
+  // matters handed to it, and no reason to be back before its next sitting. 2026-11-11.)
+  const kept = new Set<string>(Array.isArray(pp.with_matters) ? (pp.with_matters as string[]).flatMap((s) => chans.filter((c) => c.path === s || c.path.endsWith(`/${s}`)).map((c) => c.path)) : []);
+  const own = chans.filter((c) => c.ch.kind === "records" && c.ch.way === "mine" && !c.ch.on_request && !standingIds.includes(c.path) && !kept.has(c.path));
   const narrow = (m: any) => !!(m?.statement_kinds?.length || m?.records?.length || m?.has?.length);
   const trays = { kinds: new Map<string, string[] | true>(own.flatMap((c): [string, string[] | true][] => (folderKinds.has(c.path) ? [[c.path, folderKinds.get(c.path)!]] : narrow(c.ch.match) ? [[c.path, true]] : []))),
     all: new Set(own.filter((c) => !folderKinds.has(c.path) && !narrow(c.ch.match)).map((c) => c.path)),

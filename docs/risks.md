@@ -1707,8 +1707,8 @@ The mechanism:
   town's account is not on its mandate (design H1). Beside them: the rates post's notices go fifteen owners to an act, so
   an instalment is about fourteen matters, not two hundred; the principal prices each matter at one notice's two minutes,
   not fifteen (`own_seconds`), which undervalues handing it over (design H3's pricing); and the two city assistant
-  posts (finance's and the rates post's) see each other's matters, since `mine` is the town's whole (the code assistant
-  keeps to its own agreement; a model seat may read the other's). A rates notice sent from the assistant's post is not
+  posts (finance's and the rates post's) saw each other's matters, since `mine` is the town's whole (fixed 2026-11-12: an
+  assistant's post is shown its own matters only). A rates notice sent from the assistant's post is not
   read as the office's own by a new holder of the rates post (`ours` reads by position), who could levy out of cycle.
   **And a simplification:** so that the rates post can pay its own service's fee, the town's mandate to its bank names
   it beside the finance officer in towns with providers (2026-11-10). That gives an office authority over the town's
@@ -1759,6 +1759,44 @@ The mechanism:
 - **Notice by:** a fork's calls summing past its limit.
 - **Fix when:** before a run with more than a few seats on a small limit: refuse to start a fork whose end need is over
   half its limit, or stop the sittings earlier.
+
+### MT-31 · Two assistants of one organisation see each other's matters
+- **Gap:** A principal's papers to its in-house assistant (brief, remits, referrals, sign-offs, answers) are addressed
+  to the organisation and visible to it alone, and an assistant post's channels show the organisation's papers of those
+  kinds. Where two offices of one organisation have each engaged an assistant (the study's town: the finance office and
+  the rating office, both of `city`, with systems `par.3` and `par.5`), each assistant post is shown the other's matters,
+  and a seat that keeps to its own post (2026-11-11) is woken by them. The code assistant acts only on what comes under
+  its own delivery's agreement; a model is shown the rest.
+- **Where:** `worlds/generator/generate.ts` (`assistantChannels`: `mine` channels by kind); the principal's papers in
+  `kernel/crates/actors/src/delegation/principal.rs` (addressed to the organisation).
+- **Effect:** A seat reads another office's referrals as possibly its own, may act on them, and may ask for scope over a
+  matter that was never its; it sits more often than its own work brings it back. Seen in the 2026-11-11 mock run:
+  until the seat's instructions named its principal by its delivery's agreement, both town assistants were told they
+  worked for the finance officer and the rates officer.
+- **L / I:** high (in the study's town) / medium · **Status:** fixed (decisions 2026-11-12, MT-31: an assistant's post is shown its own
+  matters only) for what is handed to an assistant: the principal addresses its papers to
+  the assistant's post as well as to the organisation, and the assistant's channels keep to their own post
+  (`RecordFilter::own_post`). **Still open, a little:** the assistant's own papers back (drafts, reports, advice,
+  requests) are addressed to the organisation, so the other assistant can find them in its file, on request only, and
+  is never woken or handed them.
+- **Fix when:** (the rest) address an assistant's papers to its principal's post too (the code assistant's `say_to` and
+  the stationery's `to`), if a seat is seen reading the other's drafts.
+- **Notice by:** a seat's papers citing a referral under another agreement; `oikos-kernel delegation` rows of
+  `not_handed` at an organisation with two principals.
+
+### MT-32 · The obstacle levels rest on placeholder rates
+- **Gap:** The friction factor's levels (docs/design/obstacles.md section 6) are set by figures no source gives yet:
+  how often a body's clerk wrongly sends a paper in order back (200 and 800 basis points), how often a person does not
+  find a paper asked for, the clerk's time to record an authority, and a strained office's staffing. Only the items a
+  body's form asks for rest on what a paper of the kind is.
+- **Where:** `worlds/generator/generate.ts` (`WRONG_RETURN_BPS`, `OBSTACLE_ITEMS`); the table of slips' `accept/<kind>`
+  rows and their sources.
+- **Effect:** Obstacles met per seat-month, and so the manipulation check between levels 1 and 2, scale with a guessed
+  rate. At the factory's assistant the whole of level 2's exposure is a placeholder.
+- **L / I:** high / medium · **Status:** open (labelled in the table of slips' sources)
+- **Fix when:** before the main study is registered: each rate sourced, or reported in the paper as a placeholder with
+  the result's sensitivity to it.
+- **Notice by:** a profile's `accept/<kind>` source still saying "PLACEHOLDER".
 
 ---
 

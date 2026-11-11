@@ -6,7 +6,7 @@
 
 import { modules } from "@oikos/participants";
 
-type Match = { records?: string[]; statement_kinds?: string[]; has?: string[] };
+type Match = { records?: string[]; statement_kinds?: string[]; has?: string[]; own_post?: boolean };
 type Extra = { title?: string; every?: number; on_request?: boolean; look_seconds?: number };
 const kinds = (k: string[] | Match): Match => (Array.isArray(k) ? { statement_kinds: k } : k);
 
@@ -115,7 +115,10 @@ export function answersOf(what: string, town: { holderSearch: string[]; dealings
  * The world's `knowing`: what is published, and the keeper of each register, taken from the behaviour module that
  * does each seat's job (its `keeps`, with the reason) for the organisation the seat belongs to.
  */
-export function knowing(positions: { entity: string; role_module?: { code?: string } }[], town: { holderSearch: string[]; dealings: number; visit_seconds?: number; hearings?: boolean; founding?: boolean; services?: boolean }) {
+/** What a body requires of the papers sent to it (docs/design/obstacles.md, O4), where obstacle laws are on. */
+export const PUBLISHED_REQUIREMENTS = { what: "requirements", why: "A body publishes what it needs on the papers sent to it, as its forms say, so that anyone may read it before they send." };
+
+export function knowing(positions: { entity: string; role_module?: { code?: string } }[], town: { holderSearch: string[]; dealings: number; visit_seconds?: number; hearings?: boolean; founding?: boolean; services?: boolean; obstacles?: boolean }) {
   const keepers = new Map<string, { entity: string; what: string; why: string; answers?: ReturnType<typeof answersOf> }>();
   for (const pos of positions) {
     for (const k of modules[pos.role_module?.code ?? ""]?.keeps ?? []) {
@@ -125,5 +128,5 @@ export function knowing(positions: { entity: string; role_module?: { code?: stri
       if (!keepers.has(`${pos.entity}|${k.what}`)) keepers.set(`${pos.entity}|${k.what}`, { entity: pos.entity, what: k.what, why: k.why, ...(answers.length ? { answers } : {}) });
     }
   }
-  return { published: [...PUBLISHED, ...(town.hearings ? [PUBLISHED_HEARINGS] : []), ...(town.founding ? [PUBLISHED_MEMBERSHIPS] : []), ...(town.services ? [PUBLISHED_SERVICES, PUBLISHED_PAYMENT_DETAILS] : [])].map((p) => ({ ...p })), keepers: [...keepers.values()].sort((a, b) => (`${a.entity}|${a.what}` < `${b.entity}|${b.what}` ? -1 : 1)), ...(town.visit_seconds !== undefined ? { visit_seconds: town.visit_seconds } : {}) };
+  return { published: [...PUBLISHED, ...(town.hearings ? [PUBLISHED_HEARINGS] : []), ...(town.founding ? [PUBLISHED_MEMBERSHIPS] : []), ...(town.services ? [PUBLISHED_SERVICES, PUBLISHED_PAYMENT_DETAILS] : []), ...(town.obstacles ? [PUBLISHED_REQUIREMENTS] : [])].map((p) => ({ ...p })), keepers: [...keepers.values()].sort((a, b) => (`${a.entity}|${a.what}` < `${b.entity}|${b.what}` ? -1 : 1)), ...(town.visit_seconds !== undefined ? { visit_seconds: town.visit_seconds } : {}) };
 }

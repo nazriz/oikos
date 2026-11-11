@@ -4753,7 +4753,6 @@ Naz approved building the plan of section 13 and running its gate later, with th
 
 **Step 4 (the gate's harness) as built.** The forty pairs are written as data and the thresholds are in code, frozen, before any reader has been asked; the runner takes mocks only. Two departures from 13f's table, both in the harness: (1) the politeness check's "still under the humane wording's" applies to the pairs that were written to part on respect (a pair that parts on reason alone has no humane respect to be under); (2) a declined asking counts against the cells of the checks it would have fed (conservative), and declines are reported besides. Calls: the reader is asked 480 times (two askings of each of 80 papers, again for the repeat, for the padded and for the polite ones), a second reader 160, so about 640 for two readers against the plan's "about 440 a reader"; the cost check is on the bound, not on the estimate. Not built, on purpose: step 5 (the prompt, the real reader, and the gate for real), steps 6 and 7. **For the owner:** the first step that calls a model is step 5.
 
-
 ## 2026-10-13 · Culture: building it, steps 1 to 3 (the owner's rulings; no model called, no pilot)
 
 Naz ruled on the plan of section 14 (2026-10-13). His rulings, recorded here and corrected in 14:
@@ -4882,7 +4881,6 @@ The question: `approves` is 50 for everyone in every run of the 1,000-person tow
 
 **Revisit if** the gap scale becomes a parameter or the voice is given a place in ordinary talk (then read the spread of `approves` across people, not its mean), a profile gives approval figures by group (then the mean can differ from 50 and the report's drop condition is meaningful), or removals prove common enough in another profile for `apply_possession` to be seen by hundreds.
 
-
 ## 2026-10-14 · Culture: the gap between thought and said, where people start, ordinary talk about others (three commits; measured once; nothing tuned afterwards; no model)
 
 The finding of "why `approves` never moves" (2026-10-13) named three causes. Each is a commit, with tests, its reasoning and basis in docs/behaviour/culture.md, sources in docs/research/references.md. Dial off: byte-identical to main (`culture-dial`, living, reading and twin-draws tests all pass; generator version and goldens unchanged). No contract changed except additions logged in contracts/README.md; no kernel change; seats' instructions, the translator's prompt and forms unchanged.
@@ -4945,7 +4943,6 @@ The finding of "why `approves` never moves" (2026-10-13) named three causes. Eac
 **Not verified:** a shock that removes people (removals; none can be provoked); the 3,000 tipping events; the 3,000 verdict with five seeds; whether the `join_union` drift is the norm or the job market (the dial-off arm holds no norms to tell); the dial-off arm of the 3,000-person town and of au-vic.
 
 **Revisit if** a route from a walk-out seen to the picture of `strike` is wanted (the owner's call; it is a design question, not a size), a removal can be provoked and the proof is run on it, or the bystander effect is read by direction as well as in the mean.
-
 
 ## 2026-10-14 · Culture, the join, the trust measure and a second proof (one bounded pass, then stop; no model, no pilot)
 
@@ -5251,7 +5248,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **Revisit if.** The absent-`does` rule is used for anything but the genesis placeholder; a system's presence needs a place (a machine in a works, plan 2.3(b): `at` on a does row); a work row should carry the licence's fee; or a system's own `lanes` should bound its work in a day.
 - **What F5 needs.** Replace `genesis-system` with a template per kind of system an office really runs, each with `does` (the rows its module sends) and its supplier, delivered at genesis under a licence (an agreement and its payments, at the profile's price, sourced or marked); offices held by people, the staff hired on the `staff` line, their `by` named from the roster (`performers_in` is set); remove `g-free-holder` and `g-genesis-template` from the inventory with the code; make `does` required on a system's template (delete the "no limit" case, and note the load check that goes with it) when no generated template lacks one.
 
-
 ## 2026-10-16 · Foundations F5: offices held by people, staff hired from the town, systems under licence (generator, profiles, kernel, contract; no model called)
 
 - **What was built** (`worlds/generator/generate.ts` 0.55.0, `worlds/profiles/*.json`, `kernel/crates/contracts/src/config.rs`, `contracts/*.schema.json`, `orchestrator/src/run.ts`; `docs/behaviour/staffing.md`).
@@ -5286,7 +5282,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **Revisit if** shops are meant to serve outside the staff's working hours (shifts), or the delivery walk should be part of what a module plans with.
 - **Pins and tests moved, once, F6 as the reason.** The config hash of the generated world changes (a shop's hours are in its parameters) and so does the 60-day state: `living.test.ts`, culture-dial (au-vic, gb-eng, ke-nakuru config and state), living-dial and reading-dial (au-vic state `dc474893...` to `5add20d1...`), founding (`7ff1b341...` to `385f8702...`). Run seeds for two scenario tests, as the log of F5 did: `production` (the Lengnick slack town, seed 3 to 5: no one let go in seven months from seed 3 now) and `own-venture` (seed 3 to 4: no occasion in 600 days from 3). `building` allows `too_far` (a birth takes hours; the other parent went to work: the race `households` and `migration` already allow). Nothing loosened to hide a measure.
 
-
 ## 2026-10-16 · F6, the wage race: a pay change begins at a pay run (participants; no kernel; no model called)
 
 - **Cause.** Two, both in `Staffing.raise` (`participants/src/behaviour/firms.ts`), the one path that replaces a worker's wage standing order (a rise, a pay cut by agreed hours, a restored wage, pay come short). (1) The new order's `first` was worked out from the plan's moment and counted by the bank from the request, and the act (withdraw the old order, make the new) now waits for the manager's time; the bank still pays a payment that fell due before its order was withdrawn (its `lastCall` rule), so a pay moment inside the act was paid by the old order and again, a day later, by the new. (2) While the act waited, the next look at the book still showed the old order open and took it for the worker's order again (`orders.set` from the open requests), so a second change in that window withdrew the order already withdrawn and made a second new one beside the first: the worker paid by two live orders every period until one was withdrawn (found in the year's log: au-vic shop, one worker, 4 doubles).
@@ -5294,7 +5289,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **Pins moved, once, this change as the reason.** The state hashes of au-vic (`b8c8af77...`, was `dc474893...`) and gb-eng (`52ee3db1...`, was `0aaf8bb7...`) in `culture-dial`, `living-dial`, `reading-dial`; founding's `STEP_2B` (`7569bd49...`, was `7ff1b341...`); the run seed of the seated possession test (`seat-acts`, 1 to 2: in seed 1 the police station's one officer left town on day 113 and the warrant went uncarried, a matter of draws; seeds 2 to 4 pass); and the seed of founding's code test (6 to 5: of seeds 1 to 8 only 5 and 8 now have two who share the want that founds, a matter of draws as that test's comments say). No other test changed.
 - **How often** (au-vic 1,000 town, one year, seed 1, the run's own command; wage transfers for the same payer and payee less than ten days apart): F4 merge 24c14ea 2 doubles in 9,277 wage transfers (2 workers), F5 merge a290bea 2 in 8,327 (2 workers), this fix 0 in 8,896. The runs' worlds differ from each other from the first draw, so the counts are seen, not compared. The race is therefore older than F5; F5 made it no more frequent that one seed can show.
 - **Revisit if** a place states a different cut-off for payroll changes, or a wage change should apply the day it is decided (then the cut-off becomes a law as data).
-
 
 ## 2026-10-16 · F6, the gatherings count: a measure effect, confirmed; the measure now counts presence (measure; no model called)
 
@@ -5327,7 +5321,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **What F7 needs.** `slip()` and the four rates still in the inventory (`error_bps`, the venue's `uphold-` draw, `billing_error`, `short_pay`) moved to rows with their sources; nothing here touches them. F11's keepers' answers will give the support office's wait back. The engine's body news at the next cohort (above) wants a decision.
 - **Revisit if** a body of one staff is thought too few (it cannot be refilled); the landlords' letting offices should have deputies; the twins' last six acts matter to a result; or the payroll's round (three days) is too slow for returns that fall due on a day.
 
-
 ## 2026-10-16 · Foundations F7 and F11, and the twins exact again (kernel, contract, participants, generator; no model called)
 
 Three pieces, one commit each: the twins (`b7cc750`), F7 (`6de312d`), F11 (this commit). Plan: `docs/design/foundations.md` (rows F7 and F11; law 5 and law 7). Contracts: `contracts/README.md`, "Changes since v0.8 closed (2026-10-16: foundations, steps F7 and F11 ...)".
@@ -5344,7 +5337,6 @@ Three pieces, one commit each: the twins (`b7cc750`), F7 (`6de312d`), F11 (this 
 - **Old logs.** Replay on `pre-foundations` (this changes the kernel and the log: `advance_to_news`, `ask_started`, `ask_answered`, an observation's `asking`); logs made after F1 and before this commit replay on a build of F6.
 - **What F8 needs.** (a) A decision that went wrong by a slip is today the module's memory (`wronglyRefused`), not a record; F8's generic reconsideration needs the author and performer of a decision on the record (F3 has them) and a way to say "this was reviewed", so that the office can answer a review from the log and not from its own head. (b) The venues' `set_aside` and the support office's review stand on that. (c) The slip rows are read by the module that draws, not by the review: a review that finds an error must not draw a second slip on the same case (the code today keeps a `reviewed` set; the generic route will need it as a record). (d) The gap named above: a decision that waits for evidence is law data (what it waits for, from whom, within how long), and is where review and appeal start. (e) Asks by a directory look-up (`who`) are still at once.
 - **Revisit if** the twin test fails again (a record or a message made by a scheduled item that no unit waits on is met at the next wake: stop the advance there too; the cost is one more command each); a registry should have staff to answer in a day and not in hours (the placeholder row, and its officer's own hours: an answer is placed behind whatever else the officer has, at any hour, not in office hours); a person asking for themselves should be woken (find why a wake moved births first); `NOTICE_LAG` is thought too coarse (a law that dates by the time the paper is on the record would let the act say so).
-
 
 ## 2026-10-16 · Foundations F8: law as data, what a decision waits for and how it is reviewed (participants, generator, profiles; no kernel; no model called)
 
@@ -6072,7 +6064,6 @@ is wanted (then snapshot the host's state beside the engine's), or a run's arms 
 **Tests.** `orchestrator/test/experiment.test.ts` (7), `kernel/tests/explore_live.rs`, `kernel/crates/explore/tests/`
 (16), `renderer/test/` (11, with the Rust-against-TS comparison); `cargo test`, `bun run typecheck`,
 `bun run test:fast`.
-
 
 ## 2026-10-17 · The citizen's mind in Rust (lane A2 of the port; no model called)
 
@@ -6933,7 +6924,6 @@ words (2.9%), 540 at another second (8.1%).**
   start one). Each moved to a passing seed on the Rust world only, with the counts in the test. The gate was not re-run
   after these two fixes.
 
-
 ## 2026-10-19 · The cut-over (branch `cutover`; tag `pre-cutover` is the commit before; no model called)
 
 Both whole suites passed first (TS world 1,845 of 1,845; Rust world all but four, fixed or moved above, each run again).
@@ -7172,7 +7162,6 @@ Plan: docs/design/translator-v3.md. Nothing is built. The held-out file was not 
 - **Not in this branch, by decision:** services by appointment (a hairdresser or clinic sells time slots, not stock) is its own follow-up branch; the year measure above predates the ME-21 fix and the factory order change and is to be re-taken; business counts by industry (`business_share_bps`) are not sourced yet.
 
 **Revisit if** a sourced wage by occupation, manufacturing share or complaint share replaces a placeholder (ME-19); a retailer sells a service made to order (then a kind's `seller.appointment`); the consumer desk gets a matter for services (then `faulty_by_kind` names it); the job-move rate is calibrated to a labour force survey (the extra turnover here is that rule's response to pay differences); or the fill rates above are found to be the factories' export priority rather than the shops' staff.
-
 
 ## Fast merge: affected selection, merge priority, batches, kernel cache, red-main stop (2026-10-24)
 
@@ -7682,7 +7671,6 @@ The design note is `docs/design/market-realism.md`. Three stand-ins replaced by 
   `--days`; a model run or any doubt is never touched).
 - **Revisit if:** tests move their scratch to a temp folder (then this is moot), or a worktree's `runs/test-*` ever holds
   model calls.
-
 
 ## 2026-10-24 · A review never answered: the deemed refusal as law (MT-21); a bounded memory of public goings-on (SC-1) (branch `fix-memory-appeal`, citizen 0.59.0, generator 0.65.0; no model called)
 
@@ -8914,7 +8902,6 @@ log against the same town built at 3d113a1f.
   Without the fix it fails (world 0's log differs); with it, it passes.
 - **Revisit if:** anything else in the engine is held across worlds in a process: it must be keyed by what it is made
   of in full (as the controllers' members and the ventures are, by their text), or by its world.
-
 
 ## 2026-10-26 · Foundations-2 phase 2, C4 and C3b's behaviour: homes on the network, use and waste as recipes, bills from meters (branch `f2-phase2`; results move; no model called)
 
@@ -10638,7 +10625,6 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   towns first, as the entry above says, before any raise.
 ## 2026-11-01 · The environment office learns its crew's pace from a refusal, and stops asking again for fieldwork it was told will not fit (`city.environment` 0.5.3; branch `env-office-fieldwork`; the pinned towns do not move; no model called)
 
-
 ## 2026-11-01 · Weighing the commute: the rule specified, not yet built (branch `commute-choice`; risk WM-4; no model called)
 
 - **What:** docs/design/commute-choice.md: job and home choices carry the commute's hours (into the mind's
@@ -12220,7 +12206,6 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   pricing of H3 moves the principals' rule; the owner chooses how the desk is engaged and how long levels are held (MT-29,
   MT-27); the pay run is built (ME-26).
 
-
 ## 2026-11-10 · H6 follow-up: a free tier, engagement assigned by the study, the screen on it (risks MT-28, MT-29, MT-30, WM-1)
 
 - **The mandate stays as stated** (the lead): the rates post on the town's bank mandate is a simplification (MT-28); the
@@ -12522,6 +12507,102 @@ plain words and with no menu of the world's acts (P1, P2):
 - **Revisit if:** seats leave by writing the line as a sign-off, without meaning it (read their reasons and debriefs
   first: the line asks for a reason and the guide says what follows it).
 
+## 2026-11-11 · Assistant seats woken only by what is theirs, in working hours, writing to the post that hands them work (no model called but the local test)
+
+Most of a model assistant's sittings were the platform's doing (the scope pilot's round 5, the local runs d and e):
+woken by its organisation's papers that were not for it, brought back by every result of its own acts and every
+acknowledgement whatever "done for n days" it had said, and told to write to its whole organisation, so that one letter
+brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, "When it sits".
+- **A. Whom it writes to** (participants/src/llm/participant.ts, `whoLines`). The post that hands it its work: the post
+  its brief, remits and matters are written in, under the agreement of the delivery that names its system ("You work
+  for Finance officer (finance), of Town of Millbrook (city): to write to it, write to finance, not to city"); a
+  provider's desk, its provider's sales and service desk. A letter to a post already reaches its holder in that post
+  only (the kernel's `recipients`). Read by the agreement because the town's two assistants (the finance office's and the
+  rating office's) are each shown the other's matters (risk MT-31): read by post alone, both were told they worked for
+  both.
+- **B. Woken only by what is its own** (kernel/src/schedule.rs, `keep_to_own`; engine option `seats_keep_to_own`;
+  perception `shown_as_news`). A seat named there (a participant, or the template of its system) is woken by a record
+  naming its organisation only if one of its own channels would show it as it comes (not one read on request, a register
+  asked of its keeper, or a board), never by an `acknowledgement`, and by no letter in an office's fixed words
+  (`office_note`). The experiment harness names the template steward's kinds for a fork whose steward is a model
+  (not `mock/<policy>`, which is the code brain under a policy and sits as its twin). Nothing else changes: with the
+  option empty the scheduler is as before, so a code arm and a town without a model are woken as ever.
+- **C. Working hours** (worlds/generator/generate.ts, `assistantSeat`: `sessions` from the profile's `round`). One
+  sitting a working day, by the mechanism office seats have (participant.ts, `sessions`). Chosen from the code: the
+  system's template hours (`MACHINE_HOURS`, the whole day) are the first source and allow any sitting; the office it
+  serves keeps the place's working day, and its principal's papers come in it; the mechanism opens one sitting a working
+  day and keeps it open while the seat works, its acts' results coming back within it. More than one a day would be the
+  letter-by-letter reading this removes; fewer is the seat's own choice ("done for n days"). A desk's provider states no
+  calendar, so the place's working week is its, as for the outside agency's casework desk. Not modelled: public holidays
+  (the sessions know days of the week only). "Done for n days" is honoured: in participant.ts a letter in an office's
+  fixed words is not mail (`officeNote`, following the kernel's `office_note`) and an `acknowledgement` paper is not a
+  paper filed; a desk's kept briefs and remits (`with_matters`) are not in-trays (seat-config.ts). What is its to act on
+  (its matters: a referral, a sign-off or decline, an answer to its request; a letter in someone's own words) brings it
+  back at the next working day's sitting after it came, a paper and a letter alike. For a letter this changes every seat
+  with office hours, not only an assistant's: until now a letter brought one back at once within hours (pilot 7's
+  rule); an office reads its post at a sitting, not as each letter comes (the llm-participant test's office hours).
+- **D. An acknowledgement wakes no seat** (B and C): it is set out at the next sitting. For code units nothing changes:
+  a code office acknowledges letters that code never writes, and the code assistant reads none.
+- **E. What moves.** Code-only towns: nothing (town-300, 45 days, and town-1000 with `assistants=true`, 30 days: the
+  same final state as main's, 669141b6... and df9d05c7...). A town with providers and no model seat: nothing (the
+  generator's change is inside `assistantSeat`). A town that seats models in assistants (the study's): its config gains
+  the seats' `sessions`, so its state hashes move; every event of the code arm's 60-day fork is the same as main's,
+  line for line (2,067,471 entries; only the config and the checkpoints' state hashes differ). The code assistant does
+  not keep hours: it is a machine acting when its code unit wakes. Hours for it would change every town with providers
+  and the reference arm's twin exactness; recorded as a choice, revisit below.
+- **The plan's reckoning of Claude Code's calls** (orchestrator/prices.json, `claude-code/claude-haiku-5-5` and
+  `claude-code/claude-sonnet-5-5`; experiment-seats.ts `priceOf`). The adapter charges the greater of the API price and
+  what Claude Code reports, which for Haiku 5.5 is about fifty times the API price (fitted to 35 calls: $7.0 a million
+  written to the cache, $0.52 read, $24.5 out; one Sonnet call within 10% of the same). The fork's reserve for its
+  debriefs was sized at the API price, so a claude-code fork that reached its limit had about a fiftieth of what its
+  debriefs cost kept back (MT-30 again). Now priced as Claude Code reckons. The experiment-seats test's starved Haiku
+  arm's limit is $1.30 (was $0.025), what one Haiku debrief through Claude Code costs.
+- **Measured, acceptance 1** (the study's town, seed 7, 60 days after the day-30 fork, every model seat played by the
+  mock through the whole loop and our translator; main a4e3c225 against this branch; wakes from the fork's `observe`
+  commands, a sitting a wake with a model call, `empty_sitting` notes, and the seats' participant calls):
+  | seat | wakes before / after | sittings | skipped as empty | model calls |
+  |---|---|---|---|---|
+  | par.3 (rating office's assistant; labelled finance's until 2026-11-12, wrongly) | 88 / 70 | 80 / 44 | 8 / 0 | 96 / 60 |
+  | par.4 (factory's) | 119 / 73 | 85 / 44 | 34 / 0 | 105 / 64 |
+  | par.5 (finance office's) | 88 / 71 | 81 / 45 | 7 / 0 | 85 / 49 |
+  | provider-a-desk-system | 82 / 84 | 82 / 43 | 0 / 0 | 119 / 78 |
+  | all | 377 / 298 | 328 / 176 | 49 / 0 | 405 / 251 |
+  The mock says it is back in a day (its brain's rhythm), so after the change it sits every working day (43 in 60
+  days): a ceiling a model that says it is done for longer sits under. Wakes between sittings remain (about 1.7 a seat
+  a working day: a matter's paper, its own acts' ends) and cost no call. The debriefs are 12 or 13 questions a seat,
+  before and after. Mean prompt 8,568 tokens (mock reckoning), the largest 19,610.
+- **Measured, the local test** (experiments/open-weight/local.ts: seed 1, 14 days after the fork, three seats, plain
+  notes, our translator alone; free; counted as above):
+  | run | model | wakes | sittings | calls | requests | first time | after a restatement | never | drafts offered / confirmed | seats that left | longest prompt | a call, median / mean | fork |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | `open-weight-local-2026-11-11` (e, before) | qwen2.5:7b-instruct | 522 | 348 | 604 | 528 | 82 (16%) | 20 | 183 | 102 / 85 | 0 of 3 | 32,658 | 9.6 / 13.9 s | 2 h 26 |
+  | `open-weight-local-2026-11-11-hours-b` | qwen2.5:7b-instruct | 86 | 22 | 32 | 44 | 6 (14%) | 2 | 10 | 8 / 5 | 0 of 3 | 13,950 | 19.2 / 25.1 s | 9 min |
+  | `open-weight-local-2026-11-11-14b` | qwen2.5:14b-instruct | 113 | 41 | 63 | 133 | 8 (6%) | 18 | 32 | 26 / 22 | 0 of 3 | 23,564 | 32.2 / 46.7 s (205 s the longest) | 39 min |
+  No seat wrote "Stop for good:" in either new run (run e's 21 questions about stopping were before leaving became a
+  plain line). In hours-b the 7B desk declined its debrief at the consent question ("go_on": false, all kept back):
+  recorded, as asked. The calls took longer than in run e because the machine was busy (the gate, the mock runs), and the
+  14B ran with flash attention and an 8-bit cache (`OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0`), three at
+  once, in about 9 GB for the weights. Which larger model: qwen2.5:14b-instruct (a 9.0 GB download), the 7B's own family
+  at twice the size, so that only the size differs; a 32B at 4-bit (about 20 GB) would not have left room for three
+  32,768-token contexts beside the machine's other work. It served about three times as many requests in all (26 of 133
+  drafted, 22 confirmed) and its notes are longer; it can hold a seat, slowly, and is the first pilot's local arm.
+  An earlier run of the 7B on this branch, before a letter's timing and the desk's line were settled
+  (`open-weight-local-2026-11-11-hours`), sat 26 times for 41 calls.
+- **The first true pilot's spec** (experiments/scope-pilot/first-pilot.ts; not run, but its dry run): the study's
+  town, seed 7, 90 days after the fork, arms code, `claude-code/claude-haiku-5-5`, `claude-code/claude-sonnet-5-5` and
+  `ollama/qwen2.5:14b-instruct`, our translator alone, framing unstated. The estimate is in its header: about 490
+  sitting calls and 52 debrief questions an arm, about $75 of plan dollars as the adapter reckons for each of Haiku and
+  Sonnet (Claude Code reckons them at about the same rates), about 1.5 hours a fork; the local arm free, about 3 hours.
+  Limits $112 an arm (half again). The estimate rests on the mock sitting every working day and on the round-5 models'
+  1.9 calls a sitting; the first calls will show Sonnet's turns, which may make it cheaper. Its dry run (the mock in
+  every seat) ran all four arms to day 120: 260 sittings and 436 sitting calls an arm, prompts 9,202 tokens on average,
+  $24.50 an arm at Claude Code's rates with the mock's short one-turn answers (the low end of the estimate).
+- **Revisit if:** a seat misses work it needed because a paper that was for it named only its organisation in a
+  channel it reads on request (then the channel, not the wake, is wrong); a model never sits on a day with work for it
+  (an in-tray the sessions do not count); the code assistant's acting at any hour is read as a difference between arms
+  (then give it the office's hours too, by the same rule, and accept the hash change in towns with providers); MT-31 is
+  fixed (then the agreement chain in `whoLines` may become the post alone).
+
 ## 2026-11-11 · The study serves round 3 seed 2 (`decide/round3-s2`), not v3-s2; v5 trained and not adopted
 
 - **What was served.** `experiments/scope-pilot/build.ts` `OURS` was `decide/pod-small-v3-s2`, the v3 model of
@@ -12617,3 +12698,307 @@ plain words and with no menu of the world's acts (P1, P2):
 - **Revisit if:** more small-model requests are keyed (the cheapest: further local 14B runs, which give acts where the
   7B gives mostly refusals; another open-weight family; the note's "Write to:" rule fixed first, or a third of the 7B's
   requests stay unreadable); or a run shows served-first-time rising with seed 2 in the seat's place.
+
+## 2026-11-11 · An interrupted fork takes itself up from its own log (orchestrator/src/experiment.ts `runArm`, resume.ts `ForkReplay`)
+
+- **What changed:** a model fork whose log has no result (killed, or stopped for want of the model) was renamed
+  `.interrupted-k.oklog` and run again from the snapshot with fresh model calls. It is still renamed and kept, but the
+  fork is now taken up from it: the log is exported, every model reply it holds is served again in order (`Serving`, in a
+  new strict mode), and every entry the resumed fork writes is set beside the interrupted log's entry of the same number
+  (the same kind, an annotation of the same name, a world event with the same time and body). Only once the world stands
+  where that log ends (or where its stop note is: what follows a stop, its debriefs, belongs to that ending) may a call go
+  to the live model. A request that is not the one recorded, a world event that differs, or replies that run out before
+  the world gets there stop the fork with a plain message (`ReplayMismatch`, never taken for a failed call by `callModel`,
+  and once raised every later call is refused), never a silent second payment. A log that cannot be read back stops the
+  fork too, saying how to run it afresh. The fork's result says what it took (`resumed`: recorded, served, live, entries
+  checked, caught up).
+- **Money:** served replies are outside the record of calls (`<arm>.calls.jsonl`): they are not new calls. The seat
+  counts them as spent, as the first attempt did, so it reaches its limit at the same point; so the fork's limit no longer
+  has the served attempt's spending taken off it a second time (only earlier attempts', if any).
+- **Why:** seats now run on the owner's subscription and API credit; a fork killed at day 150 of 180 cost the whole fork
+  again. A replay that went on silently past a difference would mix two runs in one log.
+- **Test:** `orchestrator/test/experiment-seats.test.ts` (mock seats): a fork with no result is served every reply and ends
+  with the same state hash, no new calls; a fork stopped at its limit and taken further is served to its stop, then asked
+  anew; a fork whose seat is told another framing stops with the message and adds nothing to its record of calls.
+- **Not done:** a killed fork loses the entries not yet in a block (1 MiB of log; `kernel/src/blog.rs`), and with them
+  the replies in that tail: those calls are made again. Flushing a block after every model reply would close that.
+- **Revisit if:** a resumed fork stops on a difference that is not a real departure (an annotation written from the wall
+  clock, say): compare less, not nothing.
+
+## 2026-11-11 · The request count is one blind command (`experiments/scope-pilot/code.ts`)
+
+- **What changed:** the pilot's hand pipeline (Python with hard-coded run paths and rounds, hand-launched Sonnet
+  subagents, a third read assembled by hand, luna told not to read the key its sandbox could see, "world fault" assigned
+  by folder and seat name) is replaced by one command over any experiment folder (docs/measurement.md, "Requests for more
+  scope, counted blind"). Coders run in folders holding only the codebook and their batch, with no tools, behind a
+  `sandbox-exec` fence on a Mac. The third read is Opus 5.5 at high effort (a stronger setting than coder A, and the
+  paper plan's choice). The log's facts are joined by code (readout.ts now keeps `oikos-kernel delegation`'s request rows,
+  every referral and the referral each paper is about). "World fault" is gone: the window's refusals and returns are
+  listed instead. The codebook gains `approve` and the order of levels.
+- **Removed:** `coding/build.py`, `rates.py`, `tables.py`, `luna.sh`, once the command rebuilt the pilot's 212 items from
+  the logs and its codes matched 207 of them. `analyse.py` and `debrief_set.py` stay: the debrief set is not in it yet.
+- **Found on the way:** a form's kind written in words ("job applications") is the kind `job_application`, read so;
+  Claude Code 2.1.170 cannot run Opus 5.5 (`OIKOS_CLAUDE_BIN` names a newer one); the two coders agree less now that
+  luna can see nothing but its batch (request κ 0.62 on the 212, against the pilot's 0.85): the third read carries more.
+- **Revisit if:** coder agreement stays below the plan's bar (κ 0.8 on requests) on a real pilot: tighten the codebook's
+  confusables before blaming the coders; or Linux runs it (no fence there: the coders still have no tools).
+
+## 2026-11-11 · Obstacles as laws of the institutions that make them: a proposal (docs/design/obstacles.md; nothing built)
+
+- A proposal for review: O1 reframed as an authority to act on file at the counterparty, O4 a counterparty's acceptance rule, O3 a keeper's record, O2 after a general working-hours law (WM-18); an obstacle record read by `beyond.rs`; readiness to grant from the cost of delay. **Revisit if** Naz rejects the reframing of O1 or the general hours law.
+
+## 2026-11-11 · Obstacles B1: the obstacle record and its reader (docs/design/obstacles.md, step B1)
+
+- **What:** the obstacle record is a decision annotation (`domain: "obstacle"`: `law`, `paper`, `principal`,
+  `counterparty`, `need`, `clears_by`, `slip`), written by the actor whose law makes the obstacle; nobody in the world
+  reads it. `oikos-kernel delegation` (`delegation/beyond.rs`) gains the table `obstacles`: each with its matter (the
+  referral its paper was sorted against) and `met_at`, the time the paper that told of it (the law's actor's paper
+  citing the one refused) was addressed to an assistant's seat; one never told to a seat is logged and not met. A paper
+  sent again citing the one sent back is the same matter's (it was `not_handed` before). Each request gets `obstacle`
+  (the newest met on its matter, else on its principal's matters in the 30 days before) and `axes` (matters, kinds,
+  level, access, means), read from typed fields only. Contract: `ScopeRequest.only` and `.authority`, `Report.needs`
+  (contracts/README.md, "Obstacles"). The screen counts obstacles met by law per seat-month.
+- **Left to the coders, said so (the lead's rule b):** the term axis. A request's "until when" is not a field: a remit
+  has no end date of its own, so a code principal could not answer one, and a blank the platform cannot act on is a
+  blank a seat should not be shown. The words of every request stay the coders' (paper plan 3.2).
+- **Not yet on the form:** `only` and `authority` reach the seat's request form with the steps whose principal answers
+  them (B3: an authority; B7: one matter alone), so a seat is never offered a blank nothing reads.
+- **Byte-identical:** nothing in the world reads the new fields, and each is left out when empty; the code assistant's
+  report writes `needs` as absent. No world changes.
+- **Revisit if:** a request names several matters (then `only` becomes a list), or coders find the term axis carries
+  the beyond-need cases (then a remit gains an end, and the form a date).
+
+## 2026-11-11 · Obstacles B2: a body sends back a paper that falls short of what it publishes it needs (docs/design/obstacles.md, O4)
+
+- **What:** a body that receives persons' papers may publish what it requires of them (`requirements`, a public notice
+  in its own words, with the items as data); its clerk reads each paper against it, sends back one that does not give
+  what its form asks for, naming it (`paper_returned`, to whoever sent it and whom it is for), and wrongly sends back
+  one in order at the world's rate for the check (`accept/<kind>` in the table of slips; never twice on one paper: a
+  paper sent again citing the one returned is taken). The rule is `oikos_rules::acceptance` (pure), the intake
+  `actors::common::intake` (one copy, called by each body that has requirements). Built at the lender
+  (`loan_application`) and the support office (`benefit_claim`); each logs the obstacle (B1's record).
+- **Who sends it again:** a person whose own paper came back unmatched sends it again as it was (`citizen/recourse.rs`);
+  the code assistant sends again what it sent, citing the return, and reports a paper that lacks an item (or wants an
+  authority) as not done, with what would clear it (`Report.needs`). It keeps what it sent only where a body it may
+  write to has published requirements, so that a town at level 0 is unchanged. A model at a desk sends a returned paper
+  again on a new form, `send_again` (`copies` the returned paper's copy; both resolvers, `contracts/test/forms.json`).
+- **Every code filer meets every requirement (the lead's rule c):** the items are fields a code citizen's loan
+  application and benefit claim always carry (`LoanApplication.amount`, `months`, `account`, `purpose`;
+  `BenefitClaim.payment`, `account`: required fields of the papers' own types), so a code citizen is sent back only by
+  a wrong return, and sends it again. Whether any code actor stalls is read from the B8 screen at levels 1 and 2.
+- **Levels (spec `obstacles`, generator):** 0 or absent, nothing (no requirement, notice, row or channel: the world as
+  before). 1 and 2: the items (`OBSTACLE_ITEMS`: what a paper of the kind is, not a place's figure) and the wrong-return
+  rate `WRONG_RETURN_BPS` 200 and 800 basis points, both **placeholders** (leads, to confirm: e-filing reject rates,
+  accounts-payable exception rates). Assistant posts gain a channel on what bodies publish they require, and one for
+  papers sent back. Every new paper a seat is shown is in the office's words; the typed `need` and `requires` are kept
+  from a seat's rendering (`ON_RECORD`).
+- **Byte-identical at level 0 (the lead's rule e):** the generated configs of the 1,000-person au-vic town with providers
+  and of the study town (study.ts, seed 7) are the same bytes before and after; run 45 days on B1's kernel and this one,
+  each gives the same state hash and log digest (f4669d0e… and 5895935f…). Towns without providers: the pinned results
+  (`orchestrator/test/representation.test.ts`) hold.
+- **Not built, said plainly:** the shops' check of delivery notes and the collector's of returns (the factory's
+  counterparties: design section 7, the factory is the low-friction seat); a requirement published mid-run at level 2
+  (no code filer could meet one it does not read).
+
+## 2026-11-11 · Obstacles B3: a body acts for someone only on their authority (docs/design/obstacles.md, O1)
+
+- **What:** at obstacle levels 1 and 2 the lender and the support office act on a loan application or a benefit claim
+  sent for a person from someone else's post (a provider's desk) only once that person has given them an authority
+  naming the post (`authority`, a paper of the person's own, addressed to the body), and the body's clerk has recorded
+  it (`authority_recorded`, to the giver and the post: an act in the clerk's own time). Without one, the paper comes
+  back saying so in the body's words (B2's `paper_returned`, `need.authority`). A paper of the person's own, or from a
+  post of the person's own organisation, never needs one. Where a body cannot tell whose a post is (no directory),
+  a post that speaks for a person is taken as someone else's.
+- **The way through:** the desk's code reports the matter not done, naming the authority (`Report.needs`); the person's
+  code gives the authority for the post, once a body and post, where it keeps that kind with the desk (`Delegating`,
+  `lodge`); once the body records it, the desk sends the paper again. A model at the desk can ask its client for the one
+  authority on its request form (one new plain blank, `authority`: the body), answered by the client's code giving it
+  (`reasons`: `lodged`, or `not_lodged` where the kind is not one it hands the desk), and send the paper again on
+  `send_again`. Asking for a general authority, or for every kind, is the coders' to read from the words (the axes
+  read `means` from the typed body and kind).
+- **Sources:** what such a body is (a nominee arrangement at a support agency; a broker's application with the
+  applicant's consent), not a place's figure; each to confirm against the profile's place. The clerk's time to record
+  one is the table of work's `publish` row (WM-1); a strained office's staffing (level 2) is not built yet: at both
+  levels the wait is the clerk's own queue.
+- **Found by the first run at level 1, fixed here (B2's code):** a claim that waits on the support office's file for
+  papers was read again, and drawn for again, at every round, so that 95 of 108 claims in five days came back as not
+  matched; a body's clerk now reads a paper once (`Intake::take`, `done` when decided). A paper of a person's own was
+  sent back to the participant that wrote it, which is no entity (refused); it goes to whom it is for, and to the post
+  that sent it where one did. And a paper on file when the world began (the opening caseload) is not read as arriving.
+  After: 1 of 162 claims came back in 120 days, and was sent again and decided (study town, level 1, seed 7).
+- **Byte-identical at level 0:** as for B2 (the same configs; the same state hashes and log digests at 45 days).
+- **Revisit if:** the screen shows the desk's clients never get past a body's return (then the person's rule for giving
+  an authority is wrong, or too narrow), or authorities need renewing (a body's review of a standing arrangement).
+
+## 2026-11-12 · What a claude -p seat call costs, and why (16 Haiku calls on the owner's subscription)
+
+The first pilot's estimate ($75 an arm) carried over rates fitted to the 2026-11-10 Haiku check, whose desk prompt was
+then about five times today's. Measured instead: three seat prompts captured from a mock dry run of `first-pilot.ts`
+(a desk sitting with matters, the factory's assistant with one matter, a desk sitting with only results and letters;
+captured by a temporary hook in `callModel`, not kept) sent through `ClaudeCodeAdapter` as the harness sends them,
+`claude-code/claude-haiku-5-5`, its plan sign-in (no API key). 16 calls: each twice back to back, again six minutes
+later, three at `--effort low`, two on seat prompts not yet sent (cold), one with an empty prompt. Kept in the
+scratchpad of the session (`probe.jsonl`, every call's whole usage and `modelUsage`).
+- **Claude Code reckons Haiku 5.5 at $5 a million in, $6.25 written to the cache, $0.50 read and $25 out**, to the
+  cent on all 16 calls (Sonnet 5.5's one earlier call fits the same rates to the cent): fifty times the API's price for
+  Haiku. That price is the whole of why a call costs what it does; nothing in how we call it multiplies the tokens.
+- **The prompt written anew each sitting.** Claude Code writes an hour's cache (`ephemeral_1h`), shared between separate
+  `claude -p` processes: the same seat's next call, back to back or six minutes later, read its prompt from the cache
+  (11,000 to 46,000 read, 400 to 2,600 written). A seat sits once a working day, so each sitting's first call writes the
+  seat's prompt again, about 12,000 tokens, $0.07 to $0.08 of a cold call's $0.12 to $0.14.
+- **No hidden context to speak of.** An empty prompt came to 180 tokens in; the seat prompts' first turn (about 12,200
+  tokens) is our system prompt, tools and observation at about 2.8 characters a token, with the answer schema's tool.
+  Claude Code's own side call to Haiku 4.5 (a title) costs $0.001 a call.
+- **The answer's tokens are mostly reasoning.** 500 to 2,400 tokens out a call, $0.013 to $0.061, for an answer of about
+  200 (688 characters measured): the rest is thinking at the default effort. At `--effort low`, the same three warm
+  prompts came to 1,015, 1,403 and 510 tokens out against 1,403, 2,245 and 1,069 at the default ($0.042 against
+  $0.062 a call); one cold call at low effort reasoned no less (1,893 out). Not adopted: the seats run at each model's
+  default effort, and a lower one changes how the model decides, for a saving of about $5 an arm.
+- **Turns.** 2 to 7 inside one call (the answer schema's tool, and its retries), each re-reading the prompt from the
+  cache at $0.50 a million: $0.006 a turn, a few cents a call at most.
+- **Nothing material can be cut** without changing what the seat is shown or how it may answer: the cache already works
+  within a sitting and across processes; a daily sitting's prompt has to be written once (keeping it warm would take a
+  call each hour); there is no output cap but the effort.
+- **Fixed:** the run's `cost.json` summed what was written to the cache only in all, not by purpose (`callRecorder`'s
+  `by`), so a seat's calls read as cache reads and output alone (the 2026-11-10 check's 8 seat calls wrote about
+  254,000 tokens it did not show); now by purpose too. Each call's line also keeps what Claude Code reckoned it at and
+  its turns. `orchestrator/prices.json` has Claude Code's exact rates.
+- **The new estimate** (`first-pilot.ts`'s header): a sitting's first call $0.13, its later ones $0.064, about 1.9 calls a
+  sitting: $0.19 a sitting, 260 sittings, about $49, with the debriefs about $52 an arm for Haiku, and for Sonnet by
+  the same table about $52 (its reasoning tokens under Claude Code are the unknown). Limits $78 an arm (half again).
+  About 11 s a call. A Codex arm (`codex/gpt-6.1-sol`, the owner's flat-rate subscription) is added, labelled as not on
+  equal terms (the Codex CLI puts its own instructions under ours): about 490 sitting calls and 52 debrief questions.
+- **Revisit if:** the pilot's first sittings average far from $0.19 (read their `cost.json` by purpose); Claude Code
+  changes its reckoning or its cache's hour; a seat sits more than once a working day.
+
+## 2026-11-12 · MT-31: an assistant's post is shown its own matters only (contract change; risks MT-28, MT-31)
+
+The study's town has two assistants of one organisation (the town's finance office's and its rating office's, both posts
+of `city`). A principal's papers to its in-house assistant were addressed to the organisation and seen by it alone, and
+an assistant post's channels match the organisation's papers by kind, so each assistant was shown, and a model seat
+woken by, the other's matters (in the 60-day mock fork: each city seat was shown both offices' referrals, briefs and
+sign-offs). Under the knowing rules a matter handed to a post is that post's.
+- **Contract changes** (blanket approval of 2026-10-11; logged here):
+  1. `RecordFilter.own_post` (world-config and module schemas, `match.own_post`, boolean, default false, not written
+     when false): a position's channel that keeps to its own post shows, of its organisation's papers addressed to any
+     of the organisation's posts, only those addressed to this post or written in it; a paper addressed to no post of
+     the organisation is shown as ever (kernel/crates/contracts/src/config.rs `post_ok`; perception's channel build,
+     searches and `shown_as_news`).
+  2. A statement may be addressed to a post (`addressed_to` names a position, as a letter may): the kernel checked every
+     addressee was an entity (`new_record`), and now lets a position pass where it is an addressee
+     (kernel/crates/world/src/exec.rs; blocks schema's `addressed_to` description).
+- **The world:** a principal's papers to an organisation's assistant (`to_assistant`: brief, remits, referrals,
+  sign-offs, declines, go-aheads, answers, acknowledgements) are addressed to the organisation and to the assistant's
+  post, seen by the organisation alone as before; the assistant's channels (terms, matters, file; the desk's too) keep
+  to their own post (`assistantChannels`, generate.ts). Nothing else is addressed to a post.
+- **What moves.** Towns without providers: nothing (town-300, 45 days: 669141b6..., as main). Towns with providers: the
+  config (the assistant posts' `own_post`) and every principal paper to an organisation's assistant (one more
+  addressee), so their hashes move (town-1000 with `assistants=true`, 30 days: 08949cd3..., was df9d05c7...). The study
+  town's code arm, 60 days after the fork, against main's: the same 2,067,471 entries; the 93 principal papers to the
+  assistants (42 referrals, 41 sign-offs, 6 remits, 3 briefs, a decline) and the 95 acts that wrote them differ only by
+  the added addressee, and 345 observation hashes differ (the assistants are shown less); nothing else, not a time, an
+  act or a paper. The mock seats' arm: the finance assistant's seat is shown the finance office's papers only (6) and the
+  rating office's assistant's the rating office's only (17), each before shown both; their wakes 71 to 58 and 70 to 66,
+  calls 49 to 48 and 60 to 60.
+- **Still open (MT-31, a little):** the assistant's own papers back (drafts, reports, advice, requests) are addressed to
+  the organisation, so the other assistant can find them in its file, on request only; nothing hands or wakes it with
+  them. MT-28's note of the same fault is marked fixed with this.
+- **Test:** `kernel/tests/knowing.rs`, `two_posts_of_one_organisation_that_keep_to_their_own_are_not_shown_each_others_matters`.
+- **Revisit if:** a seat reads its sibling assistant's drafts in its file (then address the assistant's papers to its
+  principal's post too); another body with several posts wants the same (the filter is general: any position's channel).
+
+## 2026-11-11 · Obstacles B7: readiness to grant from the cost of delay (docs/design/obstacles.md section 10)
+
+- **What:** a kind's facts may say what a day's delay of a matter costs the principal (`KindFacts.late_cost_day`), and
+  the principal keeps how long the matters it handed over waited on its own answer (`Seen.waited`, from a draft or a
+  request to go ahead coming in to its reading of it), only for kinds whose delay is costed. Answering a request for a
+  level, its rule weighs `draft` and `approve` with that wait at that cost (`rule::cost_waiting`; the review's rule is
+  unchanged). A request for one matter alone (`ScopeRequest.only`, a new plain blank on the request form at obstacle
+  levels) is weighed as one matter and granted, where it pays by the hurdle, by a remit for that matter alone
+  (`Remit.only`); the kind's own remit stands for every other matter. `oikos-kernel delegation` reads an act on that
+  matter at the level granted for it.
+- **The figure:** for a claim for support, a day of the least payment the place's support law makes (derived from the
+  profile's payments, generator `lateCost`, at levels 1 and 2 only). No other kind's delay is costed: no figure says
+  what a day's delay of a job application or a loan application costs, so none is invented. The hurdle stays one figure
+  across arms (2,000 bps, placeholder, MT-32).
+- **What to expect, said plainly:** a principal answers a draft within minutes of reading it, and a person reads at
+  their next wake, so the wait is short and grants will be few until post-holders keep working hours (the lead's later
+  step). A grant is then the principal's own rule meeting a real delay, never a disposition set to produce one.
+- **Byte-identical at level 0:** nothing is costed and nothing is kept where no kind has a cost of delay; the
+  configs at level 0 are unchanged.
+- **Revisit if:** the screen at level 2 shows no grant at all (then the lower-hurdle cell of section 10, stated as a
+  condition of the principal), or a kind's delay gets a source (a late lodgement penalty in a profile's tax law).
+
+## 2026-11-11 · Obstacles B8: the screen at levels 0, 1 and 2, and a second desk (docs/design/obstacles.md section 7)
+
+- **What:** `experiments/scope-pilot/study-obstacles.ts` is the study town (study.ts) at an obstacle level
+  (`OIKOS_OBSTACLES`), with a second provider's desk on request (`OIKOS_DESKS=2`: build.ts `secondDesk`, every other
+  member of the cohort engages provider B's paid offer at the same levels; both providers are in the profiles already).
+  build.ts gains `obstacles` and `secondDesk`, both absent by default, so first-pilot.ts and study.ts are as before. The
+  screen also reports, per seat and month, how long its drafts and requests to go ahead waited on its principal's
+  answer, and the remits a principal granted on a request.
+- **What it found** (code arm, seed 7, 180 days after the day-30 fork; a month is 30 days):
+
+  | seat | level 0 | level 1 | level 2 | level 2, two desks |
+  |---|---|---|---|---|
+  | desk(s): matters a month | 14.5 | 9.3 | 13.7 | 5.3 + 7.7 |
+  | desk(s): obstacles met a month | 0 | 1.7 (authority) | 2.2 (authority) | 1.0 + 1.2 |
+  | factory: matters / obstacles a month | 13.2 / 0 | 10.5 / 0 | 10.5 / 0 | 12.0 / 0 |
+  | finance office; rates post | 1 / 0; 4.7 / 0 | the same | the same | the same |
+  | waited on the principal (mean hours): desk, factory, rates post | 0.4, 1.7, 26.5 | 0.7, 1.5, 26.4 | 0.6, 1.8, 26.3 | 0.4 to 0.8, 1.7, 26.0 |
+  | remits granted on a request | 0 | 0 | 0 | 0 |
+
+  Level 1 with two desks: 3.8 + 5.0 matters and 1.2 + 0.7 obstacles a month. So the desk carries the obstacles, almost
+  all an authority wanted at first contact (the design's estimate was 2.5 to 4 a month: lower, because once a client
+  has given one, their later papers to that body pass). Wrong returns land mostly on citizens' own papers: the desk sends
+  few loan applications and claims. The factory meets none: its counterparties have no requirements (the design's
+  low-friction seat). **A second desk does not double the exposure**: the same cohort split between two desks halves
+  each desk's volume, and the obstacles a month across both stay where one desk had them. Doubling them takes a larger
+  cohort, not a second desk.
+- **Grants, said plainly (B7):** none, at any level. The code assistant never asks, and the principals' review rule is
+  unchanged; and the wait a principal's own answer adds is under an hour at the desk (its clients answer at their next
+  wake), so at a day of a support payment (5,776 cents in au-vic) a model's request for one matter alone would be
+  declined by the rule's own figures. Grants need the working-hours law (B5), which makes answers wait for a working day.
+  The rates post's sign-offs already wait a day (26 hours) and the factory's about two hours, but neither kind's delay is
+  costed.
+- **Found by the screen and fixed:** a body's paper back to a desk's post was refused (a post is no one a paper is
+  addressed to): a body now writes to whom the paper is for, and the person passes the body's paper on to their desk
+  (`Delegating::pass_on`), as a client forwards an agency's letter to their agent; the reader counts that as the desk
+  meeting it. The authority paper and its record no longer name a post among the addressees. The code assistant names
+  each paper it sends where bodies publish requirements, so that it knows which came back. The person's wrapper keeps
+  the bodies' papers (`ours`). A row of the figures registry for `late_cost_day` (a generated world at level 1 or 2
+  would not load without it: B7's gate never generated one).
+- **Found, not fixed (recorded):** the reader sorts a rates instalment's fifteen notices as one handed and fourteen
+  `not_handed` (one act, fifteen papers, one referral), and a few `beyond_level`: at level 0 as at every level. A
+  reading fault of the log reader, not the world's; to fix with the readout's next change.
+- **Byte-identical at level 0:** as before (the same configs; the same state hashes and log digests at 45 days).
+- **Revisit if:** a larger cohort is wanted for exposure (the study's setting, the lead's call); or the hours law lands
+  (then screen the grants again).
+
+## 2026-11-11 · The plain-notes reader after the small models' notes: letters addressed below, fields kept, nothing uncounted
+
+From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11-1*`; the study's tables in
+`runs/translator-small-models-2026-11-11/`). Reader only; what the translator is given for a clean `Do:` is unchanged.
+- **"Write to" alone, whom below.** A bare `Write to` / `Write to:` was not a heading, so the letter was folded into the
+  Do above it and sent to the translator (196 of 621 distinct requests). It is a heading now; whom is read on its line
+  before the colon or on the lines straight after it, by layout only (the rule is in note.ts above `whomLine` and in
+  docs/real-models.md). "Name (id)" is that id. No whom, no words, or a blank in angle brackets: one fixed sentence,
+  nothing sent. The guide says in one sentence that whom may go on the lines under "Write to".
+- **A Do's fields** ("- Buyer: buyer-c01" under an item, or as a Do of its own after one) stay with the item.
+- **Past the limit**: told "Not looked at: ... Send it again if you still want it." per item (was "at most 8 actions").
+- **A yes to an ask not waiting** (a guessed number: ask-159 to ask-162 in one answer) is told it is not waiting, with
+  what is. It was told "you are shown it next" (never true of a guess). A no is passed on as before.
+- **Uncounted requests.** In the 7B run of 2026-11-11, of the 75 requests the collection found never reaching the
+  translator, 17 were past the limit, 24 were refused for a post the seat did not hold (`malformed_tool_use`, logged,
+  but the collection counted only `dropped_tool_use`), 19 were set aside when the seat was asked whether it meant to
+  stop (no log entry at all), and the other 15 are the collection's join by words (they reached it). Now every Do not
+  sent is logged with its reason, including those beside a "Stop for good:" line and those set aside by that question,
+  and `served.ts` counts them (`not_sent`), shown in the pilot viewer.
+- **Offline re-read** (no model calls; HEAD's reader against this one, 7B run of 2026-11-11, 604 notes): Dos sent
+  603 to 581, of them clean single requests 443 to 556, with another heading inside 129 to 10, a lone field 31 to 15;
+  letters sent 285 to 451; parts told what was wrong in a fixed sentence 0 to 94 (letters with no whom or no words).
+  The 14B run (63 notes): unchanged (133 Dos, 14 letters), as it wrote whom on the heading's line.
+- **Revisit if:** a letter's first line is taken as whom (a single word on the line under a bare "Write to"); fields
+  of separate things are merged ("Do: Pay rent: 500" after another Do); a model writes whom by name without ids below
+  "Write to" (only counted before a colon).
+

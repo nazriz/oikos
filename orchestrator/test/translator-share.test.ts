@@ -32,6 +32,10 @@ test("served per seat model, from a log: first time, asked back, after one resta
     route("draft.a.2", "first"), failed("draft.a.2"),
     route("draft.a.3", "restated"), drafted("draft.a.3"), ann({ annotation: "signoff", participant: "a", draft: "draft.a.3", decision: "reject" }),
     route("draft.a.4", "restated"), failed("draft.a.4"),
+    // (A Do the seat host did not send on, with its cause, is counted apart; a letter or an answer not sent is not a request.)
+    ann({ annotation: "note", subject: "a", data: { malformed_tool_use: JSON.stringify({ type: "tool_use", id: "u1", name: "do", input: { what: "x" } }), reason: "not readable" } }),
+    ann({ annotation: "note", subject: "a", data: { dropped_tool_use: JSON.stringify({ type: "tool_use", id: "u2", name: "do", input: { what: "y" } }), reason: "left in the same answer" } }),
+    ann({ annotation: "note", subject: "a", data: { dropped_tool_use: JSON.stringify({ type: "tool_use", id: "u3", name: "write", input: {} }), reason: "left in the same answer" } }),
   ].join("\n") + "\n");
-  expect((await servedOfLogs([log]))["ollama/m"]).toEqual({ requests: 4, served_first_time: 1, asked_back: 1, served_after_restatement: 1, never_served: 1, drafts_unsure: 0, drafts_offered: 2, drafts_confirmed: 1, drafts_declined: 1, drafts_unanswered: 0 });
+  expect((await servedOfLogs([log]))["ollama/m"]).toEqual({ requests: 4, served_first_time: 1, asked_back: 1, served_after_restatement: 1, never_served: 1, not_sent: 2, drafts_unsure: 0, drafts_offered: 2, drafts_confirmed: 1, drafts_declined: 1, drafts_unanswered: 0 });
 });

@@ -501,5 +501,5 @@ test("a seat cannot confirm a draft it has not been shown: asking and confirming
   const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
   expect(recs.some((r) => r.author === "mayor-system" && String(r.text).includes("CLOSED"))).toBe(false);
   expect(ann.filter((a) => a.annotation === "signoff").map((a) => a.decision)).toEqual(["reject"]); // (the one it was shown)
-  expect(seen.join("\n")).toContain("once you have seen what it would do");
+  expect(seen.join("\n")).toContain("is not waiting for your yes or no: what you ask for is set out for you with its reference once it is drawn up, and you answer it then"); // (said plainly since 2026-11-11)
 }, 300_000);

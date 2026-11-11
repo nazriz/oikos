@@ -247,6 +247,12 @@ pub struct State {
     /// draft to a body that hears the matter was declined.)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     venues: Vec<(String, Vec<String>, i64)>,
+    /// The authorities it has given a body for its assistant's post (`body|post`): docs/design/obstacles.md, O1.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    lodged: BTreeSet<String>,
+    /// The bodies' papers it has passed on to its desk.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    passed: BTreeSet<String>,
 }
 
 pub struct Delegating {
@@ -288,6 +294,8 @@ impl Delegating {
                 acknowledged: vec![],
                 changed: false,
                 venues: vec![],
+                lodged: BTreeSet::new(),
+                passed: BTreeSet::new(),
             },
         })
     }
@@ -406,6 +414,7 @@ fn ours(r: &Record, complaints: &[String], book: &Book, from_assistant: &dyn Fn(
     match &r.body {
         RecordBody::Statement { kind, data, .. } => {
             PAPERS.contains(&kind.as_str())
+                || [crate::common::intake::RETURNED, crate::common::intake::RECORDED, crate::common::intake::AUTHORITY].contains(&kind.as_str())
                 || complaints.iter().any(|c| c == kind.as_str())
                 || (kind.as_str() == "order" && data.as_ref().and_then(|d| d.get("kind")).and_then(|k| k.as_str()).is_some_and(|k| k.starts_with("service:")))
         }
@@ -501,7 +510,20 @@ impl State {
             self.eng.ordered(&r.id);
             return;
         }
+        if to_me && self.p.post.is_none() && (papers::is_kind(r, crate::common::intake::RETURNED) || papers::is_kind(r, crate::common::intake::RECORDED)) {
+            self.pass_on(r);
+            return;
+        }
         if let Some(x) = papers::read::<Report>(r) {
+            // (A body would not act on a paper its assistant sent for it without its authority: it gives the body one for
+            // the post, where it keeps that kind with the assistant. Docs/design/obstacles.md, O1.)
+            if let (Some(a), Some(post), false) = (x.needs.as_ref().and_then(|n| n.authority.clone()), r.position.as_deref(), x.done) {
+                let referral = self.book.get(&x.referral).and_then(|q| papers::read::<Referral>(q));
+                if let Some(q) = referral.filter(|q| a.for_ == self.me && hands_over(self.remit(&q.agreement, &q.kind))) {
+                    let kinds = if a.kinds.is_empty() { vec![q.kind.clone()] } else { a.kinds.clone() };
+                    self.lodge(&a.with, post, &kinds, &r.id);
+                }
+            }
             let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
             let Some(m) = self.matters.get(&action).cloned() else { return };
             let k = Self::key(&m.agreement, &m.kind);
@@ -544,6 +566,7 @@ impl State {
                 self.read_for_want(r, &action, &m, &x, t, cx);
                 return;
             }
+            self.waited(&m.kind, &m.agreement, t - r.at);
             let differs = if m.facts.is_some() { matter_differs(&m, &x) } else { vec![] };
             let wrong = if m.facts.is_some() {
                 !differs.is_empty()
@@ -577,7 +600,8 @@ impl State {
             }
         } else if let Some(x) = papers::read::<ApprovalRequest>(r) {
             let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
-            let Some(m) = self.matters.get(&action) else { return };
+            let Some(m) = self.matters.get(&action).cloned() else { return };
+            self.waited(&m.kind, &m.agreement, t - r.at);
             let d = GoAhead { request: r.id.to_string(), referral: x.referral.clone() };
             let agreement = m.agreement.clone();
             self.paper(GoAhead::KIND, &format!("Go ahead with {}.", x.referral), &agreement, &r.id, papers::data(&d), Then::Plain);
@@ -643,6 +667,13 @@ impl State {
                     self.myself(&action, &m, "The service has ended with this matter still open: doing it ourselves.");
                 }
             }
+        }
+    }
+
+    /// A matter of a kind whose delay it costs waited `secs` on its answer (docs/design/obstacles.md section 10).
+    fn waited(&mut self, kind: &str, agreement: &str, secs: i64) {
+        if self.p.kinds.get(kind).is_some_and(|f| f.late_cost_day > 0) {
+            self.seen.entry(Self::key(agreement, kind)).or_default().waited_for(secs);
         }
     }
 
@@ -750,7 +781,7 @@ impl State {
             .rev()
             .filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str()) && !self.book.withdrawn(&r.id))
             .filter_map(|r| papers::read::<Remit>(r))
-            .find(|x| x.agreement == agreement && x.kind == kind)
+            .find(|x| x.agreement == agreement && x.kind == kind && x.only.is_none())
             .map_or(Level::None, |x| x.level)
     }
 
@@ -760,7 +791,7 @@ impl State {
             .all(Remit::KIND)
             .rev()
             .filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str()) && !self.book.withdrawn(&r.id))
-            .find(|r| papers::read::<Remit>(r).is_some_and(|x| x.agreement == agreement && x.kind == kind))
+            .find(|r| papers::read::<Remit>(r).is_some_and(|x| x.agreement == agreement && x.kind == kind && x.only.is_none()))
             .map(|r| r.id.to_string())
     }
 
@@ -791,7 +822,7 @@ impl State {
             .rev()
             .filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str()))
             .filter_map(|r| papers::read::<Remit>(r))
-            .find(|x| x.agreement == agreement && x.kind == kind)
+            .find(|x| x.agreement == agreement && x.kind == kind && x.only.is_none())
     }
 
     /// Whether it has said it will not look at a kind's level again yet (its newest remit's `hold_until`, a freeze).
@@ -938,12 +969,24 @@ impl State {
                 inputs.extend(self.inputs(&e, &[(k.clone(), seen.clone())].into_iter().collect()));
                 let kd = kinds.get(&k).copied().unwrap_or_default();
                 let p = rule::estimate(e.offer.claim_slip_bps, w.prior_matters, &seen);
-                let (c_now, c_want) = (rule::cost(now, &kd, p, &w), rule::cost(level, &kd, p, &w));
-                if (c_now - c_want) * 10_000 > c_want.max(1) * i128::from(w.hurdle_bps.max(0)) {
+                let wait = seen.wait_milli_days();
+                // (Asked for one matter alone, open with it: that one matter weighed.)
+                let one = x.only.clone().filter(|rf| self.by_referral.contains_key(rf));
+                let kd = if one.is_some() { rule::Kind { per_month: 1, ..kd } } else { kd };
+                let (c_now, c_want) = (rule::cost_waiting(now, &kd, p, &w, wait), rule::cost_waiting(level, &kd, p, &w, wait));
+                if let (Some(rf), true) = (one.clone(), (c_now - c_want) * 10_000 > c_want.max(1) * i128::from(w.hurdle_bps.max(0))) {
+                    words.push(format!("For {rf} alone: {}. Our remit for {} stands for every other.", level.words(), plural(&named)));
+                    remit = Some(Remit { agreement: a.clone(), kind: k.clone(), level, hold_until: None, takes_back: vec![], answers: Some(id.to_string()), at_least: None, depth: self.depth_for(&e.offer, &k), only: Some(rf) });
+                    Why::Granted
+                } else if one.is_some() {
+                    let money = |n: i128| money_words(n as i64, &cx.ctx.world);
+                    words.push(format!("By our own figures that matter {} would cost us about {}, against {} as it is, so we keep it as it is.", level.words(), money(c_want), money(c_now)));
+                    Why::CostsMore
+                } else if (c_now - c_want) * 10_000 > c_want.max(1) * i128::from(w.hurdle_bps.max(0)) {
                     let back = if hands_over(level) { vec![] } else { self.take_back(&a, &k) };
                     words.push(format!("From now, {}: {}. It stands until a remit of ours changes it.{}", plural(&named), level.words(), taken_back(&back)));
                     let (at_least, hold_until) = self.floor(&a, &k, t).map_or((None, None), |(f, h)| (Some(f), Some(h)));
-                    remit = Some(Remit { agreement: a.clone(), kind: k.clone(), level, hold_until, takes_back: back, answers: Some(id.to_string()), at_least, depth: self.depth_for(&e.offer, &k) });
+                    remit = Some(Remit { agreement: a.clone(), kind: k.clone(), level, hold_until, takes_back: back, answers: Some(id.to_string()), at_least, depth: self.depth_for(&e.offer, &k), only: None });
                     Why::Granted
                 } else {
                     let money = |n: i128| money_words(n as i64, &cx.ctx.world);
@@ -973,6 +1016,24 @@ impl State {
             words.push("We do not change what your post is shown on request. Name the record you need and we will send a copy, if it is ours.".into());
             parts.push(Part { asked: "access".into(), granted: false, why: Why::NotChanged });
         }
+        // An authority with a body, for the assistant's post (docs/design/obstacles.md, O1): given for the kinds asked, or
+        // the matter's, where it keeps them with the assistant; a paper of its own to the body, in its own time.
+        if let Some(with) = x.authority.clone().filter(|w| !w.trim().is_empty()) {
+            let kinds: Vec<String> = kind.clone().into_iter().filter(|k| hands_over(self.remit(&x.agreement, k))).collect();
+            let post = r.position.as_deref().map(String::from);
+            let why = match post.filter(|_| !kinds.is_empty()) {
+                Some(post) => {
+                    self.lodge(&with, &post, &kinds, id);
+                    words.push(format!("We are giving {with} our authority for you in {}.", kinds.iter().map(|k| plural(&k.replace('_', " "))).collect::<Vec<_>>().join(" and ")));
+                    Why::Lodged
+                }
+                None => {
+                    words.push(format!("We give {with} no authority for you: name a kind of matter we hand you, or the matter it is for."));
+                    Why::NotLodged
+                }
+            };
+            parts.push(Part { asked: "authority".into(), granted: why == Why::Lodged, why });
+        }
         if x.limit.is_some() {
             let set = self.book.all(Brief::KIND).filter_map(|b| papers::read::<Brief>(b)).filter(|b| b.agreement == x.agreement).filter_map(|b| b.limit).last();
             let why = match set {
@@ -992,7 +1053,7 @@ impl State {
             parts.push(Part { asked: "words".into(), granted: false, why: Why::NothingNamed });
         }
         // (Granted: a new remit, or a copy sent. A level it holds already is no grant.)
-        let granted = remit.is_some() || copy.is_some();
+        let granted = remit.is_some() || copy.is_some() || parts.iter().any(|p| p.why == Why::Lodged);
         if let Some(p) = parts.iter_mut().find(|p| p.asked == "level" && p.why == Why::Granted) {
             p.granted = remit.is_some();
         }
@@ -1001,7 +1062,10 @@ impl State {
         let mut lines = format!("Your request {id}: {}", words.join(" "));
         if let Some(rm) = remit {
             self.changed = true;
-            let rw = format!("From now, {}s: {}. It stands until a remit of ours changes it.{}", rm.kind.replace('_', " "), rm.level.words(), taken_back(&rm.takes_back));
+            let rw = match &rm.only {
+                Some(rf) => format!("For {rf} alone: {}.", rm.level.words()),
+                None => format!("From now, {}s: {}. It stands until a remit of ours changes it.{}", rm.kind.replace('_', " "), rm.level.words(), taken_back(&rm.takes_back)),
+            };
             self.paper(Remit::KIND, &rw, &a, id, papers::data(&rm), Then::Plain);
             lines.push_str(" Our remit says so.");
         }
@@ -1094,16 +1158,64 @@ impl State {
     /// (the provider runs the system, but its other systems, such as its desk for persons, are not party to the
     /// organisation's matters: before 2026-11-08 they went to the provider, and the provider's desk was shown, and tried
     /// to do, the town finance office's returns: the scope pilot's first round). A person's assistant is the provider's
-    /// own desk: to the provider.
+    /// own desk: to the provider. (Addressed to the assistant's post too, since 2026-11-12: an organisation with two
+    /// offices that each engaged an assistant had each assistant shown the other's matters, risk MT-31. Its post's channels
+    /// keep to what is its own, `RecordFilter::own_post`.)
     fn to_assistant(&self, agreement: &str) -> (Vec<String>, Vec<String>) {
-        if self.p.post.is_some() {
-            return (vec![self.me.clone()], vec![self.me.clone()]);
+        if let Some(post) = &self.p.post {
+            return (vec![self.me.clone(), post.clone()], vec![self.me.clone()]);
         }
         let provider = self.provider_of(agreement);
         (vec![provider.clone()], vec![self.me.clone(), provider])
     }
 
     /// A paper of its own to its assistant, about a service.
+    /// A person's desk is told what a body wrote to the person about a paper the desk sent for them, or an authority the
+    /// body recorded that the person gave for the desk (docs/design/obstacles.md, O1 and O4): the person passes the
+    /// body's paper on, as it stands, to its provider, as a client forwards a letter to their agent. Once each.
+    fn pass_on(&mut self, r: &Arc<Record>) {
+        let d = crate::common::data(r).to_value();
+        let ours = match d["returned"].as_str() {
+            Some(_) => d["from"].is_string(),
+            None => d["authority"].as_str().and_then(|a| self.book.get(a)).is_some_and(|a| a.speaks_for.as_deref() == Some(self.me.as_str())),
+        };
+        let Some(agreement) = self.in_use().and_then(|e| e.agreement.clone()).filter(|_| ours && !self.passed.contains(r.id.as_str())) else { return };
+        self.passed.insert(r.id.to_string());
+        let by = r.speaks_for.as_deref().unwrap_or(r.author.as_str()).to_string();
+        let mut data = d.clone();
+        data["by"] = json!(by);
+        data["for"] = json!(self.me);
+        let kind = crate::common::kind(r).unwrap_or_default().to_string();
+        let words = format!("From {by}: {}", crate::common::text(r));
+        self.paper(&kind, &words, &agreement, &r.id, data, Then::Plain);
+    }
+
+    /// Its authority with a body for its assistant's post, for kinds of paper (docs/design/obstacles.md, O1): a paper of
+    /// its own to the body, which the body's clerk records in its own time. Seen by the post it names, as an authority
+    /// form's agent is told. Once for each body and post.
+    fn lodge(&mut self, with: &str, post: &str, kinds: &[String], basis: &str) {
+        let key = format!("{with}|{post}");
+        if self.lodged.contains(&key) {
+            return;
+        }
+        self.lodged.insert(key);
+        let named = if kinds.is_empty() { "the papers it sends for us".to_string() } else { kinds.iter().map(|k| plural(&k.replace('_', " "))).collect::<Vec<_>>().join(" and ") };
+        let words = format!("Our authority for {post} to act for us with you in {named}.");
+        let c = say(
+            crate::common::intake::AUTHORITY,
+            &words,
+            Say {
+                to: Some(vec![with.to_string()]),
+                visible: Some(Visible::Only(vec![self.me.clone(), with.to_string()])),
+                basis: (!basis.is_empty()).then(|| basis.to_string()),
+                data: Some(json!({ "posts": [post], "kinds": kinds })),
+                ..Default::default()
+            },
+        );
+        let s: Step<()> = because(&words, vec![c]);
+        self.queue.push(Own { program: program_text(&s.program()), why: words, then: Then::Plain });
+    }
+
     fn paper(&mut self, kind: &str, words: &str, agreement: &str, basis: &str, data: Value, then: Then) {
         let (to, visible) = self.to_assistant(agreement);
         let c = say(
@@ -1320,7 +1432,7 @@ impl State {
                         let to = if now.rank() < want.rank() { want } else { now };
                         cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": now, "to": to, "committed": why, "at_least": want, "hold_until": until, "inputs": self.inputs(&e, &seen) }));
                         let words = format!("From now, {}s: {}. We have agreed to keep them with you at least at {} until {}; after that, until a remit of ours changes it.", k.replace('_', " "), to.words(), want.word(), crate::common::when_words(until, &cx.ctx.world));
-                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: to, hold_until: Some(until), takes_back: vec![], answers: None, at_least: Some(want), depth: self.depth_for(&e.offer, k) };
+                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: to, hold_until: Some(until), takes_back: vec![], answers: None, at_least: Some(want), depth: self.depth_for(&e.offer, k), only: None };
                         self.changed = true;
                         self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
                         continue;
@@ -1332,7 +1444,7 @@ impl State {
                         cx.decided(json!({ "domain": "delegation", "choice": "remit", "agreement": a, "kind": k, "from": self.remit(&a, k), "to": want, "committed": why, "hold_until": until, "inputs": self.inputs(&e, &seen) }));
                         let back = if hands_over(want) { vec![] } else { self.take_back(&a, k) };
                         let words = format!("From now, {}s: {}. This level is fixed until {}. It does not expire: after that day it stays in force until we send a new remit.{}", k.replace('_', " "), want.words(), crate::common::when_words(until, &cx.ctx.world), taken_back(&back));
-                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: Some(until), takes_back: back, answers: None, at_least: None, depth: self.depth_for(&e.offer, k) };
+                        let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: Some(until), takes_back: back, answers: None, at_least: None, depth: self.depth_for(&e.offer, k), only: None };
                         self.changed = true;
                         self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
                     }
@@ -1367,7 +1479,7 @@ impl State {
                 let back = if hands_over(want) { vec![] } else { self.take_back(&a, k) };
                 let kept = floor.map(|(f, h)| format!(" We have agreed to keep them with you at least at {} until {}.", f.word(), crate::common::when_words(h, &cx.ctx.world))).unwrap_or_default();
                 let words = format!("From now, {}s: {}. It stands until a remit of ours changes it.{kept}{}", k.replace('_', " "), want.words(), taken_back(&back));
-                let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: floor.map(|(_, h)| h), takes_back: back, answers: None, at_least: floor.map(|(f, _)| f), depth: self.depth_for(&e.offer, k) };
+                let r = Remit { agreement: a.clone(), kind: k.clone(), level: want, hold_until: floor.map(|(_, h)| h), takes_back: back, answers: None, at_least: floor.map(|(f, _)| f), depth: self.depth_for(&e.offer, k), only: None };
                 self.changed = true;
                 self.paper(Remit::KIND, &words, &a, &a, papers::data(&r), Then::Plain);
             }

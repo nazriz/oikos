@@ -32,6 +32,29 @@ pub const KINDS: &[&str] = &[
     Handover::KIND,
 ];
 
+/// What would clear an obstacle, as the law that made it names it (docs/design/obstacles.md section 4): an authority
+/// with a body for kinds of paper, a record by id, or the items a paper lacked.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Need {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authority: Option<AuthorityNeed>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub record: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub correction: Vec<String>,
+}
+
+/// An authority a body needs on file before it acts on a paper sent for someone: from whom (`for`), with whom
+/// (`with`), for which kinds of paper.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthorityNeed {
+    #[serde(rename = "for")]
+    pub for_: String,
+    pub with: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub kinds: Vec<String>,
+}
+
 /// The level at which a kind of matter is delegated. A set, not a ladder: nothing orders them, and a remit names one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -276,6 +299,10 @@ pub struct Remit {
     /// What is handed over of a matter of this kind: the finished act, or what happened.
     #[serde(default, skip_serializing_if = "Depth::is_act")]
     pub depth: Depth,
+    /// This one matter alone (a referral), granted on a request for it: the level for that matter; the kind's stands
+    /// as it was for every other (docs/design/obstacles.md section 10).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub only: Option<String>,
 }
 impl Paper for Remit {
     const KIND: &'static str = "remit";
@@ -437,6 +464,10 @@ pub struct Report {
     /// At want depth, the way it took: the kind of paper it sent and to whom ("review_request to landlord-1").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub way: Option<String>,
+    /// Not done for want of one thing another party asked for (docs/design/obstacles.md): what would clear it, as the
+    /// paper that sent the matter back named it. Read by the principal's code; the words say the same.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub needs: Option<Need>,
 }
 impl Paper for Report {
     const KIND: &'static str = "report";
@@ -463,6 +494,12 @@ pub struct ScopeRequest {
     /// The matter in hand that needs it (a referral), where the request says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub matter: Option<String>,
+    /// The level asked for this one matter alone (a referral), not for the kind (docs/design/obstacles.md section 10).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub only: Option<String>,
+    /// A body the principal is asked to give the assistant its authority with (for the kind asked, or the matter's).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authority: Option<String>,
 }
 impl Paper for ScopeRequest {
     const KIND: &'static str = "scope_request";
@@ -496,6 +533,10 @@ pub enum Why {
     OverLimit,
     /// The request named nothing the principal can act on (a kind and a level, a record, a limit).
     NothingNamed,
+    /// An authority given to the body named, for the assistant's post (docs/design/obstacles.md, O1).
+    Lodged,
+    /// No authority given: the kind is not one the principal keeps with the assistant.
+    NotLodged,
 }
 
 /// One part of a request for more scope, and what the principal made of it.

@@ -199,6 +199,36 @@ to answer, nothing kept for it but looks that found nothing, nothing due on its 
 file unchanged) holds no sitting and calls no model; it is noted (`empty_sitting`) and the seat is back when it had
 arranged. A mock that sits as its code twin does always sits.
 
+**Since 2026-11-11, a model's seat keeps to its post and to working hours.**
+- *Woken only by what is its own* (kernel/src/schedule.rs, `keep_to_own`; the engine's `seats_keep_to_own`, which the
+  experiment harness gives a fork whose seats a model holds). Of the papers that name its organisation, only one that
+  its own channels show it as it comes wakes it (not one read only on request, or a board's); never an
+  `acknowledgement`; and no letter in an office's fixed words (an acknowledgement, a standing report, a bank's note of a
+  request of its own: `office_note`). A code arm's seats, and a `mock/<policy>` steward, are woken as their code units
+  are: the town without a model, act for act.
+- *Working hours.* An assistant's seat sits within the working calendar of the office it serves: one sitting a working
+  day, in the place's working hours (the profile's `round`: 9 to 5, five days a week in au-vic), by the office seats'
+  own mechanism (`sessions`, participants/src/llm/participant.ts). An organisation's assistant serves its principal's
+  office, which keeps the place's working day; a provider's desk serves from the provider, which states no calendar of
+  its own, so it keeps the place's working week, as the outside agency's casework desk does. The system's own hours (a
+  machine's whole day) allow any sitting; the sitting is the office's. What comes between sittings is read together at
+  the next. One sitting a day, not more: the mechanism opens one sitting a working day and holds it open while the seat
+  works (its turns, and the results of its acts, within it), and an office reads its post in such a sitting, not letter
+  by letter.
+- *"Done for n days" is honoured.* Neither the results of its own acts, nor an acknowledgement (on paper or by letter),
+  nor its organisation's papers that are not for it bring it back early. What is its to act on does (a matter handed to
+  it, an answer to its request, a sign-off or decline of its draft: its `matters`; a letter in someone's own words), and
+  then at the next working day's sitting after it came, never at once (for a letter, every seat with office hours
+  since 2026-11-11: before, a letter brought one back at once within hours). A desk's clients' briefs
+  and remits, which it keeps and is not shown as a list, bring it back no sooner.
+- *Whom it writes to.* Its standing instructions name the post that hands it its work: the post its brief, remits and
+  matters are written in, under the agreement of the delivery that names its system ("You work for Finance officer
+  (finance), of Town of Millbrook (city): to write to it, write to finance, not to city"). A provider's desk is told to
+  write to its provider's sales and service desk. A letter to a post reaches its holder in that post only. Until then a
+  town's assistant was told to write to `city`, and one letter reached every office of the town, each of which
+  acknowledged it (about twenty acknowledgements, each a wake).
+- *Two assistants of one organisation* are shown only their own matters since 2026-11-12 ("In-house for an organisation", below).
+
 **Answers to requests, and letters** (2026-11-10). A request for more scope (`scope_request`) is answered by its
 principal, part by part, in its own time, citing the request (`scope_answer`, `basis` the request; charged as any paper
 is, `publish/scope_answer`):
@@ -291,7 +321,13 @@ principal's papers to it (brief, remits, referrals, sign-offs, go-aheads) are ad
 seen by it alone, and so are the system's own papers back. The provider runs the system, but its other systems are not
 party to the organisation's matters. Before 2026-11-08 they went to the provider, and the provider's desk for persons,
 which shows whatever names the provider, was handed the town finance office's returns and tried to file them (a desk
-cannot: `not_capable`). A person's papers go to the provider's desk as before.
+cannot: `not_capable`). A person's papers go to the provider's desk as before. **Each assistant's post is shown its own
+matters only** (2026-11-12, risk MT-31): the principal's papers are addressed to the assistant's post as well as to the
+organisation, and the post's channels (its terms, matters and file) keep to their own post (`own_post` on a channel's
+match: of the organisation's papers addressed to any of its posts, only those addressed to this one or written in it).
+Before, the town's finance office's assistant and its rating office's assistant, both posts of the town, were each
+shown, and a model seat woken by, the other's matters. The assistant's own papers back are still addressed to the
+organisation, so the other assistant can find them in its file on request.
 
 **A remit's hold, in words.** A remit held by the principal's own word says until when, by date, and that it stands after
 that until a remit of the principal's changes it (`hold_until` reads as a date). Seats read a bare "hold until 5184000"
@@ -375,6 +411,39 @@ can pay its fee (until 2026-11-10 the rates post could not, and its service was 
 
 **The code-only screen** (`experiments/scope-pilot/screen.ts <spec>`) runs a spec's code arms and gives, per assistant
 seat and month, the matters handed over, what the principal kept, steps, sittings and the obstacle events that occur.
+
+## Obstacles (docs/design/obstacles.md)
+
+Ordinary office friction is made by the institution that makes it in life: a counterparty that sends a paper back for
+what it lacks, or for want of an authority on file; a keeper that does not find a record. Each such law logs what it did
+as an obstacle (a `decision`, domain `obstacle`: the paper, the kind of law, and the **need**, the least that would clear
+it), for measures only. Nobody in the world reads it. `oikos-kernel delegation` reads the log: an obstacle is **met**
+when the paper that told of it was addressed to an assistant's seat (an organisation's assistant post, or a provider's
+desk), never otherwise; a paper sent again, citing the one sent back, is the same matter's; and each request for more
+scope is set beside the newest obstacle met on its matter (or on its principal's matters in the 30 days before it) on
+the axes its typed fields name. The screen counts obstacles met by law per seat and month.
+
+**A body that sends papers back (O4, 2026-11-11).** Where the world's `obstacles` level is above 0, the lender and the
+support office publish what they need on the papers sent to them (`requirements`: the items their forms ask for) and
+their clerk reads each paper against it (`actors::common::intake`, the rule `oikos_rules::acceptance`). A paper that does
+not give an item comes back naming it (`paper_returned`, to whoever sent it and whom it is for); one in order comes back
+wrongly at the world's rate for the check (`accept/<kind>`, a placeholder: MT-32), and is taken when it is sent again. A
+person sends their own unmatched paper again as it was; the code assistant sends again what it sent, and reports one that
+lacks an item, or wants an authority, as not done with what would clear it (`Report.needs`). A model at a desk sends a
+returned paper again on its form `send_again`.
+
+**An authority on file (O1, 2026-11-11).** At the same levels the lender and the support office act on a loan
+application or a benefit claim sent for a person from someone else's post only once that person has given them an
+authority naming the post, and their clerk has recorded it. The desk's code reports such a paper not done, naming the
+authority; the person's code gives it, once for each body and post, where it keeps that kind with the desk; once the
+body records it (telling the person and the post), the desk sends the paper again. A model at the desk may ask its
+client for the one authority on its request form (`authority`: the body). A body writes to whom the paper is for,
+not to the desk's post: the person passes the body's paper on to their desk, as a client forwards an agency's letter.
+
+**Readiness to grant from the cost of delay (2026-11-11).** Where a kind's day of delay is costed (at obstacle levels,
+a claim for support: a day of the least payment), the principal counts how long matters waited on its own answer, and
+weighs a request for a higher level, or for one matter alone, with that wait at that cost. A matter granted alone gets a
+remit of its own (`Remit.only`); every other matter of the kind stays as it was.
 
 ## Leaves out (for now)
 

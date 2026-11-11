@@ -111,6 +111,9 @@ pub struct Recourse {
     pub grievances: BTreeMap<String, Grievance>,
     /// Requests for papers for a claim of ours, answered.
     evidence_sent: BTreeSet<String>,
+    /// Papers of ours a body sent back, and we sent again (docs/design/obstacles.md, O4).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    resent: BTreeSet<String>,
     /// Notices of rent increase taken to the tribunal by a way chosen (housing keeps those it weighed itself).
     pub challenged: BTreeSet<String>,
     /// Notices of rent increase that break the law as we read it, read when each came.
@@ -527,6 +530,24 @@ impl Person {
             let by = r.speaks_for.unwrap_or_else(|| r.author.clone().into());
             let d = data(r).clone();
             let k = kind(r).unwrap_or_default();
+            // A paper of our own a body sent back as not matched to its records: we send it again as it was. (One that
+            // lacks something its form asks for, or that was sent for us by someone else, is not ours to send again.)
+            if k == crate::common::intake::RETURNED {
+                let ours = d.s("returned").and_then(|x| self.book.get(x)).is_some_and(|o| o.position.is_none() && o.speaks_for.as_deref() == Some(me.as_str()));
+                let need = d.get("need").map(|n| n.to_value()).unwrap_or_default();
+                let fix = need.get("authority").is_none() && need["correction"].as_array().is_none_or(|a| a.is_empty());
+                if ours && fix && by != me && self.recourse.resent.insert(r.id.to_string()) {
+                    let p = d.get("paper").map(|n| n.to_value()).unwrap_or_default();
+                    let to: Vec<String> = p["to"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(String::from)).collect();
+                    let mut vis = vec![me.clone()];
+                    vis.extend(to.iter().cloned());
+                    w.push(because(
+                        format!("{by} sent our {} back: sending it again.", p["kind"].as_str().unwrap_or("paper").replace('_', " ")),
+                        vec![say(p["kind"].as_str().unwrap_or_default(), p["text"].as_str().unwrap_or_default(), Say { to: Some(to), visible: Some(Visible::Only(vis)), basis: Some(r.id.to_string()), data: Some(p["data"].clone()), ..Default::default() })],
+                    ));
+                }
+                continue;
+            }
             // An office that waits for papers before it decides our claim asks for them: we send what we have.
             if k == paper::EVIDENCE_REQUEST {
                 if let (Some(claim), Some(need)) = (d.s("claim"), d.s("need")) {

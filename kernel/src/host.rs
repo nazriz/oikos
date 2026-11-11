@@ -57,7 +57,7 @@ impl Write for Out {
 /// The options a host gives (all optional): `run_id`, `log` (a path: `.jsonl` is the JSONL log, anything else the
 /// binary log; absent: kept in memory), `anchors` (a path), `threads`, `until`, `stand_in`, `record_decisions`,
 /// `audit`, `snapshot_every_days` (binary log only), `stream: {cap, kinds}`, `label` (a fork's), `withhold` (acts not
-/// carried out: a researcher's intervention, `engine::Withhold`).
+/// carried out: a researcher's intervention, `engine::Withhold`), `seats_keep_to_own` (`engine::EngineOptions`).
 #[derive(Debug, Clone, Default)]
 struct Options {
     run_id: Option<String>,
@@ -82,6 +82,8 @@ fn options(v: &Value) -> Result<Options, String> {
     engine.audit = v["audit"].as_bool() == Some(true);
     engine.withhold = crate::engine::withholds(&v["withhold"])?;
     engine.at_fork = crate::engine::at_forks(&v["at_fork"])?;
+    // (Seats that keep to their own post: a fork whose seats a model holds. engine::EngineOptions::seats_keep_to_own.)
+    engine.seats_keep_to_own = v["seats_keep_to_own"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(String::from)).collect();
     engine.capture_citizens = v["capture_citizens"].as_str().filter(|p| !p.is_empty()).map(String::from);
     // (The world's records nobody reads held on disk, docs/design/tiered-storage.md: where `cold` says, or beside the
     // log; OIKOS_COLD=off keeps them in memory. The same results either way.)

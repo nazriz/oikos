@@ -69,6 +69,7 @@ export const FIGURE_BASIS: Basis[] = [
   conv("participants.*.controller.params.cadence_days", "how often a model's seat is woken when nothing comes to it: the platform's design of a seat (docs/real-models.md)"),
   conv("templates.*.controller.params.cadence_days", "how often a model's seat is woken when nothing comes to it: the platform's design of a seat (docs/real-models.md)"),
   derived("participants.*.controller.params.sessions.**", "a model's seat sits in its office's hours: the profile's working day and days (round)"),
+  derived("templates.*.controller.params.sessions.**", "an assistant's seat sits in the hours of the office it serves: the profile's working day and days (round)"),
   // The citizen (generate.ts, `citizenController`).
   ...of(CITIZEN, [
     derived("population", "the town's adult count, drawn from the profile's households"),
@@ -420,6 +421,7 @@ export const FIGURE_BASIS: Basis[] = [
     derived("delegation.hour_value", "an hour of the principal's own time at the profile's public-service wage (public_service.wage_per_pay_period) over its ordinary hours"),
     prof("delegation.kinds.*.error_cost", "assistants.principals"),
     derived("delegation.kinds.*.own_seconds", "the principal's own time for the paper: the person table's row (work_time)"),
+    derived("delegation.kinds.*.late_cost_day", "what a day's delay of a claim for support costs a person: a day of the least payment the place's support law makes (the profile's support.payments; docs/design/obstacles.md section 10), at obstacle levels only"),
     placeholder("delegation.kinds.*.compose_seconds", "the principal's time composing a paper it hands over finished: the generator's share (COMPOSE_BPS) of its own time, the table's compose/<kind> row (WM-1)"),
     placeholder("delegation.seconds", "the times of the papers of delegation (a referral, a go-ahead, a sign-off): the generator's placeholders (ME-22)"),
     prof("offers.*.claim_slip_bps", "assistants.providers"),
