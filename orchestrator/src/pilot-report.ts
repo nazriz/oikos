@@ -375,7 +375,7 @@ export async function servedOfLogs(logs: string[]): Promise<{ [model: string]: S
   const t = new ServedTally();
   for (const log of logs) for await (const line of logLines(log)) {
     if (!line.includes('"kind":"annotation"') || !/"annotation":"(usage|note|draft|translation_failure|signoff)"/.test(line)) continue;
-    if (line.includes('"annotation":"note"') && !line.includes("translation_route")) continue;
+    if (line.includes('"annotation":"note"') && !line.includes("translation_route") && !line.includes('"malformed_tool_use"') && !line.includes('"dropped_tool_use"')) continue;
     try { t.see(JSON.parse(line)); } catch {}
   }
   return t.byModel();

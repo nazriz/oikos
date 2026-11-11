@@ -145,6 +145,7 @@ export async function ingest(path: string, o: IngestOptions): Promise<Raw> {
         else if (seatList.some((s) => line.includes(`"subject":"${s}"`))) {
           const e = JSON.parse(line), d = e.body.data ?? {};
           const kind = Object.keys(d)[0] ?? "note";
+          if (kind === "malformed_tool_use" || kind === "dropped_tool_use") raw.served.see(e); // (a Do not sent on, with its cause)
           if (kind === "empty_sitting") raw.notes.push({ t: e.t, subject: e.body.subject, kind, data: d[kind] });
           else if (["no_turn", "back_for_papers", "papers_held", "sitting_missed", "prompt_trimmed", "look_cut", "not_sent", "malformed_tool_use", "dropped_tool_use", "participant_error", "notebook_not_changed", "notebook_folded", "prompt_too_long"].includes(kind)) raw.notes.push({ t: e.t, subject: e.body.subject, kind, data: d[kind] });
         }

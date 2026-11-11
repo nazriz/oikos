@@ -113,6 +113,7 @@ function overview() {
   if (served.length) tcard.append(el("div", null, el("div", { class: "label" }, "Served, per seat model"), el("div", { class: "grid" }, served.map(([m, s]) => el("div", { class: "card" }, el("b", null, m), el("dl", { class: "kv" },
     el("dt", null, "Requests"), el("dd", null, s.requests), el("dt", null, "Served first time"), el("dd", null, s.served_first_time + " (" + pct(s.served_first_time, s.requests) + ")"),
     el("dt", null, "Asked back"), el("dd", null, s.asked_back), el("dt", null, "Served after one restatement"), el("dd", null, s.served_after_restatement), el("dt", null, "Never served"), el("dd", null, s.never_served),
+    el("dt", null, "Not sent to the translator"), el("dd", null, s.not_sent || 0),
     el("dt", null, "Drafts confirmed"), el("dd", null, s.drafts_confirmed + " of " + s.drafts_offered + (s.drafts_unsure ? " (" + s.drafts_unsure + " offered with what was unclear)" : "")), el("dt", null, "Drafts declined"), el("dd", null, s.drafts_declined)))))));
   const why = Object.entries(t.fallbackWhy || {});
   if (why.length) tcard.append(el("div", { class: "small" }, "Why requests went to the fallback: " + why.map(([k, v]) => k.replace(/_/g, " ") + " " + v).join(", ") + "."));

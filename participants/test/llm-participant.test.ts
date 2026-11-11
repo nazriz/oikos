@@ -144,7 +144,7 @@ test("more actions than can be taken at once: the ones left out are said and rec
   await p.step(obs(9 * HOUR), ctx);
   await p.step(obs(9 * HOUR + 60), ctx);
   await p.step(obs(9 * HOUR + 120), ctx);
-  expect(resultsOf(calls[1]!).w3).toBe("Not done: at most 2 actions at once.");
+  expect(resultsOf(calls[1]!).w3).toContain("Not looked at: only the first 2 things");
   expect(notes.filter((n) => n.dropped_tool_use).length).toBe(1);
 });
 

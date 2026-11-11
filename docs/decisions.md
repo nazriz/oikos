@@ -12848,3 +12848,30 @@ sign-offs). Under the knowing rules a matter handed to a post is that post's.
 - **Test:** `kernel/tests/knowing.rs`, `two_posts_of_one_organisation_that_keep_to_their_own_are_not_shown_each_others_matters`.
 - **Revisit if:** a seat reads its sibling assistant's drafts in its file (then address the assistant's papers to its
   principal's post too); another body with several posts wants the same (the filter is general: any position's channel).
+
+## 2026-11-11 · The plain-notes reader after the small models' notes: letters addressed below, fields kept, nothing uncounted
+
+From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11-1*`; the study's tables in
+`runs/translator-small-models-2026-11-11/`). Reader only; what the translator is given for a clean `Do:` is unchanged.
+- **"Write to" alone, whom below.** A bare `Write to` / `Write to:` was not a heading, so the letter was folded into the
+  Do above it and sent to the translator (196 of 621 distinct requests). It is a heading now; whom is read on its line
+  before the colon or on the lines straight after it, by layout only (the rule is in note.ts above `whomLine` and in
+  docs/real-models.md). "Name (id)" is that id. No whom, no words, or a blank in angle brackets: one fixed sentence,
+  nothing sent. The guide says in one sentence that whom may go on the lines under "Write to".
+- **A Do's fields** ("- Buyer: buyer-c01" under an item, or as a Do of its own after one) stay with the item.
+- **Past the limit**: told "Not looked at: ... Send it again if you still want it." per item (was "at most 8 actions").
+- **A yes to an ask not waiting** (a guessed number: ask-159 to ask-162 in one answer) is told it is not waiting, with
+  what is. It was told "you are shown it next" (never true of a guess). A no is passed on as before.
+- **Uncounted requests.** In the 7B run of 2026-11-11, of the 75 requests the collection found never reaching the
+  translator, 17 were past the limit, 24 were refused for a post the seat did not hold (`malformed_tool_use`, logged,
+  but the collection counted only `dropped_tool_use`), 19 were set aside when the seat was asked whether it meant to
+  stop (no log entry at all), and the other 15 are the collection's join by words (they reached it). Now every Do not
+  sent is logged with its reason, including those beside a "Stop for good:" line and those set aside by that question,
+  and `served.ts` counts them (`not_sent`), shown in the pilot viewer.
+- **Offline re-read** (no model calls; HEAD's reader against this one, 7B run of 2026-11-11, 604 notes): Dos sent
+  603 to 581, of them clean single requests 443 to 556, with another heading inside 129 to 10, a lone field 31 to 15;
+  letters sent 285 to 451; parts told what was wrong in a fixed sentence 0 to 94 (letters with no whom or no words).
+  The 14B run (63 notes): unchanged (133 Dos, 14 letters), as it wrote whom on the heading's line.
+- **Revisit if:** a letter's first line is taken as whom (a single word on the line under a bare "Write to"); fields
+  of separate things are merged ("Do: Pay rent: 500" after another Do); a model writes whom by name without ids below
+  "Write to" (only counted before a colon).
