@@ -74,6 +74,10 @@ export interface LlmResponse {
   /** The model's words as it wrote them, where an adapter read them into uses (a plain note: note.ts): kept in the
    * transcript, since the words are the data (P2). */
   said?: string;
+  /** The provider's own record of the call, where an adapter keeps one (Claude Code: each model turn inside the call,
+   * every structured answer and what came of it, and its result): kept with the transcript, so that what the model
+   * said can be checked against what was taken from it. Text (JSON lines, for Claude Code): a log holds no fractions. */
+  raw?: string;
 }
 
 export interface LlmAdapter {

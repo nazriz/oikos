@@ -7,30 +7,29 @@
 // `claude-code/` route: never the Anthropic API key), the code assistant as the reference, gpt-6.1-sol through the
 // owner's Codex subscription (a labelled extra, not on equal terms), and a local open-weight model (LOCAL, below) where
 // the local test found one that can hold a seat. Our translator alone (`decide/round3-s2`, build.ts `OURS`,
-// nobody behind it); the framing unstated (a seat that asks is told the truth; every seat is debriefed); each model at
-// its default effort.
+// nobody behind it); the framing unstated (a seat that asks is told the truth; every seat is debriefed); the Claude
+// seats at the effort EFFORT names (below; each model's default unless it is set).
 //
 // Since 2026-11-11 an assistant's seat keeps to its own post and to the working hours of the office it serves (one
 // sitting a working day; its "done for n days" honoured; docs/behaviour/assistants.md, "When it sits").
 //
-// The estimate (2026-11-11, measured: docs/decisions.md, "What a claude -p seat call costs"), for 90 days:
-//   - sittings: at most one a working day a seat; this spec's dry run (the mock in every seat, no model called) sat 260
-//     times an arm, every working day (a model that says it is done for longer sits less);
-//   - calls: about 1.9 a sitting (the real models of round 5: Haiku 972 calls in 509 sittings, Sonnet 622 in 372; the
-//     dry run's mock 1.68): about 490 sitting calls an arm, a few to fold the notebook, and the debriefs, about 13
-//     questions a seat (52);
-//   - plan dollars, as the adapter reckons (Claude Code's own reckoning of Haiku 5.5 and Sonnet 5.5, $5 a million in,
-//     $6.25 written to its hour's cache, $0.50 read, $25 out: orchestrator/prices.json). Measured on 16 calls of three
-//     of this spec's own seat prompts through `claude -p`: a sitting's first call writes the seat's prompt (about 12,000
-//     tokens with the tools) to the cache, the day before's having lapsed, $0.13 on average (4 calls, $0.12 to $0.14); a
-//     later call of the sitting reads it from the cache, $0.064 on average (8 calls, $0.035 to $0.10), most of it the
-//     answer's tokens out (about 1,000 to 2,400, nine tenths of them reasoning: the answer itself is about 200). A
-//     sitting about $0.13 + 0.9 x $0.064 = $0.19; 260 sittings about $49; the debriefs about $3; Haiku about $52 an arm.
-//     Sonnet by the same table, the same tokens: about $52 (not called: how many tokens it reasons with under Claude
-//     Code is the unknown, either way);
-//   - wall time: about 11 s a call (measured, 5 to 15 s), about two calls at once: under an hour of calls a fork, the
-//     forks side by side (forksAtOnce 3), so about 1.5 hours in all if the plan's window stays open (a shut one is
-//     waited for, up to 12 hours, inside the fork);
+// The estimate (2026-11-12, from real sittings of this spec: the second smoke, runs/scope-first-pilot-smoke-2c, 5 days
+// at the default effort, after the fix that takes every answer a claude -p call gives; docs/decisions.md, "What a
+// claude -p seat's tokens are"), for 90 days, per Claude arm:
+//   - sittings: about 3.3 a working day for the four seats (10 in the smoke's 3 working days), about 215 in 90 days;
+//     260 (every working day, this spec's dry run) taken for the limits;
+//   - calls: 2.1 a sitting for Sonnet, 2.5 for Haiku (the first sittings carry 15 and 16 matters, and the rating office
+//     hands over more referrals of 15 notices each on the next days; Codex, in the first smoke, 3.6): about 2.5 a
+//     sitting, 650 sitting calls an arm; the debriefs about 47 calls; notebook folds a few;
+//   - plan dollars as Claude Code reckons ($5 a million in, $6.25 written to its hour's cache, $0.50 read, $25 out:
+//     orchestrator/prices.json), a sitting call at the default effort: Haiku $0.29 (62,000 tokens in, of them about
+//     22,000 written to the cache, and 4,800 out, most of it thinking), Sonnet $0.25 (111,000 in, 22,000 written, 2,200
+//     out, 6 turns); at EFFORT "low" both about half that, by the 29 replayed calls (Haiku 4,200 out a call against 9,700,
+//     Sonnet 1,950 against 4,100; what the seats did was the same in six of eight pairs: docs/real-models.md, "Effort").
+//     The debriefs: Haiku $3.65, Sonnet $2.60 (default).
+//     So, an arm: default effort Haiku about $200, Sonnet about $170; low effort Haiku about $100, Sonnet about $85;
+//   - wall time: about 25 s a Haiku call, 18 s a Sonnet call, three at once: about 1.5 to 2 hours of calls a fork, the
+//     forks side by side, if the plan's window stays open (a shut one is waited for, up to 12 hours, inside the fork);
 //   - the Codex arm (gpt-6.1-sol on the owner's ChatGPT subscription, flat rate: nothing reckoned a call): about 490
 //     sitting calls and 52 debrief questions, 5 to 7 s a call (measured 2026-11-10), about an hour. NOT ON EQUAL TERMS:
 //     the Codex CLI puts its own instructions under ours (docs/real-models.md), so its seat is not told only what the
@@ -58,14 +57,19 @@ export const SEED = 7;
  * absent: no local arm. */
 export const LOCAL: string | undefined = "qwen2.5:14b-instruct";
 
-/** Each arm's hard limit, USD as the adapter reckons (half again over its estimate). */
-export const LIMITS = { haiku: 78, sonnet: 78 };
+/** How hard the Claude seats reason (Claude Code's --effort): undefined is each model's default. The owner's to choose. */
+export const EFFORT: "low" | "medium" | undefined = undefined;
+
+/** Each arm's hard limit, USD as the adapter reckons: half again over its estimate at the effort set. */
+export const LIMITS = EFFORT === "low" ? { haiku: 150, sonnet: 130 } : { haiku: 300, sonnet: 255 };
 
 const ROOM = { max_tokens: 16_000 };
+// (The Claude seats' effort goes with every call of theirs: sittings, notebook folds and debriefs.)
+const CLAUDE = EFFORT ? { effort: EFFORT } : {};
 export const ARMS: Arm[] = [
   { name: "code", steward: { kind: "code" } },
-  { name: "haiku", steward: { kind: "model", model: "claude-code/claude-haiku-5-5", params: ROOM } },
-  { name: "sonnet", steward: { kind: "model", model: "claude-code/claude-sonnet-5-5", params: ROOM } },
+  { name: "haiku", steward: { kind: "model", model: "claude-code/claude-haiku-5-5", ...CLAUDE, params: ROOM } },
+  { name: "sonnet", steward: { kind: "model", model: "claude-code/claude-sonnet-5-5", ...CLAUDE, params: ROOM } },
   // (Not on equal terms: the Codex CLI puts its own instructions under ours. A labelled extra; flat rate, no limit.)
   { name: "sol", steward: { kind: "model", model: "codex/gpt-6.1-sol", params: ROOM } },
   // (A local model writes plain notes, not tool calls: participants/src/llm/note.ts.)
