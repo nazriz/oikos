@@ -31,6 +31,9 @@ _REQUIRED = re.compile(r"(^|, )required$")
 
 
 NAMED_BEFORE = "Named before: "
+# An experiment (weight editing, 2026-11-11; translator/model/wsp/): with OIKOS_DECIDE_FORM_NAMES=1 a form's name is
+# masked as a field's value is, to the forms shown. Off unless set: what is served does not change.
+FORM_NAMES = __import__("os").environ.get("OIKOS_DECIDE_FORM_NAMES") == "1"
 
 
 def named_before(text: str) -> list[str]:
@@ -113,6 +116,8 @@ def fits_type(kind: str, text: str, ftype: str | None, options: list[str] | None
     if ftype is None:
         return True
     v = as_word(text) if kind == "word" else text.strip()
+    if ftype == "form":
+        return v in (options or [])
     if ftype == "choice":
         return not options or v in options
     if ftype in ONLY_IDS:
@@ -365,6 +370,11 @@ class Follow:
     def wants(self) -> tuple[str, list[str]] | None:
         """The type of the form's field being decided now, and a choice's options; None where it is not a field."""
         state = self.machine.state
+        if FORM_NAMES and state is not None and state[0] == "arg:form" and state[2][0] == "value":
+            # (Weight editing, 2026-11-11, an experiment: a form's name is one of the forms shown, by name or id.)
+            names = [l["head"][2:].split(",")[0].strip() for l in self.machine.forms.lines]
+            ids = [m.group(1) for l in self.machine.forms.lines for m in [re.search(r"\bid ([^\s:,]+)", l["head"])] if m]
+            return ("form", names + ids) if names else None
         if state is None or state[0] != "field" or state[2][0] != "value":
             return None
         return self.machine.forms.types.get(state[1][0])
