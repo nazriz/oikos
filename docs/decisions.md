@@ -12548,9 +12548,9 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
   commands, a sitting a wake with a model call, `empty_sitting` notes, and the seats' participant calls):
   | seat | wakes before / after | sittings | skipped as empty | model calls |
   |---|---|---|---|---|
-  | par.3 (finance's assistant) | 88 / 70 | 80 / 44 | 8 / 0 | 96 / 60 |
+  | par.3 (rating office's assistant; labelled finance's until 2026-11-12, wrongly) | 88 / 70 | 80 / 44 | 8 / 0 | 96 / 60 |
   | par.4 (factory's) | 119 / 73 | 85 / 44 | 34 / 0 | 105 / 64 |
-  | par.5 (rating office's) | 88 / 71 | 81 / 45 | 7 / 0 | 85 / 49 |
+  | par.5 (finance office's) | 88 / 71 | 81 / 45 | 7 / 0 | 85 / 49 |
   | provider-a-desk-system | 82 / 84 | 82 / 43 | 0 / 0 | 119 / 78 |
   | all | 377 / 298 | 328 / 176 | 49 / 0 | 405 / 251 |
   The mock says it is back in a day (its brain's rhythm), so after the change it sits every working day (43 in 60
@@ -12629,3 +12629,39 @@ scratchpad of the session (`probe.jsonl`, every call's whole usage and `modelUsa
   equal terms (the Codex CLI puts its own instructions under ours): about 490 sitting calls and 52 debrief questions.
 - **Revisit if:** the pilot's first sittings average far from $0.19 (read their `cost.json` by purpose); Claude Code
   changes its reckoning or its cache's hour; a seat sits more than once a working day.
+
+## 2026-11-12 · MT-31: an assistant's post is shown its own matters only (contract change; risks MT-28, MT-31)
+
+The study's town has two assistants of one organisation (the town's finance office's and its rating office's, both posts
+of `city`). A principal's papers to its in-house assistant were addressed to the organisation and seen by it alone, and
+an assistant post's channels match the organisation's papers by kind, so each assistant was shown, and a model seat
+woken by, the other's matters (in the 60-day mock fork: each city seat was shown both offices' referrals, briefs and
+sign-offs). Under the knowing rules a matter handed to a post is that post's.
+- **Contract changes** (blanket approval of 2026-10-11; logged here):
+  1. `RecordFilter.own_post` (world-config and module schemas, `match.own_post`, boolean, default false, not written
+     when false): a position's channel that keeps to its own post shows, of its organisation's papers addressed to any
+     of the organisation's posts, only those addressed to this post or written in it; a paper addressed to no post of
+     the organisation is shown as ever (kernel/crates/contracts/src/config.rs `post_ok`; perception's channel build,
+     searches and `shown_as_news`).
+  2. A statement may be addressed to a post (`addressed_to` names a position, as a letter may): the kernel checked every
+     addressee was an entity (`new_record`), and now lets a position pass where it is an addressee
+     (kernel/crates/world/src/exec.rs; blocks schema's `addressed_to` description).
+- **The world:** a principal's papers to an organisation's assistant (`to_assistant`: brief, remits, referrals,
+  sign-offs, declines, go-aheads, answers, acknowledgements) are addressed to the organisation and to the assistant's
+  post, seen by the organisation alone as before; the assistant's channels (terms, matters, file; the desk's too) keep
+  to their own post (`assistantChannels`, generate.ts). Nothing else is addressed to a post.
+- **What moves.** Towns without providers: nothing (town-300, 45 days: 669141b6..., as main). Towns with providers: the
+  config (the assistant posts' `own_post`) and every principal paper to an organisation's assistant (one more
+  addressee), so their hashes move (town-1000 with `assistants=true`, 30 days: 08949cd3..., was df9d05c7...). The study
+  town's code arm, 60 days after the fork, against main's: the same 2,067,471 entries; the 93 principal papers to the
+  assistants (42 referrals, 41 sign-offs, 6 remits, 3 briefs, a decline) and the 95 acts that wrote them differ only by
+  the added addressee, and 345 observation hashes differ (the assistants are shown less); nothing else, not a time, an
+  act or a paper. The mock seats' arm: the finance assistant's seat is shown the finance office's papers only (6) and the
+  rating office's assistant's the rating office's only (17), each before shown both; their wakes 71 to 58 and 70 to 66,
+  calls 49 to 48 and 60 to 60.
+- **Still open (MT-31, a little):** the assistant's own papers back (drafts, reports, advice, requests) are addressed to
+  the organisation, so the other assistant can find them in its file, on request only; nothing hands or wakes it with
+  them. MT-28's note of the same fault is marked fixed with this.
+- **Test:** `kernel/tests/knowing.rs`, `two_posts_of_one_organisation_that_keep_to_their_own_are_not_shown_each_others_matters`.
+- **Revisit if:** a seat reads its sibling assistant's drafts in its file (then address the assistant's papers to its
+  principal's post too); another body with several posts wants the same (the filter is general: any position's channel).

@@ -340,6 +340,16 @@ pub fn held_structures(st: &State, entity: &str) -> Vec<Id> {
     out.into_iter().collect()
 }
 
+/// Whose a position is (its organisation), for a filter that keeps to its own post (`RecordFilter::own_post`).
+fn post_of(st: &State) -> impl Fn(&str) -> Option<String> + '_ {
+    |id: &str| st.positions.get(id).map(|p| p.entity.to_string())
+}
+
+/// The position a capacity is (none: a person's own).
+fn post_key(key: &Id) -> Option<&str> {
+    (key.as_str() != SELF).then_some(key.as_str())
+}
+
 pub fn can_see(st: &State, rec: &Record, entity: &str) -> bool {
     rec.visible_to.allows(entity) || st.author_entity(rec).as_deref() == Some(entity)
 }
@@ -1031,7 +1041,7 @@ pub fn shown_as_news(knowing: &crate::config::Knowing, st: &State, rec: &Record,
                     return false;
                 }
                 let want = Want::of(*way, from.as_ref(), &me);
-                can_see(st, rec, &me) && (area.is_some() || placed_ok(st, rec, &me, None)) && matches(st, rec, filter, want.as_ref(), true)
+                can_see(st, rec, &me) && (area.is_some() || placed_ok(st, rec, &me, None)) && matches(st, rec, filter, want.as_ref(), true) && filter.post_ok(rec, post_key(&cap.key), &me, post_of(st))
             }
             _ => false,
         })
@@ -1108,7 +1118,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         Way::Published if from.is_none() => s.config.knowing.board_most(filter),
                         _ => None,
                     };
-                    for r in search(st, index, &me, filter, want.as_ref(), scope.as_ref(), q, most) {
+                    for r in search(st, index, &me, filter, want.as_ref(), scope.as_ref(), q, most).into_iter().filter(|r| filter.post_ok(&r.load(), post_key(&cap.key), &me, post_of(st))) {
                         if !found.iter().any(|x| x.same(&r)) {
                             found.push(r);
                         }
@@ -1225,7 +1235,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                             .map(|q| &by_seq[(q - 1) as usize])
                             .filter(|h| {
                                 let r = h.load();
-                                can_see(st, &r, &me) && placed_ok(st, &r, &me, scope.as_ref()) && matches(st, &r, filter, want.as_ref(), true)
+                                can_see(st, &r, &me) && placed_ok(st, &r, &me, scope.as_ref()) && matches(st, &r, filter, want.as_ref(), true) && filter.post_ok(&r, post_key(&cap.key), &me, post_of(st))
                             })
                             .cloned()
                             .collect(),

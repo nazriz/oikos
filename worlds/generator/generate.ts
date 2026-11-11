@@ -201,10 +201,12 @@ const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "
  * id in a referral's words could not be named (docs/decisions.md, 2026-11-08, "The scope pilot's first round"). */
 const ASSISTANT_TERMS = ["service_delivery", "service_ended", "brief", "remit"];
 const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement"];
+// (Each keeps to its post, `own_post`: what a principal hands its assistant is addressed to the assistant's post as
+// well as to the organisation, and an organisation with two assistants' posts shows each only its own: risk MT-31.)
 const assistantChannels = (also: string[] = []) => [
-  K.mine("terms", ASSISTANT_TERMS, { title: "The service you work under: its delivery, briefs and remits" }),
-  K.mine("matters", ASSISTANT_MATTERS, { title: "Matters handed to you, and the answers to what you asked" }),
-  K.mine("file", [...new Set([...ASSISTANT_SEES, ...ASSISTANT_PAPERS, ...also])], { title: "Your file: the matters handed to you, your papers on them and what you sent, looked up on request (look, with what to find)", on_request: true }),
+  K.mine("terms", { statement_kinds: ASSISTANT_TERMS, own_post: true }, { title: "The service you work under: its delivery, briefs and remits" }),
+  K.mine("matters", { statement_kinds: ASSISTANT_MATTERS, own_post: true }, { title: "Matters handed to you, and the answers to what you asked" }),
+  K.mine("file", { statement_kinds: [...new Set([...ASSISTANT_SEES, ...ASSISTANT_PAPERS, ...also])], own_post: true }, { title: "Your file: the matters handed to you, your papers on them and what you sent, looked up on request (look, with what to find)", on_request: true }),
   K.board("laws", ["law", "charter", "payment_details"], { title: "The town's laws and charter, and where what they charge is paid, published: looked up on request (look, with what to find), for the law a matter rests on" }),
   K.lookUp("who", { title: WHO }),
 ];

@@ -1367,9 +1367,29 @@ pub struct RecordFilter {
     /// Statements having all of these parts ("offer", "practice", "adico", "formal"), whatever their kind.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub has: Option<Vec<String>>,
+    /// Only what is this post's own of its organisation's papers: one addressed to one or more of the organisation's
+    /// posts is shown only through those posts' channels and the one it was written in; one addressed to no post of it
+    /// is shown as ever (2026-11-12, risk MT-31: two assistants of one organisation were shown each other's matters).
+    /// A position's channel only.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub own_post: bool,
 }
 
 impl RecordFilter {
+    /// Whether a record is this post's own, as `own_post` asks: `post` the channel's position, `me` its organisation.
+    pub fn post_ok(&self, rec: &crate::blocks::Record, post: Option<&str>, me: &str, post_of: impl Fn(&str) -> Option<String>) -> bool {
+        if !self.own_post {
+            return true;
+        }
+        let Some(post) = post else { return true };
+        if rec.position.as_deref() == Some(post) {
+            return true;
+        }
+        let crate::blocks::RecordBody::Statement { addressed_to: Some(to), .. } = &rec.body else { return true };
+        let ours: Vec<&str> = to.iter().map(|x| x.as_str()).filter(|x| post_of(x).as_deref() == Some(me)).collect();
+        ours.is_empty() || ours.contains(&post)
+    }
+
     /// The collections a filter names, as the world's `knowing` names them: a statement kind (`lot`), statements
     /// having something (`has:practice`), a record type (`records:claim`). None: it names none (any record).
     pub fn collections(&self) -> Option<Vec<String>> {
