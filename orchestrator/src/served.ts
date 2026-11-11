@@ -14,6 +14,9 @@ export interface Served {
   asked_back: number;
   served_after_restatement: number;
   never_served: number;
+  /** Requests never sent to the translator, each with its cause in the log (a `malformed_tool_use` or `dropped_tool_use`
+   * note on a Do: not readable, a post not held, the seat talking to itself, past the limit, left in the same answer). */
+  not_sent: number;
   /** Drafts offered with a sentence saying what was unclear about them (our translator alone, unsure). */
   drafts_unsure: number;
   drafts_offered: number;
@@ -22,7 +25,7 @@ export interface Served {
   drafts_unanswered: number;
 }
 
-export const noneServed = (): Served => ({ requests: 0, served_first_time: 0, asked_back: 0, served_after_restatement: 0, never_served: 0, drafts_unsure: 0, drafts_offered: 0, drafts_confirmed: 0, drafts_declined: 0, drafts_unanswered: 0 });
+export const noneServed = (): Served => ({ requests: 0, served_first_time: 0, asked_back: 0, served_after_restatement: 0, never_served: 0, not_sent: 0, drafts_unsure: 0, drafts_offered: 0, drafts_confirmed: 0, drafts_declined: 0, drafts_unanswered: 0 });
 
 export function addServed(into: Served, x: Served): Served {
   for (const k of Object.keys(into) as (keyof Served)[]) into[k] += x[k] ?? 0;
@@ -68,7 +71,10 @@ export class ServedTally {
   see(e: { kind?: string; body?: any }): void {
     if (e?.kind !== "annotation") return;
     const b = e.body ?? {};
-    if (b.annotation === "usage" && b.purpose === "participant" && typeof b.subject === "string" && !this.model.has(b.subject)) this.model.set(b.subject, `${b.provider}/${b.model}`);
+    // (A Do the seat host did not send on, with its cause: counted, so that no request goes unaccounted for.)
+    if (b.annotation === "note" && typeof (b.data?.malformed_tool_use ?? b.data?.dropped_tool_use) === "string" && typeof b.subject === "string") {
+      if (/^\{[^{]*"name":"do"/.test(b.data.malformed_tool_use ?? b.data.dropped_tool_use)) this.of(b.subject).not_sent++;
+    } else if (b.annotation === "usage" && b.purpose === "participant" && typeof b.subject === "string" && !this.model.has(b.subject)) this.model.set(b.subject, `${b.provider}/${b.model}`);
     else if (b.annotation === "note" && b.data?.translation_route) {
       const r = b.data.translation_route;
       this.stage.set(String(r.draft), { ...(r.stage ? { stage: r.stage } : {}), ...(r.unsure_offered ? { unsure: true } : {}) });
@@ -111,4 +117,4 @@ export class ServedTally {
 const pct = (x: number, of: number) => (of ? `${Math.round((100 * x) / of)}%` : "-");
 /** One line for a model's requests. */
 export const servedText = (s: Served): string =>
-  `${s.requests} requests: served first time ${s.served_first_time} (${pct(s.served_first_time, s.requests)}), asked back ${s.asked_back}, served after one restatement ${s.served_after_restatement}, never served ${s.never_served}; drafts offered ${s.drafts_offered}${s.drafts_unsure ? ` (${s.drafts_unsure} with what was unclear)` : ""}: confirmed ${s.drafts_confirmed}, declined ${s.drafts_declined}, not answered ${s.drafts_unanswered}`;
+  `${s.requests} requests: served first time ${s.served_first_time} (${pct(s.served_first_time, s.requests)}), asked back ${s.asked_back}, served after one restatement ${s.served_after_restatement}, never served ${s.never_served}${s.not_sent ? `; not sent to the translator ${s.not_sent}` : ""}; drafts offered ${s.drafts_offered}${s.drafts_unsure ? ` (${s.drafts_unsure} with what was unclear)` : ""}: confirmed ${s.drafts_confirmed}, declined ${s.drafts_declined}, not answered ${s.drafts_unanswered}`;

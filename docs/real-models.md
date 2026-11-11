@@ -103,6 +103,24 @@ Stop for good: <reason>                      (the way out: taken at once, said o
   of whose parts can be read is one unread answer saying why in plain words, asked once more, as ever. A heading given
   as a Do's words is that heading; a Do that is only a list is one request an item; "## Write to" may have who on the
   line under it. The note as written is kept in the transcript (`said`).
+- **Whom a letter goes to (2026-11-11).** On the `Write to` line before its colon (a name with its id in brackets is
+  that id); or, when nothing stands before the colon, on the lines straight after it: each holds only names or ids
+  (comma-separated) and may end in a colon. Whom ends at the first line with a colon (what follows it there is the
+  letter's first words), at a blank line once begun, or at the first line that is not only names and ids; the rest is
+  the letter. A line that begins as a letter does ("Dear", "Re", "Subject", a greeting) is never whom; a name of a few
+  words counts only before a colon. No whom that can be read, no words, or a blank in angle brackets ("<reference>")
+  copied from the guide: one fixed sentence (note.ts), nothing sent.
+- **A Do's fields (2026-11-11).** Lines under one bulleted Do that are a label, a colon and a value, or are set in
+  under an item, stay with the item above as one request in the seat's words; a Do that is one such field alone, right
+  after a Do, joins it. A list of separate things is still one request an item. "Do as <post>: - Confirm ask-92." is
+  that confirm; a Do that only starts like a heading ("Do: Confirm the time with them") stays a Do.
+- **Past the limit, and answers to what is not waiting (2026-11-11).** The first 8 actions (or `max_actions`) are taken
+  in order; each after them is told "Not looked at: ... Send it again if you still want it." A yes to an `ask-`
+  that is not waiting (asked in the same answer, or a number guessed) is told it is not waiting, with what is.
+- **Every request accounted for (2026-11-11).** A Do that is not sent to the translator is in the log as a
+  `malformed_tool_use` (not readable, a post not held, the seat talking to itself) or a `dropped_tool_use` (past the
+  limit; left in the same answer; set aside when asked whether it meant to stop), each with its reason; `served.ts`
+  counts them as `not_sent`, and the pilot viewer shows it.
 - The local test (qwen2.5:7b, 2026-11-10; docs/decisions.md has the table): its notes are read; few of its requests are
   served, it restates in the same words, confirms whatever it is shown, and two of three seats chose to stop in the last run.
 - The conversation is sent as plain chat: the seat's earlier uses written back as the notes that say them, what came of
@@ -447,7 +465,7 @@ Every seat answer is **read exactly or not at all**. What is read is only what t
 
 1. The seat is told, in the same exchange: "Your last answer could not be read: <why>. Nothing in it has been done, so all you meant by it is still to do. Give the whole of it again, in the form asked for: every look, letter, request and note you meant, not only the part that could not be read. This is the same turn over again, not a sign to stop: say you are done for now only if you had meant to." (Until 2026-10-09 it ended "Please give your answer again, in the form asked for.", and one second answer of two was only `done_for_now`: the look and the note first meant were not given again.) It is asked once.
 2. If that cannot be read either, the sitting ends with nothing done. Both are noted in the log (`unread_answer`, with the words as written), and the seat's next sitting opens: "When you were last here, your answer could not be read, so nothing was done."
-3. A use past the limit of actions (8 unless set) is refused: the seat is told in its next turn ("Not done: at most 8 actions at once."), or, if it left, at its next sitting; the log has a `dropped_tool_use` note. The adapters no longer drop anything silently (an `also` entry naming a tool the seat does not have used to be filtered out; it now makes the answer unread).
+3. A use past the limit of actions (8 unless set) is not looked at: the seat is told in its next turn ("Not looked at: only the first 8 things you ask in one answer are taken up, and this came after them. Send it again if you still want it."; until 2026-11-11 "Not done: at most 8 actions at once."), or, if it left, at its next sitting; the log has a `dropped_tool_use` note. The adapters no longer drop anything silently (an `also` entry naming a tool the seat does not have used to be filtered out; it now makes the answer unread).
 
 **What a seat is told about how to answer**, per provider:
 - Claude Code (`claude -p`, `--json-schema`): in its system prompt, after its tools, "=== How you answer ===: Give your answer in the structured output asked for: the tool you use in `tool`, its input as a JSON object in input_json; any further tools, if your instructions allow several, in `also`, each with its own input_json, in the order they're to be carried out." The shape is the schema's (`tool`, `input_json`, `also`, `text`).
