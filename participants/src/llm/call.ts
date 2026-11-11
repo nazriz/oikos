@@ -161,7 +161,7 @@ export interface LlmIO {
    * ever, as the log is): each debrief call's answer, and each whole interview. With it, the log's transcript of a
    * debrief call holds a digest of the answer in place of the answer, so that a log can be published whatever a seat
    * asked to be kept back (VISION 15, point 7). A resumed run is served those answers from that file. */
-  apart?(entry: { kind: "call"; subject: string; ref: string; sha256: string; output: unknown } | { kind: "debrief"; subject: string; record: unknown }): Promise<void>;
+  apart?(entry: { kind: "call"; subject: string; ref: string; sha256: string; output: unknown; raw?: unknown } | { kind: "debrief"; subject: string; record: unknown }): Promise<void>;
 }
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
@@ -231,7 +231,7 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
   let apart: string | undefined;
   if (req.purpose === "debrief" && io.apart) {
     apart = sha256(JSON.stringify(res.content));
-    await io.apart({ kind: "call", subject: req.subject, ref: req.ref ?? "", sha256: apart, output: res.content });
+    await io.apart({ kind: "call", subject: req.subject, ref: req.ref ?? "", sha256: apart, output: res.content, ...(res.raw !== undefined ? { raw: res.raw } : {}) });
   }
   // The system prompt is logged in full the first time it's seen, then by hash.
   const systemHash = sha256(req.system);
@@ -245,6 +245,8 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
       ...(newSystem ? { system: req.system } : {}),
       turn: req.messages.length, input: last?.content ?? "", ...(apart ? { output_apart: true, output_sha256: apart } : { output: res.content }), ...(req.effort ? { effort: req.effort } : {}),
       ...(res.estimated ? { usage_estimated: true } : {}), ...(res.said !== undefined ? { said: res.said } : {}),
+      // (The provider's own record of the call; a debrief's goes apart with its answer, since it holds the answer.)
+      ...(res.raw !== undefined && !apart ? { raw: res.raw } : {}),
     },
   });
   return res;

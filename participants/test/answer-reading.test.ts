@@ -2,6 +2,7 @@
 // at all. The loop's side of it (telling the seat, asking once more) is in llm-participant.test.ts.
 
 import { expect, test } from "bun:test";
+import { canonical } from "../src/canon";
 import { readAnswerText } from "../src/llm/answer";
 import { UsageLimitReached } from "../src/llm/call";
 import { answerFrom, ClaudeCodeAdapter, claudeCodeSystem } from "../src/llm/claude-code";
@@ -65,6 +66,53 @@ test("Claude Code: one `claude -p` per call with our system prompt in place of i
   // Any other failure is an error, with what it said.
   const failing = async () => ({ code: 1, stdout: "", stderr: "not signed in" });
   await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", failing, { attempts: 1 }).complete(req)).rejects.toThrow("not signed in");
+});
+
+test("Claude Code: every structured answer a call gives, in whichever of its turns, is taken in order; one not readable makes the whole call unread; the call's own record is kept (smoke 2026-11-11: Sonnet's requests lost)", async () => {
+  // A real call, cut down (runs/claude-code-turns-2026-11-11/a01): Sonnet called `do` by name (refused by Claude Code),
+  // then gave two requests in one structured answer and a note in a second. The result's structured_output is the note alone.
+  const stream = await Bun.file(`${import.meta.dir}/fixtures/claude-p-answer-in-two-turns.jsonl`).text();
+  const seatReq: LlmRequest = { ...req, tools: ["do", "notebook", "done_for_now"].map((name) => ({ name, description: name, input_schema: { type: "object" } })) };
+  let args: string[] = [];
+  const r = await new ClaudeCodeAdapter("claude-sonnet-5-5", async (a) => ((args = a), { code: 0, stderr: "", stdout: stream })).complete(seatReq);
+  expect(args.slice(args.indexOf("--output-format"), args.indexOf("--output-format") + 2)).toEqual(["--output-format", "stream-json"]);
+  expect(args).toContain("--verbose");
+  expect(r.content.map((b) => (b.type === "tool_use" ? `${b.name}:${String(b.input.what ?? b.input.add).slice(0, 30)}` : `${b.type}:${b.text}`))).toEqual([
+    "text:Drafting the first 8 of the 15 rates notices for sign-off; the remaining 7 follow next.",
+    "do:Fill in form-rates-assistant-d",
+    "do:Fill in form-rates-assistant-d",
+    "notebook:Day 31: asked for the first 8 ",
+  ]);
+  expect((r.content[1] as { input: { what: string } }).input.what).toContain("owner builder");
+  expect((r.content[2] as { input: { what: string } }).input.what).toContain("owner c0003");
+  expect(r.usage).toMatchObject({ output_tokens: 4528, turns: 11 });
+  // Kept: every turn's uses and what came of them, the thinking by its length only, and the result.
+  // (As text: the result's costs are fractions, which a log does not hold; the second smoke stopped on it.)
+  expect(() => canonical({ raw: r.raw })).not.toThrow();
+  const raw = r.raw!.split("\n").map((l) => JSON.parse(l)) as { type: string; content?: { type: string; signature?: string }[] }[];
+  expect(raw.filter((e) => e.type === "assistant").flatMap((e) => e.content!).filter((b) => b.type === "tool_use").length).toBe(4);
+  expect(JSON.stringify(raw)).not.toContain("signature");
+  expect(raw.at(-1)).toMatchObject({ type: "result", num_turns: 11 });
+  // A part given again, exactly (the same requests said twice, as Sonnet did in b01): each use is taken once.
+  const lines = stream.split("\n");
+  const first = lines.findIndex((l) => l.includes('"name": "StructuredOutput"'));
+  const twiceOver = [...lines.slice(0, first + 2), lines[first]!.replaceAll("toolu_01Jf7iox7gk59iNvE96gtKX3", "toolu_again"), lines[first + 1]!.replaceAll("toolu_01Jf7iox7gk59iNvE96gtKX3", "toolu_again"), ...lines.slice(first + 2)].join("\n");
+  const once = await new ClaudeCodeAdapter("claude-sonnet-5-5", async () => ({ code: 0, stderr: "", stdout: twiceOver })).complete(seatReq);
+  expect(once.content.map((b) => b.type === "tool_use" && b.name)).toEqual([false, "do", "do", "notebook"]);
+  // One part that can't be read: the whole call is unread, nothing of it taken, and the seat told which part.
+  const badPart = stream.replaceAll('"tool": "notebook"', '"tool": "notes"');
+  const bad = await new ClaudeCodeAdapter("claude-sonnet-5-5", async () => ({ code: 0, stderr: "", stdout: badPart })).complete(seatReq);
+  expect(bad.content).toEqual([{ type: "text", text: expect.any(String), unread: 'you gave your answer in 2 parts, and in part 2 "notes" isn\'t one of your tools' }]);
+  // An answer Claude Code refused (not the schema's shape) was not given: it is not taken.
+  const refused = stream.replace('"content": "Structured output provided successfully"}]}}\n{"type": "assistant", "message": {"id": "msg_011CgvMUQZDWZ7fasf4gPe54"', '"content": "Output does not match required schema", "is_error": true}]}}\n{"type": "assistant", "message": {"id": "msg_011CgvMUQZDWZ7fasf4gPe54"');
+  expect(refused).not.toBe(stream);
+  expect((await new ClaudeCodeAdapter("claude-sonnet-5-5", async () => ({ code: 0, stderr: "", stdout: refused })).complete(seatReq)).content.map((b) => b.type === "tool_use" && b.name)).toEqual(["notebook"]);
+  // An answer of the caller's own shape given twice, differently: unread, as which was meant is not guessed.
+  const twice = [{ type: "assistant", message: { content: [{ type: "tool_use", id: "a", name: "StructuredOutput", input: { x: 1 } }] } }, { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "a", content: "ok" }] } },
+    { type: "assistant", message: { content: [{ type: "tool_use", id: "b", name: "StructuredOutput", input: { x: 2 } }] } }, { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "b", content: "ok" }] } },
+    { type: "result", is_error: false, result: "", structured_output: { x: 2 }, usage: {} }].map((e) => JSON.stringify(e)).join("\n");
+  const obj = await new ClaudeCodeAdapter("claude-sonnet-5-5", async () => ({ code: 0, stderr: "", stdout: twice }), { attempts: 1 }).complete({ ...req, purpose: "debrief", answer: { name: "answer", schema: { type: "object" } } });
+  expect(obj.content).toEqual([{ type: "text", text: expect.any(String), unread: "it gave more than one answer, and one is wanted" }]);
 });
 
 test("a seat's answer is read exactly or not at all: each way it can be not whole is one unread answer, never a guess (pilots 10 and 11)", () => {

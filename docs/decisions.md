@@ -12907,6 +12907,80 @@ sign-offs). Under the knowing rules a matter handed to a post is that post's.
 - **Revisit if:** a seat reads its sibling assistant's drafts in its file (then address the assistant's papers to its
   principal's post too); another body with several posts wants the same (the filter is general: any position's channel).
 
+## 2026-11-12 · Every answer a claude -p call gives is taken (participants/src/llm/claude-code.ts)
+
+In the first pilot's smoke (`runs/scope-first-pilot-smoke/`, main at 2787ce9f) the Sonnet 5.5 arm did nothing in the
+world in 10 seat calls (0 acts, 0 drafts, no request reached the translator) while its words said "All 15 drafts asked
+for". The cause, established by replaying its first call through `claude -p` with every turn kept
+(`runs/claude-code-turns-2026-11-11/a01-…`, the exact prompt captured by running the smoke's spec with a recording
+stand-in for `claude`, no model called): in one call Sonnet first called `do` by name eight times (refused by Claude
+Code: it has no such tool), then gave the eight requests in one structured answer, then a note in a second; Claude
+Code's result (`structured_output`) holds only the last, so the adapter took the note and dropped the eight requests
+without a word. In the smoke the last answer was `done_for_now`. Of 16 Sonnet calls replayed (four seat prompts of the
+smoke, three efforts), 12 gave their answer in two to four structured parts, and the old reader kept only the last part
+of each; every one of 13 Haiku calls gave one, which is why Haiku's requests got through.
+- **Fixed:** the call is read as a stream (`--output-format stream-json --verbose`); every structured answer Claude Code
+  accepted is taken, in the order given (one it refused as not of the schema's shape was not given, and the model was
+  told so); a use given again exactly in a later part is taken once (Sonnet once gave its seven requests a second time
+  with only its note reworded); any part not readable makes the whole call one unread answer, which the seat is told
+  ("you gave your answer in 3 parts, and in part 2 …"), never a partial read. An answer of the caller's own shape
+  (debriefs, readings) given twice differently is unread, as which was meant is not guessed. Uses the model made by
+  name are not taken: Claude Code told it they failed, and in every call replayed (17 of 29 had some, up to 9 in one)
+  the model gave each again in a structured answer.
+- **Told:** "How you answer" now says the tools are used only through the structured output, never by name, and to give
+  the whole answer in one, another being taken as well, not in place of it. Sonnet still splits its answer (3 of 3 after
+  the change), so the reader, not the wording, is what holds.
+- **Kept:** each call's own record goes with its transcript as `raw` (each turn's uses and their results, the thinking
+  by length only, the result line), a debrief's in the record kept apart with its answer. About 5 to 30 KB a call.
+- **Test:** `participants/test/answer-reading.test.ts`, from the replayed call cut down
+  (`participants/test/fixtures/claude-p-answer-in-two-turns.jsonl`).
+- **Revisit if:** Claude Code changes its stream's shape or how it answers a schema (a version past 2.1.170); a model is
+  seen to mean a later structured answer as replacing an earlier one (then ask, as for an unread answer).
+
+## 2026-11-12 · What a claude -p seat's tokens are, what effort does, and the first pilot re-estimated (experiments/scope-pilot/first-pilot.ts)
+
+The first smoke's Haiku seats came to about $0.40 a sitting call (6,600 tokens out a call), three to six times the
+2026-11-11 estimate. Measured on the pilot's own seat prompts, captured exactly from its spec (a recording stand-in
+for `claude`, no model called) or rebuilt from the smoke's transcripts, each through `claude -p` with every turn kept
+(29 calls on the owner's subscription, Haiku 5.5 and Sonnet 5.5, `runs/claude-code-turns-2026-11-11/`):
+- **What the output is.** At Haiku 5.5's default effort about 70% of it is thinking (Claude Code's own estimate in
+  the stream: 6,650 of 9,700 a call); the rest is the answer, which for a sitting with fifteen matters is eight
+  requests of 150 to 250 tokens each, written as a JSON string inside the schema's object; and, in 17 of 29 calls, the
+  same uses first called by name (Claude Code refuses them: it has no such tools) and then given again, which doubles
+  the answer's tokens and adds a turn each. Sonnet thinks little (about 500 a call) and its output is mostly the
+  answer, in parts and with the uses called by name first. No retries inside Claude Code beyond one schema refusal.
+  Each turn re-reads the prompt from the cache ($0.50 a million) and writes what the turn added ($6.25), so long
+  thinking costs twice: as output, and written to the cache for the next turn.
+- **What governs it on this route:** `--effort` (low, medium, high, xhigh, max; nothing passed is the model's default),
+  which a seat already takes (`steward.effort`, `seat_effort`); Claude Code's `MAX_THINKING_TOKENS` (not measured);
+  no turn limit among Claude Code 2.1.170's options; the answer schema, which a model meets in one turn or several.
+- **What effort changes** (docs/real-models.md, "Effort", has the table): at low, Haiku's output is 4,200 a call
+  against 9,700 (thinking 1,700 against 6,650), $0.16 against $0.41; Sonnet's 1,950 against 4,100, $0.10 against
+  $0.25 (the default calls ran first, cold, so part of their cost is the cache written). What the seat did was the
+  same in six of eight pairs; in the other two Haiku at its default only looked and noted where at low it drafted, and
+  Sonnet at low reported a finished matter by letter where at its default it filled in the report form. One call a
+  pair: enough to see that low effort does not stop the seats acting, not enough to say it never changes a decision.
+- **Recommendation, the owner's to decide:** `low` for both Claude arms. The study's measure is what the seats ask for
+  and do, which the effort did not change here; it halves the subscription drawn; and an API seat, the earlier pilots'
+  condition, reasoned a few hundred tokens a call, nearer to low than to Claude Code's default. Against it: a model's
+  default is the condition most users meet, and low effort may make a seat less careful on the rare hard matter. The
+  spec has it as `EFFORT` (undefined until chosen), with limits for each.
+- **The second smoke** (`runs/scope-first-pilot-smoke-2c/`, same spec as the first, Haiku and Sonnet at the default
+  effort, $10 an arm; `-2` and `-2b` are two starts that failed before any sitting, the first because the call's
+  record held fractions, which a log does not, now kept as text, the second on an unfinished edit of the spec):
+  Sonnet 30 acts (0 in the first smoke), 51 requests to our translator (31 served first time, 16 asked back, 2 after one
+  restatement, 2 never), 33 drafts offered, 30 confirmed; 21 sitting calls in 10 sittings, $5.27, 47 debrief calls
+  $2.60, all four debriefs complete. Haiku 16 acts and 32 requests (23 first time, 8 asked back, 1 never), 15 sitting
+  calls in 6 sittings, $4.40, then stopped at its limit on day 32 (the limit less the debriefs' reserve: $3.71 spent
+  of $10 with $1.01 under way); its debriefs ran (46 calls, $3.65; two seats ended them at the last question by their
+  own choice).
+- **The estimate** (`first-pilot.ts` header): about 2.5 calls a sitting, 260 sittings, about 650 sitting calls an arm;
+  at the default effort Haiku about $200 an arm, Sonnet about $170 (limits $300 and $255); at low about $100 and $85
+  (limits $150 and $130). The earlier estimate's $0.13 and $0.064 a call came from three short sample prompts at
+  about 1.9 calls a sitting; the first sittings here carry fifteen or sixteen matters and more come.
+- **Revisit if:** the pilot's first week costs more than a fifth of its estimate a week (read `cost.json` by purpose);
+  a seat at low effort is seen to decide differently on a matter that needs care (then compare that matter at both).
+
 ## 2026-11-11 · Obstacles B7: readiness to grant from the cost of delay (docs/design/obstacles.md section 10)
 
 - **What:** a kind's facts may say what a day's delay of a matter costs the principal (`KindFacts.late_cost_day`), and
@@ -13074,3 +13148,19 @@ From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11
 - **Revisit if:** a new model's failure is a single decision that a readout separates better than its head on held-out
   requests (then a rank-one edit of that head is worth a try); several acts of one kind become common in pilots (data,
   not weights); the mask asks back right answers in a new pilot (a request naming a form by a word the form does not use).
+
+## 2026-11-12 · The first pilot set: a 45-day baseline at low effort (experiments/scope-pilot/first-pilot.ts)
+
+- **What:** the coordinator's decision on the measurement above: the Claude arms at `--effort low` (`EFFORT`, a
+  condition of this run, stated in its header), and every arm 45 days after the fork (day 30 to 75), not 90, so that a
+  Claude arm comes to about the owner's $50 (Haiku about $52, Sonnet about $43 by the second smoke's sittings; limits
+  half again, $78 and $65, the debriefs' reserve of about $5 inside them). The header says what the run is: a baseline
+  at obstacle level 0 (`obstacles: 0`, the world as before), one seed, Codex not on equal terms, the local arm in plain
+  notes.
+- **Why Sonnet filed no reports in the second smoke:** the cycle had not closed. Its rating-office seat drafted every
+  notice of a referral before reporting it (two referrals of 15 drafted and confirmed by day 33), and its notebook on
+  day 33 reads "NEXT: write report for rec.23998 and rec.22588 (form-rates-assistant-report, client city)"; days 34
+  and 35 were a weekend, with no sitting. It never asked for a report, so neither the form nor the translator was
+  reached; the code assistant files a report with each referral it finishes (15 in the five days). Not a fault of ours.
+- **Revisit if:** the pilot's first week costs more than a fifth of an arm's limit; a seat at low effort is seen to
+  decide differently on a matter that needs care.
