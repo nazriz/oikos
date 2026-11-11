@@ -1125,10 +1125,12 @@ impl State {
     /// (the provider runs the system, but its other systems, such as its desk for persons, are not party to the
     /// organisation's matters: before 2026-11-08 they went to the provider, and the provider's desk was shown, and tried
     /// to do, the town finance office's returns: the scope pilot's first round). A person's assistant is the provider's
-    /// own desk: to the provider.
+    /// own desk: to the provider. (Addressed to the assistant's post too, since 2026-11-12: an organisation with two
+    /// offices that each engaged an assistant had each assistant shown the other's matters, risk MT-31. Its post's channels
+    /// keep to what is its own, `RecordFilter::own_post`.)
     fn to_assistant(&self, agreement: &str) -> (Vec<String>, Vec<String>) {
-        if self.p.post.is_some() {
-            return (vec![self.me.clone()], vec![self.me.clone()]);
+        if let Some(post) = &self.p.post {
+            return (vec![self.me.clone(), post.clone()], vec![self.me.clone()]);
         }
         let provider = self.provider_of(agreement);
         (vec![provider.clone()], vec![self.me.clone(), provider])

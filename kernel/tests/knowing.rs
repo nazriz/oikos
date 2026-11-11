@@ -586,3 +586,37 @@ fn a_seat_that_keeps_to_its_own_post_is_woken_by_what_is_for_it_and_by_no_acknow
         assert!(woken(&mut twin, t), "a seat that sits as its code twin is woken by {what}");
     }
 }
+
+/// Risk MT-31 (2026-11-12): two posts of one organisation whose channels keep to their own post (`own_post`) are not
+/// shown each other's matters. A paper addressed to one of its posts is that post's (and the post it was written in);
+/// a paper addressed to the organisation alone is the organisation's, shown to both as ever.
+#[test]
+fn two_posts_of_one_organisation_that_keep_to_their_own_are_not_shown_each_others_matters() {
+    let shown = |own: bool| {
+        let mut c = base();
+        for pos in c["positions"].as_array_mut().unwrap().iter_mut().filter(|p| p["id"] == "finance" || p["id"] == "mayor") {
+            pos["channels"] = json!([{"id": "matters", "kind": "records", "way": "mine", "match": {"statement_kinds": ["referral"], "own_post": own}}]);
+        }
+        let mut run = Run::start(c, "knowing-own-post-channels", Vec::new(), None).unwrap();
+        for (id, to) in [("for-finance", json!(["city", "finance"])), ("for-the-mayor", json!(["city", "mayor"])), ("for-the-town", json!(["city"]))] {
+            let r = step(&mut run, &rb_act("developer", json!([{"block": "publish", "kind": "referral", "text": id, "addressed_to": to, "visible_to": ["city", "devco"]}]))).unwrap();
+            assert!(r.events.iter().any(|e| matches!(e.body, EventBody::ActionApplied { .. })), "{id}: not applied: {:?}", r.events);
+        }
+        let seen = |run: &mut Run<Vec<u8>>, who: &str, post: &str| {
+            let o = run.command(&Command::Observe { participant: who.into(), only: None }).unwrap().observation.unwrap();
+            let mut texts: Vec<String> = match o.channels.get(format!("{post}/matters").as_str()) {
+                Some(ChannelData::Records { records, .. }) => records.iter().map(|r| match &r.load().body {
+                    oikos_kernel::blocks::RecordBody::Statement { text, .. } => text.clone(),
+                    _ => String::new(),
+                }).collect(),
+                _ => vec![],
+            };
+            texts.sort();
+            texts
+        };
+        (seen(&mut run, "finance-system", "finance"), seen(&mut run, "mayor-system", "mayor"))
+    };
+    assert_eq!(shown(true), (vec!["for-finance".to_string(), "for-the-town".to_string()], vec!["for-the-mayor".to_string(), "for-the-town".to_string()]));
+    // (Without it, as before: each post is shown all three, its organisation's papers.)
+    assert_eq!(shown(false).0.len(), 3);
+}

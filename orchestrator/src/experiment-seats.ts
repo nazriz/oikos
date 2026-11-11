@@ -321,7 +321,7 @@ export interface CallStats {
   /** What earlier attempts of the fork spent (counted against its limit). */
   earlier_microusd: number;
   ms: { total: number; p50: number | null; p95: number | null; max: number | null };
-  by: { [purposeAndModel: string]: { calls: number; errors: number; input_tokens: number; cache_read_tokens: number; output_tokens: number; cost_microusd: number; ms: number } };
+  by: { [purposeAndModel: string]: { calls: number; errors: number; input_tokens: number; cache_read_tokens: number; cache_write_tokens: number; output_tokens: number; cost_microusd: number; ms: number } };
   /** Errors by kind (the provider's error class or the first words of its message). */
   error_kinds: { [kind: string]: number };
 }
@@ -342,16 +342,18 @@ export function callRecorder(file: string, who: { seed: number; arm: string; sea
       const t0 = performance.now();
       const line: any = { attempt, seed: who.seed, arm: who.arm, seat, subject: req.subject, purpose: req.purpose, model: named, at: new Date().toISOString() };
       const k = `${req.purpose} ${named}`;
-      const b = (st.by[k] ??= { calls: 0, errors: 0, input_tokens: 0, cache_read_tokens: 0, output_tokens: 0, cost_microusd: 0, ms: 0 });
+      // (Every kind of token by purpose too: until 2026-11-12 what was written to the cache was summed only in all, so a
+      // seat's calls read as cache reads and output alone.)
+      const b = (st.by[k] ??= { calls: 0, errors: 0, input_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, output_tokens: 0, cost_microusd: 0, ms: 0 });
       try {
         const r = await a.complete(req);
         const ms = Math.round(performance.now() - t0);
         const u = r.usage;
         const cost = Math.max(costMicroUsd(priceOf(named), u) ?? 0, Math.ceil(u.reported_cost_microusd ?? 0));
-        Object.assign(line, { input_tokens: u.input_tokens, cache_read_tokens: u.cache_read_tokens ?? 0, cache_write_tokens: u.cache_write_tokens ?? 0, output_tokens: u.output_tokens, cost_microusd: cost, ms, ...(r.estimated ? { estimated: true } : {}) });
+        Object.assign(line, { input_tokens: u.input_tokens, cache_read_tokens: u.cache_read_tokens ?? 0, cache_write_tokens: u.cache_write_tokens ?? 0, output_tokens: u.output_tokens, cost_microusd: cost, ms, ...(u.reported_cost_microusd !== undefined ? { reported_microusd: u.reported_cost_microusd } : {}), ...(u.turns !== undefined ? { turns: u.turns } : {}), ...(r.estimated ? { estimated: true } : {}) });
         st.calls++; b.calls++; times.push(ms); st.ms.total += ms; b.ms += ms;
         st.input_tokens += u.input_tokens; st.cache_read_tokens += u.cache_read_tokens ?? 0; st.cache_write_tokens += u.cache_write_tokens ?? 0; st.output_tokens += u.output_tokens; st.cost_microusd += cost;
-        b.input_tokens += u.input_tokens; b.cache_read_tokens += u.cache_read_tokens ?? 0; b.output_tokens += u.output_tokens; b.cost_microusd += cost;
+        b.input_tokens += u.input_tokens; b.cache_read_tokens += u.cache_read_tokens ?? 0; b.cache_write_tokens += u.cache_write_tokens ?? 0; b.output_tokens += u.output_tokens; b.cost_microusd += cost;
         return r;
       } catch (e) {
         const ms = Math.round(performance.now() - t0);

@@ -6,7 +6,7 @@
 
 import { modules } from "@oikos/participants";
 
-type Match = { records?: string[]; statement_kinds?: string[]; has?: string[] };
+type Match = { records?: string[]; statement_kinds?: string[]; has?: string[]; own_post?: boolean };
 type Extra = { title?: string; every?: number; on_request?: boolean; look_seconds?: number };
 const kinds = (k: string[] | Match): Match => (Array.isArray(k) ? { statement_kinds: k } : k);
 

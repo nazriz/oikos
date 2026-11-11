@@ -2265,6 +2265,10 @@
                   "uniqueItems": true,
                   "minItems": 1
                 },
+                "own_post": {
+                  "description": "Only what is this post's own of its organisation's papers (docs/behaviour/assistants.md, \"In-house for an organisation\"): a paper addressed to one or more of the organisation's posts is shown only through those posts' channels, and through the one it was written in; a paper addressed to no post of the organisation is shown as ever. For a position's channel only.",
+                  "type": "boolean"
+                },
                 "statement_kinds": {
                   "type": "array",
                   "items": {
@@ -2351,6 +2355,10 @@
                   },
                   "uniqueItems": true,
                   "minItems": 1
+                },
+                "own_post": {
+                  "description": "Only what is this post's own of its organisation's papers (docs/behaviour/assistants.md, \"In-house for an organisation\"): a paper addressed to one or more of the organisation's posts is shown only through those posts' channels, and through the one it was written in; a paper addressed to no post of the organisation is shown as ever. For a position's channel only.",
+                  "type": "boolean"
                 },
                 "statement_kinds": {
                   "type": "array",
@@ -2474,6 +2482,10 @@
                   "uniqueItems": true,
                   "minItems": 1
                 },
+                "own_post": {
+                  "description": "Only what is this post's own of its organisation's papers (docs/behaviour/assistants.md, \"In-house for an organisation\"): a paper addressed to one or more of the organisation's posts is shown only through those posts' channels, and through the one it was written in; a paper addressed to no post of the organisation is shown as ever. For a position's channel only.",
+                  "type": "boolean"
+                },
                 "statement_kinds": {
                   "type": "array",
                   "items": {
@@ -2585,6 +2597,10 @@
                   "uniqueItems": true,
                   "minItems": 1
                 },
+                "own_post": {
+                  "description": "Only what is this post's own of its organisation's papers (docs/behaviour/assistants.md, \"In-house for an organisation\"): a paper addressed to one or more of the organisation's posts is shown only through those posts' channels, and through the one it was written in; a paper addressed to no post of the organisation is shown as ever. For a position's channel only.",
+                  "type": "boolean"
+                },
                 "statement_kinds": {
                   "type": "array",
                   "items": {
@@ -2686,6 +2702,10 @@
                   },
                   "uniqueItems": true,
                   "minItems": 1
+                },
+                "own_post": {
+                  "description": "Only what is this post's own of its organisation's papers (docs/behaviour/assistants.md, \"In-house for an organisation\"): a paper addressed to one or more of the organisation's posts is shown only through those posts' channels, and through the one it was written in; a paper addressed to no post of the organisation is shown as ever. For a position's channel only.",
+                  "type": "boolean"
                 },
                 "statement_kinds": {
                   "type": "array",

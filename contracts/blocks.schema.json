@@ -599,6 +599,7 @@
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Basis"
         },
         "addressed_to": {
+          "description": "Whom the statement is addressed to: entities, or a post (a position, which makes it that post's among its organisation's papers: a channel's `own_post`).",
           "type": "array",
           "items": {
             "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"

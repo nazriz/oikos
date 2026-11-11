@@ -12577,9 +12577,9 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
   commands, a sitting a wake with a model call, `empty_sitting` notes, and the seats' participant calls):
   | seat | wakes before / after | sittings | skipped as empty | model calls |
   |---|---|---|---|---|
-  | par.3 (finance's assistant) | 88 / 70 | 80 / 44 | 8 / 0 | 96 / 60 |
+  | par.3 (rating office's assistant; labelled finance's until 2026-11-12, wrongly) | 88 / 70 | 80 / 44 | 8 / 0 | 96 / 60 |
   | par.4 (factory's) | 119 / 73 | 85 / 44 | 34 / 0 | 105 / 64 |
-  | par.5 (rating office's) | 88 / 71 | 81 / 45 | 7 / 0 | 85 / 49 |
+  | par.5 (finance office's) | 88 / 71 | 81 / 45 | 7 / 0 | 85 / 49 |
   | provider-a-desk-system | 82 / 84 | 82 / 43 | 0 / 0 | 119 / 78 |
   | all | 377 / 298 | 328 / 176 | 49 / 0 | 405 / 251 |
   The mock says it is back in a day (its brain's rhythm), so after the change it sits every working day (43 in 60
@@ -12771,3 +12771,80 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
 - **Byte-identical at level 0:** as for B2 (the same configs; the same state hashes and log digests at 45 days).
 - **Revisit if:** the screen shows the desk's clients never get past a body's return (then the person's rule for giving
   an authority is wrong, or too narrow), or authorities need renewing (a body's review of a standing arrangement).
+
+## 2026-11-12 · What a claude -p seat call costs, and why (16 Haiku calls on the owner's subscription)
+
+The first pilot's estimate ($75 an arm) carried over rates fitted to the 2026-11-10 Haiku check, whose desk prompt was
+then about five times today's. Measured instead: three seat prompts captured from a mock dry run of `first-pilot.ts`
+(a desk sitting with matters, the factory's assistant with one matter, a desk sitting with only results and letters;
+captured by a temporary hook in `callModel`, not kept) sent through `ClaudeCodeAdapter` as the harness sends them,
+`claude-code/claude-haiku-5-5`, its plan sign-in (no API key). 16 calls: each twice back to back, again six minutes
+later, three at `--effort low`, two on seat prompts not yet sent (cold), one with an empty prompt. Kept in the
+scratchpad of the session (`probe.jsonl`, every call's whole usage and `modelUsage`).
+- **Claude Code reckons Haiku 5.5 at $5 a million in, $6.25 written to the cache, $0.50 read and $25 out**, to the
+  cent on all 16 calls (Sonnet 5.5's one earlier call fits the same rates to the cent): fifty times the API's price for
+  Haiku. That price is the whole of why a call costs what it does; nothing in how we call it multiplies the tokens.
+- **The prompt written anew each sitting.** Claude Code writes an hour's cache (`ephemeral_1h`), shared between separate
+  `claude -p` processes: the same seat's next call, back to back or six minutes later, read its prompt from the cache
+  (11,000 to 46,000 read, 400 to 2,600 written). A seat sits once a working day, so each sitting's first call writes the
+  seat's prompt again, about 12,000 tokens, $0.07 to $0.08 of a cold call's $0.12 to $0.14.
+- **No hidden context to speak of.** An empty prompt came to 180 tokens in; the seat prompts' first turn (about 12,200
+  tokens) is our system prompt, tools and observation at about 2.8 characters a token, with the answer schema's tool.
+  Claude Code's own side call to Haiku 4.5 (a title) costs $0.001 a call.
+- **The answer's tokens are mostly reasoning.** 500 to 2,400 tokens out a call, $0.013 to $0.061, for an answer of about
+  200 (688 characters measured): the rest is thinking at the default effort. At `--effort low`, the same three warm
+  prompts came to 1,015, 1,403 and 510 tokens out against 1,403, 2,245 and 1,069 at the default ($0.042 against
+  $0.062 a call); one cold call at low effort reasoned no less (1,893 out). Not adopted: the seats run at each model's
+  default effort, and a lower one changes how the model decides, for a saving of about $5 an arm.
+- **Turns.** 2 to 7 inside one call (the answer schema's tool, and its retries), each re-reading the prompt from the
+  cache at $0.50 a million: $0.006 a turn, a few cents a call at most.
+- **Nothing material can be cut** without changing what the seat is shown or how it may answer: the cache already works
+  within a sitting and across processes; a daily sitting's prompt has to be written once (keeping it warm would take a
+  call each hour); there is no output cap but the effort.
+- **Fixed:** the run's `cost.json` summed what was written to the cache only in all, not by purpose (`callRecorder`'s
+  `by`), so a seat's calls read as cache reads and output alone (the 2026-11-10 check's 8 seat calls wrote about
+  254,000 tokens it did not show); now by purpose too. Each call's line also keeps what Claude Code reckoned it at and
+  its turns. `orchestrator/prices.json` has Claude Code's exact rates.
+- **The new estimate** (`first-pilot.ts`'s header): a sitting's first call $0.13, its later ones $0.064, about 1.9 calls a
+  sitting: $0.19 a sitting, 260 sittings, about $49, with the debriefs about $52 an arm for Haiku, and for Sonnet by
+  the same table about $52 (its reasoning tokens under Claude Code are the unknown). Limits $78 an arm (half again).
+  About 11 s a call. A Codex arm (`codex/gpt-6.1-sol`, the owner's flat-rate subscription) is added, labelled as not on
+  equal terms (the Codex CLI puts its own instructions under ours): about 490 sitting calls and 52 debrief questions.
+- **Revisit if:** the pilot's first sittings average far from $0.19 (read their `cost.json` by purpose); Claude Code
+  changes its reckoning or its cache's hour; a seat sits more than once a working day.
+
+## 2026-11-12 · MT-31: an assistant's post is shown its own matters only (contract change; risks MT-28, MT-31)
+
+The study's town has two assistants of one organisation (the town's finance office's and its rating office's, both posts
+of `city`). A principal's papers to its in-house assistant were addressed to the organisation and seen by it alone, and
+an assistant post's channels match the organisation's papers by kind, so each assistant was shown, and a model seat
+woken by, the other's matters (in the 60-day mock fork: each city seat was shown both offices' referrals, briefs and
+sign-offs). Under the knowing rules a matter handed to a post is that post's.
+- **Contract changes** (blanket approval of 2026-10-11; logged here):
+  1. `RecordFilter.own_post` (world-config and module schemas, `match.own_post`, boolean, default false, not written
+     when false): a position's channel that keeps to its own post shows, of its organisation's papers addressed to any
+     of the organisation's posts, only those addressed to this post or written in it; a paper addressed to no post of
+     the organisation is shown as ever (kernel/crates/contracts/src/config.rs `post_ok`; perception's channel build,
+     searches and `shown_as_news`).
+  2. A statement may be addressed to a post (`addressed_to` names a position, as a letter may): the kernel checked every
+     addressee was an entity (`new_record`), and now lets a position pass where it is an addressee
+     (kernel/crates/world/src/exec.rs; blocks schema's `addressed_to` description).
+- **The world:** a principal's papers to an organisation's assistant (`to_assistant`: brief, remits, referrals,
+  sign-offs, declines, go-aheads, answers, acknowledgements) are addressed to the organisation and to the assistant's
+  post, seen by the organisation alone as before; the assistant's channels (terms, matters, file; the desk's too) keep
+  to their own post (`assistantChannels`, generate.ts). Nothing else is addressed to a post.
+- **What moves.** Towns without providers: nothing (town-300, 45 days: 669141b6..., as main). Towns with providers: the
+  config (the assistant posts' `own_post`) and every principal paper to an organisation's assistant (one more
+  addressee), so their hashes move (town-1000 with `assistants=true`, 30 days: 08949cd3..., was df9d05c7...). The study
+  town's code arm, 60 days after the fork, against main's: the same 2,067,471 entries; the 93 principal papers to the
+  assistants (42 referrals, 41 sign-offs, 6 remits, 3 briefs, a decline) and the 95 acts that wrote them differ only by
+  the added addressee, and 345 observation hashes differ (the assistants are shown less); nothing else, not a time, an
+  act or a paper. The mock seats' arm: the finance assistant's seat is shown the finance office's papers only (6) and the
+  rating office's assistant's the rating office's only (17), each before shown both; their wakes 71 to 58 and 70 to 66,
+  calls 49 to 48 and 60 to 60.
+- **Still open (MT-31, a little):** the assistant's own papers back (drafts, reports, advice, requests) are addressed to
+  the organisation, so the other assistant can find them in its file, on request only; nothing hands or wakes it with
+  them. MT-28's note of the same fault is marked fixed with this.
+- **Test:** `kernel/tests/knowing.rs`, `two_posts_of_one_organisation_that_keep_to_their_own_are_not_shown_each_others_matters`.
+- **Revisit if:** a seat reads its sibling assistant's drafts in its file (then address the assistant's papers to its
+  principal's post too); another body with several posts wants the same (the filter is general: any position's channel).
