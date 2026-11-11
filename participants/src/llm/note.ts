@@ -68,7 +68,9 @@ export function noteGuide(tools: ToolSpec[]): string {
   const t = (name: string) => by.get(name);
   if (t("do")) L.push(`- "Do: ..." then what you do, in plain words. ${t("do")!.description}${under(t("do")!)} Do is for acts in the world; notes to yourself go under "Notebook:".`);
   // (It read "then who it goes to by id", and a 7B model wrote "Write to acc-c0497 by id:", 2026-11-10.)
-  if (t("write")) L.push(`- "Write to", then whom it goes to: a person, an organisation or a post, each as the id in brackets after its name in your reports (several separated by commas), then a colon, then the letter, on the same line or the lines below. ${t("write")!.description}${under(t("write")!)}`);
+  // (One short sentence on addressing, 2026-11-11: a 7B model wrote "Write to:" alone, whom on the lines below, in 196 of
+  // 621 requests; that is read now too, but the plainest way is said.)
+  if (t("write")) L.push(`- "Write to", then whom it goes to: a person, an organisation or a post, each as the id in brackets after its name in your reports (several separated by commas), then a colon, then the letter. ${ADDRESS_SAID} ${t("write")!.description}${under(t("write")!)}`);
   if (t("look")) {
     const report = propsOf(t("look"))["report"];
     L.push(`- "Look at", then which, by its id${report?.enum ? ` (${report.enum.join(", ")})` : ""}. ${t("look")!.description}${under(t("look")!)}${propsOf(t("look"))["find"] ? ' Each thing to find is written as what, how it compares and the value, such as "Find: kind = complaint"; several are separated by semicolons.' : ""}`);
@@ -114,8 +116,14 @@ function split(said: string, tools: ToolSpec[]): { before: string[]; parts: Part
     // a line of the letter. A "Look at" inside words written out (a request, a letter, a note) is a heading only if it
     // names one of the reports.)
     // (A heading given as a Do's words, "Do: Write to ...:" or "Do: Look at ...", is that heading: as a 7B model wrote it.)
-    const inner = m && /^do$/i.test(m[1]!) ? /^\s*:\s*(?=(?:write\s+to|look|confirm|decline|notebook|done|stop\s+for\s+good)\b)/i.exec(m[2]!.replace(/^\s*(?:\*\*|__)/, "").replace(/(?:\*\*|__)/, "")) : null;
-    if (inner) { split(m![2]!.replace(/^\s*(?:\*\*|__)/, "").replace(/(?:\*\*|__)/, "").slice(inner[0].length), tools).parts.forEach((p) => parts.push(p)); continue; }
+    // ("Do as <post>: - Confirm ask-92." too, as a 7B model wrote it, 2026-11-11. Taken as that heading only if it reads
+    // as one, whole; else the line is the Do's words, never lost: "Do: Confirm the time with them" is a Do.)
+    const cleaned = m ? m[2]!.replace(/^\s*(?:\*\*|__)/, "").replace(/(?:\*\*|__)/, "") : "";
+    const inner = m && /^do$/i.test(m[1]!) ? /^\s*(?:as\s+[^:\n]+)?:\s*(?:[-*•]\s+)?(?=(?:write\s+to|look|confirm|decline|notebook|done|stop\s+for\s+good)\b)/i.exec(cleaned) : null;
+    if (inner) {
+      const sub = split(cleaned.slice(inner[0].length), tools);
+      if (sub.parts.length && !sub.before.some((l) => l.trim())) { sub.parts.forEach((p) => parts.push(p)); continue; }
+    }
     const head0 = m ? m[1]!.toLowerCase().replace(/\s+/g, " ") : "";
     const head = head0 === "note" || head0 === "notes" ? "notebook" : head0;
     const rest = m ? m[2]!.replace(/^\s*(?:\*\*|__)/, "").replace(/(?:\*\*|__)/, "") : "";
@@ -124,9 +132,10 @@ function split(said: string, tools: ToolSpec[]): { before: string[]; parts: Part
     const inWords = !marked && (parts.length ? ["do", "write to", "notebook", "stop for good"].includes(parts.at(-1)!.head) : before.some((l) => l.trim()));
     const isHead = !!m && (
       head === "do" ? /^\s*(?:as\s+[^:]+)?\s*:/i.test(rest)
-      : head === "write to" ? /^\s*[^:\s][^:]*:/.test(rest) || (marked && /^\s*:?\s*$/.test(rest))
+      // ("Write to" with whom on its own line before a colon; alone, whom on the lines below; or whom alone, by ids.)
+      : head === "write to" ? /^\s*[^:\s][^:]*:/.test(rest) || /^\s*[:,]?\s*$/.test(rest) || !!idsOnly(rest) || (/^\s*:/.test(rest) && !!whomLine(rest.replace(/^\s*:/, "")))
       : head.startsWith("look") ? /^\s*\S/.test(rest) && (!inWords || !!reportNamed(rest.replace(/^\s*(?:at|into|in|up)\b/i, ""), reports).report)
-      : head === "confirm" || head === "decline" ? /^\s+[`"'“(\[]*[\w-]*[.\d][\w.-]*/.test(rest)
+      : head === "confirm" || head === "decline" ? /^\s+[`"'“(\[]*[\w-]*[.\d][\w.-]*/.test(rest) || PLACEHOLDER_AT.test(rest)
       : head === "notebook" ? /^\s*(?:,?\s*(?:afresh|anew|in full|change)\b)?\s*:/i.test(rest) && (head0 === "notebook" || !inWords)
       : head === "done" ? /^\s*(?:for\s+(?:\d|now)|[.!]?\s*$)/i.test(rest) || (!inWords && /^\s*for\b/i.test(rest))
       : head === "stop for good" || head === "leave" ? /^\s*:/.test(rest) && (head !== "leave" || parts.at(-1)?.head !== "write to")
@@ -147,6 +156,68 @@ const trimLines = (ls: string[]) => {
 /** After the heading's own words, up to the colon: what is said on the heading's line after it. */
 const afterColon = (s: string) => { const i = s.indexOf(":"); return i < 0 ? "" : s.slice(i + 1).trim(); };
 const bare = (s: string) => s.trim().replace(/^["'“‘(\[<*_]+|["'”’)\]>*_.,;]+$/g, "");
+
+/** A blank copied from the guide's own shapes, in angle brackets ("<reference>", "<id>"), never the real thing. */
+const PLACEHOLDER = /<[A-Za-z][^<>\n]{0,40}>/;
+const PLACEHOLDER_AT = /^\s+<[A-Za-z][^<>\n]{0,40}>/;
+/** A line that is plainly one field of something: a label of a few words, a colon, a value ("- Buyer: buyer-c01"). */
+const FIELD_LINE = /^\s*(?:[-*•]|\d+[.)])?\s*(?:\*\*)?([A-Za-z][\w ()'/-]{0,40}?)(?:\*\*)?\s*:\s*\S[^\n]*$/;
+const isField = (l: string): boolean => { const m = FIELD_LINE.exec(l); return !!m && m[1]!.trim().split(/\s+/).length <= 5; };
+const LONE_FIELD = { test: (s: string) => !s.includes("\n") && isField(s) };
+
+// Whom a letter goes to (2026-11-11). The plainest rule, by layout only:
+//  - On the "Write to" line, before its colon: as written, several separated by commas (a name with its id in brackets
+//    after it, "Planning officer (planning)", is that id; the guide asks for the id in brackets after the name).
+//  - With nothing before the colon (a bare "Write to" or "Write to:"), whom is on the lines straight after it: each such
+//    line holds only names or ids, separated by commas, and may end in a colon. Whom ends at the first line that has a
+//    colon (what follows it there is the letter's first words), at a blank line once whom has begun, or at the first
+//    line that is not only names and ids; everything after is the letter. A name or id is one word, or a name with its
+//    id in brackets; a name of a few words counts only before a colon. A line that begins as a letter does ("Dear",
+//    "Re", "Subject", a greeting or thanks) is never whom.
+//  - "Write to" with ids alone and no colon ("Write to planning-office, p.4") names whom, the letter below; ids here
+//    are words with a digit, hyphen or dot, so that "Write to them" in a sentence stays a sentence.
+const LETTER_WORDS = /^(?:dear|re|subject|hello|hi|greetings|regards|kind\s+regards|thanks|thank\s+you|sincerely)\b/i;
+const IN_BRACKETS = /\(([^()\s]+)\)[\s.,;]*$/;
+const WHOM_APART = /,|;|\band\b/;
+/** One whom, as written on the heading's line: the id in brackets after a name, else as written. */
+const whomAsWritten = (x: string): string => { const s = x.replace(/\s+by\s+id\s*$/i, "").trim(); return bare(IN_BRACKETS.exec(s)?.[1] ?? s); };
+/** One whom, on a line of its own: an id, a name with its id in brackets, or (before a colon) a short name; else none. */
+function whomOnLine(x: string, beforeColon: boolean): string | undefined {
+  const s = x.replace(/\s+by\s+id\s*$/i, "").trim();
+  if (!s || LETTER_WORDS.test(s)) return undefined;
+  const id = IN_BRACKETS.exec(s)?.[1];
+  if (id) return bare(id);
+  const b = bare(s);
+  if (!b || /[!?"“”]/.test(b)) return undefined;
+  if (/^\S+$/.test(b)) return b;
+  return beforeColon && b.split(/\s+/).length <= 4 && !/[.]/.test(b) ? b : undefined;
+}
+/** A line that holds only whom (names or ids), and, after a colon, the letter's first words; or none. */
+function whomLine(line: string): { who: string[]; words?: string } | undefined {
+  const s = line.replace(/^\s*(?:[-*•]|\d+[.)])?\s*(?:\*\*|__)?/, "").replace(/(?:\*\*|__)\s*:/, ":");
+  const c = s.indexOf(":");
+  const names = (c < 0 ? s : s.slice(0, c)).split(WHOM_APART).map((x) => x.trim()).filter(Boolean);
+  if (!names.length) return undefined;
+  const who = names.map((x) => whomOnLine(x, c >= 0));
+  if (who.some((x) => x === undefined)) return undefined;
+  return { who: who as string[], ...(c >= 0 ? { words: s.slice(c + 1).trim() } : {}) };
+}
+/** "Write to" with ids alone on its line, no colon: those ids; else none. */
+const idsOnly = (rest: string): string[] | undefined => {
+  if (rest.includes(":")) return undefined;
+  const xs = rest.split(WHOM_APART).map((x) => x.trim()).filter(Boolean);
+  const ids = xs.map((x) => { const id = IN_BRACKETS.exec(x)?.[1]; const b = bare(id ?? x); return /^\S*[\d.-]\S*$/.test(b) && !/[!?"“”]/.test(b) ? b : undefined; });
+  return ids.length && ids.every(Boolean) ? (ids as string[]) : undefined;
+};
+
+/** How to address a letter, said once in the guide. */
+export const ADDRESS_SAID = 'Whom may also go on the lines straight under "Write to", one a line, before the letter.';
+/** What a seat is told of a letter whose "Write to" names no one that can be read: nothing is sent. */
+export const NO_WHOM_SAID = 'the letter did not say whom it goes to, so it was not sent: write "Write to", then the id of each it goes to, then a colon, then the letter';
+/** What a seat is told of a letter with no words: nothing is sent. */
+export const NO_WORDS_SAID = 'the letter had no words, so it was not sent: write the letter after the colon, or on the lines under "Write to"';
+/** What a seat is told of a blank copied in angle brackets: nothing is done with it. */
+export const PLACEHOLDER_SAID = "it still had a blank in angle brackets (such as <reference>) where the real reference, id or words go, so nothing was done with it: write them in its place";
 
 /** A value under a field, as its schema takes it; or why it can't be. */
 function valueOf(field: string, s: Schema | undefined, said: string): { v: unknown } | { why: string } {
@@ -252,10 +323,18 @@ function readNoteParts(said: string, tools: ToolSpec[], nextId: () => string, by
     if ("why" in one) {
       firstWhy ??= one.why;
       if (one.empty) continue;
-      out.push({ type: "tool_use", id: nextId(), name: one.name, input: { _unparsed: [p.raw ?? p.head + p.rest, ...p.lines].join("\n").trim().slice(0, 2000) } });
+      // (`_why`: a fixed sentence the seat is told instead of "it couldn't be read", where what is wrong is plain.)
+      out.push({ type: "tool_use", id: nextId(), name: one.name, input: { _unparsed: [p.raw ?? p.head + p.rest, ...p.lines].join("\n").trim().slice(0, 2000), ...(one.tell ? { _why: one.why } : {}) } });
       continue;
     }
     read++;
+    // (A Do whose words are one field and nothing else, a label, a colon and a value, right after another Do, is a field
+    // of that one: "Do: Draft an export invoice." then "Do: Quantity: 25", as a 7B model wrote them, 2026-11-11.)
+    const last = out.at(-1) as any, only = one.blocks.length === 1 ? (one.blocks[0] as any) : undefined;
+    if (only?.name === "do" && typeof only.input?.what === "string" && LONE_FIELD.test(only.input.what) && last?.type === "tool_use" && last.name === "do" && typeof last.input?.what === "string" && last.input.as === only.input.as && only.input.why === undefined) {
+      last.input.what = `${last.input.what}\n${only.input.what}`;
+      continue;
+    }
     out.push(...one.blocks);
   }
   if (!read) return unreadAnswer(said, firstWhy ?? "it had nothing under its headings");
@@ -263,7 +342,7 @@ function readNoteParts(said: string, tools: ToolSpec[], nextId: () => string, by
 }
 
 /** One part of a note: its blocks, or why it can't be read (`empty`: a heading with nothing under it, which says nothing). */
-function readPart(p: Part, by: Map<string, ToolSpec>, _said: string, nextId: () => string): { blocks: ContentBlock[] } | { why: string; name: string; empty?: true } {
+function readPart(p: Part, by: Map<string, ToolSpec>, _said: string, nextId: () => string): { blocks: ContentBlock[] } | { why: string; name: string; empty?: true; tell?: true } {
   const out: ContentBlock[] = [];
   // ("Stop for good:" is the seat's plain act of leaving, its words its reason; "Leave:" is told how (see the top).)
   if (p.head === "leave" || p.head === "stop for good") {
@@ -274,6 +353,7 @@ function readPart(p: Part, by: Map<string, ToolSpec>, _said: string, nextId: () 
   }
   const name = p.head === "do" ? "do" : p.head === "write to" ? "write" : p.head.startsWith("look") ? "look" : p.head === "confirm" || p.head === "decline" ? "confirm" : p.head === "notebook" ? "notebook" : p.head === "done" ? "done_for_now" : "opt_out";
   const no = (why: string, empty?: true) => ({ why, name, ...(empty ? { empty } : {}) });
+  const tell = (why: string) => ({ why, name, tell: true as const });
   const t = by.get(name);
   const heading = p.head.charAt(0).toUpperCase() + p.head.slice(1);
   if (!t) return no(`"${heading}" is not something you can do here`);
@@ -293,27 +373,53 @@ function readPart(p: Part, by: Map<string, ToolSpec>, _said: string, nextId: () 
     // it is told so in one fixed sentence and goes to nobody. In the local test of 2026-11-10, 24 of the 53 requests
     // never served were "Examine my own requests and pending actions." and its like.)
     if (SELF_TALK.test(what)) return { blocks: [{ type: "tool_use", id: nextId(), name, input: { _self: what.slice(0, 2000) } }] };
+    if (PLACEHOLDER.test(what)) return tell(PLACEHOLDER_SAID);
     const items = what.split("\n").filter((l) => l.trim());
     const BULLET = /^\s*(?:[-*•]|\d+[.)])\s+/;
-    if (items.length > 1 && items.every((l) => BULLET.test(l))) {
-      for (const l of items) out.push({ type: "tool_use", id: nextId(), name, input: { what: l.replace(BULLET, "").trim(), ...(as ? { as: bare(as) } : {}), ...under.input } });
+    // (Lines that are plainly the fields of one thing, a label, a colon and a value ("- Buyer: buyer-c01"), or lines set
+    // in under an item, stay with the item above them: one request, in the seat's own words. A 7B model listed a
+    // delivery note's fields under it, 2026-11-11, and each field went to the translator as a request of its own.)
+    const indent = (l: string) => /^\s*/.exec(l)![0].replace(/\t/g, "  ").length;
+    const base = Math.min(...items.map(indent));
+    if (items.length > 1 && BULLET.test(items[0]!) && items.every((l) => BULLET.test(l) || indent(l) > base)) {
+      const groups: string[][] = [];
+      for (const l of items) {
+        const head = BULLET.test(l) && indent(l) === base && !isField(l);
+        if (head || !groups.length) groups.push([l]);
+        else groups.at(-1)!.push(l);
+      }
+      const said = (g: string[]) => [g[0]!.replace(BULLET, "").trim(), ...g.slice(1).map((l) => l.replace(/\s+$/, "").slice(Math.min(base, indent(l))))].join("\n");
+      for (const g of groups) out.push({ type: "tool_use", id: nextId(), name, input: { what: said(g), ...(as ? { as: bare(as) } : {}), ...under.input } });
       return { blocks: out };
     }
     input = { what: items.length === 1 ? what.replace(BULLET, "") : what, ...(as ? { as: bare(as) } : {}), ...under.input };
   } else if (name === "write") {
-    let rest = p.rest, lines = under.body;
-    // ("## Write to" alone, who on the line under it: "- p.4: the letter".)
-    if (!rest.replace(/:/, "").trim()) {
-      const k = lines.findIndex((l) => l.trim());
-      const m = k >= 0 ? /^\s*(?:[-*]\s*)?([^:]+):\s*(.*)$/.exec(lines[k]!) : null;
-      if (m) { rest = ` ${m[1]}: ${m[2]}`; lines = lines.slice(k + 1); }
+    // Whom, by the rule written above `whomLine`: on the heading's line before its colon, or on the lines straight after it.
+    const i = p.rest.indexOf(":");
+    const onLine = (i < 0 ? p.rest : p.rest.slice(0, i)).replace(/^\s*,/, "").trim();
+    let who: string[] = [], first = "", lines = under.body;
+    if (onLine) {
+      // (Whom, with "by id" said after it let pass: as the guide once read and a 7B model wrote, 2026-11-10.)
+      who = onLine.split(WHOM_APART).map(whomAsWritten).filter(Boolean);
+      first = i < 0 ? "" : p.rest.slice(i + 1).trim();
+    } else {
+      const below = [...(i >= 0 && p.rest.slice(i + 1).trim() ? [p.rest.slice(i + 1)] : []), ...lines];
+      let k = 0;
+      while (k < below.length && !below[k]!.trim()) k++;
+      for (; k < below.length; k++) {
+        if (!below[k]!.trim()) break;
+        if (PLACEHOLDER.test(below[k]!.split(":")[0]!)) return tell(PLACEHOLDER_SAID);
+        const w = whomLine(below[k]!);
+        if (!w) break;
+        who.push(...w.who);
+        if (w.words !== undefined) { first = w.words; k++; break; }
+      }
+      lines = below.slice(k);
     }
-    const i = rest.indexOf(":");
-    // (Whom, with "by id" said after it let pass: as the guide once read and a 7B model wrote, 2026-11-10.)
-    const who = (i < 0 ? rest : rest.slice(0, i)).split(/,|;|\band\b/).map((x) => bare(x.replace(/\s+by\s+id\s*$/i, ""))).filter(Boolean);
-    if (!who.length) return no('"Write to" did not say who it goes to (by id, before the colon)');
-    const text = trimLines([i < 0 ? "" : rest.slice(i + 1).trim(), ...lines]).join("\n").trim();
-    if (!text) return no(`the letter to ${who.join(", ")} had no words`);
+    if (PLACEHOLDER.test(onLine)) return tell(PLACEHOLDER_SAID);
+    if (!who.length) return tell(NO_WHOM_SAID);
+    const text = trimLines([first, ...lines]).join("\n").trim();
+    if (!text) return tell(NO_WORDS_SAID);
     input = { to: who, text, ...under.input };
   } else if (name === "look") {
     const head = p.rest.replace(/^\s*(?:at|into|in|up)\b/i, "");
@@ -327,6 +433,7 @@ function readPart(p: Part, by: Map<string, ToolSpec>, _said: string, nextId: () 
     aside([...also.body, ...under.body]);
     input = { report, ...also.input, ...under.input };
   } else if (name === "confirm") {
+    if (PLACEHOLDER_AT.test(p.rest)) return tell(PLACEHOLDER_SAID);
     const ref = bare(p.rest.split(":")[0]!.trim().split(/\s+/)[0] ?? "");
     if (!ref) return no(`"${heading}" did not say which, by its reference`);
     const note = body(afterColon(p.rest));

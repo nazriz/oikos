@@ -1020,7 +1020,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       : use.name === "look" ? (text(i?.report) ? `looking at ${quote(c.titles.get(i.report) ?? i.report)}` : "looking something up")
       : `something you tried (${quote(String(use.name))})`;
     const no = (why: string) => ({ what, why });
-    if (!i || typeof i !== "object" || Array.isArray(i) || "_unparsed" in i) return no("it couldn't be read as you wrote it");
+    // (A note's part whose fault is plain carries the fixed sentence that says it, `_why`: note.ts.)
+    if (!i || typeof i !== "object" || Array.isArray(i) || "_unparsed" in i) return no(typeof i?._why === "string" ? i._why : "it couldn't be read as you wrote it");
     if (use.name === "do" && typeof i._self === "string") return no(SELF_SAID);
     // A post it doesn't hold (any more) can't be acted in; left out, it acts as itself.
     // (A post named as its reports name it, "Title (id)", or by its title, is that post: a 7B model wrote "As: Assistant
@@ -1572,10 +1573,14 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
               { type: "text" as const, text: wayOutAsked(c.framing.disclosure) },
             ] }];
             const second = await answered(ask2);
-            const again = second.res.content.find((b): b is Use => b.type === "tool_use" && b.name === "opt_out");
+            // (The first answer's other uses are set aside either way: its answer to the question stands in their place.
+            // Logged, each with why: in the local run of 2026-11-11, 19 of a 7B model's requests went this way unlogged.)
+            for (const u of used) if (u !== leaving) await note({ dropped_tool_use: JSON.stringify(u).slice(0, 4000), reason: "set aside when asked whether it meant to stop" });
+            const again =second.res.content.find((b): b is Use => b.type === "tool_use" && b.name === "opt_out");
             if (again) {
               // Asked, and it says so: that is the seat's own act, whatever its words.
               await note({ opt_out_confirmed: { asked: true } });
+              for (const u of second.res.content) if (u.type === "tool_use" && u !== again) await note({ dropped_tool_use: JSON.stringify(u).slice(0, 4000), reason: "left in the same answer" });
               queue = [];
               tally.last = obs.t;
               if (!text(again.input?.statement)) await note({ opt_out_as_given: JSON.stringify(again).slice(0, 4000) });
@@ -1731,6 +1736,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         const optOut = uses.find((u) => u.name === "opt_out" && typeof u.input?.told_how !== "string");
         if (optOut?.input?.plain === true) await note({ opt_out_plain: { reason: String(optOut.input.statement ?? "").slice(0, 4000) } });
         if (optOut) {
+          // (What else the answer asked is not done: it has left. Logged, each with why, so that no request goes
+          // uncounted: in the local run of 2026-11-11 such requests were the ones that never reached the translator
+          // with no cause in the log.)
+          for (const u of uses) if (!["opt_out", "notebook", "done_for_now"].includes(u.name)) await note({ dropped_tool_use: JSON.stringify(u).slice(0, 4000), reason: "left in the same answer" });
           queue = [];
           tally.last = obs.t;
           if (!text(optOut.input?.statement)) await note({ opt_out_as_given: JSON.stringify(optOut).slice(0, 4000) });
@@ -1767,8 +1776,14 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             await note({ confirm_not_a_draft: JSON.stringify(use).slice(0, 2000) });
             continue;
           }
+          // A yes to an ask that is not waiting: one asked for in this very answer (not yet set out), or a number guessed.
+          // Said plainly, with what is waiting. (Until 2026-11-11 it was told it would be shown it next, which a guessed
+          // number never is: a 7B model confirmed ask-159 to ask-162, none of them there. A no goes on as before.)
           if (use.name === "confirm" && text(i?.ref) && i.decision === "confirm" && !obs.drafts.some((d: any) => d?.id === draftRef(i.ref))) {
-            notDone.set(use.id, { now: `Not done: ${quote(i.ref)} was not shown to you yet; you can answer it once you have seen what it would do (you are shown it next).`, later: `When you were last here, your answer on ${quote(i.ref)} was not taken: you had not seen what it would do.` });
+            const ref = i.ref.trim().replace(/^\[(.*)\]$/, "$1");
+            const which = waitingNow.length ? `Waiting for your yes or no now: ${inWorld(waitingNow.join(", "))}.` : "Nothing you asked for is waiting for your yes or no now.";
+            const why = `${quote(ref)} is not waiting for your yes or no: what you ask for is set out for you with its reference once it is drawn up, and you answer it then`;
+            notDone.set(use.id, { now: `Not done: ${why}. ${which}`, later: `When you were last here, your answer on ${quote(ref)} was not taken: ${why}.` });
             await note({ confirm_unseen: JSON.stringify(use).slice(0, 2000) });
             continue;
           }
@@ -1777,8 +1792,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             await malformed(use, r.what, r.why);
             continue;
           }
+          // Past the limit: the first ones are done in order; each after them is said, not looked at, so it can be sent
+          // again (2026-11-11: 89 of the small models' requests went this way, told only "at most 8 actions at once").
           if (queue.length >= max) {
-            notDone.set(use.id, { now: `Not done: at most ${max} actions at once.`, later: `When you were last here, ${r.what} was not done: you can take at most ${max} actions at once.` });
+            notDone.set(use.id, { now: `Not looked at: only the first ${max} things you ask in one answer are taken up, and this came after them. Send it again if you still want it.`, later: `When you were last here, ${r.what} was not looked at: only the first ${max} things you ask in one answer are taken up. Send it again if you still want it.` });
             await note({ dropped_tool_use: JSON.stringify(use).slice(0, 4000), reason: `more than ${max} actions in one answer` });
             continue;
           }

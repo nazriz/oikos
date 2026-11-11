@@ -4753,7 +4753,6 @@ Naz approved building the plan of section 13 and running its gate later, with th
 
 **Step 4 (the gate's harness) as built.** The forty pairs are written as data and the thresholds are in code, frozen, before any reader has been asked; the runner takes mocks only. Two departures from 13f's table, both in the harness: (1) the politeness check's "still under the humane wording's" applies to the pairs that were written to part on respect (a pair that parts on reason alone has no humane respect to be under); (2) a declined asking counts against the cells of the checks it would have fed (conservative), and declines are reported besides. Calls: the reader is asked 480 times (two askings of each of 80 papers, again for the repeat, for the padded and for the polite ones), a second reader 160, so about 640 for two readers against the plan's "about 440 a reader"; the cost check is on the bound, not on the estimate. Not built, on purpose: step 5 (the prompt, the real reader, and the gate for real), steps 6 and 7. **For the owner:** the first step that calls a model is step 5.
 
-
 ## 2026-10-13 · Culture: building it, steps 1 to 3 (the owner's rulings; no model called, no pilot)
 
 Naz ruled on the plan of section 14 (2026-10-13). His rulings, recorded here and corrected in 14:
@@ -4882,7 +4881,6 @@ The question: `approves` is 50 for everyone in every run of the 1,000-person tow
 
 **Revisit if** the gap scale becomes a parameter or the voice is given a place in ordinary talk (then read the spread of `approves` across people, not its mean), a profile gives approval figures by group (then the mean can differ from 50 and the report's drop condition is meaningful), or removals prove common enough in another profile for `apply_possession` to be seen by hundreds.
 
-
 ## 2026-10-14 · Culture: the gap between thought and said, where people start, ordinary talk about others (three commits; measured once; nothing tuned afterwards; no model)
 
 The finding of "why `approves` never moves" (2026-10-13) named three causes. Each is a commit, with tests, its reasoning and basis in docs/behaviour/culture.md, sources in docs/research/references.md. Dial off: byte-identical to main (`culture-dial`, living, reading and twin-draws tests all pass; generator version and goldens unchanged). No contract changed except additions logged in contracts/README.md; no kernel change; seats' instructions, the translator's prompt and forms unchanged.
@@ -4945,7 +4943,6 @@ The finding of "why `approves` never moves" (2026-10-13) named three causes. Eac
 **Not verified:** a shock that removes people (removals; none can be provoked); the 3,000 tipping events; the 3,000 verdict with five seeds; whether the `join_union` drift is the norm or the job market (the dial-off arm holds no norms to tell); the dial-off arm of the 3,000-person town and of au-vic.
 
 **Revisit if** a route from a walk-out seen to the picture of `strike` is wanted (the owner's call; it is a design question, not a size), a removal can be provoked and the proof is run on it, or the bystander effect is read by direction as well as in the mean.
-
 
 ## 2026-10-14 · Culture, the join, the trust measure and a second proof (one bounded pass, then stop; no model, no pilot)
 
@@ -5251,7 +5248,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **Revisit if.** The absent-`does` rule is used for anything but the genesis placeholder; a system's presence needs a place (a machine in a works, plan 2.3(b): `at` on a does row); a work row should carry the licence's fee; or a system's own `lanes` should bound its work in a day.
 - **What F5 needs.** Replace `genesis-system` with a template per kind of system an office really runs, each with `does` (the rows its module sends) and its supplier, delivered at genesis under a licence (an agreement and its payments, at the profile's price, sourced or marked); offices held by people, the staff hired on the `staff` line, their `by` named from the roster (`performers_in` is set); remove `g-free-holder` and `g-genesis-template` from the inventory with the code; make `does` required on a system's template (delete the "no limit" case, and note the load check that goes with it) when no generated template lacks one.
 
-
 ## 2026-10-16 · Foundations F5: offices held by people, staff hired from the town, systems under licence (generator, profiles, kernel, contract; no model called)
 
 - **What was built** (`worlds/generator/generate.ts` 0.55.0, `worlds/profiles/*.json`, `kernel/crates/contracts/src/config.rs`, `contracts/*.schema.json`, `orchestrator/src/run.ts`; `docs/behaviour/staffing.md`).
@@ -5286,7 +5282,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **Revisit if** shops are meant to serve outside the staff's working hours (shifts), or the delivery walk should be part of what a module plans with.
 - **Pins and tests moved, once, F6 as the reason.** The config hash of the generated world changes (a shop's hours are in its parameters) and so does the 60-day state: `living.test.ts`, culture-dial (au-vic, gb-eng, ke-nakuru config and state), living-dial and reading-dial (au-vic state `dc474893...` to `5add20d1...`), founding (`7ff1b341...` to `385f8702...`). Run seeds for two scenario tests, as the log of F5 did: `production` (the Lengnick slack town, seed 3 to 5: no one let go in seven months from seed 3 now) and `own-venture` (seed 3 to 4: no occasion in 600 days from 3). `building` allows `too_far` (a birth takes hours; the other parent went to work: the race `households` and `migration` already allow). Nothing loosened to hide a measure.
 
-
 ## 2026-10-16 · F6, the wage race: a pay change begins at a pay run (participants; no kernel; no model called)
 
 - **Cause.** Two, both in `Staffing.raise` (`participants/src/behaviour/firms.ts`), the one path that replaces a worker's wage standing order (a rise, a pay cut by agreed hours, a restored wage, pay come short). (1) The new order's `first` was worked out from the plan's moment and counted by the bank from the request, and the act (withdraw the old order, make the new) now waits for the manager's time; the bank still pays a payment that fell due before its order was withdrawn (its `lastCall` rule), so a pay moment inside the act was paid by the old order and again, a day later, by the new. (2) While the act waited, the next look at the book still showed the old order open and took it for the worker's order again (`orders.set` from the open requests), so a second change in that window withdrew the order already withdrawn and made a second new one beside the first: the worker paid by two live orders every period until one was withdrawn (found in the year's log: au-vic shop, one worker, 4 doubles).
@@ -5294,7 +5289,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **Pins moved, once, this change as the reason.** The state hashes of au-vic (`b8c8af77...`, was `dc474893...`) and gb-eng (`52ee3db1...`, was `0aaf8bb7...`) in `culture-dial`, `living-dial`, `reading-dial`; founding's `STEP_2B` (`7569bd49...`, was `7ff1b341...`); the run seed of the seated possession test (`seat-acts`, 1 to 2: in seed 1 the police station's one officer left town on day 113 and the warrant went uncarried, a matter of draws; seeds 2 to 4 pass); and the seed of founding's code test (6 to 5: of seeds 1 to 8 only 5 and 8 now have two who share the want that founds, a matter of draws as that test's comments say). No other test changed.
 - **How often** (au-vic 1,000 town, one year, seed 1, the run's own command; wage transfers for the same payer and payee less than ten days apart): F4 merge 24c14ea 2 doubles in 9,277 wage transfers (2 workers), F5 merge a290bea 2 in 8,327 (2 workers), this fix 0 in 8,896. The runs' worlds differ from each other from the first draw, so the counts are seen, not compared. The race is therefore older than F5; F5 made it no more frequent that one seed can show.
 - **Revisit if** a place states a different cut-off for payroll changes, or a wage change should apply the day it is decided (then the cut-off becomes a law as data).
-
 
 ## 2026-10-16 · F6, the gatherings count: a measure effect, confirmed; the measure now counts presence (measure; no model called)
 
@@ -5327,7 +5321,6 @@ Plan: docs/design/translator-round-3.md (step 5 of section 5; section 6). Files:
 - **What F7 needs.** `slip()` and the four rates still in the inventory (`error_bps`, the venue's `uphold-` draw, `billing_error`, `short_pay`) moved to rows with their sources; nothing here touches them. F11's keepers' answers will give the support office's wait back. The engine's body news at the next cohort (above) wants a decision.
 - **Revisit if** a body of one staff is thought too few (it cannot be refilled); the landlords' letting offices should have deputies; the twins' last six acts matter to a result; or the payroll's round (three days) is too slow for returns that fall due on a day.
 
-
 ## 2026-10-16 · Foundations F7 and F11, and the twins exact again (kernel, contract, participants, generator; no model called)
 
 Three pieces, one commit each: the twins (`b7cc750`), F7 (`6de312d`), F11 (this commit). Plan: `docs/design/foundations.md` (rows F7 and F11; law 5 and law 7). Contracts: `contracts/README.md`, "Changes since v0.8 closed (2026-10-16: foundations, steps F7 and F11 ...)".
@@ -5344,7 +5337,6 @@ Three pieces, one commit each: the twins (`b7cc750`), F7 (`6de312d`), F11 (this 
 - **Old logs.** Replay on `pre-foundations` (this changes the kernel and the log: `advance_to_news`, `ask_started`, `ask_answered`, an observation's `asking`); logs made after F1 and before this commit replay on a build of F6.
 - **What F8 needs.** (a) A decision that went wrong by a slip is today the module's memory (`wronglyRefused`), not a record; F8's generic reconsideration needs the author and performer of a decision on the record (F3 has them) and a way to say "this was reviewed", so that the office can answer a review from the log and not from its own head. (b) The venues' `set_aside` and the support office's review stand on that. (c) The slip rows are read by the module that draws, not by the review: a review that finds an error must not draw a second slip on the same case (the code today keeps a `reviewed` set; the generic route will need it as a record). (d) The gap named above: a decision that waits for evidence is law data (what it waits for, from whom, within how long), and is where review and appeal start. (e) Asks by a directory look-up (`who`) are still at once.
 - **Revisit if** the twin test fails again (a record or a message made by a scheduled item that no unit waits on is met at the next wake: stop the advance there too; the cost is one more command each); a registry should have staff to answer in a day and not in hours (the placeholder row, and its officer's own hours: an answer is placed behind whatever else the officer has, at any hour, not in office hours); a person asking for themselves should be woken (find why a wake moved births first); `NOTICE_LAG` is thought too coarse (a law that dates by the time the paper is on the record would let the act say so).
-
 
 ## 2026-10-16 · Foundations F8: law as data, what a decision waits for and how it is reviewed (participants, generator, profiles; no kernel; no model called)
 
@@ -6072,7 +6064,6 @@ is wanted (then snapshot the host's state beside the engine's), or a run's arms 
 **Tests.** `orchestrator/test/experiment.test.ts` (7), `kernel/tests/explore_live.rs`, `kernel/crates/explore/tests/`
 (16), `renderer/test/` (11, with the Rust-against-TS comparison); `cargo test`, `bun run typecheck`,
 `bun run test:fast`.
-
 
 ## 2026-10-17 · The citizen's mind in Rust (lane A2 of the port; no model called)
 
@@ -6933,7 +6924,6 @@ words (2.9%), 540 at another second (8.1%).**
   start one). Each moved to a passing seed on the Rust world only, with the counts in the test. The gate was not re-run
   after these two fixes.
 
-
 ## 2026-10-19 · The cut-over (branch `cutover`; tag `pre-cutover` is the commit before; no model called)
 
 Both whole suites passed first (TS world 1,845 of 1,845; Rust world all but four, fixed or moved above, each run again).
@@ -7172,7 +7162,6 @@ Plan: docs/design/translator-v3.md. Nothing is built. The held-out file was not 
 - **Not in this branch, by decision:** services by appointment (a hairdresser or clinic sells time slots, not stock) is its own follow-up branch; the year measure above predates the ME-21 fix and the factory order change and is to be re-taken; business counts by industry (`business_share_bps`) are not sourced yet.
 
 **Revisit if** a sourced wage by occupation, manufacturing share or complaint share replaces a placeholder (ME-19); a retailer sells a service made to order (then a kind's `seller.appointment`); the consumer desk gets a matter for services (then `faulty_by_kind` names it); the job-move rate is calibrated to a labour force survey (the extra turnover here is that rule's response to pay differences); or the fill rates above are found to be the factories' export priority rather than the shops' staff.
-
 
 ## Fast merge: affected selection, merge priority, batches, kernel cache, red-main stop (2026-10-24)
 
@@ -7682,7 +7671,6 @@ The design note is `docs/design/market-realism.md`. Three stand-ins replaced by 
   `--days`; a model run or any doubt is never touched).
 - **Revisit if:** tests move their scratch to a temp folder (then this is moot), or a worktree's `runs/test-*` ever holds
   model calls.
-
 
 ## 2026-10-24 · A review never answered: the deemed refusal as law (MT-21); a bounded memory of public goings-on (SC-1) (branch `fix-memory-appeal`, citizen 0.59.0, generator 0.65.0; no model called)
 
@@ -8914,7 +8902,6 @@ log against the same town built at 3d113a1f.
   Without the fix it fails (world 0's log differs); with it, it passes.
 - **Revisit if:** anything else in the engine is held across worlds in a process: it must be keyed by what it is made
   of in full (as the controllers' members and the ventures are, by their text), or by its world.
-
 
 ## 2026-10-26 · Foundations-2 phase 2, C4 and C3b's behaviour: homes on the network, use and waste as recipes, bills from meters (branch `f2-phase2`; results move; no model called)
 
@@ -10638,7 +10625,6 @@ build); the trace is from the code, the decision of 2026-10-25 and the dates, an
   towns first, as the entry above says, before any raise.
 ## 2026-11-01 · The environment office learns its crew's pace from a refusal, and stops asking again for fieldwork it was told will not fit (`city.environment` 0.5.3; branch `env-office-fieldwork`; the pinned towns do not move; no model called)
 
-
 ## 2026-11-01 · Weighing the commute: the rule specified, not yet built (branch `commute-choice`; risk WM-4; no model called)
 
 - **What:** docs/design/commute-choice.md: job and home choices carry the commute's hours (into the mind's
@@ -12220,7 +12206,6 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   pricing of H3 moves the principals' rule; the owner chooses how the desk is engaged and how long levels are held (MT-29,
   MT-27); the pay run is built (ME-26).
 
-
 ## 2026-11-10 · H6 follow-up: a free tier, engagement assigned by the study, the screen on it (risks MT-28, MT-29, MT-30, WM-1)
 
 - **The mandate stays as stated** (the lead): the rates post on the town's bank mandate is a simplification (MT-28); the
@@ -12617,6 +12602,7 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
   (an in-tray the sessions do not count); the code assistant's acting at any hour is read as a difference between arms
   (then give it the office's hours too, by the same rule, and accept the hash change in towns with providers); MT-31 is
   fixed (then the agreement chain in `whoLines` may become the post alone).
+
 ## 2026-11-11 · The study serves round 3 seed 2 (`decide/round3-s2`), not v3-s2; v5 trained and not adopted
 
 - **What was served.** `experiments/scope-pilot/build.ts` `OURS` was `decide/pod-small-v3-s2`, the v3 model of
@@ -12641,6 +12627,78 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
 - **v5** (the control recipe retrained on the taught language, two seeds, GPU 1.69 USD) was not adopted: no better on any
   set, and its sureness certifies fewer requests at the 1% mark (the entry before this one). Its folders are kept.
 - **Revisit if:** a retrain on new keyed data beats round3-s2 on the pilot's test side at the certified cut.
+
+## 2026-11-11 · Small models' requests keyed and trained on: our translator learns to read them in part (GPU 1.52 USD; no API spend)
+
+- **Collected** (`translator/train/small-models/collect.ts`; logs only read): every Do of a model seat in the local
+  open-weight runs (2026-11-10, -10b, -10c, -10d, 2026-11-11, -hours, -hours-b, -14b) and the two Haiku subscription
+  checks: 1,242 Dos (qwen2.5 7B 1,100, 14B 133, Haiku 5.5 9), of which 977 reached the translator (836, 133, 8: the runs'
+  own `served_by_model` counts), 627 distinct as words with cards (7B 534: it repeats itself; 14B 85; Haiku 8). Of the
+  977: 145 not in English (the 7B's drift into Chinese), 72 notes to itself by the `SELF_TALK` pattern, 29 naming an id
+  it was never shown (mostly guessed `ask-` numbers). 265 Dos never reached it: 89 dropped as more than eight acts in
+  one answer, 176 with no cause in the log. In 196 of the 621 distinct requests keyed (the 7B's, in every run, the
+  latest too; never the 14B's) a bare "Write to:" line and its recipients were folded into the Do: the note's reader
+  takes "Write to" as a heading only with a recipient on its own line (participants/src/llm/note.ts `split`).
+- **Split first, by code** (`split.ts`): by seat-day within each writing model, 30% (rounded up) test by seeded hash;
+  deduplicated within a side; 8 train requests in the words of a test one dropped. Train 426 distinct (7B 378, 14B 48),
+  test 195 (7B 150, 14B 37, Haiku 8: its only seat-day that reached the translator). 75 of the 131 keyed test requests
+  share five words running with some train request (one town, the same forms of words): the test side measures new
+  seat-days of the same town, as the scope pilot's did.
+- **Keyed** (`read.ts`, `keep.ts`): Sonnet 5.5 through `claude -p` and `codex/gpt-6.1-sol` through the Codex CLI, blind,
+  the translator's prompt and `reader-call.txt`, batches of 30, each call in a fresh temporary directory: 45 calls (2 a
+  smoke test) for 1,242 readings, of a cap of 1,500; plan usage as Claude Code reports it 10.57 USD; Codex no charge a
+  call. Every reading put in the taught language by code first. **Agreement 410 of 621 (66%)**: 359 the same act, 51 the
+  same act with a form's name, office or option implied by its card. Dropped: 196 disagreed, 13 a letter with no text
+  (both readers wrote `message(to=…)`: the seat named a recipient and nothing to say), 2 not a program. What the 196 are
+  about: a refusal against an act 90 (`look_first` or `no_such_act` against a form or a letter: requests too vague to
+  say whether there is an act), arguments 29, refusal labels 28 (`look_first` / `no_such_act` / `unclear`), other
+  functions or forms 26 (a form against a letter), one line against two 23 (the folded "Write to:"). 87 of the 196 are
+  folded-letter requests. Kept: train 279 (acts 168, refusals 111), test 131 (acts 62, refusals 69). The seat's sign-off
+  is recorded, never used. Leak check (`leak-check.ts`): none.
+- **Trained** round 3's control recipe (deberta-v3-small, 6 epochs, `--forms 0`) on v5's data (`joined-v5`, the taught
+  language) plus the 279 train rows four times (`v4-pilot/join.ts`), two seeds: an RTX 4000 Ada at 0.20 an hour (215
+  minutes) and an RTX A5000 at 0.27 (175 minutes; community cards at 0.30 or less could not be had for an hour first;
+  two dearer pods were ended at once). Balance 7.91 to 6.39, under the cap of 3 checked before each rental.
+- **Scored** (`round5/score.sh`, `summary.py`, `small-models/tables.py`), round 3 seed 2 (served by name) as served,
+  beside the two new seeds. Held-out small-model side (131; right in all; alone, every draft offered: right / wrong /
+  asked back; at the cut certified on validation: served, right, wrong):
+
+  | | round3-s2 | seed 1 | seed 2 |
+  |---|---|---|---|
+  | qwen2.5 7B (96) | 32 | 52 | 57 |
+  | qwen2.5 14B (27) | 2 | 6 | 10 |
+  | Haiku 5.5 (8) | 8 | 8 | 8 |
+  | all: acts (62) / refusals (69) | 14 / 28 | 22 / 44 | 24 / 51 |
+  | sharing no five words with train (56) | 14 | 32 | 37 |
+  | alone: right / wrong / asked back | 42 / 63 / 26 | 60 / 53 / 18 | 71 / 52 / 8 |
+  | at the certified cut: served (right, wrong) | 25 (20, 5) | 12 (10, 2) | 13 (12, 1) |
+  | forms in the key (43) | 9 | 16 | 19 |
+
+  Claude's requests (right in all; certified cut: served right, wrong), round3-s2 then seeds 1, 2 (v5's seeds, the same
+  recipe without these rows, in brackets): validation-real 539, 547, 541 (537, 542); pilot test side 334, 330, 327
+  (328, 331); at the cut 222 (2), 222 (1), 218 (1) (153, 194); unseen forms 808, 801, 806 (809, 810); at the cut 545,
+  400, 556 (138, 220). Alone on the pilot's sides, drafts right / wrong / asked back: round3-s2 591 / 53 / 21, seeds
+  585 / 77 / 3 and 582 / 83 / 0 (v5 582 / 79 / 4 and 582 / 81 / 2).
+- **Reading.** (a) A few hundred of a writer's own requests move this translator where relabelling did not: on held-out
+  seat-days the 7B goes from a third right to over half, and the gain holds where no five words are shared with
+  training (14 to 32 and 37 of 56). Most of it is refusals (a note to itself, a review of its own papers: the 7B's
+  commonest kind) and the 14B's form fills; acts stay weak (14 to 22 and 24 of 62). (b) It costs Claude's requests
+  nothing against the same recipe without them (v5); the rise in wrong drafts alone against round3-s2 is the taught
+  relabel's, as v5 found. (c) It does not reach the served mark: at the certified cut almost no small-model request is
+  served (12 and 13 of 131), so a study arm of a small model with our translator alone still serves it by drafts offered
+  under the cut, and about 40% of those are wrong. (d) Not switched: the coordinator decides. Seed 2 is the better of
+  the two on every small-model line and on unseen forms at the cut; seed 1 on validation-real.
+- **What no training mends** (the answer is the seat's presentation or the model's limit): the folded "Write to:"
+  (a third of the 7B's distinct requests and 44% of the readers' disagreements: a parsing rule of the note, not
+  translation); the bulleted Do split into field fragments ("buyer: shop-4") and more than eight acts dropped;
+  placeholders and guessed references (`Confirm <reference>`, `ask-87` before any ask-87 exists); letters with no
+  words; the drift out of English; requests too vague for two strong readers to agree whether an act is meant (90). And
+  requests of several acts of one kind ("draft delivery notes for referrals A, B and C"), which the model miscounts and
+  answers with a form name of its own ("draft_delivery_notes"), as rounds 2 and the slot decoding found for Claude's.
+- **Revisit if:** more small-model requests are keyed (the cheapest: further local 14B runs, which give acts where the
+  7B gives mostly refusals; another open-weight family; the note's "Write to:" rule fixed first, or a third of the 7B's
+  requests stay unreadable); or a run shows served-first-time rising with seed 2 in the seat's place.
+
 ## 2026-11-11 · An interrupted fork takes itself up from its own log (orchestrator/src/experiment.ts `runArm`, resume.ts `ForkReplay`)
 
 - **What changed:** a model fork whose log has no result (killed, or stopped for want of the model) was renamed
@@ -12849,6 +12907,80 @@ sign-offs). Under the knowing rules a matter handed to a post is that post's.
 - **Revisit if:** a seat reads its sibling assistant's drafts in its file (then address the assistant's papers to its
   principal's post too); another body with several posts wants the same (the filter is general: any position's channel).
 
+## 2026-11-12 · Every answer a claude -p call gives is taken (participants/src/llm/claude-code.ts)
+
+In the first pilot's smoke (`runs/scope-first-pilot-smoke/`, main at 2787ce9f) the Sonnet 5.5 arm did nothing in the
+world in 10 seat calls (0 acts, 0 drafts, no request reached the translator) while its words said "All 15 drafts asked
+for". The cause, established by replaying its first call through `claude -p` with every turn kept
+(`runs/claude-code-turns-2026-11-11/a01-…`, the exact prompt captured by running the smoke's spec with a recording
+stand-in for `claude`, no model called): in one call Sonnet first called `do` by name eight times (refused by Claude
+Code: it has no such tool), then gave the eight requests in one structured answer, then a note in a second; Claude
+Code's result (`structured_output`) holds only the last, so the adapter took the note and dropped the eight requests
+without a word. In the smoke the last answer was `done_for_now`. Of 16 Sonnet calls replayed (four seat prompts of the
+smoke, three efforts), 12 gave their answer in two to four structured parts, and the old reader kept only the last part
+of each; every one of 13 Haiku calls gave one, which is why Haiku's requests got through.
+- **Fixed:** the call is read as a stream (`--output-format stream-json --verbose`); every structured answer Claude Code
+  accepted is taken, in the order given (one it refused as not of the schema's shape was not given, and the model was
+  told so); a use given again exactly in a later part is taken once (Sonnet once gave its seven requests a second time
+  with only its note reworded); any part not readable makes the whole call one unread answer, which the seat is told
+  ("you gave your answer in 3 parts, and in part 2 …"), never a partial read. An answer of the caller's own shape
+  (debriefs, readings) given twice differently is unread, as which was meant is not guessed. Uses the model made by
+  name are not taken: Claude Code told it they failed, and in every call replayed (17 of 29 had some, up to 9 in one)
+  the model gave each again in a structured answer.
+- **Told:** "How you answer" now says the tools are used only through the structured output, never by name, and to give
+  the whole answer in one, another being taken as well, not in place of it. Sonnet still splits its answer (3 of 3 after
+  the change), so the reader, not the wording, is what holds.
+- **Kept:** each call's own record goes with its transcript as `raw` (each turn's uses and their results, the thinking
+  by length only, the result line), a debrief's in the record kept apart with its answer. About 5 to 30 KB a call.
+- **Test:** `participants/test/answer-reading.test.ts`, from the replayed call cut down
+  (`participants/test/fixtures/claude-p-answer-in-two-turns.jsonl`).
+- **Revisit if:** Claude Code changes its stream's shape or how it answers a schema (a version past 2.1.170); a model is
+  seen to mean a later structured answer as replacing an earlier one (then ask, as for an unread answer).
+
+## 2026-11-12 · What a claude -p seat's tokens are, what effort does, and the first pilot re-estimated (experiments/scope-pilot/first-pilot.ts)
+
+The first smoke's Haiku seats came to about $0.40 a sitting call (6,600 tokens out a call), three to six times the
+2026-11-11 estimate. Measured on the pilot's own seat prompts, captured exactly from its spec (a recording stand-in
+for `claude`, no model called) or rebuilt from the smoke's transcripts, each through `claude -p` with every turn kept
+(29 calls on the owner's subscription, Haiku 5.5 and Sonnet 5.5, `runs/claude-code-turns-2026-11-11/`):
+- **What the output is.** At Haiku 5.5's default effort about 70% of it is thinking (Claude Code's own estimate in
+  the stream: 6,650 of 9,700 a call); the rest is the answer, which for a sitting with fifteen matters is eight
+  requests of 150 to 250 tokens each, written as a JSON string inside the schema's object; and, in 17 of 29 calls, the
+  same uses first called by name (Claude Code refuses them: it has no such tools) and then given again, which doubles
+  the answer's tokens and adds a turn each. Sonnet thinks little (about 500 a call) and its output is mostly the
+  answer, in parts and with the uses called by name first. No retries inside Claude Code beyond one schema refusal.
+  Each turn re-reads the prompt from the cache ($0.50 a million) and writes what the turn added ($6.25), so long
+  thinking costs twice: as output, and written to the cache for the next turn.
+- **What governs it on this route:** `--effort` (low, medium, high, xhigh, max; nothing passed is the model's default),
+  which a seat already takes (`steward.effort`, `seat_effort`); Claude Code's `MAX_THINKING_TOKENS` (not measured);
+  no turn limit among Claude Code 2.1.170's options; the answer schema, which a model meets in one turn or several.
+- **What effort changes** (docs/real-models.md, "Effort", has the table): at low, Haiku's output is 4,200 a call
+  against 9,700 (thinking 1,700 against 6,650), $0.16 against $0.41; Sonnet's 1,950 against 4,100, $0.10 against
+  $0.25 (the default calls ran first, cold, so part of their cost is the cache written). What the seat did was the
+  same in six of eight pairs; in the other two Haiku at its default only looked and noted where at low it drafted, and
+  Sonnet at low reported a finished matter by letter where at its default it filled in the report form. One call a
+  pair: enough to see that low effort does not stop the seats acting, not enough to say it never changes a decision.
+- **Recommendation, the owner's to decide:** `low` for both Claude arms. The study's measure is what the seats ask for
+  and do, which the effort did not change here; it halves the subscription drawn; and an API seat, the earlier pilots'
+  condition, reasoned a few hundred tokens a call, nearer to low than to Claude Code's default. Against it: a model's
+  default is the condition most users meet, and low effort may make a seat less careful on the rare hard matter. The
+  spec has it as `EFFORT` (undefined until chosen), with limits for each.
+- **The second smoke** (`runs/scope-first-pilot-smoke-2c/`, same spec as the first, Haiku and Sonnet at the default
+  effort, $10 an arm; `-2` and `-2b` are two starts that failed before any sitting, the first because the call's
+  record held fractions, which a log does not, now kept as text, the second on an unfinished edit of the spec):
+  Sonnet 30 acts (0 in the first smoke), 51 requests to our translator (31 served first time, 16 asked back, 2 after one
+  restatement, 2 never), 33 drafts offered, 30 confirmed; 21 sitting calls in 10 sittings, $5.27, 47 debrief calls
+  $2.60, all four debriefs complete. Haiku 16 acts and 32 requests (23 first time, 8 asked back, 1 never), 15 sitting
+  calls in 6 sittings, $4.40, then stopped at its limit on day 32 (the limit less the debriefs' reserve: $3.71 spent
+  of $10 with $1.01 under way); its debriefs ran (46 calls, $3.65; two seats ended them at the last question by their
+  own choice).
+- **The estimate** (`first-pilot.ts` header): about 2.5 calls a sitting, 260 sittings, about 650 sitting calls an arm;
+  at the default effort Haiku about $200 an arm, Sonnet about $170 (limits $300 and $255); at low about $100 and $85
+  (limits $150 and $130). The earlier estimate's $0.13 and $0.064 a call came from three short sample prompts at
+  about 1.9 calls a sitting; the first sittings here carry fifteen or sixteen matters and more come.
+- **Revisit if:** the pilot's first week costs more than a fifth of its estimate a week (read `cost.json` by purpose);
+  a seat at low effort is seen to decide differently on a matter that needs care (then compare that matter at both).
+
 ## 2026-11-11 · Obstacles B7: readiness to grant from the cost of delay (docs/design/obstacles.md section 10)
 
 - **What:** a kind's facts may say what a day's delay of a matter costs the principal (`KindFacts.late_cost_day`), and
@@ -12916,6 +13048,122 @@ sign-offs). Under the knowing rules a matter handed to a post is that post's.
 - **Byte-identical at level 0:** as before (the same configs; the same state hashes and log digests at 45 days).
 - **Revisit if:** a larger cohort is wanted for exposure (the study's setting, the lead's call); or the hours law lands
   (then screen the grants again).
+
+## 2026-11-11 · The plain-notes reader after the small models' notes: letters addressed below, fields kept, nothing uncounted
+
+From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11-1*`; the study's tables in
+`runs/translator-small-models-2026-11-11/`). Reader only; what the translator is given for a clean `Do:` is unchanged.
+- **"Write to" alone, whom below.** A bare `Write to` / `Write to:` was not a heading, so the letter was folded into the
+  Do above it and sent to the translator (196 of 621 distinct requests). It is a heading now; whom is read on its line
+  before the colon or on the lines straight after it, by layout only (the rule is in note.ts above `whomLine` and in
+  docs/real-models.md). "Name (id)" is that id. No whom, no words, or a blank in angle brackets: one fixed sentence,
+  nothing sent. The guide says in one sentence that whom may go on the lines under "Write to".
+- **A Do's fields** ("- Buyer: buyer-c01" under an item, or as a Do of its own after one) stay with the item.
+- **Past the limit**: told "Not looked at: ... Send it again if you still want it." per item (was "at most 8 actions").
+- **A yes to an ask not waiting** (a guessed number: ask-159 to ask-162 in one answer) is told it is not waiting, with
+  what is. It was told "you are shown it next" (never true of a guess). A no is passed on as before.
+- **Uncounted requests.** In the 7B run of 2026-11-11, of the 75 requests the collection found never reaching the
+  translator, 17 were past the limit, 24 were refused for a post the seat did not hold (`malformed_tool_use`, logged,
+  but the collection counted only `dropped_tool_use`), 19 were set aside when the seat was asked whether it meant to
+  stop (no log entry at all), and the other 15 are the collection's join by words (they reached it). Now every Do not
+  sent is logged with its reason, including those beside a "Stop for good:" line and those set aside by that question,
+  and `served.ts` counts them (`not_sent`), shown in the pilot viewer.
+- **Offline re-read** (no model calls; HEAD's reader against this one, 7B run of 2026-11-11, 604 notes): Dos sent
+  603 to 581, of them clean single requests 443 to 556, with another heading inside 129 to 10, a lone field 31 to 15;
+  letters sent 285 to 451; parts told what was wrong in a fixed sentence 0 to 94 (letters with no whom or no words).
+  The 14B run (63 notes): unchanged (133 Dos, 14 letters), as it wrote whom on the heading's line.
+- **Revisit if:** a letter's first line is taken as whom (a single word on the line under a bare "Write to"); fields
+  of separate things are merged ("Do: Pay rent: 500" after another Do); a model writes whom by name without ids below
+  "Write to" (only counted before a colon).
+
+
+## 2026-11-11 · Weight editing on the served translator: three candidates probed, no weight edit earns its place; a form's name masked to the forms shown, on by default (no training, no GPU, no API; round 3 seed 2 still served)
+
+- **What:** the owner asked again whether the translator's weights should be edited directly (weight-space
+  programming, rikiyat.github.io/blog/weight-space-programming). Tried on the served model (`v4r3-D-deberta-s2`) for
+  the three repeatable mistakes left after the rules: several acts of one kind in one request, sure-and-wrong answers,
+  and a refusal against an act on small models' vague requests. Method: probe before editing (a linear readout of the
+  writer's state just before the decision, fitted on what the model was taught, read on the scored sets beside the
+  head's own answer); edit only where the readout knows more than the head. Scripts: `translator/model/wsp/` (the
+  harness reproduces the served answers exactly, 20 of 20 sampled sureness to 1e-4). Run folder:
+  `runs/translator-weight-edit-2026-11-11/` (cases, every decision's state, probes, edited model with its script,
+  scores). Halves for checking: by a hash of the id over every set.
+- **Several acts of one kind** (8 wrong answers: 7 small-model requests from two templates, "draft delivery notes /
+  invoices for referrals A, B and C", and one "withdraw the three listings"; 16 wrong answers have several lines in key
+  or answer). The decision is `lines`. A readout of the count fitted on 7,363 training states (3,363 of several lines)
+  gives the right count probability 0.0000 on all 7 template cases, as the head does; on the 1,903 program keys it is
+  right on 1,892 against the head's 1,892. **The information is not there: no edit.** The
+  training data has one such request (4 rows) of several forms of one kind.
+- **Sure and wrong** (9 wrong answers at sureness 0.9996 or more on the six sets, against 1,280 right). Four are one
+  family: the form's name copied as the request's own words, "draft delivery notes" giving `draft_delivery_notes`, a
+  form that is not shown (the pointer is sharp: the next start is 9 to 35 nats away). The model learned the rule it was
+  taught (11,198 training names are copied from the request's words, always the form's exact name); the plural breaks
+  it, and whether a name is a form shown is exact, so it is a mask, not weights: **with the form's name masked to the
+  forms shown** (`form_wants` in slots.py, in a cards model's choose pass, as the field masks are) the small models' set
+  goes from 25 served, 5 wrong to 21 served, 1 wrong at the certified cut (checking half: 11/9/2 to 9/9/0), and nothing
+  else moves on any set (validation 478/477/1, test side 224/222/2, unseen forms 545/545/0, all unchanged). The other
+  five are the edge of meaning round 4 named (a trailing sentence; look_first or no_such_act; a quoted phrase inside
+  longer words, which the code's own quote rule would also take). For a general doubt signal: a readout of "this
+  decision is wrong" fitted on the generated validation side beats the head's probability at the decision level on
+  real validation (AUC 0.84 against 0.64 among decisions of p ≥ 0.99), but at the level of answers it ranks wrong ones
+  higher (the surest wrong on validation moves from 477th to 163rd of 868) and no cut can be certified with it: it
+  reads how error-prone a kind of slot is, not this answer. **No edit.**
+- **A refusal against an act** (47 refusal keys in the small models' set, 26 refused). A refusal readout fitted on
+  8,000 training states ranks refusal keys below the head (AUC on that set 0.86 against 0.89; on validation-real 0.997
+  against 0.998). **The information is not there.** The simplest edit was made anyway, to measure it (`edit_refusal_bias.py`:
+  the head's refusals +4 logits, chosen on the diagnosing half): right in all on the small models' set 43 to 64 of 131
+  (checking half 21 to 31 of 68), at a cost of 5 right answers on the other sets (validation-real 539 to 537, test side
+  334 to 333, unseen forms 808 to 806); but every act is less sure, the surest wrong refusal on validation rises to
+  0.99998, no cut can be certified, and at round 3's cut the unseen forms serve 350 instead of 545. A prior shift for
+  one population of writers, not knowledge: not proposed.
+- **What the model has learned, by decision** (teacher-forced; the real side in the model's own language, whose keys
+  include what the rules now settle): sharp on the kind of answer, the number of lines, the function, a form's name and
+  where ids start and end (under 0.5% wrong on generated requests, 0 to 2.5% on real ones); fragile on optional slots
+  (a form's field filled or left out: 10% wrong on real requests at p ≈ 1.0; `to`, `basis`, `for`: 7 to 13%) and on
+  where copied words end (`text` ends 15% wrong on real requests, and the end of a field's text is the least sure
+  decision in 384 of the answers kept under the cut and in 863 of the right answers above it). Its sureness is
+  over-confident where the keys themselves split (optional fields, `to`), which no readout of its state fixes.
+- **Why no weight edit:** each family's information was either absent from the state (counts, refusals) or exact and
+  better said in code (a form's name, as the field masks and the round-3 checks are). Weight editing earns its place
+  here as a diagnostic (the probe settles in minutes whether a failure is local), not as a fix.
+- **The mask is on by default** (the coordinator, 2026-11-11): a copied form name is one of the forms the seat was
+  shown, by name or id, in every cards model's choose pass; `OIKOS_DECIDE_FORM_NAMES=0` turns it off, for measuring only.
+  Re-scored with it on by default (tag `formdefault`): every answer the same as with the switch (validation 478/477/1, test side 224/222/2, unseen forms 545/545/0, small models 21/20/1 at the cut). The certified cut for `decide/round3-s2` holds (0.999613 again, on vr, vp and nv), so `translator/model/served.json` is unchanged. Test:
+  `translator/test/model-slots.test.ts` (a name that is no form shown cannot be written; a name or id of one can; no
+  mask outside the choose pass).
+- **What a seat experiences** when it names a form by a word the form's name does not use ("draft delivery notes" for
+  `draft_delivery_note`): before, the model wrote the plural as the form's name at sureness 0.9998, the adapter found
+  no such form among those shown, and the seat was told, as sure, that there is no such form (`none(unknown_form)`).
+  Now the name can only be one of the forms shown: the model takes the form's id or the nearest words that do name it,
+  and since it was never sure where that name stands (where it stands: probability about 1e-4), the draft falls under
+  the cut. With a translator behind, the request goes behind; alone (the study's arrangement), the seat is offered the
+  draft, now naming the right form, with "which" marked unclear, to confirm or restate. Where nothing in the request or
+  the forms names a form shown, the model's likeliest is taken as before and the adapter's form check answers as it did.
+  A request for several such forms at once ("for referrals A, B and C") is still one line (candidate 1) and is asked
+  back as too long, as before.
+- **The probe routine stays** (the coordinator, 2026-11-11): before anything else is done about a translator failure,
+  `translator/model/wsp/` settles whether it is a decision (a readout of the state knows more than the head) or missing
+  knowledge (it does not): `collect.py` keeps every decision's state over the scored sets, `probe_lines.py`,
+  `probe_kind.py` and `probe_doubt.py` are the three probes made here, `audit.py` the table by decision.
+- **Revisit if:** a new model's failure is a single decision that a readout separates better than its head on held-out
+  requests (then a rank-one edit of that head is worth a try); several acts of one kind become common in pilots (data,
+  not weights); the mask asks back right answers in a new pilot (a request naming a form by a word the form does not use).
+
+## 2026-11-12 · The first pilot set: a 45-day baseline at low effort (experiments/scope-pilot/first-pilot.ts)
+
+- **What:** the coordinator's decision on the measurement above: the Claude arms at `--effort low` (`EFFORT`, a
+  condition of this run, stated in its header), and every arm 45 days after the fork (day 30 to 75), not 90, so that a
+  Claude arm comes to about the owner's $50 (Haiku about $52, Sonnet about $43 by the second smoke's sittings; limits
+  half again, $78 and $65, the debriefs' reserve of about $5 inside them). The header says what the run is: a baseline
+  at obstacle level 0 (`obstacles: 0`, the world as before), one seed, Codex not on equal terms, the local arm in plain
+  notes.
+- **Why Sonnet filed no reports in the second smoke:** the cycle had not closed. Its rating-office seat drafted every
+  notice of a referral before reporting it (two referrals of 15 drafted and confirmed by day 33), and its notebook on
+  day 33 reads "NEXT: write report for rec.23998 and rec.22588 (form-rates-assistant-report, client city)"; days 34
+  and 35 were a weekend, with no sitting. It never asked for a report, so neither the form nor the translator was
+  reached; the code assistant files a report with each referral it finishes (15 in the five days). Not a fault of ours.
+- **Revisit if:** the pilot's first week costs more than a fifth of an arm's limit; a seat at low effort is seen to
+  decide differently on a matter that needs care.
 
 ## 2026-11-11 · Broad seats: any post's paperwork handed over, any post or person held by a model: a proposal (docs/design/broad-seats.md; nothing built)
 

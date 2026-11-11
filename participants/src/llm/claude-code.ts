@@ -1,8 +1,14 @@
 // Anthropic models through Claude Code's non-interactive mode (`claude -p`), so a Claude plan's sign-in can stand in
 // for an API key. Each call runs `claude -p` once: our system prompt (and the tools, which are the same call after
-// call) replace Claude Code's own; the conversation goes in on stdin; the answer comes back as one structured object in
+// call) replace Claude Code's own; the conversation goes in on stdin; the answer comes back as structured objects in
 // the shape the Codex adapter's schema has (`--json-schema`), which we read, exactly or not at all (answer.ts), as tool
 // uses or text. Token counts, cached ones too, come from the result.
+//
+// A call is several model turns inside Claude Code, and a model may give the structured answer more than once in them
+// (Sonnet 5.5 gave eight requests in one and a note in the next, 2026-11-11): Claude Code's result keeps only the last.
+// So the call is read as a stream (`--output-format stream-json --verbose`), every answer Claude Code accepted is taken,
+// in the order given, and the stream is kept with the call's transcript (`raw`), so that what was said can be checked
+// against what was taken (docs/decisions.md, "Every answer a claude -p call gives is taken").
 //
 // Caveats, recorded with every run that uses it (docs/real-models.md):
 //  - It is not free: `claude -p` draws on the plan's monthly Agent SDK credit, at API rates; when that is
@@ -26,7 +32,7 @@ import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ContentBlock, LlmAdapter, LlmRequest, LlmResponse } from "./adapter";
-import { readAnswerObject, readAnswerText } from "./answer";
+import { readAnswerObject, readAnswerText, unreadAnswer } from "./answer";
 import { promptTooLong, UsageLimitReached } from "./call";
 import { answerSchema, runBounded, transcript } from "./codex";
 
@@ -58,24 +64,87 @@ export function claudeCodeSystem(req: LlmRequest): string {
     ...(tools
       ? ["", "=== Tools you can use ===", tools, "",
         // (How many tools an answer may use is the instructions' to say: a participant's say several, the translator's one.)
-        "=== How you answer ===\nGive your answer in the structured output asked for: the tool you use in `tool`, its input as a JSON object in input_json; any further tools, if your instructions allow several, in `also`, each with its own input_json, in the order they're to be carried out."]
+        "=== How you answer ===\nGive your answer in the structured output asked for: the tool you use in `tool`, its input as a JSON object in input_json; any further tools, if your instructions allow several, in `also`, each with its own input_json, in the order they're to be carried out. The tools above are used only that way, never called by name. Give your whole answer in one structured output: once given, it is taken as it stands, and another given after it is taken as well, after it, and does not replace it."]
       : []),
   ].join("\n");
 }
 
-/** A call's answer as content blocks, read exactly or not at all (answer.ts): the structured output Claude Code returns
- * for the schema, or, failing that, a reply that is exactly the same object. With no tools, its words. */
-export function answerFrom(result: any, tools: string[], nextId: () => string): ContentBlock[] {
+/** Claude Code's own tool for the structured answer. */
+const STRUCTURED = "StructuredOutput";
+
+/** What one `claude -p` call gave back, from its output: the result (the last result line); every structured answer
+ * Claude Code accepted, in the order given; and the call's record (`raw`: each turn's uses and what came of them, its
+ * thinking by length only, and the result), for its transcript: one JSON line an event, as text, since a log holds
+ * whole numbers only and the result's costs are not. Output that is one result line with no turns
+ * (`--output-format json`) has its structured output as its one answer. */
+export function readCall(stdout: string): { result: any; answers: unknown[]; raw: string } {
+  const events: any[] = [];
+  for (const l of stdout.split("\n")) {
+    if (!l.startsWith("{")) continue;
+    try {
+      events.push(JSON.parse(l));
+    } catch {
+      // (a line cut off: what came before it stands, and a call with no result line has failed)
+    }
+  }
+  const result = events.filter((e) => e?.type === "result").at(-1);
+  const uses: { id: string; input: unknown }[] = [];
+  const accepted = new Map<string, boolean>();
+  const raw: unknown[] = [];
+  for (const e of events) {
+    if (e?.type === "assistant" && Array.isArray(e.message?.content)) {
+      for (const b of e.message.content) if (b?.type === "tool_use" && b.name === STRUCTURED) uses.push({ id: b.id, input: b.input });
+      raw.push({ type: "assistant", id: e.message.id, content: e.message.content.map((b: any) => (b?.type === "thinking" ? { type: "thinking", chars: String(b.thinking ?? "").length } : b)), usage: e.message.usage });
+    } else if (e?.type === "user" && Array.isArray(e.message?.content)) {
+      for (const b of e.message.content) if (b?.type === "tool_result") accepted.set(b.tool_use_id, !b.is_error);
+      raw.push({ type: "user", content: e.message.content });
+    } else if (e?.type === "system" && e.subtype === "thinking_tokens") raw.push({ type: "thinking_tokens", estimated: e.estimated_tokens });
+    else if (e?.type === "system" && e.subtype === "init") raw.push({ type: "init", model: e.model, claude_code_version: e.claude_code_version, tools: e.tools });
+    else if (e?.type === "result") raw.push(e);
+  }
+  // (An answer Claude Code refused as not of the schema's shape was not given: the model is told so, and gives it again.
+  // The result's own is the last accepted; were it not among them, it is taken after them, never in place of them.)
+  const answers = uses.filter((u) => accepted.get(u.id) === true).map((u) => u.input);
+  const last = result?.structured_output;
+  if (last !== undefined && last !== null && !(answers.length && JSON.stringify(answers.at(-1)) === JSON.stringify(last))) answers.push(last);
+  return { result, answers, raw: raw.map((e) => JSON.stringify(e)).join("\n") };
+}
+
+const resultAnswers = (result: any): unknown[] => (result?.structured_output != null ? [result.structured_output] : []);
+
+/** A call's answer as content blocks, read exactly or not at all (answer.ts): every structured answer the call gave, in
+ * order, as one answer (their words first, then each use as given); any one of them not readable makes the whole call
+ * one unread answer, never part of it read. With none, a reply that is exactly the same object. With no tools, its words. */
+export function answerFrom(result: any, tools: string[], nextId: () => string, answers: unknown[] = resultAnswers(result)): ContentBlock[] {
   if (!tools.length) return [{ type: "text", text: String(result.result ?? "").slice(0, 4000) }];
-  const o = result.structured_output;
-  if (o !== undefined && o !== null) return readAnswerObject(o, tools, JSON.stringify(o), nextId);
-  return readAnswerText(String(result.result ?? ""), tools, nextId);
+  if (!answers.length) return readAnswerText(String(result.result ?? ""), tools, nextId);
+  const said = answers.map((a) => JSON.stringify(a)).join("\n");
+  // (Read with ids of their own first, so that an answer not taken uses none of the call's.)
+  const read = answers.map((o) => readAnswerObject(o, tools, said, () => "-"));
+  const bad = read.findIndex((c) => c.some((b) => b.type === "text" && b.unread !== undefined));
+  if (bad >= 0) {
+    const why = (read[bad]!.find((b) => b.type === "text" && b.unread !== undefined) as { unread: string }).unread;
+    return unreadAnswer(said, answers.length === 1 ? why : `you gave your answer in ${answers.length} parts, and in part ${bad + 1} ${why}`);
+  }
+  const words = [...new Set(read.flatMap((c) => c.flatMap((b) => (b.type === "text" && b.text ? [b.text] : []))))];
+  // (A use given again, exactly, in a later part is the same act said twice, not a second one: Sonnet 5.5 gave its seven
+  // requests again with only its note reworded, 2026-11-11. It is taken once; the call's record keeps both.)
+  const before = new Set<string>();
+  const uses: ContentBlock[] = [];
+  for (const c of read) {
+    const here = c.flatMap((b) => (b.type === "tool_use" ? [{ b, key: JSON.stringify([b.name, b.input]) }] : []));
+    for (const { b, key } of here) if (!before.has(key)) uses.push({ ...b, id: nextId() });
+    for (const { key } of here) before.add(key);
+  }
+  return [...(words.length ? [{ type: "text" as const, text: words.join("\n") }] : []), ...uses];
 }
 
 /** A call's answer where the caller asked for one object of its own shape (`answer`): that object as a tool_use block of
- * the name given, or, if what came back is not an object, one unread block. */
-export function objectAnswer(result: any, name: string, nextId: () => string): ContentBlock[] {
-  let o = result.structured_output;
+ * the name given, or, if what came back is not an object, one unread block. Given more than once, and not the same each
+ * time, it is unread: one is wanted, and which was meant is not guessed. */
+export function objectAnswer(result: any, name: string, nextId: () => string, answers: unknown[] = resultAnswers(result)): ContentBlock[] {
+  if (new Set(answers.map((a) => JSON.stringify(a))).size > 1) return [{ type: "text", text: answers.map((a) => JSON.stringify(a)).join("\n").slice(0, 4000), unread: "it gave more than one answer, and one is wanted" }];
+  let o = answers[0];
   if (o === undefined || o === null) {
     try {
       o = JSON.parse(String(result.result ?? "").trim().replace(/^```(?:json)?\s*\n/i, "").replace(/\n```$/, ""));
@@ -109,7 +178,7 @@ export class ClaudeCodeAdapter implements LlmAdapter {
       const system = join(dir, "system.txt");
       writeFileSync(system, claudeCodeSystem(req));
       const names = (req.tools ?? []).map((t) => t.name);
-      const args = ["-p", "--model", this.model.split("@")[0]!, ...((req.effort ?? this.effort) ? ["--effort", (req.effort ?? this.effort)!] : []), "--system-prompt-file", system, "--tools", "", "--output-format", "json", "--no-session-persistence", "--setting-sources", "",
+      const args = ["-p", "--model", this.model.split("@")[0]!, ...((req.effort ?? this.effort) ? ["--effort", (req.effort ?? this.effort)!] : []), "--system-prompt-file", system, "--tools", "", "--output-format", "stream-json", "--verbose", "--no-session-persistence", "--setting-sources", "",
         "--strict-mcp-config", "--disable-slash-commands", "--exclude-dynamic-system-prompt-sections", ...(req.answer ? ["--json-schema", JSON.stringify(req.answer.schema)] : names.length ? ["--json-schema", JSON.stringify(answerSchema(names))] : [])];
       const timeoutMs = this.o.timeoutMs ?? 180_000;
       const attempts = this.o.attempts ?? 3;
@@ -117,16 +186,15 @@ export class ClaudeCodeAdapter implements LlmAdapter {
       // own exchange, which is recorded. The other purposes, with no one to tell, are asked again as before.)
       const askAgain = req.purpose !== "participant";
       let result: any;
+      let raw = "";
       let content: ContentBlock[] = [];
       for (let n = 1; ; n++) {
         const r = await this.run(args, transcript(req.messages), dir, timeoutMs);
-        try {
-          result = JSON.parse(r.stdout.trim().split("\n").filter((l) => l.startsWith("{")).pop() ?? "");
-        } catch {
-          result = undefined;
-        }
+        const got = readCall(r.stdout);
+        result = got.result;
+        raw = got.raw;
         const nextId = () => `claude-code-${++this.calls}`;
-        content = !result || result.is_error ? [] : req.answer ? objectAnswer(result, req.answer.name, nextId) : answerFrom(result, names, nextId);
+        content = !result || result.is_error ? [] : req.answer ? objectAnswer(result, req.answer.name, nextId, got.answers) : answerFrom(result, names, nextId, got.answers);
         const unread = content.some((b) => b.type === "text" && b.unread !== undefined);
         const failed = r.timedOut || r.code !== 0 || !result || result.is_error || (unread && askAgain && n < attempts);
         // (What it said only when it failed: a word in a good answer isn't a limit. A call that ran out of time failed
@@ -143,7 +211,7 @@ export class ClaudeCodeAdapter implements LlmAdapter {
       const usage = { input_tokens: u.input_tokens ?? 0, output_tokens: u.output_tokens ?? 0, cache_read_tokens: u.cache_read_input_tokens ?? 0, cache_write_tokens: u.cache_creation_input_tokens ?? 0, ...(typeof result.total_cost_usd === "number" ? { reported_cost_microusd: Math.ceil(result.total_cost_usd * 1e6) } : {}), ...(typeof result.num_turns === "number" ? { turns: result.num_turns } : {}) };
       const log = this.o.log ?? process.env.OIKOS_CLAUDE_CODE_LOG;
       if (log) appendFileSync(log, JSON.stringify({ subject: req.subject, purpose: req.purpose, model: this.model, ...((req.effort ?? this.effort) ? { effort: req.effort ?? this.effort } : {}), input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cache_read_tokens: usage.cache_read_tokens, cache_write_tokens: usage.cache_write_tokens, turns: result.num_turns, reported_usd: result.total_cost_usd, by_model: result.modelUsage, ms: result.duration_ms }) + "\n");
-      return { content, usage };
+      return { content, usage, raw };
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -312,7 +312,7 @@ test("hosted OpenAI-compatible (Fireworks and the like), against a local stub se
 });
 
 test("a plain note (note.ts): each heading read into its use, a note with none is one Do, and what can't be read is said", async () => {
-  const { readNote } = await import("../src/llm/note");
+  const { readNote, NO_WHOM_SAID, NO_WORDS_SAID, PLACEHOLDER_SAID } = await import("../src/llm/note");
   const { tools } = await import("../src/llm/participant");
   // (The seat's own tools, as a seat with papers to look into has them.)
   const ts = tools({ participant: "a", titles: new Map([["papers", "Papers on file"]]), onRequest: ["papers"], standing: [], framing: { disclosure: "simulation" }, cadenceDays: 1 } as any);
@@ -355,7 +355,25 @@ test("a plain note (note.ts): each heading read into its use, a note with none i
   expect(read("Pay the builder $500 from acc.3.\nLook at the receipt first.")).toEqual([{ do: { what: "Pay the builder $500 from acc.3.\nLook at the receipt first." } }]);
   // As a 7B model wrote them (2026-11-10): a heading given as a Do's words is that heading; an empty heading says nothing;
   // a part that can't be read is passed on as not read (the seat is told), and the rest goes on.
-  expect(read("## Do:\n- Do: Look at papers\nDo: pay rec.1.\nWrite to p.4:")).toEqual([{ look: { report: "papers" } }, { do: { what: "pay rec.1." } }, { write: { _unparsed: "Write to p.4:" } }]);
+  expect(read("## Do:\n- Do: Look at papers\nDo: pay rec.1.\nWrite to p.4:")).toEqual([{ look: { report: "papers" } }, { do: { what: "pay rec.1." } }, { write: { _unparsed: "Write to p.4:", _why: NO_WORDS_SAID } }]);
+  // As the 7B and 14B models wrote them in the local runs of 2026-11-11 (small-model study):
+  // "Write to" alone, whom on the lines below, is a letter, never folded into the Do above it (196 of 621 requests).
+  expect(read('Do: Draft the job application for acc-c0074.\n\nWrite to:\nprovider-a: \n"Subject: Clarification needed\nDear Provider-A,\nWe are tasked."'))
+    .toEqual([{ do: { what: "Draft the job application for acc-c0074." } }, { write: { to: ["provider-a"], text: '"Subject: Clarification needed\nDear Provider-A,\nWe are tasked."' } }]);
+  expect(read("Do: pay rec.1.\nWrite to:\ncity, works\n\nDear all, please send the forms.\nWrite to: provider-a: hello\nWrite to Planning officer (planning): about the lots."))
+    .toEqual([{ do: { what: "pay rec.1." } }, { write: { to: ["city", "works"], text: "Dear all, please send the forms." } }, { write: { to: ["provider-a"], text: "hello" } }, { write: { to: ["planning"], text: "about the lots." } }]);
+  // No whom that can be read, or no words: told in one fixed sentence, nothing sent.
+  expect(read("Do: pay rec.1.\nWrite to:\nRe: Request for Clarification\nDear Team,\nPlease advise.\nWrite to:\n- factory-1:\nAbout: rec.9342"))
+    .toEqual([{ do: { what: "pay rec.1." } }, { write: { _unparsed: "Write to:\nRe: Request for Clarification\nDear Team,\nPlease advise.", _why: NO_WHOM_SAID } }, { write: { _unparsed: "Write to:\n- factory-1:\nAbout: rec.9342", _why: NO_WORDS_SAID } }]);
+  // A Do's fields, set in under it or given as Dos of their own, stay with it; separate items are still one each.
+  expect(read("Do as factory-1-manager-assistant:\n- Draft a delivery note for order rec.9342.\n  - Buyer: buyer-c01 (buyer-c01).\n  - Delivered: 50 units.\n- Draft an export invoice.\n  - Account (must be filled in): acc-factory-1"))
+    .toEqual([{ do: { what: "Draft a delivery note for order rec.9342.\n  - Buyer: buyer-c01 (buyer-c01).\n  - Delivered: 50 units.", as: "factory-1-manager-assistant" } }, { do: { what: "Draft an export invoice.\n  - Account (must be filled in): acc-factory-1", as: "factory-1-manager-assistant" } }]);
+  expect(read("Do: Draft an export invoice for rec.1117.\n\nDo: Amount (must be filled in): $8,436.75 (The sum invoiced)\n\nDo: Quantity (must be filled in): 25"))
+    .toEqual([{ do: { what: "Draft an export invoice for rec.1117.\nAmount (must be filled in): $8,436.75 (The sum invoiced)\nQuantity (must be filled in): 25" } }]);
+  // A blank copied in angle brackets is told, not done; "Do as ...: - Confirm ask-92." is that confirm; a Do that only
+  // starts like a heading is a Do, never lost.
+  expect(read("Confirm <reference>: c06984.\nDo as desk: - Confirm ask-92.\nDo: Confirm the time with them."))
+    .toEqual([{ confirm: { _unparsed: "Confirm <reference>: c06984.", _why: PLACEHOLDER_SAID } }, { confirm: { ref: "ask-92", decision: "confirm" } }, { do: { what: "Confirm the time with them." } }]);
   // A Do that is the seat talking to itself goes to nobody, marked so (the participant says one fixed sentence); a Do
   // about the world's papers is a Do (2026-11-11: 24 of a 7B model's 53 requests never served were the first kind).
   expect(read("Do: Examine my own requests and pending actions.\nDo: Note that rec.4 is paid.\nDo: Review rec.12 and pay it.\nDo: Add an entry in my notebook that today is day 32."))

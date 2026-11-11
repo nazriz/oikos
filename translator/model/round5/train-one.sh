@@ -3,9 +3,10 @@
 # --forms 0) on a community pod of its own, on data-v5-fair (the taught language). Held to a spending cap for the round:
 # before each try the balance is read, and a pod is rented only if what the round has spent so far (from the balance
 # when the round began, in $R/balance-at-start) and this pod's most (price cap x time limit) stay within CAP.
+# OIKOS_ROUND: another round's folder; DATA: the data folder (default $R/data-v5-fair).
 #   translator/model/round5/train-one.sh <run name> <seed> <state name>
 W=${0:A:h:h:h:h}
-R=${OIKOS_RUNS:-/Users/clawd/oikos/runs}/translator-v5-2026-11-10
+R=${OIKOS_ROUND:-${OIKOS_RUNS:-/Users/clawd/oikos/runs}/translator-v5-2026-11-10}
 N=$1; SEED=$2; ST=$3
 CAP=${CAP:-4.00}; PRICE=${PRICE:-0.30}; LIMIT=${LIMIT:-19800}
 source ~/.zshenv
@@ -21,7 +22,7 @@ for k in 1 2 3 4 5 6; do
   [[ -d $R/pods/$ST ]] && mv $R/pods/$ST $R/pods/$ST.try-$k-$(date +%H%M)
   OIKOS_POD_STATE=$R/pods/$ST OIKOS_POD_MODELS=$R/models OIKOS_POD_MAX_PER_HOUR=$PRICE SECONDS_LIMIT=$LIMIT OIKOS_POD_CLOUD=${CLOUD:-COMMUNITY} \
   OIKOS_POD_GPUS="NVIDIA RTX A4500,NVIDIA GeForce RTX 3090,NVIDIA RTX A5000,NVIDIA GeForce RTX 4090,NVIDIA GeForce RTX 3090 Ti,NVIDIA RTX A6000,NVIDIA A40,NVIDIA RTX 4000 Ada Generation" \
-    zsh translator/model/pod/pod.sh run $R/data-v5-fair "$N:microsoft/deberta-v3-small:$SEED:--forms 0 --epochs 6" > $R/pod-$ST.out 2>&1
+    zsh translator/model/pod/pod.sh run ${DATA:-$R/data-v5-fair} "$N:microsoft/deberta-v3-small:$SEED:--forms 0 --epochs 6" > $R/pod-$ST.out 2>&1
   echo "$(date) try $k: exit $?"
   grep -q "queued and started" $R/pods/$ST/pod.log && exit 0
   sleep 600

@@ -103,6 +103,24 @@ Stop for good: <reason>                      (the way out: taken at once, said o
   of whose parts can be read is one unread answer saying why in plain words, asked once more, as ever. A heading given
   as a Do's words is that heading; a Do that is only a list is one request an item; "## Write to" may have who on the
   line under it. The note as written is kept in the transcript (`said`).
+- **Whom a letter goes to (2026-11-11).** On the `Write to` line before its colon (a name with its id in brackets is
+  that id); or, when nothing stands before the colon, on the lines straight after it: each holds only names or ids
+  (comma-separated) and may end in a colon. Whom ends at the first line with a colon (what follows it there is the
+  letter's first words), at a blank line once begun, or at the first line that is not only names and ids; the rest is
+  the letter. A line that begins as a letter does ("Dear", "Re", "Subject", a greeting) is never whom; a name of a few
+  words counts only before a colon. No whom that can be read, no words, or a blank in angle brackets ("<reference>")
+  copied from the guide: one fixed sentence (note.ts), nothing sent.
+- **A Do's fields (2026-11-11).** Lines under one bulleted Do that are a label, a colon and a value, or are set in
+  under an item, stay with the item above as one request in the seat's words; a Do that is one such field alone, right
+  after a Do, joins it. A list of separate things is still one request an item. "Do as <post>: - Confirm ask-92." is
+  that confirm; a Do that only starts like a heading ("Do: Confirm the time with them") stays a Do.
+- **Past the limit, and answers to what is not waiting (2026-11-11).** The first 8 actions (or `max_actions`) are taken
+  in order; each after them is told "Not looked at: ... Send it again if you still want it." A yes to an `ask-`
+  that is not waiting (asked in the same answer, or a number guessed) is told it is not waiting, with what is.
+- **Every request accounted for (2026-11-11).** A Do that is not sent to the translator is in the log as a
+  `malformed_tool_use` (not readable, a post not held, the seat talking to itself) or a `dropped_tool_use` (past the
+  limit; left in the same answer; set aside when asked whether it meant to stop), each with its reason; `served.ts`
+  counts them as `not_sent`, and the pilot viewer shows it.
 - The local test (qwen2.5:7b, 2026-11-10; docs/decisions.md has the table): its notes are read; few of its requests are
   served, it restates in the same words, confirms whatever it is shown, and two of three seats chose to stop in the last run.
 - The conversation is sent as plain chat: the seat's earlier uses written back as the notes that say them, what came of
@@ -212,6 +230,7 @@ model, tool-calling and notes alike:
 - Each call is one `claude -p`: no tools of its own, no settings, skills or servers, no session kept, in an empty temporary directory, and without `ANTHROPIC_API_KEY` (with one set, Claude Code would bill the key).
 - Our system prompt replaces Claude Code's own (`--system-prompt-file`), so unlike Codex nothing sits under the seat's instructions. The tools and how to answer go with it, because they are the same call after call; the conversation goes in on stdin.
 - The answer is asked for as structured output (`--json-schema`), in the shape the Codex adapter's schema has, and read exactly or not at all (below). Until 2026-10-08 it was asked for in words; the measurement that changed it is below.
+- **A call is several model turns, and a model may give the structured answer more than once in them** (since 2026-11-11). Claude Code's result keeps only the last, so until then every answer but the last was dropped without a word: Sonnet 5.5 gives its requests in one structured answer and a note or `done_for_now` in the next in most heavy sittings (12 of 16 replayed; Haiku 5.5 in none of 13), and in the first pilot's smoke its whole arm did nothing in the world while saying "All 15 drafts asked for" (`runs/claude-code-turns-2026-11-11/`, docs/decisions.md, "Every answer a claude -p call gives is taken"). The call is now read as a stream (`--output-format stream-json --verbose`): every answer Claude Code accepted is taken, in order (a use given again exactly in a later answer is taken once); any one not readable makes the whole call one unread answer, which the seat is told; and the call's own record (each turn's uses and what came of them, the thinking by length only, and the result) is kept with its transcript as `raw` (with a debrief's answer, apart). The seat is told in "How you answer" to give its whole answer in one, and that another is taken as well, not in place of it. A model also calls its tools by name now and then (Claude Code refuses: it has none by those names) before giving them in the structured answer; nothing of those is taken, and the model is told by Claude Code that they failed.
 - Tokens come from the result, cached ones too. Claude Code caches what repeats (the system prompt and tools) for an hour by itself.
 
 **What it costs, and the spending limit:**
@@ -447,7 +466,7 @@ Every seat answer is **read exactly or not at all**. What is read is only what t
 
 1. The seat is told, in the same exchange: "Your last answer could not be read: <why>. Nothing in it has been done, so all you meant by it is still to do. Give the whole of it again, in the form asked for: every look, letter, request and note you meant, not only the part that could not be read. This is the same turn over again, not a sign to stop: say you are done for now only if you had meant to." (Until 2026-10-09 it ended "Please give your answer again, in the form asked for.", and one second answer of two was only `done_for_now`: the look and the note first meant were not given again.) It is asked once.
 2. If that cannot be read either, the sitting ends with nothing done. Both are noted in the log (`unread_answer`, with the words as written), and the seat's next sitting opens: "When you were last here, your answer could not be read, so nothing was done."
-3. A use past the limit of actions (8 unless set) is refused: the seat is told in its next turn ("Not done: at most 8 actions at once."), or, if it left, at its next sitting; the log has a `dropped_tool_use` note. The adapters no longer drop anything silently (an `also` entry naming a tool the seat does not have used to be filtered out; it now makes the answer unread).
+3. A use past the limit of actions (8 unless set) is not looked at: the seat is told in its next turn ("Not looked at: only the first 8 things you ask in one answer are taken up, and this came after them. Send it again if you still want it."; until 2026-11-11 "Not done: at most 8 actions at once."), or, if it left, at its next sitting; the log has a `dropped_tool_use` note. The adapters no longer drop anything silently (an `also` entry naming a tool the seat does not have used to be filtered out; it now makes the answer unread).
 
 **What a seat is told about how to answer**, per provider:
 - Claude Code (`claude -p`, `--json-schema`): in its system prompt, after its tools, "=== How you answer ===: Give your answer in the structured output asked for: the tool you use in `tool`, its input as a JSON object in input_json; any further tools, if your instructions allow several, in `also`, each with its own input_json, in the order they're to be carried out." The shape is the schema's (`tool`, `input_json`, `also`, `text`).
@@ -644,6 +663,19 @@ Two things about a seat are the town's description's to set, and so a queue entr
 - Not a paper: a ballot closing, a payment falling due, anything that only becomes true with time. A seat waiting on one gives fewer days.
 
 **Effort** (`seat_effort`: `"seat_effort=low"` for every seat, `"seat_effort.finance=low"` for one office). How hard a seat's model reasons, where its way in takes that: Claude Code's `--effort`, the Codex CLI's `model_reasoning_effort`. It goes with each of that seat's calls (and is recorded with each transcript), and comes before an effort named with the run's model (`claude-code/claude-haiku-5-5@low`, which sets it for every seat and the translator alike). Not given: nothing is passed, and the model's own default stands, as before.
+
+What effort does on the `claude-code/` route, measured 2026-11-11 on the first pilot's own seat prompts (four of them, from its smoke: the rates and desk seats' first sittings with 15 and 16 matters, the rates seat's next day with its notebook, and its second call of a sitting, confirming eight drafts; 29 calls, `runs/claude-code-turns-2026-11-11/`, docs/decisions.md, "What a claude -p seat's tokens are"): a seat's output is mostly thinking at Haiku 5.5's default (about 70%), and the rest is the answer, given once or (Sonnet) in parts, and uses called by name that Claude Code refuses and the model gives again. Mean a call:
+
+| model, effort | calls | tokens in (all, cached too) | written to the cache | out | of it thinking (estimated) | Claude Code's $ |
+|---|---|---|---|---|---|---|
+| Haiku 5.5, default | 5 | 60,600 | 22,000 | 9,700 | 6,650 | 0.41 |
+| Haiku 5.5, medium | 2 | 36,800 | 4,000 | 4,500 | 2,300 | 0.16 |
+| Haiku 5.5, low | 5 | 51,300 | 3,900 | 4,200 | 1,700 | 0.16 |
+| Sonnet 5.5, default | 5 | 86,500 | 16,700 | 4,100 | 530 | 0.25 |
+| Sonnet 5.5, medium | 2 | 107,600 | 2,700 | 2,800 | 310 | 0.14 |
+| Sonnet 5.5, low | 5 | 64,900 | 1,900 | 1,950 | 360 | 0.10 |
+
+(The default calls were run first, cold, so their cache writes are larger than a warm call's; compare output.) What the seat did was the same at every effort in all eight pairs (four prompts, two models, default against low) but two: Haiku at its default once only looked and noted where at low it drafted seven notices, and Sonnet at low once reported a finished matter by letter where at its default it filled in the report form. The same requests, the same confirmations, the same notes otherwise; the thinking, not the acting, is what the effort changes here.
 - The Claude Code adapter takes `CLAUDE_EFFORT` out of the environment of the commands it runs, with the rest of what a Claude Code session sets, so that a run started from inside a session is the run it would be from a terminal. So a seat's effort was the model's default unless named with the model.
 - Why a setting: Haiku 5.5 spent about three quarters of its output on thinking in the second live check (486,390 of 649,320 tokens in one pilot) and a 30-day pilot cost $15 to $19 against under $1 for Sonnet 5.5. Whether a lower effort keeps a Haiku seat's answers read whole is **not measured**: the reader comparison found Haiku at low effort a poor reader of requests, which is the translator's job and not a seat's. Measure it on a short pilot before a wave uses it.
 
