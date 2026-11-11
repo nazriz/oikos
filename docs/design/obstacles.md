@@ -268,6 +268,10 @@ do not exist: shops pay with the order). Neither is in this design. The honest c
 study's low-friction seat in each arm, to let the desk carry the obstacle analysis, and to redo the power calculation
 (paper plan 4.6) on desk seat-months.
 
+**Measured (B8, 2026-11-11; code arm, seed 7, 180 days):** the desk met 1.7 obstacles a month at level 1 and 2.2 at
+level 2, nearly all an authority wanted at first contact; the factory, the finance office and the rates post met none.
+A second desk with the cohort split between them does not raise the total (docs/decisions.md, "Obstacles B8").
+
 ## 8. Build plan
 
 Each step lands green through `scripts/merge.ts`. Each is documented in `docs/behaviour/` and `docs/decisions.md` as

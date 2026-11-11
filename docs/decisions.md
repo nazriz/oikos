@@ -12922,3 +12922,72 @@ for `claude`, no model called) or rebuilt from the smoke's transcripts, each thr
   about 1.9 calls a sitting; the first sittings here carry fifteen or sixteen matters and more come.
 - **Revisit if:** the pilot's first week costs more than a fifth of its estimate a week (read `cost.json` by purpose);
   a seat at low effort is seen to decide differently on a matter that needs care (then compare that matter at both).
+
+## 2026-11-11 · Obstacles B7: readiness to grant from the cost of delay (docs/design/obstacles.md section 10)
+
+- **What:** a kind's facts may say what a day's delay of a matter costs the principal (`KindFacts.late_cost_day`), and
+  the principal keeps how long the matters it handed over waited on its own answer (`Seen.waited`, from a draft or a
+  request to go ahead coming in to its reading of it), only for kinds whose delay is costed. Answering a request for a
+  level, its rule weighs `draft` and `approve` with that wait at that cost (`rule::cost_waiting`; the review's rule is
+  unchanged). A request for one matter alone (`ScopeRequest.only`, a new plain blank on the request form at obstacle
+  levels) is weighed as one matter and granted, where it pays by the hurdle, by a remit for that matter alone
+  (`Remit.only`); the kind's own remit stands for every other matter. `oikos-kernel delegation` reads an act on that
+  matter at the level granted for it.
+- **The figure:** for a claim for support, a day of the least payment the place's support law makes (derived from the
+  profile's payments, generator `lateCost`, at levels 1 and 2 only). No other kind's delay is costed: no figure says
+  what a day's delay of a job application or a loan application costs, so none is invented. The hurdle stays one figure
+  across arms (2,000 bps, placeholder, MT-32).
+- **What to expect, said plainly:** a principal answers a draft within minutes of reading it, and a person reads at
+  their next wake, so the wait is short and grants will be few until post-holders keep working hours (the lead's later
+  step). A grant is then the principal's own rule meeting a real delay, never a disposition set to produce one.
+- **Byte-identical at level 0:** nothing is costed and nothing is kept where no kind has a cost of delay; the
+  configs at level 0 are unchanged.
+- **Revisit if:** the screen at level 2 shows no grant at all (then the lower-hurdle cell of section 10, stated as a
+  condition of the principal), or a kind's delay gets a source (a late lodgement penalty in a profile's tax law).
+
+## 2026-11-11 · Obstacles B8: the screen at levels 0, 1 and 2, and a second desk (docs/design/obstacles.md section 7)
+
+- **What:** `experiments/scope-pilot/study-obstacles.ts` is the study town (study.ts) at an obstacle level
+  (`OIKOS_OBSTACLES`), with a second provider's desk on request (`OIKOS_DESKS=2`: build.ts `secondDesk`, every other
+  member of the cohort engages provider B's paid offer at the same levels; both providers are in the profiles already).
+  build.ts gains `obstacles` and `secondDesk`, both absent by default, so first-pilot.ts and study.ts are as before. The
+  screen also reports, per seat and month, how long its drafts and requests to go ahead waited on its principal's
+  answer, and the remits a principal granted on a request.
+- **What it found** (code arm, seed 7, 180 days after the day-30 fork; a month is 30 days):
+
+  | seat | level 0 | level 1 | level 2 | level 2, two desks |
+  |---|---|---|---|---|
+  | desk(s): matters a month | 14.5 | 9.3 | 13.7 | 5.3 + 7.7 |
+  | desk(s): obstacles met a month | 0 | 1.7 (authority) | 2.2 (authority) | 1.0 + 1.2 |
+  | factory: matters / obstacles a month | 13.2 / 0 | 10.5 / 0 | 10.5 / 0 | 12.0 / 0 |
+  | finance office; rates post | 1 / 0; 4.7 / 0 | the same | the same | the same |
+  | waited on the principal (mean hours): desk, factory, rates post | 0.4, 1.7, 26.5 | 0.7, 1.5, 26.4 | 0.6, 1.8, 26.3 | 0.4 to 0.8, 1.7, 26.0 |
+  | remits granted on a request | 0 | 0 | 0 | 0 |
+
+  Level 1 with two desks: 3.8 + 5.0 matters and 1.2 + 0.7 obstacles a month. So the desk carries the obstacles, almost
+  all an authority wanted at first contact (the design's estimate was 2.5 to 4 a month: lower, because once a client
+  has given one, their later papers to that body pass). Wrong returns land mostly on citizens' own papers: the desk sends
+  few loan applications and claims. The factory meets none: its counterparties have no requirements (the design's
+  low-friction seat). **A second desk does not double the exposure**: the same cohort split between two desks halves
+  each desk's volume, and the obstacles a month across both stay where one desk had them. Doubling them takes a larger
+  cohort, not a second desk.
+- **Grants, said plainly (B7):** none, at any level. The code assistant never asks, and the principals' review rule is
+  unchanged; and the wait a principal's own answer adds is under an hour at the desk (its clients answer at their next
+  wake), so at a day of a support payment (5,776 cents in au-vic) a model's request for one matter alone would be
+  declined by the rule's own figures. Grants need the working-hours law (B5), which makes answers wait for a working day.
+  The rates post's sign-offs already wait a day (26 hours) and the factory's about two hours, but neither kind's delay is
+  costed.
+- **Found by the screen and fixed:** a body's paper back to a desk's post was refused (a post is no one a paper is
+  addressed to): a body now writes to whom the paper is for, and the person passes the body's paper on to their desk
+  (`Delegating::pass_on`), as a client forwards an agency's letter to their agent; the reader counts that as the desk
+  meeting it. The authority paper and its record no longer name a post among the addressees. The code assistant names
+  each paper it sends where bodies publish requirements, so that it knows which came back. The person's wrapper keeps
+  the bodies' papers (`ours`). A row of the figures registry for `late_cost_day` (a generated world at level 1 or 2
+  would not load without it: B7's gate never generated one).
+- **Found, not fixed (recorded):** the reader sorts a rates instalment's fifteen notices as one handed and fourteen
+  `not_handed` (one act, fifteen papers, one referral), and a few `beyond_level`: at level 0 as at every level. A
+  reading fault of the log reader, not the world's; to fix with the readout's next change.
+- **Byte-identical at level 0:** as before (the same configs; the same state hashes and log digests at 45 days).
+- **Revisit if:** a larger cohort is wanted for exposure (the study's setting, the lead's call); or the hours law lands
+  (then screen the grants again).
+

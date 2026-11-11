@@ -124,11 +124,11 @@ pub fn to_record<'a>(book: &'a Book, me: &str, asked: &std::collections::BTreeSe
     book.open(AUTHORITY).filter(|r| super::addressed_to(r).iter().any(|a| a.as_str() == me) && !recorded.contains(r.id.as_str()) && !asked.contains(r.id.as_str())).collect()
 }
 
-/// The clerk's record of an authority, to whoever gave it and to the posts it names (an agent is told it may act).
+/// The clerk's record of an authority, to whoever gave it (a post is no one a paper is addressed to: the giver tells
+/// whom they authorised).
 pub fn record(a: &Record, me: &str) -> Call {
     let by = a.speaks_for.as_deref().unwrap_or(a.author.as_str()).to_string();
-    let mut to = vec![by];
-    to.extend(data(a).get("posts").map(|p| p.to_value()).and_then(|p| p.as_array().cloned()).into_iter().flatten().filter_map(|x| x.as_str().map(String::from)));
+    let to = vec![by];
     let mut vis = to.clone();
     vis.push(me.to_string());
     say(RECORDED, &format!("Your authority {} is recorded: we act on what it covers.", a.id), Say { to: Some(to), visible: Some(Visible::Only(vis)), basis: Some(a.id.to_string()), data: Some(json!({ "authority": a.id })), ..Default::default() })
@@ -175,15 +175,13 @@ pub fn check(book: &Book, me: &str, req: &Requirements, r: &Record, cx: &mut Cx)
     }
     cx.decided(json!({ "domain": "obstacle", "law": if need.get("authority").is_some() { "authority" } else { "acceptance" }, "paper": r.id, "principal": for_,
         "counterparty": me, "need": need, "clears_by": if need.get("authority").is_some() { "authority" } else { "sent_again" }, "slip": slipped, "inputs": [r.id] }));
-    // (To whoever it is for, and to the post that sent it for them, where one did.)
-    let mut to: Vec<String> = post.map(String::from).into_iter().collect();
-    if !to.contains(&for_) {
-        to.push(for_.clone());
-    }
+    // (To whoever it is for: a body writes to the one the paper speaks for, as it would to a claimant, and not to a post
+    // it has no authority for, which is no one a paper is addressed to. They tell whoever sent it for them.)
+    let to: Vec<String> = vec![for_.clone()];
     let mut vis = to.clone();
     vis.push(me.to_string());
     // (The paper as it was, to be sent again as it stands, citing it: a form sends it so, `copies`.)
     let copy = json!({ "kind": kind, "to": super::addressed_to(r), "text": super::text(r), "data": data(r).to_value(), "basis": [r.id] });
-    let call = say(RETURNED, &said, Say { to: Some(to), visible: Some(Visible::Only(vis)), basis: Some(r.id.to_string()), data: Some(json!({ "returned": r.id, "need": need, "paper": copy })), ..Default::default() });
+    let call = say(RETURNED, &said, Say { to: Some(to), visible: Some(Visible::Only(vis)), basis: Some(r.id.to_string()), data: Some(json!({ "returned": r.id, "need": need, "paper": copy, "from": post })), ..Default::default() });
     Some((said, call))
 }

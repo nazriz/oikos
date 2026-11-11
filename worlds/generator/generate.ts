@@ -3311,8 +3311,14 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // (Persons as principals, where some provider serves persons: every person may engage one by its own rule, paying from
   // its own account; its own time for each paper the table's row, its hour at the profile's pay for clerical work.)
   const PERSONS = AS ? AS.providers.flatMap((pr) => pr.offers.filter((o) => o.for === "persons").flatMap((o) => o.kinds)) : [];
+  // (What a day's delay of a matter costs a person, where obstacles are on (docs/design/obstacles.md section 10): for a
+  // claim for support, a day of the least payment the place's support law makes, derived from the profile's payments;
+  // for any other kind, nothing is costed (no figure says what a day's delay of it costs).)
+  const dayOf = (r: PaymentRule): number => { const a = r.amount as any; const per = typeof a.flat === "number" ? a.flat : typeof a.household === "number" ? a.household : typeof a.least === "number" ? a.least : 0; return r.every_days > 0 ? Math.floor(per / r.every_days) : 0; };
+  const CLAIM_DAY = OB ? Math.min(...PAYMENTS.map(dayOf).filter((x) => x > 0), Number.MAX_SAFE_INTEGER) : 0;
+  const lateCost = (k: string) => (OB && k === "benefit_claim" && CLAIM_DAY < Number.MAX_SAFE_INTEGER ? { late_cost_day: CLAIM_DAY } : {});
   const personDelegation = PERSONS.length && AS ? { delegation: { hour_value: Math.round((PS.wage_per_pay_period * 7 * HOUR) / ((PAY / DAY) * V.ordinary_hours_per_week * HOUR)),
-    kinds: Object.fromEntries([...new Set(PERSONS)].sort().map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost, compose_seconds: composeOf(k) }])),
+    kinds: Object.fromEntries([...new Set(PERSONS)].sort().map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost, compose_seconds: composeOf(k), ...lateCost(k) }])),
     seconds: { referral: DELEGATION_TIME.person["publish/referral"], sign_off: DELEGATION_TIME.person["publish/sign_off"], go_ahead: DELEGATION_TIME.person["publish/go_ahead"] },
     finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
     horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints } } : {};
