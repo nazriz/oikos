@@ -108,6 +108,10 @@ test("a town that does not ask for assistants is generated as before; one that d
   // the rates post's standing order for its fee was refused, and its service switched off after 75 days).
   const mandate = on.world.records.find((r: any) => r.id === "signatories-city");
   for (const p of principals.filter((x: any) => x.entity === "city")) expect(mandate.data.positions).toContain(p.id);
+  // (A payment goes with the papers it is part of, to the assistant: so the mandate names each town office's assistant's
+  // post, and an organisation's assistant's system writes payment instructions. docs/design/broad-seats.md, G1.)
+  for (const p of principals.filter((x: any) => x.entity === "city")) expect(mandate.data.positions).toContain(p.role_module.params.delegation.post);
+  expect(on.templates.find((t: any) => t.id === "assistant-a").does.some((d: any) => d.block === "publish" && d.kind === "request")).toBe(true);
   expect(plain.world.records.find((r: any) => r.id === "signatories-city").data.positions).toEqual(["finance"]);
   // A study's reach (the scope pilot's cohort `reach`): those it reaches see the offers and decide by their own rule, with
   // nothing decided for them; the rest are shown no offer and have no rule for one.

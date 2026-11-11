@@ -64,6 +64,16 @@ kind over (`kernel/crates/actors/src/delegation/principal.rs`):
   delegated, and it does the act itself). Its own code hears of the act when the assistant reports it done (with what the
   assistant's act made), or when it does the matter itself after all (a draft it declined, a matter reported not done, a
   service that ended with the matter open).
+- **A matter is the paperwork of its act** (docs/design/broad-seats.md, G1, 2026-11-11). A withdrawal goes with the
+  paper that replaces what it withdraws, and a payment with the papers of its act (the tax with the return that reports
+  it, a fee with an application, an order paid with the order), to the assistant, who makes it from the account the
+  principal pays from. The body's part of the act stays with the principal and it says so in the referral: goods moved,
+  work, and an entry in a register of its own (a claim recorded), which is the keeper's act of authority, not paperwork
+  sent. Where the act also has papers the principal keeps, a payment stays with it, since which paper it goes with cannot
+  be told. Until 2026-11-11 a payment always stayed with the principal ("we do the payment that goes with it
+  ourselves", the scope pilot's W5), and an order paid with the order would reach the seller after its money (MT-28).
+  The town's mandate to its bank names each town office's assistant's post for these payments (a simplification: the
+  office lodging the change of mandate itself, design H1, is not built).
 - **What comes back**, dealt with in its own time when its own code waits: a draft read whole (if it is not what was
   asked, the principal finds it unless its reading slips: the person's row `publish/sign_off` in the table of slips) and
   signed off or declined; a request to go ahead answered; a report taken in; advice set beside what it did.

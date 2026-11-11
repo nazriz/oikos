@@ -1717,7 +1717,7 @@ The mechanism:
   (the price list); `offices/treasury.rs` (the levy in chunks of 15, `ours`); `worlds/generator/generate.ts` (principals' kinds).
 - **Effect:** A firm's assistant is never handed purchasing, pricing or payments, which in a real office are much of the
   work; volume stays lower than a real service's.
-- **L / I:** high / medium · **Status:** open (2026-11-10)
+- **L / I:** high / medium · **Status:** open (2026-11-10); parting by variables replaced 2026-11-11 (docs/design/broad-seats.md, G1): an act's paperwork goes as one matter, a payment with the papers of its act (an order paid with the order, the tax with a return), to the assistant, whose system now writes payment instructions and whose post (for a town office) is on the town's mandate (a simplification of H1's mandate the office would lodge). Still open: claims recorded stay the principal's (the keeper's act), price lists and payments are not in the offers (G3), and the rates post's `ours` by position.
 - **Notice by:** the screen's "kept" column; a kind added to an offer whose acts are parted.
 - **Fix when:** `route` keeps together a withdrawal with what supersedes it and a payment with what it pays for (by a
   link the act states, not a guess), and a principal's kinds may be calls priced by the table's row for what they make;

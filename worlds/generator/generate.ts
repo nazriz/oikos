@@ -3562,6 +3562,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       mandate.data = { ...mandate.data, positions: [...mandate.data.positions, ...towns.map((p) => p!.id)] };
       mandate.text += ` By a later resolution, the ${towns.map((p) => p!.title.toLowerCase()).join(" and the ")} may also instruct payments from it, for a service the office has engaged.`;
     }
+    // (A payment goes with the papers it is part of, to whoever the office hands them to: docs/design/broad-seats.md, G1.
+    // So the mandate names each town office's assistant's post too, for the payments that go with its papers: the
+    // finance office's return goes with the tax it reports. A simplification: in life the office would lodge the change
+    // of mandate itself when it hands such papers over (design H1), which is not built; risk MT-28.)
+    const helpers = assistantPosts.filter((a) => a.entity === "city" && !mandate?.data.positions.includes(a.post));
+    if (mandate && helpers.length) {
+      mandate.data = { ...mandate.data, positions: [...mandate.data.positions, ...helpers.map((a) => a.post)] };
+      mandate.text += ` The assistant's post of each office named may instruct the payments that go with the papers the office hands it.`;
+    }
   }
   if (AS && spec.assistant_seats?.length) {
     const seatsOrgs = AS.providers.some((pr) => pr.offers.some((o) => o.for === "organisations" && spec.assistant_seats!.includes(o.template)));
@@ -3701,7 +3710,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // papers of delegation, played by the assistant's code unless a study seats a model in it.)
     // (Two offers of one system, a paid tier and a free one, are one kind of system: the first offer's.)
     ...(AS ? AS.providers.flatMap((pr) => pr.offers.filter((o, i) => pr.offers.findIndex((x) => x.template === o.template) === i).map((o) => ({ id: o.template, kind: "system", title: o.title, supplier: pr.id,
-      does: [...papersOf(o.kinds).map((kind) => ({ block: "publish", kind, seconds: Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000)) })),
+      // (An organisation's assistant also writes the payment instructions that go with the papers it is handed: the tax
+      // with a return. docs/design/broad-seats.md, G1: until then a payment always stayed with the principal.)
+      does: [...[...papersOf(o.kinds), ...(o.for === "organisations" ? ["request"] : [])].map((kind) => ({ block: "publish", kind, seconds: Math.max(1, Math.round((personPaper(kind) * o.speed_bps) / 10_000)) })),
         ...ASSISTANT_PAPERS.map((kind) => ({ block: "publish", kind, seconds: ASSISTANT_PAPER_SECONDS })), { block: "withdraw", seconds: ASSISTANT_PAPER_SECONDS }, { block: "message", seconds: ASSISTANT_PAPER_SECONDS }],
       hours: MACHINE_HOURS, ...(HOST ? { runs_on: HOST.runsOn } : {}), ...(spec.assistant_seats?.includes(o.template) ? assistantSeat(pr, o) : { controller: code("assistant"), framing: unstated }) }))) : []),
     ...["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated })),

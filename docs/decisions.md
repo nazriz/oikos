@@ -12920,3 +12920,30 @@ sign-offs). Under the knowing rules a matter handed to a post is that post's.
 ## 2026-11-11 · Broad seats: any post's paperwork handed over, any post or person held by a model: a proposal (docs/design/broad-seats.md; nothing built)
 
 - A proposal for review: a matter is an act's paperwork (MT-28); its facts read back from the post's own form, the code assistant filling the same form; offers by class of paperwork; assistants for any post or person by one spec option; seven more counterparties with an intake; office-holder and person seats made supported again; one template a provider across towns. **Revisit if** Naz prefers kind-by-kind breadth, or rejects "decided" blanks being given at matter depth.
+
+## 2026-11-11 · Broad seats approved; G1: a matter is the paperwork of its act (docs/design/broad-seats.md)
+
+- **Approved** by the lead under the owner's go of 2026-11-10 and his question of 2026-11-11, with five decisions (the
+  note's section 13): 40 busy seats from the G9 screen; tills and billing runs not in the offers by default; office
+  holders a separate arm after G5; a decision left to the assistant within a limit later; office and person seats
+  unstated by default.
+- **What (G1):** `Delegating::route` no longer parts an act by its variables alone. A payment goes with the papers of its
+  act to the assistant (the tax with the return that reports it; an order paid with the order), beside the withdrawal
+  that already went with the paper that replaces it. Goods moved, work and a claim recorded in the principal's own
+  register stay with the principal, which says so in the referral. Where the act also has papers the principal keeps,
+  the payment stays with it. An organisation's assistant's system writes payment instructions (`publish/request` on its
+  template, at the offer's speed), and the town's mandate to its bank names each town office's assistant's post.
+- **Why:** parted, a payment reached its payee before the paper it goes with (MT-28), and the assistant was told the
+  payment was not its to make (W5), which a real clerk filing a return is. Claims stay: recording a right in one's own
+  register is the keeper's authority, and a model's stationery has no form for it (the rates post's notices would go
+  out with their claims unrecorded at a model's seat).
+- **What moves in the study town** (and `first-pilot.ts`, unchanged as a spec): about two acts a month, the finance
+  office's and the factory's monthly return with its payment, now one matter each, the payment made by the assistant
+  after sign-off instead of by the principal at once (a day or so later, within the due day). The rates post's notices
+  are unchanged (their claims stay with it). The households' matters carry no payments. The mandate's text gains a
+  sentence. Towns without providers are untouched (everything is under `Delegating` or `assistants`).
+- **Found by the code screen first:** the assistant's system could not write a payment (`not_capable`: its template
+  had no row for it), so every return came back not done and the principal paid itself late; fixed by the row before
+  this landed.
+- **Revisit if:** a principal's act carries a payment unrelated to its handed papers (then the act must state the link);
+  H1's mandate lodged by the office itself is built (then the generator's line goes).

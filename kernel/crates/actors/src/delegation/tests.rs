@@ -133,18 +133,37 @@ fn a_kind_handed_over_goes_as_a_referral_and_comes_back_to_the_principal_when_no
     assert!(back.lines().any(|l| l.starts_with("statement(basis=lease-1")), "reported not done: the principal does it itself: {back}");
 }
 
+/// The calls a referral carries, as the last one sent has them.
+fn handed_calls(h: &Harness) -> (String, String) {
+    let sent = h.sent.iter().rev().find(|p| p.contains("kind=referral")).cloned().unwrap();
+    let calls = sent.split("\"calls\":\"").nth(1).and_then(|x| x.split("\",\"kind\"").next()).unwrap_or_default().to_string();
+    (sent, calls)
+}
+
 #[test]
-fn what_is_not_handed_over_is_done_by_the_principal_in_the_same_act_as_the_referral() {
-    // (Its notices come with a fee paid in the same act: the payment stays its own.)
+fn an_acts_paperwork_goes_as_one_matter_and_its_body_stays_with_the_principal() {
+    // (docs/design/broad-seats.md, G1. A payment goes with the paper it is part of, as a fee with an application or the
+    // tax with a return: parted, the money reached the payee before the paper, MT-28.)
     let pay = "money(to=acc-tribunal, amount=\"$10.00\", from=acc-ll, for=\"fee\")";
     let (mut h, _, remit) = engaged_doing(&format!("{NOTICE}\n{pay}"));
-    let out = all(&h.wake(34 * DAY + 3600, world(vec![remit])));
-    let act = out.lines().skip_while(|l| !l.starts_with("money(")).take(2).collect::<Vec<_>>().join("\n");
-    assert!(act.starts_with("money(") && act.contains("kind=referral"), "one act: its payment and the referral: {out}");
-    let sent = h.sent.iter().rev().find(|p| p.contains("kind=referral")).unwrap();
-    let calls = sent.split("\"calls\":\"").nth(1).and_then(|x| x.split("\",\"kind\"").next()).unwrap_or_default();
-    assert!(calls.contains("notice_to_vacate") && !calls.contains("acc-tribunal"), "the notice is handed over, the payment is not: {calls}");
-    assert!(sent.contains("\"does_itself\":[\"money\"]") && sent.contains("We do the payment that goes with it ourselves"), "and the assistant is told the payment is not its to make (the scope pilot's W5): {sent}");
+    let out = all(&h.wake(34 * DAY + 3600, world(vec![remit.clone()])));
+    assert!(!out.lines().any(|l| l.starts_with("money(")), "the principal does not pay ahead of the paper: {out}");
+    let (sent, calls) = handed_calls(&h);
+    assert!(calls.contains("notice_to_vacate") && calls.contains("acc-tribunal"), "the notice and its payment are one matter: {calls}");
+    assert!(sent.contains("carries=notice_to_vacate") && !sent.contains("does_itself"), "of the paper's kind, with nothing left to the principal: {sent}");
+    // (Goods moved are the body's part: the principal moves them, in the same act as the referral, and says so.)
+    let goods = "goods(at=t1-home, carried=yes, from_at=store, kind=goods, quantity=\"3\", to=t1)";
+    let (mut h, _, remit2) = engaged_doing(&format!("{NOTICE}\n{goods}"));
+    let out = all(&h.wake(34 * DAY + 3600, world(vec![remit2])));
+    assert!(out.lines().any(|l| l.starts_with("goods(")) && out.contains("kind=referral"), "one act: the goods moved and the referral: {out}");
+    let (sent, calls) = handed_calls(&h);
+    assert!(!calls.contains("goods(") && sent.contains("We do the moving of the goods ourselves"), "{sent}");
+    // (With a paper of its own kept in the same act, which paper a payment goes with cannot be told: it pays itself.)
+    let kept = "statement(kind=letter, text=\"About the fence.\", to=[\"t1\"])";
+    let (mut h, _, remit3) = engaged_doing(&format!("{NOTICE}\n{kept}\n{pay}"));
+    let out = all(&h.wake(34 * DAY + 3600, world(vec![remit3])));
+    let (_, calls) = handed_calls(&h);
+    assert!(out.lines().any(|l| l.starts_with("money(")) && !calls.contains("acc-tribunal") && calls.contains("notice_to_vacate"), "{out}");
 }
 
 #[test]

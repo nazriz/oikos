@@ -340,7 +340,9 @@ impl Actor for Delegating {
                 }
                 if let Some((agreement, level, handed, own, facts)) = routed {
                     let text = program_text(&handed);
-                    let kind = kinds_of(&handed).first().cloned().unwrap_or_default();
+                    // (The matter is of the kind of the papers it carries, not of a payment that goes with them.)
+                    let ks = kinds_of(&handed);
+                    let kind = ks.iter().find(|k| k.as_str() != "money").or(ks.first()).cloned().unwrap_or_default();
                     if level == Level::Advice {
                         // (It does it itself, and asks what the assistant would have done.)
                         s.ask_advice(&agreement, &kind, &text, cx);
@@ -869,10 +871,16 @@ impl State {
         if mine.is_empty() {
             return None;
         }
-        // (A withdrawal goes with the paper it is part of: a new price list that withdraws the old one is one matter, so
-        // no list stands withdrawn while the new one waits for its sign-off. 2026-11-10, found by the enough-work screen.)
-        let (withdrawals, rest): (Vec<Line>, Vec<Line>) = others.into_iter().partition(|l| l.call.fn_ == "statement" && l.call.get("withdraw").is_some());
-        mine.extend(withdrawals);
+        // (The act's paperwork goes as one matter, its body's part stays with the principal: docs/design/broad-seats.md,
+        // G1. A withdrawal goes with the paper it is part of (a new price list that withdraws the old one: no list stands
+        // withdrawn while the new one waits for its sign-off), and a payment with the papers it goes with (an order paid
+        // with the order, a return with the tax it reports: parted, the money reached the seller before the order, MT-28).
+        // Where the act also has papers of its own the principal keeps, which of them a payment goes with cannot be told,
+        // and the payment stays with the principal. Goods moved, work and entries in the principal's own registers (a
+        // claim recorded) stay its own: they are not paperwork sent.)
+        let keeps_papers = others.iter().any(|l| l.call.fn_ == "statement" && l.call.get("withdraw").is_none());
+        let (goes, rest): (Vec<Line>, Vec<Line>) = others.into_iter().partition(|l| (l.call.fn_ == "statement" && l.call.get("withdraw").is_some()) || (l.call.fn_ == "money" && !keeps_papers));
+        mine.extend(goes);
         others = rest;
         let binds = |ls: &[Line]| ls.iter().filter_map(|l| l.bind.clone()).collect::<Vec<String>>();
         let uses = |ls: &[Line], names: &[String]| ls.iter().any(|l| super::vars_of(&l.call).iter().any(|v| names.contains(v)));

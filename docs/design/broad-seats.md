@@ -1,8 +1,9 @@
 # Broad seats: any post's work handed over, any post or person held by a model (design, 2026-11-11)
 
-**Status:** proposal for review. Nothing built. It follows `docs/design/handing-over.md` (H1 to H6, built) and
-`docs/design/obstacles.md` (B1 to B3, built). It decides no result. Contract changes are under the blanket approval of
-2026-10-11 and are listed in section 10.
+**Status:** approved by the lead under the owner's go of 2026-11-10 and his question of 2026-11-11; G1 and G2
+building. It follows `docs/design/handing-over.md` (H1 to H6, built) and `docs/design/obstacles.md` (B1 to B3, built).
+It decides no result. Contract changes are under the blanket approval of 2026-10-11 and are listed in section 10. The
+lead's decisions on section 12's questions are in section 13.
 
 **The question (Naz, 2026-11-11):** "am I right to think that we only have a small amount of seats that support this?
 like, should we be expanding it so that the oikos world can be more broadly interacted with?" Yes, and yes. The study
@@ -396,3 +397,23 @@ before, except `Referral.facts`, read only by the code assistant and the seat's 
 5. **The default framing of office seats** (generator says "simulated"): set it to `unstated` everywhere a model
    sits in a study, per D10? Recommend yes, with the debrief as now; honest disclosure stays available as a spec
    setting.
+
+## 13. Decided (the lead, 2026-11-11)
+
+1. **40 busy seats,** chosen from the G9 screen.
+2. **Tills and billing runs are not in the offers by default:** a point-of-sale or billing system's work.
+3. **Models holding offices are a separate arm,** after G5, not in the first pilot.
+4. **A principal leaving a decision to its assistant within a limit:** later, noted.
+5. **Office and person seats default to the unstated framing.**
+
+Build order: G1, then G2, each landed alone; G3, G4 and G9 once those are on main; G5 by a second worker alongside.
+Added by the lead: "decided" blanks hand the principal's decision over, said plainly in the behaviour page, and what a
+model decides is not widened here; everything a seat is shown passes the plain-terms backstop
+(`orchestrator/test/assistants-fork.test.ts`).
+
+**As built, G1 (2026-11-11).** A payment goes with the papers of its act; a claim recorded in the principal's own
+register stays with the principal, beside goods and work. Why: recording a right in one's own register is the keeper's
+act of authority, not paperwork sent to anyone, and a model's stationery has no form for it (the rates post's notices
+would go out with their claims unrecorded at a model's seat). Where an act also has papers the principal keeps, a
+payment stays with the principal, since which paper it goes with cannot be told.
+
