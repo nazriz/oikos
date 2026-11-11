@@ -26,7 +26,7 @@ import { costReport } from "./cost";
 import { servedOfLogs, shareText, translatorShare } from "./pilot-report";
 import { servedText } from "./served";
 import { chooseModel } from "./models";
-import { KernelDied, KernelLogFailed, kernelBinary } from "./kernel";
+import { KernelDied, KernelLogFailed, kernelBinary, requireCurrentEngine } from "./kernel";
 import { MEASURE_FAILED_FILE } from "./pilot-state";
 import { clearForFreshRun, compressLog, currentLogs, isLog, isStoppedLog, logsOf, realModelIn } from "./logs";
 import { logToResume, recordedCalls, prepareResume, Serving } from "./resume";
@@ -444,6 +444,8 @@ export interface BatchResult {
 const CLI = join(import.meta.dir, "cli.ts");
 
 export async function runBatch(o: BatchOptions): Promise<BatchResult> {
+  // (Not on an engine older than the kernel sources: stopped before anything is built or written.)
+  requireCurrentEngine();
   const log = o.log ?? (() => {});
   const sets = o.sets ?? [];
   const { config, spec, generator } = await loadWorld(o.world, sets);

@@ -7,7 +7,7 @@
 import { closeSync, mkdtempSync, openSync, rmSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { nativeEngine } from "./kernel";
+import { nativeEngine, requireCurrentEngine } from "./kernel";
 
 export interface SeatWake { key: string; participant: string; t: number; woke_for: string; since: number; observation: any }
 
@@ -40,6 +40,8 @@ export interface RustOptions {
 }
 
 const need = () => {
+  // (Every world started or resumed passes here: an engine older than the kernel sources is stopped with one plain line.)
+  requireCurrentEngine();
   const n = nativeEngine();
   if (!n?.World) throw new Error("the Rust world needs the engine's native module: run `bun run kernel`");
   return n;

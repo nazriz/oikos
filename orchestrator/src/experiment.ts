@@ -20,7 +20,7 @@ import { availableParallelism } from "node:os";
 import { join, resolve } from "node:path";
 import { DetachedActor, RustWorld, twinSpecs, type SeatWake } from "./rust-world";
 import { ForkReplay } from "./resume";
-import { kernelBinary } from "./kernel";
+import { kernelBinary, requireCurrentEngine } from "./kernel";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { Ledger, STEWARDSHIP_MEASURES, STEWARDSHIP_NAMES, type Institutions, type StewardOfPost, type StewardshipResult } from "@oikos/measure/stewardship";
@@ -978,6 +978,8 @@ export function recourseProblems(config: any, held?: HeldPrereg): string[] {
 
 export async function runExperiment(spec: ExperimentSpec, o: RunOptions): Promise<{ report: Report; results: ArmResult[]; text: string; out: string }> {
   const say = o.log ?? (() => {});
+  // (Not on an engine older than the kernel sources: stopped before anything is built or written.)
+  requireCurrentEngine();
   // (A dry run says so in the spec it keeps, so that its workers, its report and any rebuilt report all know.)
   if (mockModels(spec)) spec = { ...spec, seats: { ...(spec.seats ?? {}), mock_models: true } };
   validate(spec, o.factories);
