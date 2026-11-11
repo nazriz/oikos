@@ -222,10 +222,12 @@ const obstacleRequires = (level: number, kinds: string[]) => (level > 0 ? { requ
  * it comes; papers sent back to it, and authorities recorded for its clients. */
 const obstacleChannels = (level: number) => (level > 0 ? [K.published("requirements", ["requirements"], { title: "What the bodies you write to need on the papers sent to them, as each publishes it" }), K.mine("returned", ["paper_returned", "authority_recorded"], { title: "Papers sent back to you, saying what is missing" })] : []);
 
+// (Each keeps to its post, `own_post`: what a principal hands its assistant is addressed to the assistant's post as
+// well as to the organisation, and an organisation with two assistants' posts shows each only its own: risk MT-31.)
 const assistantChannels = (also: string[] = []) => [
-  K.mine("terms", ASSISTANT_TERMS, { title: "The service you work under: its delivery, briefs and remits" }),
-  K.mine("matters", ASSISTANT_MATTERS, { title: "Matters handed to you, and the answers to what you asked" }),
-  K.mine("file", [...new Set([...ASSISTANT_SEES, ...ASSISTANT_PAPERS, ...also])], { title: "Your file: the matters handed to you, your papers on them and what you sent, looked up on request (look, with what to find)", on_request: true }),
+  K.mine("terms", { statement_kinds: ASSISTANT_TERMS, own_post: true }, { title: "The service you work under: its delivery, briefs and remits" }),
+  K.mine("matters", { statement_kinds: ASSISTANT_MATTERS, own_post: true }, { title: "Matters handed to you, and the answers to what you asked" }),
+  K.mine("file", { statement_kinds: [...new Set([...ASSISTANT_SEES, ...ASSISTANT_PAPERS, ...also])], own_post: true }, { title: "Your file: the matters handed to you, your papers on them and what you sent, looked up on request (look, with what to find)", on_request: true }),
   K.board("laws", ["law", "charter", "payment_details"], { title: "The town's laws and charter, and where what they charge is paid, published: looked up on request (look, with what to find), for the law a matter rests on" }),
   K.lookUp("who", { title: WHO }),
 ];

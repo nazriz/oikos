@@ -1918,8 +1918,13 @@ impl<'a> Exec<'a> {
             by: (!self.by.is_empty() && self.by != [self.participant.to_string()]).then(|| self.by.to_vec()),
             body,
         };
+        // (A statement may be addressed to a post, as a letter may: it is that post's among its organisation's papers,
+        // `RecordFilter::own_post`. 2026-11-12, risk MT-31.)
+        let to_post = |e: &str| matches!(&rec.body, RecordBody::Statement { addressed_to: Some(a), .. } if a.iter().any(|x| x.as_str() == e)) && self.st.positions.contains_key(e);
         for e in rec.entities_named().into_iter().chain(rec.visibility_entities()) {
-            self.entity_exists(e)?;
+            if !to_post(e) {
+                self.entity_exists(e)?;
+            }
         }
         for b in rec.basis.iter().flat_map(Basis::ids) {
             self.record_of_kind(b, "any")?;

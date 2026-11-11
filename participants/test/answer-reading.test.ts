@@ -50,7 +50,7 @@ test("Claude Code: one `claude -p` per call with our system prompt in place of i
     { type: "tool_use", id: "claude-code-1", name: "do", input: { what: "Publish a notice." } },
     { type: "tool_use", id: "claude-code-2", name: "do", input: { what: "Tell the clerk." } },
   ]);
-  expect(r.usage).toEqual({ input_tokens: 4, output_tokens: 300, cache_read_tokens: 2900, cache_write_tokens: 120, reported_cost_microusd: 10000 });
+  expect(r.usage).toEqual({ input_tokens: 4, output_tokens: 300, cache_read_tokens: 2900, cache_write_tokens: 120, reported_cost_microusd: 10000, turns: 3 });
   // With no tools: the words, and no schema.
   let noTools: string[] = [];
   const words = await new ClaudeCodeAdapter("claude-sonnet-5-5", async (args) => (noTools = args, { code: 0, stderr: "", stdout: result("Thanks for asking.") })).complete({ ...req, tools: undefined });

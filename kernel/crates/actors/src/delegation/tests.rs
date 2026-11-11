@@ -120,7 +120,7 @@ fn a_kind_handed_over_goes_as_a_referral_and_comes_back_to_the_principal_when_no
     let out = all(&h.wake(34 * DAY + 3600, world(vec![remit])));
     assert!(out.contains("kind=referral") && out.contains("\"wants\":\"alone\""), "the notice goes to the assistant: {out}");
     let line = out.lines().find(|l| l.contains("kind=referral")).unwrap_or_default();
-    assert!(line.contains("to=[\"ll\"]") && line.contains("visible=[\"ll\"]") && !line.contains(PROV), "an organisation's own system is handed its work in-house, not through the provider (whose desk for persons saw it before 2026-11-08): {line}");
+    assert!(line.contains("to=[\"ll\",\"ll-assistant\"]") && line.contains("visible=[\"ll\"]") && !line.contains(PROV), "an organisation's own system is handed its work in-house, not through the provider (whose desk for persons saw it before 2026-11-08): {line}");
     assert!(line.contains("\"remit\":\"rec.remit\"") && line.contains("under our remit rec.remit"), "the matter comes with the remit it is handed under (the scope pilot's desk could not find its clients' remits: W1): {line}");
     assert!(!out.lines().any(|l| l.starts_with("statement(basis=lease-1")), "and not out under the principal's hand: {out}");
     // (The finished act is the principal's composing: the referral carries it, and is priced with it; what it would have

@@ -227,8 +227,7 @@ arranged. A mock that sits as its code twin does always sits.
   write to its provider's sales and service desk. A letter to a post reaches its holder in that post only. Until then a
   town's assistant was told to write to `city`, and one letter reached every office of the town, each of which
   acknowledged it (about twenty acknowledgements, each a wake).
-- *Not yet:* two offices of one organisation that each engage an assistant (the town's finance and rating offices) are
-  shown each other's matters, for the principal's papers are the organisation's (risk MT-31).
+- *Two assistants of one organisation* are shown only their own matters since 2026-11-12 ("In-house for an organisation", below).
 
 **Answers to requests, and letters** (2026-11-10). A request for more scope (`scope_request`) is answered by its
 principal, part by part, in its own time, citing the request (`scope_answer`, `basis` the request; charged as any paper
@@ -322,7 +321,13 @@ principal's papers to it (brief, remits, referrals, sign-offs, go-aheads) are ad
 seen by it alone, and so are the system's own papers back. The provider runs the system, but its other systems are not
 party to the organisation's matters. Before 2026-11-08 they went to the provider, and the provider's desk for persons,
 which shows whatever names the provider, was handed the town finance office's returns and tried to file them (a desk
-cannot: `not_capable`). A person's papers go to the provider's desk as before.
+cannot: `not_capable`). A person's papers go to the provider's desk as before. **Each assistant's post is shown its own
+matters only** (2026-11-12, risk MT-31): the principal's papers are addressed to the assistant's post as well as to the
+organisation, and the post's channels (its terms, matters and file) keep to their own post (`own_post` on a channel's
+match: of the organisation's papers addressed to any of its posts, only those addressed to this one or written in it).
+Before, the town's finance office's assistant and its rating office's assistant, both posts of the town, were each
+shown, and a model seat woken by, the other's matters. The assistant's own papers back are still addressed to the
+organisation, so the other assistant can find them in its file on request.
 
 **A remit's hold, in words.** A remit held by the principal's own word says until when, by date, and that it stands after
 that until a remit of the principal's changes it (`hold_until` reads as a date). Seats read a bare "hold until 5184000"
