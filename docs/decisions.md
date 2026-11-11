@@ -13002,3 +13002,75 @@ From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11
   of separate things are merged ("Do: Pay rent: 500" after another Do); a model writes whom by name without ids below
   "Write to" (only counted before a colon).
 
+
+## 2026-11-11 · Weight editing on the served translator: three candidates probed, no weight edit earns its place; a form's name masked to the forms shown, on by default (no training, no GPU, no API; round 3 seed 2 still served)
+
+- **What:** the owner asked again whether the translator's weights should be edited directly (weight-space
+  programming, rikiyat.github.io/blog/weight-space-programming). Tried on the served model (`v4r3-D-deberta-s2`) for
+  the three repeatable mistakes left after the rules: several acts of one kind in one request, sure-and-wrong answers,
+  and a refusal against an act on small models' vague requests. Method: probe before editing (a linear readout of the
+  writer's state just before the decision, fitted on what the model was taught, read on the scored sets beside the
+  head's own answer); edit only where the readout knows more than the head. Scripts: `translator/model/wsp/` (the
+  harness reproduces the served answers exactly, 20 of 20 sampled sureness to 1e-4). Run folder:
+  `runs/translator-weight-edit-2026-11-11/` (cases, every decision's state, probes, edited model with its script,
+  scores). Halves for checking: by a hash of the id over every set.
+- **Several acts of one kind** (8 wrong answers: 7 small-model requests from two templates, "draft delivery notes /
+  invoices for referrals A, B and C", and one "withdraw the three listings"; 16 wrong answers have several lines in key
+  or answer). The decision is `lines`. A readout of the count fitted on 7,363 training states (3,363 of several lines)
+  gives the right count probability 0.0000 on all 7 template cases, as the head does; on the 1,903 program keys it is
+  right on 1,892 against the head's 1,892. **The information is not there: no edit.** The
+  training data has one such request (4 rows) of several forms of one kind.
+- **Sure and wrong** (9 wrong answers at sureness 0.9996 or more on the six sets, against 1,280 right). Four are one
+  family: the form's name copied as the request's own words, "draft delivery notes" giving `draft_delivery_notes`, a
+  form that is not shown (the pointer is sharp: the next start is 9 to 35 nats away). The model learned the rule it was
+  taught (11,198 training names are copied from the request's words, always the form's exact name); the plural breaks
+  it, and whether a name is a form shown is exact, so it is a mask, not weights: **with the form's name masked to the
+  forms shown** (`form_wants` in slots.py, in a cards model's choose pass, as the field masks are) the small models' set
+  goes from 25 served, 5 wrong to 21 served, 1 wrong at the certified cut (checking half: 11/9/2 to 9/9/0), and nothing
+  else moves on any set (validation 478/477/1, test side 224/222/2, unseen forms 545/545/0, all unchanged). The other
+  five are the edge of meaning round 4 named (a trailing sentence; look_first or no_such_act; a quoted phrase inside
+  longer words, which the code's own quote rule would also take). For a general doubt signal: a readout of "this
+  decision is wrong" fitted on the generated validation side beats the head's probability at the decision level on
+  real validation (AUC 0.84 against 0.64 among decisions of p ≥ 0.99), but at the level of answers it ranks wrong ones
+  higher (the surest wrong on validation moves from 477th to 163rd of 868) and no cut can be certified with it: it
+  reads how error-prone a kind of slot is, not this answer. **No edit.**
+- **A refusal against an act** (47 refusal keys in the small models' set, 26 refused). A refusal readout fitted on
+  8,000 training states ranks refusal keys below the head (AUC on that set 0.86 against 0.89; on validation-real 0.997
+  against 0.998). **The information is not there.** The simplest edit was made anyway, to measure it (`edit_refusal_bias.py`:
+  the head's refusals +4 logits, chosen on the diagnosing half): right in all on the small models' set 43 to 64 of 131
+  (checking half 21 to 31 of 68), at a cost of 5 right answers on the other sets (validation-real 539 to 537, test side
+  334 to 333, unseen forms 808 to 806); but every act is less sure, the surest wrong refusal on validation rises to
+  0.99998, no cut can be certified, and at round 3's cut the unseen forms serve 350 instead of 545. A prior shift for
+  one population of writers, not knowledge: not proposed.
+- **What the model has learned, by decision** (teacher-forced; the real side in the model's own language, whose keys
+  include what the rules now settle): sharp on the kind of answer, the number of lines, the function, a form's name and
+  where ids start and end (under 0.5% wrong on generated requests, 0 to 2.5% on real ones); fragile on optional slots
+  (a form's field filled or left out: 10% wrong on real requests at p ≈ 1.0; `to`, `basis`, `for`: 7 to 13%) and on
+  where copied words end (`text` ends 15% wrong on real requests, and the end of a field's text is the least sure
+  decision in 384 of the answers kept under the cut and in 863 of the right answers above it). Its sureness is
+  over-confident where the keys themselves split (optional fields, `to`), which no readout of its state fixes.
+- **Why no weight edit:** each family's information was either absent from the state (counts, refusals) or exact and
+  better said in code (a form's name, as the field masks and the round-3 checks are). Weight editing earns its place
+  here as a diagnostic (the probe settles in minutes whether a failure is local), not as a fix.
+- **The mask is on by default** (the coordinator, 2026-11-11): a copied form name is one of the forms the seat was
+  shown, by name or id, in every cards model's choose pass; `OIKOS_DECIDE_FORM_NAMES=0` turns it off, for measuring only.
+  Re-scored with it on by default (tag `formdefault`): every answer the same as with the switch (validation 478/477/1, test side 224/222/2, unseen forms 545/545/0, small models 21/20/1 at the cut). The certified cut for `decide/round3-s2` holds (0.999613 again, on vr, vp and nv), so `translator/model/served.json` is unchanged. Test:
+  `translator/test/model-slots.test.ts` (a name that is no form shown cannot be written; a name or id of one can; no
+  mask outside the choose pass).
+- **What a seat experiences** when it names a form by a word the form's name does not use ("draft delivery notes" for
+  `draft_delivery_note`): before, the model wrote the plural as the form's name at sureness 0.9998, the adapter found
+  no such form among those shown, and the seat was told, as sure, that there is no such form (`none(unknown_form)`).
+  Now the name can only be one of the forms shown: the model takes the form's id or the nearest words that do name it,
+  and since it was never sure where that name stands (where it stands: probability about 1e-4), the draft falls under
+  the cut. With a translator behind, the request goes behind; alone (the study's arrangement), the seat is offered the
+  draft, now naming the right form, with "which" marked unclear, to confirm or restate. Where nothing in the request or
+  the forms names a form shown, the model's likeliest is taken as before and the adapter's form check answers as it did.
+  A request for several such forms at once ("for referrals A, B and C") is still one line (candidate 1) and is asked
+  back as too long, as before.
+- **The probe routine stays** (the coordinator, 2026-11-11): before anything else is done about a translator failure,
+  `translator/model/wsp/` settles whether it is a decision (a readout of the state knows more than the head) or missing
+  knowledge (it does not): `collect.py` keeps every decision's state over the scored sets, `probe_lines.py`,
+  `probe_kind.py` and `probe_doubt.py` are the three probes made here, `audit.py` the table by decision.
+- **Revisit if:** a new model's failure is a single decision that a readout separates better than its head on held-out
+  requests (then a rank-one edit of that head is worth a try); several acts of one kind become common in pilots (data,
+  not weights); the mask asks back right answers in a new pilot (a request naming a form by a word the form does not use).
