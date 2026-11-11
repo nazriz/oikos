@@ -27,6 +27,10 @@
           "required": true,
           "type": "entity"
         },
+        "due": {
+          "description": "The day the return falls due by, as the law says.",
+          "type": "date"
+        },
         "law": {
           "description": "The law it is withheld under: the tax law that lists the return (it names the charges each return reports; report them in that return, not in another).",
           "type": "record"
@@ -41,6 +45,18 @@
           "required": true,
           "type": "date"
         },
+        "period_from": {
+          "description": "The day the period began.",
+          "type": "date"
+        },
+        "period_to": {
+          "description": "The day after the period, as the law counts it.",
+          "type": "date"
+        },
+        "return": {
+          "description": "The return, by the name the tax law gives it.",
+          "type": "text"
+        },
         "withheld": {
           "description": "What was withheld in the period, in all.",
           "required": true,
@@ -53,8 +69,12 @@
         "basis": "=law",
         "data": {
           "account": "=account",
+          "due": "=due",
           "paid": "#paid",
           "period_end": "=period_end",
+          "period_from": "=period_from",
+          "period_to": "=period_to",
+          "return": "=return",
           "withheld": "#withheld"
         },
         "kind": "withholding_report",
@@ -95,6 +115,18 @@
           "description": "For a count: how many.",
           "type": "count"
         },
+        "file": {
+          "description": "For a decision by its number: its file, as the books keep it.",
+          "type": "text"
+        },
+        "found": {
+          "description": "For a decision by its number: whether there is one.",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "type": "choice"
+        },
         "nth": {
           "description": "For a decision by its number: which.",
           "type": "count"
@@ -117,8 +149,11 @@
           "ask": "=ask",
           "audit": "=audit",
           "count": "=count",
+          "file": "=file",
+          "found": "?found",
           "nth": "=nth",
-          "request": "=request"
+          "request": "=request",
+          "statement": "=statement"
         },
         "kind": "audit_answer",
         "text": "Answer to audit request {request}: {statement}",

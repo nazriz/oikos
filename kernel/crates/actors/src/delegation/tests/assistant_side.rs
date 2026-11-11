@@ -26,16 +26,19 @@ fn handed(wants: &str, agreement: &str) -> Vec<Value> {
     ]
 }
 
-/// Handed what happened, the code assistant works the paper out from the facts, as its principal's code would have.
+/// Handed what happened, the code assistant fills its principal's own form from the blanks given, working out what the
+/// form works out by its rules (docs/design/broad-seats.md, G2): the paper its principal's code would have sent.
 #[test]
-fn handed_what_happened_it_composes_the_paper_from_the_facts() {
+fn handed_what_happened_it_fills_its_principals_form_from_the_blanks_given() {
     let mut h = assistant(None);
     let mut papers = handed("alone", "agr.1");
+    let spec = serde_json::to_value(oikos_rules::forms::all().into_iter().find(|f| f.form == "export_invoice").unwrap()).unwrap();
     papers[2] = statement("rec.ref", 34 * DAY, ME, "referral", &[PROV], json!({ "agreement": "agr.1", "kind": "invoice", "wants": "alone", "depth": "matter",
-        "facts": { "goods": "goods", "quantity": 20, "sent_from": "works", "to": "outside", "unit_price": "10000", "paid_into": "acc-ll", "under": "rec.16" } }));
+        "facts": { "kind": "goods", "quantity": 20, "from_at": "works", "buyer": "outside", "unit_price": "10000", "account": "acc-ll", "offer": "rec.16",
+            "composed_on": [{ "spec": spec, "bind": "invoice" }] } }));
     let out = all(&h.wake(34 * DAY + 3600, world(papers)));
     let inv = out.lines().find(|l| l.contains("kind=invoice")).unwrap_or_else(|| panic!("{out}"));
-    assert!(inv.starts_with("invoice = statement(") && inv.contains("\"amount\":\"200000\"") && inv.contains("basis=rec.16") && inv.contains("to=[\"outside\"]"), "{inv}");
+    assert!(inv.starts_with("invoice = statement(") && inv.contains("\"amount\":\"200000\"") && inv.contains("\"for\":\"20 goods exported\"") && inv.contains("basis=rec.16") && inv.contains("to=[\"outside\"]"), "{inv}");
 }
 
 fn acted(out: &str) -> bool {

@@ -1581,25 +1581,7 @@ fn not_an_id(x: &str, what: &str) -> String {
     }
 }
 
-/// A length of time in words, as people say one: whole days where it is whole days ("14 days", "1 day"); else whole
-/// hours ("8 hours"); else hours and minutes ("1 hour 30 minutes", "45 minutes"); seconds only where nothing rounder
-/// fits. (The participants' forms write the same: `durationWords`.)
-pub fn duration_words(seconds: i64) -> String {
-    let n = |x: i64, word: &str| if x == 1 { format!("1 {word}") } else { format!("{x} {word}s") };
-    if seconds % 86_400 == 0 {
-        return n(seconds / 86_400, "day");
-    }
-    if seconds < 0 {
-        return n(seconds, "second");
-    }
-    if seconds % 3_600 == 0 {
-        return n(seconds / 3_600, "hour");
-    }
-    if seconds % 60 == 0 {
-        return if seconds > 3_600 { format!("{} {}", n(seconds / 3_600, "hour"), n((seconds % 3_600) / 60, "minute")) } else { n(seconds / 60, "minute") };
-    }
-    n(seconds, "second")
-}
+pub use oikos_rules::form_papers::duration_words;
 
 /// Seconds as whole days, to the nearest (half a day and over rounds up; a negative span mirrors it). Exact integers:
 /// no floating point anywhere results depend on it (until 2026-10-05 this was a float division, rounded; the same

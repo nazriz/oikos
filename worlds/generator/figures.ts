@@ -422,6 +422,7 @@ export const FIGURE_BASIS: Basis[] = [
     prof("delegation.kinds.*.error_cost", "assistants.principals"),
     derived("delegation.kinds.*.own_seconds", "the principal's own time for the paper: the person table's row (work_time)"),
     derived("delegation.kinds.*.late_cost_day", "what a day's delay of a claim for support costs a person: a day of the least payment the place's support law makes (the profile's support.payments; docs/design/obstacles.md section 10), at obstacle levels only"),
+    derived("delegation.forms", "the principal's own forms, as its stationery has them with its own details filled in: the same figures as its records' terms (docs/design/broad-seats.md, G2)"),
     placeholder("delegation.kinds.*.compose_seconds", "the principal's time composing a paper it hands over finished: the generator's share (COMPOSE_BPS) of its own time, the table's compose/<kind> row (WM-1)"),
     placeholder("delegation.seconds", "the times of the papers of delegation (a referral, a go-ahead, a sign-off): the generator's placeholders (ME-22)"),
     prof("offers.*.claim_slip_bps", "assistants.providers"),

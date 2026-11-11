@@ -1,7 +1,7 @@
 # Broad seats: any post's work handed over, any post or person held by a model (design, 2026-11-11)
 
-**Status:** approved by the lead under the owner's go of 2026-11-10 and his question of 2026-11-11; G1 and G2
-building. It follows `docs/design/handing-over.md` (H1 to H6, built) and `docs/design/obstacles.md` (B1 to B3, built).
+**Status:** approved by the lead under the owner's go of 2026-11-10 and his question of 2026-11-11; G1 built; G2
+built. It follows `docs/design/handing-over.md` (H1 to H6, built) and `docs/design/obstacles.md` (B1 to B3, built).
 It decides no result. Contract changes are under the blanket approval of 2026-10-11 and are listed in section 10. The
 lead's decisions on section 12's questions are in section 13.
 
@@ -417,3 +417,10 @@ act of authority, not paperwork sent to anyone, and a model's stationery has no 
 would go out with their claims unrecorded at a model's seat). Where an act also has papers the principal keeps, a
 payment stays with the principal, since which paper it goes with cannot be told.
 
+**As built, G2 (2026-11-11).** As in 4.2 to 4.4, with these differences. The roles default by type and by place: a
+blank only the paper's words use is `words`, and a word the receiving office reads (in the paper's details) is a fact.
+A blank may be words and still have the form's own way of putting it (`worked`), which the code assistant uses and the
+principal does not check (the invoice's memo). A blank the paper does not show can be read from the others (`read`: the
+price of each behind a sum), so that the sum is worked out by the assistant as H5 had it. Facts carry each paper's form
+under `composed_on`, which no seat is shown. A list into which two list blanks are written cannot be read back, and its
+matters go as the finished act. The census found an eleventh misfit after the ten: MT-33, a known exception.

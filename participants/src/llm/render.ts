@@ -47,7 +47,7 @@ const MOMENTS = new Set(["at", "since", "until", "first", "closes", "opens", "du
 // (Details a paper keeps for the record, whose content its own words already say: not set out again. An answer to a
 // request for more scope keeps why each part went as it did as typed codes, for whoever measures, and says it in the
 // office's words; a referral names in its words what its principal does itself. docs/design/handing-over.md, 2026-11-10.)
-const ON_RECORD = new Set(["reasons", "does_itself", "need", "requires"]);
+const ON_RECORD = new Set(["reasons", "does_itself", "need", "requires", "composed_on"]);
 const whole = (v: unknown): v is number | string => (typeof v === "number" && Number.isSafeInteger(v)) || (typeof v === "string" && /^-?(0|[1-9][0-9]{0,37})$/.test(v));
 const percent = (v: number, per: number) => `${String(Number(((v * 100) / per).toFixed(6)))}%`;
 /** A moment as a date, with the time of day where it is not the day's start (so that two moments never read alike). */

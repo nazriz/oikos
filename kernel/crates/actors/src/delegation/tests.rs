@@ -402,12 +402,13 @@ fn a_level_decided_by_hand_as_a_floor_is_kept_at_least_and_its_rule_may_raise_it
 const EXPORT: &str = "goods(at=outside, carried=yes, from_at=works, kind=goods, quantity=\"20\", to=outside)\ninvoice = statement(basis=rec.16, data={\"from_at\":\"works\",\"kind\":\"goods\",\"outcome\":{\"money\":{\"amount\":\"200000\",\"for\":\"20 goods exported\",\"to\":\"acc-ll\"}},\"quantity\":20}, kind=invoice, text=\"Invoice: 20 goods at $100.00 each, $2,000.00.\", to=[\"outside\"], visible=[\"ll\",\"outside\"])";
 
 #[test]
-fn a_matter_handed_over_as_what_happened_carries_its_facts_and_its_draft_is_read_on_its_material_details() {
+fn a_matter_handed_over_as_what_happened_carries_its_facts_read_back_on_its_form_and_its_draft_is_read_on_them() {
     // (A service that takes invoices as what happened: its system works the paper out. The principal's rule weighs that
     // without its composing, and its remit says the depth.)
     let script: Vec<Value> = (1..=40).map(|d| json!({ "at": d * DAY + 3600, "call": EXPORT })).collect();
     let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
-        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "invoice": { "own_seconds": 1800, "error_cost": 1000, "compose_seconds": 900 } }, "hour_value": 4000, "review_days": 30 } }));
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "invoice": { "own_seconds": 1800, "error_cost": 1000, "compose_seconds": 900 } }, "hour_value": 4000, "review_days": 30,
+            "forms": { "invoice": serde_json::to_value(oikos_rules::forms::all().into_iter().find(|f| f.form == "export_invoice").unwrap()).unwrap() } } }));
     let inner = crate::stub::Script.create(&h.ctx).unwrap();
     h.actor = wrap(&h.ctx, inner).unwrap();
     let mut o = offer();
@@ -434,17 +435,17 @@ fn a_matter_handed_over_as_what_happened_carries_its_facts_and_its_draft_is_read
     // (A draft as its own code would have sent it, in other words: signed off. One that invoices for more: declined,
     // the detail named.)
     let referral = last_referral(&h);
-    let same = statement("rec.d1", 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "invoice", "text": "Our invoice for the 20 goods.", "to": ["outside"],
+    let same = statement("rec.d1", 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "invoice", "text": "Our invoice for the 20 goods.", "to": ["outside"], "basis": "rec.16",
         "data": { "kind": "goods", "quantity": 20, "from_at": "works", "outcome": { "money": { "amount": "200000", "to": "acc-ll", "for": "export" } } } } }));
     let out = all(&h.wake(35 * DAY + 3600, world(vec![same])));
     assert!(out.contains("kind=sign_off"), "{out}");
     h.wake(36 * DAY + 3600, world(vec![]));
     let referral = last_referral(&h);
-    let more = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "invoice", "text": "Invoice.", "to": ["outside"],
+    let more = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "invoice", "text": "Invoice.", "to": ["outside"], "basis": "rec.16",
         "data": { "kind": "goods", "quantity": 20, "from_at": "works", "outcome": { "money": { "amount": "250000", "to": "acc-ll" } } } } }));
     let out = all(&h.wake(37 * DAY + 3600, world(vec![more])));
     let no = out.lines().find(|l| l.contains("kind=declined")).unwrap_or_else(|| panic!("{out}"));
-    assert!(no.contains("outcome money amount"), "{no}");
+    assert!(no.contains("the sum invoiced"), "the blank named as its form describes it: {no}");
 }
 
 #[test]

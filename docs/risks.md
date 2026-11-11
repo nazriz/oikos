@@ -1784,6 +1784,20 @@ The mechanism:
 - **Notice by:** a seat's papers citing a referral under another agreement; `oikos-kernel delegation` rows of
   `not_handed` at an organisation with two principals.
 
+### MT-33 · The environment office advertises without the number of openings its form writes
+- **Gap:** The form-fit law (docs/design/broad-seats.md, G2) holds that an office's forms can write every paper its own
+  code writes. The environment office's job postings carry no `openings` in their data, which the job advertisement
+  form writes (every other office's postings do), so they do not read back on the form.
+- **Where:** the environment office's posting (`city.environment`); `participants/src/shared/papers.ts`
+  (`job_advertisement`); the census in `orchestrator/test/office-papers-run.test.ts`, which lists it as the one known
+  exception.
+- **Effect:** A matter of the environment office's postings would go as the finished act, not as what happened; a model
+  holding the office writes postings with the openings, the code without. No study seats it.
+- **L / I:** high / low · **Status:** open (2026-11-11)
+- **Fix when:** with the next change that moves every town's hash (the working-hours law): the code writes `openings`,
+  and the census's exception goes.
+- **Notice by:** the census.
+
 ### MT-32 · The obstacle levels rest on placeholder rates
 - **Gap:** The friction factor's levels (docs/design/obstacles.md section 6) are set by figures no source gives yet:
   how often a body's clerk wrongly sends a paper in order back (200 and 800 basis points), how often a person does not

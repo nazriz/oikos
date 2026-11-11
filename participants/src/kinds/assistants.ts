@@ -54,10 +54,6 @@ export function withObstacles(issues: Issued[]): Issued[] {
   return out;
 }
 
-/** The kinds of paper a matter can be handed over for as what happened (the facts, and the assistant works the paper out):
- * the ones the engine composes (kernel/crates/actors/src/delegation/compose.rs, `MATTER_KINDS`: one list, held by a test
- * there). docs/design/handing-over.md, step H5. */
-export const MATTER_KINDS = ["delivery_note", "invoice"];
 
 /** The draft of one of the principal's papers, for its sign-off: the paper as the principal's own form would write it,
  * carried in the draft (`paper`) and sent as it stands once signed off. */

@@ -55,6 +55,7 @@
     "visible": "public",
     "data": {
      "audit": "=audit",
+     "body": "=body",
      "ask": "=ask",
      "kind": "=kind",
      "nth": "=nth",
@@ -180,6 +181,50 @@
     "particulars": {
      "type": "text",
      "description": "Where any do not agree: each decision and what was found, in the law's terms."
+    },
+    "kind": {
+     "type": "text",
+     "description": "For decisions: the kind of decision."
+    },
+    "due": {
+     "type": "date",
+     "description": "The day the body had to answer by."
+    },
+    "not_found": {
+     "type": "count",
+     "description": "For decisions: how many asked for could not be found."
+    },
+    "not_answered": {
+     "type": "count",
+     "description": "How many requests the body did not answer in time."
+    },
+    "disagreements": {
+     "type": "text",
+     "description": "Where any do not agree: each, as the findings give it."
+    },
+    "reconciles": {
+     "type": "choice",
+     "options": [
+      "yes",
+      "no"
+     ],
+     "description": "For accounts: whether the books and the bank's record agree."
+    },
+    "matched": {
+     "type": "count",
+     "description": "For accounts: payments that agree."
+    },
+    "in_books_not_bank": {
+     "type": "text",
+     "description": "For accounts: payments in the books and not in the bank's record."
+    },
+    "in_bank_not_books": {
+     "type": "text",
+     "description": "For accounts: payments in the bank's record and not in the books."
+    },
+    "differ": {
+     "type": "text",
+     "description": "For accounts: payments that differ in the sum."
     }
    },
    "writes": {
@@ -190,14 +235,24 @@
      "body": "=body",
      "audit": "=audit",
      "check": "=check",
+     "kind": "=kind",
      "period": "#period",
      "from": "=begins",
      "to": "=ends",
+     "due": "=due",
      "population": "#population",
      "sample": "#sample",
      "agreed": "#agreed",
      "not_agreed": "#not_agreed",
-     "not_checked": "#not_checked"
+     "not_checked": "#not_checked",
+     "not_found": "#not_found",
+     "not_answered": "#not_answered",
+     "disagreements": "=disagreements",
+     "reconciles": "?reconciles",
+     "matched": "#matched",
+     "in_books_not_bank": "=in_books_not_bank",
+     "in_bank_not_books": "=in_bank_not_books",
+     "differ": "=differ"
     }
    }
   }
@@ -243,6 +298,18 @@
    "statement": {
     "type": "text",
     "description": "The books' entries asked for, in words."
+   },
+   "found": {
+    "type": "choice",
+    "options": [
+     "yes",
+     "no"
+    ],
+    "description": "For a decision by its number: whether there is one."
+   },
+   "file": {
+    "type": "text",
+    "description": "For a decision by its number: its file, as the books keep it."
    }
   },
   "writes": {
@@ -261,7 +328,10 @@
     "audit": "=audit",
     "ask": "=ask",
     "nth": "=nth",
-    "count": "=count"
+    "count": "=count",
+    "found": "?found",
+    "file": "=file",
+    "statement": "=statement"
    }
   }
  },
@@ -879,6 +949,22 @@
      "required": true,
      "description": "What is paid over now, in all."
     },
+    "period_from": {
+     "type": "date",
+     "description": "The day the period began."
+    },
+    "period_to": {
+     "type": "date",
+     "description": "The day after the period, as the law counts it."
+    },
+    "return": {
+     "type": "text",
+     "description": "The return, by the name the tax law gives it."
+    },
+    "due": {
+     "type": "date",
+     "description": "The day the return falls due by, as the law says."
+    },
     "law": {
      "type": "record",
      "description": "The law it is withheld under: the tax law that lists the return (it names the charges each return reports; report them in that return, not in another)."
@@ -899,7 +985,11 @@
      "account": "=account",
      "paid": "#paid",
      "period_end": "=period_end",
-     "withheld": "#withheld"
+     "withheld": "#withheld",
+     "period_from": "=period_from",
+     "period_to": "=period_to",
+     "return": "=return",
+     "due": "=due"
     }
    }
   }
@@ -1815,6 +1905,14 @@
     "reason": {
      "type": "text",
      "description": "Where it is refused: why."
+    },
+    "decision": {
+     "type": "record",
+     "description": "Where it asked for a decision to be looked at again: the decision."
+    },
+    "review": {
+     "type": "text",
+     "description": "Where a decision was looked at again: what came of it, in a word (upheld, varied, set aside)."
     }
    },
    "writes": {
@@ -1833,7 +1931,9 @@
      "matter": "=matter",
      "granted": "?granted",
      "amount": "#amount",
-     "reason": "=reason"
+     "reason": "=reason",
+     "decision": "=decision",
+     "review": "=review"
     }
    }
   },
@@ -2394,6 +2494,10 @@
    "for_days": {
     "type": "count",
     "description": "How many days the order may be served over."
+   },
+   "pay_in_days": {
+    "type": "count",
+    "description": "Where it is bought on the seller's terms of trade: the days it is paid within, from delivery."
    }
   },
   "writes": {
@@ -2414,7 +2518,8 @@
     "at": "=at",
     "account": "=account",
     "retry_of": "=retry_of",
-    "for_days": "=for_days"
+    "for_days": "=for_days",
+    "pay_in_days": "=pay_in_days"
    }
   }
  },
@@ -3327,6 +3432,14 @@
    "reason": {
     "type": "text",
     "description": "Where it is refused: why."
+   },
+   "decision": {
+    "type": "record",
+    "description": "Where it asked for a decision to be looked at again: the decision."
+   },
+   "review": {
+    "type": "text",
+    "description": "Where a decision was looked at again: what came of it, in a word (upheld, varied, set aside)."
    }
   },
   "writes": {
@@ -3345,7 +3458,9 @@
     "matter": "=matter",
     "granted": "?granted",
     "amount": "#amount",
-    "reason": "=reason"
+    "reason": "=reason",
+    "decision": "=decision",
+    "review": "=review"
    }
   }
  },
@@ -3506,6 +3621,14 @@
     "until": {
      "type": "date",
      "description": "Where granted for a time: the day the payment ends."
+    },
+    "on_review": {
+     "type": "record",
+     "description": "Where it decides a request to look at a decision again: the request."
+    },
+    "replaces": {
+     "type": "record",
+     "description": "Where it replaces an earlier decision: that decision."
     }
    },
    "writes": {
@@ -3526,7 +3649,9 @@
      "reason": "=reason",
      "amount": "#amount",
      "every": "=every",
-     "until": "=until"
+     "until": "=until",
+     "on_review": "=on_review",
+     "replaces": "=replaces"
     }
    }
   }
@@ -3603,6 +3728,18 @@
     "reason": {
      "type": "text",
      "description": "Why not, or why less than was asked."
+    },
+    "asked": {
+     "type": "amount",
+     "description": "How much the claim asked for."
+    },
+    "on_review": {
+     "type": "record",
+     "description": "Where it decides a request to look at a decision again: the request."
+    },
+    "replaces": {
+     "type": "record",
+     "description": "Where it replaces an earlier decision: that decision."
     }
    },
    "writes": {
@@ -3620,9 +3757,12 @@
      "claim": "=claim",
      "taxpayer": "=taxpayer",
      "use": "=use",
+     "asked": "#asked",
      "granted": "?granted",
      "amount": "#amount",
-     "reason": "=reason"
+     "reason": "=reason",
+     "on_review": "=on_review",
+     "replaces": "=replaces"
     }
    }
   },
@@ -3657,6 +3797,14 @@
     "outstanding": {
      "type": "amount",
      "description": "Owing (nothing: 0)."
+    },
+    "to_set_off": {
+     "type": "amount",
+     "description": "Of the credit, what is kept to set against its next return."
+    },
+    "as_of": {
+     "type": "date",
+     "description": "The day the account stands so."
     }
    },
    "writes": {
@@ -3671,11 +3819,13 @@
     ],
     "data": {
      "taxpayer": "=taxpayer",
+     "as_of": "=as_of",
      "owed": "#owed",
      "paid": "#paid",
      "refunded": "#refunded",
+     "outstanding": "#outstanding",
      "credit": "#credit",
-     "outstanding": "#outstanding"
+     "to_set_off": "#to_set_off"
     }
    }
   }
@@ -3779,6 +3929,10 @@
     "for_days": {
      "type": "count",
      "description": "How many days the order may be served over."
+    },
+    "pay_in_days": {
+     "type": "count",
+     "description": "Where it is bought on the seller's terms of trade: the days it is paid within, from delivery."
     }
    },
    "writes": {
@@ -3799,7 +3953,8 @@
      "at": "=at",
      "account": "=account",
      "retry_of": "=retry_of",
-     "for_days": "=for_days"
+     "for_days": "=for_days",
+     "pay_in_days": "=pay_in_days"
     }
    }
   },
@@ -3848,6 +4003,24 @@
       "overdue"
      ],
      "description": "Where nothing was delivered because the order was not paid for, or the buyer had not paid what it owed on earlier ones."
+    },
+    "price_each": {
+     "type": "amount",
+     "description": "Where it is sold on terms: the price of each delivered, which what is owed is worked out from.",
+     "read": "int(owed) / delivered"
+    },
+    "owed": {
+     "type": "amount",
+     "description": "Where it is sold on terms: what is owed for those delivered.",
+     "worked": "delivered * int(price_each)"
+    },
+    "pay_in_days": {
+     "type": "count",
+     "description": "Where it is sold on terms: the days it is to be paid within."
+    },
+    "pay_to": {
+     "type": "account",
+     "description": "Where it is sold on terms: the account it is to be paid into."
     }
    },
    "writes": {
@@ -3868,7 +4041,10 @@
      "delivered": "=delivered",
      "refund": "#refund",
      "unit_price": "#unit_price",
-     "declined": "=declined"
+     "declined": "=declined",
+     "owed": "#owed",
+     "pay_in_days": "=pay_in_days",
+     "pay_to": "=pay_to"
     }
    }
   },
@@ -3943,10 +4119,16 @@
      "required": true,
      "description": "Where they were sent from."
     },
+    "unit_price": {
+     "type": "amount",
+     "description": "The price of each, which the sum is worked out from.",
+     "read": "int(amount) / quantity"
+    },
     "amount": {
      "type": "amount",
      "required": true,
-     "description": "The sum invoiced."
+     "description": "The sum invoiced: how many, at the price of each.",
+     "worked": "quantity * int(unit_price)"
     },
     "account": {
      "type": "account",
@@ -3956,12 +4138,14 @@
     "memo": {
      "type": "text",
      "required": true,
-     "description": "What the payment is for, in a few words."
+     "role": "words",
+     "description": "What the payment is for, in a few words: how many of what, sent.",
+     "worked": "string(quantity) + ' ' + kind + ' exported'"
     }
    },
    "writes": {
     "kind": "invoice",
-    "text": "Invoice: {quantity} {kind}, {amount}.",
+    "text": "Invoice: {quantity} {kind} at {unit_price} each, {amount}.",
     "basis": "=offer",
     "to": [
      "=buyer"

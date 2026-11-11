@@ -85,6 +85,7 @@
   "kernel/crates/rules/src/calendar.rs": 15,
   "kernel/crates/rules/src/decisions.rs": 1,
   "kernel/crates/rules/src/entry.rs": 2,
+  "kernel/crates/rules/src/form_papers.rs": 3,
   "kernel/crates/rules/src/household.rs": 12,
   "kernel/crates/rules/src/rent.rs": 3,
   "kernel/crates/rules/src/returns.rs": 1,

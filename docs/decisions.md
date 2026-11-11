@@ -12947,3 +12947,45 @@ sign-offs). Under the knowing rules a matter handed to a post is that post's.
   this landed.
 - **Revisit if:** a principal's act carries a payment unrelated to its handed papers (then the act must state the link);
   H1's mandate lodged by the office itself is built (then the generator's line goes).
+
+## 2026-11-11 · Broad seats G2: a matter's facts read back on the principal's own form (docs/design/broad-seats.md)
+
+- **What:** at `matter` depth a principal reads each paper of its act back on its own form for the kind
+  (`oikos_rules::form_papers::read_back`, the resolver's template engine read the other way, moved into the rules crate
+  so that the actors can use it; its parameters' `forms`, which the generator gives every principal from its module's
+  `issues` and `handsOver` with its own details filled in). It gives every blank but the writer's words and those the
+  form works out by a rule of its own (`worked`, a rule in the law reader's terms, `oikos_law::value`), where the rule
+  gives its own figure. A blank's role (`fact`, `decided`, `worked`, `words`) defaults by its type and its place in the
+  paper. The code assistant fills the same form through the same writer (`form_papers::compose`); a draft is read back
+  on it and checked on every blank but the words (`form_papers::differs`), a decline naming each blank as the form
+  describes it. `compose.rs` and both `MATTER_KINDS` lists are gone: every kind an organisation's offer takes may go as
+  what happened, and goes as the finished act where a paper does not read back or a line is not a paper (a payment).
+- **Decided blanks hand the principal's decision over** (a price, a sum, a rise, a finding). That is how a manager
+  hands paperwork to a clerk, and it is not widened: the model's choices at this depth are the words, the timing, the
+  records looked up, the follow-up and whether to keep within its remit (the behaviour page says so).
+- **The form-fit law and its census:** an office's forms can write every paper its code writes
+  (`orchestrator/test/office-papers-run.test.ts`, on the run that test already makes). Ten forms were completed with
+  the blanks their code writes (contracts/README.md lists them); the export invoice gained the price of each (read from
+  the sum) and the sum and memo are worked from it, which keeps H5's rule that the assistant works the sum out. One known
+  exception, the environment office's postings without their number of openings, is MT-33, closed with the next change
+  that moves every town.
+- **The move proved** (the study town, seed 7, 90 days after the fork, code arm, levels frozen, wants off): of 237 papers
+  handed over as what happened, 218 were sent by the code assistant with the same kind, addressees, details and basis
+  as the principal's own code's (the `handed` annotation's program): 6 invoices (in the same words too), 21 delivery
+  notes, 189 rates notices, 2 requests for supply, each written on its principal's form. 15 more (one rates instalment)
+  were done by the principal itself after the code assistant's draft slipped, as before; 4 were in acts the world
+  refused before the referral was made (a mover not at the works: not this change's). The words differ for the kinds
+  whose code writes words of its own (the form's words are the code assistant's): delivery notes and rates notices.
+  The town at act and at matter depth is not the same town to the byte, and was not before: at act depth the principal
+  is charged the composing (H3), which moves its own day.
+- **What moves in the study town and `first-pilot.ts` (unchanged as a spec):** rates notices (an instalment's fourteen
+  matters of about fifteen notices each) and requests for supply now go as what happened, beside invoices and delivery
+  notes; delivery notes on terms read back with what is owed worked out; the return with its payment still goes as the
+  finished act (a payment is not a paper). A seat at the rates post is given each notice's blanks (the owner, the lots,
+  the sum, the due day: the office's decision) and drafts each on its form. Every town without providers is unchanged.
+- **Law 11's count:** the template engine moved from the resolver (outside the count) into the rules crate brings its
+  three conventions with it (a name's longest length, the digits of a whole number, the largest whole number a JSON
+  reader keeps exactly): the inventory gains `form_papers.rs: 3`, no new figure.
+- **Revisit if:** a kind's papers often fail to read back (the census says which, and the form is completed); a seat
+  writes papers that differ only in a blank whose role is wrong (then the form says its role); a decision should be
+  left to the assistant within a limit (the lead's question 4: later).

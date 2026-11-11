@@ -31,6 +31,7 @@ pub mod entry;
 pub mod decisions;
 pub mod demand;
 pub mod forms;
+pub mod form_papers;
 pub mod household;
 pub mod identity;
 pub mod labour;

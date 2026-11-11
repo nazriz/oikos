@@ -914,3 +914,25 @@ unchanged to the byte.
 - **B7, readiness to grant:** `KindFacts.late_cost_day` (a principal's parameters), `Seen.waited` and `Seen.waits`
   (its saved state), `Remit.only` (a level for one matter alone, granted on `ScopeRequest.only`, now on the request form
   at obstacle levels).
+
+## Broad seats G1 and G2: an act's paperwork, and matters read back on their forms (2026-11-11; docs/design/broad-seats.md; docs/decisions.md, "Broad seats approved; G1" and "G2"; under the owner's blanket approval of contract changes, 2026-10-11, and the lead's approval of the design, 2026-11-11)
+
+Additions with defaults: every record on file reads as before, and a town without providers is unchanged to the byte.
+
+- **G1:** a `referral` may carry a payment (`money`) beside the papers of its act; `does_itself` then no longer names it.
+  An organisation's assistant's system writes `publish/request` (its template's row). The town's `signatories` name
+  each town office's assistant's post (generator only).
+- **G2:** `FormField` gains `role` (`fact` | `decided` | `worked` | `words`), `worked` (a rule over the other blanks, in
+  the law reader's terms) and `read` (for a blank the paper does not show: how it is read from the others), in the
+  modules' forms and the catalogue (`forms/papers.json`); a published form record shows none of them (FormData's
+  fields are as before). A principal's parameters gain `forms` (kind: its own form, `{form, title, fields, writes}` with
+  its details filled in). At `matter`, `Referral.facts` is the blanks the principal gives for its one paper, or
+  `{papers: [...]}` for several, with `composed_on` (each paper's form and the name its code gave it), which a seat is
+  never shown. An organisation's offer takes every kind at `act` and `matter`. Forms completed with the blanks their
+  code writes: `order` (`pay_in_days`), `delivery_note` (`owed`, `pay_in_days`, `pay_to`; `price_each` read),
+  `export_invoice` (`unit_price` read; `amount` worked; `memo` words with the form's own way of putting it; its words
+  say the price of each), `withholding_return` (`period_from`, `period_to`, `return`, `due`), `remedy_answer`
+  (`decision`, `review`), `benefit_decision` and `tax_credit_decision` (`on_review`, `replaces`; the latter `asked`),
+  `tax_statement` (`as_of`, `to_set_off`), `audit_answer` (`found`, `file`, `statement` in its data), `audit_request`
+  (`body` in its data), `audit_report` (its count's details and the accounts' check). The law reader gains `value` (an
+  expression's value, beside `evaluate`). The rule `forms.read_back` is served to TypeScript.

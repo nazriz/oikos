@@ -17,6 +17,7 @@
     "./generator/profile": "./generator/profile.ts",
     "./generator/weather": "./generator/weather.ts",
     "./generator/scenario": "./generator/scenario.ts",
-    "./generator/figures": "./generator/figures.ts"
+    "./generator/figures": "./generator/figures.ts",
+    "./generator/rules": "./generator/rules.ts"
   }
 }
