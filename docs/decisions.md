@@ -12991,3 +12991,19 @@ for `claude`, no model called) or rebuilt from the smoke's transcripts, each thr
 - **Revisit if:** a larger cohort is wanted for exposure (the study's setting, the lead's call); or the hours law lands
   (then screen the grants again).
 
+
+## 2026-11-12 · The first pilot set: a 45-day baseline at low effort (experiments/scope-pilot/first-pilot.ts)
+
+- **What:** the coordinator's decision on the measurement above: the Claude arms at `--effort low` (`EFFORT`, a
+  condition of this run, stated in its header), and every arm 45 days after the fork (day 30 to 75), not 90, so that a
+  Claude arm comes to about the owner's $50 (Haiku about $52, Sonnet about $43 by the second smoke's sittings; limits
+  half again, $78 and $65, the debriefs' reserve of about $5 inside them). The header says what the run is: a baseline
+  at obstacle level 0 (`obstacles: 0`, the world as before), one seed, Codex not on equal terms, the local arm in plain
+  notes.
+- **Why Sonnet filed no reports in the second smoke:** the cycle had not closed. Its rating-office seat drafted every
+  notice of a referral before reporting it (two referrals of 15 drafted and confirmed by day 33), and its notebook on
+  day 33 reads "NEXT: write report for rec.23998 and rec.22588 (form-rates-assistant-report, client city)"; days 34
+  and 35 were a weekend, with no sitting. It never asked for a report, so neither the form nor the translator was
+  reached; the code assistant files a report with each referral it finishes (15 in the five days). Not a fault of ours.
+- **Revisit if:** the pilot's first week costs more than a fifth of an arm's limit; a seat at low effort is seen to
+  decide differently on a matter that needs care.
