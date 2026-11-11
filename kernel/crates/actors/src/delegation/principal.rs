@@ -597,11 +597,8 @@ impl State {
                 // as it stands on its form for that, `send_signed`. Before 2026-11-10 a seat had to write the paper out
                 // again on the direct form, and read that as beyond a draft-level remit: the scope pilot's one clean
                 // request, and round 5's factory seat.)
-                let paper = x.paper.as_ref().map(|p| signed_copy(p, crate::common::text(r)));
-                let words = match paper {
-                    Some(_) => format!("Draft {} read and signed off. Send it as it stands: this is the signed copy.", r.id),
-                    None => format!("Draft {} read and signed off: send it as it stands.", r.id),
-                };
+                let paper = x.paper.as_ref().map(|p| with_instructions(signed_copy(p, crate::common::text(r)), &m.program));
+                let words = signed_words(&r.id, paper.as_ref());
                 let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
                 self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
             }
@@ -1134,11 +1131,8 @@ impl State {
         let found = self.want_reading(m, x);
         let missed = !found.is_empty() && slip(cx, "publish/sign_off", &r.id, &SlipOptions::default());
         if found.is_empty() || missed {
-            let paper = x.paper.as_ref().map(|p| signed_copy(p, crate::common::text(r)));
-            let words = match paper {
-                Some(_) => format!("Draft {} read and signed off. Send it as it stands: this is the signed copy.", r.id),
-                None => format!("Draft {} read and signed off: send it as it stands.", r.id),
-            };
+            let paper = x.paper.as_ref().map(|p| with_instructions(signed_copy(p, crate::common::text(r)), &m.program));
+            let words = signed_words(&r.id, paper.as_ref());
             let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
             self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
             return;
@@ -1296,7 +1290,7 @@ impl State {
                 }
                 (
                     Referral { agreement: m.agreement.clone(), kind: m.kind.clone(), wants: m.level, calls: Some(m.program.clone()), facts: None, remit: remit.clone(), does_itself: does_itself.to_vec(), depth: Depth::Act, want: None },
-                    format!("For you {}: {}{}. What to do is as written.{}", m.level.words(), a_kind(&m.kind), under(remit.as_deref()), ourselves(does_itself)),
+                    format!("For you {}: {}{}. What to do is as written.{}{}", m.level.words(), a_kind(&m.kind), under(remit.as_deref()), ourselves(does_itself), pays_with(&m.program, m.level)),
                     extra,
                 )
             }
@@ -1657,6 +1651,54 @@ fn signed_copy(paper: &Value, draft_words: &str) -> Value {
     let words = if words.is_empty() { paper.get("text").and_then(Value::as_str).unwrap_or_default() } else { words };
     out.insert("text".to_string(), json!(words));
     Value::Object(out)
+}
+
+/// A signed copy with the instructions to a keeper that belong to the same matter (docs/design/broad-seats.md, G1: a
+/// payment goes with the papers of its act): the matter's own payments, as its code wrote them (`with`, in the call
+/// language), which go out with the paper when the signed copy is sent, citing the sign-off. The draft carries the paper;
+/// the principal's sign-off covers both, as the code assistant's draft carries both.
+fn with_instructions(mut paper: Value, program: &str) -> Value {
+    if let Ok(Program::Lines(lines)) = parse_program(program) {
+        let pay: Vec<Line> = lines.into_iter().filter(|l| l.call.fn_ == "money").map(|l| Line { bind: None, call: l.call }).collect();
+        if !pay.is_empty() {
+            paper["with"] = json!(program_text(&Program::Lines(pay)));
+        }
+    }
+    paper
+}
+
+/// Where a matter's paperwork carries a payment, what becomes of it at a draft's level, in words: the draft is of the
+/// paper, and the signed copy carries the payment, made when it is sent (docs/design/broad-seats.md, G1).
+fn pays_with(program: &str, level: Level) -> &'static str {
+    let pays = matches!(parse_program(program), Ok(Program::Lines(ls)) if ls.iter().any(|l| l.call.fn_ == "money"));
+    match (pays, level) {
+        (true, Level::Draft) => " Draft the paper: the payment that goes with it is signed off with it, and the signed copy we send back carries it, so that sending the paper makes the payment too.",
+        _ => "",
+    }
+}
+
+/// What a principal says with a sign-off: send it as it stands, and, where the signed copy carries the payments that go
+/// with it, each in words (how much, from which account, to which).
+fn signed_words(draft: &str, paper: Option<&Value>) -> String {
+    let Some(p) = paper else { return format!("Draft {draft} read and signed off: send it as it stands.") };
+    let pays: Vec<String> = match p["with"].as_str().map(parse_program) {
+        Some(Ok(Program::Lines(ls))) => ls
+            .iter()
+            .map(|l| {
+                let s = |k: &str| match l.call.get(k) {
+                    Some(oikos_sight::calls::Value::Id(x)) | Some(oikos_sight::calls::Value::Text(x)) => x.clone(),
+                    _ => String::new(),
+                };
+                format!("{} from {} to {}", s("amount"), s("from"), s("to"))
+            })
+            .collect(),
+        _ => vec![],
+    };
+    if pays.is_empty() {
+        format!("Draft {draft} read and signed off. Send it as it stands: this is the signed copy.")
+    } else {
+        format!("Draft {draft} read and signed off. Send it as it stands, with the payment that goes with it ({}): this is the signed copy, and sending it makes the payment too.", pays.join("; "))
+    }
 }
 
 /// A kind of paper in the plural, in words ("invoices", "withholding reports").

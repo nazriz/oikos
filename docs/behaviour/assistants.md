@@ -73,7 +73,10 @@ kind over (`kernel/crates/actors/src/delegation/principal.rs`):
   be told. Until 2026-11-11 a payment always stayed with the principal ("we do the payment that goes with it
   ourselves", the scope pilot's W5), and an order paid with the order would reach the seller after its money (MT-28).
   The town's mandate to its bank names each town office's assistant's post for these payments (a simplification: the
-  office lodging the change of mandate itself, design H1, is not built).
+  office lodging the change of mandate itself, design H1, is not built). At `draft`, a seat drafts the paper on its
+  principal's form; the principal's sign-off covers the payments too, and its signed copy carries them (`with`), so that
+  sending the signed copy makes them in the same act, each citing the sign-off. The referral and the sign-off say so in
+  words. The reader counts such a payment `within` its matter; one a seat makes of its own is sorted as any act.
 - **What happened, read back on its own form** (docs/design/broad-seats.md, G2, 2026-11-11). Where its remit hands a
   kind over as what happened (`matter`), the principal reads each paper of the act back on its own form for the kind
   (its parameters' `forms`: the form its stationery has, its own details filled in; `oikos_rules::form_papers::

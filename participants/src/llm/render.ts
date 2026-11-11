@@ -43,6 +43,8 @@ const MONEY_LISTS = new Set(["prices", "demolition", "goods", "lines", "amounts"
 const TIME_SPANS = new Set(["every", "period", "notice", "term"]);
 // (Dates by the names the world's office papers give them: a payroll notice's first pay day read "first pay: 6652800"
 // to the seats of 2026-10-09.)
+/** Days something falls due by: read as the day, with no time of day. */
+const DAYS_DUE = new Set(["due", "first_due", "answer_by", "pay_by"]);
 const MOMENTS = new Set(["at", "since", "until", "first", "closes", "opens", "due", "first_due", "first_pay", "last_day", "last_from", "period_end", "hold_until"]);
 // (Details a paper keeps for the record, whose content its own words already say: not set out again. An answer to a
 // request for more scope keeps why each part went as it did as typed codes, for whoever measures, and says it in the
@@ -84,7 +86,7 @@ export function readable(x: unknown, how: { fields?: FieldKinds; money?: (a: str
       out[k] = sums ? Object.fromEntries(Object.entries(v as object).map(([n, a]) => [n, sum(a as string)])) : readable(v, deeper, k);
       continue;
     }
-    if (type) out[k] = type === "amount" ? sum(v) : type === "duration" ? duration(Number(v)) : type === "date" ? moment(Number(v)) : v;
+    if (type) out[k] = type === "amount" ? sum(v) : type === "duration" ? duration(Number(v)) : type === "date" ? (DAYS_DUE.has(k) && Number(v) >= 0 ? when(Number(v)) : moment(Number(v))) : v;
     // (Of a standing instruction or a standing work order, `first` is how long after the paper was lodged its first
     // time falls, not a date: read as a date it was a day counted from the world's start, and a seat declined four
     // right drafts and confirmed a wrong one by it, 2026-10-09.)
@@ -94,6 +96,9 @@ export function readable(x: unknown, how: { fields?: FieldKinds; money?: (a: str
     else if (MONEY_DETAILS.has(k) || (k === "from" && under === "brackets")) out[k] = sum(v);
     else if (TIME_SPANS.has(k) || k.endsWith("_seconds")) out[k.endsWith("_seconds") ? k.slice(0, -8) : k] = duration(Number(v));
     // (A notice of a new rent: the day it starts, beside the day the rent now paid started.)
+    // (A day something falls due is a day, never a time of day: a rates notice's "due: year 1, day 61, 12:00:01" read as a
+    // deadline to the second. docs/design/broad-seats.md, G2.)
+    else if (DAYS_DUE.has(k) && Number(v) >= 0) out[k] = when(Number(v));
     else if (MOMENTS.has(k) || k.endsWith("_at") || (k === "from" && whole(o.last_from))) out[k] = moment(Number(v));
     else out[k] = v;
   }
@@ -195,7 +200,11 @@ function factWordsOf(raw: unknown, fields?: FieldKinds, under?: string): string 
     else if (isPlain(v) || (Array.isArray(v) && v.every(isPlain)) || (typeof v === "object" && oneFigure(k, v as object))) {
       // (One detail at a time, so that each is read by its own name, as `readable` reads a paper's.)
       for (const [k2, v2] of Object.entries(readable({ [k]: v }, { ...(fields ? { fields } : {}), ...(sumNow ? { money: sumNow } : {}) }, under) as object)) parts.push(`${words(k2)}: ${Array.isArray(v2) ? (v2.length ? v2.map(plainValue).join(", ") : "none") : isPlain(v2) ? plainValue(v2) : `(${factWords(v2, undefined, k)})`}`);
-    } else parts.push(`${words(k)}: (${factWords(v, undefined, k)})`);
+    } else if (k === "facts" && v !== null && typeof v === "object" && !Array.isArray(v)) last.unshift(`what happened: ${factWords(v, undefined, k)}`);
+    // (Several papers' details, each in turn and numbered, their own details run together: a rates instalment's notices
+    // read as brackets inside brackets until 2026-11-11. docs/design/broad-seats.md, G2.)
+    else if (Array.isArray(v) && v.length && v.every((x) => x !== null && typeof x === "object" && !Array.isArray(x))) parts.push(`${words(k)}: ${v.map((x, i) => `${i + 1}. ${factWords(x, undefined, k).replace(/; /g, ", ")}`).join("; ")}`);
+    else parts.push(`${words(k)}: (${factWords(v, undefined, k)})`);
   }
   return [...parts, ...last].join("; ");
 }
@@ -232,10 +241,13 @@ export function offerWords(o: { [k: string]: any }): string {
 function paperWords(p: { kind?: unknown; to?: unknown; basis?: unknown; text?: unknown; data?: unknown; [k: string]: unknown }): string {
   const to = Array.isArray(p.to) ? p.to.join(", ") : typeof p.to === "string" ? p.to : "";
   const basis = Array.isArray(p.basis) ? p.basis.join(", ") : typeof p.basis === "string" ? p.basis : "";
-  const rest = Object.fromEntries(Object.entries(p).filter(([k]) => !["kind", "to", "basis", "text", "data", "visible", "visible_to", "addressed_to"].includes(k)));
+  const rest = Object.fromEntries(Object.entries(p).filter(([k]) => !["kind", "to", "basis", "text", "data", "visible", "visible_to", "addressed_to", "with"].includes(k)));
+  // (The payments that go with the paper, carried in the signed copy and made when it is sent: said as what they do.
+  // docs/design/broad-seats.md, G1.)
+  const withIt = typeof p.with === "string" ? [`and with it, made when it is sent: ${programWords(p.with)}`] : [];
   return [`${typeof p.kind === "string" ? aKind(p.kind) : "a paper"}${to ? ` to ${to}` : ""}${basis ? `, citing ${basis}` : ""}`,
     ...(typeof p.text === "string" ? [`in these words: "${p.text}"`] : []),
-    ...(p.data !== undefined && p.data !== null ? [`with these details: ${factWords(p.data, typeof p.kind === "string" ? formFields?.get(p.kind) : undefined)}`] : []), ...(Object.keys(rest).length ? [factWords(rest)] : [])].join(", ");
+    ...(p.data !== undefined && p.data !== null ? [`with these details: ${factWords(p.data, typeof p.kind === "string" ? formFields?.get(p.kind) : undefined)}`] : []), ...(Object.keys(rest).length ? [factWords(rest)] : []), ...withIt].join(", ");
 }
 /** A kind of paper with its article: "an invoice", "a benefit claim". */
 const aKind = (kind: string) => `${/^[aeiou]/i.test(words(kind)) ? "an" : "a"} ${words(kind)}`;

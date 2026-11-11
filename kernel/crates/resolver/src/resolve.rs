@@ -1470,7 +1470,20 @@ impl Resolver<'_> {
             if let Some(r) = bind {
                 block.insert("ref".into(), json!(r));
             }
-            return Ok(vec![Json::Object(block)]);
+            // (The payments the signed copy carries go with it, in the same act, citing what signed them: a matter is the
+            // paperwork of its act, and the sign-off covered both. docs/design/broad-seats.md, G1. Payments only: an
+            // instruction to a keeper, nothing else.)
+            let mut out = vec![Json::Object(block)];
+            if let Some(with) = paper.get("with").and_then(Json::as_str) {
+                let Ok(Program::Lines(lines)) = calls::parse_program(with) else { return ask("The signed copy's payment could not be read: draft it again.") };
+                for l in lines.iter().filter(|l| l.call.fn_ == "money") {
+                    let mut call = l.call.clone();
+                    call.args.retain(|(k, _)| k != "basis");
+                    call.args.push(("basis".into(), Value::Id(id.clone())));
+                    out.extend(self.money(&call, None)?);
+                }
+            }
+            return Ok(out);
         }
         // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement
         // the rest of the world reads. It does not cite the form.

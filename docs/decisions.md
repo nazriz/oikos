@@ -13237,3 +13237,23 @@ From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11
 - **Revisit if:** a kind's papers often fail to read back (the census says which, and the form is completed); a seat
   writes papers that differ only in a blank whose role is wrong (then the form says its role); a decision should be
   left to the assistant within a limit (the lead's question 4: later).
+
+## 2026-11-11 · Broad seats G1, completed: a draft's sign-off covers its matter's payments, and the signed copy sends them
+
+- **What (the lead's decision of 2026-11-11, the first option):** a matter is the paperwork of its act, so the
+  instructions to a keeper that belong to a handed-over act travel with its draft. Where a model drafts on its
+  principal's form, the principal's sign-off carries the matter's payments in the signed copy (`with`, in the call
+  language), and sending the signed copy (`send_signed`, both resolvers) makes them in the same act, each citing the
+  sign-off. The referral tells the seat so in plain words ("the signed copy we send back carries it, so that sending
+  the paper makes the payment too"), and so does the sign-off ("with the payment that goes with it ($22717.46 from
+  acc-city to acc-outside)"). The code assistant's drafts already carried both.
+- **The reader:** a payment that goes out with a signed copy, citing the sign-off whose copy carried it, is `within`
+  its matter (`beyond.rs`, `signed_with`); a payment a seat makes of its own, outside any matter, is sorted as before.
+- **Words:** a day something falls due is said as a day, never with a time of day; several papers' details (a rates
+  instalment's notices) are numbered in turn, not brackets inside brackets; the plain-terms backstop
+  (`orchestrator/test/assistants-fork.test.ts`) holds both.
+- **Found by:** the mock fork of the study town with G1 and G2 in (the finance seat's return could be sent signed
+  without its tax).
+- **Revisit if:** a matter carries instructions other than payments (a claim recorded stays the principal's, G1); a
+  seat sends the paper on the direct form instead of the signed copy (then the payment is not made, and the reader
+  says `not_as_signed` or `beyond_level` as before).

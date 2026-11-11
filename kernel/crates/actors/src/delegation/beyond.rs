@@ -52,6 +52,8 @@ pub struct Reader {
     about: BTreeMap<String, String>,
     /// A sign-off's referral, and the paper it signed (where the draft carried one).
     sign_offs: Vec<(i64, String, Option<Value>)>,
+    /// A sign-off whose signed copy carries the payments of its matter (`with`): its id, and its referral.
+    signed_with: BTreeMap<String, String>,
     go_aheads: Vec<(i64, String)>,
     requests: Vec<Value>,
     answers: BTreeMap<String, (i64, Value)>,
@@ -297,7 +299,12 @@ impl Reader {
                 self.referrals.insert(id, ReferralSeen { t, principal: sf, kind: s(&d["kind"]).unwrap_or_default().into(), wants: s(&d["wants"]).unwrap_or_default().into(), calls: s(&d["calls"]).map(String::from), does_itself: does, used: false });
             }
             "draft" => {}
-            "sign_off" => self.sign_offs.push((t, s(&d["referral"]).unwrap_or_default().into(), d.get("paper").filter(|p| p.is_object()).cloned())),
+            "sign_off" => {
+                if d["paper"]["with"].is_string() {
+                    self.signed_with.insert(id.clone(), s(&d["referral"]).unwrap_or_default().into());
+                }
+                self.sign_offs.push((t, s(&d["referral"]).unwrap_or_default().into(), d.get("paper").filter(|p| p.is_object()).cloned()))
+            }
             "go_ahead" => self.go_aheads.push((t, s(&d["referral"]).unwrap_or_default().into())),
             "scope_request" => {
                 // (What it is about: the matter it names, or the matter of the paper it answers.)
@@ -376,6 +383,16 @@ impl Reader {
             return;
         }
         let level = self.level(&principal, kind, t);
+        // (A payment sent with a signed copy, citing the sign-off whose copy carried it: the signed matter's, within its
+        // remit as signed. docs/design/broad-seats.md, G1. A payment a seat makes of its own, citing no such sign-off,
+        // is sorted as any other act.)
+        if let Some(rf) = bases(r).iter().find_map(|b| self.signed_with.get(b.as_str()).cloned()) {
+            let wants = self.referrals.get(&rf).map(|x| x.wants.clone());
+            self.referral_of.insert(id.to_string(), rf.clone());
+            self.acts.push(json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": Value::Null, "level": level,
+                "referral": rf, "wants": wants, "signed": true, "class": "within", "with_signed": true }));
+            return;
+        }
         // (A paper sent again, citing one sorted against a matter (one returned, say): that matter's.)
         let again = bases(r).iter().find_map(|b| self.referral_of.get(b.as_str()).cloned()).filter(|rf| self.referrals.contains_key(rf));
         let (referral, wants) = match again {
@@ -599,16 +616,23 @@ mod tests {
             rec(12, "let1", "letter", "f1", "mgr-assistant", &["f1"], json!({})),
             rec(13, "sr1", "scope_request", "f1", "mgr-assistant", &["f1"], json!({ "agreement": "a", "kind": "invoice", "level": "alone", "matter": "rf2" })),
             rec(14, "sa1", "scope_answer", "f1", "mgr", &["f1"], json!({ "request": "sr1", "granted": false, "reasons": [{ "asked": "level", "granted": false, "why": "costs_more" }] })),
+            // (A return handed over with its payment: the signed copy carries the payment, which goes out with it.)
+            rec(15, "rf4", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "invoice", "wants": "draft" })),
+            rec(16, "so4", "sign_off", "f1", "mgr", &["f1"], json!({ "draft": "d4", "referral": "rf4", "paper": { "kind": "invoice", "to": ["buyer"], "data": { "q": 4 }, "with": "money(amount=\"$1.00\", from=acc-f1, to=acc-b)" } })),
         ] {
             r.take(&e);
         }
+        let mut pay2 = rec(17, "pay2", "request", "f1", "mgr-assistant", &["bank"], json!({ "outcome": { "money": { "from": "acc-f1", "to": "acc-b", "amount": "100" } } }));
+        pay2["body"]["record"]["basis"] = json!("so4");
+        r.take(&pay2);
         let rows = r.rows();
         let class = |id: &str| rows.iter().find(|x| x["record"] == id).map(|x| x["class"].clone());
         assert_eq!(class("inv1"), Some(json!("within")));
         assert_eq!(class("inv2"), Some(json!("beyond_level")));
         assert_eq!(class("inv3"), Some(json!("not_as_signed")));
         assert_eq!(class("inv4"), Some(json!("not_handed")));
-        assert_eq!(class("pay1"), Some(json!("no_remit")));
+        assert_eq!(class("pay1"), Some(json!("no_remit")), "a payment of its own, outside any matter");
+        assert_eq!(class("pay2"), Some(json!("within")), "a payment that went out with the signed copy that carried it (G1)");
         assert_eq!(class("let1"), None, "a letter to its principal is no act of a kind of matter");
         let q = rows.iter().find(|x| x["table"] == "requests").expect("the request");
         assert_eq!((q["level_then"].clone(), q["needed"]["kind"].clone(), q["answer"]["granted"].clone()), (json!("draft"), json!("invoice"), json!(false)));

@@ -151,6 +151,18 @@ fn an_acts_paperwork_goes_as_one_matter_and_its_body_stays_with_the_principal() 
     let (sent, calls) = handed_calls(&h);
     assert!(calls.contains("notice_to_vacate") && calls.contains("acc-tribunal"), "the notice and its payment are one matter: {calls}");
     assert!(sent.contains("carries=notice_to_vacate") && !sent.contains("does_itself"), "of the paper's kind, with nothing left to the principal: {sent}");
+    // (At draft, a seat drafts the paper on its form; the sign-off covers the payment too, and its signed copy carries it,
+    // to go out with the paper when sent: the lead's decision of 2026-11-11.)
+    let mut draft_remit = remit.clone();
+    draft_remit["data"]["level"] = json!("draft");
+    let (mut h, _, _) = engaged_doing(&format!("{NOTICE}\n{pay}"));
+    let out = all(&h.wake(34 * DAY + 3600, world(vec![draft_remit])));
+    assert!(out.contains("sending the paper makes the payment too"), "the seat is told the payment goes with its draft: {out}");
+    let referral = last_referral(&h);
+    let draft = statement("rec.d1", 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": "notice_to_vacate", "text": "Please go.", "to": ["t1"], "basis": "lease-1" } }));
+    let out = all(&h.wake(35 * DAY + 3600, world(vec![draft])));
+    let line = out.lines().find(|l| l.contains("kind=sign_off")).unwrap_or_else(|| panic!("{out}"));
+    assert!(line.contains("\"with\":\"money(") && line.contains("acc-tribunal") && line.contains("with the payment that goes with it ($10.00 from acc-ll to acc-tribunal)"), "{line}");
     // (Goods moved are the body's part: the principal moves them, in the same act as the referral, and says so.)
     let goods = "goods(at=t1-home, carried=yes, from_at=store, kind=goods, quantity=\"3\", to=t1)";
     let (mut h, _, remit2) = engaged_doing(&format!("{NOTICE}\n{goods}"));

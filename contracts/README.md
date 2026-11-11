@@ -936,3 +936,6 @@ Additions with defaults: every record on file reads as before, and a town withou
   `tax_statement` (`as_of`, `to_set_off`), `audit_answer` (`found`, `file`, `statement` in its data), `audit_request`
   (`body` in its data), `audit_report` (its count's details and the accounts' check). The law reader gains `value` (an
   expression's value, beside `evaluate`). The rule `forms.read_back` is served to TypeScript.
+- **G1, completed (2026-11-11):** a sign-off's signed copy (`SignOff.paper`) may carry `with`, the matter's payments in
+  the call language; a form that sends a signed copy (`copies`) makes them in the same act, each citing the sign-off
+  (both resolvers). The reader's `acts` rows gain `with_signed` for such a payment.
