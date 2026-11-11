@@ -247,6 +247,9 @@ pub struct State {
     /// draft to a body that hears the matter was declined.)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     venues: Vec<(String, Vec<String>, i64)>,
+    /// The authorities it has given a body for its assistant's post (`body|post`): docs/design/obstacles.md, O1.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    lodged: BTreeSet<String>,
 }
 
 pub struct Delegating {
@@ -288,6 +291,7 @@ impl Delegating {
                 acknowledged: vec![],
                 changed: false,
                 venues: vec![],
+                lodged: BTreeSet::new(),
             },
         })
     }
@@ -502,6 +506,15 @@ impl State {
             return;
         }
         if let Some(x) = papers::read::<Report>(r) {
+            // (A body would not act on a paper its assistant sent for it without its authority: it gives the body one for
+            // the post, where it keeps that kind with the assistant. Docs/design/obstacles.md, O1.)
+            if let (Some(a), Some(post), false) = (x.needs.as_ref().and_then(|n| n.authority.clone()), r.position.as_deref(), x.done) {
+                let referral = self.book.get(&x.referral).and_then(|q| papers::read::<Referral>(q));
+                if let Some(q) = referral.filter(|q| a.for_ == self.me && hands_over(self.remit(&q.agreement, &q.kind))) {
+                    let kinds = if a.kinds.is_empty() { vec![q.kind.clone()] } else { a.kinds.clone() };
+                    self.lodge(&a.with, post, &kinds, &r.id);
+                }
+            }
             let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
             let Some(m) = self.matters.get(&action).cloned() else { return };
             let k = Self::key(&m.agreement, &m.kind);
@@ -973,6 +986,24 @@ impl State {
             words.push("We do not change what your post is shown on request. Name the record you need and we will send a copy, if it is ours.".into());
             parts.push(Part { asked: "access".into(), granted: false, why: Why::NotChanged });
         }
+        // An authority with a body, for the assistant's post (docs/design/obstacles.md, O1): given for the kinds asked, or
+        // the matter's, where it keeps them with the assistant; a paper of its own to the body, in its own time.
+        if let Some(with) = x.authority.clone().filter(|w| !w.trim().is_empty()) {
+            let kinds: Vec<String> = kind.clone().into_iter().filter(|k| hands_over(self.remit(&x.agreement, k))).collect();
+            let post = r.position.as_deref().map(String::from);
+            let why = match post.filter(|_| !kinds.is_empty()) {
+                Some(post) => {
+                    self.lodge(&with, &post, &kinds, id);
+                    words.push(format!("We are giving {with} our authority for you in {}.", kinds.iter().map(|k| plural(&k.replace('_', " "))).collect::<Vec<_>>().join(" and ")));
+                    Why::Lodged
+                }
+                None => {
+                    words.push(format!("We give {with} no authority for you: name a kind of matter we hand you, or the matter it is for."));
+                    Why::NotLodged
+                }
+            };
+            parts.push(Part { asked: "authority".into(), granted: why == Why::Lodged, why });
+        }
         if x.limit.is_some() {
             let set = self.book.all(Brief::KIND).filter_map(|b| papers::read::<Brief>(b)).filter(|b| b.agreement == x.agreement).filter_map(|b| b.limit).last();
             let why = match set {
@@ -992,7 +1023,7 @@ impl State {
             parts.push(Part { asked: "words".into(), granted: false, why: Why::NothingNamed });
         }
         // (Granted: a new remit, or a copy sent. A level it holds already is no grant.)
-        let granted = remit.is_some() || copy.is_some();
+        let granted = remit.is_some() || copy.is_some() || parts.iter().any(|p| p.why == Why::Lodged);
         if let Some(p) = parts.iter_mut().find(|p| p.asked == "level" && p.why == Why::Granted) {
             p.granted = remit.is_some();
         }
@@ -1106,6 +1137,32 @@ impl State {
     }
 
     /// A paper of its own to its assistant, about a service.
+    /// Its authority with a body for its assistant's post, for kinds of paper (docs/design/obstacles.md, O1): a paper of
+    /// its own to the body, which the body's clerk records in its own time. Seen by the post it names, as an authority
+    /// form's agent is told. Once for each body and post.
+    fn lodge(&mut self, with: &str, post: &str, kinds: &[String], basis: &str) {
+        let key = format!("{with}|{post}");
+        if self.lodged.contains(&key) {
+            return;
+        }
+        self.lodged.insert(key);
+        let named = if kinds.is_empty() { "the papers it sends for us".to_string() } else { kinds.iter().map(|k| plural(&k.replace('_', " "))).collect::<Vec<_>>().join(" and ") };
+        let words = format!("Our authority for {post} to act for us with you in {named}.");
+        let c = say(
+            crate::common::intake::AUTHORITY,
+            &words,
+            Say {
+                to: Some(vec![with.to_string()]),
+                visible: Some(Visible::Only(vec![self.me.clone(), with.to_string(), post.to_string()])),
+                basis: (!basis.is_empty()).then(|| basis.to_string()),
+                data: Some(json!({ "posts": [post], "kinds": kinds })),
+                ..Default::default()
+            },
+        );
+        let s: Step<()> = because(&words, vec![c]);
+        self.queue.push(Own { program: program_text(&s.program()), why: words, then: Then::Plain });
+    }
+
     fn paper(&mut self, kind: &str, words: &str, agreement: &str, basis: &str, data: Value, then: Then) {
         let (to, visible) = self.to_assistant(agreement);
         let c = say(

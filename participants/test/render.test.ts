@@ -22,6 +22,12 @@ test("the papers of delegation read in the office's words: a signed copy as the 
   expect(answer).not.toMatch(/held|reasons|why|5184000|5,184,000/);
   expect(answer).toContain(when(86_400 * 60));
   expect(factWords({ agreement: "rec.1", kind: "withholding_report", wants: "draft", does_itself: ["money"] })).not.toMatch(/does itself|money/);
+  // (A paper a body sent back carries the paper as it was, and says what it needs in its own words only; a body's notice
+  // of what it requires keeps its items as data: docs/design/obstacles.md.)
+  const back = factWords({ returned: "rec.90", need: { correction: ["purpose"] }, paper: { kind: "loan_application", text: "A loan, please.", to: ["bank"], data: { amount: 500000, purpose: "" }, basis: ["rec.90"] } });
+  expect(back).toContain("the paper: a loan application to bank");
+  expect(back).not.toMatch(/need|correction|\{/);
+  expect(factWords({ requires: { items: { loan_application: [{ field: "purpose", says: "what it is for" }] }, authority: ["loan_application"] } })).toBe("");
   // (A collector's payment details: where what is owed goes, with no sum.)
   expect(factWords({ law: "law-income-tax", outcome: { money: { to: "acc-outside", for: "tax on pay" } } })).toContain("pay what is owed into acc-outside (tax on pay)");
 });

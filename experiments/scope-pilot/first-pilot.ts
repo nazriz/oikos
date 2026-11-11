@@ -6,7 +6,7 @@
 // four seats): Claude Haiku 5.5 and Claude Sonnet 5.5 through the owner's Claude subscription (`claude -p`, the
 // `claude-code/` route: never the Anthropic API key), the code assistant as the reference, gpt-6.1-sol through the
 // owner's Codex subscription (a labelled extra, not on equal terms), and a local open-weight model (LOCAL, below) where
-// the local test found one that can hold a seat. Our translator alone (`decide/pod-small-v3-s2`,
+// the local test found one that can hold a seat. Our translator alone (`decide/round3-s2`, build.ts `OURS`,
 // nobody behind it); the framing unstated (a seat that asks is told the truth; every seat is debriefed); each model at
 // its default effort.
 //

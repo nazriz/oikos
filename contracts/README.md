@@ -885,3 +885,27 @@ code-only town is unchanged to the byte (the 300-person town, 90 days: the same 
   `look_first`, `needs_calculation`, `unknown_form` and `unclear` keep their own.
 - **A date with its day first** (`"day 22 of year 1"`) is read as the same date as `"year 1, day 22"`, for `first` and
   `until` and for a form's date field (both resolvers; `contracts/test/when.json`).
+
+## Obstacles (2026-11-11; docs/design/obstacles.md; docs/decisions.md, "Obstacles B1" and after; under the owner's blanket approval of contract changes, 2026-10-11, and the lead's approval of the design, 2026-11-11)
+
+Additions with defaults: every record on file reads as before, and a town where no obstacle law is configured is
+unchanged to the byte.
+
+- **B1, the record and the reader:** the decision annotation with `domain: "obstacle"` (`law`: `acceptance` |
+  `authority` | `record` | `approval`; `paper`, the paper sent back or awaited; `principal`; `counterparty`; `need`;
+  `clears_by`; `slip`), written by the actor whose law makes the obstacle, read only by measures. `ScopeRequest.only`
+  (a referral: the level asked for that matter alone) and `ScopeRequest.authority` (a body the principal is asked to
+  give the assistant its authority with). `Report.needs` (`Need`: `authority` {`for`, `with`, `kinds`}, `record`,
+  `correction`). `oikos-kernel delegation` gains the table `obstacles` (each with its matter and `met_at`, the time
+  the paper that told of it reached an assistant's seat) and, on each request, `obstacle` and `axes` (matters, kinds,
+  level, access, means: `within` | `beyond`; the term and the words are the coders').
+- **B2, a body's requirements (O4):** the papers `requirements` (a body's public notice of what it needs on papers sent
+  to it; data `requires`: `items` by kind, `authority`, `basis`), `paper_returned` (`returned`, the paper sent back;
+  `need`; `paper`, a copy of it as it was, citing it, which a form may send again as it stands) and `authority` /
+  `authority_recorded` (a person's authority for posts to act for them with a body, for kinds; the body's record of it,
+  to the giver and the posts named). The modules' parameter `requires` (bank.lending, world.transfers). FormData
+  `copies` reads a paper sent back as it reads a sign-off (both resolvers; `contracts/test/forms.json`); the form
+  `send_again`. The world spec's `obstacles` (0, 1, 2; generator only). Rows of the table of slips `accept/<kind>`.
+- **B3, an authority on file (O1):** at levels 1 and 2 a body's `requires.authority` names the kinds it acts on for a
+  person only on their own word or an authority they gave it. `ScopeRequest.authority` reaches the request form (one
+  plain blank: the body); the principal answers it by giving the authority, `reasons` `lodged` or `not_lodged`.

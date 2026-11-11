@@ -8,6 +8,7 @@
 // and the label step that carries a request's world with it (readers.ts).
 
 import { expect, test } from "bun:test";
+import { taught } from "../model/taught";
 import { calls, formatMoney, type Currency } from "@oikos/participants";
 import TABLE from "../../contracts/test/amounts.json";
 import { translatorSystem } from "../src/index";
@@ -232,7 +233,7 @@ test("a trained model's answer copies an amount exactly, however its world write
       ] as const) {
         const spans = spansIn(request, program);
         const e = encode({ request, forms: [], program, spans });
-        const canonical = calls.programText(calls.parseProgram(program));
+        const canonical = taught(program)!;
         expect(decode(e.input, e.steps)).toBe(canonical);
         // As pieces, what a model points at: the amount is whole pieces, and comes back character for character.
         const r = row("x", "positive", e);

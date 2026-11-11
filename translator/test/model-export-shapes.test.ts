@@ -7,6 +7,7 @@
 // reaches a model, so none of these kinds may be cut.
 
 import { expect, test } from "bun:test";
+import { taught } from "../model/taught";
 import { calls } from "@oikos/participants";
 import type { LlmAdapter, LlmRequest } from "@oikos/participants/llm";
 import { decode, encode, vocabulary } from "../model/encode";
@@ -76,7 +77,7 @@ test("the export cuts none of the new kinds: holds, entries, standing work, dire
     for (const e of of) {
       const back = exported(e);
       if (back === undefined) cut.push(`${kind}: ${e.program}`);
-      else expect(back).toBe(calls.programText(calls.parseProgram(e.program)));
+      else expect(back).toBe(taught(e.program)!);
     }
   }
   expect(cut).toEqual([]);

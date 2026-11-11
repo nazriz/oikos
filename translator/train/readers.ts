@@ -25,6 +25,7 @@ import { canonical } from "../eval/run";
 import { decode, encode } from "../model/encode";
 import { row, stepsOf } from "../model/export";
 import { formOfLine, type BlindAnswer } from "./blind";
+import { taught } from "../model/taught";
 import { sameButForFreeText } from "./meaning";
 import { DATA_VERSION, formOf, functionOf, goldText, needed, sameProgram, shapeOf, spanOf, spansIn, type Example, type FormSpec, type Needed } from "./data";
 
@@ -210,7 +211,8 @@ function asExample(u: Unlabelled, parsed: calls.Program, forms: FormSpec[], by: 
     const r = row(example.id, example.kind, enc);
     if (!r) return { why: "not_encodable", detail: "a span cuts a piece of the input" };
     const back = decode(enc.input, stepsOf(r, r.steps));
-    if (canonical(back) !== canonical(program)) return { why: "not_encodable", detail: `the steps give ${back}` };
+    // (Read back in the taught language: what the host sets by rule is no decision of the model's, model/taught.ts.)
+    if (canonical(back) !== canonical(taught(program) ?? program)) return { why: "not_encodable", detail: `the steps give ${back}` };
   } catch (e) {
     return { why: "not_encodable", detail: String((e as Error).message).slice(0, 300) };
   }

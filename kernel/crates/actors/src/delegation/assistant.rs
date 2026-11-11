@@ -48,7 +48,7 @@ impl Kind for Assistant {
         DAY
     }
     fn create(&self, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
-        Ok(Box::new(Stepper::new(Assisting { me: ctx.entity.clone(), sys: ctx.participant.clone(), book: Book::new(), mine: vec![], matters: BTreeMap::new(), handled: BTreeSet::new(), ways: BTreeMap::new() })))
+        Ok(Box::new(Stepper::new(Assisting { me: ctx.entity.clone(), sys: ctx.participant.clone(), book: Book::new(), mine: vec![], matters: BTreeMap::new(), handled: BTreeSet::new(), ways: BTreeMap::new(), sent: vec![], awaiting: vec![] })))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
         Ok(Box::new(Stepper::<Assisting>::restore(saved)?))
@@ -94,8 +94,12 @@ struct InHand {
 pub enum Then {
     /// Its draft or request on file: its id is what an answer will cite.
     Asked { referral: String },
-    /// The act carried out: what follows is the report.
-    Did { referral: String },
+    /// The act carried out: what follows is the report. (What it sent, kept should a paper of it come back.)
+    Did {
+        referral: String,
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        calls: String,
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -111,6 +115,14 @@ struct Assisting {
     /// At want depth, the way it took on each matter (the paper it sent and to whom), for its report.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     ways: BTreeMap<String, String>,
+    /// The papers it sent on its matters (their ids): the referral, and what it sent, should one come back
+    /// (docs/design/obstacles.md, O1 and O4). The newest few hundred.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    sent: Vec<(String, String, String)>,
+    /// Papers a body sent back for want of a client's authority: (the body, the client, the referral, what it sent, the
+    /// paper sent back), until the body records one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    awaiting: Vec<(String, String, String, String, String)>,
 }
 
 impl Assisting {
@@ -137,7 +149,11 @@ impl Assisting {
     }
 
     fn report(&self, m: &Mine, referral: &str, done: bool, created: BTreeMap<String, String>, why: Option<String>) -> Step<Then> {
-        let r = Report { referral: referral.to_string(), done, created, why: why.clone(), way: self.ways.get(referral).cloned() };
+        self.report_needing(m, referral, done, created, why, None)
+    }
+
+    fn report_needing(&self, m: &Mine, referral: &str, done: bool, created: BTreeMap<String, String>, why: Option<String>, needs: Option<crate::papers::delegation::Need>) -> Step<Then> {
+        let r = Report { referral: referral.to_string(), done, created, why: why.clone(), way: self.ways.get(referral).cloned(), needs };
         let words = if done { format!("Done: {referral}.") } else { format!("Not done: {referral} ({}).", why.as_deref().unwrap_or("")) };
         because(words.clone(), vec![self.say_to(m, Report::KIND, &words, referral, papers::data(&r))])
     }
@@ -169,7 +185,9 @@ impl Assisting {
                 }
             }
         }
-        let mut s = Step::new(lines).then(Then::Did { referral: referral.to_string() });
+        // (It keeps what it sent where a body it may write to has said it sends papers back: docs/design/obstacles.md.)
+        let keep = self.book.open(crate::common::intake::NOTICE).next().is_some();
+        let mut s = Step::new(lines).then(Then::Did { referral: referral.to_string(), calls: if keep { calls.to_string() } else { String::new() } });
         s.why = Some(format!("Doing what {referral} asks."));
         s
     }
@@ -227,6 +245,23 @@ impl Assisting {
             lines.push(Line { bind: None, call: crate::steps::pay(&to, cost, crate::steps::Pay { from: Some(acc), for_: Some("Application fee.".into()), ..Default::default() }, cx) });
         }
         Ok((oikos_sight::calls::program_text(&Program::Lines(lines)), way))
+    }
+}
+
+/// A call made to cite one more record (its `basis`, kept with any it cited already).
+fn cite(c: &mut oikos_sight::calls::Call, id: &str) {
+    use oikos_sight::calls::Value as Arg;
+    match c.args.iter_mut().find(|(k, _)| k == "basis") {
+        Some((_, v)) => {
+            let mut all: Vec<Value> = match v {
+                Arg::Id(x) | Arg::Text(x) => vec![Value::from(x.clone())],
+                Arg::Json(Value::Array(a)) => a.clone(),
+                _ => vec![],
+            };
+            all.push(Value::from(id));
+            *v = Arg::Json(Value::Array(all));
+        }
+        None => c.args.push(("basis".into(), crate::steps::arg(id))),
     }
 }
 
@@ -388,6 +423,61 @@ impl Plan for Assisting {
             }
             let _ = m.kind;
         }
+        // Papers of its own a body sent back (docs/design/obstacles.md, O1 and O4): one the body could not match to its
+        // records is sent again as it was, citing the return; for anything else (an authority, an item its form asks
+        // for) it reports the matter not done, with what would clear it, as the body said.
+        let back: Vec<(String, String, String, Value)> = self
+            .book
+            .all(crate::common::intake::RETURNED)
+            .filter(|r| !self.handled.contains(r.id.as_str()))
+            .filter_map(|r| {
+                let d = crate::common::data(r).to_value();
+                let (_, rf, calls) = self.sent.iter().find(|x| Some(x.0.as_str()) == d["returned"].as_str())?;
+                Some((r.id.to_string(), rf.clone(), calls.clone(), d))
+            })
+            .collect();
+        for (id, rf, calls, d) in back {
+            self.handled.insert(id.clone());
+            let Some(m) = self.service_of(&rf) else { continue };
+            let need = &d["need"];
+            if need.get("authority").is_none() && need["correction"].as_array().is_none_or(|a| a.is_empty()) {
+                let mut st = self.send(&m, &rf, &calls);
+                for l in &mut st.lines {
+                    cite(&mut l.call, &id);
+                }
+                st.why = Some(format!("{id} sent {rf}'s paper back: sending it again."));
+                steps.push(st);
+            } else {
+                let needs = serde_json::from_value::<crate::papers::delegation::Need>(need.clone()).ok();
+                // (Waiting on an authority: it sends the paper again once the body says it has recorded one.)
+                if let Some(a) = needs.as_ref().and_then(|n| n.authority.clone()) {
+                    self.awaiting.push((a.with, a.for_, rf.clone(), calls.clone(), id.clone()));
+                }
+                let why = self.book.get(&id).map(|r| crate::common::text(r).to_string());
+                steps.push(self.report_needing(&m, &rf, false, BTreeMap::new(), why, needs));
+            }
+        }
+        // An authority a body recorded for a client it waits on: the paper sent back for want of it goes again.
+        let recorded: Vec<(String, String, Vec<String>)> = self
+            .book
+            .all(crate::common::intake::RECORDED)
+            .filter(|r| !self.handled.contains(r.id.as_str()))
+            .map(|r| (r.id.to_string(), r.speaks_for.as_deref().unwrap_or(r.author.as_str()).to_string(), crate::common::addressed_to(r).iter().map(|x| x.to_string()).collect()))
+            .collect();
+        for (id, with, to) in recorded {
+            self.handled.insert(id.clone());
+            let (now, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.awaiting).into_iter().partition(|w| w.0 == with && to.contains(&w.1));
+            self.awaiting = rest;
+            for (_, _, rf, calls, returned) in now {
+                let Some(m) = self.service_of(&rf) else { continue };
+                let mut st = self.send(&m, &rf, &calls);
+                for l in &mut st.lines {
+                    cite(&mut l.call, &returned);
+                }
+                st.why = Some(format!("{with} has recorded the authority it needed: sending {rf}'s paper again."));
+                steps.push(st);
+            }
+        }
         steps
     }
 
@@ -399,11 +489,20 @@ impl Plan for Assisting {
                 }
                 vec![]
             }
-            Then::Did { referral } => {
+            Then::Did { referral, calls } => {
                 let Some(svc) = self.service_of(referral) else { return vec![] };
                 match done {
                     Done::Outcome(o) if done.applied() => {
                         let created: BTreeMap<String, String> = o.created.iter().flatten().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+                        if !calls.is_empty() {
+                            for id in created.values() {
+                                self.sent.push((id.clone(), referral.clone(), calls.clone()));
+                            }
+                            if self.sent.len() > crate::figures::KEPT_ACKNOWLEDGED {
+                                let over = self.sent.len() - crate::figures::KEPT_ACKNOWLEDGED;
+                                self.sent.drain(..over);
+                            }
+                        }
                         vec![self.report(&svc, referral, true, created, None)]
                     }
                     Done::Outcome(o) => vec![self.report(&svc, referral, false, BTreeMap::new(), Some(o.refusal.as_ref().and_then(|r| r.detail.clone()).unwrap_or_else(|| "refused".into())))],

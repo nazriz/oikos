@@ -2,6 +2,7 @@
 // pipeline, the seen cases and the trained model's code (docs/design/call-language-gaps.md B.1, B.2, B.3, B.5).
 
 import { expect, test } from "bun:test";
+import { taught } from "../model/taught";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -170,7 +171,7 @@ test("through the pipeline: holds and entries become examples with their spans, 
   const orders = kept.filter((e) => e.program.startsWith("work(") && e.program.includes("until="));
   expect(orders.length).toBeGreaterThan(5);
   const all = [...holds, ...entries, ...refusals, ...orders].map((e) => encode(e));
-  [...holds, ...entries, ...refusals, ...orders].forEach((e, i) => expect(decode(all[i]!.input, all[i]!.steps)).toBe(calls.programText(calls.parseProgram(e.program))));
+  [...holds, ...entries, ...refusals, ...orders].forEach((e, i) => expect(decode(all[i]!.input, all[i]!.steps)).toBe(taught(e.program)!));
   const v = vocabulary(all);
   for (const [choice] of ADDED) expect(v).toContain(choice);
   expect(v).toContain("const:entry");

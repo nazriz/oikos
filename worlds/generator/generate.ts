@@ -8,9 +8,9 @@
 
 import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
-import { ASSISTANT_ISSUES, MATTER_KINDS, clientDraft, clientDraftOf, clientPapers, wantPapers, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { ASSISTANT_ISSUES, withObstacles, MATTER_KINDS, clientDraft, clientDraftOf, clientPapers, wantPapers, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
-import { COMPOSE_BPS, SCOPE_ANSWER_SECONDS } from "./registry";
+import { COMPOSE_BPS, SCOPE_ANSWER_SECONDS, WRONG_RETURN_BPS } from "./registry";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
@@ -201,6 +201,27 @@ const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "
  * id in a referral's words could not be named (docs/decisions.md, 2026-11-08, "The scope pilot's first round"). */
 const ASSISTANT_TERMS = ["service_delivery", "service_ended", "brief", "remit"];
 const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement"];
+/** What the bodies that receive persons' papers require of them, at obstacle levels 1 and 2 (docs/design/obstacles.md,
+ * O4): the items their own forms ask for, each a field every code actor that files the kind fills. Basis: a lender's
+ * application asks how much, over how long, what for and the account; a support claim the payment and the account to
+ * pay it into (the forms of the place's lenders and support agency, to confirm). Not a place's figure: what a paper of
+ * the kind is. */
+const OBSTACLE_ITEMS: Record<string, { field: string; says: string }[]> = {
+  loan_application: [{ field: "amount", says: "how much" }, { field: "months", says: "over how many months" }, { field: "account", says: "the account to pay it into" }, { field: "purpose", says: "what it is for" }],
+  benefit_claim: [{ field: "payment", says: "the payment claimed" }, { field: "account", says: "the account to pay it into" }],
+};
+// (How often a body's clerk wrongly sends back a paper in order, by obstacle level, WRONG_RETURN_BPS, is in the registry.)
+/** A body's requirements at an obstacle level, as its `requires` parameter (none at level 0). */
+/** The kinds a body acts on for a person only on their own word or an authority they gave it (docs/design/obstacles.md,
+ * O1), at levels 1 and 2. Basis: a support agency acts for someone else only under a nominee or similar arrangement the
+ * claimant lodges on its form; a lender takes an application through a broker only with the applicant's consent (the
+ * place's agency and lenders, to confirm). What such a body is, not a place's figure. */
+const AUTHORITY_KINDS = ["loan_application", "benefit_claim"];
+const obstacleRequires = (level: number, kinds: string[]) => (level > 0 ? { requires: { items: Object.fromEntries(kinds.filter((k) => OBSTACLE_ITEMS[k]).map((k) => [k, OBSTACLE_ITEMS[k]])), authority: kinds.filter((k) => AUTHORITY_KINDS.includes(k)), basis: "docs/design/obstacles.md, O4 and O1: the items its form asks for, and the papers it acts on for someone else only with their authority (to confirm against the place's forms)." } } : {});
+/** The channels an assistant's post gains where obstacle laws are on: what the bodies it writes to publish they require, as
+ * it comes; papers sent back to it, and authorities recorded for its clients. */
+const obstacleChannels = (level: number) => (level > 0 ? [K.published("requirements", ["requirements"], { title: "What the bodies you write to need on the papers sent to them, as each publishes it" }), K.mine("returned", ["paper_returned", "authority_recorded"], { title: "Papers sent back to you, saying what is missing" })] : []);
+
 // (Each keeps to its post, `own_post`: what a principal hands its assistant is addressed to the assistant's post as
 // well as to the organisation, and an organisation with two assistants' posts shows each only its own: risk MT-31.)
 const assistantChannels = (also: string[] = []) => [
@@ -343,6 +364,11 @@ export interface TownSpec {
    * the kinds `want-<about>` (WANT_KINDS) at want depth, the desk sees the bodies that say what they hear and writes the
    * papers a want takes. Off unless set: a town without it is generated exactly as before. Needs `assistants`. */
   assistant_wants?: boolean;
+  /** The obstacle laws at a study's level (docs/design/obstacles.md section 6): 0 or absent, none (the world exactly as
+   * before); 1, each body at its ordinary figure; 2, at the strained end. The bodies that receive persons' papers (the
+   * lender, the support office) publish what they require (`OBSTACLE_ITEMS`), and their clerks send back a paper that
+   * falls short, or wrongly one in order at the level's rate (`WRONG_RETURN_BPS`, placeholders). */
+  obstacles?: 0 | 1 | 2;
   /** What a person keeps of public goings-on (docs/behaviour/citizen.md, "What a person remembers of public goings-on";
    * risk SC-1): on unless set false (then everyone keeps every published paper for good, as before 2026-10-24); or the
    * bound's sizes in place of the generator's placeholders. */
@@ -666,6 +692,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // Assistants on offer (docs/behaviour/assistants.md): only where the town asks for them; a town that does not is as before.
   if (spec.assistants && !V.assistants) throw new Error(`profile ${P.id} has no assistants on offer (values.assistants), and the town asks for them`);
   // (Wants handed over, where the town asks: the persons' offers take the kinds of want too, at want depth.)
+  const OB = spec.obstacles ?? 0;
   const AS = spec.assistants && V.assistants ? (spec.assistant_wants ? { ...V.assistants, providers: V.assistants.providers.map((pr) => ({ ...pr, offers: pr.offers.map((o) => (o.for === "persons" ? { ...o, kinds: [...o.kinds, ...WANT_KINDS] } : o)) })) } : V.assistants) : undefined;
   const entities: any[] = [
     { id: "outside", kind: "boundary", name: "The outside world" },
@@ -2707,7 +2734,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const Cr = V.credit;
   office("bank-lending", "bank", "Lending officer", undefined, [{ id: "ledger", kind: "accounts" }, mine("applications"), K.lookUp(), deaths, lawBook],
     code("bank.lending", { who: "who", pay_staff: true, rate_bps: Cr.lending_rate_bps, buffer_bps: Cr.serviceability_buffer_bps ?? 0, max_share_bps: Cr.max_repayment_share_bps, max_months: Cr.max_months,
-      default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: Cr.reserve, ...(OW?.market ? { mortgage_rate_bps: OW.mortgage_rate_bps, mortgage_max_months: OW.market.mortgage_months, max_lvr_bps: 10_000 - OW.market.deposit_bps } : {}), funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
+      default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: Cr.reserve, ...obstacleRequires(OB, ["loan_application"]), ...(OW?.market ? { mortgage_rate_bps: OW.mortgage_rate_bps, mortgage_max_months: OW.market.mortgage_months, max_lvr_bps: 10_000 - OW.market.deposit_bps } : {}), funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
   // The weather bureau (the outside world's): warns of heavy rain, drought and heatwaves a few days ahead.
   if (W?.events.length) office("weather-bureau", "outside", "Weather bureau", undefined, [K.mine("bureau", ["weather_warning"])], code("world.weather", { events: W.events, lead_days: CL!.warning_lead_days }));
   office("outside-funding", "outside", "Wholesale funding", undefined, [{ id: "ledger", kind: "accounts" }, K.mine("draws", ["funding_draw"])], code("world.funding", { account: "acc-outside" }));
@@ -2778,7 +2805,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         ...(spec.assistant_seats?.includes(desk.template) ? assistantSeat(pr, desk) : { controller: code("assistant"), framing: unstated }) });
       // (And its service agreements with its clients, looked up on request: the desk is party to each, and a referral
       // cites the one it comes under. Until 2026-11-08 it could not read them: the scope pilot's W1.)
-      positions.push({ id: `${pr.id}-desk`, entity: pr.id, title: "Assistants' desk", channels: [...assistantChannels(), K.mine("agreements", { records: ["agreement"] }, { title: "Your service agreements with your clients, looked up on request (look, with what to find)", on_request: true }),
+      positions.push({ id: `${pr.id}-desk`, entity: pr.id, title: "Assistants' desk", channels: [...assistantChannels(), ...obstacleChannels(OB), K.mine("agreements", { records: ["agreement"] }, { title: "Your service agreements with your clients, looked up on request (look, with what to find)", on_request: true }),
         // (Handed wants, it finds for itself which bodies say they hear a matter, as anyone can.)
         ...(spec.assistant_wants && FR ? [K.published("hearings", { has: ["hears"] })] : [])], holder: `${pr.id}-desk-system` });
     }
@@ -3509,7 +3536,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const post = `${pos.id}-assistant`;
       // (The account it pays from and its keeper: the organisation's own, so its post may be shown it. Before 2026-11-10 a
       // seat could not name the bank to ask it to pay from it: "You don't know who keeps account acc-factory-1".)
-      positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: [...assistantChannels(kinds), { id: "account", kind: "accounts" }] });
+      positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: [...assistantChannels(kinds), ...obstacleChannels(OB), { id: "account", kind: "accounts" }] });
       assistantPosts.push({ post, entity: pos.entity, code: m.code, kinds });
       Object.assign(m.params, { delegation: { post, account: `acc-${pos.entity}`, hour_value: hourValue,
         kinds: Object.fromEntries(kinds.map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost, compose_seconds: composeOf(k) }])),
@@ -3536,7 +3563,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const m = modules[a.code];
       const own = m?.issuesWith?.(positions.find((p) => p.id === a.post.replace(/-assistant$/, ""))?.role_module?.params ?? {}) ?? {};
       const theirs = [...(m?.issues ?? []), ...(m?.handsOver ?? [])].filter((x) => a.kinds.includes(x.writes.kind));
-      for (const x of [...ASSISTANT_ISSUES, ...theirs, ...theirs.map(draftOf)]) records.push(stationeryForm(a.post, a.entity, x, own, "Assistant"));
+      for (const x of [...(OB ? withObstacles(ASSISTANT_ISSUES) : ASSISTANT_ISSUES), ...theirs, ...theirs.map(draftOf)]) records.push(stationeryForm(a.post, a.entity, x, own, "Assistant"));
       positions.find((p) => p.id === a.post)!.channels.push(K.mine("stationery", ["form"], { title: "The post's own forms" }));
     }
     for (const pr of AS.providers) {
@@ -3548,7 +3575,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // (And where wants are handed over, the papers a want takes, on forms of their own.)
       const papers = [...clientPapers(PAYMENTS.map((r) => r.id)).filter((x) => desk.kinds.includes(x.writes.kind)), ...(desk.kinds.some((k) => WANT_PAPER[k]) ? wantPapers() : [])];
       const words = desk.kinds.filter((k) => !WANT_PAPER[k] && !papers.some((x) => x.writes.kind === k));
-      for (const x of [...ASSISTANT_ISSUES, clientDraft(words), ...papers, ...papers.map(clientDraftOf)]) records.push(stationeryForm(`${pr.id}-desk`, pr.id, x, {}, "Assistants' desk"));
+      for (const x of [...(OB ? withObstacles(ASSISTANT_ISSUES) : ASSISTANT_ISSUES), clientDraft(words), ...papers, ...papers.map(clientDraftOf)]) records.push(stationeryForm(`${pr.id}-desk`, pr.id, x, {}, "Assistants' desk"));
       positions.find((p) => p.id === `${pr.id}-desk`)!.channels.push(K.mine("stationery", ["form"], { title: "The desk's own forms" }));
     }
   }
@@ -3720,12 +3747,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // law and applies it. Its own book: the claims made to it, and, where a payment is reckoned from a record of
   // contributions, the employers' reports addressed to it.
   office("outside-support", "outside", "Support payments", undefined,
-    [{ id: "ledger", kind: "accounts" }, K.mine("claims", ["benefit_claim", "benefit_change", "benefit_decision", "case_for_decision", DECISION_KIND.evidence, DECISION_KIND.confirmation]),
+    [{ id: "ledger", kind: "accounts" }, K.mine("claims", ["benefit_claim", "benefit_change", "benefit_decision", "case_for_decision", DECISION_KIND.evidence, DECISION_KIND.confirmation, ...(OB ? ["authority", "authority_recorded", "paper_returned", "requirements"] : [])]),
       // (And, where things go wrong: what is asked of it, and what a body that hears such things tells it and decides.)
       ...(FR ? [K.mine("reviews", [DECISION_KIND.request, DECISION_KIND.review, "complaint_notice", "venue_decision", "hearing_notice", "tribunal_order", "benefit_decision", DECISION_KIND.answer, "complaint_response", "tribunal_response"])] : []),
       K.mine("gone", ["death_registration", "departure"]), lawBook,
       ...(PAYMENTS.some((r) => r.who?.record || "share_bps" in r.amount) || DECISIONS.some((d) => d.needs?.some((n) => n.from === "employer")) ? [K.mine("contributions", ["withholding_report"])] : [])],
-    code("world.transfers", { account: "acc-outside", publish_every_days: 30,
+    code("world.transfers", { account: "acc-outside", publish_every_days: 30, ...obstacleRequires(OB, ["benefit_claim"]),
       ...(FR ? { respond: { grant_bps: FR.put_right_on_asking_bps } } : {}), ...(casework ? { casework: { by: casework.id, kinds: CASEWORK_KINDS } } : {}) }));
   // The tax collector (for a town, the higher government's; docs/behaviour/public-finance.md, "The taxpayer's account"): it keeps each
   // taxpayer's account from what is its own, the returns addressed to it and the payments into its accounts, and decides claims for tax
@@ -4280,7 +4307,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // (Heat makes illness likelier where the body is: docs/behaviour/weather.md.)
     ...(spec.life === false ? {} : { life: W && CL && L ? { ...life, illness: { ...(life.illness as object), fields: [...((life.illness as any).fields ?? []), { field: "heat", bps_per_unit: CL.heat_illness_bps_per_unit }] } } : life }),
     caps: { max_created_entities: 50 },
-    knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}), ...(AS ? { services: true } : {}) }),
+    knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}), ...(AS ? { services: true } : {}), ...(OB ? { obstacles: true } : {}) }),
     // (Work is done in a workplace: a person named to do an act's work must be in one. `by` is F3's; the generator names none yet.)
     orchestration: { thinking_time: "free", performers_in: "workplace", act_time: {
       ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person, ...(AS ? DELEGATION_TIME.person : {}), ...composeRows }, ...(V.work_time?.system ? { system: { ...V.work_time.system } } : {}),
@@ -4301,7 +4328,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
           "template.tax-casework.hours": `An officer's working day (the profile's ordinary ${V.ordinary_hours_per_week} hours a week over ${WORK_DAYS} days, from ${V.round!.work_start_hour}:00) on each of the place's working days; closed on its days of rest and public holidays (the profile's calendar.weekend and calendar.holidays).`,
           "template.tax-casework.lanes": "Placeholder (PB-23): one officer for the town's taxpayers; a place's tax officers per employer that files returns would size it, and none was found.",
         } : {}) } },
-      ...(slips || AUTO?.offers.length || AS ? { slip: ((): NonNullable<typeof slips> => {
+      ...(slips || AUTO?.offers.length || AS || OB ? { slip: ((): NonNullable<typeof slips> => {
         // (The rate at which each system on offer gets a unit wrong: a row of the table for a system, as the offer states it.)
         const t: NonNullable<typeof slips> = slips ?? { person: {}, system: {}, sources: {} };
         for (const o of AUTO?.offers ?? []) {
@@ -4316,6 +4343,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         if (AS) {
           t.person["publish/sign_off"] = { bps: AS.principals.review_misses_bps };
           t.sources["person.publish/sign_off"] = `How often a person reading a draft whole misses a slip in it: ${AS.principals.review_misses_bps / 100}%. ${P.sources["assistants"] ?? ""}`;
+        }
+        // (How often a body's clerk wrongly sends back a paper in order: docs/design/obstacles.md, O4.)
+        if (OB) for (const k of Object.keys(OBSTACLE_ITEMS)) for (const who of ["person", "system"] as const) {
+          t[who][`accept/${k}`] = { bps: WRONG_RETURN_BPS[OB]! };
+          t.sources[`${who}.accept/${k}`] = `How often a clerk checking a ${k.replace("_", " ")} wrongly sends one in order back: ${WRONG_RETURN_BPS[OB]! / 100}% at obstacle level ${OB}. A PLACEHOLDER (docs/design/obstacles.md section 6; leads to confirm: e-filing reject rates, accounts-payable exception rates).`;
         }
         return t;
       })() } : {}) },

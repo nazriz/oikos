@@ -12264,6 +12264,35 @@ Design step H6 of `docs/design/handing-over.md` (no new mechanism: real work mad
   depth a referral will cost the principal the paper's row too, so handing over pays even less; at matter depth the
   principal pays the referral alone, and `draft` still costs it more than a paper of under about five and a half minutes.
 
+## 2026-11-11 · Translator v5: the control recipe retrained on the taught language; no better than the model it would replace (GPU 1.69 USD; no API spend)
+
+- **Data, by code.** Round 3's joined set (`joined-v4c`, the pilot's real requests in it as the control had them)
+  relabelled to the taught language (`relabel.ts taught`: no basis, no for, a payment's memo, refusals told alike as one
+  label, `no_such_act`): 78,654 training rows (23,421 changed; 50 that composed a statement's data set aside). The
+  export reads every example so (`encode.ts` through `model/taught.ts`; slots `calls.TAUGHT`). Leak check by code
+  (`model/leak-check.ts`): no training row is in a real test case's words, from its seat-day, or shares five words with a
+  held-out case. Runs in `runs/translator-v5-2026-11-10/` (kept whole).
+- **Trained** two seeds of round 3's recipe (deberta-v3-small, 6 epochs, `--forms 0`) on two pods at once: an RTX A5000 at
+  0.27 an hour (174 minutes) and an RTX A4500 at 0.25 (210 minutes), under a cap of 4 USD checked before each rental
+  (`round5/train-one.sh`). Community cards were all taken at first; any cloud found them. Balance 9.60 to 7.91.
+- **Scored** on the sets in the taught language (`round5/sets.sh`; an older model read as served, `v4-score.ts --taught`),
+  against the served model of round 3 (seed 2). Right in all (vr, vp, nv, tp, uf): round 3 539, 55, 202, 334, 808;
+  v5 seed 1 537, 55, 199, 328, 809; seed 2 542, 54, 197, 331, 810. Forms seen in training against forms not: round 3
+  666/713 and 810/826; v5 661 and 811, 664 and 812. Certified on validation (one-sided 95%, 1% wrong), read on the test
+  side and unseen forms, served right: round 3 222 of 368 (2 wrong) and 545 of 824; v5 seed 1 153 (1) and 138; seed 2
+  194 (1) and 220; the two v5 seeds served where both agree 208 (2) and 422. Alone, with ask-back (every draft offered,
+  none withheld), on the pilot's sides by writing model: drafts right and wrong are within a few of round 3's for each,
+  with fewer asked back and more wrong drafts (round 3's asked-back count includes the papers it composes data for,
+  which the host now asks back). What a restatement brings needs a run (served.ts).
+- **Found on the way, fixed:** the real-requests eval (`passesReal`) told refusals apart by label, so `no_such_act` for an
+  expected `not_an_act` counted wrong though the seat is told the same words: v5 read 23 of 180 there, 82 and 84 once
+  fixed (round 3's 82 under the same code).
+- **Reading:** the retrain buys nothing. The rule (A, B, E) already gives a model trained before it the one right call
+  at serving time, and what the relabel took out of the keys was what that model was scored against, not what it got
+  wrong. Its sureness is spread thinner (the certified cut rises), so fewer requests are served at the 1% mark. Not
+  switched: the coordinator decides.
+- **Revisit if:** new keyed data (seats that quote; the pilot's next rounds) changes what is wrong; then the same command
+  line retrains (`relabel.ts taught`, `v4-data.sh`, `round5/train-one.sh`, `round5/score.sh`, `round5/summary.py`).
 ## 2026-11-10 · A matter priced by what it carries; the study's run-long hold a floor (enough-work screen findings)
 
 - **What:** an act of several papers of a kind (the rates post's: fifteen owners' notices to an act) is one matter, and
@@ -12588,6 +12617,160 @@ brought about twenty acknowledgements. Behaviour: docs/behaviour/assistants.md, 
   (an in-tray the sessions do not count); the code assistant's acting at any hour is read as a difference between arms
   (then give it the office's hours too, by the same rule, and accept the hash change in towns with providers); MT-31 is
   fixed (then the agreement chain in `whoLines` may become the post alone).
+## 2026-11-11 · The study serves round 3 seed 2 (`decide/round3-s2`), not v3-s2; v5 trained and not adopted
+
+- **What was served.** `experiments/scope-pilot/build.ts` `OURS` was `decide/pod-small-v3-s2`, the v3 model of
+  2026-10-25 (in the audit it read the pilot's forms at 80% where seen and 55% where not), and every arm of the study
+  (and the open-weight smoke, which takes `OURS`) seated it alone. It is now `decide/round3-s2`: round 3's seed 2
+  (`runs/translator-model/round3-s2` -> `runs/translator-v4-r3-2026-11-08/models/v4r3-D-deberta-s2`, a link as
+  pod-small-v3-s2's is; no weights in git). `decide/pod-small-v3-s2` stays available by name (`OURS_BEFORE`).
+- **Why:** the best measured on the pilot's own requests (scored in the taught language, as the host now serves it):
+  right 539/615 on validation-real, 334/368 on the pilot's test side, 808/824 on unseen forms; forms seen in training
+  666/713, unseen 810/826. At its certified cut-off (0.999613, the one-sided 95% bound of 1% wrong on validation) it
+  serves 222 of 368 right on the test side (2 wrong) and 545 of 824 on unseen forms (none wrong). On the in-repo real
+  requests (R180) 82/180 as the served adapter offers them, the same as v5's.
+- **The cut-off is beside it** in `translator/model/served.json`, which `DecideAdapter` reads for a model served by name
+  (unless a caller sets one): our translator alone offers a draft under it with what is unclear; with a translator
+  behind, the request goes behind.
+- **Checked end to end, nothing called:** `experiments/scope-pilot/dry.ts` (the study's town, the code arm and one mock
+  arm for 3 days after the fork, mock models): the translator step loaded `decide/round3-s2`, served alone (every
+  route `arrangement: alone`), and the report gave the served counts by seat model (17 requests from the mock's code
+  calls, which no model is trained to read: a plumbing check, not a score). The model answered in 100 to 400 ms a
+  request on this machine's CPU. `OIKOS_TRANSLATOR_MODELS` must name `runs/translator-model` for a run outside the main
+  checkout.
+- **v5** (the control recipe retrained on the taught language, two seeds, GPU 1.69 USD) was not adopted: no better on any
+  set, and its sureness certifies fewer requests at the 1% mark (the entry before this one). Its folders are kept.
+- **Revisit if:** a retrain on new keyed data beats round3-s2 on the pilot's test side at the certified cut.
+## 2026-11-11 · An interrupted fork takes itself up from its own log (orchestrator/src/experiment.ts `runArm`, resume.ts `ForkReplay`)
+
+- **What changed:** a model fork whose log has no result (killed, or stopped for want of the model) was renamed
+  `.interrupted-k.oklog` and run again from the snapshot with fresh model calls. It is still renamed and kept, but the
+  fork is now taken up from it: the log is exported, every model reply it holds is served again in order (`Serving`, in a
+  new strict mode), and every entry the resumed fork writes is set beside the interrupted log's entry of the same number
+  (the same kind, an annotation of the same name, a world event with the same time and body). Only once the world stands
+  where that log ends (or where its stop note is: what follows a stop, its debriefs, belongs to that ending) may a call go
+  to the live model. A request that is not the one recorded, a world event that differs, or replies that run out before
+  the world gets there stop the fork with a plain message (`ReplayMismatch`, never taken for a failed call by `callModel`,
+  and once raised every later call is refused), never a silent second payment. A log that cannot be read back stops the
+  fork too, saying how to run it afresh. The fork's result says what it took (`resumed`: recorded, served, live, entries
+  checked, caught up).
+- **Money:** served replies are outside the record of calls (`<arm>.calls.jsonl`): they are not new calls. The seat
+  counts them as spent, as the first attempt did, so it reaches its limit at the same point; so the fork's limit no longer
+  has the served attempt's spending taken off it a second time (only earlier attempts', if any).
+- **Why:** seats now run on the owner's subscription and API credit; a fork killed at day 150 of 180 cost the whole fork
+  again. A replay that went on silently past a difference would mix two runs in one log.
+- **Test:** `orchestrator/test/experiment-seats.test.ts` (mock seats): a fork with no result is served every reply and ends
+  with the same state hash, no new calls; a fork stopped at its limit and taken further is served to its stop, then asked
+  anew; a fork whose seat is told another framing stops with the message and adds nothing to its record of calls.
+- **Not done:** a killed fork loses the entries not yet in a block (1 MiB of log; `kernel/src/blog.rs`), and with them
+  the replies in that tail: those calls are made again. Flushing a block after every model reply would close that.
+- **Revisit if:** a resumed fork stops on a difference that is not a real departure (an annotation written from the wall
+  clock, say): compare less, not nothing.
+
+## 2026-11-11 · The request count is one blind command (`experiments/scope-pilot/code.ts`)
+
+- **What changed:** the pilot's hand pipeline (Python with hard-coded run paths and rounds, hand-launched Sonnet
+  subagents, a third read assembled by hand, luna told not to read the key its sandbox could see, "world fault" assigned
+  by folder and seat name) is replaced by one command over any experiment folder (docs/measurement.md, "Requests for more
+  scope, counted blind"). Coders run in folders holding only the codebook and their batch, with no tools, behind a
+  `sandbox-exec` fence on a Mac. The third read is Opus 5.5 at high effort (a stronger setting than coder A, and the
+  paper plan's choice). The log's facts are joined by code (readout.ts now keeps `oikos-kernel delegation`'s request rows,
+  every referral and the referral each paper is about). "World fault" is gone: the window's refusals and returns are
+  listed instead. The codebook gains `approve` and the order of levels.
+- **Removed:** `coding/build.py`, `rates.py`, `tables.py`, `luna.sh`, once the command rebuilt the pilot's 212 items from
+  the logs and its codes matched 207 of them. `analyse.py` and `debrief_set.py` stay: the debrief set is not in it yet.
+- **Found on the way:** a form's kind written in words ("job applications") is the kind `job_application`, read so;
+  Claude Code 2.1.170 cannot run Opus 5.5 (`OIKOS_CLAUDE_BIN` names a newer one); the two coders agree less now that
+  luna can see nothing but its batch (request κ 0.62 on the 212, against the pilot's 0.85): the third read carries more.
+- **Revisit if:** coder agreement stays below the plan's bar (κ 0.8 on requests) on a real pilot: tighten the codebook's
+  confusables before blaming the coders; or Linux runs it (no fence there: the coders still have no tools).
+
+## 2026-11-11 · Obstacles as laws of the institutions that make them: a proposal (docs/design/obstacles.md; nothing built)
+
+- A proposal for review: O1 reframed as an authority to act on file at the counterparty, O4 a counterparty's acceptance rule, O3 a keeper's record, O2 after a general working-hours law (WM-18); an obstacle record read by `beyond.rs`; readiness to grant from the cost of delay. **Revisit if** Naz rejects the reframing of O1 or the general hours law.
+
+## 2026-11-11 · Obstacles B1: the obstacle record and its reader (docs/design/obstacles.md, step B1)
+
+- **What:** the obstacle record is a decision annotation (`domain: "obstacle"`: `law`, `paper`, `principal`,
+  `counterparty`, `need`, `clears_by`, `slip`), written by the actor whose law makes the obstacle; nobody in the world
+  reads it. `oikos-kernel delegation` (`delegation/beyond.rs`) gains the table `obstacles`: each with its matter (the
+  referral its paper was sorted against) and `met_at`, the time the paper that told of it (the law's actor's paper
+  citing the one refused) was addressed to an assistant's seat; one never told to a seat is logged and not met. A paper
+  sent again citing the one sent back is the same matter's (it was `not_handed` before). Each request gets `obstacle`
+  (the newest met on its matter, else on its principal's matters in the 30 days before) and `axes` (matters, kinds,
+  level, access, means), read from typed fields only. Contract: `ScopeRequest.only` and `.authority`, `Report.needs`
+  (contracts/README.md, "Obstacles"). The screen counts obstacles met by law per seat-month.
+- **Left to the coders, said so (the lead's rule b):** the term axis. A request's "until when" is not a field: a remit
+  has no end date of its own, so a code principal could not answer one, and a blank the platform cannot act on is a
+  blank a seat should not be shown. The words of every request stay the coders' (paper plan 3.2).
+- **Not yet on the form:** `only` and `authority` reach the seat's request form with the steps whose principal answers
+  them (B3: an authority; B7: one matter alone), so a seat is never offered a blank nothing reads.
+- **Byte-identical:** nothing in the world reads the new fields, and each is left out when empty; the code assistant's
+  report writes `needs` as absent. No world changes.
+- **Revisit if:** a request names several matters (then `only` becomes a list), or coders find the term axis carries
+  the beyond-need cases (then a remit gains an end, and the form a date).
+
+## 2026-11-11 · Obstacles B2: a body sends back a paper that falls short of what it publishes it needs (docs/design/obstacles.md, O4)
+
+- **What:** a body that receives persons' papers may publish what it requires of them (`requirements`, a public notice
+  in its own words, with the items as data); its clerk reads each paper against it, sends back one that does not give
+  what its form asks for, naming it (`paper_returned`, to whoever sent it and whom it is for), and wrongly sends back
+  one in order at the world's rate for the check (`accept/<kind>` in the table of slips; never twice on one paper: a
+  paper sent again citing the one returned is taken). The rule is `oikos_rules::acceptance` (pure), the intake
+  `actors::common::intake` (one copy, called by each body that has requirements). Built at the lender
+  (`loan_application`) and the support office (`benefit_claim`); each logs the obstacle (B1's record).
+- **Who sends it again:** a person whose own paper came back unmatched sends it again as it was (`citizen/recourse.rs`);
+  the code assistant sends again what it sent, citing the return, and reports a paper that lacks an item (or wants an
+  authority) as not done, with what would clear it (`Report.needs`). It keeps what it sent only where a body it may
+  write to has published requirements, so that a town at level 0 is unchanged. A model at a desk sends a returned paper
+  again on a new form, `send_again` (`copies` the returned paper's copy; both resolvers, `contracts/test/forms.json`).
+- **Every code filer meets every requirement (the lead's rule c):** the items are fields a code citizen's loan
+  application and benefit claim always carry (`LoanApplication.amount`, `months`, `account`, `purpose`;
+  `BenefitClaim.payment`, `account`: required fields of the papers' own types), so a code citizen is sent back only by
+  a wrong return, and sends it again. Whether any code actor stalls is read from the B8 screen at levels 1 and 2.
+- **Levels (spec `obstacles`, generator):** 0 or absent, nothing (no requirement, notice, row or channel: the world as
+  before). 1 and 2: the items (`OBSTACLE_ITEMS`: what a paper of the kind is, not a place's figure) and the wrong-return
+  rate `WRONG_RETURN_BPS` 200 and 800 basis points, both **placeholders** (leads, to confirm: e-filing reject rates,
+  accounts-payable exception rates). Assistant posts gain a channel on what bodies publish they require, and one for
+  papers sent back. Every new paper a seat is shown is in the office's words; the typed `need` and `requires` are kept
+  from a seat's rendering (`ON_RECORD`).
+- **Byte-identical at level 0 (the lead's rule e):** the generated configs of the 1,000-person au-vic town with providers
+  and of the study town (study.ts, seed 7) are the same bytes before and after; run 45 days on B1's kernel and this one,
+  each gives the same state hash and log digest (f4669d0e… and 5895935f…). Towns without providers: the pinned results
+  (`orchestrator/test/representation.test.ts`) hold.
+- **Not built, said plainly:** the shops' check of delivery notes and the collector's of returns (the factory's
+  counterparties: design section 7, the factory is the low-friction seat); a requirement published mid-run at level 2
+  (no code filer could meet one it does not read).
+
+## 2026-11-11 · Obstacles B3: a body acts for someone only on their authority (docs/design/obstacles.md, O1)
+
+- **What:** at obstacle levels 1 and 2 the lender and the support office act on a loan application or a benefit claim
+  sent for a person from someone else's post (a provider's desk) only once that person has given them an authority
+  naming the post (`authority`, a paper of the person's own, addressed to the body), and the body's clerk has recorded
+  it (`authority_recorded`, to the giver and the post: an act in the clerk's own time). Without one, the paper comes
+  back saying so in the body's words (B2's `paper_returned`, `need.authority`). A paper of the person's own, or from a
+  post of the person's own organisation, never needs one. Where a body cannot tell whose a post is (no directory),
+  a post that speaks for a person is taken as someone else's.
+- **The way through:** the desk's code reports the matter not done, naming the authority (`Report.needs`); the person's
+  code gives the authority for the post, once a body and post, where it keeps that kind with the desk (`Delegating`,
+  `lodge`); once the body records it, the desk sends the paper again. A model at the desk can ask its client for the one
+  authority on its request form (one new plain blank, `authority`: the body), answered by the client's code giving it
+  (`reasons`: `lodged`, or `not_lodged` where the kind is not one it hands the desk), and send the paper again on
+  `send_again`. Asking for a general authority, or for every kind, is the coders' to read from the words (the axes
+  read `means` from the typed body and kind).
+- **Sources:** what such a body is (a nominee arrangement at a support agency; a broker's application with the
+  applicant's consent), not a place's figure; each to confirm against the profile's place. The clerk's time to record
+  one is the table of work's `publish` row (WM-1); a strained office's staffing (level 2) is not built yet: at both
+  levels the wait is the clerk's own queue.
+- **Found by the first run at level 1, fixed here (B2's code):** a claim that waits on the support office's file for
+  papers was read again, and drawn for again, at every round, so that 95 of 108 claims in five days came back as not
+  matched; a body's clerk now reads a paper once (`Intake::take`, `done` when decided). A paper of a person's own was
+  sent back to the participant that wrote it, which is no entity (refused); it goes to whom it is for, and to the post
+  that sent it where one did. And a paper on file when the world began (the opening caseload) is not read as arriving.
+  After: 1 of 162 claims came back in 120 days, and was sent again and decided (study town, level 1, seed 7).
+- **Byte-identical at level 0:** as for B2 (the same configs; the same state hashes and log digests at 45 days).
+- **Revisit if:** the screen shows the desk's clients never get past a body's return (then the person's rule for giving
+  an authority is wrong, or too narrow), or authorities need renewing (a body's review of a standing arrangement).
 
 ## 2026-11-12 · What a claude -p seat call costs, and why (16 Haiku calls on the owner's subscription)
 
