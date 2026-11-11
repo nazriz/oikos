@@ -11,6 +11,7 @@ import { formsIn, inputOf, lineOf, programFrom, type Decoding, type Grammar } fr
 import { pieces } from "./export";
 import { namedAmong, partsOf, ranked, taken, type FormFacts } from "./subset";
 import { cutShort, quoteRule } from "./serve-rules";
+import SERVED from "./served.json";
 
 const HERE = import.meta.dir;
 
@@ -347,6 +348,9 @@ export class DecideAdapter implements LlmAdapter {
    * it is unsure for is never told so by it: the request goes behind. Then nobody is "given its best draft the next
    * time", and the cut-off holds for every request. */
   constructor(public model: string, private o: DecideOptions = {}) {
+    // (A model served by name has the cut-off certified for it, served.json, unless the caller sets one.)
+    const served = (SERVED as { [name: string]: { cut?: number } })[model];
+    if (o.threshold === undefined && typeof served?.cut === "number") this.o = { ...o, threshold: served.cut };
     const vocabulary = vocabularyOf(this.dir());
     this.decoding = decodingOf(this.dir());
     this.grammar = this.decoding !== "steps" ? grammarOf(this.dir()) : undefined;

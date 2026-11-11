@@ -14,6 +14,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { AgreeAdapter, DecideAdapter, SERVING_CHECKS } from "./adapter";
 import * as C from "./v4-curve";
 import { right } from "./v4-right";
+import { taught } from "./taught";
 
 const args = process.argv.slice(2);
 const all = (k: string) => args.flatMap((a, i) => (a === `--${k}` ? [args[i + 1]!] : []));
@@ -41,8 +42,11 @@ for (const m of all("model")) {
       // The model's own answer, before anything this adapter withholds for reasons of its own (a form not shown, a
       // release by kind): what is scored. A serving check (SERVING_CHECKS: two models disagreeing, copied words cut
       // short) is part of what is served, so its answer is asked back, and the model's own is kept beside it.
-      const own = x.wrote ?? x.program;
-      const program = x.withheld && SERVING_CHECKS.includes(x.withheld) ? x.program : own;
+      // (`--taught`: a model trained before 2026-11-10 read as the host now serves it, what code sets by rule left out
+      // and a payment's for= as its memo, so that it is scored on the same keys as one taught the new language.)
+      const asTaught = (p: string) => { if (!args.includes("--taught")) return p; try { return taught(p) ?? "none(unclear)"; } catch { return p; } };
+      const own = asTaught(x.wrote ?? x.program);
+      const program = x.withheld && SERVING_CHECKS.includes(x.withheld) ? asTaught(x.program) : own;
       // (Its sureness in parts, for a calibration measured outside: calibrate.py.)
       const last = a.answers.at(-1);
       answers.push({ id: r.id, program, sure: x.sure, ms: x.ms ?? performance.now() - t0, ok: right(program, r.program, r), writer: writerOf(r), ...(program !== own ? { own, own_ok: right(own, r.program, r), withheld: x.withheld } : {}), ...(last?.parts ? { parts: last.parts } : {}), ...(last?.steps !== undefined ? { steps: last.steps } : {}) });

@@ -6,6 +6,7 @@
 // `encode` turns an example (its program and its spans, translator/train/data.ts) into steps; `decode` turns steps
 // back into a program. `decode(encode(e))` is the example's program, exactly: the test of whether deciding and
 // copying is enough for the call language.
+import { taught, taughtSpans } from "./taught";
 import { calls } from "@oikos/participants";
 
 /** A span of the input: `id` and `text` are its characters as they stand (bare, or quoted), `word` its words as one
@@ -44,10 +45,15 @@ const LONG = 80;
 /** The arguments a function has by name. A form’s are its two own (which form, and to whom): every other is a field
  * of the form being filled in, known only from the form as shown, so it is pointed at, never chosen from a list. */
 const FORM_ARGS = new Set(["form", "to"]);
-const fixedArgs = (fn: string): Set<string> | undefined => (fn === "form" ? FORM_ARGS : calls.ARGS[fn]?.allowed);
+const fixedArgs = (fn: string): Set<string> | undefined => (fn === "form" ? FORM_ARGS : calls.TAUGHT[fn]?.allowed);
 
 /** The steps of an example's program. Throws NotEncodable where a value is neither a span nor marked implied. */
-export function encode(e: { request: string; forms: string[]; program: string; spans?: Span[] }, order: Order = ORDER, decoding: Decoding = "steps"): Encoded {
+export function encode(e0: { request: string; forms: string[]; program: string; spans?: Span[] }, order: Order = ORDER, decoding: Decoding = "steps"): Encoded {
+  // (Read in the taught language, 2026-11-10: what the host sets by rule is no decision of the model's; a program that
+  // composes a statement's data makes no example. taught.ts.)
+  const program = taught(e0.program);
+  if (program === undefined) throw new NotEncodable("a statement's data is not a translator's to write");
+  const e = { ...e0, program, ...(e0.spans ? { spans: taughtSpans(e0.spans, e0.program) } : {}) };
   const input = inputOf(e.request, e.forms);
   const p = calls.parseProgram(e.program);
   // (`cards` is slot by slot over the same input, with one difference: a form's field whose value the request implies
@@ -215,7 +221,7 @@ const said = (v: calls.Value | undefined): string | undefined => (v && "id" in v
 export interface Slot { name: string; required: boolean; wanted?: boolean; field?: [number, number] }
 /** A call's slots, in order. A form's are known once `form` and `to` are (pass them; without them, its own two). */
 export function slotsOf(fn: string, forms: FormLine[], form?: string, to?: string, own?: Grammar): Slot[] {
-  const a = calls.ARGS[fn];
+  const a = calls.TAUGHT[fn];
   if (!a) throw new NotEncodable(`${fn} is no function`);
   // (A model decides the slots it was taught, in the order it was taught them: its own `grammar` (config.json) where
   // it is given, as the contract had them when it was trained. An argument the contract gained since is a slot the
@@ -228,7 +234,7 @@ export function slotsOf(fn: string, forms: FormLine[], form?: string, to?: strin
  * two; its fields come from its line). Kept with the export and with the model (config.json `grammar`). */
 export type Grammar = { [fn: string]: { args: string[]; required: string[] } };
 export const grammar = (): Grammar =>
-  Object.fromEntries(Object.entries(calls.ARGS).map(([fn, a]) => [fn, fn === "form" ? { args: ["form", "to"], required: ["form"] } : { args: [...(a.allowed ?? [])], required: a.required.filter((k) => a.allowed?.has(k)) }]));
+  Object.fromEntries(Object.entries(calls.TAUGHT).map(([fn, a]) => [fn, fn === "form" ? { args: ["form", "to"], required: ["form"] } : { args: [...(a.allowed ?? [])], required: a.required.filter((k) => a.allowed?.has(k)) }]));
 
 /** The program a run of slot decisions comes to. Throws on decisions no program is made of: too few or too many, one
  * that is not allowed where it stands (an argument the contract requires left out, a name used before it is bound, a

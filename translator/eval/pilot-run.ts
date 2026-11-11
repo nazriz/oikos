@@ -133,7 +133,11 @@ export function passesReal(c: Pick<RealCase, "expect" | "forms" | "ignore">, got
   return c.expect.some((e) => {
     const w = shapeOf(e, c);
     if (w === undefined) return false;
-    if (!Array.isArray(w)) return Array.isArray(g) ? refusalOf(got, c) === w.none : g.none === w.none;
+    // (Refusals the seat is told in the same words are one answer: resolver.ts `LABEL_TEXT`, 2026-11-10.)
+    if (!Array.isArray(w)) {
+      const alike = (x: string | undefined) => x !== undefined && (x === w.none || LABEL_TEXT[x as calls.Label] === LABEL_TEXT[w.none]);
+      return Array.isArray(g) ? alike(refusalOf(got, c)) : alike(g.none);
+    }
     if (!Array.isArray(g) || g.length !== w.length) return false;
     // Each accepted call matched by a different call of the answer, in any order.
     const used = new Set<number>();

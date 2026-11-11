@@ -7,7 +7,7 @@ import { CASES } from "../eval/cases";
 import { FORMS, GAPS, PILOT_CASES, type RealCase } from "../eval/pilot-cases";
 import { evaluateReal, passesReal, realKnowledge, realReportText, shapeOf } from "../eval/pilot-run";
 import { passes } from "../eval/run";
-import { translatorContext } from "../src/index";
+import { LABEL_TEXT, translatorContext } from "../src/index";
 
 const c = (expect: string[], more: Partial<RealCase> = {}) => ({ expect, ...more });
 
@@ -132,10 +132,10 @@ test("scoring by shape: a refusal is its label, or a call that comes to it; no r
   const form = c(["none(unknown_form)"]);
   expect(passesReal(form, 'form(form=dog_licence, name="Rex")')).toBe(true);
   expect(passesReal(c(["none(unknown_form)"], { forms: "wide" }), 'form(form=council_proposal, kind=law, proposal="x")')).toBe(false);
-  // Nothing can say it: the refusal that says so is right, and so is whatever else the case accepts; another refusal
-  // isn't, and nor is a draft.
+  // Nothing can say it: the refusal that says so is right, and so is a refusal the seat is told in the same words (one
+  // answer since 2026-11-10: LABEL_TEXT), and whatever else the case accepts; another refusal isn't, and nor is a draft.
   const gap = c(["none(no_such_act)", 'message(to=bank, text="…")']);
-  for (const l of calls.LABELS) expect([l, passesReal(gap, `none(${l})`)]).toEqual([l, l === "no_such_act"]);
+  for (const l of calls.LABELS) expect([l, passesReal(gap, `none(${l})`)]).toEqual([l, LABEL_TEXT[l] === LABEL_TEXT.no_such_act]);
   expect(passesReal(gap, 'message(to="bank", text="Hold the six payments.")')).toBe(true);
   expect(passesReal(gap, "system(retire=job-c0003-wages)")).toBe(false);
   expect(passesReal(gap, "none(*)")).toBe(false);
