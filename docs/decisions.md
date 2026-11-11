@@ -12848,3 +12848,7 @@ sign-offs). Under the knowing rules a matter handed to a post is that post's.
 - **Test:** `kernel/tests/knowing.rs`, `two_posts_of_one_organisation_that_keep_to_their_own_are_not_shown_each_others_matters`.
 - **Revisit if:** a seat reads its sibling assistant's drafts in its file (then address the assistant's papers to its
   principal's post too); another body with several posts wants the same (the filter is general: any position's channel).
+
+## 2026-11-11 · Broad seats: any post's paperwork handed over, any post or person held by a model: a proposal (docs/design/broad-seats.md; nothing built)
+
+- A proposal for review: a matter is an act's paperwork (MT-28); its facts read back from the post's own form, the code assistant filling the same form; offers by class of paperwork; assistants for any post or person by one spec option; seven more counterparties with an intake; office-holder and person seats made supported again; one template a provider across towns. **Revisit if** Naz prefers kind-by-kind breadth, or rejects "decided" blanks being given at matter depth.
