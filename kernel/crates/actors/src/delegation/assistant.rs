@@ -187,6 +187,14 @@ impl Assisting {
         }
         // (It keeps what it sent where a body it may write to has said it sends papers back: docs/design/obstacles.md.)
         let keep = self.book.open(crate::common::intake::NOTICE).next().is_some();
+        if keep {
+            // (Each paper named, so that the outcome says which records it made: what a body may send back.)
+            for (i, l) in lines.iter_mut().enumerate() {
+                if l.bind.is_none() && l.call.fn_ == "statement" {
+                    l.bind = Some(format!("sent{i}"));
+                }
+            }
+        }
         let mut s = Step::new(lines).then(Then::Did { referral: referral.to_string(), calls: if keep { calls.to_string() } else { String::new() } });
         s.why = Some(format!("Doing what {referral} asks."));
         s
@@ -462,7 +470,16 @@ impl Plan for Assisting {
             .book
             .all(crate::common::intake::RECORDED)
             .filter(|r| !self.handled.contains(r.id.as_str()))
-            .map(|r| (r.id.to_string(), r.speaks_for.as_deref().unwrap_or(r.author.as_str()).to_string(), crate::common::addressed_to(r).iter().map(|x| x.to_string()).collect()))
+            .map(|r| {
+                // (As its client passed it on: the body that recorded it, and the client; else as the body wrote it.)
+                let d = crate::common::data(r).to_value();
+                let with = d["by"].as_str().map(String::from).unwrap_or_else(|| r.speaks_for.as_deref().unwrap_or(r.author.as_str()).to_string());
+                let to: Vec<String> = match d["for"].as_str() {
+                    Some(c) => vec![c.to_string()],
+                    None => crate::common::addressed_to(r).iter().map(|x| x.to_string()).collect(),
+                };
+                (r.id.to_string(), with, to)
+            })
             .collect();
         for (id, with, to) in recorded {
             self.handled.insert(id.clone());

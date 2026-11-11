@@ -12849,7 +12849,76 @@ sign-offs). Under the knowing rules a matter handed to a post is that post's.
 - **Revisit if:** a seat reads its sibling assistant's drafts in its file (then address the assistant's papers to its
   principal's post too); another body with several posts wants the same (the filter is general: any position's channel).
 
-## 2026-11-11 · Weight editing on the served translator: three candidates probed, no weight edit earns its place; a form-name mask found on the way (no training, no GPU, no API; round 3 seed 2 still served)
+## 2026-11-11 · Obstacles B7: readiness to grant from the cost of delay (docs/design/obstacles.md section 10)
+
+- **What:** a kind's facts may say what a day's delay of a matter costs the principal (`KindFacts.late_cost_day`), and
+  the principal keeps how long the matters it handed over waited on its own answer (`Seen.waited`, from a draft or a
+  request to go ahead coming in to its reading of it), only for kinds whose delay is costed. Answering a request for a
+  level, its rule weighs `draft` and `approve` with that wait at that cost (`rule::cost_waiting`; the review's rule is
+  unchanged). A request for one matter alone (`ScopeRequest.only`, a new plain blank on the request form at obstacle
+  levels) is weighed as one matter and granted, where it pays by the hurdle, by a remit for that matter alone
+  (`Remit.only`); the kind's own remit stands for every other matter. `oikos-kernel delegation` reads an act on that
+  matter at the level granted for it.
+- **The figure:** for a claim for support, a day of the least payment the place's support law makes (derived from the
+  profile's payments, generator `lateCost`, at levels 1 and 2 only). No other kind's delay is costed: no figure says
+  what a day's delay of a job application or a loan application costs, so none is invented. The hurdle stays one figure
+  across arms (2,000 bps, placeholder, MT-32).
+- **What to expect, said plainly:** a principal answers a draft within minutes of reading it, and a person reads at
+  their next wake, so the wait is short and grants will be few until post-holders keep working hours (the lead's later
+  step). A grant is then the principal's own rule meeting a real delay, never a disposition set to produce one.
+- **Byte-identical at level 0:** nothing is costed and nothing is kept where no kind has a cost of delay; the
+  configs at level 0 are unchanged.
+- **Revisit if:** the screen at level 2 shows no grant at all (then the lower-hurdle cell of section 10, stated as a
+  condition of the principal), or a kind's delay gets a source (a late lodgement penalty in a profile's tax law).
+
+## 2026-11-11 · Obstacles B8: the screen at levels 0, 1 and 2, and a second desk (docs/design/obstacles.md section 7)
+
+- **What:** `experiments/scope-pilot/study-obstacles.ts` is the study town (study.ts) at an obstacle level
+  (`OIKOS_OBSTACLES`), with a second provider's desk on request (`OIKOS_DESKS=2`: build.ts `secondDesk`, every other
+  member of the cohort engages provider B's paid offer at the same levels; both providers are in the profiles already).
+  build.ts gains `obstacles` and `secondDesk`, both absent by default, so first-pilot.ts and study.ts are as before. The
+  screen also reports, per seat and month, how long its drafts and requests to go ahead waited on its principal's
+  answer, and the remits a principal granted on a request.
+- **What it found** (code arm, seed 7, 180 days after the day-30 fork; a month is 30 days):
+
+  | seat | level 0 | level 1 | level 2 | level 2, two desks |
+  |---|---|---|---|---|
+  | desk(s): matters a month | 14.5 | 9.3 | 13.7 | 5.3 + 7.7 |
+  | desk(s): obstacles met a month | 0 | 1.7 (authority) | 2.2 (authority) | 1.0 + 1.2 |
+  | factory: matters / obstacles a month | 13.2 / 0 | 10.5 / 0 | 10.5 / 0 | 12.0 / 0 |
+  | finance office; rates post | 1 / 0; 4.7 / 0 | the same | the same | the same |
+  | waited on the principal (mean hours): desk, factory, rates post | 0.4, 1.7, 26.5 | 0.7, 1.5, 26.4 | 0.6, 1.8, 26.3 | 0.4 to 0.8, 1.7, 26.0 |
+  | remits granted on a request | 0 | 0 | 0 | 0 |
+
+  Level 1 with two desks: 3.8 + 5.0 matters and 1.2 + 0.7 obstacles a month. So the desk carries the obstacles, almost
+  all an authority wanted at first contact (the design's estimate was 2.5 to 4 a month: lower, because once a client
+  has given one, their later papers to that body pass). Wrong returns land mostly on citizens' own papers: the desk sends
+  few loan applications and claims. The factory meets none: its counterparties have no requirements (the design's
+  low-friction seat). **A second desk does not double the exposure**: the same cohort split between two desks halves
+  each desk's volume, and the obstacles a month across both stay where one desk had them. Doubling them takes a larger
+  cohort, not a second desk.
+- **Grants, said plainly (B7):** none, at any level. The code assistant never asks, and the principals' review rule is
+  unchanged; and the wait a principal's own answer adds is under an hour at the desk (its clients answer at their next
+  wake), so at a day of a support payment (5,776 cents in au-vic) a model's request for one matter alone would be
+  declined by the rule's own figures. Grants need the working-hours law (B5), which makes answers wait for a working day.
+  The rates post's sign-offs already wait a day (26 hours) and the factory's about two hours, but neither kind's delay is
+  costed.
+- **Found by the screen and fixed:** a body's paper back to a desk's post was refused (a post is no one a paper is
+  addressed to): a body now writes to whom the paper is for, and the person passes the body's paper on to their desk
+  (`Delegating::pass_on`), as a client forwards an agency's letter to their agent; the reader counts that as the desk
+  meeting it. The authority paper and its record no longer name a post among the addressees. The code assistant names
+  each paper it sends where bodies publish requirements, so that it knows which came back. The person's wrapper keeps
+  the bodies' papers (`ours`). A row of the figures registry for `late_cost_day` (a generated world at level 1 or 2
+  would not load without it: B7's gate never generated one).
+- **Found, not fixed (recorded):** the reader sorts a rates instalment's fifteen notices as one handed and fourteen
+  `not_handed` (one act, fifteen papers, one referral), and a few `beyond_level`: at level 0 as at every level. A
+  reading fault of the log reader, not the world's; to fix with the readout's next change.
+- **Byte-identical at level 0:** as before (the same configs; the same state hashes and log digests at 45 days).
+- **Revisit if:** a larger cohort is wanted for exposure (the study's setting, the lead's call); or the hours law lands
+  (then screen the grants again).
+
+
+## 2026-11-11 · Weight editing on the served translator: three candidates probed, no weight edit earns its place; a form's name masked to the forms shown, on by default (no training, no GPU, no API; round 3 seed 2 still served)
 
 - **What:** the owner asked again whether the translator's weights should be edited directly (weight-space
   programming, rikiyat.github.io/blog/weight-space-programming). Tried on the served model (`v4r3-D-deberta-s2`) for
@@ -12871,7 +12940,7 @@ sign-offs). Under the knowing rules a matter handed to a post is that post's.
   form that is not shown (the pointer is sharp: the next start is 9 to 35 nats away). The model learned the rule it was
   taught (11,198 training names are copied from the request's words, always the form's exact name); the plural breaks
   it, and whether a name is a form shown is exact, so it is a mask, not weights: **with the form's name masked to the
-  forms shown (`OIKOS_DECIDE_FORM_NAMES=1` in slots.py, off by default, nothing served changes)** the small models' set
+  forms shown** (`form_wants` in slots.py, in a cards model's choose pass, as the field masks are) the small models' set
   goes from 25 served, 5 wrong to 21 served, 1 wrong at the certified cut (checking half: 11/9/2 to 9/9/0), and nothing
   else moves on any set (validation 478/477/1, test side 224/222/2, unseen forms 545/545/0, all unchanged). The other
   five are the edge of meaning round 4 named (a trailing sentence; look_first or no_such_act; a quoted phrase inside
@@ -12898,9 +12967,25 @@ sign-offs). Under the knowing rules a matter handed to a post is that post's.
 - **Why no weight edit:** each family's information was either absent from the state (counts, refusals) or exact and
   better said in code (a form's name, as the field masks and the round-3 checks are). Weight editing earns its place
   here as a diagnostic (the probe settles in minutes whether a failure is local), not as a fix.
-- **Not done:** the mask is not turned on; it changes decoding for every cards model and should land with a test
-  (`translator/test/model-slots.test.ts`) when wanted. The old scratch files (`translator/model/py/wsp_*.py`, untracked
-  in the main checkout) are for the v3 model and superseded by `translator/model/wsp/`: they can be deleted.
+- **The mask is on by default** (the coordinator, 2026-11-11): a copied form name is one of the forms the seat was
+  shown, by name or id, in every cards model's choose pass; `OIKOS_DECIDE_FORM_NAMES=0` turns it off, for measuring only.
+  Re-scored with it on by default (tag `formdefault`): every answer the same as with the switch (validation 478/477/1, test side 224/222/2, unseen forms 545/545/0, small models 21/20/1 at the cut). The certified cut for `decide/round3-s2` holds (0.999613 again, on vr, vp and nv), so `translator/model/served.json` is unchanged. Test:
+  `translator/test/model-slots.test.ts` (a name that is no form shown cannot be written; a name or id of one can; no
+  mask outside the choose pass).
+- **What a seat experiences** when it names a form by a word the form's name does not use ("draft delivery notes" for
+  `draft_delivery_note`): before, the model wrote the plural as the form's name at sureness 0.9998, the adapter found
+  no such form among those shown, and the seat was told, as sure, that there is no such form (`none(unknown_form)`).
+  Now the name can only be one of the forms shown: the model takes the form's id or the nearest words that do name it,
+  and since it was never sure where that name stands (where it stands: probability about 1e-4), the draft falls under
+  the cut. With a translator behind, the request goes behind; alone (the study's arrangement), the seat is offered the
+  draft, now naming the right form, with "which" marked unclear, to confirm or restate. Where nothing in the request or
+  the forms names a form shown, the model's likeliest is taken as before and the adapter's form check answers as it did.
+  A request for several such forms at once ("for referrals A, B and C") is still one line (candidate 1) and is asked
+  back as too long, as before.
+- **The probe routine stays** (the coordinator, 2026-11-11): before anything else is done about a translator failure,
+  `translator/model/wsp/` settles whether it is a decision (a readout of the state knows more than the head) or missing
+  knowledge (it does not): `collect.py` keeps every decision's state over the scored sets, `probe_lines.py`,
+  `probe_kind.py` and `probe_doubt.py` are the three probes made here, `audit.py` the table by decision.
 - **Revisit if:** a new model's failure is a single decision that a readout separates better than its head on held-out
   requests (then a rank-one edit of that head is worth a try); several acts of one kind become common in pilots (data,
   not weights); the mask asks back right answers in a new pilot (a request naming a form by a word the form does not use).

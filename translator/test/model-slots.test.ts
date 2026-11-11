@@ -296,3 +296,22 @@ print(json.dumps({"refused": slots.masks_refuse(json.load(open(${JSON.stringify(
   const out = Bun.spawnSync([python, "-c", script]);
   expect(JSON.parse(out.stdout.toString())).toEqual({ refused: [], wrong_kind: [false, false, false, false, false], right_kind: [true, true, true, true, true] });
 });
+
+test("a form's name in a cards model's choose pass is one of the forms shown, by name or id, never words that name none", () => {
+  // (Weight editing, 2026-11-11: "draft delivery notes" was copied as the form `draft_delivery_notes`, shown nowhere.)
+  const python = Bun.which("python3");
+  if (!python) return;
+  const py = join(import.meta.dir, "../model/py");
+  const script = `import sys, json; sys.path.insert(0, ${JSON.stringify(py)}); import slots
+text = "draft delivery notes for referral rec.5\\n- draft_delivery_note, to=desk, id form-desk-draft-delivery-note: has referral"
+g = {"form": {"args": ["form", "to"], "required": ["form"]}}
+def at_form(mode):
+    m = slots.Machine(g, slots.Forms(text), mode)
+    for s in ("program", "lines:1", "fn:form"): m.take(s)
+    return m
+w = slots.form_wants(at_form("choose"))
+print(json.dumps({"slot": at_form("choose").state[0], "wants": w, "full": slots.form_wants(at_form("full")),
+  "fits": [slots.fits_type(k, t, *w) for k, t in [("word", "draft delivery notes"), ("word", "the draft delivery note"), ("id", "form-desk-draft-delivery-note"), ("id", "form-other")]]}))`;
+  const out = Bun.spawnSync([python, "-c", script]);
+  expect(JSON.parse(out.stdout.toString())).toEqual({ slot: "arg:form", wants: ["form", ["draft_delivery_note", "form-desk-draft-delivery-note"]], full: null, fits: [false, true, true, false] });
+});

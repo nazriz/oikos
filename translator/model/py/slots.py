@@ -31,9 +31,21 @@ _REQUIRED = re.compile(r"(^|, )required$")
 
 
 NAMED_BEFORE = "Named before: "
-# An experiment (weight editing, 2026-11-11; translator/model/wsp/): with OIKOS_DECIDE_FORM_NAMES=1 a form's name is
-# masked as a field's value is, to the forms shown. Off unless set: what is served does not change.
-FORM_NAMES = __import__("os").environ.get("OIKOS_DECIDE_FORM_NAMES") == "1"
+# A form's name is masked as a field's value is, to the forms shown (by name or id), in a cards model's choose pass
+# (weight editing, 2026-11-11: a copied name such as "draft delivery notes" named no form shown, at sureness 0.9998).
+# OIKOS_DECIDE_FORM_NAMES=0 turns it off, for measuring only.
+FORM_NAMES = __import__("os").environ.get("OIKOS_DECIDE_FORM_NAMES") != "0"
+
+
+def form_wants(machine) -> tuple[str, list[str]] | None:
+    """What a form's name may be where one is being decided in the choose pass: ("form", the names and ids of the
+    forms shown); None elsewhere, in another mode, or with no form shown."""
+    state = machine.state
+    if not FORM_NAMES or machine.mode != "choose" or state is None or state[0] != "arg:form" or state[2][0] != "value":
+        return None
+    names = [l["head"][2:].split(",")[0].strip() for l in machine.forms.lines]
+    ids = [m.group(1) for l in machine.forms.lines for m in [re.search(r"\bid ([^\s:,]+)", l["head"])] if m]
+    return ("form", names + ids) if names else None
 
 
 def named_before(text: str) -> list[str]:
@@ -369,12 +381,10 @@ class Follow:
 
     def wants(self) -> tuple[str, list[str]] | None:
         """The type of the form's field being decided now, and a choice's options; None where it is not a field."""
+        named = form_wants(self.machine)
+        if named is not None:
+            return named
         state = self.machine.state
-        if FORM_NAMES and state is not None and state[0] == "arg:form" and state[2][0] == "value":
-            # (Weight editing, 2026-11-11, an experiment: a form's name is one of the forms shown, by name or id.)
-            names = [l["head"][2:].split(",")[0].strip() for l in self.machine.forms.lines]
-            ids = [m.group(1) for l in self.machine.forms.lines for m in [re.search(r"\bid ([^\s:,]+)", l["head"])] if m]
-            return ("form", names + ids) if names else None
         if state is None or state[0] != "field" or state[2][0] != "value":
             return None
         return self.machine.forms.types.get(state[1][0])
