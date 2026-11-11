@@ -79,6 +79,9 @@ pub struct Reader {
     obstacle_of: BTreeMap<String, usize>,
     /// The papers an assistant's seat wrote: which seat.
     wrote: BTreeMap<String, String>,
+    /// The referral each act (its cause) was sorted against, by kind: every paper of a matter handed over is that
+    /// matter's, however many one act sends (a rates instalment's fifteen notices).
+    act_referral: BTreeMap<(i64, String), String>,
 }
 
 /// An obstacle as the law that made it logged it (`decision`, domain `obstacle`), with the paper that told of it, once
@@ -162,7 +165,7 @@ impl Reader {
             Some("event") if s(&e["body"]["event"]) == Some("recorded") => {
                 let t = e["t"].as_i64().unwrap_or(0);
                 let cause = e["body"]["cause"].as_i64();
-                self.recorded(t, &e["body"]["record"]);
+                self.recorded(t, cause, &e["body"]["record"]);
                 if let Some(c) = cause {
                     self.charge(c, &e["body"]["record"]);
                 }
@@ -243,7 +246,7 @@ impl Reader {
         self.applied = None;
     }
 
-    fn recorded(&mut self, t: i64, r: &Value) {
+    fn recorded(&mut self, t: i64, cause: Option<i64>, r: &Value) {
         if s(&r["record"]) != Some("statement") {
             return;
         }
@@ -322,7 +325,7 @@ impl Reader {
                     self.answers.insert(q.into(), (t, d.clone()));
                 }
             }
-            _ => self.act(t, &id, kind, &sf, r),
+            _ => self.act(t, cause, &id, kind, &sf, r),
         }
     }
 
@@ -332,7 +335,7 @@ impl Reader {
     }
 
     /// A paper of any other kind: sorted if an assistant wrote it in its principal's name.
-    fn act(&mut self, t: i64, id: &str, kind: &str, sf: &str, r: &Value) {
+    fn act(&mut self, t: i64, cause: Option<i64>, id: &str, kind: &str, sf: &str, r: &Value) {
         if PAPERS.contains(&kind) {
             return;
         }
@@ -377,8 +380,10 @@ impl Reader {
         }
         let level = self.level(&principal, kind, t);
         // (A paper sent again, citing one sorted against a matter (one returned, say): that matter's.)
+        // (Or another paper of an act already sorted against a matter: an act of several papers is one matter.)
         let again = bases(r).iter().find_map(|b| self.referral_of.get(b.as_str()).cloned()).filter(|rf| self.referrals.contains_key(rf));
-        let (referral, wants) = match again {
+        let same_act = cause.and_then(|c| self.act_referral.get(&(c, kind.to_string())).cloned());
+        let (referral, wants) = match again.or(same_act) {
             Some(rf) => {
                 let w = self.referrals.get(&rf).map(|x| x.wants.clone());
                 (Some(rf), w)
@@ -393,6 +398,9 @@ impl Reader {
         };
         if let Some(rf) = &referral {
             self.referral_of.insert(id.to_string(), rf.clone());
+            if let Some(c) = cause {
+                self.act_referral.insert((c, kind.to_string()), rf.clone());
+            }
         }
         // (Granted a level for this one matter alone: what it was handed at is that level.)
         let wants = match referral.as_ref().and_then(|rf| self.remits.iter().rev().find(|x| x.only.as_deref() == Some(rf.as_str()) && x.t <= t)) {
@@ -612,6 +620,40 @@ mod tests {
         assert_eq!(class("let1"), None, "a letter to its principal is no act of a kind of matter");
         let q = rows.iter().find(|x| x["table"] == "requests").expect("the request");
         assert_eq!((q["level_then"].clone(), q["needed"]["kind"].clone(), q["answer"]["granted"].clone()), (json!("draft"), json!("invoice"), json!(false)));
+    }
+
+    /// An act of several papers handed over as one matter (a rates instalment's notices, `carries_count`): every paper
+    /// the act sends is read against that matter's referral, not the first alone; a later act is the next matter's.
+    #[test]
+    fn every_paper_of_an_act_handed_as_one_matter_is_read_against_its_referral() {
+        let mut r = Reader::new();
+        r.take(&json!({ "kind": "header", "body": { "config": { "positions": [
+            { "id": "mgr", "entity": "f1", "role_module": { "params": { "delegation": { "post": "mgr-assistant" } } } },
+            { "id": "mgr-assistant", "entity": "f1" } ] } } }));
+        let calls = "statement(kind=rates_notice, text=\"a\", to=[\"o1\"])\nstatement(kind=rates_notice, text=\"b\", to=[\"o2\"])\nstatement(kind=rates_notice, text=\"c\", to=[\"o3\"])";
+        let by_act = |t: i64, cause: i64, id: &str, to: &str| {
+            let mut e = rec(t, id, "rates_notice", "f1", "mgr-assistant", &[to], json!({}));
+            e["body"]["cause"] = json!(cause);
+            e
+        };
+        for e in [
+            rec(1, "rm1", "remit", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "rates_notice", "level": "draft" })),
+            rec(2, "rf1", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "rates_notice", "wants": "draft", "calls": calls })),
+            rec(3, "rf2", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "rates_notice", "wants": "draft", "calls": calls })),
+            rec(4, "so1", "sign_off", "f1", "mgr", &["f1"], json!({ "draft": "d1", "referral": "rf1" })),
+            by_act(5, 70, "n1", "o1"),
+            by_act(5, 70, "n2", "o2"),
+            by_act(5, 70, "n3", "o3"),
+            by_act(6, 80, "n4", "o1"),
+        ] {
+            r.take(&e);
+        }
+        let rows = r.rows();
+        let act = |id: &str| rows.iter().find(|x| x["record"] == id).map(|x| (x["referral"].clone(), x["class"].clone())).expect("sorted");
+        for id in ["n1", "n2", "n3"] {
+            assert_eq!(act(id), (json!("rf1"), json!("within")), "{id}: a paper of the signed matter's act");
+        }
+        assert_eq!(act("n4"), (json!("rf2"), json!("beyond_level")), "another act is the next matter's, sent unsigned");
     }
 
     /// An obstacle (docs/design/obstacles.md section 4) is met only when the paper that tells of it reaches the seat; a

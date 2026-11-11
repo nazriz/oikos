@@ -12917,3 +12917,18 @@ sign-offs). Under the knowing rules a matter handed to a post is that post's.
 - **Revisit if:** a larger cohort is wanted for exposure (the study's setting, the lead's call); or the hours law lands
   (then screen the grants again).
 
+## 2026-11-11 · The delegation reader reads every paper of one act against its matter's referral
+
+- **What:** `oikos-kernel delegation` (`kernel/crates/actors/src/delegation/beyond.rs`) sorted an act of several papers
+  handed over as one matter (a rates instalment: fifteen owners' notices, one referral, `carries_count`) as one paper
+  against the referral and the rest as `not_handed`, or against the next instalment's referral where one was already
+  handed (so `beyond_level` while that one was unsigned): each referral was taken by one paper only. Found by the B8
+  screen, at every obstacle level, 0 included. The reader now keeps the referral each act (its cause) was sorted
+  against, by kind, and every other paper of that kind from the same act is read against it, so a handed matter's papers
+  are all within the remit when its referral and level allow. A later act still takes the next unused referral.
+  The world is unchanged; only the reading moves.
+- **Test:** `every_paper_of_an_act_handed_as_one_matter_is_read_against_its_referral` (beyond.rs): three papers of one
+  act under a signed referral are all within it; the next act's paper is the next referral's.
+- **Revisit if:** an assistant carries out two matters of one kind in a single act (then the act's papers would need
+  telling apart by the referral's own calls, which the reader can parse), or a matter's papers are sent over several
+  acts with no basis linking them.
