@@ -144,7 +144,10 @@ test("in a town with assistants, principals engage by their own rule, hand matte
   const orgs = new Set(config.positions.filter((p: any) => p.role_module?.params?.delegation).map((p: any) => p.entity));
   const theirs = kinds("referral").filter((r) => orgs.has(r.speaks_for));
   expect(theirs.length).toBeGreaterThan(0);
-  for (const r of theirs) expect([r.addressed_to, r.visible_to]).toEqual([[r.speaks_for], [r.speaks_for]]);
+  // (And addressed to its assistant's post as well, so that another office's assistant in the same organisation is not
+  // shown it: since 2026-11-12, risk MT-31.)
+  const assistantOf = (post: string) => config.positions.find((p: any) => p.id === post)?.role_module?.params?.delegation?.post;
+  for (const r of theirs) expect([r.addressed_to, r.visible_to]).toEqual([[r.speaks_for, assistantOf(r.in_position)], [r.speaks_for]]);
   // Every input of a decision about delegating is a record made by then that its principal's organisation may see.
   const entityOf = new Map<string, string[]>();
   for (const p of config.positions) if (p.holder) entityOf.set(p.holder, [...(entityOf.get(p.holder) ?? []), p.entity]);
