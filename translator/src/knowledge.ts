@@ -199,9 +199,12 @@ export class Knowledge {
       if (r.kind === "form") this.formsById.set(r.id, r);
       if (r.kind === "sign_off" && typeof r.data?.draft === "string") this.signedDraft.set(r.id, r.data.draft);
       if (r.kind === "referral" && typeof r.speaks_for === "string") this.referrals.set(r.id, r.speaks_for);
-      // (A sign-off's copy keeps whose sign-off it is: the copy goes in their name. kernel/crates/resolver, the same.)
-      if ((r.kind === "sign_off" || r.kind === "paper_returned") && r.data?.paper && typeof r.data.paper === "object" && !Array.isArray(r.data.paper))
-        this.signed.set(r.id, r.kind === "sign_off" && typeof r.speaks_for === "string" ? { ...r.data.paper, signed_by: r.speaks_for } : r.data.paper);
+      // (A sign-off's copy keeps whose sign-off it is, and a paper sent back whom it was for: the copy goes in their name.
+      // kernel/crates/resolver, the same.)
+      if ((r.kind === "sign_off" || r.kind === "paper_returned") && r.data?.paper && typeof r.data.paper === "object" && !Array.isArray(r.data.paper)) {
+        const by = r.kind === "sign_off" ? r.speaks_for : r.data.for;
+        this.signed.set(r.id, typeof by === "string" ? { ...r.data.paper, signed_by: by } : r.data.paper);
+      }
       // Job advertisements, and the applications that answer them: an offer of employment made on one is on its terms.
       if (r.kind === "job_posting") this.jobs.set(r.id, { advertisement: r.id, ...(typeof r.data?.space === "string" && r.data.space ? { space: r.data.space } : {}) });
       if (r.kind === "job_application" && typeof r.data?.posting === "string") this.applications.set(r.id, r.data.posting);

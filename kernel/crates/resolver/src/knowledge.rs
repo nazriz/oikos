@@ -340,7 +340,14 @@ impl RecordFacts {
                     }
                     facts.signed = Some((id, Arc::new(paper)))
                 }
-                Some("paper_returned") if r["data"]["paper"].is_object() => facts.signed = Some((id, Arc::new(r["data"]["paper"].clone()))),
+                // (A paper sent back goes again in the name of whom it was for, as the body's paper names them.)
+                Some("paper_returned") if r["data"]["paper"].is_object() => {
+                    let mut paper = r["data"]["paper"].clone();
+                    if let (Some(p), Some(by)) = (paper.as_object_mut(), s(&r["data"]["for"])) {
+                        p.insert("signed_by".into(), Value::from(by));
+                    }
+                    facts.signed = Some((id, Arc::new(paper)))
+                }
                 // (A sign-off of a draft written as acts, not on a form, carries no paper: kept as that, with the draft it
                 // signed, so that a seat naming it is told so and not that it named the wrong record. The scope pilot's
                 // baseline: 55 sends of a predecessor's sign-offs answered "no signed copy on file", 2026-11-14.)

@@ -36,6 +36,17 @@ pub fn parse_date(s: &str) -> Result<i64, String> {
     if (1..=15).contains(&t.len()) && t.bytes().all(|b| b.is_ascii_digit()) {
         return Ok(t.parse().unwrap_or_default());
     }
+    // (A day before the start, as the world itself writes one: "24,450 days before the start", "3 days before the year
+    // began": the day that many days before. participants/src/forms.ts, the same. The scope pilot's baseline, 2026-11-14:
+    // a client's date of birth copied as shown was "not a date".)
+    for tail in [" days before the start", " day before the start", " days before the year began", " day before the year began"] {
+        if let Some(n) = lower.strip_suffix(tail) {
+            let digits: String = n.chars().filter(|c| *c != ',').collect();
+            if (1..=9).contains(&digits.len()) && digits.bytes().all(|b| b.is_ascii_digit()) {
+                return Ok(-digits.parse::<i64>().unwrap_or_default() * DAY);
+            }
+        }
+    }
     let digits = |rest: &str, max: usize| -> Option<(i64, usize)> {
         let n = rest.bytes().take_while(u8::is_ascii_digit).count();
         if n == 0 || n > max {
@@ -109,6 +120,8 @@ mod tests {
         let now = 21 * day; // 2 April 2026
         assert_eq!(date_words_in(0, Some(&dated)), "12 March 2026");
         assert_eq!(date_words_in(0, None), "year 1, day 1");
+        // (A day before the start, read as the world writes it: participants/test/dates.test.ts, the same.)
+        assert_eq!((parse_date("24,450 days before the start"), parse_date("1 day before the year began")), (Ok(-24_450 * day), Ok(-day)));
         assert_eq!(parse_date_in("15 April 2026", now, Some(&dated)), Ok(34 * day));
         assert_eq!(parse_date_in("year 1, day 22", now, Some(&dated)), Ok(21 * day), "an old paper still reads");
         assert_eq!(parse_date_in("15 April", now, Some(&dated)), Ok(34 * day), "this year's");

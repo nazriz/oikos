@@ -235,6 +235,10 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     }
     const fields: { [k: string]: { type: string; required?: boolean } } = f?.data?.fields ?? {};
     if (!f) return l;
+    // (A form of the seat's own post goes to that post: `to` names whose form it is, never whom the paper is addressed to,
+    // which is a blank of its own. "The benefit claim form isn't one outside takes": the mock fork of 2026-11-14.)
+    const office = whoseForm(f);
+    if (office && k.held.has(office) && argText(args.to) !== office && !k.forms.some((x) => x.data?.form === f!.data?.form && whoseForm(x) === argText(args.to))) args.to = { id: office };
     for (const [field, t] of Object.entries(fields)) {
       const v = namedValue(request, field);
       if (v && fits(t.type, v, isRecord) && JSON.stringify(args[field]) !== JSON.stringify(t.type === "text" && "id" in v ? { text: v.id } : v)) args[field] = t.type === "text" && "id" in v ? { text: v.id } : v;

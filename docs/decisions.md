@@ -13329,6 +13329,12 @@ From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11
     organisation, which reads them (a seat had addressed them to the principal's post, which does not).
   - The delegation reader matches a paper to the sign-off whose copy it is (a rates matter's fifteen notices read as
     "not handed").
+  - A paper a body sent back goes again in the name of whom it was for (its `for`), as a signed copy goes in its
+    signer's.
+  - A form of the seat's own post goes to that post: `to=` names whose form it is, never whom the paper is addressed to
+    ("The benefit claim form isn't one outside takes", the mock fork at level 2).
+  - A day before the start, as the world writes one ("24,450 days before the start", a client's date of birth on a
+    benefit claim's referral), is read as a date by both resolvers' readers.
 - **Offline, on the baseline's own requests** (no model calls; the logged calls with the rules applied, judged by what
   the seat confirmed, declined and restated): drafts right as the seat judged them, Haiku 66 to 121 of 131, Sonnet 185
   to 190 of 194, Codex 56 to 65 of 84; Codex's remaining declines are the act-depth referral's words, which G2 replaced.
