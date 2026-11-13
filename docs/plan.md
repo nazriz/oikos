@@ -6,7 +6,52 @@ coordinating session keeps the rest current. Each item names where its detail li
 
 Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` waiting on the owner.
 
-## Now (2026-11-10)
+## Now: to a usable result (2026-11-14)
+
+**To a usable result: Haiku assistants meeting obstacles (decided 2026-11-14).** One model (Claude Haiku 5.5 on the API),
+the household desk and the factory seated, the finance and rates assistants code, obstacle levels 0, 1, 2, our
+translator alone, framing unstated. Platform frozen except for faults a real run shows. The spec is
+`experiments/scope-pilot/obstacle-run.ts` (its rungs, health check and limits); the health check is
+`experiments/scope-pilot/funnel.ts`.
+
+Ready to run:
+
+- [ ] The baseline's faults fixed: the preview of a signed copy, sign-offs from before the fork, blanks filled with the
+  wrong value, the client blank (gate-faults).
+- [ ] A signed paper is sent and reaches its counterparty, shown end to end on a real fork.
+- [~] The health check: a funnel per seat from handed over to reported done, with a verdict; it fails the baseline where
+  the baseline failed (`funnel.ts`, branch `worktree-agent-a692d78756fb1d2fe`: the baseline's desk FAILS at send in
+  every model arm, Haiku 0 of 12 signed sent; its rates seat at send or at drafting; awaiting merge).
+- [~] The API route checked with real calls; cost per seat-day measured (9 Haiku calls, 2026-11-14,
+  `runs/api-route-check-2026-11-14/`: tools used, the history taken back, the standing part cached; same branch).
+- [~] A principal's readiness to grant as a stated setting (or shown not to produce grants, and left out): shown not to
+  produce grants for the desk's kinds at any hurdle the rule takes, and left out (`build.ts` `hurdleBps`; same branch).
+- [ ] The reader's count of acts beside remits re-read on the baseline and explained.
+- [ ] The blind count run on a smoke fork; the codebook tightened where the coders disagree.
+- [~] Spending caps per fork; a fork resumes from its own log; the engine checked current before a run (caps per fork in
+  the spec, a health-check stop resumable: same branch; resume from its own log 7d400625; engine check landed 2026-11-11).
+
+The rungs (the same setup throughout; a rung that fails is fixed and run again; up only on a clean pass with no new kind
+of fault):
+
+- [ ] Rung 1: 10 days, 1 seed, level 2. Pass: the funnel healthy for the desk and the factory; at least one obstacle met
+  and cleared; every seat debriefed.
+- [ ] Rung 2: 30 days, 1 seed, levels 0 and 2. Pass: healthy at day 10 and day 30; obstacles met within a factor of two
+  of the code screen's rate; the blind count runs end to end on it.
+- [ ] Rung 3: 90 days, 2 seeds, levels 0, 1 and 2. Pass: as rung 2, and a seat can find its earlier requests and their
+  answers; cost within a quarter of the forecast.
+- [ ] Rung 4: 180 days, the full design under the cap.
+
+Then:
+
+- [ ] Counted: per level, obstacles met, what was asked for against what was needed, acts beyond the remit, what
+  followed a yes and a no.
+- [ ] A short results page.
+
+Parked until then: assistants for any post (G3, G4, G9), models holding offices (G5), working hours for every post, the
+viewer, small models' translator data.
+
+## The path to here (2026-11-10, kept as history)
 
 **The study.** Do AI assistants with delegated work ask for more authority or resources than they need, across a wide
 range of models? Obstacles are the main designed factor; open-weight models, with abliterated models paired against

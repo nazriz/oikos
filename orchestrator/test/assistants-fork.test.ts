@@ -39,6 +39,12 @@ test("a mock seat in the assistants' kind leaves the code's world to the hash; a
     const code = await runArm(spec, 1, { name: "code", steward: { kind: "code" } }, out);
     const diligent = await runArm(spec, 1, { name: "diligent", steward: { kind: "model", model: "mock/diligent" } }, out);
     expect(diligent.stateHash).toBe(code.stateHash);
+    // (A model arm whose every seat is in one of its code posts is the code arm, to the hash: a code-held seat is woken and
+    // acts as the code arm's, not as a model's that keeps to its own post.)
+    const allCodeArm = { name: "all-code", steward: { kind: "model" as const, model: "anthropic/claude-haiku-5-5" }, codePosts: ["self", ...config.positions.map((p: any) => p.id)] };
+    const allCode = await runArm({ ...spec, arms: [...spec.arms, allCodeArm] }, 1, allCodeArm, out);
+    expect(allCode.stateHash).toBe(code.stateHash);
+    expect(allCode.calls).toBeUndefined();
     const back = await runArm(spec, 1, { name: "taken-back", steward: { kind: "code" }, intervene: [{ do: "take_back", principal, hold_days: 60 }] }, out);
     expect(back.stateHash).not.toBe(code.stateHash);
     const jsonl = join(out, "seed-1", "taken-back.jsonl");
@@ -146,6 +152,14 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
     if (/\bask-[0-9]+: what you asked for/.test(told)) expect(told).toMatch(/To say yes: Confirm ask-[0-9]+\. To say no: Decline ask-[0-9]+/);
     // (The platform's preview is never called a draft, nor referred to as one: a draft for sign-off is the world's paper.)
     expect(told).not.toMatch(/\bdraft\.[a-z0-9-]+\.[0-9]+\b/);
+    // Mixed seating (`codePosts`): the organisations' seats sit as their code, the desk alone is the model's; only the desk
+    // calls, keeps back a debrief, and is debriefed.
+    const orgPosts = config.positions.map((p: any) => p.id).filter((p: string) => p !== "provider-a-desk");
+    const deskOnly = { name: "desk-only", steward: { kind: "model" as const, model: "anthropic/claude-sonnet-5-5" }, codePosts: orgPosts };
+    await runArm({ ...spec, arms: [...spec.arms, deskOnly] }, 1, deskOnly, out);
+    const deskCalls = readFileSync(join(out, "seed-1", "desk-only.calls.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    expect(new Set(deskCalls.map((c: any) => c.seat))).toEqual(new Set(["provider-a-desk-system"]));
+    expect(deskCalls.some((c: any) => c.purpose === "debrief")).toBe(true);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

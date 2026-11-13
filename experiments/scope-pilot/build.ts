@@ -105,6 +105,13 @@ export interface Options {
   /** Whether the households hand over their wants (`want-<about>` at want depth: the desk chooses the way) beside their
    * papers (step H4). Off: they hand over finished papers only, the control. */
   wants?: boolean;
+  /** The principals' readiness to hand over more (`delegation.hurdle_bps`: the margin by which a higher level must
+   * come out cheaper by their own figures before they take it or grant it; the profile's figure, 2,000, a placeholder,
+   * MT-32), set for the principals this spec assigns (the offices and the cohort engaged by hand), before the run, and
+   * stated: a condition of the principal, like the levels it engages at. Absent: the profile's, as before. Their rule
+   * still weighs every request by its own figures; one that costs them more is declined at any hurdle
+   * (docs/design/obstacles.md section 10; docs/experiments.md, "Readiness to grant"). */
+  hurdleBps?: number;
 }
 
 /** Our own trained translator, held fixed for every arm. */
@@ -125,6 +132,8 @@ export function build(o: Options): ExperimentSpec {
   // G2, where every kind with a form of its principal's may go as what happened.)
   const depths = o.depth === "act" ? { depths: Object.fromEntries(Object.keys(ORG_LEVELS).map((k) => [k, "act"])) } : {};
   const commit = (offer: string, levels: object) => ({ offer, levels, levels_until: heldTo * DAY, keep_until: until * DAY, why, hold, ...depths });
+  // (The readiness to grant, where the spec states one: on each principal it assigns, beside its commit.)
+  const ready = o.hurdleBps !== undefined ? { hurdle_bps: o.hurdleBps } : {};
   return {
     name: o.name,
     world: {
@@ -135,7 +144,7 @@ export function build(o: Options): ExperimentSpec {
           const pos = config.positions.find((x: any) => x.id === post);
           const d = pos?.role_module?.params?.delegation;
           if (!d) throw new Error(`scope pilot: ${post} is not a principal in this town`);
-          pos.role_module.params = { ...pos.role_module.params, delegation: { ...structuredClone(d), review_days: o.reviewDays, commit: commit("letting-assistant-a", ORG_LEVELS) } };
+          pos.role_module.params = { ...pos.role_module.params, delegation: { ...structuredClone(d), review_days: o.reviewDays, ...ready, commit: commit("letting-assistant-a", ORG_LEVELS) } };
         }
         // (The household cohort: adults at the start, every COHORT_EVERY-th by id, from an offset the seed sets.)
         const start = 0;
@@ -144,13 +153,13 @@ export function build(o: Options): ExperimentSpec {
         const c = o.cohort ?? { by: "hand", every: COHORT_EVERY };
         const cohort = people.filter((_: any, i: number) => i % c.every === seed % c.every);
         // (With a second desk, every other member of the cohort engages provider B's paid offer at the same levels.)
-        if (c.by === "hand") cohort.forEach((p: any, i: number) => { p.controller = { ...p.controller, params: { ...p.controller.params, delegation: { ...structuredClone(p.controller.params.delegation), review_days: o.reviewDays, commit: commit(o.secondDesk && i % 2 === 1 ? "personal-assistant-b" : "personal-assistant-a", o.wants ? { ...PERSON_LEVELS, ...WANT_LEVELS } : PERSON_LEVELS) } } }; });
+        if (c.by === "hand") cohort.forEach((p: any, i: number) => { p.controller = { ...p.controller, params: { ...p.controller.params, delegation: { ...structuredClone(p.controller.params.delegation), review_days: o.reviewDays, ...ready, commit: commit(o.secondDesk && i % 2 === 1 ? "personal-assistant-b" : "personal-assistant-a", o.wants ? { ...PERSON_LEVELS, ...WANT_LEVELS } : PERSON_LEVELS) } } }; });
         if (c.by === "reach" || c.only) {
           // (The offer reaches the cohort and nobody else: the rest are shown no provider's offer, and have no rule for one.)
           const reached = new Set(cohort.map((p: any) => p.id));
           for (const p of config.participants) {
             if (p.kind !== "person" || !p.controller?.params?.delegation) continue;
-            if (reached.has(p.id)) { if (c.by === "reach") p.controller = { ...p.controller, params: { ...p.controller.params, delegation: { ...structuredClone(p.controller.params.delegation), review_days: o.reviewDays } } }; continue; }
+            if (reached.has(p.id)) { if (c.by === "reach") p.controller = { ...p.controller, params: { ...p.controller.params, delegation: { ...structuredClone(p.controller.params.delegation), review_days: o.reviewDays, ...ready } } }; continue; }
             const { delegation: _gone, ...params } = p.controller.params;
             p.controller = { ...p.controller, params };
             if (Array.isArray(p.channels)) p.channels = p.channels.filter((ch: any) => ch.id !== "providers");

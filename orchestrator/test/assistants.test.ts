@@ -122,6 +122,14 @@ test("a town that does not ask for assistants is generated as before; one that d
   expect(ruled.length).toBeLessThan(reached.length / 2);
   for (const p of ruled) expect(p.controller.params.delegation.commit).toBeUndefined();
   for (const p of reached) expect(p.channels.some((c: any) => c.id === "providers")).toBe(!!p.controller.params.delegation);
+  // The principals' readiness to grant, where a study states one, is set on the principals it assigns and on nobody else;
+  // where it states none, their parameters are the profile's to the byte.
+  const hand = (hurdleBps?: number) => (build({ name: "t", days: 1, seeds: [1], reviewDays: 14, arms: [], budget: { experiment_usd: 0, arm_usd: {} }, offices: [], cohort: { by: "hand", every: 3, only: true }, ...(hurdleBps !== undefined ? { hurdleBps } : {}) }).world as any).prepare(structuredClone(on), 1);
+  const ready = hand(500).participants.filter((p: any) => p.controller?.params?.delegation);
+  expect(ready.length).toBeGreaterThan(0);
+  for (const p of ready) expect([p.controller.params.delegation.hurdle_bps, !!p.controller.params.delegation.commit]).toEqual([500, true]);
+  const profile = on.participants.find((x: any) => x.controller?.params?.delegation).controller.params.delegation.hurdle_bps;
+  expect(new Set(hand().participants.filter((p: any) => p.controller?.params?.delegation).map((p: any) => p.controller.params.delegation.hurdle_bps))).toEqual(new Set([profile]));
 });
 
 test("in a town with assistants, principals engage by their own rule, hand matters over and hear back; every decision rests on what they were shown", async () => {

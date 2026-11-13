@@ -410,6 +410,36 @@ fn a_level_decided_by_hand_as_a_floor_is_kept_at_least_and_its_rule_may_raise_it
     assert!(two.contains("\"why\":\"costs_more\""), "{two}");
 }
 
+#[test]
+fn the_grants_reader_answers_as_the_rule_would_and_changes_nothing() {
+    // (`oikos-kernel grants`: what a saved principal's rule would answer to a request for the next level up, read from its
+    // memory alone. The reader and the rule share `weigh`; here the rule's own answer to that request agrees with it.)
+    let script: Vec<Value> = (1..=100).map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
+    let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 120 * DAY, "keep_until": 120 * DAY, "why": "the study's design" });
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "commit": commit } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    h.wake(DAY + 3600, world(vec![offer_rec(10_000)]));
+    let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).unwrap() as i64 + 1);
+    h.wake(32 * DAY + 3600, world(set_up(&order)));
+    h.wake(33 * DAY + 3600, world(vec![signed()]));
+    let floor = json!({ "id": "rec.f1", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 34 * DAY, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [PROV], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "notice_to_vacate", "level": "draft", "hold_until": 120 * DAY, "at_least": "draft" } });
+    h.wake(34 * DAY + 3600, world(vec![floor]));
+    let saved = h.actor.save().unwrap();
+    let rows = principal::would_answer(&saved, 35 * DAY).expect("a principal").expect("its memory reads");
+    assert_eq!(h.actor.save().unwrap(), saved, "reading changes nothing");
+    let row = rows.iter().find(|r| r["kind"] == "notice_to_vacate" && r["only"] == false).unwrap_or_else(|| panic!("{rows:?}"));
+    assert_eq!((row["now"].as_str(), row["asked"].as_str()), (Some("draft"), Some("approve")), "{row}");
+    let ask = statement("rec.ask", 35 * DAY, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "level": "approve" }));
+    let mut ans = all(&h.wake(35 * DAY + 60, world(vec![ask])));
+    ans.push_str(&all(&h.wake(36 * DAY + 3600, world(vec![]))));
+    let answer = ans.lines().find(|l| l.contains("kind=scope_answer")).unwrap_or_else(|| panic!("{ans}"));
+    let why = if row["answer"] == "granted" { "\"why\":\"granted\"" } else { "\"why\":\"costs_more\"" };
+    assert!(answer.contains(why), "the reader said {}: {answer}", row["answer"]);
+}
+
 /// An export as the producer makes it: the goods sent, and the invoice for them.
 const EXPORT: &str = "goods(at=outside, carried=yes, from_at=works, kind=goods, quantity=\"20\", to=outside)\ninvoice = statement(basis=rec.16, data={\"from_at\":\"works\",\"kind\":\"goods\",\"outcome\":{\"money\":{\"amount\":\"200000\",\"for\":\"20 goods exported\",\"to\":\"acc-ll\"}},\"quantity\":20}, kind=invoice, text=\"Invoice: 20 goods at $100.00 each, $2,000.00.\", to=[\"outside\"], visible=[\"ll\",\"outside\"])";
 

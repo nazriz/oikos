@@ -13299,3 +13299,81 @@ From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11
 - **Revisit if:** a matter carries instructions other than payments (a claim recorded stays the principal's, G1); a
   seat sends the paper on the direct form instead of the signed copy (then the payment is not made, and the reader
   says `not_as_signed` or `beyond_level` as before).
+
+## 2026-11-14 · The obstacle run: readiness to grant, mixed seating, the health check, the API route, sized
+
+**What a principal's rule answers (`oikos-kernel grants`, cherry-picked from `working-hours` 9f822f66).** A read-only
+reader of a fork's snapshots: for every saved principal, what its rule would answer then to a request for the next level
+up of each kind it hands over, for the kind and for one matter, with the figures it weighed (`principal::would_answer`,
+sharing `weigh` with the rule that answers, so they cannot drift). It changes nothing (a test: the reader and the rule's
+own answer to the same request agree, and the memory saves the same after reading).
+- **Read at obstacle level 2, the study town, code arm, seed 7, snapshots at days 60, 120 and 180 (the fork on day 30),
+  default hurdle 2,000:** every request for the next level up is declined for every kind of the desk's that matters,
+  except a tribunal response for one matter (advice to draft: 3,729 bps cheaper, granted) and, at day 120 only, the
+  factory's delivery notes (draft to approve, 2,769 bps cheaper). Why: approving costs a person more than signing off a
+  draft, by their own figures (one matter a month: 1,107 cents against 985, 11% more; a want, 601 against 479, 20%
+  more), and a person's request for a whole kind weighs nothing against nothing (their expected matters a month of a
+  kind are 0, so both costs are 0, and 0 is not cheaper than 0). The offices' kinds cost 3% to 61% more at `approve`.
+- **The readier setting tried: 0** (the readiest the rule takes: it clamps a hurdle below 0, and a negative one would
+  grant what costs the principal more, which is absurd). At 0 one more kind is granted, a complaint for one matter
+  (advice to draft, 619 to 673 bps cheaper); the desk's draft kinds (job, loan and benefit applications, review requests,
+  wants) are declined as at 2,000; and the principals' own reviews move too (the factory raised a kind to `alone` by
+  itself, one person a complaint to draft), so a readier cell is not the same town readier to answer. **So the grant
+  condition is left out of the run**: no hurdle short of absurd produces grants for the desk's kinds, and the one that
+  produces a few also changes what the principals do unasked.
+- **The setting stays available** (`build.ts`, `hurdleBps`, on the principals a spec assigns; absent, the profile's, to
+  the byte). It is not an arm within one experiment: the principals weigh from day 1, so another hurdle is another town.
+  Delay costs (B7) would be the honest lever for grants, and need approvals that come late (leave, B6), not in this build.
+- **Revisit if** leave (B6) lands, or the desk's kinds gain a level between draft and approve that costs the principal
+  less, or the study wants behaviour after a grant badly enough to design for it.
+
+**Some seats by model, the rest by code, in one arm (`Arm.codePosts`).** The run seats Haiku at the desk and the
+factory only; the finance and rates offices' assistants meet no obstacles and would only cost calls. A template steward's
+seat in one of the named posts sits as its code, is woken as the code arm's, makes no call and is not debriefed; the
+model's seats keep to their own post, named one by one (`seats_keep_to_own` takes participants as well as templates).
+Smallest change: a field on the arm, a branch where a seat's controller is made. Proven: an arm whose every seat is
+code-held is the code arm to the hash; the desk-only arm calls only from the desk and debriefs it. **Revisit if** a seat
+is delivered after the fork in a mixed arm (it is the model's but does not keep to its own post; the log notes it).
+
+**The health check (`experiments/scope-pilot/funnel.ts`), asked for by the lead after the baseline (2026-11-14).** The
+baseline's model seats drafted and were signed off and almost nothing was sent, found only by noticing two reports did
+not add up. A funnel per seat and kind (handed, drafted, drafts, signed, sent, answered, shown, done), the translator's
+stages, obstacles made, met and cleared, requests for more, unread answers, sittings, calls and debriefs, all read from
+the fork's log (a running fork's too), with a fixed verdict (in its header). On the baseline it fails every model arm
+where it failed: the desk at send (Haiku 0 of 12 signed sent, Sonnet 0 of 29, Codex 0 of 33, local 0 of 16), the
+rates seat at send (Haiku 0 of 38) or at drafting (Codex, local), the factory at send (Sonnet 11 of 17, Codex 5 of 11);
+the code arm passes. The harness runs it on a model arm's fork on stated days (`ExperimentSpec.healthCheck`; the run's
+10 and 30) and stops a failing fork as an error, its log kept, so `--resume` takes it up; at the end it is recorded
+with the result. Its own reading, not `delegation/beyond.rs` (being fixed by another worker): a signed draft is sent when
+a paper of its kind, in the seat's post, for the principal, follows the sign-off. A dry run of rung 2 at level 2 showed
+the check read a running fork at day 10 and the end, and found the mock's desk and factory drafting nothing: our
+translator alone served the mock's requests 0 and 4 times of 9 and 13 (the translator faults gate-faults is fixing).
+- **Revisit if** a stage's rule misreads a paper (a sent paper that does not follow its sign-off, a send by another way),
+  or the thresholds fail healthy forks: they are fixed before a rung, never tuned to pass one.
+- **Known limit:** a fork stopped by its check is not debriefed then; it is debriefed when taken up and finished. A fork
+  stopped for a fault that is then fixed cannot be taken up from its log (the world differs): it is run afresh, its log
+  moved aside, and its seat was not debriefed for the stopped attempt. Each such seat is to be named in the rung's notes.
+
+**The API route, checked (2026-11-14; 9 Haiku calls, `runs/api-route-check-2026-11-14/`).** Nothing had run through
+`anthropic/` since 8 November. The seat prompts of this setup (as its dry run built them) sent through the harness's
+own adapter: every answer was tool uses (the desk's first sitting: a notebook entry and eight requests in one answer;
+none in notes); an answer taken back as the conversation's history with its uses answered was accepted (thinking is not
+kept, and the API takes the history without it); the standing part (system and tools, about 11,500 tokens at the desk,
+9,800 at the factory) was written once and read from the cache by the next call of the same seat; tokens and cost per
+call are recorded (`calls.jsonl`). Calls: the desk's first sitting 24,699 tokens written to the cache and 6,991 out
+($0.0066, 30 s); later calls 9,800 to 12,600 read, 250 to 2,000 written, 180 to 410 out ($0.0003 to $0.0006, 2 s);
+the factory's first 12,651 written, 415 out ($0.0018); two of the desk's heaviest mid-run sittings (from the mock fork at level 1: its 200th and 440th calls) 39,600 and 43,900 tokens in, 1,000 and 1,100 out ($0.004 and $0.006, 6 s). Every action is read: the API gives every use in one answer,
+and the seat takes them all (up to 8 an answer, the rest noted), so the split-answer fault of `claude -p` cannot
+happen here. Limits and the debrief reserve are the adapter-independent machinery the dry runs exercise. **Effort:** the
+API adapter sends no `thinking` and no `effort`, so Haiku 5.5 runs at its API defaults (adaptive thinking, effort
+medium), as rounds 1 to 5 did through the same adapter (their Haiku seats: 302 tokens out a call on average).
+
+**Sized (2026-11-14).** A mock fork of the setup, 180 days, at each level: the desk about 700 sitting calls (682 to
+719), prompts a mean 52,000 to 60,000 characters (about 19,000 to 21,000 tokens; the largest 138,000 characters, about
+50,000 tokens, under the 100,000-token price step), the factory about 190 calls at 30,000 characters, and about 12
+debrief calls a seat. Priced at the API's rates with the real calls' shapes (2.8 characters a token): a fork about $1.0 to $1.2 if the
+standing part is read from the cache and outputs average 400 tokens, and $2.35 (level 0), $2.67 (level 1), $2.39 (level
+2) if every token in were written to the cache and outputs averaged 1,000 tokens (three times the measured mean). The desk is expected to meet about 10 obstacles a fork at level 1 and 13 at level 2 (1.7 and 2.2 a month,
+the code screen); level 0 none. Designs under $80 with a hard $5 a fork (twice the worst case): 16 forks at most.
+Recommended: level 0 three seeds, levels 1 and 2 six each (15 forks; caps $75; expected $15 to $37). Rungs 1 to 3 cost
+under $10 together at their own limits.

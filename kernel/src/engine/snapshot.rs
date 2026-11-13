@@ -143,6 +143,11 @@ impl Snapshot {
         self.kernel.state()
     }
 
+    /// Each code unit's saved memory, by its key (read only: for tools that read what an actor held then).
+    pub fn actors(&self) -> impl Iterator<Item = (&str, &Value)> {
+        self.saved.units.iter().filter_map(|u| Some((u.key.as_str(), u.actor.as_ref()?)))
+    }
+
     /// The world's state hash when it was taken.
     pub fn state_hash(&self) -> &str {
         &self.head.state_hash
