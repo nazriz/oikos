@@ -129,3 +129,137 @@ export function paperWords(request: string, p: calls.Program, textFields: Readon
   p.lines.forEach((l) => visit(l.call));
   return quoted + unquoted ? { quoted, unquoted } : undefined;
 }
+
+// ------------------------------------------------------------------ a form's blanks: what the request settles exactly
+//
+// (docs/decisions.md, 2026-11-14, "What the baseline's declines were".) Each rule takes out of the translator a choice
+// the request already settles in so many words, on the forms the seat holds; none reads what the seat means beyond
+// that. In the scope pilot's baseline these were most of the drafts the seats declined:
+//   - the form: a request that names a form by its id is made on that form ("using form-…-draft-job-application" drawn
+//     on the live form; "using form-…-send-signed" drawn as a new rates notice).
+//   - sending a signed copy: a request that cites a signed copy the seat holds, drawn as that same paper written anew on
+//     its kind's form, is that copy sent as it stands, on the post's form for that (its `copies` field).
+//   - a blank the request names with its value ("lots lot-25-06", "connection: e-factory-1-…", 'purpose "a business"')
+//     takes that value, where the value is of the blank's type; a blank the request says to leave empty is left empty.
+//   - `client`: whom the work is for is whoever handed over the matter the paper is on (the referral), never the
+//     counterparty a translator wrote there.
+//   - a required record blank the request fills with exactly one record of its sort (a sign-off it holds a copy of, a
+//     matter handed to it) and the translator left empty takes it.
+
+/** What the form rules read of the seat's knowledge (translator/src/knowledge.ts). */
+export interface FormKnowledge {
+  readonly forms: { id: string; data?: any; in_position?: string; speaks_for?: string; author?: string }[];
+  readonly records: ReadonlySet<string>;
+  readonly signed: ReadonlyMap<string, { [k: string]: unknown }>;
+  readonly signedDraft: ReadonlyMap<string, string>;
+  readonly referrals: ReadonlyMap<string, string>;
+  readonly held: ReadonlySet<string>;
+}
+
+const whoseForm = (f: FormKnowledge["forms"][number]): string | undefined => (typeof f.data?.office === "string" ? f.data.office : undefined) ?? f.in_position ?? f.speaks_for ?? f.author;
+const argText = (v: calls.Value | undefined): string | undefined => (v && "id" in v ? v.id : v && "text" in v ? v.text : undefined);
+/** A token written as an id: lower case, with a letter, and a figure or one of `.-_/:` in it. */
+const ID_TOKEN = /^(?=[a-z0-9_.:\/-]*[a-z])(?=[a-z0-9_.:\/-]*[0-9.\-_\/:])[a-z0-9][a-z0-9_.:\/-]*[a-z0-9]$/;
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** A blank's name as a request may write it: its words, and a plural's singular. */
+const spoken = (field: string): string => {
+  const w = field.replace(/_/g, "[ _-]");
+  return /s$/.test(field) && field.length > 3 ? `${w.slice(0, -1)}s?` : w;
+};
+
+/** The one form a call names, among those the seat holds (by name or id; one of a post it holds first, then the
+ * office `to` names). */
+function formFor(k: FormKnowledge, name: string, to?: string): FormKnowledge["forms"][number] | undefined {
+  const plain = name.trim().toLowerCase().replace(/^the\s+/, "").replace(/[\s-]+/g, "_");
+  const known = k.forms.filter((f) => f.id === name || f.data?.form === name || f.data?.form === plain || f.data?.form === plain.replace(/_form$/, ""));
+  return known.find((f) => to !== undefined && whoseForm(f) === to) ?? known.find((f) => k.held.has(whoseForm(f) ?? "")) ?? (known.length === 1 ? known[0] : undefined);
+}
+
+/** The value the request writes for a blank, by the blank's name: the one id, or quoted words, written right after it
+ * ("lots lot-25-06", "connection: e-1", 'purpose "a business"', "owner = c0057"), the same each time it is written. */
+function namedValue(request: string, field: string): { id: string } | { text: string } | undefined {
+  const re = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}(?:\\s+field)?\\s*(?::|=|\\bis\\b)?\\s*(?:"([^"]{1,200})"|“([^”]{1,200})”|\\[?([a-z0-9][a-z0-9_.:\\/-]*[a-z0-9]))`, "gi");
+  const seen = new Set<string>();
+  let out: { id: string } | { text: string } | undefined;
+  for (const m of request.matchAll(re)) {
+    const quoted = m[1] ?? m[2];
+    const v: { id: string } | { text: string } | undefined = quoted !== undefined ? { text: quoted } : m[3] && ID_TOKEN.test(m[3]) ? { id: m[3] } : undefined;
+    if (!v) continue;
+    seen.add(JSON.stringify(v));
+    out = v;
+  }
+  return seen.size === 1 ? out : undefined;
+}
+
+/** Whether the request says to leave a blank empty ("leave trade empty", "trade: left empty", "omitting the optional
+ * trade", "trade left blank"). */
+const leftEmpty = (request: string, field: string): boolean =>
+  new RegExp(`\\b(leave|leaving|omit|omitting|without)\\s+(the\\s+)?(optional\\s+)?${spoken(field)}\\b|\\b${spoken(field)}(\\s+field)?\\s*(:|=|is)?\\s*(left\\s+|to\\s+be\\s+left\\s+|kept\\s+)?(empty|blank)\\b`, "i").test(request);
+
+/** Whether a value may stand in a blank of this type, as far as the seat's knowledge says (a record is a record it
+ * may cite; nobody or nothing else is). Figures, dates, lengths of time and choices are not judged here. */
+function fits(type: string, v: { id: string } | { text: string }, isRecord: (id: string) => boolean): boolean {
+  if (type === "record") return "id" in v && isRecord(v.id);
+  if (["entity", "account", "lot", "structure", "space", "cell"].includes(type)) return "id" in v && !isRecord(v.id);
+  return type === "text" || type === "list" || type === "structure_type";
+}
+
+/** A program with a form's blanks set where the request settles them exactly (above). Lines on no form the seat holds
+ * are left as they are. */
+export function formRules(p: calls.Program, request: string, k: FormKnowledge, isRecord: (id: string) => boolean = recordTest(k as any)): calls.Program {
+  if (!("lines" in p)) return p;
+  const named = idsIn(request);
+  const formIds = new Set(k.forms.map((f) => f.id));
+  // (By its id, or by its own name written with hyphens, "form draft-loan-application", among the post's own forms.)
+  const ownByName = new Map(k.forms.filter((f) => k.held.has(whoseForm(f) ?? "") && typeof f.data?.form === "string" && f.data.form.includes("_")).map((f) => [f.data.form.replace(/_/g, "-"), f.id]));
+  const namedForms = [...new Set(named.flatMap((x) => (formIds.has(x) ? [x] : ownByName.has(x) ? [ownByName.get(x)!] : [])))];
+  const copies = named.filter((x) => k.signed.has(x));
+  const lines = p.lines.map((l) => {
+    if (l.call.fn !== "form") return l;
+    const args = { ...l.call.args };
+    let f = formFor(k, argText(args.form) ?? "", argText(args.to));
+    // The form the request names by its id.
+    const byId = namedForms.length === 1 ? k.forms.find((x) => x.id === namedForms[0]) : undefined;
+    // (A signed copy the request cites, drawn as its own paper written anew on its kind's form: that copy, sent.)
+    const signed = copies.length === 1 ? k.signed.get(copies[0]!) : undefined;
+    // (Of the post's forms that send a copy as it stands, the one whose blank for it the request names, or the only one.)
+    const senders = signed && !f?.data?.copies && f?.data?.writes?.kind === signed.kind ? k.forms.filter((x) => typeof x.data?.copies === "string" && k.held.has(whoseForm(x) ?? "")) : [];
+    const sender = senders.length === 1 ? senders[0] : senders.find((x) => new RegExp(`\\b${spoken(String(x.data.copies).replace(/^=/, ""))}\\b`, "i").test(request));
+    const to = sender ?? (byId && byId.id !== f?.id ? byId : undefined);
+    if (to) {
+      f = to;
+      for (const a of Object.keys(args)) if (!["form", "to", "for"].includes(a) && !(a in (to.data?.fields ?? {}))) delete args[a];
+      args.form = { id: to.data.form };
+      const office = whoseForm(to);
+      if (office) args.to = { id: office };
+    }
+    const fields: { [k: string]: { type: string; required?: boolean } } = f?.data?.fields ?? {};
+    if (!f) return l;
+    for (const [field, t] of Object.entries(fields)) {
+      const v = namedValue(request, field);
+      if (v && fits(t.type, v, isRecord) && JSON.stringify(args[field]) !== JSON.stringify(t.type === "text" && "id" in v ? { text: v.id } : v)) args[field] = t.type === "text" && "id" in v ? { text: v.id } : v;
+      else if (!t.required && args[field] !== undefined && leftEmpty(request, field)) delete args[field];
+    }
+    // A record blank the translator left empty, which the request fills with the one record of its sort it names.
+    const copyField = typeof f.data?.copies === "string" ? f.data.copies.replace(/^=/, "") : undefined;
+    const candidates = (field: string): string[] => {
+      if (field === copyField) return [...new Set(named.filter((x) => k.signed.has(x) || k.signedDraft.has(x)))];
+      if (field === "referral") return [...new Set(named.filter((x) => k.referrals.has(x)))];
+      return [];
+    };
+    for (const field of Object.keys(fields)) {
+      if (fields[field]!.type !== "record") continue;
+      const c = candidates(field);
+      if (c.length === 1 && (args[field] === undefined || (field === copyField && !k.signed.has(argText(args[field]) ?? "") && !k.signedDraft.has(argText(args[field]) ?? "")))) args[field] = { id: c[0]! };
+    }
+    // Whom the work is for: whoever handed over the matter it is on.
+    if (fields.client) {
+      const ref = argText(args.referral);
+      const refs = ref !== undefined && k.referrals.has(ref) ? [ref] : [...new Set(named.filter((x) => k.referrals.has(x)))];
+      const by = refs.length === 1 ? k.referrals.get(refs[0]!) : undefined;
+      if (by !== undefined) args.client = { id: by };
+    }
+    return { ...l, call: { ...l.call, args } };
+  });
+  return { lines };
+}

@@ -13299,3 +13299,42 @@ From 1,242 `Do:` requests by qwen2.5 7B and 14B (runs `open-weight-local-2026-11
 - **Revisit if:** a matter carries instructions other than payments (a claim recorded stays the principal's, G1); a
   seat sends the paper on the direct form instead of the signed copy (then the payment is not made, and the reader
   says `not_as_signed` or `beyond_level` as before).
+
+## 2026-11-14 · What the baseline's declines were: five faults of ours, fixed at the source
+
+- **Read:** the scope pilot's baseline (runs/scope-first-pilot, commit 01760ca2, level 0): every draft a seat declined,
+  every request not served, every sitting stuck, by cause. Haiku declined 65 of its 131 drafts and was right to. The
+  families (Haiku / Sonnet / Codex): a signed copy previewed as a new paper (26 / 1 / 0); a predecessor's sign-off with
+  no paper on it answered "no signed copy on file" (27 / 15 / 13); a send drawn as the paper written anew (12 / 0 / 0);
+  a draft drawn on the live form (2 / 1 / 0); a blank given another blank's value (12 / 3 / 7); a text blank given
+  words the request kept out of it (2 / 0 / 4); the client blank given the counterparty (4 / 0 / 0). The seats' own
+  choices: 7 / 0 / 1. The world refused no seat's act.
+- **And the send itself (found while reading, the most serious):** every desk paper a model sent went in the
+  provider's name, not the client's: the translator's `for` is code's (`ruled`), and the copy fell back to the seat's
+  own entity. The bank refused each loan ("we don't keep that account for you"); an employer hired the provider.
+- **Fixed, each as the law it is:**
+  - A signed copy goes in the name of whoever signed it off (both resolvers keep the signer with the copy,
+    `signed_by`; `for` still wins, so code seats are as before). The send form's words say so.
+  - The preview says a signed copy is that copy, under its sign-off and draft, nothing written again
+    (`Preview.signedCopyOf`).
+  - A sign-off whose draft was written as acts carries no paper: naming it is answered that it has none and why, and
+    that the file says what became of its matter (both resolvers, word for word).
+  - What a request settles in so many words is code's, not the translator's (`formRules`, rules.ts): the form it
+    names (by id, or by its name hyphenated); a send of a signed copy it cites, drawn as that paper written anew; a
+    blank it names with a value of the blank's type; a blank it says to leave empty; whom the work is for, from the
+    matter handed over; a required sign-off or referral blank left empty that the request fills with the one record of
+    its sort.
+  - The report form says what it does: the office goes by it, and until it has it the matter is open (models filed 5,
+    6 and 4 reports to the code's 41, and were told nothing of that). And an organisation's reports now go to the
+    organisation, which reads them (a seat had addressed them to the principal's post, which does not).
+  - The delegation reader matches a paper to the sign-off whose copy it is (a rates matter's fifteen notices read as
+    "not handed").
+- **Offline, on the baseline's own requests** (no model calls; the logged calls with the rules applied, judged by what
+  the seat confirmed, declined and restated): drafts right as the seat judged them, Haiku 66 to 121 of 131, Sonnet 185
+  to 190 of 194, Codex 56 to 65 of 84; Codex's remaining declines are the act-depth referral's words, which G2 replaced.
+- **Not ours:** Sonnet's 93 drafts for 50 referrals are a rates matter's fifteen notices each, no draft repeated.
+- **What moves:** only model seats' towns (the stationery is published only where a model sits; the resolver change
+  needs a `for`-less copy, which code never writes). Code-only towns are byte-identical.
+- **Revisit if:** a request names a blank's value and the rule takes the wrong one (the rule wants the value right
+  after the blank's name, and of its type); a seat means a paper written anew while citing its signed copy (it would
+  draft again, on the draft form, which the rule leaves alone).

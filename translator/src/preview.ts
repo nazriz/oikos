@@ -115,6 +115,18 @@ export class Preview {
     return undefined;
   }
 
+  /** The signed copy the seat holds that a paper is, exactly (its kind, words, whom it goes to, who sees it, its
+   * details and what it cites): the sign-off it came back with, and the draft that sign-off signed. */
+  private signedCopyOf(b: any): { signOff: string; draft?: string } | undefined {
+    const same = (x: unknown, y: unknown) => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
+    for (const [id, p] of this.k.signed) {
+      if (p.kind !== b.kind || typeof p.text !== "string" || !String(p.text).startsWith(String(b.text ?? "")) || !same(p.to, b.addressed_to) || !same(p.data, b.data) || !same(p.visible, b.visible_to) || !same(p.basis, b.basis)) continue;
+      const draft = this.k.signedDraft.get(id);
+      return { signOff: id, ...(draft ? { draft } : {}) };
+    }
+    return undefined;
+  }
+
   /**
    * Whom a paper made on the office's own form goes to, and why each: someone a field of the form names, with that
    * field and what the form says of it; someone the form itself sends every paper to, with the form's own reason
@@ -458,6 +470,18 @@ export class Preview {
         // A paper of the office's own, made on its form: what the form has filled in and what it leaves empty, and of
         // everyone it goes to, why, in the form's own words.
         const made = this.madeOn(b);
+        // A signed copy sent as it stands (a form that `copies` a sign-off): said to be that, the paper signed off under
+        // the sign-off, and not a paper newly made on the kind's form. Before 2026-11-14 it read "You will issue a job
+        // application (form-…)", word for word as a fresh one, and Haiku declined 26 right sends in the scope pilot's
+        // baseline as "a NEW application", its rates seat holding every signed notice for fear of charging twice.
+        const copy = this.signedCopyOf(b);
+        if (copy) {
+          const kind = String(b.kind).replace(/_/g, " ");
+          const goes = made ? this.goesTo(b, made).trim() : "";
+          return one(`You will send ${an(kind)} exactly as it was signed off under ${copy.signOff}${copy.draft ? ` (your draft ${copy.draft})` : ""}${named(b)}: "${b.text}". Nothing in it is written again.`, [...PAPER, ...(b.offer !== undefined ? ["offer"] : [])],
+            [...(made ? this.filled(made.form.data as forms.FormData, made.fields, forms.claimFields(made.form.data as forms.FormData).filter((n) => made.fields[n] === undefined)) : this.details(b.data) ? [`With these details: ${this.details(b.data)}.`] : []),
+              ...(goes ? [goes] : seen(b)), ...(made ? [] : cites(b)), ...rule(b)], `the signed ${kind}`);
+        }
         if (made) {
           const goes = this.goesTo(b, made).trim();
           const kind = String(b.kind).replace(/_/g, " ");

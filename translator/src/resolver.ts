@@ -65,6 +65,12 @@ export function toldAlike(a: string | null | undefined, b: string | null | undef
 }
 
 class Ask extends Error {}
+
+/** What a seat naming a sign-off that carries no paper is told (kernel/crates/resolver `no_paper_words`, word for word):
+ * a sign-off of a draft written as acts, not on a form, has nothing on it to send (2026-11-14: the scope pilot's
+ * baseline answered 55 such sends "no signed copy on file", as if the seat had named the wrong record). */
+export const noPaperWords = (id: string, draft?: string): string =>
+  `The sign-off ${id}${draft ? ` (of the draft ${draft})` : ""} has no paper with it to send: the draft it signed was not written on a form, so it was for whoever drafted it to act on there and then. Whether that was done is on your file: look there for the report on its matter.`;
 /** A name that could be more than one of those the seat knows of: the question, and the answer as data. */
 class Ambiguous extends Ask {
   constructor(question: string, readonly answer: Ambiguity) {
@@ -908,11 +914,13 @@ class Resolver {
     if (unknown.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} form has no ${unknown.join(" or ")} field. Its fields are: ${Object.keys(spec.fields).join(", ")}.`);
     if (missing.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} needs: ${missing.join(", ")}.`);
     // A signed copy sent as it stands (contracts: FormData `copies`): the paper the named sign-off carries, in the name of
-    // whoever it is made for. Nothing of it is written again, so nothing of it can differ from what was signed.
+    // whoever it is made for: whoever signed it off (a client's paper goes in the client's name), or as `for` says.
+    // Nothing of it is written again, so nothing of it can differ from what was signed.
     if (typeof spec.copies === "string" && spec.copies.startsWith("=")) {
-      const me = this.id(c, "for") ?? this.me;
       const id = String(data[spec.copies.slice(1)] ?? "");
       const paper = this.k.signed.get(id);
+      const me = this.id(c, "for") ?? (typeof paper?.signed_by === "string" ? paper.signed_by : this.me);
+      if (!paper && this.k.signedDraft.has(id)) throw new Ask(noPaperWords(id, this.k.signedDraft.get(id)));
       if (!paper) throw new Ask(`You have no signed copy on file as ${id}: name the sign-off that came back with the paper signed.`);
       const block: Block = { block: "publish", kind: paper.kind, text: String(paper.text ?? "").slice(0, 16384) } as Block;
       for (const [from, to] of [["to", "addressed_to"], ["data", "data"], ["visible", "visible_to"], ["basis", "basis"]] as const) if (paper[from] !== undefined && paper[from] !== null) (block as any)[to] = paper[from];

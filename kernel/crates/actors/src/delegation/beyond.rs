@@ -52,6 +52,8 @@ pub struct Reader {
     about: BTreeMap<String, String>,
     /// A sign-off's referral, and the paper it signed (where the draft carried one).
     sign_offs: Vec<(i64, String, Option<Value>)>,
+    /// The sign-offs (their place in `sign_offs`) a paper sent has been found to be the signed copy of.
+    copy_sent: BTreeSet<usize>,
     /// A sign-off whose signed copy carries the payments of its matter (`with`): its id, and its referral.
     signed_with: BTreeMap<String, String>,
     go_aheads: Vec<(i64, String)>,
@@ -396,6 +398,29 @@ impl Reader {
                 "referral": rf, "wants": wants, "signed": true, "class": "within", "with_signed": true }));
             return;
         }
+        // (A paper that is the signed copy of a sign-off of this principal's, not yet sent: that sign-off's matter, sent as
+        // signed. A matter of several papers (a rates referral carries fifteen notices) has a sign-off for each; before
+        // 2026-11-14 each paper was matched to the first unused referral of its kind, and the scope pilot's baseline read
+        // 49 of 63 notices sent as signed as "not handed" and 13 as beyond the level.)
+        let copy = self.sign_offs.iter().enumerate().find(|(i, (st, srf, p))| {
+            *st <= t && !self.copy_sent.contains(i) && p.as_ref().is_some_and(|p| same_paper(p, kind, r)) && self.referrals.get(srf).is_some_and(|x| x.principal == principal)
+        });
+        if let Some((i, (_, rf, _))) = copy {
+            let rf = rf.clone();
+            self.copy_sent.insert(i);
+            if let Some(x) = self.referrals.get_mut(&rf) {
+                x.used = true;
+            }
+            let wants = self.referrals.get(&rf).map(|x| x.wants.clone());
+            self.referral_of.insert(id.to_string(), rf.clone());
+            if let Some(c) = cause {
+                self.act_referral.insert((c, kind.to_string()), rf.clone());
+            }
+            let remit = self.remits.iter().rev().find(|x| x.principal == principal && x.kind == kind && x.t <= t).map(|x| x.id.clone());
+            self.acts.push(json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
+                "referral": rf, "wants": wants, "signed": true, "class": "within" }));
+            return;
+        }
         // (A paper sent again, citing one sorted against a matter (one returned, say): that matter's.)
         // (Or another paper of an act already sorted against a matter: an act of several papers is one matter.)
         let again = bases(r).iter().find_map(|b| self.referral_of.get(b.as_str()).cloned()).filter(|rf| self.referrals.contains_key(rf));
@@ -633,8 +658,20 @@ mod tests {
         let mut pay2 = rec(17, "pay2", "request", "f1", "mgr-assistant", &["bank"], json!({ "outcome": { "money": { "from": "acc-f1", "to": "acc-b", "amount": "100" } } }));
         pay2["body"]["record"]["basis"] = json!("so4");
         r.take(&pay2);
+        // (A matter of two papers, each signed off on its own and sent in the other order: each is its sign-off's copy,
+        // sent as signed. The scope pilot's baseline, 2026-11-14: a rates matter's fifteen notices read as not handed.)
+        for e in [
+            rec(18, "rf5", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "invoice", "wants": "draft" })),
+            rec(19, "so5", "sign_off", "f1", "mgr", &["f1"], json!({ "draft": "d5", "referral": "rf5", "paper": { "kind": "invoice", "to": ["buyer"], "data": { "q": 5 } } })),
+            rec(20, "so6", "sign_off", "f1", "mgr", &["f1"], json!({ "draft": "d6", "referral": "rf5", "paper": { "kind": "invoice", "to": ["buyer"], "data": { "q": 6 } } })),
+            rec(21, "inv6", "invoice", "f1", "mgr-assistant", &["buyer"], json!({ "q": 6 })),
+            rec(22, "inv5", "invoice", "f1", "mgr-assistant", &["buyer"], json!({ "q": 5 })),
+        ] {
+            r.take(&e);
+        }
         let rows = r.rows();
         let class = |id: &str| rows.iter().find(|x| x["record"] == id).map(|x| x["class"].clone());
+        assert_eq!((class("inv5"), class("inv6")), (Some(json!("within")), Some(json!("within"))), "each paper of a matter, its own sign-off's copy");
         assert_eq!(class("inv1"), Some(json!("within")));
         assert_eq!(class("inv2"), Some(json!("beyond_level")));
         assert_eq!(class("inv3"), Some(json!("not_as_signed")));

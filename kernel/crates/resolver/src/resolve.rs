@@ -1450,12 +1450,19 @@ impl Resolver<'_> {
             return ask(format!("The {form_name} needs: {}.", missing.join(", ")));
         }
         // A signed copy sent as it stands (contracts: FormData `copies`): the paper the named sign-off carries, in the name
-        // of whoever it is made for. Nothing of it is written again, so nothing of it can differ from what was signed.
+        // of whoever it is made for: whoever signed it off (a client's paper goes in the client's name), or as `for` says.
+        // Nothing of it is written again, so nothing of it can differ from what was signed.
         if let Some(field) = spec["copies"].as_str().and_then(|x| x.strip_prefix('=')) {
-            let me = self.id(c, "for")?.unwrap_or_else(|| self.me.clone());
             let id = data.get(field).and_then(Json::as_str).unwrap_or_default().to_string();
             let Some(paper) = self.k.signed.get(id.as_str()) else {
                 return ask(format!("You have no signed copy on file as {id}: name the sign-off that came back with the paper signed."));
+            };
+            if paper["no_paper"] == json!(true) {
+                return ask(no_paper_words(&id, paper["draft"].as_str()));
+            }
+            let me = match self.id(c, "for")? {
+                Some(x) => x,
+                None => paper["signed_by"].as_str().map(String::from).unwrap_or_else(|| self.me.clone()),
             };
             let mut block = Map::new();
             block.insert("block".into(), json!("publish"));
@@ -1622,6 +1629,13 @@ pub fn as_label(s: &str) -> String {
     }
     out.truncate(64);
     out
+}
+
+/// What a seat naming a sign-off that carries no paper is told (the TS resolver's `noPaperWords`, word for word): that
+/// there is nothing on it to send, why, and where what became of it is.
+pub fn no_paper_words(id: &str, draft: Option<&str>) -> String {
+    let of = draft.map(|d| format!(" (of the draft {d})")).unwrap_or_default();
+    format!("The sign-off {id}{of} has no paper with it to send: the draft it signed was not written on a form, so it was for whoever drafted it to act on there and then. Whether that was done is on your file: look there for the report on its matter.")
 }
 
 #[cfg(test)]
