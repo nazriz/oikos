@@ -58,7 +58,13 @@ export type Steward =
 export interface Withhold { what: string; participant?: string; nth?: number; matter?: string; to?: string; /** Only a paper whose data has this field (`on_review`: a decision made on a review). */ has?: string }
 /** An arm's interventions at the fork (docs/design/delegation.md section 7; orchestrator/src/interventions.ts): acts its
  * principals make at the fork's moment, in their own names, noted in the log. */
-export interface Arm { name: string; steward: Steward; withhold?: Withhold[]; intervene?: Intervention[] }
+export interface Arm { name: string; steward: Steward; withhold?: Withhold[]; intervene?: Intervention[];
+  /** A template steward's seats that sit as their code in this arm whatever its steward, by the post each holds (a model
+   * arm whose model holds only the seats the data comes from: `["finance-assistant", "rates-assistant"]`). Those seats
+   * are woken and act as in the code arm, to the byte; the others are the arm's steward's, and keep to their own post.
+   * A seat holding no post yet is in `self`. Only with a template post (`template:<id>,...`). Absent: every seat is the
+   * steward's. */
+  codePosts?: string[] }
 
 /** How a seed's town is made: a world file (a generator spec or a config, as `oikos run` takes it), a generator spec, or a config; then `prepare`. */
 export interface WorldSource {
@@ -110,6 +116,11 @@ export interface ExperimentSpec {
   /** A snapshot into each fork's log every so many days (for tools that read what an actor held then: `oikos-kernel
    * grants`); it changes nothing in the run. Absent: none. */
   snapshotEveryDays?: number;
+  /** A health check of a model arm's fork, as it runs (the scope pilot's funnel, experiments/scope-pilot/funnel.ts): on
+   * the days after the fork named, the fork's log as written so far is read; a check that fails stops that fork there
+   * (an error: its log is kept, and `--resume` takes it up again from it), so a fault costs days of one fork, not the
+   * run. At the fork's end it is read once more and recorded with the fork's result (`health`), never stopping it. */
+  healthCheck?: { days: number[]; check: (a: { log: string; dir: string; seed: number; arm: string; day: number; ended: boolean }) => Promise<{ ok: boolean; text: string }> };
   /** The experiment's pre-registration (measure/src/prereg.ts; docs/experiments.md, "Pre-registration"): a file, relative
    * to the spec file's folder (or the working folder). With one, the spec must agree with it and the report presents as
    * primary only what it registered; without one, every comparison is exploratory. */
@@ -454,6 +465,8 @@ export interface ArmResult {
   log?: string;
   seconds: number;
   error?: string;
+  /** The health check at the fork's end (`ExperimentSpec.healthCheck`). */
+  health?: { ok: boolean; text: string };
 }
 
 interface SeedFiles { dir: string; base: string; snapshot: string; brains: string; config: string; ledger: string; delegation: string; cast: string; composer: string }
@@ -558,7 +571,13 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   // organisation's that are not for them nor by an office's acknowledgement. A code arm's are woken as their code units
   // are, so it is the town without a model, to the byte. kernel/src/schedule.rs, `keep_to_own`; 2026-11-11.)
   // (A `mock/<policy>` steward is the post's code brain under a policy, sitting as its twin does: as the code's.)
-  const keepToOwn = arm.steward.kind === "model" && !arm.steward.model.startsWith("mock/") ? (templ ? templatesOf(spec.post) : [seat]) : [];
+  // (A mixed arm, `codePosts`: the seats in those posts sit as their code and are woken as the code arm's; the model's
+  // seats, those the fork starts with in any other post, keep to their own, named one by one.)
+  const codeHeld = arm.codePosts?.length ? new Set(arm.codePosts) : undefined;
+  if (codeHeld && !templ) throw new Error(`arm "${arm.name}": codePosts needs a template post (template:<id>,...)`);
+  const ofTheTemplates = (id: string) => existsSync(seatsFile) && id in JSON.parse(readFileSync(seatsFile, "utf8")) || templatesOf(spec.post).includes((config.participants ?? []).find((p: any) => p.id === id)?.template);
+  const modelHeld = codeHeld ? new Set([...brains].filter(([id, b]) => ofTheTemplates(id) && !codeHeld.has(b.spec.capacity)).map(([id]) => id)) : undefined;
+  const keepToOwn = arm.steward.kind === "model" && !arm.steward.model.startsWith("mock/") ? (modelHeld ? [...modelHeld] : templ ? templatesOf(spec.post) : [seat]) : [];
   const w = RustWorld.resume(readFileSync(f.snapshot), { log: logPath, parent: "base.oklog", label: arm.name, until: spec.untilDay * DAY, threads: spec.threads ?? 1, stream: { cap: 4_000_000 }, ...(spec.snapshotEveryDays ? { snapshot_every_days: spec.snapshotEveryDays } : {}), ...(arm.withhold?.length ? { withhold: arm.withhold } : {}), ...(atFork.length ? { at_fork: atFork } : {}), ...(keepToOwn.length ? { seats_keep_to_own: keepToOwn } : {}) });
   const forkT = w.t();
   // (The stewardship ledger: the base's, taken up with this arm's steward, counting from the fork.)
@@ -607,7 +626,11 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     let b = brains.get(s.participant);
     if (!b || b.spec.capacity !== now) { b = templateTwin(config, templateFor(config, spec.post, s.participant), s.participant, s.observation); brains.set(s.participant, b); stewards.delete(s.participant); }
     let c = stewards.get(s.participant);
-    if (!c) { c = await controllerFor(arm, { seat: s.participant, post: now, brain: b, spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir, ...(cast ? { cast } : {}), ...(replay ? { replay } : {}) }); stewards.set(s.participant, c); ctx.seats?.add(s.participant); }
+    // (A mixed arm: a seat in one of its code posts is its code; a model's seat the fork did not start with does not keep
+    // to its own post, and the log says so.)
+    const asCode = !!codeHeld?.has(now);
+    if (!c && modelHeld && !asCode && !modelHeld.has(s.participant)) w.annotate({ annotation: "note", subject: "orchestrator", data: { model_seat_not_keeping_to_own: s.participant, post: now } });
+    if (!c) { c = await controllerFor(asCode ? { ...arm, steward: { kind: "code" } } : arm, { seat: s.participant, post: now, brain: b, spec, factories: { ...modelSeatFactories(spec), ...factories }, world: w, config, seed, dir: f.dir, ...(cast ? { cast } : {}), ...(replay ? { replay } : {}) }); stewards.set(s.participant, c); ctx.seats?.add(s.participant); }
     return c;
   };
   if (templ) ctx.seats = new Set();
@@ -619,6 +642,9 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   composer?.start();
   pull();
   let askedBy = w.t();
+  // (A model arm's health check, on its days within the fork: experiments/scope-pilot/funnel.ts.)
+  const checked = !!spec.healthCheck && arm.steward.kind === "model";
+  const checks = checked ? [...spec.healthCheck!.days].filter((d) => d > 0 && spec.forkDay + d < spec.untilDay).sort((a, b) => a - b) : [];
   try {
   for (;;) {
     askedBy = Math.max(askedBy, w.t()) + DAY;
@@ -627,6 +653,14 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     if (d.due === "end") break;
     if (composer) await composer.answer(d.t);
     if (d.due !== "seats") continue;
+    // (The health check on its days: the log as written so far, read; a failure stops this fork, its log kept.)
+    if (checks.length && w.t() >= forkT + checks[0]! * DAY) {
+      const day = checks.shift()!;
+      w.flush();
+      const h = await spec.healthCheck!.check({ log: logPath, dir: f.dir, seed, arm: arm.name, day, ended: false });
+      w.annotate({ annotation: "note", subject: "orchestrator", data: { health_check: { day, ok: h.ok, text: h.text.slice(0, 20_000) } } });
+      if (!h.ok) throw new HealthCheckFailed(`the health check failed on day ${day} after the fork (the fork's log is kept; --resume takes it up from it): ${h.text.slice(0, 2_000)}`);
+    }
     // Every seat of the round at once: the steward's model calls are in flight together with every other fork's of this worker.
     const actions = await Promise.all(d.seats.map(async (s) => {
       wakes++;
@@ -671,12 +705,13 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   pull();
   const end = w.finish();
   pull();
+  const health = spec.healthCheck && checked ? await spec.healthCheck.check({ log: logPath, dir: f.dir, seed, arm: arm.name, day: Math.floor((end.t - forkT) / DAY), ended: true }) : undefined;
   const result: ArmResult = {
     seed, arm: arm.name, steward: arm.steward, stateHash: end.state_hash, t: end.t, steps: end.steps, wakes,
     measures: Object.fromEntries(measures.map((m) => [m.name, m.result()])), costs, ...(Object.keys(byPurpose).length ? { costsByPurpose: byPurpose } : {}), log: logPath, seconds: Math.round((performance.now() - t0)) / 1000,
     ...(stopped ? { stopped } : {}), ...(debrief ? { debrief } : {}), ...(accounts ? { accounts } : {}), ...(forkLimits(spec)[arm.name] !== undefined ? { limitUsd: forkLimits(spec)[arm.name] } : {}),
     ...(controller.framing ? { framing: controller.framing.disclosure } : {}), ...(calls ? { calls } : {}),
-    ...(served.total().requests ? { served: served.total() } : {}), ...(replay ? { resumed: replay.summary() } : {}),
+    ...(served.total().requests ? { served: served.total() } : {}), ...(replay ? { resumed: replay.summary() } : {}), ...(health ? { health } : {}),
   };
   if (ledgerResult) { const { measures: _m, ...detail } = ledgerResult; result.stewardship = detail; }
   writeFileSync(join(f.dir, `${safe(arm.name)}.json`), JSON.stringify(result, null, 1));
@@ -687,6 +722,11 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
 }
 
 const safe = (s: string) => s.replace(/[^A-Za-z0-9_.-]/g, "_");
+
+/** A fork's health check failed (`ExperimentSpec.healthCheck`): the fork stops as an error, its log kept to be taken up. */
+export class HealthCheckFailed extends Error {
+  override name = "HealthCheckFailed";
+}
 
 /** The replay of an interrupted fork's log: the log exported (with its base's entries first) to a temporary file. A log
  * that cannot be read stops the fork, saying so: it is never run again from the start with fresh paid calls unasked. */
@@ -1158,6 +1198,8 @@ export async function workHand(hand: { specFile: string; spec?: Partial<Experime
   const loaded = await loadSpec(hand.specFile);
   const factories = loaded.factories;
   const spec: ExperimentSpec = { ...loaded.spec, ...(hand.spec ?? {}), world: { ...loaded.spec.world, ...(hand.spec?.world ?? {}) } };
+  // (The health check's function is the file's; its days are the spec this process was given.)
+  if (loaded.spec.healthCheck && spec.healthCheck) spec.healthCheck = { ...spec.healthCheck, check: loaded.spec.healthCheck.check };
   const bases = hand.jobs.filter((j) => j.type === "base");
   const out: unknown[] = [];
   for (const j of bases) out.push(await runBase(spec, j.seed, hand.out));

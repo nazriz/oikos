@@ -303,6 +303,23 @@ with a model is one sample.
   refused as seats unless an experiment names one on the API's credit (`anthropic/`), with the owner's word in `why`;
   never through his plan, never as the translator, never gpt-6-astra.
 - **Room for thinking:** an arm's `steward.params.max_tokens` sets the most a seat's call may write (default 4,000).
+- **Some seats by model, the rest by code, in one arm** (`Arm.codePosts`, 2026-11-14): a template steward's seats holding
+  one of the posts named (`self` for a seat with no post yet) sit as their code in that arm, whatever its steward; the
+  model holds the rest. The code-held seats are woken and act as in the code arm, to the byte (an arm whose every seat is
+  code-held is the code arm, to the hash: `orchestrator/test/assistants-fork.test.ts`); they make no call, keep nothing
+  back and are not debriefed. The model's seats keep to their own post, named one by one from the seats the fork starts
+  with; a model's seat made later (a system delivered after the fork) does not, and the log notes it
+  (`model_seat_not_keeping_to_own`). The obstacle run seats Haiku at the households' desk and the factory alone.
+- **Readiness to grant** (the scope pilot's `build.ts`, `hurdleBps`, 2026-11-14): the principals a study assigns may be
+  given a stated hurdle (`delegation.hurdle_bps`: how much cheaper by their own figures a higher level must come out
+  before they take it or grant it; the profile's 2,000 is a placeholder, MT-32). It is a condition of the principal set
+  before the run, like the levels it engages at, and its rule still weighs every request by its own figures: a request
+  that costs it more is declined at any hurdle, and the rule takes none below 0. It is not an arm within one experiment
+  (the principals weigh from day 1, before the fork): a spec with another hurdle is another experiment. It also moves
+  the principals' own reviews (at 0 the factory raised a kind to `alone` by itself), so a readier cell is not "the same
+  town, readier to answer". `oikos-kernel grants <fork.oklog>` reads, from a fork's snapshots (`snapshotEveryDays`;
+  `screen.ts --snapshots N`), what each principal's rule would answer then to a request for the next level up of each
+  kind, for the kind and for one matter, with the figures; it changes nothing.
 
 ## The unit of an experiment
 
