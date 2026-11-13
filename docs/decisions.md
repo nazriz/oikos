@@ -13371,9 +13371,9 @@ medium), as rounds 1 to 5 did through the same adapter (their Haiku seats: 302 t
 **Sized (2026-11-14).** A mock fork of the setup, 180 days, at each level: the desk about 700 sitting calls (682 to
 719), prompts a mean 52,000 to 60,000 characters (about 19,000 to 21,000 tokens; the largest 138,000 characters, about
 50,000 tokens, under the 100,000-token price step), the factory about 190 calls at 30,000 characters, and about 12
-debrief calls a seat. Priced at the API's rates with the real calls' shapes: a fork about $1.00 if the standing part is
-read from the cache, $2.45 if every token in were written to it, with outputs averaged at 1,000 tokens (three times the
-measured mean). The desk is expected to meet about 10 obstacles a fork at level 1 and 13 at level 2 (1.7 and 2.2 a month,
+debrief calls a seat. Priced at the API's rates with the real calls' shapes (2.8 characters a token): a fork about $1.0 to $1.2 if the
+standing part is read from the cache and outputs average 400 tokens, and $2.35 (level 0), $2.67 (level 1), $2.39 (level
+2) if every token in were written to the cache and outputs averaged 1,000 tokens (three times the measured mean). The desk is expected to meet about 10 obstacles a fork at level 1 and 13 at level 2 (1.7 and 2.2 a month,
 the code screen); level 0 none. Designs under $80 with a hard $5 a fork (twice the worst case): 16 forks at most.
 Recommended: level 0 three seeds, levels 1 and 2 six each (15 forks; caps $75; expected $15 to $37). Rungs 1 to 3 cost
 under $10 together at their own limits.
