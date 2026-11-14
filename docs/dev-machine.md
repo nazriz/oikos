@@ -206,8 +206,9 @@ cannot be tried here.)
 - **Red main:** CI's last step writes its result to `~/.oikos/main-ci.json` (`scripts/main-status.ts`; `gh run list` is asked
   first when it works); while the latest result is a failure on a commit in origin/main, `merge.ts` refuses everything but
   `--fix-main`.
-- **Conflicts:** only `docs/decisions.md` and `docs/research/references.md` are resolved (both sides kept, markers
-  stripped, the tree checked for any left). A conflict anywhere else leaves that branch out and says which files.
+- **Conflicts:** only `docs/decisions.md`, `docs/research/references.md` and `contracts/README.md` (each an
+  append-only list: a change adds its own entry) are resolved (both sides kept, markers stripped, the tree checked for
+  any left). A conflict anywhere else leaves that branch out and says which files.
 - **Fixing a red main:** `--fix-main` lands the repair while main is red; it is tested the same way.
 - **Flakes:** if the gate fails with exactly one failed test file and it is `scripts/slots.test.ts` or
   `orchestrator/test/pilot-wave.test.ts` (timing under load), that file is rerun alone and accepted only if it passes.

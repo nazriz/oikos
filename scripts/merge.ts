@@ -24,7 +24,9 @@ import { blocker, fromRuns, readStatus } from "./main-status";
 import { acquire, installHook } from "./merge-lock";
 import { clearLanded, lowDisk } from "./disk-tidy";
 
-export const KEEP_BOTH_FILES = ["docs/decisions.md", "docs/research/references.md"];
+// (contracts/README.md too: every change appends its own dated entry at the end, and three landings of 14 November bounced
+// on two of them; checked 2026-11-15 over its last 40 changes, all but two appended, one edited a line in place.)
+export const KEEP_BOTH_FILES = ["docs/decisions.md", "docs/research/references.md", "contracts/README.md"];
 /** Conflicts resolved by keeping main's side: the suite's timings, a cache any run writes again. */
 export const KEEP_OURS_FILES = ["scripts/test-times.json"];
 /** What the merge asks of scripts/test.ts (scripts/test-runner.test.ts runs the selection with exactly these). */
