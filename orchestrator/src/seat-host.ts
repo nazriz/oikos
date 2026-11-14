@@ -68,7 +68,7 @@ export interface ModelSeatOptions {
 }
 
 /** What the fork's end was, as the debrief tells it. */
-export type ForkEnd = { how: "length_set" | "last_day" | "spending_limit" | "stopped"; t: number };
+export type ForkEnd = { how: "length_set" | "last_day" | "spending_limit" | "stopped" | "fault"; t: number };
 
 /** A model seat in a fork: what the harness's `SeatController` is, with the log's entries seen and the fork's end. */
 export class ModelSeat {

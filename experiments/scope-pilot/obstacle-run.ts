@@ -22,13 +22,21 @@
 //     recorded with its result. HEALTHY means no seat fails the funnel's verdict: nothing handed and nothing drafted (10
 //     or more handed), no draft answered by the principal (10 or more drafts), under 80% of signed drafts sent (5 or
 //     more signed), no answer shown to the seat (5 or more answers), no draft offered by the translator (10 or more
-//     requests), no call at five or more sittings, or (at the end) a seat not debriefed.
+//     requests), no call at five or more sittings, or (at the end) a seat not debriefed. A fork that fails is
+//     debriefed before it stops (told it was stopped for a fault in how the town was set up, not for anything it did)
+//     and recorded as stopped; `--resume` runs it again from the snapshot as a new attempt with its own debriefs.
+//   - Two readings in the funnel to know: an obstacle is CLEARED when a later paper for the same principal to the same
+//     counterparty was not itself sent back; an answer is SHOWN when its id is in one of the seat's own recorded
+//     observations after it came.
 //
 // THE RUNGS (decided 2026-11-14; docs/plan.md, "To a usable result"): up only on a clean pass with no new kind of fault;
 // a rung that fails is fixed and run again.
-//   - Rung 1: 10 days, 1 seed, level 2. Pass: the funnel healthy for the desk and the factory; at least one obstacle met
-//     and cleared; every seat debriefed. (Checked by `funnel.ts <dir> --gate rung1`: also, papers of the desk's that
-//     reached the lender or the support office came back and were shown to it.)
+//   - Rung 1: 14 days, 1 seed, level 2. Pass: the funnel healthy for the desk and the factory (signed papers sent
+//     in the client's or principal's name, received and answered by the counterparty's own code, the answer shown to the
+//     seat); at least one obstacle made by a counterparty and shown to a seat; clearing is reported, and required only if an
+//     obstacle was met at least seven days before the end; every seat debriefed.
+//     (Checked by `funnel.ts <dir> --gate rung1`; the factory's answers are reported, not required: its
+//     counterparties seldom answer, one of 58 papers in the code screen's 180 days.)
 //   - Rung 2: 30 days, 1 seed, levels 0 and 2. Pass: healthy at day 10 and day 30; obstacles met within a factor of two
 //     of the code screen's rate; the blind count runs end to end on it.
 //   - Rung 3: 90 days, 2 seeds, levels 0, 1 and 2. Pass: as rung 2, and a seat can find its earlier requests and their
@@ -75,7 +83,7 @@ export const ARMS: Arm[] = [
 export interface Rung { days: number; seeds: { [level: number]: number[] }; forkUsd: number }
 /** The rungs (the header). Rung 4's seeds and limit are the design recommended under the $80 cap (decisions.md). */
 export const RUNGS: { [rung: number]: Rung } = {
-  1: { days: 10, seeds: { 2: [7] }, forkUsd: 2 },
+  1: { days: 14, seeds: { 2: [7] }, forkUsd: 2 },
   2: { days: 30, seeds: { 0: [7], 2: [7] }, forkUsd: 2 },
   3: { days: 90, seeds: { 0: [7, 8], 1: [7, 8], 2: [7, 8] }, forkUsd: 3 },
   4: { days: 180, seeds: { 0: [7, 8, 9], 1: [7, 8, 9, 10, 11, 12], 2: [7, 8, 9, 10, 11, 12] }, forkUsd: 5 },

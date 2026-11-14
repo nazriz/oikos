@@ -1,11 +1,13 @@
-// The obstacle run's smoke: rung 1 of obstacle-run.ts (10 days after the fork, one seed, level 2), the same setup as
+// The obstacle run's smoke: rung 1 of obstacle-run.ts (14 days after the fork, one seed, level 2), the same setup as
 // every rung (see obstacle-run.ts's header for the setup, the health check and the rungs). Ready to run after the
 // baseline's faults are fixed (gate-faults, 2026-11-14); not yet run.
 //
-// PASS (rung 1): the funnel healthy for the desk and the factory; at least one obstacle met and cleared; every seat
-// debriefed; and papers of the desk's that reached the lender (bank) or the support office (outside) came back and were
-// shown to it. `bun experiments/scope-pilot/funnel.ts <dir> --gate rung1` says so, and exits 1 if not.
-// Expected cost: well under a dollar (a 10-day fork: about 40 desk calls, 12 factory calls, two debriefs); its hard
+// PASS (rung 1): the funnel healthy for the desk and the factory (signed papers sent
+// in the client's or principal's name, received and answered by the counterparty's own code, the answer shown to the
+// seat); at least one obstacle made by a counterparty and shown to a seat; clearing is reported, and required only if an
+// obstacle was met at least seven days before the end; every seat debriefed.
+// `bun experiments/scope-pilot/funnel.ts <dir> --gate rung1` says so, and exits 1 if not.
+// Expected cost: well under a dollar (a 14-day fork: about 55 desk calls, 15 factory calls, two debriefs); its hard
 // limit is rung 1's fork limit (RUNGS[1].forkUsd, $2).
 //
 // To start it (on the run server, from the checkout; detached and kept awake; never deletes a run):

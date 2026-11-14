@@ -117,9 +117,10 @@ export interface ExperimentSpec {
    * grants`); it changes nothing in the run. Absent: none. */
   snapshotEveryDays?: number;
   /** A health check of a model arm's fork, as it runs (the scope pilot's funnel, experiments/scope-pilot/funnel.ts): on
-   * the days after the fork named, the fork's log as written so far is read; a check that fails stops that fork there
-   * (an error: its log is kept, and `--resume` takes it up again from it), so a fault costs days of one fork, not the
-   * run. At the fork's end it is read once more and recorded with the fork's result (`health`), never stopping it. */
+   * the days after the fork named, the fork's log as written so far is read; a check that fails stops that fork there,
+   * its seats debriefed (told the run was stopped for a fault in the town's set-up, not for anything they did), the fork
+   * recorded as stopped (`HealthCheckFailed`); `--resume` runs it again from the snapshot as a new attempt, its earlier
+   * log and result kept under other names. A fault costs days of one fork, not the run. At the fork's end it is read once more and recorded with the fork's result (`health`), never stopping it. */
   healthCheck?: { days: number[]; check: (a: { log: string; dir: string; seed: number; arm: string; day: number; ended: boolean }) => Promise<{ ok: boolean; text: string }> };
   /** The experiment's pre-registration (measure/src/prereg.ts; docs/experiments.md, "Pre-registration"): a file, relative
    * to the spec file's folder (or the working folder). With one, the spec must agree with it and the report presents as
@@ -659,7 +660,7 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
       w.flush();
       const h = await spec.healthCheck!.check({ log: logPath, dir: f.dir, seed, arm: arm.name, day, ended: false });
       w.annotate({ annotation: "note", subject: "orchestrator", data: { health_check: { day, ok: h.ok, text: h.text.slice(0, 20_000) } } });
-      if (!h.ok) throw new HealthCheckFailed(`the health check failed on day ${day} after the fork (the fork's log is kept; --resume takes it up from it): ${h.text.slice(0, 2_000)}`);
+      if (!h.ok) throw new HealthCheckFailed(`the health check failed on day ${day} after the fork (its seats debriefed; its log kept; --resume runs it again from the snapshot as a new attempt): ${h.text.slice(0, 2_000)}`);
     }
     // Every seat of the round at once: the steward's model calls are in flight together with every other fork's of this worker.
     const actions = await Promise.all(d.seats.map(async (s) => {
@@ -683,13 +684,14 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
   } catch (e) {
     // A fork's spending limit, or its model out of reach: the fork stops here, cleanly, and says why; its seat is still
     // debriefed (out of what its limit kept back). The run's other forks go on.
-    if (!(e instanceof SpendingLimitReached)) throw e;
+    // (A failed health check stops the fork the same way: its seats debriefed, told it was a fault in the town's set-up.)
+    if (!(e instanceof SpendingLimitReached) && !(e instanceof HealthCheckFailed)) throw e;
     stopped = { why: e.message, by: e.name, t: w.t() };
     w.annotate({ annotation: "note", subject: "orchestrator", data: { stopped: e.message, by: e.name } });
   }
   let debrief: string | undefined;
   const runEnd = Number(config.clock?.run_seconds ?? 0);
-  const how: ForkEnd["how"] = stopped ? (stopped.by === "SpendingLimitReached" ? "spending_limit" : "stopped") : spec.untilDay * DAY >= runEnd ? "last_day" : "length_set";
+  const how: ForkEnd["how"] = stopped ? (stopped.by === "SpendingLimitReached" ? "spending_limit" : stopped.by === "HealthCheckFailed" ? "fault" : "stopped") : spec.untilDay * DAY >= runEnd ? "last_day" : "length_set";
   if (controller.end) debrief = await controller.end({ how, t: w.t() });
   // (Each of a template steward's seats is debriefed as any seat is.)
   for (const c of stewards.values()) if (c.end) { const d = await c.end({ how, t: w.t() }); if (d) debrief = debrief ? `${debrief}\n${d}` : d; }
@@ -1084,7 +1086,7 @@ export async function runExperiment(spec: ExperimentSpec, o: RunOptions): Promis
 }
 
 /** Why a fork stopped that is worth running again once the model can be had (not its own spending limit). */
-const RETRY = new Set(["CreditExhausted", "UsageLimitReached", "ModelUnreachable"]);
+const RETRY = new Set(["CreditExhausted", "UsageLimitReached", "ModelUnreachable", "HealthCheckFailed"]);
 
 /** What an interrupted experiment left that need not be done again: the seeds whose base is whole, and the forks whose
  * result stands. A fork's result that does not stand (failed, or stopped for want of the model) is kept under another
@@ -1105,6 +1107,10 @@ export function resumable(spec: ExperimentSpec, out: string, say: (s: string) =>
       let k = 1;
       while (existsSync(join(f.dir, `${safe(a.name)}.interrupted-${k}.json`))) k++;
       renameSync(file, join(f.dir, `${safe(a.name)}.interrupted-${k}.json`));
+      // (A fork stopped by its health check was debriefed and is not taken up from its log: its fault is fixed first, so
+      // the world differs. Its log is kept beside its result, and the fork runs again from the snapshot, a new attempt.)
+      const stoppedLog = join(f.dir, `${safe(a.name)}.oklog`);
+      if (r?.stopped?.by === "HealthCheckFailed" && existsSync(stoppedLog)) renameSync(stoppedLog, join(f.dir, `${safe(a.name)}.interrupted-${k}.oklog`));
       say(`seed ${seed}, ${a.name}: ${r?.stopped ? `stopped (${r.stopped.by})` : "no result"}; run again`);
     }
   }
