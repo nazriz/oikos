@@ -13637,3 +13637,42 @@ none, stay a subject line only, as before.
   world, as no buyer it could invoice, wrote to the manager to ask, and the manager's code does not read letters. The
   four duplicate sends it declined (requests par.4.12 to 16) were its own retries after the unsure notices of (3).
 - **Revisit if:** a draft's matter should be one of several open of its kind (it is then asked back, as before).
+
+## 2026-11-14 · B1: the client passes on every paper about a matter it handed over
+
+**The law (docs/design/stakes.md, B1; closes MT-34).** A principal who has handed a matter to an assistant passes on to
+it every paper it receives about that matter, as its own act (`kernel/crates/actors/src/delegation/principal/forward.rs`):
+persons and organisations alike, every kind of paper and every body. About the matter: the paper cites a paper sent on
+the matter, or it comes from whom the matter's paper went to and cites what that paper cited (the counterparty's next
+step on it: a tribunal's order on the application a response answers). Only what was sent to the principal, and only
+after the hand-over. What the principal knows of a matter is its own: the program and facts it handed over, the papers
+its assistant sent in its name (which it sees), and what its assistant's reports say they made; a paper no report names
+is tied to the oldest matter of its kind with no paper yet. The copy is a new delegation paper, `forward` (the body's
+paper's id, kind, words, data, who wrote it, and the matter), priced at `publish/forward` (a minute, placeholder: WM-1), and
+queued like its other papers to its assistant (its own time).
+- **Why a new kind, not the body's kind (as returns are passed on):** a copy in the body's kind, addressed in the
+  principal's own name, would be read again by the principal's own code (a decision, an order) and priced at the body's
+  composing time (`publish/benefit_decision`, twenty minutes). A forward is the client's own short act. Returns and
+  recorded authorities keep their established form (the desk's procedure, the obstacle reader and the translator's copy
+  form read them by kind); folding them in is MT-39's revisit.
+- **The code assistant:** a forwarded paper that asks for something by a date waits on the body's answer; if the date
+  passes with none, the matter is reported not done, naming the paper (`Report.needs.record`; obstacles O3's "silence
+  past `by`"); the body's answer closes the matter, and nothing more is done. The client's own code still answers an
+  evidence request itself (it keeps the papers). Chosen so the code arm does what a clerk would and adds no act a
+  client would find pointless (telling the client of a decision the client forwarded).
+- **The seat's matters reader** puts the body's answer, or what it asks by a date, on the matter's line; a finished
+  matter keeps its line for a fortnight after the answer (a reader's choice), one asked something by a date until the
+  answer or the date. **A matter whose last report says not done is open** (it was counted finished before, the
+  reader going by any report): listed with the reason until a later report says done or the client declines it, so a
+  seat that reported "not done for want of an authority" sees it again (the lead, from this step's proof).
+- **At the client's sitting (D1a):** a person who deals with their post when they sit down to it (`answer_lag`)
+  passes a body's paper on then, with the rest of their post: the paper waits in `in_post` and is forwarded from
+  `take`. An organisation's principal forwards on its next wake, as it deals with its other post.
+- **Easy to replace:** the code assistant's waiting on a dated request is one block in `assistant.rs` (`due`); the
+  referral worker's "a matter handed over stays handed over" (the client hands the reply to the same assistant) is to
+  replace it.
+- **What moves:** towns with providers only (their principals forward; their desks see more and the code assistant
+  reports on lapsed dates). Towns without providers do not move (the principal keeps no trace until a service is in
+  use; the new state fields are left out when empty; the `forward` row is added only where providers are).
+- **Revisit if** a body is seen writing about a handed matter without citing its paper (MT-39), or a study needs the
+  formal form (a correspondence nominee the office writes to directly).

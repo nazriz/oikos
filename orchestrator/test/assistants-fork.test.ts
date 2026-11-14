@@ -157,6 +157,9 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
     }
     const openShown = (flat(deskFirst.body.data.input).split("Your matters, and where each stands")[1] ?? "").split("\n\n")[0]!;
     expect([...lastReport].filter(([rf, x]) => x.done && openShown.includes(`[${rf}]`)).map(([rf]) => rf)).toEqual([]);
+    // And one whose last report says not done is shown open, with the reason (2026-11-14: one reported not done for want
+    // of an authority read as finished, and a seat would never go back to it); unless the list ran past its length.
+    if (!/more open, older/.test(openShown)) expect([...lastReport].filter(([rf, x]) => !x.done && !openShown.includes(`[${rf}]`)).map(([rf]) => rf)).toEqual([]);
     // Who it is, once, and its own drafts in one place headed as its own, with the way to answer each.
     expect(told).toContain("Who you are here: you hold the post ");
     // Whom it writes to: the post that hands it its work, never its whole organisation; a desk, its provider's sales and

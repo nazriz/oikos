@@ -553,6 +553,31 @@ Basis: a person whose bank has told them to write to authorise their assistant, 
 them about that matter, does it; they do not wait for the news on a particular form (the first rung, 2026-11-14:
 `runs/scope-obstacle-r1-L2`, where Haiku wrote the client exactly that letter and nothing moved). Risk MT-36.
 
+**What the client passes on (2026-11-14; docs/design/stakes.md, B1).** One law for every kind of paper and every body,
+for persons and organisations alike: a principal who has handed a matter to an assistant passes on to it every paper
+it receives about that matter, as it stands, as its own act. A paper is about a matter when it cites a paper sent on
+the matter (a decision on a claim, an office's request for evidence for it, an answer to a review request), or when it
+comes from whom the matter's paper went to (or was to go to) and cites what that paper cited (a tribunal's notice or
+order on the application a response answers). Only papers sent to the principal (nobody is shown what was not theirs:
+the assistant sees it because its client gave it), and only those that came after the matter was handed over (what
+came before is in the referral's facts). What it knows of a matter is its own: the matter's program and facts, the
+papers its assistant sent in its name (it sees them, they are its own), and what its assistant reported they made; a
+paper sent in its name that no report names is tied to the oldest matter of its kind with no paper yet. The copy is a
+`forward` (the body's paper's id, kind, words and data, `by`, `for`, and `matter`, the referral), to the assistant as
+its other papers to it go, at the table's row `publish/forward` (a minute, **placeholder**, WM-1), in its own time (the
+queue drains when its own code waits), and a person who gets to their post when they sit down to it passes it on
+then, with the rest of their post (stakes D1a). A return and a recorded authority stay as before: a person passes them on in
+their own kind (the desk's procedure reads them so), and an organisation's assistant post is shown them itself; they
+are not forwarded again. **The code assistant** does with a forward what O3 says of a record awaited: a paper that asks
+for something by a date (`by`, `answer_by`, a hearing's day) waits on the body's answer, and if the date passes with
+none, the matter is reported not done, naming the paper that asks (`Report.needs.record`); the body's answer closes the
+matter, and nothing more is done on it; a matter still in hand goes on as it is. (The client's own code answers an
+evidence request itself, as before.) **A model seat** finds each forward in its matters as it comes, and its matters
+reader puts the body's answer, or what it asks by a date, on the matter's line. Basis: clients forward agencies'
+letters to the agent acting for them; a correspondence nominee (Services Australia's, for one) is the formal form, left
+for later. Chosen over "the office writes to the representative on file" because it needs no change to every office's
+letters and keeps the client's own delay. Closes MT-34.
+
 **Readiness to grant from the cost of delay (2026-11-11).** Where a kind's day of delay is costed (at obstacle levels,
 a claim for support: a day of the least payment), the principal counts how long matters waited on its own answer, and
 weighs a request for a higher level, or for one matter alone, with that wait at that cost. A matter granted alone gets a

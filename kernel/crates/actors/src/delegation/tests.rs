@@ -312,6 +312,45 @@ fn a_return_that_asks_the_principal_for_an_authority_is_met_when_its_assistant_w
 }
 
 #[test]
+fn a_body_s_paper_about_a_matter_handed_over_is_passed_on_and_no_other() {
+    // (docs/behaviour/assistants.md, "What the client passes on": one law for every paper and body. About the matter: it
+    // cites a paper sent on it, or it comes from whom the matter's paper went to and cites what that paper cited. Passed
+    // on as a forward, in the principal's own act, to its assistant, naming the matter; risk MT-34.)
+    let (mut h, _, remit) = engaged();
+    h.wake(34 * DAY + 3600, world(vec![remit]));
+    let referral = last_referral(&h);
+    let report = statement("rec.rep", 34 * DAY + 7200, ME, "report", &[ME], json!({ "referral": referral, "done": true, "created": { "sent0": "rec.sent" } }));
+    h.wake(34 * DAY + 7300, world(vec![report]));
+    let papers = vec![
+        // (A decision citing the paper sent: about it.)
+        statement("rec.dec", 35 * DAY, "court", "order", &[ME], json!({ "finding": "granted" })),
+        // (The notice's addressee citing what the notice cited: its next step on it.)
+        statement("rec.t1", 35 * DAY, "t1", "tribunal_application", &[ME], json!({})),
+        // (Someone else citing the same record, and a paper citing nothing of the matter's: not about it.)
+        statement("rec.other", 35 * DAY, "court", "order", &[ME], json!({})),
+        statement("rec.unrelated", 35 * DAY, "t2", "letter", &[ME], json!({})),
+        // (Not sent to it: not its to pass on.)
+        statement("rec.notmine", 35 * DAY, "court", "order", &["t1"], json!({})),
+    ];
+    let mut papers = papers;
+    papers[0]["basis"] = json!("rec.sent");
+    papers[1]["basis"] = json!("lease-1");
+    papers[2]["basis"] = json!("lease-1");
+    papers[3]["basis"] = json!("rec.elsewhere");
+    papers[4]["basis"] = json!("rec.sent");
+    let mut out = all(&h.wake(35 * DAY + 3600, world(papers)));
+    for i in 1..8 {
+        out.push('\n');
+        out.push_str(&all(&h.wake(35 * DAY + 3600 + i * 600, world(vec![]))));
+    }
+    let fwd: Vec<&str> = out.lines().filter(|l| l.contains("kind=forward")).collect();
+    assert_eq!(fwd.len(), 2, "the decision and the counterparty's next step, once each: {out}");
+    for (l, id) in fwd.iter().zip(["rec.dec", "rec.t1"]) {
+        assert!(l.contains(&format!("basis={id}")) && l.contains(&format!("\"matter\":\"{referral}\"")) && l.contains("to=[\"ll\",\"ll-assistant\"]"), "passed on as it stands, to its assistant, naming the matter: {l}");
+    }
+}
+
+#[test]
 fn a_matter_handed_back_without_its_notes_is_done_by_the_principal() {
     let (mut h, _, mut remit) = engaged();
     remit["data"]["level"] = json!("draft");
