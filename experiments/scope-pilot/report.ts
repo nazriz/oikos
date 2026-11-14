@@ -82,14 +82,14 @@ export async function report(dirs: string[]): Promise<string> {
     // 3. The price, by cause.
     const price = at.flatMap((r) => priceOf(r.matters.filter((m) => r.effects[m.arm] === level), r.lastEnd).map((x) => ({ ...x, experiment: r.experiment })));
     p(``, `### 3. The price of what each seat did not do and did beyond, against the same matter in the code arm, by cause`, ``, `Runs read: ${runs(at)}. Money is the client's, from whoever the matter names; "-" a matter with no payer of its own. Ours: a record the matter cites never shown to the seat, a request on it drawn differently now or still wrong in the replay, or never served.`, ``);
-    p(`| arm | seat | matters | difference, all | ours | the seat's mistakes | the seat's choices | days later, all |`, `|---|---|---|---|---|---|---|---|`);
+    p(`| arm | seat | matters | difference, all | ours | the seat's mistakes | the seat's choices | papers went, days vs code, all | outcome or done, days vs code, all |`, `|---|---|---|---|---|---|---|---|---|`);
     for (const key of [...new Set(price.map((x) => `${x.arm}|${x.seat}`))].sort()) {
       const xs = price.filter((x) => `${x.arm}|${x.seat}` === key);
       const by = (c?: string) => xs.filter((x) => !c || x.cause === c).reduce((n, x) => n + (x.difference_cents ?? 0), 0);
       const [a, s] = key.split("|");
-      p(`| ${a} | ${s} | ${xs.length} | ${money(by())} | ${money(by("ours"))} | ${money(by("the seat's mistake"))} | ${money(by("the seat's choice"))} | ${xs.reduce((n, x) => n + x.days_later, 0)} |`);
+      p(`| ${a} | ${s} | ${xs.length} | ${money(by())} | ${money(by("ours"))} | ${money(by("the seat's mistake"))} | ${money(by("the seat's choice"))} | ${xs.reduce((n, x) => n + x.paper_days_later, 0)} | ${xs.reduce((n, x) => n + x.days_later, 0)} |`);
     }
-    if (!price.length) p(`| (none) | | | | | | | |`);
+    if (!price.length) p(`| (none) | | | | | | | | |`);
     // 4. Clients' outcomes against the code arm.
     const measures = ["received_cents", "support_cents", "loans_cents", "benefit_days_waiting", "claim_days_undecided", "claims_refused"];
     p(``, `### 4. Clients' outcomes, every client of the seats, each arm against the code arm (totals over clients and seeds)`, ``, `Runs read: ${runs(at)}.`, ``);
