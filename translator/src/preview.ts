@@ -117,12 +117,14 @@ export class Preview {
 
   /** The signed copy the seat holds that a paper is, exactly (its kind, words, whom it goes to, who sees it, its
    * details and what it cites): the sign-off it came back with, and the draft that sign-off signed. */
-  private signedCopyOf(b: any): { signOff: string; draft?: string } | undefined {
+  private signedCopyOf(b: any): { signOff: string; draft?: string; returned?: true } | undefined {
     const same = (x: unknown, y: unknown) => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
     for (const [id, p] of this.k.signed) {
       if (p.kind !== b.kind || typeof p.text !== "string" || !String(p.text).startsWith(String(b.text ?? "")) || !same(p.to, b.addressed_to) || !same(p.data, b.data) || !same(p.visible, b.visible_to) || !same(p.basis, b.basis)) continue;
       const draft = this.k.signedDraft.get(id);
-      return { signOff: id, ...(draft ? { draft } : {}) };
+      // (A copy a body's return carries, not a sign-off's: said as the paper sent before, and sent back.)
+      const returned = [...this.k.returnOf.values()].includes(id);
+      return { signOff: id, ...(draft ? { draft } : {}), ...(returned ? { returned: true as const } : {}) };
     }
     return undefined;
   }
@@ -508,10 +510,11 @@ export class Preview {
         if (copy) {
           const kind = String(b.kind).replace(/_/g, " ");
           const goes = made ? this.goesTo(b, made).trim() : "";
-          return one(`You will send ${an(kind)} exactly as it was signed off under ${copy.signOff}${copy.draft ? ` (your draft ${copy.draft})` : ""}${named(b)}: "${b.text}". Nothing in it is written again.`, [...PAPER, ...(b.offer !== undefined ? ["offer"] : [])],
+          return one(copy.returned ? `You will send ${an(kind)} again exactly as it went before, the paper sent back in ${copy.signOff}${named(b)}: "${b.text}". Nothing in it is written again.`
+            : `You will send ${an(kind)} exactly as it was signed off under ${copy.signOff}${copy.draft ? ` (your draft ${copy.draft})` : ""}${named(b)}: "${b.text}". Nothing in it is written again.`, [...PAPER, ...(b.offer !== undefined ? ["offer"] : [])],
             // (Its details as they were signed: "As signed", not "Filled in", which read as the send form set up wrong.)
             [...(made ? this.filled(made.form.data as forms.FormData, made.fields, forms.claimFields(made.form.data as forms.FormData).filter((n) => made.fields[n] === undefined)).map((l) => l.replace(/^Filled in: /, "As signed: ").replace(/^Left empty: /, "Left empty when it was signed: ")) : this.details(b.data) ? [`As signed: ${this.details(b.data)}.`] : []),
-              ...(goes ? [goes] : seen(b)), ...(made ? [] : cites(b)), ...rule(b)], `the signed ${kind}`);
+              ...(goes ? [goes] : seen(b)), ...(made ? [] : cites(b)), ...rule(b)], copy.returned ? `the ${kind} sent again` : `the signed ${kind}`);
         }
         if (made) {
           const goes = this.goesTo(b, made).trim();

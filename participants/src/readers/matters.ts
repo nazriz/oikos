@@ -274,8 +274,10 @@ export class Matters {
       const returned = back && back.at >= m.signed!.at ? `; sent, and sent back by ${back.by} on ${day(back.at)} (${back.id})${back.authority ? `; their authority recorded on ${day(back.authority.at)} (${back.authority.id})` : ""}` : "";
       const nothing = m.wants === "advice" ? "no advice given yet" : m.wants === "approve" ? "no request to go ahead yet" : m.wants === "alone" ? "not yet done" : "no draft yet";
       const where = m.signed
-        ? returned ? `signed off on ${day(m.signed.at)} (${m.signed.id})${returned}; not yet reported`
-          : m.sent !== undefined ? `signed off on ${day(m.signed.at)} (${m.signed.id}); sent on ${day(m.sent)}; not yet reported`
+        // (Said as whose the report is: "not yet reported" read as a report to come from someone else, and a desk waited
+        // for it on eleven matters it had sent (the stakes run's rung 1, 2026-11-15).)
+        ? returned ? `signed off on ${day(m.signed.at)} (${m.signed.id})${returned}; you have not reported on it`
+          : m.sent !== undefined ? `signed off on ${day(m.signed.at)} (${m.signed.id}); sent on ${day(m.sent)}; you have not reported on it`
           // (Signed off before the seat took the post, and nothing of it seen since: whether it went is not known here.)
           : m.signed.at < (this.arrived ?? 0) ? `signed off on ${day(m.signed.at)} (${m.signed.id}), before you took this post; not reported on` : `signed off on ${day(m.signed.at)} (${m.signed.id}); not yet sent`
         : m.draft !== undefined ? `your draft went for sign-off on ${day(m.draft)}; no answer yet` : nothing;

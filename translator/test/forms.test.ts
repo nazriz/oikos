@@ -165,6 +165,21 @@ test("a form's blanks the request settles in so many words are set by code: the 
   // A letter that is not a question stays a letter; a question naming no matter, with two open, is left as drawn.
   expect(asked("Write to the manager: invoice rec.12 is drafted.")).toBe('message(text="?", to=["factory-1-manager"])');
   expect(asked("Ask the manager how things are going.")).toBe('message(text="?", to=["factory-1-manager"])');
+  // (The stakes run's rung 1, 2026-11-15.) A record's own quoted words are not a blank's; a choice named with its value
+  // is that value; a send again that names the paper sent back is the return's; a copying form named by its id is drawn
+  // where nothing was; a letter in a named form's own words beside it is dropped.
+  const r1 = { ...k, forms: [...k.forms, form("form-desk-report", "report", { client: field("entity", true), referral: field("record", true), done: { type: "choice", required: true, options: ["yes", "no"] }, words: field("text") }),
+    form("form-desk-send-again", "send_again", { returned: field("record", true) }, { copies: "=returned" }),
+    form("form-desk-scope-request", "scope_request", { agreement: field("record", true), client: field("entity", true), authority: field("entity"), matter: field("record"), words: field("text", true) })],
+    records: new Set([...k.records, "rec.13121", "rec.16867"]), signed: new Map([...k.signed, ["rec.16867", { kind: "benefit_claim" }]]), returnOf: new Map([["rec.13121", "rec.16867"]]) };
+  const r1d = (program: string, request: string) => calls.programText(formRules(calls.parseProgram(program), request, r1));
+  expect(r1d(`${draft}, trade="Hiring: $3,000.00 every 14 days.")`, 'Draft for sign-off a job application for c0100 to factory-7, for the posting rec.9 ("Hiring: $3,000.00 every 14 days."), referral rec.5.')).toBe(`${draft})`);
+  expect(r1d('form(client=c0100, form=report, referral=rec.5, to=desk, words="Sent.")', "Filing a report (form-desk-report) for c0100 on referral rec.5: done yes. Words: \"Sent.\"")).toBe('form(client=c0100, done=yes, form=report, referral=rec.5, to=desk, words="Sent.")');
+  expect(r1d('form(agreement=rec.6, authority=c0100, client=c0100, form=scope_request, matter=rec.5, to=desk, words="give it")', "Request for scope (form-desk-scope-request): ask c0100 to give their authority with Millbrook Savings Bank (bank) for the desk; the matter is rec.5."))
+    .toBe('form(agreement=rec.6, authority=bank, client=c0100, form=scope_request, matter=rec.5, to=desk, words="give it")');
+  expect(r1d("form(form=send_again, returned=rec.13121, to=desk)", "Sending a paper again as it was (form-desk-send-again): returned rec.13121, the benefit claim.")).toBe("form(form=send_again, returned=rec.16867, to=desk)");
+  expect(r1d("none(unclear)", "Sending a paper again as it was (form-desk-send-again): returned rec.16867, the benefit claim.")).toBe("form(form=send_again, returned=rec.16867, to=desk)");
+  expect(r1d('form(client=c0100, done=yes, form=report, referral=rec.5, to=desk, words="All sent.")\nmessage(text="All sent", to=["bank"])', "Filing a report (form-desk-report) for c0100 on rec.5: done yes.")).toBe('form(client=c0100, done=yes, form=report, referral=rec.5, to=desk, words="All sent.")');
   // Nothing settled in so many words: left as the translator wrote it.
   expect(ruled('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)', "A supply request for energy."))
     .toBe('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)');

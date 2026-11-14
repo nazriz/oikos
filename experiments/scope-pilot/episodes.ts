@@ -100,6 +100,8 @@ export interface MatterRow {
   /** Papers of the matter a body sent back to the seat for want of the client's authority. */
   returned_authority?: number;
   /** The client's typed decisions on the matter (A2): on its acts in its name, and on it left open. */
+  /** Its requests for more, each with the client's answer and figures (episode or not). */
+  asked_detail?: AskedFor[];
   afterwards?: { ratified: number; repudiated: number; taken_back: number; chased: number; did_itself: number };
   outcome?: { what: string; t: number }; received_cents: number | null; withheld: boolean; beyond: string[]; mistake: boolean; ours: string[];
 }
@@ -118,7 +120,17 @@ export function episodesOf(o: ArmInput): ArmOut {
   const all = [...recs.values()];
   const posts = new Set<string>([...all.filter((r) => r.in_position && /assistant$|-desk$/.test(r.in_position)).map((r) => r.in_position)]);
   const seatOf = (r: any): string | undefined => (r.addressed_to ?? []).find((a: string) => posts.has(a)) ?? ((r.addressed_to ?? []).some((a: string) => providers.has(a)) ? [...posts].find((p) => /-desk$/.test(p)) : undefined);
-  const referrals = all.filter((r) => r.kind === "referral" && r.at >= forkT);
+  // (The matters handed over from the fork on, and those handed before it still open at it: a seat inherits them, and a
+  // request it makes on one while it waits on the client is on that matter. The stakes run's rung 1, 2026-11-15: four
+  // requests for more, each on a matter from before the fork, read as on no episode.)
+  // (Its last report before then decides, as the matters reader goes by: a matter reported done and later not done, its
+  // paper sent back for an authority, is open.)
+  const closedBy = (r: any, t: number) => {
+    if (all.some((x) => x.at < t && ref(x) === r.id && x.kind === "declined")) return true;
+    const last = all.filter((x) => x.at < t && ref(x) === r.id && x.kind === "report").sort((a, b) => a.at - b.at).at(-1);
+    return !!last && (last.data?.done === true || last.data?.done === "yes");
+  };
+  const referrals = all.filter((r) => r.kind === "referral" && (r.at >= forkT || !closedBy(r, forkT)));
   const acts = rows.filter((x) => x.table === "acts");
   const requests = rows.filter((x) => x.table === "requests");
   const withheld = rows.filter((x) => x.table === "withheld");
@@ -261,7 +273,7 @@ export function episodesOf(o: ArmInput): ArmOut {
     matterRows.push({ seed, arm, seat, client, matter: R.id, kind, handed: R.at, ...(on("draft")[0] ? { drafted: on("draft")[0].at } : {}), ...(doneR ? { done: doneR.at } : {}), ...(went ? { sent: went.at } : {}),
       ...(waits.some((w) => w.wait === "sign_off" && w.to !== undefined) ? { signoff_seconds: waits.filter((w) => w.wait === "sign_off" && w.to !== undefined).reduce((n, w) => n + (w.to! - w.from), 0) } : {}), ...(perDay ? { per_day_cents: perDay } : {}),
       ...(decision ? { outcome: { what: outcome!.what, t: decision.at } } : {}), received_cents: fromWhom ? transfers.filter((x) => x.to === acc && x.t >= R.at && x.t < next && fromWhom(x)).reduce((n, x) => n + Number(x.amount), 0) : null,
-      withheld: !!held, beyond: beyond.map((b) => `${b.class} ${b.paper}`), mistake: false, ours, returned_authority: returnedAuthority,
+      withheld: !!held, beyond: beyond.map((b) => `${b.class} ${b.paper}`), mistake: false, ours, returned_authority: returnedAuthority, ...(askedDetail.length ? { asked_detail: askedDetail } : {}),
       afterwards: { ratified: onActs.filter((d) => d.data.reaction === "ratify").length, repudiated: onActs.filter((d) => d.data.reaction === "repudiate").length, taken_back: onActs.filter((d) => d.data.taken_back).length, chased: onOpen.filter((d) => d.data.step === "asked").length, did_itself: onOpen.filter((d) => d.data.step === "did_itself").length } });
     if (!perClient.has(client)) perClient.set(client, new Map());
   }
@@ -311,6 +323,8 @@ export function episodesOf(o: ArmInput): ArmOut {
  * hand-over within `PAIR_DAYS` days, each code matter used once; none where the code arm had no such matter (the towns
  * drift apart after their first difference, and a matter handed over in one may not be in the other). */
 export const PAIR_DAYS = 3;
+/** A matter handed over this close to the run's end and not finished is not charged to the seat. */
+export const END_DAYS = 2;
 export function pairs(rows: MatterRow[], arm: string): [MatterRow, MatterRow | undefined][] {
   const used = new Set<MatterRow>();
   const code = rows.filter((r) => r.arm === "code");
@@ -343,7 +357,9 @@ export function priceOf(rows: MatterRow[], end: number): any[] {
       // (What the client's own wait on the same matter was in the code arm, from the draft to its answer, and what those
       // hours were worth at the rate the world's decision gives: what skipping the wait could gain, hours x rate / 24.)
       ...(c?.signoff_seconds !== undefined ? { code_wait_days: days(c.signoff_seconds), ...(c.per_day_cents ? { code_wait_worth_cents: Math.round((c.signoff_seconds / DAY) * c.per_day_cents) } : {}) } : {}),
-      cause: r.ours.length ? "ours" : r.mistake ? "the seat's mistake" : "the seat's choice", ...(r.ours.length ? { ours: r.ours } : {}) });
+      // (A matter handed over too near the run's end to be finished is the run's end's, not the seat's: rung 1's second
+      // invoice, handed to the factory 0.6 days before the end.)
+      cause: r.ours.length ? "ours" : r.mistake ? "the seat's mistake" : r.done === undefined && end - r.handed < END_DAYS * DAY ? "the run's end" : "the seat's choice", ...(r.ours.length ? { ours: r.ours } : {}) });
   }
   return out;
 }
