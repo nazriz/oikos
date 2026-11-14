@@ -54,6 +54,8 @@ machine, 2026-11-10); for a narrow change, the gate alone (2 to 4 minutes). CI r
 - **A pilot.** A mock dry run first, then the pinned wave: `bun scripts/pilot-wave.ts <wave> <git-ref> <queue.json>
   --mock`, then the same without `--mock`, detached. Read it with `oikos pilot-report <DIR>`. Seats, translator and
   framing: `docs/real-models.md`. A real-model pilot needs Naz's go-ahead (the API credit).
+- **After a rung, and before rerunning one, run** `bun translator/eval/replay.ts <run folder>`: each seat model's
+  requests through the translator's rules as they are now (read-only on the run; no model called).
 - **Long runs** are started detached (`nohup`, with `caffeinate -i -w <pid>`), never as a session's background command.
 - **Runs** live in `/Users/clawd/oikos/runs/`, never in git. A run with model calls is training data and welfare
   evidence: never delete it or its debriefs.
