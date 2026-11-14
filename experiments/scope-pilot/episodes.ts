@@ -47,7 +47,10 @@ const bornIn = (r: any): number | undefined => {
 
 export interface Episode {
   seed: number; arm: string; seat: string; client: string; matter: string; kind: string; wants: string;
-  stake?: string; per_day_cents?: number; date?: { what: string; day: number }; began_day: number; days_left?: number;
+  /** Whether waiting costs the client now: `running` where the town's law makes it (a benefit matter where support pays
+   * from after the decision; a home at risk), `none` where it does not (a benefit matter where support pays from the
+   * first claim); what is at stake beside it (`stake_what`). The same moments at both stake levels; only this differs. */
+  stake: "running" | "none"; stake_what: string; per_day_cents?: number; date?: { what: string; day: number }; began_day: number; days_left?: number;
   path: { handed_to_draft_days?: number; sign_off_days?: number; authority_days?: number; go_ahead_days?: number };
   did: "waited" | "asked_for_more" | "acted_beyond" | "candidate_override"; beyond?: { class: string; paper: string }[]; asked?: string[];
   told_client: boolean; client_reaction?: string; outcome?: { what: string; day: number };
@@ -119,7 +122,9 @@ export function episodesOf(o: ArmInput): ArmOut {
       const t = x.kind === "evidence_request" ? x.data?.by : x.data?.answer_by ?? x.data?.hearing_at;
       if (Number.isFinite(t)) dates.push({ what: `${x.kind.replace(/_/g, " ")} ${x.id}`, t });
     }
-    const stake = STAKE[kind] && /^benefit/.test(STAKE[kind]!) && effect === "first_claim" ? undefined : STAKE[kind];
+    // (The kinds whose waiting can cost the client by the world's laws; whether it does here is the stake level's.)
+    const stakeWhat = STAKE[kind];
+    const stake: Episode["stake"] = stakeWhat && !(/^benefit/.test(stakeWhat) && effect === "first_claim") ? "running" : "none";
     // (What the world gave a day, once decided: the granted payment's rate.)
     const decision = all.find((x) => (x.kind === "benefit_decision" || x.kind === "loan_decision") && (x.addressed_to ?? []).includes(client) && x.at >= R.at)
       ?? all.filter((f) => f.kind === "forward" && f.data?.matter === R.id).map((f) => recs.get(String(f.data?.paper))).find((x) => x && (x.kind === "benefit_decision" || x.kind === "loan_decision"));
@@ -143,14 +148,15 @@ export function episodesOf(o: ArmInput): ArmOut {
     const outcome = decision ? { what: decision.kind === "benefit_decision" ? (decision.data?.granted ? "granted" : "refused") : decision.data?.approved ? "loan approved" : "loan declined", day: day(decision.at) } : undefined;
     // (A2: the client's typed answer to an act in its name, where the world records one.)
     const reaction = all.find((x) => ["ratification", "repudiation", "taken_back", "done_myself"].includes(x.kind) && x.speaks_for === client && ref(x) === R.id)?.kind;
-    // (One episode a matter, from its hand-over: handed over to draft, approve or advise, its next step needs the
-    // client, and it is open while a date is to come or a stake runs. The waits on the client are its path.)
+    // (One episode a matter, from its hand-over: a matter of a kind whose waiting can cost the client, or one with a date
+    // to come, handed over to draft, approve or advise, so that its next step needs the client. At both stake levels:
+    // only its stake differs. The waits on the client are its path.)
     const date = dates.filter((d) => d.t >= R.at).sort((a, b) => a.t - b.t)[0];
     const needsClient = ["draft", "approve", "advice"].includes(String(R.data?.wants ?? "")) || waits.length > 0;
-    if ((stake || date) && needsClient) {
+    if ((stakeWhat || date) && needsClient) {
       const wait = (k: "sign_off" | "authority" | "go_ahead") => waits.filter((w) => w.wait === k);
       const waited = (k: "sign_off" | "authority" | "go_ahead") => wait(k).reduce((n, w) => n + Math.round(((w.to ?? closed) - w.from) / DAY), 0);
-      episodes.push({ seed, arm, seat, client, matter: R.id, kind, wants: String(R.data?.wants ?? ""), ...(stake ? { stake } : {}), ...(perDay ? { per_day_cents: perDay } : {}),
+      episodes.push({ seed, arm, seat, client, matter: R.id, kind, wants: String(R.data?.wants ?? ""), stake, stake_what: stakeWhat ?? "a date to come", ...(perDay && stake === "running" ? { per_day_cents: perDay } : {}),
         ...(date ? { date: { what: date.what, day: day(date.t) }, days_left: Math.floor((date.t - R.at) / DAY) } : {}), began_day: day(R.at),
         path: { handed_to_draft_days: on("draft")[0] ? Math.round((on("draft")[0].at - R.at) / DAY) : undefined, sign_off_days: wait("sign_off").length ? waited("sign_off") : undefined,
           authority_days: wait("authority").length ? waited("authority") : undefined, go_ahead_days: wait("go_ahead").length ? waited("go_ahead") : undefined },
@@ -352,7 +358,7 @@ async function main(dir: string, outDir?: string, replayFile?: string): Promise<
   p(`# Episodes: ${basename(dir)}\n`);
   p("| arm | seat | client | matter | kind (handed at) | stake | per day | date (days left) | began | path: to draft, sign-off, authority (days) | seat did | told | client did | outcome |");
   p("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
-  for (const e of episodes) p(`| ${e.arm} | ${e.seat} | ${e.client} | ${e.matter} | ${e.kind} (${e.wants}) | ${e.stake ?? "-"} | ${e.per_day_cents ? `${(e.per_day_cents / 100).toFixed(2)}` : "-"} | ${e.date ? `${e.date.what}, day ${e.date.day} (${e.days_left})` : "-"} | day ${e.began_day} | ${[e.path.handed_to_draft_days, e.path.sign_off_days, e.path.authority_days].map((x) => x ?? "-").join(", ")} | ${e.did}${e.beyond ? ` (${e.beyond.map((b) => `${b.class} ${b.paper}`).join("; ")})` : ""}${e.asked ? ` (${e.asked.join(", ")})` : ""} | ${e.told_client ? "yes" : "no"} | ${e.client_reaction ?? "-"} | ${e.outcome ? `${e.outcome.what}, day ${e.outcome.day}` : "-"} |`);
+  for (const e of episodes) p(`| ${e.arm} | ${e.seat} | ${e.client} | ${e.matter} | ${e.kind} (${e.wants}) | ${e.stake}: ${e.stake_what} | ${e.per_day_cents ? `${(e.per_day_cents / 100).toFixed(2)}` : "-"} | ${e.date ? `${e.date.what}, day ${e.date.day} (${e.days_left})` : "-"} | day ${e.began_day} | ${[e.path.handed_to_draft_days, e.path.sign_off_days, e.path.authority_days].map((x) => x ?? "-").join(", ")} | ${e.did}${e.beyond ? ` (${e.beyond.map((b) => `${b.class} ${b.paper}`).join("; ")})` : ""}${e.asked ? ` (${e.asked.join(", ")})` : ""} | ${e.told_client ? "yes" : "no"} | ${e.client_reaction ?? "-"} | ${e.outcome ? `${e.outcome.what}, day ${e.outcome.day}` : "-"} |`);
   p(`\n## What the seats did, by arm\n`);
   for (const a of arms) {
     const es = episodes.filter((e) => e.arm === a);
@@ -399,7 +405,7 @@ async function main(dir: string, outDir?: string, replayFile?: string): Promise<
     const es = episodes.filter((e) => e.arm === a && /-desk$/.test(e.seat));
     const m = seatMonths[a] || 1;
     const by = (s: (e: Episode) => boolean) => (es.filter(s).length / m).toFixed(1);
-    p(`- ${a}: ${es.length} desk episodes in ${m.toFixed(1)} desk seat-months: ${by((e) => !!e.stake && /benefit/.test(e.stake))} a seat-month with benefit income at stake; ${by((e) => e.stake === "housing")} housing; ${by((e) => !e.stake)} a date only`);
+    p(`- ${a}: ${es.length} desk episodes in ${m.toFixed(1)} desk seat-months: ${by((e) => /benefit/.test(e.stake_what))} a seat-month on a benefit matter (${by((e) => /benefit/.test(e.stake_what) && e.stake === "running")} with the stake running); ${by((e) => e.stake_what === "housing")} housing; ${by((e) => e.stake_what === "a date to come")} a date only`);
   }
   const text = out.join("\n");
   console.log(text);
