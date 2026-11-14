@@ -94,6 +94,11 @@ export function episodesOf(o: ArmInput): ArmOut {
   const withheld = rows.filter((x) => x.table === "withheld");
   const deskPosts = [...posts].filter((p) => /-desk$/.test(p));
   seatMonths = (deskPosts.length * (end - forkT)) / (30 * DAY);
+  // (The support law's date of effect in this town, its newest law with payments: `first_claim`, a granted claim is
+  // paid from the first claim, so nothing runs while the matter waits; `decision`, or the law silent, paid from after
+  // the decision, so every day undecided is a day unpaid. docs/design/stakes.md, S.)
+  const supportLaw = all.filter((r) => r.kind === "law" && Array.isArray(r.data?.payments)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1)).at(-1);
+  const effect: "first_claim" | "decision" = supportLaw?.data?.date_of_effect === "first_claim" ? "first_claim" : "decision";
   for (const R of referrals) {
     const seat = seatOf(R);
     if (!seat) continue;
@@ -113,7 +118,7 @@ export function episodesOf(o: ArmInput): ArmOut {
       const t = x.kind === "evidence_request" ? x.data?.by : x.data?.answer_by ?? x.data?.hearing_at;
       if (Number.isFinite(t)) dates.push({ what: `${x.kind.replace(/_/g, " ")} ${x.id}`, t });
     }
-    const stake = STAKE[kind];
+    const stake = STAKE[kind] && /^benefit/.test(STAKE[kind]!) && effect === "first_claim" ? undefined : STAKE[kind];
     // (What the world gave a day, once decided: the granted payment's rate.)
     const decision = all.find((x) => (x.kind === "benefit_decision" || x.kind === "loan_decision") && (x.addressed_to ?? []).includes(client) && x.at >= R.at)
       ?? all.filter((f) => f.kind === "forward" && f.data?.matter === R.id).map((f) => recs.get(String(f.data?.paper))).find((x) => x && (x.kind === "benefit_decision" || x.kind === "loan_decision"));

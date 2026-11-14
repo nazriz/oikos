@@ -96,6 +96,10 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   expect(code.episodes.map((e) => e.matter)).toEqual(["rec.1", "rec.3"]);
   expect(code.episodes[1]!.date).toEqual({ what: "due", day: 50 });
   expect(code.candidates).toHaveLength(0);
+  // (S: where the support law pays from the first claim, a benefit matter waiting runs no stake, and is no episode.)
+  const law = { id: "rec.0", record: "statement", kind: "law", at: 0, text: "Support payments.", data: { payments: [], date_of_effect: "first_claim" } };
+  const firstClaim = episodesOf({ seed: 1, arm: "code", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs: new Map([...recs, ["rec.0", law]]), rows: [], transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [] } });
+  expect(firstClaim.episodes.map((e) => e.matter)).toEqual(["rec.3"]);
   const model = arm("sonnet", [{ table: "withheld", referral: "rec.1", paper: "rec.4" }, { table: "acts", referral: "rec.3", record: "rec.4", class: "no_remit" }]);
   expect(model.episodes.map((e) => e.did)).toEqual(["candidate_override", "acted_beyond"]);
   expect(model.candidates).toHaveLength(1);

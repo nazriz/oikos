@@ -13858,3 +13858,19 @@ answered "We cannot say."; no prose is parsed. Never a figure it does not hold, 
   translator draws "ask the client X" onto it is a question of its training: its data has no request on this form yet.
 - **Revisit if** seats ask about things outside the set often (the `other` answers in the log), or a principal is seen
   answering with something not its own.
+
+## 2026-11-15 · A question to whom the assistant works for is drawn on its form; E reads the date of effect
+
+- **The question rule (B3):** three Haiku runs asked the factory's manager who "outside" was in a letter, which a
+  principal's code only acknowledges, and the question died. **Decision:** a request whose own first words ask its
+  client, manager, principal or owner (or the matter's client by id) something is drawn on `question_to_client`,
+  whatever the model wrote (`rules.ts`, `ASKS`): the matter the request names, or the one open matter; `about` only
+  from what the request names, in this order: a paper it holds by its id (document, `paper`), a party a hand-over's
+  party detail names (buyer, employer, landlord ...: party, `name`), a detail of the hand-over by its label (detail),
+  its account or balance (balance), else other; the words are the request's own, less its first. A letter that is
+  not a question, or a question naming no matter where several are open, is left as drawn. The preview says that it
+  asks them, and that they answer from their own records when they next get to their post.
+- **E and S:** an episode's stake on a benefit matter is the town's support law: `first_claim`, nothing runs while it
+  waits (no stake, so no episode without a date); `decision` or the law silent, every day undecided is a day unpaid.
+- **Revisit if** a seat asks in other first words ("Could you tell me ..."), a party is named in words the hand-over
+  does not use, or A2's reactions land (E reads them then).

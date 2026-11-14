@@ -151,6 +151,20 @@ test("a form's blanks the request settles in so many words are set by code: the 
   // A draft for sign-off drawn as the send of a signed paper is a reading code knows is wrong: the translator is asked again.
   expect(misread(calls.parseProgram("form(form=send_signed, sign_off=rec.5, to=desk)"), "Draft for sign-off a job application in c0100's name; referral rec.5", k)).toContain("draft for sign-off");
   expect(misread(calls.parseProgram("form(form=send_signed, sign_off=rec.7, to=desk)"), "Send the paper signed off in rec.7 as it was signed.", k)).toBeUndefined();
+  // (B3.) A request whose first words ask whom it works for something about a matter it holds is the question form, the
+  // matter from the request, and what it asks about only what the request names: three Haiku runs asked the factory's
+  // manager who "outside" was in a letter, which its code only acknowledges.
+  const q = { ...k, forms: [...k.forms, form("form-desk-question", "question_to_client", { referral: field("record", true), client: field("entity", true), about: field("choice", true), paper: field("record"), name: field("text"), words: field("text", true) })],
+    referrals: new Map([["rec.5", "c0100"], ["rec.12", "factory-1"]]), referralGives: new Map<string, { [f: string]: string }>([["rec.5", { trade: "retail" }], ["rec.12", { buyer: "outside", from_at: "factory-1-works", offer: "rec.23328", kind: "goods" }]]) };
+  const asked = (request: string, program = 'message(text="?", to=["factory-1-manager"])') => calls.programText(formRules(calls.parseProgram(program), request, q));
+  expect(asked("Ask the manager who 'outside' is on invoice rec.12: the buyer is given only as outside."))
+    .toBe('form(about=party, client=factory-1, form=question_to_client, name="outside", referral=rec.12, to=desk, words="who \'outside\' is on invoice rec.12: the buyer is given only as outside.")');
+  expect(asked("Ask the client for their payslip rec.10, for the job application rec.5.")).toBe('form(about=document, client=c0100, form=question_to_client, paper=rec.10, referral=rec.5, to=desk, words="for their payslip rec.10, for the job application rec.5.")');
+  expect(asked("Ask c0100 what their account stands at, for rec.5.")).toBe('form(about=balance, client=c0100, form=question_to_client, referral=rec.5, to=desk, words="what their account stands at, for rec.5.")');
+  expect(asked("Ask the client which trade they want named on rec.5.")).toBe('form(about=detail, client=c0100, form=question_to_client, name="trade", referral=rec.5, to=desk, words="which trade they want named on rec.5.")');
+  // A letter that is not a question stays a letter; a question naming no matter, with two open, is left as drawn.
+  expect(asked("Write to the manager: invoice rec.12 is drafted.")).toBe('message(text="?", to=["factory-1-manager"])');
+  expect(asked("Ask the manager how things are going.")).toBe('message(text="?", to=["factory-1-manager"])');
   // Nothing settled in so many words: left as the translator wrote it.
   expect(ruled('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)', "A supply request for energy."))
     .toBe('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)');
