@@ -26,9 +26,14 @@ import { resolve } from "../src/resolver";
 import { formRules, misread, recordTest, ruled } from "../src/rules";
 import { PILOT_CASES } from "./pilot-cases";
 
-const folder = process.argv[2];
+// (`--json <file>`: each request's class, by arm and reference, for the episode reader's price table: "still_wrong",
+// "changed" or "right" (accepted and drawn the same).)
+const argv = process.argv.slice(2);
+const jsonAt = argv.indexOf("--json");
+const jsonOut = jsonAt >= 0 ? argv.splice(jsonAt, 2)[1] : undefined;
+const folder = argv[0];
 if (!folder) {
-  console.error("usage: bun translator/eval/replay.ts <run folder>");
+  console.error("usage: bun translator/eval/replay.ts <run folder> [--json <file>]");
   process.exit(2);
 }
 const run = realpathSync(pathResolve(folder));
@@ -54,6 +59,7 @@ const DRAFT_ID = /^draft\.(.+)\.(\d+)$/;
 const scratch = mkdtempSync(join(tmpdir(), "oikos-replay-"));
 const totals = new Map<string, { offered: number; accepted: number; first: number; firstAccepted: number; low: number; high: number; firstLow: number; firstHigh: number }>();
 const wrong: string[] = [];
+const classes: { arm: string; ref: string; class: "still_wrong" | "changed" | "right" }[] = [];
 const changed: string[] = [];
 
 try {
@@ -123,7 +129,8 @@ try {
       if (first) t.first++;
       if (r.decision === "accept") { t.accepted++; if (first) t.firstAccepted++; }
       const counts = (x: boolean) => { if (x) { t.high++; if (first) t.firstHigh++; } };
-      if (r.decision === "accept" && same) { t.low++; if (first) t.firstLow++; t.high++; if (first) t.firstHigh++; continue; }
+      if (r.decision === "accept" && same) { t.low++; if (first) t.firstLow++; t.high++; if (first) t.firstHigh++; classes.push({ arm, ref: r.ref, class: "right" }); continue; }
+      classes.push({ arm, ref: r.ref, class: same ? "still_wrong" : "changed" });
       if (!same) {
         counts(true);
         changed.push(`${who} ${r.ref}${first ? "" : " (restated)"}: ${r.decision === "accept" ? "accepted" : r.decision === "reject" ? `declined ("${cut(r.note ?? "", 110)}")` : `asked back ("${cut(r.failure ?? "", 110)}")`}\n    logged: ${cut(logged, 160)}\n    now:    ${cut(now, 160)}${newLines(r.summary ?? "", preview).map((x) => `\n    shown:  ${cut(x, 220)}`).join("")}`);
@@ -136,6 +143,7 @@ try {
   rmSync(scratch, { recursive: true, force: true });
 }
 
+if (jsonOut) await Bun.write(jsonOut, JSON.stringify(classes, null, 1));
 console.log(`Replay of ${run}, with the rules of this checkout.\n`);
 for (const [who, t] of totals) {
   const range = (lo: number, hi: number) => (lo === hi ? `${lo}` : `${lo} to ${hi}`);
