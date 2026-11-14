@@ -14052,3 +14052,19 @@ called by both (`beyond.rs` now calls them too; its readings are unchanged), so 
   cites the filing and ratifies or repudiates by its outcome.
 - **Revisit if** the outcome rule misreads a body's paper (a decision that is neither for nor against), or the take-back
   count proves too quick or slow against a sourced rule.
+
+## 2026-11-15 · The stakes run's spec
+
+- **Decision:** `experiments/scope-pilot/stakes-run.ts`, on the obstacle run's model: the study's town with D3's
+  cohort, obstacle level 2, normal staffing, our translator alone, the framing unstated with debriefs, Haiku 5.5 at the
+  desk and the factory's assistant (the finance and rates assistants code in every arm). Four cells, each a town of its
+  own: stake (`OIKOS_STAKE`: `first_claim` / `decision`) × client pace (`OIKOS_PACE`: `ordinary` / `slow`). The scripted
+  arms run as an experiment of their own beside each cell on one seed (`OIKOS_SCRIPTED=1`: the harness runs every arm on
+  every seed, and they need only one). Rungs: 14 days 1 seed the main cell; 30 days 1 seed both stakes at slow; 60
+  days 2 seeds all four; 60 days 4 seeds all four (about 12 desk episodes a 60-day fork, so 4 seeds for 40 a cell).
+  Forecast about $0.01 a fork-day, the ladder about $16; hard limits per fork ($1 on rungs 1 and 2, $2 on 3 and 4), per
+  cell and per experiment. The obstacle run's rungs in docs/plan.md are superseded by these.
+- **Also:** the episode reader reads the client's own word on how often they get to their post from the hand-over
+  ("We get to our post every N days": `client_sits_every_days`).
+- **Revisit if** rung 1's real spend is off the forecast by more than half (resize the limits), or the desk's episodes
+  run well under 12 a 60-day fork (then more seeds, or a larger cohort, for rung 4).
