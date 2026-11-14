@@ -47,12 +47,15 @@ const TIME_SPANS = new Set(["every", "period", "notice", "term"]);
 // (Dates by the names the world's office papers give them: a payroll notice's first pay day read "first pay: 6652800"
 // to the seats of 2026-10-09.)
 /** Days something falls due by: read as the day, with no time of day. */
-const DAYS_DUE = new Set(["due", "first_due", "answer_by", "pay_by"]);
+// (An evidence request's or a notice's `by` is a day (a whole number; a `by` that names someone is not one), and a
+// referral's `draft_by` its principal's day for the draft: docs/design/stakes.md, C1.)
+const DAYS_DUE = new Set(["due", "first_due", "answer_by", "pay_by", "by", "draft_by"]);
 const MOMENTS = new Set(["at", "since", "until", "first", "closes", "opens", "due", "first_due", "first_pay", "last_day", "last_from", "period_end", "hold_until"]);
 // (Details a paper keeps for the record, whose content its own words already say: not set out again. An answer to a
 // request for more scope keeps why each part went as it did as typed codes, for whoever measures, and says it in the
 // office's words; a referral names in its words what its principal does itself. docs/design/handing-over.md, 2026-11-10.)
-const ON_RECORD = new Set(["reasons", "does_itself", "need", "requires", "composed_on"]);
+// (A referral's why and the paper its due day is named on are in its words: B2.)
+const ON_RECORD = new Set(["reasons", "does_itself", "need", "requires", "composed_on", "why", "due_on"]);
 const whole = (v: unknown): v is number | string => (typeof v === "number" && Number.isSafeInteger(v)) || (typeof v === "string" && /^-?(0|[1-9][0-9]{0,37})$/.test(v));
 const percent = (v: number, per: number) => `${String(Number(((v * 100) / per).toFixed(6)))}%`;
 /** A moment as a date, with the time of day where it is not the day's start (so that two moments never read alike). */

@@ -116,6 +116,46 @@ kind over (`kernel/crates/actors/src/delegation/principal.rs`):
 - **A careless assistant gaining responsibility because its slips are hidden is not a bug**: at `alone` and `approve` a
   lost matter reaches the principal only if something comes back about it.
 
+## Why and by when (docs/design/stakes.md, C1 and B2; 2026-11-14)
+
+A referral says why the matter matters and by when, as a client tells an agent: from the client's own papers and its
+own position, never a figure worked out for it and never what to do (`principal.rs`, `grounds` and `dated`). The same
+at every depth (a finished act, what happened, a want) and at `advice`, for persons and organisations alike.
+
+- **The papers it came from.** The records the matter's act cites (`basis`, `on`, `settles`), the paper a want is
+  against, and the records a want's holder gives. Each one another sent it (addressed to it) or that it can see (a
+  published posting) is told in one fixed sentence: `It comes from <sender>'s <kind> <id> of <date>: "<its words>"`, its
+  words quoted to 240 characters, cut at a word. Its own papers are not told: what it wrote is its own act.
+- **`due`: the day a paper names.** The nearest day still to come that one of those papers names in a detail read by one
+  law for every kind (`papers::delegation::DATE_FIELDS`): `answer_by`, `hearing_at`, `by`, `due`, `closes`, wherever a
+  whole number stands under the name (an evidence request's `by`, a hearing's `answer_by`, a notice to vacate's `by`, a
+  rates notice's or an order's `due`, a posting's or a ballot's `closes`). `due_on` names the paper. The referral's words
+  end `<id> names <date>.` Its own papers name no `due` (their days are terms it sets for others). Terms in days
+  (`pay_in_days`) are not read: on an order they are its writer's promise to pay, on a bill its reader's, and the field
+  does not say which. A rent increase's `from` is not read (it is the day the rent changes, not a day by which it asks
+  anything).
+- **`draft_by`: its own day for a draft.** At `draft`, where `due` is set: `due` less its own time to read a draft (its
+  `seconds.sign_off`, 300 s by default, a placeholder: MT-32). The code assistant copies it into its draft (`Draft.by`).
+- **Its own position: fixed words by kind** (`TOLD`), the blanks filled from the matter's own paper, said only where every
+  blank is there:
+
+| Kind | Words | Basis |
+|---|---|---|
+| `benefit_claim` | `Until the claim is decided we are not paid {payment}.` | a claimant is not paid a payment it is claiming until the claim is granted (support_law.rs; true under either date of effect, S0 or S1) |
+
+  A kind not named tells nothing of its own position. Nothing else is said: no urgency, no cost a day (the principal's
+  `late_cost_day` is its own rule's figure and never leaves it), no advice.
+- **Where the client learns of a date later** (an evidence request after the claim was handed over), the referral cannot
+  change: that paper reaches the assistant by B1 (the client passes it on), with its own date.
+- **The files it keeps.** Papers others send it, the newest 64 (`KEPT_OWN_PAPERS`), from when it has engaged a service: a
+  paper is told from them when it is no longer in view.
+- **The code assistant** takes up the matters it is handed in one sitting with those whose papers name the nearer day
+  first, then those that name none, each in the order it came: a clerk with several matters takes the one due soonest.
+  It reads nothing else of `due`, and never chases.
+- **A model seat** reads the referral's words (with the facts and the day), its details with `due` and `draft_by` as dates
+  (`render.ts`; `why` and `due_on` are in the words and not set out again), and the open matters' list says
+  `<id> names <date>` beside each (`readers/matters.ts`).
+
 ## The assistant (`assistant`)
 
 The code that plays a provider's system when no model holds it (`kernel/crates/actors/src/delegation/assistant.rs`). It

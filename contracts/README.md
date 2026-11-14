@@ -949,3 +949,17 @@ providers is unchanged to the byte.
   `to_hour`), from the profile's new `paperwork` (every profile; a labelled placeholder, MT-37). Its saved state gains
   `sits` (its habit as drawn), `in_post`, `letters_in_post` and `post_due` (what waits in its post, and when it next
   sits down to it).
+## Stakes C1 and B2: why and by when on a referral (2026-11-14; docs/design/stakes.md; docs/decisions.md, "C1 and B2"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additions with defaults, each left out when empty: every record on file reads as before, and a town without providers is
+unchanged to the byte.
+
+- `Referral.due` (a day, world seconds: the nearest day still to come that a paper the matter cites, sent to the
+  principal, names), `Referral.due_on` (that paper's id), `Referral.draft_by` (at `draft`: `due` less the principal's
+  time to read a draft), `Referral.why` (a list of sentences: the papers the matter came from, in their senders' words,
+  and the principal's own position in its kind's fixed words; docs/behaviour/assistants.md, "Why and by when").
+- `Draft.by` (a day: the principal's day for it, copied from `Referral.draft_by`).
+- The details a paper names a day in, read by one law for every kind (`papers::delegation::DATE_FIELDS`): `answer_by`,
+  `hearing_at`, `by`, `due`, `closes`, where a whole number stands under the name.
+- A seat's view (`participants/src/llm/render.ts`): `by` and `draft_by` read as days; a referral's `why` and `due_on`
+  are in its words and not set out again.

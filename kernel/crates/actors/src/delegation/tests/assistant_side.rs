@@ -77,6 +77,15 @@ fn a_draft_waits_for_its_sign_off_and_a_request_for_its_go_ahead() {
     h.wake(34 * DAY + 3600, world(handed("approve", "agr.1")));
     let cut = statement("rec.cut", 34 * DAY + 7200, ME, "remit", &[PROV], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "level": "none" }));
     assert!(!acted(&all(&h.wake(35 * DAY + 3600, world(vec![cut, go])))), "taken back: not its to send");
+
+    // (Two matters: the one whose papers name the nearer day is drafted first, and its draft carries its client's day for
+    // it: docs/design/stakes.md, C1.)
+    let mut h = assistant(None);
+    let mut papers = handed("draft", "agr.1");
+    papers.push(statement("rec.ref2", 34 * DAY, ME, "referral", &[PROV], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "wants": "draft", "calls": NOTICE, "due": 40 * DAY, "due_on": "rec.ask", "draft_by": 40 * DAY - 300 })));
+    let out = all(&h.wake(34 * DAY + 3600, world(papers)));
+    let drafts: Vec<&str> = out.lines().filter(|l| l.contains("kind=draft")).collect();
+    assert!(drafts.len() == 2 && drafts[0].contains("\"referral\":\"rec.ref2\"") && drafts[0].contains(&format!("\"by\":{}", 40 * DAY - 300)) && !drafts[1].contains("\"by\""), "{out}");
 }
 
 #[test]

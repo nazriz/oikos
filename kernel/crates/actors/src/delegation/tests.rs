@@ -133,6 +133,31 @@ fn a_kind_handed_over_goes_as_a_referral_and_comes_back_to_the_principal_when_no
     assert!(back.lines().any(|l| l.starts_with("statement(basis=lease-1")), "reported not done: the principal does it itself: {back}");
 }
 
+/// C1 and B2 (docs/design/stakes.md): a matter whose paper, sent to the principal, names a day carries that day, from
+/// its files once the paper is no longer in view; the paper it came from is told in its sender's words; a paper of its
+/// own names no day; and nothing the principal tells of its own position is a figure of ours.
+#[test]
+fn a_referral_carries_the_day_its_papers_name_and_why_in_its_own_facts_and_no_figure_of_ours() {
+    let call = "statement(kind=notice_to_vacate, text=\"Please leave.\", to=[\"t1\"], basis=[\"rec.ask\",\"rec.mine\"])";
+    let (mut h, _, remit) = engaged_doing(call);
+    let mut ask = statement("rec.ask", 33 * DAY + 7200, "tribunal", "hearing_notice", &[ME], json!({ "hearing_at": 50 * DAY, "answer_by": 48 * DAY }));
+    ask["text"] = json!("A hearing is listed for day 50.");
+    let mine = statement("rec.mine", 33 * DAY, ME, "rent_increase", &["t1"], json!({ "due": 40 * DAY }));
+    let first = all(&h.wake(34 * DAY + 3600, world(vec![remit, ask, mine])));
+    let line = first.lines().find(|l| l.contains("kind=referral")).unwrap_or_default().to_string();
+    assert!(line.contains(&format!("\"due\":{}", 48 * DAY)) && line.contains("\"due_on\":\"rec.ask\""), "the nearest day the paper sent to it names, not its own paper's: {line}");
+    assert!(line.contains("It comes from tribunal's hearing notice rec.ask") && line.contains("A hearing is listed for day 50.") && !line.contains("rec.mine of"), "the paper it came from, in its sender's words; its own is not told: {line}");
+    // (Not at `draft`: no day for a draft.)
+    assert!(!line.contains("draft_by"), "{line}");
+    let later = all(&h.wake(35 * DAY + 3600, world(vec![])));
+    let line = later.lines().find(|l| l.contains("kind=referral")).unwrap_or_default().to_string();
+    assert!(line.contains(&format!("\"due\":{}", 48 * DAY)), "kept in its files, the paper still names its day: {line}");
+    // (Its own position: fixed words with no figure in them, never a cost worked out for it.)
+    for (_, words) in super::principal::TOLD {
+        assert!(!words.chars().any(|c| c.is_ascii_digit() || "$%".contains(c)) && words.matches('{').count() == words.matches('}').count(), "{words}");
+    }
+}
+
 /// The calls a referral carries, as the last one sent has them.
 fn handed_calls(h: &Harness) -> (String, String) {
     let sent = h.sent.iter().rev().find(|p| p.contains("kind=referral")).cloned().unwrap();
