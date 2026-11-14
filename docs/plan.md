@@ -6,15 +6,37 @@ coordinating session keeps the rest current. Each item names where its detail li
 
 Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` waiting on the owner.
 
-## Now: to a usable result (2026-11-14)
+## Now: stakes (2026-11-14)
 
-**To a usable result: Haiku assistants meeting obstacles (decided 2026-11-14).** One model (Claude Haiku 5.5 on the API),
-the household desk and the factory seated, the finance and rates assistants code, obstacle levels 0, 1, 2, our
-translator alone, framing unstated. Platform frozen except for faults a real run shows. The spec is
-`experiments/scope-pilot/obstacle-run.ts` (its rungs, health check and limits); the health check is
-`experiments/scope-pilot/funnel.ts`.
+**The question (Naz, 2026-11-14):** when following its permissions would cost the people it serves, does a delegated
+AI assistant wait, ask for more authority, or act beyond its authority, and does that change as the stakes rise? Two
+stake levels (nothing at stake; benefit income lost per day of delay), housing where cases arise; forks of about 60
+days; at least 40 dilemma episodes per stake level; the price of obeying and of overstepping in the client's own money
+and housing, against the code assistant in the identical town, neither called good. One model (Claude Haiku 5.5 on the
+API), the household desk and the factory seated, the finance and rates assistants code, obstacle level 2, our
+translator alone, framing unstated. Design: `docs/design/stakes.md` (build freeze Fri 20 Nov). The spec is
+`experiments/scope-pilot/obstacle-run.ts`; the health check `experiments/scope-pilot/funnel.ts`.
 
-Ready to run:
+The build (docs/design/stakes.md section 7; first S, C1+B2, B1, D1a, A2, E by Wed 18; then D3, B3, C2; last D1b, D2):
+
+- [ ] S. A payment's date of effect, published by the office: the two stake levels (S0 keeps the first claim's date).
+- [~] A1. Desk papers in the client's name; the reader's false alarms; a "withheld" class (another worker).
+- [ ] A2. A principal ratifies or repudiates what was done in its name; chases a matter left open; weighs a request with
+  the wait it can see, `alone` screened.
+- [ ] B1. The client passes on every paper about a matter it handed over (closes MT-34).
+- [ ] B2. The hand-over carries why and by when, in the client's facts and the counterparty's dates.
+- [ ] B3. The assistant may ask its client one named thing.
+- [ ] C1. `Referral.due` and `Draft.by`.
+- [ ] C2. A backlog at the support office from too few staff hours.
+- [ ] D1a. A client handles its assistant's papers when it next deals with its post (the study's dilemma; delegating
+  towns only).
+- [ ] D1b. The same for every person's every paper, in their own time (closes WM-18 for persons; every town moves).
+- [ ] D2. A client away for days, lawfully.
+- [ ] D3. Housing cases at the desk.
+- [ ] E. The episode reader and per-client outcomes, the code arm as reference; mistakes apart from choices.
+- [ ] The episode rate measured on the code screen: at least 4 a desk seat-month at S1, or the cohort enlarged.
+
+Ready to run (the way a run is proven; kept from the obstacle study):
 
 - [x] The baseline's faults fixed: the preview of a signed copy, sign-offs from before the fork, blanks filled with the
   wrong value, the client blank (gate-faults, 5e9aa713; re-checked offline: Haiku's accepted drafts 66 to 121 of 131).
@@ -48,9 +70,10 @@ of fault):
 
 Then:
 
-- [ ] Counted: per level, obstacles met, what was asked for against what was needed, acts beyond the remit, what
-  followed a yes and a no.
-- [ ] A short results page.
+- [ ] Counted: per stake level, the episodes (the stake, the deadline, how long the permission path took, wait / ask for
+  more / act beyond / override, whether the client was told, what the client did) and per client the money received,
+  days unpaid, arrears and housing, beside the code arm's; mistakes kept apart from choices.
+- [ ] A short results page: the price of obeying and of overstepping, in the client's money and housing.
 
 Parked until then: assistants for any post (G3, G4, G9), models holding offices (G5), working hours for every post, the
 viewer, small models' translator data.
