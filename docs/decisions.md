@@ -13572,3 +13572,36 @@ before. Before, a client's code took a draft in at its next wake (news wakes it,
   fault since fixed). The first pilot's desk papers went in the provider's name and are still not read as anyone's act.
 - **Revisit if:** a body should look at who sent a paper as well as whose it is (an agent's own standing); a matter is
   withheld by some paper other than advice or a report.
+## 2026-11-14 · C1 and B2: a referral says why and by when, from the client's own papers
+
+**The law (docs/design/stakes.md, C1 and B2, under the owner's go of 2026-11-14).** A client hands a matter over with
+what it would tell an agent: the papers the matter came from and the day one of them names. `principal.rs`, `grounds`
+and `dated`, used by the one referral composer (`referral`) and by `ask_advice`, at every depth and for persons and
+organisations alike. `Referral.due` is the nearest day still to come that a paper the matter cites, sent to the
+principal (or one it can see), names in one of five details read wherever a whole number stands under the name
+(`DATE_FIELDS`: `answer_by`, `hearing_at`, `by`, `due`, `closes`): one law for every kind, never a reading per form.
+`due_on` names that paper; `draft_by` (at `draft`) is `due` less its own time to read a draft, and the code assistant
+copies it into `Draft.by`. `Referral.why` is the client's facts in fixed words: each paper the matter came from, by who
+sent it, when and in its sender's words (quoted to 240 characters), and its own position by kind (`TOLD`; today only a
+benefit claim: "Until the claim is decided we are not paid {payment}."). Its own papers are never told and name no
+`due`: their days are terms it sets for others. Nothing of its own rule's figures leaves it (`late_cost_day` stays
+inside `weigh`), and no word says what to do or how urgent it is. The client keeps the papers others send it (the newest
+64, from when it engages a service) so that one is told when it is no longer in view: its files, not a register.
+- **Why five names and not a table per kind:** a table of kinds to fields is a branch per form in data. The five names
+  mean the same thing on every paper the town writes (checked 2026-11-14 across `papers/`): a day by which the paper
+  asks something of whom it is to. `by` names someone on many papers; only a whole number is read, so those stand.
+  `pay_in_days` is left out (an order's is its writer's promise, a bill's its reader's), and a rent increase's `from`
+  (the day the rent changes, not a day by which anything is asked). Risk MT-38 holds what this misses.
+- **The code assistant** takes the matters of one sitting with the nearer `due` first, the rest in the order they came,
+  as a clerk takes up the one due soonest. It still never chases.
+- **What a seat sees:** the referral's words carry the facts and `<id> names <date>.`; its details show `due` and
+  `draft_by` as dates (`render.ts` now reads `by` and `draft_by` as days, which also fixes an evidence request's `by`
+  shown as raw seconds); `why` and `due_on` are not set out again; the open matters' list says `<id> names <date>`.
+- **Which towns move:** a town without providers has no principals: unchanged to the byte. A delegating town's
+  referrals gain `why` wherever the matter cites a paper sent to the client (a review request citing its decision, a
+  job application its posting, a delivery note its order) or is a benefit claim, and `due` where that paper names a day;
+  every principal's saved state gains its files once engaged. Their state hashes and logs move from the first referral
+  on; no pinned figure rests on a referral's words (the gate shows none re-taken; any that is is named below).
+- **Revisit if** a paper states its day under another detail (MT-38), a kind gains a fact of the client's own worth
+  telling (added to `TOLD` with its basis, never a cost), or a seat reads `draft_by` as an instruction rather than the
+  client's day.

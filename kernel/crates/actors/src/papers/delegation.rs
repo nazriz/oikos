@@ -338,6 +338,36 @@ pub struct Referral {
     pub depth: Depth,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub want: Option<WantHanded>,
+    /// The day named on a paper the matter came from, where one names a day by which it asks something of the principal
+    /// (an evidence request's `by`, a hearing's `answer_by`, a notice's `by`: [`DATE_FIELDS`]), the nearest still to
+    /// come: the counterparty's own date, never one of ours (docs/design/stakes.md, C1). Absent: no paper it holds names
+    /// one.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
+    pub due: Option<i64>,
+    /// The paper that names `due`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_on: Option<String>,
+    /// The principal's own day for the draft, where it asks for one and a paper names `due`: `due` less its own time to
+    /// read a draft (C1). The code assistant copies it into its draft's `by`.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
+    pub draft_by: Option<i64>,
+    /// Why the matter matters and by when, as the principal would tell it: its own facts about the matter, in the fixed
+    /// words its kind has (docs/behaviour/assistants.md, "Why and by when"), and each paper the matter came from that it
+    /// holds, by who sent it, when, and in its sender's own words (B2). Never a cost worked out for it, never what to do.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub why: Vec<String>,
+}
+
+/// The details in which a paper names a day by which it asks something of whom it is to (an evidence request's `by`,
+/// a hearing's `answer_by` and `hearing_at`, a notice's or an order's `due`, a notice to vacate's `by`, a posting's or a
+/// ballot's `closes`), read wherever a whole number stands under one of these names: one law for every kind of paper,
+/// never a reading per form. Terms in days (`pay_in_days`) are not read: on an order they are its writer's promise, on
+/// a bill its reader's, and which is not in the field (docs/decisions.md, "C1 and B2").
+pub const DATE_FIELDS: &[&str] = &["answer_by", "hearing_at", "by", "due", "closes"];
+
+/// The days a paper's details name ([`DATE_FIELDS`]), with the detail that names each, in that order.
+pub fn dates_named(data: &Value) -> Vec<(&'static str, i64)> {
+    DATE_FIELDS.iter().filter_map(|k| lenient::whole(data.get(*k)?).map(|v| (*k, v))).collect()
 }
 impl Paper for Referral {
     const KIND: &'static str = "referral";
@@ -389,6 +419,9 @@ pub struct Draft {
     /// A draft written on a form (a model's): the paper as it would go (`kind`, `text`, `to`, `data`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paper: Option<Value>,
+    /// The principal's day for it, as its referral gave it (`Referral.draft_by`), copied by whoever drafts.
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
+    pub by: Option<i64>,
 }
 impl Paper for Draft {
     const KIND: &'static str = "draft";

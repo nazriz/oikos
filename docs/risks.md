@@ -1886,6 +1886,25 @@ The mechanism:
 - **Notice by:** a step landing with a "(to confirm)" still on its basis line, or a result whose size turns on one of
   these figures.
 
+### MT-38 · A referral's due day is read only from five named details of the papers it cites
+- **Gap:** Since 2026-11-14 a referral's `due` is the nearest day a paper the matter cites, sent to the principal, names
+  under `answer_by`, `hearing_at`, `by`, `due` or `closes` (`papers::delegation::DATE_FIELDS`). A day named any other
+  way is not read: terms in days (`pay_in_days`), a rent increase's `from`, a decision's review window (the law's
+  `within_days`, which the decision paper does not state), a date only in a paper's words, and a paper the matter
+  relates to but does not cite (an evidence request that comes after the claim was handed over: B1 passes it on).
+- **Where:** `kernel/crates/actors/src/papers/delegation.rs` (`DATE_FIELDS`, `dates_named`),
+  `kernel/crates/actors/src/delegation/principal.rs` (`grounds`); docs/behaviour/assistants.md, "Why and by when".
+- **Effect:** Matters with a real deadline go to the assistant with no `due` (a review request, a want against a
+  refused claim, an invoice on terms), so a seat is not shown the day, the code assistant does not take it up first, a
+  client's `left_open` (A2) never chases it, and an episode reader that keys on `due` undercounts deadline episodes.
+  It never invents a day: the error is only ever a day missing.
+- **L / I:** high / medium · **Status:** open
+- **Fix when:** the episode reader (E) or the stakes run counts deadline episodes by kind, or a counterparty paper
+  starts naming its days under another detail; the fix is the paper stating its day (the decision naming the last day
+  to ask for a review), not a reading per form.
+- **Notice by:** referrals of `review_request`, `want-claim_refused` or `invoice` with no `due` in a stakes run
+  (`oikos-kernel export <log> | grep '"referral"'`).
+
 ---
 
 ## Profiles and sources

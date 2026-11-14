@@ -340,6 +340,10 @@ impl Plan for Assisting {
             .filter_map(|r| papers::read::<Referral>(r).map(|x| (r.id.to_string(), x)))
             .filter(|(_, x)| self.service(&x.agreement).is_some())
             .collect();
+        // (The matter whose papers name the nearer day first, as a clerk takes up the one due soonest; those that name
+        // none after, each in the order it came: docs/design/stakes.md, C1.)
+        let mut referrals = referrals;
+        referrals.sort_by_key(|(_, x)| x.due.unwrap_or(i64::MAX));
         for (id, x) in referrals {
             self.handled.insert(id.clone());
             let m = self.service(&x.agreement).cloned().expect("filtered above");
@@ -379,7 +383,7 @@ impl Plan for Assisting {
                 }
                 Level::Draft => {
                     let wrong = self.slips(&m, cx, &id);
-                    let d = Draft { referral: id.clone(), calls: (!wrong).then(|| calls.clone()), paper: None };
+                    let d = Draft { referral: id.clone(), calls: (!wrong).then(|| calls.clone()), paper: None, by: x.draft_by };
                     self.matters.insert(id.clone(), InHand { agreement: x.agreement.clone(), wants: x.wants, kind: x.kind.clone(), calls: if wrong { String::new() } else { calls.clone() }, asked: None });
                     let words = format!("Draft for {id}, for your sign-off.");
                     let mut s = Step::new(vec![Line { bind: Some("asked".into()), call: self.say_to(&m, Draft::KIND, &words, &id, papers::data(&d)) }]).then(Then::Asked { referral: id.clone() });

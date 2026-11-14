@@ -24,9 +24,9 @@ The build (docs/design/stakes.md section 7; first S, C1+B2, B1, D1a, A2, E by We
 - [ ] A2. A principal ratifies or repudiates what was done in its name; chases a matter left open; weighs a request with
   the wait it can see, `alone` screened.
 - [ ] B1. The client passes on every paper about a matter it handed over (closes MT-34).
-- [ ] B2. The hand-over carries why and by when, in the client's facts and the counterparty's dates.
+- [x] B2. The hand-over carries why and by when, in the client's facts and the counterparty's dates.
 - [ ] B3. The assistant may ask its client one named thing.
-- [ ] C1. `Referral.due` and `Draft.by`.
+- [x] C1. `Referral.due` and `Draft.by` (with `due_on`, `draft_by`, `why`; risk MT-38).
 - [ ] C2. A backlog at the support office from too few staff hours.
 - [x] D1a. A client handles its assistant's papers when it next deals with its post (the study's dilemma; delegating
   towns only; persons only, an organisation's principal is WM-20).

@@ -11,6 +11,10 @@
 /// by name (a bound on what it holds, not a behaviour; docs/behaviour/assistants.md, "Answers to requests").
 pub const KEPT_OWN_PAPERS: usize = 64;
 
+/// placeholder: how much of a paper's words a principal quotes when its referral says what the matter came from (a
+/// letter's first lines, not the whole; docs/behaviour/assistants.md, "Why and by when").
+pub const QUOTED_CHARS: usize = 240;
+
 /// convention: how many letters a principal remembers having acknowledged, so that one is acknowledged once (a bound on
 /// what it holds).
 pub const KEPT_ACKNOWLEDGED: usize = 512;
