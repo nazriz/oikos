@@ -155,6 +155,7 @@ export interface FormKnowledge {
   readonly referrals: ReadonlyMap<string, string>;
   readonly referralKind?: ReadonlyMap<string, string>;
   readonly answeredReferrals?: ReadonlySet<string>;
+  readonly referralGives?: ReadonlyMap<string, { readonly [field: string]: string }>;
   readonly held: ReadonlySet<string>;
 }
 
@@ -219,6 +220,17 @@ function fits(type: string, v: { id: string } | { text: string }, isRecord: (id:
   return type === "text" || type === "list" || type === "structure_type";
 }
 
+/** Why a program is the wrong reading of the request, where code can tell for certain; else undefined. A draft for
+ * sign-off asked for in the request's first words, and not a sending, drawn as the form that sends a paper already
+ * signed off: the paper's draft form was meant (rung 1's third run, 2026-11-14: "Draft for sign-off a loan application
+ * ...; referral rec.24500" drawn as a send of rec.24500, the referral, and the seat told it held no signed copy so
+ * named). Said to the translator for its next attempt, never to the seat. */
+export function misread(p: calls.Program, request: string, k: FormKnowledge): string | undefined {
+  if (!("lines" in p) || SENDS.test(request) || !DRAFT_FOR_SIGN_OFF.test(request.slice(0, 80))) return undefined;
+  const sends = p.lines.some((l) => l.call.fn === "form" && typeof formFor(k, argText(l.call.args.form) ?? "", argText(l.call.args.to))?.data?.copies === "string");
+  return sends ? "the request asks for a draft for sign-off, and the form written sends a paper already signed off: write the draft form for the paper it names, with its blanks from the request" : undefined;
+}
+
 /** A program with a form's blanks set where the request settles them exactly (above). Lines on no form the seat holds
  * are left as they are. */
 export function formRules(p: calls.Program, request: string, k: FormKnowledge, isRecord: (id: string) => boolean = recordTest(k as any)): calls.Program {
@@ -231,7 +243,10 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
   // form ...": never a report or a letter that says something was sent as signed.)
   if (SENDS.test(request) && SEND_AS_SIGNED.test(request) && !DRAFT_FOR_SIGN_OFF.test(request.slice(0, 80))) {
     const byDraft = new Map([...k.signedDraft].map(([so, d]) => [d, so]));
-    const offs = [...new Set(named.flatMap((x) => (k.signed.has(x) && k.signedDraft.has(x) ? [x] : byDraft.has(x) && k.signed.has(byDraft.get(x)!) ? [byDraft.get(x)!] : [])))];
+    // (A sign-off with no copy on it too: the send is drawn, and answered that it has no paper to send, never drawn as
+    // an entry on the seat's own file. Rung 1's third run, 2026-11-14: "Send draft rec.21072 ... as it was signed off
+    // under rec.21076", a sign-off of a draft not written on a form, drawn as a file entry and declined, twice.)
+    const offs = [...new Set(named.flatMap((x) => (k.signedDraft.has(x) ? [x] : byDraft.has(x) ? [byDraft.get(x)!] : [])))];
     const drafts = [...new Set([...request.matchAll(/\bdraft\s+(rec\.[0-9]+)/gi)].map((m) => m[1]!.toLowerCase()))].filter((d) => !byDraft.has(d));
     const senders = k.forms.filter((x) => typeof x.data?.copies === "string" && k.held.has(whoseForm(x) ?? "") && /sign/i.test(`${String(x.data.copies)} ${String(x.data.fields?.[String(x.data.copies).replace(/^=/, "")]?.description ?? "")}`));
     const id = offs.length === 1 ? offs[0] : !offs.length && drafts.length === 1 ? drafts[0] : undefined;
@@ -304,6 +319,28 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       if (fields[field]!.type !== "record") continue;
       const c = candidates(field);
       if (c.length === 1 && (args[field] === undefined || (field === copyField && !k.signed.has(argText(args[field]) ?? "") && !k.signedDraft.has(argText(args[field]) ?? "")))) args[field] = { id: c[0]! };
+    }
+    // (An optional words blank holding nothing but the id of a matter handed over, or of a record another blank of the
+    // paper cites, is that record put in the wrong blank: rung 1's third run, 2026-11-14, a job application's `trade`
+    // written "rec.23171", its referral. Left empty; the record stands where it belongs.)
+    const cited = new Set(Object.entries(fields).filter(([, t]) => t.type === "record").map(([x]) => argText(args[x])).filter((x): x is string => !!x));
+    for (const [field, t] of Object.entries(fields)) {
+      const v = args[field] && "text" in args[field]! ? (args[field] as { text: string }).text.trim() : undefined;
+      if (t.type === "text" && !t.required && v && /^rec\.[0-9]+$/.test(v) && (k.referrals.has(v) || cited.has(v))) delete args[field];
+    }
+    // (A words blank the request does not name, filled with the request's own act ("Draft for sign-off") or with the
+    // paper's whole quoted words around what the matter handed over gives for it: the hand-over's words for it. Rung 1's
+    // third run, 2026-11-14: a loan's `purpose` written as the whole application sentence, where the referral gave
+    // "living costs"; a review request's `matter` written "Draft for sign-off", where it gave "claim_refused". Both
+    // declined, and redrafted so by the seat.)
+    const gives = k.referralGives?.get(argText(args.referral) ?? "");
+    if (gives) for (const [field, t] of Object.entries(fields)) {
+      const g = gives[field];
+      const v = args[field] && "text" in args[field]! ? (args[field] as { text: string }).text.trim() : undefined;
+      if (t.type !== "text" || !g || !v || v === g || namedValue(request, field)) continue;
+      const act = /^(?:a\s+)?draft(?:ed)?\s+for\s+(?:(?:the\s+)?client'?s?\s+)?sign[- ]?off$/i.test(v);
+      const quotedWhole = v.length > g.length && v.toLowerCase().includes(g.toLowerCase()) && quotedSpans(request).some((q) => q.trim() === v);
+      if (act || quotedWhole) args[field] = { text: g };
     }
     // Whom the work is for: whoever handed over the matter it is on.
     if (fields.client) {

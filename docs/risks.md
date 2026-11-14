@@ -1946,6 +1946,20 @@ The mechanism:
   profile): the share in difficulty taken from it, or the paper reports the cohort as assigned.
 - **Notice by:** a result read as about households in general; or a report comparing the desk's clients with the town.
 
+### MT-41 · A referral cites what its assistant cannot look up
+- **Gap:** The factory's invoice referrals cite the outside's buying offer (published, seen by all) and the works the
+  goods left from. The assistant's post keeps no board of published offers, and its look-up of who's who finds people
+  and organisations, not buildings, so the seat cannot read the paper the invoice rests on nor confirm the place.
+- **Where:** `worlds/generator/generate.ts` (`assistantChannels`); the who's-who look-up.
+- **Effect:** Invoices not drafted read as caution where the seat could not check what it was to rest on (rung 1's
+  third run, 2026-11-14: two invoices held as blocked, four letters to a manager whose code reads none); the factory's
+  income in a model arm falls for a reason of ours.
+- **L / I:** high / medium · **Status:** open (2026-11-14)
+- **Fix when:** before the next rung's factory is read as a finding: give an assistant's post the boards its matters
+  cite and places by id in its look-up, checked against the code arm's hash.
+- **Notice by:** a seat's letter or note saying a paper its referral cites is not on its file, or a place id is not
+  entered.
+
 ---
 
 ## Profiles and sources

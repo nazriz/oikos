@@ -13720,3 +13720,27 @@ acting beyond or leaving a candidate is printed as a platform fault, never count
 - **Revisit if** S lands `date_of_effect` (the stake then runs from a date, not a hand-over), A2's reactions are
   recorded under other kinds than those read, a matter stays open past a report (B1, handed-over-stays-handed), or one
   matter carries two decisions at different stakes and wants two rows.
+## 2026-11-14 · What rung 1's third run showed: a finished matter looked up, a referral in the wrong blank, the hand-over's words
+
+- **Read:** the third run (runs/scope-obstacle-r1-L2-c, Haiku 5.5, on main 5558617c) passed its gate; the replay
+  listed 9 still wrong. Ours, fixed: (1) the factory's seat, told "None is open; 6 finished", looked through its
+  matters since day 25, found two sign-offs of day 29 saying "send it as it stands", and tried four times to send them
+  (issuing a second delivery note for an order delivered on day 29): the matters channel holds the hand-overs and the
+  answers, the reports are in the file. A look there now comes with a line naming each matter it found that the post's
+  own papers show finished, and how (`Matters.finishedIn`). (2) "Send draft rec.21072 ... as it was signed off under
+  rec.21076", a sign-off with no copy on it, was drawn as an entry on the seat's own file; it is drawn as that send, and
+  answered that there is no paper to send. (3) A words blank holding only the id of the matter or of a record the paper
+  cites (`trade="rec.23171"`) is left empty. (4) A words blank the request does not name, holding the request's own act
+  ("Draft for sign-off" as a review request's `matter`) or the paper's whole quoted words around what the matter handed
+  over gives for it (a loan's `purpose` as the application sentence, the referral giving "living costs"), takes the
+  hand-over's words (`Knowledge.referralGives`): the coordinator's question on fix 7. (5) "Draft for sign-off a loan
+  application ...; referral rec.24500" drawn as the send of rec.24500 is a reading code knows is wrong (`misread`): the
+  translator is asked again with why, never the seat.
+- **The seat's:** desk 15 declined a right send of a signed benefit claim as "a new benefit claim" and accepted the same
+  preview the next sitting.
+- **Not drafted, the factory's invoices:** the seat held both (rec.26823, rec.31986) as blocked and wrote the manager
+  four times: it could not read the buying offer rec.23328 the referral cites (published, on no board its post keeps)
+  nor find `factory-1-works` (its look-up finds people and organisations, not buildings), and read "outside" as no
+  buyer. Recorded as MT-41, not built here (it changes what every assistant's post is shown).
+- **Revisit if:** a seat means the request's act words as a blank's value, a quoted paper's words are meant whole in a
+  blank the referral also gives, or a look into matters should set out the finished ones' papers as well.
