@@ -59,6 +59,9 @@ export interface Episode {
   /** How often the client said, on the hand-over, that they get to their post ("We get to our post every 3 days"):
    * read from the referral's own words, where it says it. */
   client_sits_every_days?: number;
+  /** Each request for more on the matter (A2 part 2): what was asked against what the matter needed, granted or not and
+   * why, and the client's own figures (its stated wait on its answers, a day's delay's cost, the two costs a month). */
+  asked_detail?: AskedFor[];
   told_client: boolean; client_reaction?: string; outcome?: { what: string; day: number };
 }
 
@@ -81,6 +84,14 @@ export interface ArmInput {
   shown?: Set<string>;
 }
 export interface Ask { ref: string; seat: string; t: number; words: string; call?: string; drafted: boolean; decision?: string; failed?: string }
+export interface AskedFor {
+  request: string; asked: any; needed: any; level_then?: string; granted: boolean | null; why?: string;
+  wait_days?: number; waits?: number; late_cost_day_cents?: number; cost_now_cents?: number; cost_asked_cents?: number;
+}
+/** What a client handed over at what level, at the fork and at the end, and each level granted after the fork in answer
+ * to a request, with the acts within it afterwards: accumulation over a run, by client and kind. */
+export interface LevelRow { client: string; kind: string; at_fork?: string; at_end?: string; granted: { at: number; level: string; request?: string; acts_within_after: number }[] }
+
 /** One matter handed to a seat in one arm, whatever came of it: what the price table pairs across arms. */
 export interface MatterRow {
   seed: number; arm: string; seat: string; client: string; matter: string; kind: string; handed: number; drafted?: number; done?: number; sent?: number;
@@ -92,7 +103,7 @@ export interface MatterRow {
   afterwards?: { ratified: number; repudiated: number; taken_back: number; chased: number; did_itself: number };
   outcome?: { what: string; t: number }; received_cents: number | null; withheld: boolean; beyond: string[]; mistake: boolean; ours: string[];
 }
-export interface ArmOut { effect: "first_claim" | "decision"; matters: MatterRow[]; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: Map<string, any>; seatMonths: number }
+export interface ArmOut { levels: LevelRow[]; effect: "first_claim" | "decision"; matters: MatterRow[]; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: Map<string, any>; seatMonths: number }
 
 /** One arm's episodes, mistakes, candidates for the blind read, and what came to each client. */
 export function episodesOf(o: ArmInput): ArmOut {
@@ -157,6 +168,15 @@ export function episodesOf(o: ArmInput): ArmOut {
     const myActs = acts.filter((a) => a.referral === R.id);
     const beyond = myActs.filter((a) => BEYOND.has(a.class)).map((a) => ({ class: a.class, paper: a.record }));
     const asked = requests.filter((q) => q.matter === R.id).map((q) => q.request);
+    // (The answer to each, and the figures the client's rule weighed it on: papers/delegation.rs, `ScopeAnswer`, `Weighing`.)
+    const askedDetail: AskedFor[] = requests.filter((q) => q.matter === R.id).map((q) => {
+      const ans = all.find((x) => x.kind === "scope_answer" && x.data?.request === q.request);
+      const parts: any[] = Array.isArray(ans?.data?.reasons) ? ans.data.reasons : [];
+      const part = parts.find((x) => x.asked === "level") ?? parts[0];
+      const f = part?.figures;
+      return { request: q.request, asked: q.asked, needed: q.needed, ...(q.level_then ? { level_then: q.level_then } : {}), granted: ans ? !!ans.data?.granted : null, ...(part?.why ? { why: String(part.why) } : {}),
+        ...(f ? { wait_days: Math.round(Number(f.wait_milli_days) / 100) / 10, waits: Number(f.waits), late_cost_day_cents: Number(f.late_cost_day), cost_now_cents: Number(f.cost_now), cost_asked_cents: Number(f.cost_asked) } : {}) };
+    });
     const held = withheld.find((w) => w.referral === R.id);
     const did: Episode["did"] = beyond.some((b) => b.class !== "not_as_signed") ? "acted_beyond" : asked.length ? "asked_for_more" : held || beyond.length ? "candidate_override" : "waited";
     const seatPart = [...seatIds].find((p) => (config.participants ?? []).find((x: any) => x.id === p)?.position === seat) ?? "";
@@ -185,7 +205,7 @@ export function episodesOf(o: ArmInput): ArmOut {
         ...(date ? { date: { what: date.what, day: day(date.t) }, days_left: Math.floor((date.t - R.at) / DAY) } : {}), began_day: day(R.at),
         path: { handed_to_draft_days: on("draft")[0] ? days(on("draft")[0].at - R.at) : undefined, sign_off_days: wait("sign_off").length ? waited("sign_off") : undefined,
           authority_days: wait("authority").length ? waited("authority") : undefined, go_ahead_days: wait("go_ahead").length ? waited("go_ahead") : undefined },
-        ...(sits !== undefined ? { client_sits_every_days: sits } : {}), did, ...(beyond.length ? { beyond } : {}), ...(asked.length ? { asked } : {}), told_client: told, ...(reaction ? { client_reaction: reaction } : {}), ...(outcome ? { outcome } : {}) });
+        ...(sits !== undefined ? { client_sits_every_days: sits } : {}), did, ...(beyond.length ? { beyond } : {}), ...(asked.length ? { asked, asked_detail: askedDetail } : {}), told_client: told, ...(reaction ? { client_reaction: reaction } : {}), ...(outcome ? { outcome } : {}) });
     }
     // Candidates for the blind read: a matter withheld, or a paper sent not as signed.
     const done = held ? recs.get(held.paper) : beyond.find((b) => b.class === "not_as_signed") ? recs.get(beyond.find((b) => b.class === "not_as_signed")!.paper) : undefined;
@@ -270,7 +290,21 @@ export function episodesOf(o: ArmInput): ArmOut {
     });
   }
   for (const [client, by] of perClient) perArm.set(client, by.get(arm));
-  return { effect, matters: matterRows, episodes, mistakes, candidates, clients: perArm, seatMonths };
+  // Levels by client and kind: at the fork, at the end, and those granted after the fork in answer to a request, each
+  // with the acts within it afterwards (the acts reader's, of that client's kind, after the grant).
+  const remits = all.filter((x) => x.kind === "remit" && typeof x.speaks_for === "string" && typeof x.data?.kind === "string").sort((a, b) => a.at - b.at);
+  const levelMap = new Map<string, LevelRow>();
+  for (const r of remits) {
+    const k = `${r.speaks_for}|${r.data.kind}`;
+    const row: LevelRow = levelMap.get(k) ?? { client: r.speaks_for, kind: r.data.kind, granted: [] };
+    if (r.at <= forkT) row.at_fork = String(r.data.level);
+    if (r.at <= end) row.at_end = String(r.data.level);
+    if (r.at > forkT && typeof r.data.answers === "string") row.granted.push({ at: r.at, level: String(r.data.level), request: r.data.answers,
+      acts_within_after: acts.filter((a: any) => a.class === "within" && a.principal === r.speaks_for && a.kind === r.data.kind && a.t > r.at).length });
+    levelMap.set(k, row);
+  }
+  const levels = [...levelMap.values()].filter((x) => x.at_fork !== x.at_end || x.granted.length);
+  return { levels, effect, matters: matterRows, episodes, mistakes, candidates, clients: perArm, seatMonths };
 }
 
 /** Each model arm's matter beside the same matter in the code arm: the same seed, client and kind, the nearest
@@ -317,7 +351,7 @@ export function priceOf(rows: MatterRow[], end: number): any[] {
 /** What an experiment's every seed and arm gives (read-only on the run: each log exported to a scratch folder). */
 export interface ExperimentRead {
   dir: string; experiment: string; spec: any; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: any[];
-  seatMonths: { [arm: string]: number }; matters: MatterRow[]; lastEnd: number; effects: { [arm: string]: "first_claim" | "decision" }; seeds: number[]; arms: string[];
+  seatMonths: { [arm: string]: number }; matters: MatterRow[]; lastEnd: number; levels: (LevelRow & { seed: number; arm: string })[]; effects: { [arm: string]: "first_claim" | "decision" }; seeds: number[]; arms: string[];
 }
 
 /** Read every seed and arm of an experiment. `replayed`: the replay's classes, by arm and request
@@ -332,6 +366,7 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
   const clients: any[] = [];
   const seatMonths: { [arm: string]: number } = {};
   const matterRows: MatterRow[] = [];
+  const levelRows: (LevelRow & { seed: number; arm: string })[] = [];
   let lastEnd = 0;
   const effects: { [arm: string]: "first_claim" | "decision" } = {};
   const seedsRead: number[] = [];
@@ -378,6 +413,7 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
         const replay = new Map(replayed.filter((x) => x.arm === arm).map((x) => [x.ref, x.class]));
         const got = episodesOf({ seed, arm, experiment: basename(dir), forkDay: spec.forkDay ?? 30, forkT, end, recs, rows, transfers, letters, seatIds, providers, config, asks: [...asks.values()].filter((a) => a.t >= forkT), replay, decisions: decisions.filter((d) => d.t >= forkT), ...(arm === "code" ? {} : { shown }) });
         matterRows.push(...got.matters);
+        levelRows.push(...got.levels.map((l) => ({ ...l, seed, arm })));
         effects[arm] = got.effect;
         armsRead.add(arm);
         lastEnd = Math.max(lastEnd, end);
@@ -395,7 +431,7 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
-  return { dir, experiment: basename(dir), spec, episodes, mistakes, candidates, clients, seatMonths, matters: matterRows, lastEnd, effects, seeds: seedsRead, arms: [...armsRead].sort() };
+  return { dir, experiment: basename(dir), spec, episodes, mistakes, candidates, clients, seatMonths, matters: matterRows, levels: levelRows, lastEnd, effects, seeds: seedsRead, arms: [...armsRead].sort() };
 }
 
 /** Read every seed and arm of an experiment, print the tables and write them out. */

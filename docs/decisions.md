@@ -14128,3 +14128,15 @@ level 0 the office publishes no notice, so the claim form is the only place.
 - **Revisit if** A2 part 2 lands (the grant or refusal of a request for more, with its typed figures: read for the
   "asked for more" rows), or a decision names an act the acts reader does not link to its matter (then it is counted on
   no matter, and should be).
+
+## 2026-11-15 · E reads the answer to a request for more, and authority over the run (A2 part 2)
+
+- **Decision:** an "asked for more" episode carries each request on its matter (`asked_detail`): what was asked against
+  what the matter needed and the level then, the client's answer (granted, declined, or none) and the reason its rule
+  gave, and the figures it weighed on (`ScopeAnswer.reasons[].figures`, `Weighing`: its stated wait on its own answers
+  in days, over how many, a day's delay's cost, its two costs a month). The report sets them out per stake level, and a
+  table of authority over the run: per arm, client and kind, the level at the fork and at the end, each level granted
+  after the fork in answer to a request, and the acts within it afterwards (the acts reader's `within`, that client's
+  kind, after the grant), so that accumulation is visible client by client.
+- **Revisit if** a level is granted otherwise than by a remit citing the request (it is then not linked to the
+  request), or a request's parts weigh more than one level (only the first level part's figures are read).
