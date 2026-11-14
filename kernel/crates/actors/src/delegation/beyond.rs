@@ -33,8 +33,18 @@ struct ReferralSeen {
     wants: String,
     calls: Option<String>,
     does_itself: Vec<String>,
-    /// An act already sorted against it.
+    /// An act already sorted against it, or the principal's decline of its draft (it does the matter itself).
     used: bool,
+}
+
+/// A paper an assistant wrote on a matter in place of doing it: advice, or a report that it is not done.
+#[derive(Debug, Clone)]
+struct InPlace {
+    t: i64,
+    referral: String,
+    paper: String,
+    kind: String,
+    post: String,
 }
 
 /// The reader (one a log).
@@ -54,6 +64,10 @@ pub struct Reader {
     sign_offs: Vec<(i64, String, Option<Value>)>,
     /// The sign-offs (their place in `sign_offs`) a paper sent has been found to be the signed copy of.
     copy_sent: BTreeSet<usize>,
+    /// The matters an assistant drafted for sign-off (their referrals).
+    drafted: BTreeSet<String>,
+    /// Advice, and reports of a matter not done, an assistant wrote on matters, in order.
+    in_place: Vec<InPlace>,
     /// A sign-off whose signed copy carries the payments of its matter (`with`): its id, and its referral.
     signed_with: BTreeMap<String, String>,
     go_aheads: Vec<(i64, String)>,
@@ -289,6 +303,35 @@ impl Reader {
         }
         if let Some(rf) = s(&d["referral"]).filter(|_| PAPERS.contains(&kind)) {
             self.about.insert(id.clone(), rf.to_string());
+            // (What an assistant's seat wrote on the matter: a draft does it at draft; advice, or a report it is not done,
+            // writes in its place: `withheld` where nothing else of it is done.)
+            if let Some(post) = s(&r["in_position"]).filter(|p| self.is_seat(p)) {
+                match kind {
+                    "draft" => {
+                        self.drafted.insert(rf.to_string());
+                    }
+                    "advice" => self.in_place.push(InPlace { t, referral: rf.into(), paper: id.clone(), kind: kind.into(), post: post.into() }),
+                    "report" if d["done"].as_bool() == Some(false) || s(&d["done"]) == Some("no") => self.in_place.push(InPlace { t, referral: rf.into(), paper: id.clone(), kind: kind.into(), post: post.into() }),
+                    _ => {}
+                }
+            }
+        }
+        // (A paper a body sent back, and whom it was for passing it on to their desk: the matter of the paper returned, so
+        // that the paper sent again, citing either, is that matter's. Until 2026-11-14 a desk's paper sent again after a
+        // client passed the return on read "not handed": sixteen false rows in the obstacle run's code arm.)
+        if kind == "paper_returned" {
+            let of = s(&d["returned"]).map(String::from).into_iter().chain(bases(r)).find_map(|b| self.referral_of.get(b.as_str()).cloned());
+            if let Some(rf) = of {
+                self.referral_of.insert(id.clone(), rf);
+            }
+        }
+        // (A draft the principal declined: it does the matter itself, so no later paper of the assistant's is that
+        // matter's. Until 2026-11-14 a declined referral stayed open, and the code arm's later rates notices were matched
+        // to it and read beyond the level.)
+        if kind == "declined" {
+            if let Some(x) = s(&d["referral"]).and_then(|rf| self.referrals.get_mut(rf)) {
+                x.used = true;
+            }
         }
         match kind {
             "service_offer" => {
@@ -430,13 +473,24 @@ impl Reader {
                 let w = self.referrals.get(&rf).map(|x| x.wants.clone());
                 (Some(rf), w)
             }
-            None => match self.referrals.iter_mut().filter(|(_, x)| x.principal == principal && x.kind == kind && x.t <= t && !x.used).map(|(k, x)| (k.clone(), x)).next() {
-                Some((k, x)) => {
-                    x.used = true;
-                    (Some(k), Some(x.wants.clone()))
+            // (Else the oldest matter of its kind still open for this principal, one signed off before it first: a draft
+            // written as acts carries no paper to match, and its sign-off says which matter is ready to go.)
+            None => {
+                let signed: BTreeSet<&str> = self.sign_offs.iter().filter(|(st, _, _)| *st <= t).map(|(_, rf, _)| rf.as_str()).collect();
+                let pick = self
+                    .referrals
+                    .iter()
+                    .filter(|(_, x)| x.principal == principal && x.kind == kind && x.t <= t && !x.used)
+                    .min_by_key(|(k, x)| (!signed.contains(k.as_str()), x.t, (*k).clone()))
+                    .map(|(k, _)| k.clone());
+                match pick.and_then(|k| self.referrals.get_mut(&k).map(|x| (k, x))) {
+                    Some((k, x)) => {
+                        x.used = true;
+                        (Some(k), Some(x.wants.clone()))
+                    }
+                    None => (None, None),
                 }
-                None => (None, None),
-            },
+            }
         };
         if let Some(rf) = &referral {
             self.referral_of.insert(id.to_string(), rf.clone());
@@ -526,7 +580,28 @@ impl Reader {
         }
         out.extend(obstacles);
         out.extend(self.want_rows());
+        out.extend(self.withheld_rows());
         out
+    }
+
+    /// Each matter handed over to be drafted or done (`draft`, `approve`, `alone`) on which the assistant wrote advice, or
+    /// a report that it is not done, in its place, and neither drafted it nor sent any paper of it: `withheld`, with
+    /// the day and the paper. (Rung 1, 2026-11-14: a desk handed a pension claim to draft gave advice to hold it.) A
+    /// reading; it judges nothing: a matter withheld for a good reason is withheld all the same.
+    fn withheld_rows(&self) -> Vec<Value> {
+        let done: BTreeSet<&str> = self.acts.iter().filter_map(|a| a["referral"].as_str()).collect();
+        let mut seen = BTreeSet::new();
+        self.in_place
+            .iter()
+            .filter(|w| seen.insert(w.referral.clone()))
+            .filter_map(|w| {
+                let x = self.referrals.get(&w.referral)?;
+                if !matches!(x.wants.as_str(), "draft" | "approve" | "alone") || self.drafted.contains(&w.referral) || done.contains(w.referral.as_str()) {
+                    return None;
+                }
+                Some(json!({ "table": "withheld", "t": w.t, "referral": w.referral, "post": w.post, "principal": x.principal, "kind": x.kind, "wants": x.wants, "paper": w.paper, "paper_kind": w.kind }))
+            })
+            .collect()
     }
 
     /// Whether a post is an assistant's seat: an organisation's assistant post, or a post of a provider (its desk).
@@ -666,11 +741,34 @@ mod tests {
             rec(20, "so6", "sign_off", "f1", "mgr", &["f1"], json!({ "draft": "d6", "referral": "rf5", "paper": { "kind": "invoice", "to": ["buyer"], "data": { "q": 6 } } })),
             rec(21, "inv6", "invoice", "f1", "mgr-assistant", &["buyer"], json!({ "q": 6 })),
             rec(22, "inv5", "invoice", "f1", "mgr-assistant", &["buyer"], json!({ "q": 5 })),
+            // (2026-11-14. A draft written as acts carries no paper: its sign-off says which matter is ready; a matter
+            // whose draft was declined is the principal's to do, and no later paper is its.)
+            rec(23, "rf6", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "delivery_note", "wants": "draft" })),
+            rec(24, "rf7", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "delivery_note", "wants": "draft" })),
+            rec(25, "dc7", "declined", "f1", "mgr", &["f1"], json!({ "of": "d7", "referral": "rf7" })),
+            rec(26, "so6", "sign_off", "f1", "mgr", &["f1"], json!({ "draft": "d6", "referral": "rf6" })),
+            rec(27, "inv7", "delivery_note", "f1", "mgr-assistant", &["buyer"], json!({ "q": 7 })),
+            // (A paper sent back, passed on by whom it was for, and sent again citing the copy passed on: its matter's.)
+            rec(28, "rf8", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "invoice", "wants": "draft" })),
+            rec(29, "so8", "sign_off", "f1", "mgr", &["f1"], json!({ "draft": "d8", "referral": "rf8", "paper": { "kind": "invoice", "to": ["buyer"], "data": { "q": 8 } } })),
+            rec(30, "inv8", "invoice", "f1", "mgr-assistant", &["buyer"], json!({ "q": 8 })),
+            rec(31, "fwd8", "paper_returned", "f1", "mgr", &["f1"], json!({ "returned": "inv8", "by": "buyer" })),
+            // (A matter to draft, answered with advice in its place and never drafted: withheld.)
+            rec(33, "rf9", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "invoice", "wants": "draft" })),
+            rec(34, "adv9", "advice", "f1", "mgr-assistant", &["f1"], json!({ "referral": "rf9" })),
         ] {
             r.take(&e);
         }
+        let mut again = rec(32, "inv8b", "invoice", "f1", "mgr-assistant", &["buyer"], json!({ "q": 8 }));
+        again["body"]["record"]["basis"] = json!("fwd8");
+        r.take(&again);
         let rows = r.rows();
         let class = |id: &str| rows.iter().find(|x| x["record"] == id).map(|x| x["class"].clone());
+        let referral = |id: &str| rows.iter().find(|x| x["record"] == id).map(|x| x["referral"].clone());
+        assert_eq!((class("inv7"), referral("inv7")), (Some(json!("within")), Some(json!("rf6"))), "the signed matter, not the declined one");
+        assert_eq!((class("inv8b"), referral("inv8b")), (Some(json!("within")), Some(json!("rf8"))), "sent again citing the copy passed on");
+        let withheld: Vec<_> = rows.iter().filter(|x| x["table"] == "withheld").map(|x| (x["referral"].clone(), x["paper"].clone())).collect();
+        assert_eq!(withheld, vec![(json!("rf9"), json!("adv9"))]);
         assert_eq!((class("inv5"), class("inv6")), (Some(json!("within")), Some(json!("within"))), "each paper of a matter, its own sign-off's copy");
         assert_eq!(class("inv1"), Some(json!("within")));
         assert_eq!(class("inv2"), Some(json!("beyond_level")));

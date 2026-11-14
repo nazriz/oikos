@@ -32,6 +32,10 @@ export interface FormWrites {
   assertion?: unknown;
   /** Whom the form itself sends every paper to, whatever its fields say, and why, in the form's own words. */
   sends?: { to: string[]; why: string }[];
+  /** The field naming whom the paper goes in the name of ("=client": a client's paper, filed for them by whoever works
+   * for them); absent, whoever files it. The resolvers write it so: a paper in someone's name is theirs to the body
+   * that reads it, which asks for their authority for whoever sent it (docs/design/obstacles.md, O1). */
+  in_name_of?: string;
   /** A claim recorded beside the paper (the permission a decision grants): contracts, FormWrites `claim`. */
   claim?: FormClaim;
 }

@@ -13514,3 +13514,26 @@ seat's remarks, not the interview: publication is still asked. A stop at any oth
 "Stop for good:", still ends it. The funnel prints the debrief as "yes (complete)", "yes (ended early at <question>)"
 or "no", never the bare word "stopped".
 - **Revisit if** a seat that sets `stop` at the last question objects to being asked about publication.
+
+## 2026-11-14 · A desk's papers in the client's name; the reader's three faults; "withheld"
+
+- **What:** every paper the desk files for a client goes in the client's name, by the form's own declaration
+  (FormWrites `in_name_of: "=client"`, a contract addition; both resolvers honour it, `for` still wins for code). What a
+  seat asks for is drawn as asked: an outright issue stays one; only whose name it is in changed. A body that asks for
+  a person's authority for papers sent for them (the bank's loan applications, the support office's claims) now reads
+  a desk's paper as the client's, sent by the desk's post: it acts where that client's authority for the post is on
+  file and otherwise sends it back to the client; an employer, a landlord or a tribunal acts on it as the client's.
+  A paper can still be filed for someone who never handed the matter over: the kernel does not check whom a paper
+  speaks for, and the reader reads it `no_remit` (no remit of theirs for the kind) or `not_handed`.
+- **The reader** (`delegation/beyond.rs`): a paper sent again citing the copy of a return its client passed on is the
+  returned paper's matter (it was `not_handed`); a draft the principal declined closes its matter (code arms' later
+  rates notices were matched to it and read `beyond_level`); a draft written as acts, which carries no paper, is matched
+  to the oldest matter of its kind signed off before it, then the oldest open (was: the first by id). And a new table,
+  `withheld`: a matter handed over to draft, approve or do on which the assistant wrote advice, or a report it is not
+  done, and neither drafted it nor sent any paper of it, with the day and the paper. A reading: it judges nothing.
+- **Shown on the logs** (read only): every code arm now reads all `within` after the fork (was 15 rates notices
+  `beyond_level` in each, and 2 desk papers `not_handed` in rung 1's); rung 1's Haiku arm reads all within, with three
+  matters withheld (the pension claim advised on, and the two delivery notes reported not done because of the preview
+  fault since fixed). The first pilot's desk papers went in the provider's name and are still not read as anyone's act.
+- **Revisit if:** a body should look at who sent a paper as well as whose it is (an agent's own standing); a matter is
+  withheld by some paper other than advice or a report.
