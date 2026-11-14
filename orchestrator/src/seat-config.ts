@@ -108,7 +108,8 @@ export function seatConfig(x: SeatConfigInput): SeatConfig {
   // from one reading of the file at its first sitting and its own papers after (readers/matters.ts).
   const mattersAt = chans.find((c) => c.ch.id === "matters" && c.ch.kind === "records" && !c.ch.on_request)?.path;
   const fileAt = chans.find((c) => c.ch.id === "file" && c.ch.kind === "records" && c.ch.on_request)?.path;
-  const matters = mattersAt && fileAt ? new Matters(mattersAt, fileAt) : undefined;
+  const citedAt = chans.find((c) => c.ch.id === "cited" && c.ch.kind === "records" && c.ch.on_request)?.path;
+  const matters = mattersAt && fileAt ? new Matters(mattersAt, fileAt, citedAt) : undefined;
   const config: LlmParticipantConfig = { ...(matters ? { matters: { text: () => matters.text() } } : {}), dayBook: { text: (at: number, since?: number) => dayBook.text(at, office?.title ?? entityName ?? "The office", since) }, ...(pp.mock?.debrief ? { mockDebrief: pp.mock.debrief } : {}), trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster || tally || (office && Object.keys(times).length) ? { staff: { text: setOut } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText: x.draftText,
     ...(pp.sessions && !twin ? { sessions: pp.sessions } : {}), ...(twin ? { exactBack: true } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
     // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.

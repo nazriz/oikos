@@ -34,12 +34,23 @@ const WORDS = 240;
 /** A body's paper a client passed on about a matter: an answer, or (with `due`) what it asks for by a date. */
 interface Passed { id: string; at: number; by: string; text: string; due?: number }
 
-interface Matter { id: string; at: number; kind: string; from: string; wants?: string; due?: { at: number; on: string }; advised?: number; signed?: { id: string; at: number; paper?: any }; declined?: number; draft?: number; sent?: number; report?: { id?: string; at: number; done: boolean; why?: string }; answer?: Passed; asks?: Passed }
+interface Matter { id: string; at: number; kind: string; from: string; wants?: string; due?: { at: number; on: string }; advised?: number; signed?: { id: string; at: number; paper?: any }; declined?: number; draft?: number; sent?: number; report?: { id?: string; at: number; done: boolean; why?: string }; answer?: Passed; asks?: Passed; cites?: string[] }
 
 const ref = (r: Paper): string | undefined => (typeof (r as any).data?.referral === "string" ? (r as any).data.referral : undefined);
 const same = (p: any, b: any) => p && p.kind === b.kind && JSON.stringify(p.to ?? []) === JSON.stringify(b.addressed_to ?? []) && JSON.stringify(p.data ?? null) === JSON.stringify(b.data ?? null);
 /** The day a paper a matter came from names, as its referral gives it (docs/design/stakes.md, C1). */
 const dueOf = (d: any): { due?: { at: number; on: string } } => (Number.isSafeInteger(Number(d?.due)) && d?.due !== null && d?.due !== undefined && typeof d?.due_on === "string" ? { due: { at: Number(d.due), on: d.due_on } } : {});
+/** The most cited papers looked up at one sitting. */
+const LOOKUPS = 16;
+/** The records a referral cites by id: its basis, and every record id among the details it gives (`facts`). */
+const citesOf = (r: Paper): string[] => {
+  const ids = new Set<string>();
+  const b = (r as any).basis;
+  for (const x of Array.isArray(b) ? b : typeof b === "string" ? [b] : []) if (/^rec\.[0-9]+$/.test(x)) ids.add(x);
+  const walk = (v: unknown): void => { if (typeof v === "string") { if (/^rec\.[0-9]+$/.test(v)) ids.add(v); } else if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) if (k !== "composed_on") walk(x); };
+  walk((r as any).data?.facts);
+  return [...ids];
+};
 const isBack = (r: Paper) => (r as any).record === "statement" && ((r as any).kind === "paper_returned" || (r as any).kind === "authority_recorded");
 
 export class Matters {
@@ -62,7 +73,29 @@ export class Matters {
   private readonly back = new Map<string, { id: string; at: number; by: string; authority?: { id: string; at: number } }>();
 
   /** `matters`: the post's channel of matters handed to it; `file`: its own file, read on request. */
-  constructor(readonly matterPath: string, readonly filePath: string) {}
+  /** Published papers its matters cite, looked up by id (`citedPath`): what was found, and every id asked for. */
+  private readonly cited = new Map<string, Paper>();
+  private readonly askedFor = new Set<string>();
+  /** Whether the next observation answers the reader's own look-ups (not one the seat made itself). */
+  private looking = false;
+
+  /** `matters`: the post's channel of matters handed to it; `file`: its own file, read on request; `cited`: the board of
+   * published papers its matters may cite, looked up by id (MT-41). */
+  constructor(readonly matterPath: string, readonly filePath: string, readonly citedPath?: string) {}
+
+  /** The looks for the published papers that the matters handed over in this observation cite and the seat does not
+   * hold, one by its id each (its principal named them in the hand-over: rung 1's third run, 2026-11-14, the factory's
+   * invoices cited a buyer's offer its post could not read, and were never drafted). Each id is asked for once; a
+   * search of a board, which takes what any such search takes. Empty where there is nothing to look up. */
+  lookups(obs: Observation, holds: (id: string) => boolean): { channel: string; query: { where: { field: string; op: "="; value: string }[]; limit: number } }[] {
+    if (!this.citedPath) return [];
+    const ch = (obs.channels as any)?.[this.matterPath];
+    const recs: Paper[] = ch?.kind === "records" ? ch.records ?? [] : [];
+    const ids = recs.filter((r) => (r as any).record === "statement" && (r as any).kind === "referral").flatMap(citesOf).filter((id) => !holds(id) && !this.askedFor.has(id)).slice(0, LOOKUPS);
+    for (const id of ids) this.askedFor.add(id);
+    if (ids.length) this.looking = true;
+    return ids.map((id) => ({ channel: this.citedPath!, query: { where: [{ field: "id", op: "=" as const, value: id }], limit: 1 } }));
+  }
 
   /** Whether the file has yet to be read through (before the seat's first sitting). */
   get toRead(): boolean {
@@ -100,7 +133,7 @@ export class Matters {
     if ((r as any).record !== "statement") return;
     const k = (r as any).kind as string;
     if (k === "referral") {
-      if (!this.matters.has(r.id)) this.matters.set(r.id, { id: r.id, at: r.at, kind: String((r as any).data?.kind ?? "matter"), from: String((r as any).speaks_for ?? ""), ...(typeof (r as any).data?.wants === "string" ? { wants: (r as any).data.wants } : {}), ...dueOf((r as any).data) });
+      if (!this.matters.has(r.id)) this.matters.set(r.id, { id: r.id, at: r.at, kind: String((r as any).data?.kind ?? "matter"), from: String((r as any).speaks_for ?? ""), ...(typeof (r as any).data?.wants === "string" ? { wants: (r as any).data.wants } : {}), ...dueOf((r as any).data), cites: citesOf(r) });
       return;
     }
     const d = (r as any).data ?? {};
@@ -158,7 +191,22 @@ export class Matters {
     for (const r of rec(this.matterPath)) this.take(r);
     const others = Object.keys(chans ?? {}).filter((p) => p !== this.matterPath && p !== this.filePath);
     for (const p of others) for (const r of rec(p)) if (isBack(r)) this.take(r);
-    if (!first) return obs;
+    // (What the look-ups for cited papers found: kept, and set out with the matters that cite them, not as a look.)
+    let o: Observation = obs;
+    if (this.citedPath && this.looking && chans?.[this.citedPath]?.search) {
+      this.looking = false;
+      for (const r of rec(this.citedPath)) if (this.askedFor.has(r.id)) this.cited.set(r.id, r);
+      const { [this.citedPath]: _gone, ...restCh } = chans;
+      o = { ...obs, channels: restCh } as Observation;
+    }
+    if (!first) return o;
+    return this.handOver(o);
+  }
+
+  private handOver(obs: Observation): Observation {
+    const chans = obs.channels as any;
+    const rec = (p: string): Paper[] => (chans?.[p]?.kind === "records" ? chans[p].records ?? [] : []);
+    const others = Object.keys(chans ?? {}).filter((p) => p !== this.matterPath && p !== this.filePath);
     for (const r of this.found.splice(0)) this.take(r);
     for (const m of this.matters.values()) if (this.closed(m)) this.before.add(m.id);
     const out: any = { ...obs, channels: { ...chans } };
@@ -242,7 +290,9 @@ export class Matters {
       const stands = this.closed(m) ? reported : notDone || where;
       const answer = m.answer && (!m.asks || m.answer.at >= m.asks.at) ? `; ${m.answer.by}'s answer, passed on to you on ${day(m.answer.at)} (${m.answer.id}): "${said(m.answer)}"` : "";
       const asks = this.asking(m) ? `; ${m.asks!.by} asks for something by ${day(m.asks!.due!)}, passed on to you on ${day(m.asks!.at)} (${m.asks!.id}): "${said(m.asks!)}"` : "";
-      open.push(`- [${m.id}] ${m.kind.replace(/_/g, " ")}, handed over by ${m.from} on ${day(m.at)}: ${stands}${named}${answer}${asks}.`);
+      // (The published papers it cites, as found: each set out with it, in its own words.)
+      const cites = (m.cites ?? []).flatMap((id) => { const r = this.cited.get(id) as any; return r ? [`\n  It cites [${r.id}] ${String(r.kind).replace(/_/g, " ")} from ${r.speaks_for ?? r.author} (${day(r.at)}): "${said({ text: String(r.text ?? "") } as Passed)}"`] : []; }).join("");
+      open.push(`- [${m.id}] ${m.kind.replace(/_/g, " ")}, handed over by ${m.from} on ${day(m.at)}: ${stands}${named}${answer}${asks}.${cites}`);
     }
     const lines = ["Your matters, and where each stands (from your own papers on them, and what your clients passed on to you about them):", ...open.slice(0, MOST)];
     if (open.length > MOST) lines.push(`(And ${open.length - MOST} more open, older.)`);

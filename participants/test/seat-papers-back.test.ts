@@ -8,6 +8,7 @@ import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import type { Observation } from "../src/contracts";
 import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { createLlmParticipant, tools, type LlmParticipantConfig } from "../src/llm/participant";
+import { Matters } from "../src/readers/matters";
 
 const DAY = 86_400;
 const HOUR = 3_600;
@@ -144,4 +145,21 @@ test("an assistant's done for n days is honoured: an acknowledgement, a paper or
   for (const s of ["referral rec.9.", "acknowledgement rec.5.", "your letter is received"]) expect(shown(calls[1]!)).toContain(s);
   // Whom it writes to: the post that hands it its work, not the whole organisation (a letter to which every office answers).
   expect(String(calls[1]!.system)).toContain("You work for finance, of city: to write to it, write to finance, not to city.");
+});
+
+test("an assistant's matter that cites a published paper it does not hold: looked up once by its id, and set out with the matter", () => {
+  // (MT-41, rung 1's third run, 2026-11-14: the factory's invoices cited a buyer's offer its post could not read, and
+  // were never drafted. Only what the hand-over names, one by its id; never the board.)
+  const m = new Matters("a/matters", "a/file", "a/cited");
+  const referral = { id: "rec.9", record: "statement", kind: "referral", at: 31 * DAY, author: "x", speaks_for: "factory-1", text: "For you to draft for sign-off: an invoice.", data: { kind: "invoice", wants: "draft", facts: { offer: "rec.5", order: "rec.6", buyer: "outside" } } } as any;
+  const obs = { t: 31 * DAY, channels: { "a/matters": { kind: "records", records: [referral] } } } as any;
+  m.absorbRead({ t: 31 * DAY, channels: { "a/file": { kind: "records", search: true, records: [] } } } as any);
+  expect(m.lookups(obs, (id) => id === "rec.6")).toEqual([{ channel: "a/cited", query: { where: [{ field: "id", op: "=", value: "rec.5" }], limit: 1 } }]);
+  expect(m.lookups(obs, () => false).map((l) => l.query.where[0]!.value)).toEqual(["rec.6"]);
+  const offer = { id: "rec.5", record: "statement", kind: "buying_offer", at: 20 * DAY, author: "y", speaks_for: "outside", text: "Buying goods: up to 70 at $98.72 each." };
+  const shown = m.absorb({ t: 31 * DAY, channels: { "a/matters": { kind: "records", records: [referral] }, "a/cited": { kind: "records", search: true, records: [offer] } } } as any);
+  expect(Object.keys(shown.channels)).toEqual(["a/matters"]);
+  expect(m.text()).toContain('It cites [rec.5] buying offer from outside (year 1, day 21): "Buying goods: up to 70 at $98.72 each."');
+  // (A search of that board the seat makes itself is its own look, set out as one.)
+  expect(Object.keys(m.absorb({ t: 32 * DAY, channels: { "a/cited": { kind: "records", search: true, records: [offer] } } } as any).channels)).toEqual(["a/cited"]);
 });
