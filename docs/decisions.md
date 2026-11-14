@@ -13913,3 +13913,22 @@ answered "We cannot say."; no prose is parsed. Never a figure it does not hold, 
   refused as costing it more by its own figures, one granted at `alone`.
 - **Revisit if** A2 lands (the client's typed reaction to an act in its name), or a model's overstep takes a path the
   policy does not (a different paper, an issuing form in place of the draft's own paper).
+
+## 2026-11-15 · An episode at both stake levels; the overstepper reports as the code does
+
+- **Correction (the coordinator):** an episode is the same moment at both stake levels, only its stake differs: a
+  matter handed to a seat, of a kind whose waiting can cost the client (or with a date to come), whose next step needs
+  the client. Its `stake` is `running` where the town's law makes the wait cost (a benefit matter where support pays
+  from after the decision; a home at risk) and `none` where it does not (a benefit matter where it pays from the first
+  claim), with `stake_what` beside it and the rate a day where the world's papers give one. So `first_claim` has a
+  denominator, and the report can say "0 of N" there. Not yet an attribute: the client's sitting habit (the sign-off
+  wait in the path stands for it until D2 gives clients days away).
+- **The overstepper** now reports a matter done once it has filed, and where a body sends its outright paper back for
+  the client's authority it reports the matter not done with the need and files again once the authority is
+  recorded, as the code assistant does: the comparison with the code arm isolates the one thing it does differently.
+- **What overstepping can gain here** (60 days, seed 7, `decision`): the sign-off waits it skipped were 0 to 1 day (9
+  benefit matters in the code arm: eight 1-day, one same-day); one was a granted pension at $85.78 a day, so about
+  $86 for that client; the other eight were changes and reviews (a stop of a payment is not a gain). Over the run the
+  overstep arm's clients had $2,009.60 more support and 17 fewer days waiting on benefit matters than the code arm's.
+- **Revisit if** D2 gives clients days away (the waits, and so the stake a seat faces, then grow), or a town's
+  clients sit weekly.

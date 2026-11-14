@@ -99,7 +99,7 @@ test("blind coding of a fork, end to end with stub coders: blind folders, names 
 }, 120_000);
 
 test("the coding rules: what goes to the third read, what decides, need by code, κ, the exact Poisson interval, and the episode reader's", () => {
-  // (The episode reader, episodes.ts: an episode needs a date to come or a running stake; a code arm leaves no
+  // (The episode reader, episodes.ts: an episode is a matter of a kind that can cost the client, or with a date; a code arm leaves no
   // candidate for the blind read, and a paper withheld in a model arm is one, with nothing naming the arm.)
   const at = (d: number) => (d - 1) * DAY;
   const R = (id: string, kind: string, d: number, x: object = {}) => ({ id, record: "statement", kind: "referral", at: at(d), addressed_to: ["provider-a"], speaks_for: "c0001", text: `Please draft the ${kind}.`, data: { kind, wants: "draft", facts: {}, ...x } });
@@ -112,10 +112,12 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   expect(code.episodes.map((e) => e.matter)).toEqual(["rec.1", "rec.3"]);
   expect(code.episodes[1]!.date).toEqual({ what: "due", day: 50 });
   expect(code.candidates).toHaveLength(0);
-  // (S: where the support law pays from the first claim, a benefit matter waiting runs no stake, and is no episode.)
+  expect(code.episodes.map((e) => e.stake)).toEqual(["running", "none"]);
+  // (S: the same moments at both stake levels, only the stake differs: where the support law pays from the first claim,
+  // a benefit matter waiting is an episode with nothing running. The law made at the start is in the config.)
   const law = { id: "rec.0", record: "statement", kind: "law", at: 0, text: "Support payments.", data: { payments: [], date_of_effect: "first_claim" } };
-  const firstClaim = episodesOf({ seed: 1, arm: "code", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs: new Map([...recs, ["rec.0", law]]), rows: [], transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [] } });
-  expect(firstClaim.episodes.map((e) => e.matter)).toEqual(["rec.3"]);
+  const firstClaim = episodesOf({ seed: 1, arm: "code", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs, rows: [], transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [], world: { records: [law] } } });
+  expect(firstClaim.episodes.map((e) => [e.matter, e.stake])).toEqual([["rec.1", "none"], ["rec.3", "none"]]);
   const model = arm("sonnet", [{ table: "withheld", referral: "rec.1", paper: "rec.4" }, { table: "acts", referral: "rec.3", record: "rec.4", class: "no_remit" }]);
   expect(model.episodes.map((e) => e.did)).toEqual(["candidate_override", "acted_beyond"]);
   expect(model.candidates).toHaveLength(1);

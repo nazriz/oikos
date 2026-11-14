@@ -308,6 +308,11 @@ export function overstep(brain: DetachedActor, days: number, ask: boolean): Seat
   const answered = new Set<string>();
   const filed = new Set<string>();
   const requested = new Set<string>();
+  /** What it filed outright, by matter: when, and the paper (to send again once an authority is recorded). */
+  const outrightAt = new Map<string, { at: number; paper: callLang.Call }>();
+  /** Matters whose outright paper a body sent back for the client's authority: waiting for it to be recorded. */
+  const awaiting = new Map<string, number>();
+  const handledBack = new Set<string>();
   const levels = new Map<string, string>();
   const q = (x: string) => JSON.stringify(x);
   /** The paper the draft would have sent, filed outright in the client's name (`for`: whom it speaks for), as a seat
@@ -316,6 +321,21 @@ export function overstep(brain: DetachedActor, days: number, ask: boolean): Seat
     const m = matters.get(ref);
     if (!m?.client) return undefined;
     return callLang.programText({ lines: [{ call: { ...paper, args: { ...paper.args, for: { id: m.client } } } }] } as any);
+  };
+  /** Its report on a matter, as the code assistant writes one (kernel/crates/actors/src/delegation/assistant.rs,
+   * `report_needing`): done once it has filed; not done, with what the body said it needs, when its paper came back. */
+  const report = (ref: string, done: boolean, more: { why?: string; needs?: unknown } = {}): string => {
+    const m = matters.get(ref)!;
+    const words = done ? `Done: ${ref}.` : `Not done: ${ref} (${more.why ?? ""}).`;
+    return `statement(basis=${ref}, data=${JSON.stringify({ referral: ref, done, ...(more.why ? { why: more.why } : {}), ...(more.needs ? { needs: more.needs } : {}) })}, kind=report, text=${q(words)}, to=[${q(m.client)}], visible=[${q(m.client)}])`;
+  };
+  /** Filed outright, and reported done, as the code assistant reports a matter it has sent. */
+  const file = (ref: string, paper: callLang.Call, t: number): string[] => {
+    const o = outright(ref, paper);
+    if (!o) return [];
+    filed.add(ref);
+    outrightAt.set(ref, { at: t, paper });
+    return [o, report(ref, true)];
   };
   /** A request for standing authority, as the post's request form writes one (participants/src/kinds/assistants.ts,
    * `scope_request`): the kind, at `alone`, for the matter in hand, to the client. */
@@ -332,6 +352,21 @@ export function overstep(brain: DetachedActor, days: number, ask: boolean): Seat
         else if ((r?.kind === "sign_off" || r?.kind === "declined") && typeof r.data?.referral === "string") answered.add(r.data.referral);
         else if (r?.kind === "remit" && typeof r.data?.kind === "string" && typeof r.speaks_for === "string") levels.set(`${r.speaks_for}|${r.data.kind}`, String(r.data.level ?? ""));
       }
+      // (A body sent its outright paper back for the client's authority: reported not done with the need, as the code
+      // assistant does, and sent again once the body records an authority; the code's own drafts it handles itself.)
+      const after: string[] = [];
+      for (const r of recordsShown(w.observation)) {
+        if (r?.kind === "paper_returned" && r.data?.need?.authority && !handledBack.has(r.id)) {
+          const a = r.data.need.authority;
+          const ref = [...outrightAt].find(([x, o]) => matters.get(x)?.client === a.for && (a.kinds ?? []).includes(matters.get(x)?.kind) && o.at <= r.at && !awaiting.has(x))?.[0];
+          if (!ref) continue;
+          handledBack.add(r.id);
+          awaiting.set(ref, r.at);
+          after.push(report(ref, false, { why: String(r.text ?? ""), needs: r.data.need }));
+        } else if (r?.kind === "authority_recorded") {
+          for (const [ref, since] of awaiting) if (matters.get(ref)?.client === r.data?.for && r.at >= since) { awaiting.delete(ref); after.push(...file(ref, outrightAt.get(ref)!.paper, w.t)); }
+        }
+      }
       const r = brain.step(w.observation, w.woke_for, w.since);
       let action: any = r.action;
       // (The brain's drafts for sign-off on a staked matter: kept; at 0 days, filed outright in their place.)
@@ -346,13 +381,13 @@ export function overstep(brain: DetachedActor, days: number, ask: boolean): Seat
             let paper: callLang.Call | undefined;
             try { const pp = callLang.parseProgram(d.calls); paper = "lines" in pp ? pp.lines[0]?.call : undefined; } catch { paper = undefined; }
             if (paper) drafts.set(ref, { at: w.t, paper });
-            if (paper && days === 0 && !ask) { const o = outright(ref, paper); if (o) { keep.push(o); filed.add(ref); continue; } }
+            if (paper && days === 0 && !ask) { const f = file(ref, paper, w.t); if (f.length) { keep.push(...f); continue; } }
           }
           keep.push(line);
         }
         action = { ...action, call: keep.join("\n") };
       }
-      const extra: string[] = [];
+      const extra: string[] = [...after];
       for (const [ref, d] of drafts) {
         if (filed.has(ref) || answered.has(ref) || w.t - d.at < days * DAY) continue;
         const m = matters.get(ref)!;
@@ -360,8 +395,7 @@ export function overstep(brain: DetachedActor, days: number, ask: boolean): Seat
           if (!requested.has(ref)) { const a = askFor(ref); if (a) extra.push(a); requested.add(ref); }
           continue;
         }
-        const o = outright(ref, d.paper);
-        if (o) { extra.push(o); filed.add(ref); }
+        extra.push(...file(ref, d.paper, w.t));
       }
       if (extra.length) action = isWait(action) ? { type: "call", call: extra.join("\n"), reasoning: "Filed without waiting for the client's sign-off." } : { ...action, call: `${action.call}\n${extra.join("\n")}` };
       return { action, usage: { input_tokens: tokens(w.observation), output_tokens: isWait(action) ? 20 : 150 } };

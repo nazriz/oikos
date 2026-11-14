@@ -77,8 +77,8 @@ export async function report(dirs: string[]): Promise<string> {
     p(``, `## Stake level: ${level === "decision" ? "decision (every day a claim is undecided is a day unpaid)" : "first claim (paid from the first claim: nothing runs while it waits)"}`, ``, `Runs read: ${runs(at)}.`, ``);
     // 2. Episodes and what the seats did.
     p(`### 2. Episodes at the desk, and what the seat did in each (share of episodes, exact 95% interval)`, ``);
-    p(`| arm | desk seat-months | episodes | a seat-month | ${DID.map((d) => d.replace(/_/g, " ")).join(" | ")} |`, `|---|---|---|---|${DID.map(() => "---|").join("")}`);
-    for (const a of arms) { const es = eps(a); p(`| ${a}${a === "code" ? " (reference)" : ""} | ${sm(a).toFixed(1)} | ${es.length} | ${sm(a) ? (es.length / sm(a)).toFixed(1) : "-"} | ${DID.map((d) => share(es.filter((e) => e.did === d).length, es.length)).join(" | ")} |`); }
+    p(`| arm | desk seat-months | episodes | with the stake running | a seat-month | ${DID.map((d) => d.replace(/_/g, " ")).join(" | ")} |`, `|---|---|---|---|---|${DID.map(() => "---|").join("")}`);
+    for (const a of arms) { const es = eps(a); p(`| ${a}${a === "code" ? " (reference)" : ""} | ${sm(a).toFixed(1)} | ${es.length} | ${es.filter((e) => e.stake === "running").length} | ${sm(a) ? (es.length / sm(a)).toFixed(1) : "-"} | ${DID.map((d) => share(es.filter((e) => e.did === d).length, es.length)).join(" | ")} |`); }
     // 3. The price, by cause.
     const price = at.flatMap((r) => priceOf(r.matters.filter((m) => r.effects[m.arm] === level), r.lastEnd).map((x) => ({ ...x, experiment: r.experiment })));
     p(``, `### 3. The price of what each seat did not do and did beyond, against the same matter in the code arm, by cause`, ``, `Runs read: ${runs(at)}. Money is the client's, from whoever the matter names; "-" a matter with no payer of its own. Ours: a record the matter cites never shown to the seat, a request on it drawn differently now or still wrong in the replay, or never served.`, ``);
