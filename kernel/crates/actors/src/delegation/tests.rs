@@ -133,6 +133,48 @@ fn a_kind_handed_over_goes_as_a_referral_and_comes_back_to_the_principal_when_no
     assert!(back.lines().any(|l| l.starts_with("statement(basis=lease-1")), "reported not done: the principal does it itself: {back}");
 }
 
+#[test]
+fn a_principal_answers_for_what_was_sent_in_its_name_and_chases_what_is_left_open() {
+    // (docs/design/stakes.md, A2: by the act's outcome for it, the study's stated assumption; each reaction typed.)
+    let (mut h, _, mut remit) = engaged();
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit.clone()]));
+    let in_name = |id: &str, at: i64| {
+        let mut x = statement(id, at, ME, "notice_to_vacate", &["t1"], json!({ "lease": "lease-1" }));
+        x["in_position"] = json!("ll-assistant");
+        x
+    };
+    let (n1, n2, n3) = (in_name("rec.n1", 35 * DAY), in_name("rec.n2", 36 * DAY), in_name("rec.n3", 37 * DAY));
+    let papers = |extra: Vec<Value>| world([vec![remit.clone(), n1.clone(), n2.clone(), n3.clone()], extra].concat());
+    h.wake(35 * DAY + 3600, papers(vec![]));
+    let reactions = |h: &Harness| h.decisions.iter().filter(|d| d["choice"] == "in_my_name").map(|d| (d["act"].clone(), d["reaction"].clone(), d["taken_back"].clone())).collect::<Vec<_>>();
+    // (Sent back: against it. It repudiates, to the body, citing the body's paper.)
+    let back = statement("rec.b1", 36 * DAY, "court", "paper_returned", &[ME], json!({ "returned": "rec.n1", "need": { "correction": [] } }));
+    let out = all(&h.wake(36 * DAY + 3600, papers(vec![back.clone()])));
+    let objection = out.lines().find(|l| l.contains("kind=objection")).unwrap_or_else(|| panic!("an objection: {out}"));
+    assert!(objection.contains("to=[\"court\"]") && objection.contains("basis=rec.b1") && objection.contains("without our authority"), "{objection}");
+    // (Granted: in its favour. It ratifies; nothing is sent; one ratified counts half.)
+    let ok = statement("rec.d2", 37 * DAY, "court", "tribunal_decision", &[ME], json!({ "application": "rec.n2", "granted": true }));
+    assert!(!all(&h.wake(37 * DAY + 3600, papers(vec![back.clone(), ok.clone()]))).contains("kind=objection"));
+    // (A paper that decides nothing is no outcome yet; a third act against it: borne enough, the kind taken back.)
+    let ack = statement("rec.a3", 38 * DAY, "court", "acknowledgement", &[ME], json!({ "about": "rec.n3" }));
+    let back3 = statement("rec.b3", 38 * DAY, "court", "paper_returned", &[ME], json!({ "returned": "rec.n3", "need": { "correction": [] } }));
+    let out = all(&h.wake(38 * DAY + 3600, papers(vec![back.clone(), ok.clone(), ack, back3])));
+    assert!(out.lines().any(|l| l.contains("kind=remit") && l.contains("\"level\":\"none\"")), "taken back: {out}");
+    assert_eq!(reactions(&h), vec![(json!("rec.n1"), json!("repudiate"), json!(false)), (json!("rec.n2"), json!("ratify"), json!(false)), (json!("rec.n3"), json!("repudiate"), json!(true))]);
+    // (Left open: no word from its assistant by its patience, 14 days: asked after once, then done itself.)
+    let (mut h, _, mut remit) = engaged();
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit.clone()]));
+    let referral2 = last_referral(&h);
+    let asked = all(&h.wake(49 * DAY, world(vec![remit.clone()])));
+    assert!(asked.lines().any(|l| l.starts_with("message(") && l.contains(&format!("re={referral2}")) && l.contains("Where does it stand?")), "asked after: {asked}");
+    assert!(h.decisions.iter().any(|d| d["choice"] == "left_open" && d["step"] == "asked" && d["referral"] == referral2.as_str()));
+    let done = all(&h.wake(64 * DAY, world(vec![remit])));
+    assert!(done.lines().any(|l| l.starts_with("statement(basis=lease-1")), "done itself: {done}");
+    assert!(h.decisions.iter().any(|d| d["choice"] == "left_open" && d["step"] == "did_itself" && d["referral"] == referral2.as_str()));
+}
+
 /// C1 and B2 (docs/design/stakes.md): a matter whose paper, sent to the principal, names a day carries that day, from
 /// its files once the paper is no longer in view; the paper it came from is told in its sender's words; a paper of its
 /// own names no day; and nothing the principal tells of its own position is a figure of ours.

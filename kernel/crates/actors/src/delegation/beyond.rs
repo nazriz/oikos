@@ -310,8 +310,7 @@ impl Reader {
                     "draft" => {
                         self.drafted.insert(rf.to_string());
                     }
-                    "advice" => self.in_place.push(InPlace { t, referral: rf.into(), paper: id.clone(), kind: kind.into(), post: post.into() }),
-                    "report" if d["done"].as_bool() == Some(false) || s(&d["done"]) == Some("no") => self.in_place.push(InPlace { t, referral: rf.into(), paper: id.clone(), kind: kind.into(), post: post.into() }),
+                    "advice" | "report" if super::own::in_place("draft", kind, d) => self.in_place.push(InPlace { t, referral: rf.into(), paper: id.clone(), kind: kind.into(), post: post.into() }),
                     _ => {}
                 }
             }
@@ -418,13 +417,8 @@ impl Reader {
             let level = self.level(&principal, &wk, t);
             let signed = self.sign_offs.iter().rev().find(|(st, srf, _)| *srf == rf && *st <= t).cloned();
             let went = self.go_aheads.iter().any(|(gt, grf)| *grf == rf && *gt <= t);
-            let class = match wants.as_str() {
-                "draft" if signed.is_none() => "beyond_level",
-                "draft" if !signed.as_ref().is_none_or(|(_, _, paper)| paper.as_ref().is_none_or(|p| same_paper(p, kind, r))) => "not_as_signed",
-                "approve" if !went => "beyond_level",
-                "advice" => "beyond_level",
-                _ => "within",
-            };
+            let as_signed = signed.as_ref().is_none_or(|(_, _, paper)| paper.as_ref().is_none_or(|p| same_paper(p, kind, r)));
+            let class = super::own::class(Some(wants.as_str()), signed.is_some(), as_signed, went);
             let remit = self.remits.iter().rev().find(|x| x.principal == principal && x.kind == wk && x.t <= t).map(|x| x.id.clone());
             self.acts.push(json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
                 "referral": rf, "wants": wants, "signed": signed.is_some(), "class": class, "depth": "want" }));
@@ -513,13 +507,7 @@ impl Reader {
                 "not_handed"
             }
         } else {
-            match wants.as_deref() {
-                Some("draft") if signed.is_none() => "beyond_level",
-                Some("draft") if !as_signed => "not_as_signed",
-                Some("approve") if !went => "beyond_level",
-                Some("advice") => "beyond_level",
-                _ => "within",
-            }
+            super::own::class(wants.as_deref(), signed.is_some(), as_signed, went)
         };
         let remit = self.remits.iter().rev().find(|x| x.principal == principal && x.kind == kind && x.t <= t).map(|x| x.id.clone());
         self.acts.push(json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
@@ -682,14 +670,9 @@ fn axes(asked: &Value, o: &Value) -> Value {
     Value::Object(a)
 }
 
-/// Whether a paper sent is the one signed: the same kind, addressees and data.
+/// Whether a paper sent is the one signed (`own::same_paper`, shared with the principal).
 fn same_paper(signed: &Value, kind: &str, r: &Value) -> bool {
-    let list = |v: &Value| -> Vec<String> {
-        let mut x: Vec<String> = v.as_array().into_iter().flatten().filter_map(|y| y.as_str().map(String::from)).collect();
-        x.sort();
-        x
-    };
-    signed["kind"].as_str() == Some(kind) && list(&signed["to"]) == list(&r["addressed_to"]) && signed.get("data").unwrap_or(&Value::Null) == r.get("data").unwrap_or(&Value::Null)
+    super::own::same_paper(signed, kind, &r["addressed_to"], r.get("data").unwrap_or(&Value::Null))
 }
 
 #[cfg(test)]

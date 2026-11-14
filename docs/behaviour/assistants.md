@@ -581,6 +581,29 @@ Basis: a person whose bank has told them to write to authorise their assistant, 
 them about that matter, does it; they do not wait for the news on a particular form (the first rung, 2026-11-14:
 `runs/scope-obstacle-r1-L2`, where Haiku wrote the client exactly that letter and nothing moved). Risk MT-36.
 
+**A principal answers for its assistant (2026-11-15; docs/design/stakes.md, A2; `principal/answers.rs`).** It reads
+only the world's papers that reach it, never the reader; what counts as covered, and as in place of a draft, is the
+reader's own definition (`delegation::own`), shared so the two cannot disagree.
+- *In its name, not covered.* A body's paper citing a paper its assistant sent in its name (in its post, or a desk's in
+  the client's name) that no sign-off of its own (whose signed copy it is), go-ahead of its own, or remit at `alone`
+  covers. **By the act's outcome for it, the study's stated assumption:** a grant, an acceptance, a review that changed
+  the decision, it ratifies (the act stands); a paper sent back, a refusal, a review that upheld it, it repudiates (an
+  `objection` to the body: "rec.N was sent in our name without our authority, and we do not stand by it"), and does the
+  matter itself where still open. A paper that decides nothing (an acknowledgement, a request for papers) is no outcome
+  yet. Each act counts toward taking the kind back: a repudiated one whole, a ratified one half (placeholders, MT-37);
+  at two, it takes the remit back (a remit at none), unless its own word holds the kind (a floor or a freeze). A
+  person reads the body's paper when it sits down to its post (D1a). Typed: `choice: "in_my_name"`, `reaction`
+  (`ratify` | `repudiate`), `act`, `outcome` (`for` | `against`), `by`, `count_bps`, `taken_back`.
+- *Left open.* A matter handed over with no draft, request to go ahead, report or advice from its assistant by its clock
+  (the day its referral names; else its patience: a want's `answer_days`, else `patience_days`, 14 days where neither is
+  given, a placeholder: MT-37) is asked after once, by a letter about it ("We handed you rec.N on <date>. Where does it
+  stand?"); left still after the same patience again, it does it itself. Advice in place of a draft it asked for starts
+  the chase at once. Typed: `choice: "left_open"`, `step` (`asked` | `did_itself`), `why`.
+- *A letter with no reference* is about its one unmet need on a paper that assistant sent, if it has exactly one; with
+  two or more nothing follows (MT-36).
+- Basis: agency law's ratification and repudiation (Restatement (Third) of Agency ss 4.01 to 4.07; to confirm: MT-37);
+  a client chases an agent, then acts. Its time: the table's rows for the papers it writes.
+
 **A question to the client (2026-11-14; docs/design/stakes.md, B3).** An assistant may ask its principal one named
 thing about a matter it was handed, on its form `question_to_client` (a `question` paper: the matter, what it asks
 about, and the paper, party or detail named). What it may ask about is a small set the principal's code answers from

@@ -1008,3 +1008,14 @@ Additions with defaults, left out when empty.
 - `Forward.due()` reads `DATE_FIELDS` (the nearest day), as a referral's `due` does.
 - A model desk's stationery: the form `evidence` (papers for a claim, in a client's name: `office`, `request`, `claim`,
   `need`, `last_employer`) and its draft, where the desk takes claims (generator only).
+
+## Stakes A2, part 1: a principal answers for its assistant (2026-11-15; docs/design/stakes.md; docs/decisions.md, "A2, part 1"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additions with defaults: a principal that never sees a paper in its name it did not cover, or a matter left open, writes
+nothing new, and its saved state is as before.
+
+- A new paper, `objection` (from a principal to a body: `data: { act, by, reaction }`), the principal's repudiation of
+  a paper sent in its name without its authority.
+- A principal's parameters gain `patience_days` (absent: 14).
+- Its saved state gains `in_name`, `reacted`, `in_name_counts`, `chased`, `cited`, `cites_read` (each absent when empty).
+- `delegation::own` (`same_paper`, `class`, `in_place`): the reader's definitions, shared with the principal.
