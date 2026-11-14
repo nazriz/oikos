@@ -242,7 +242,7 @@ export class FunnelReader {
       if (this.debriefs.has(participant)) s.debriefed = this.debriefs.get(participant)!;
     }
     const servedBy = this.served.bySeat();
-    for (const s of seats.values()) s.served = s.participants.map((p) => servedBy[p]).filter(Boolean).reduce((a, x) => { for (const k of Object.keys(a) as (keyof Served)[]) a[k] += x![k]; return a; }, { requests: 0, served_first_time: 0, asked_back: 0, served_after_restatement: 0, never_served: 0, not_sent: 0, drafts_unsure: 0, drafts_offered: 0, drafts_confirmed: 0, drafts_declined: 0, drafts_unanswered: 0 } as Served);
+    for (const s of seats.values()) s.served = s.participants.map((p) => servedBy[p]).filter((x): x is Served => !!x).reduce((a: Served, x) => { for (const k of Object.keys(a) as (keyof Served)[]) a[k] += x[k]; return a; }, { requests: 0, served_first_time: 0, asked_back: 0, served_after_restatement: 0, never_served: 0, not_sent: 0, drafts_unsure: 0, drafts_offered: 0, drafts_confirmed: 0, drafts_declined: 0, drafts_unanswered: 0 } as Served);
     for (const [q, post] of this.requests) { const s = seat(post); s.requests.made++; const why = this.requestAnswers.get(q) ?? "not answered"; s.requests.answered[why] = (s.requests.answered[why] ?? 0) + 1; }
     for (const o of obstacleRows) {
       if (!o.seat || !seats.has(o.seat) && !this.posts.has(o.seat) || (o.t ?? 0) < this.from) continue;
