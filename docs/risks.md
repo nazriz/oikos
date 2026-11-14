@@ -361,20 +361,28 @@ The mechanism:
   then a backlog in the officers' hours, from the opening caseload, at a placeholder level (MT-32).
 
 ### WM-18 · A person's work in a post is not held to working hours
-- **Gap:** A system's lanes work inside its template's `hours`, but nothing seems to keep a person's acts in a post
-  inside the post's working day (to confirm in the kernel). In the scope pilot a principal signed off a draft about
-  five simulated minutes after it came, at any hour of the day or night.
-- **Where:** the kernel's timelines; every post held by a person.
-- **Effect:** Answers, sign-offs and replies come faster than a real office's, so any measure of waiting (a request
-  answered, an approval that does not come: paper plan O2) reads short.
+- **Gap:** A system's lanes work inside its template's `hours`, but nothing keeps a person's acts in a post inside the
+  post's working day. A person's own act time is placed on their timeline but not counted against their working day
+  (`catalogue.working_day`): the world kernel charges `add_worked` for `work` shares only, never for the seconds of the
+  act itself, so their paperwork costs their time but not their day. In the scope pilot a principal signed off a draft
+  about five simulated minutes after it came, at any hour of the day or night.
+- **Where:** the world kernel's act placement (kernel/crates/world/src/kernel.rs, `place` and `over_the_day`); every
+  post held by a person.
+- **Effect:** An officer's acts in a post come at any hour; a person's paperwork never crowds their working day.
+  Since 2026-11-14 (stakes D1a and D1b) a person reads their post at a sitting of their own, so replies to post no
+  longer come at once; what is left still makes an office's answers, and acts a person starts on their own, quicker
+  than a real one's.
 - **L / I:** high / medium · **Status:** open; a law of its own, decided 2026-11-10 (docs/design/handing-over.md, 12).
-  Eased 2026-11-14 for persons as principals (stakes D1a, docs/decisions.md "A client gets to its assistant's papers
-  when it next gets to its post"): what comes to a client by post waits until it next sits down to its post, by a
-  habit drawn once a person (`principal.rs`, `answer_lag`). Still open: a person's own paperwork outside delegation,
-  their paper acts counted in their day (D1b), and an organisation's principal (WM-20).
-- **Notice by:** the times of day of principals' papers in a delegating run.
-- **Fix when:** before obstacle O2 is read in the main study (D1b of docs/design/stakes.md). It moves every town's
-  hash, so it lands alone.
+  Eased 2026-11-14 for every person's post (stakes D1b, docs/decisions.md "Every person gets to their post at their own
+  sitting"; D1a's client post folded into it): what others send a person waits until they next sit down to their post
+  (kernel/crates/actors/src/post.rs). Still open, and left out of D1b on purpose (the lead, 2026-11-14: each is a new
+  behaviour for every town and needs its own checkpoint): a person's paper time counted against their working day;
+  acts a person starts on their own deferred to a sitting; agreements (a lease, a service's terms) as post; and an
+  organisation's principal (WM-20).
+- **Notice by:** the times of day of officers' papers and of persons' own claims and complaints; a person whose day
+  of paperwork would not fit their job.
+- **Fix when:** before a study reads the speed of an office held by a person, or of acts persons start themselves. It
+  moves every town's hash, so it lands alone.
 
 ### WM-19 · No pay run: wages go by standing payments set at hire
 - **Gap:** An employer's wages go out by standing payments set when someone is hired, so nobody does a pay run each

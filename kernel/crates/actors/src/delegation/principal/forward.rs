@@ -182,22 +182,14 @@ impl State {
         self.about_matter(r)
     }
 
-    /// Papers newly seen: each one to pass on is passed on now, or, for a person who deals with their post when they sit
-    /// down to it (`answer_lag`), put in its post with the rest, and passed on then (`take`, from `sit_down`).
-    pub(super) fn pass_on_seen(&mut self, pic: &Picture, lag: Option<i64>) {
+    /// Papers newly seen: each one to pass on is passed on now. (A person is shown what came by post when they sit down to
+    /// it, crate::post, so a person passes it on then: stakes D1b. Until D1b the principal held its own post here.)
+    pub(super) fn pass_on_seen(&mut self, pic: &Picture) {
         if self.traces.is_empty() && self.untied.is_empty() {
             return;
         }
         for r in pic.all_records() {
-            if self.to_pass_on(r).is_none() {
-                continue;
-            }
-            if lag.is_some() && self.by_post(r) {
-                if !self.in_post.iter().any(|x| x == r.id.as_str()) {
-                    self.book.take_all([r]);
-                    self.in_post.push(r.id.to_string());
-                }
-            } else {
+            if self.to_pass_on(r).is_some() {
                 self.forward(r);
             }
         }

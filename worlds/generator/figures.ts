@@ -409,6 +409,9 @@ export const FIGURE_BASIS: Basis[] = [
     // the scenario, worlds/scenarios.)
     derived("shocks.**", "a scenario's scripted shock to the world market: the spec's `shocks`, each with its basis in its scenario (worlds/scenarios)"),
     prof("change_bps_per_year", "automation.price_fall_bps_per_year"),
+    prof("paperwork.every_days.*.*", "paperwork"),
+    prof("paperwork.from_hour", "paperwork"),
+    prof("paperwork.to_hour", "paperwork"),
   ].flatMap((r) => PARAMS_AT.map((at) => ({ ...r, family: `any module: ${r.at}${r.given ? ` (${r.given})` : ""}`, at: `${at}.${r.at}` }))),
   // Delegation (docs/behaviour/assistants.md): what a principal weighs, and what a provider sells, where a town has
   // assistants on offer (`assistants: true`).
@@ -420,9 +423,6 @@ export const FIGURE_BASIS: Basis[] = [
     prof("delegation.review_days", "assistants.principals"),
     derived("delegation.hour_value", "an hour of the principal's own time at the profile's public-service wage (public_service.wage_per_pay_period) over its ordinary hours"),
     prof("delegation.kinds.*.error_cost", "assistants.principals"),
-    prof("delegation.paperwork.every_days.*.*", "paperwork"),
-    prof("delegation.paperwork.from_hour", "paperwork"),
-    prof("delegation.paperwork.to_hour", "paperwork"),
     derived("delegation.kinds.*.own_seconds", "the principal's own time for the paper: the person table's row (work_time)"),
     derived("delegation.kinds.*.late_cost_day", "what a day's delay of a claim for support, or of putting right a refused one (a review request about it, a want handed over to have it put right), costs a person: a day of the least payment the place's support law makes (the profile's support.payments; docs/design/obstacles.md section 10), at obstacle levels only, and none where the law pays from the first claim"),
     derived("delegation.forms", "the principal's own forms, as its stationery has them with its own details filled in: the same figures as its records' terms (docs/design/broad-seats.md, G2)"),

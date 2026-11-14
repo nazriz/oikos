@@ -899,32 +899,35 @@ fn a_want_handed_over_carries_its_fields_and_comes_back_with_nothing_to_redo() {
 
 #[test]
 fn a_person_deals_with_what_comes_by_post_when_it_next_sits_down_to_it_and_not_before() {
-    // (Stakes D1a, docs/behaviour/assistants.md "Getting to the post": a person, whose assistant is the provider's desk,
-    // who gets to its post every three days in the evening. Before 2026-11-14 a draft was signed off at the next wake.)
-    let script: Vec<Value> = [34, 40].iter().map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
+    // (Stakes D1a and D1b, docs/behaviour/citizen.md "Getting to the post": a person, whose assistant is the provider's
+    // desk, who gets to their post every three days in the evening; the post is every person's (crate::post), the
+    // principal's papers among it. Before 2026-11-14 a draft was signed off at the next wake.)
+    let script: Vec<Value> = [40, 46].iter().map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
     let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 90 * DAY, "keep_until": 90 * DAY, "why": "a test's design", "hold": "freeze" });
-    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
-        "delegation": { "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "commit": commit,
-            "paperwork": { "every_days": [[3, 10_000]], "from_hour": 19, "to_hour": 20 } } }));
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script, "paperwork": { "every_days": [[3, 10_000]], "from_hour": 19, "to_hour": 20 },
+        "delegation": { "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "commit": commit } }));
     let inner = crate::stub::Script.create(&h.ctx).unwrap();
-    h.actor = wrap(&h.ctx, inner).unwrap();
+    h.actor = crate::post::wrap(&h.ctx, wrap(&h.ctx, inner).unwrap());
     let mut o = offer();
     o["for"] = json!("persons");
     h.wake(DAY + 3600, world(vec![statement("rec.off", 0, PROV, "service_offer", &[], o.clone())]));
     let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).expect("it engages") as i64 + 1);
     let mut up = set_up(&order);
     up[0]["data"]["offer"] = o;
-    h.wake(32 * DAY + 3600, world(up));
-    h.wake(33 * DAY + 3600, world(vec![signed()]));
-    let remit = json!({ "id": "rec.remit", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 33 * DAY + 4000, "visible_to": [ME, PROV],
+    let remit = json!({ "id": "rec.remit", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 39 * DAY, "visible_to": [ME, PROV],
         "kind": "remit", "text": "From now", "addressed_to": [PROV], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "notice_to_vacate", "level": "draft", "hold_until": 90 * DAY } });
-    h.wake(34 * DAY + 3600, world(vec![remit]));
+    // (The provider's delivery is post too: the service is taken up at a sitting.)
+    for t in (32 * DAY + 3600..=40 * DAY + 3600).step_by(3600) {
+        let recs = if t == 32 * DAY + 3600 { up.clone() } else if t == 33 * DAY + 3600 { vec![signed()] } else if t == 39 * DAY { vec![remit.clone()] } else { vec![] };
+        h.wake(t, world(recs));
+    }
+    assert!(h.sent.iter().any(|p| p.contains("kind=referral")), "the service in use, the notice handed over: {}", all(&h.sent));
     // (Each draft comes from the desk an hour after the referral; the person is woken every hour after, as news and its
     // own code would wake it, and signs off only at a sitting.)
     let mut signed_at = vec![];
-    for at_day in [34, 40] {
-        if at_day == 40 {
-            for t in (37 * DAY..40 * DAY + 3600).step_by(3600) {
+    for at_day in [40, 46] {
+        if at_day == 46 {
+            for t in (43 * DAY..46 * DAY + 3600).step_by(3600) {
                 h.wake(t, world(vec![]));
             }
         }

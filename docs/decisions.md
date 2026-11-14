@@ -14218,3 +14218,33 @@ c0736's returns from the bank are on file too, and are met once the request's au
 the client's own id (a translator rule, another worker's).
 - **Revisit if** a body asks for an authority other than by a return (a published requirement read before sending), so
   that a client should give one before any paper comes back.
+
+
+## 2026-11-14 · Every person gets to their post at their own sitting (stakes D1b)
+
+**The law.** D1a's law, for every person and every paper sent them: what others send a person (a statement addressed
+to them by someone else; a letter from someone else) waits in their post until they next sit down to it, by the
+profile's habit drawn once a person, and their code is shown it then, in the order it came (`kernel/crates/actors/
+src/post.rs`: `draw`, `answer_lag`, `by_post`, and the wrapper `Posted`, round every person's own code at the one
+place actors are made, `offices/books.rs` `create`/`restore`). What they do about it is their own act then, at the
+table of work's row. **D1a is now its consequence:** the principal no longer holds its own papers (its `answer_lag`,
+`in_post` and the rest are gone from principal.rs, which differs from before D1a by one comment); the wrapper outside it
+shows it its desk's papers at the sitting, as any person's post. The draw is the same (`paperwork-<person>`), so a
+client's habit is what it was under D1a. `paperwork` moves from the principal's parameters to every person's code's.
+- **How it holds:** a channel that shows only what is new hands a paper once, so the wrapper keeps it (saved) until the
+  sitting and puts it back in the same channel then; a channel kept whole shows it again, and it is held back until
+  then; a search's answers (what they asked a keeper) are never held. It wakes the person at the sitting if nothing
+  wakes them before.
+- **The smallest honest version (the lead, 2026-11-14).** Left out, and named on WM-18: a person's paper time is still
+  not counted against their working day (charging it would make the kernel refuse job work after a person's own
+  paperwork, a new behaviour for every town needing its own checkpoint); acts a person starts on their own (a claim, a
+  complaint) go when their code decides; agreements (a lease, a service's terms) are not post.
+- **The early check the lead asked for:** non-clients still meet dated requests. The study town, level 2, seed 7, base
+  and a 60-day code fork, "before" with every habit removed: evidence requests answered by their date, 65 of 65 before
+  and 64 of 65 after for non-clients (one late), 36 of 36 and 37 of 37 for clients. No hearing notice reached a person in
+  that town in 90 days. The desk's waits on its client grow beyond D1a's, the weekly sitters now showing: month 1 mean
+  31 hours (median 9.9, 90th percentile 110, longest 147), month 2 mean 16 (90th percentile 56, longest 75).
+- **Every town moves** (every profile gives the habit). The pins are re-taken at the final rebase, each with its reason
+  (below, when landed).
+- **Revisit if** a source for the habit is opened (MT-37); a study reads the speed of acts persons start themselves, or
+  of an office held by a person (WM-18); a town's base outcomes are seen to turn on the weekly tail (missed dates).
