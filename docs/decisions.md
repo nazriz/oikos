@@ -13572,3 +13572,22 @@ before. Before, a client's code took a draft in at its next wake (news wakes it,
   fault since fixed). The first pilot's desk papers went in the provider's name and are still not read as anyone's act.
 - **Revisit if:** a body should look at who sent a paper as well as whose it is (an agent's own standing); a matter is
   withheld by some paper other than advice or a report.
+
+
+## 2026-11-14 · What the rung 1 rerun showed: a date read two ways, a draft's matter, a rule's draft told as unsure
+
+- **Read:** the rerun (runs/scope-obstacle-r1-L2-b, Haiku 5.5, 14 days at level 2, on main 618beaa4): 31 requests, 20
+  served first time. Three faults of ours, fixed: (1) a day before the start read "year -66, day 35" in what the seat
+  was handed and "year -66, day -330" in the preview of a draft and of a signed copy (the preview's date words took
+  the remainder of a negative instant): Haiku declined the pension claim four times for it; the preview now reads such
+  a day as the seat is shown it everywhere else (render.ts `moment`). (2) "Draft for sign-off ..." naming no matter was
+  drawn on the draft form and asked back for its referral twice, and at the factory a connection's id stood in the
+  referral: a record blank holding what is no record the seat may cite is left empty, and a draft naming no matter
+  takes the one matter of its paper's kind handed over by whom it is for (or the post's principal), not yet signed off
+  or declined. (3) A send drawn by rule (the request named it, the model wrote nothing it was sure of) came with the
+  model's own "Nothing was drawn up ... these blanks are still empty", and a right send was declined as "drawn up from
+  free text"; what the model was unsure of is not said of a draft the rules drew.
+- **Not ours:** the factory's two invoices were not drafted by the seat's choice: it read the buyer, the outside
+  world, as no buyer it could invoice, wrote to the manager to ask, and the manager's code does not read letters. The
+  four duplicate sends it declined (requests par.4.12 to 16) were its own retries after the unsure notices of (3).
+- **Revisit if:** a draft's matter should be one of several open of its kind (it is then asked back, as before).

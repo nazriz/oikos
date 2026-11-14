@@ -153,6 +153,8 @@ export interface FormKnowledge {
   readonly signed: ReadonlyMap<string, { [k: string]: unknown }>;
   readonly signedDraft: ReadonlyMap<string, string>;
   readonly referrals: ReadonlyMap<string, string>;
+  readonly referralKind?: ReadonlyMap<string, string>;
+  readonly answeredReferrals?: ReadonlySet<string>;
   readonly held: ReadonlySet<string>;
 }
 
@@ -286,6 +288,18 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       if (field === "referral") return [...new Set(named.filter((x) => k.referrals.has(x)))];
       return [];
     };
+    // (A record blank holding what is no record the seat may cite, a connection's id in a referral, is not filled: the
+    // rung 1 rerun, 2026-11-14.)
+    for (const field of Object.keys(fields)) if (fields[field]!.type === "record" && args[field] !== undefined && !isRecord(argText(args[field]) ?? "")) delete args[field];
+    // (A draft's matter, where the request names none: the one matter of the paper's kind handed over by whom the paper is
+    // for, or by the post's principal, not yet signed off or declined. "It was read as the draft loan application, and
+    // this blank of it is still empty: referral", twice in the rung 1 rerun.)
+    if (fields.referral && args.referral === undefined && k.referralKind) {
+      const paperKind = String(f.data?.writes?.data?.paper?.kind ?? f.data?.writes?.kind ?? "");
+      const by = argText(args.client);
+      const open = [...k.referralKind].filter(([id, kind]) => kind === paperKind && !k.answeredReferrals?.has(id) && (by === undefined || k.referrals.get(id) === by)).map(([id]) => id);
+      if (open.length === 1 && !named.some((x) => k.referrals.has(x))) args.referral = { id: open[0]! };
+    }
     for (const field of Object.keys(fields)) {
       if (fields[field]!.type !== "record") continue;
       const c = candidates(field);

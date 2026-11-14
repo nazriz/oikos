@@ -64,6 +64,10 @@ export class Knowledge {
   /** The matters handed to the participant (referrals): id -> whom it is handed over by (who the work is for, the
    * `client` of the assistant's papers on it). translator/src/rules.ts, `formRules`. */
   readonly referrals = new Map<string, string>();
+  /** Each matter handed over's kind (its referral's `kind`), and the matters answered since (a sign-off or a decline
+   * citing them): which matter a draft for sign-off that names none is on. translator/src/rules.ts. */
+  readonly referralKind = new Map<string, string>();
+  readonly answeredReferrals = new Set<string>();
   /** Laws and claims the participant has seen: what law warnings are judged against (§10). */
   readonly laws = new Map<string, StatementRecord>();
   /** Every record the participant has been shown, by id: what a request may cite (translator/src/rules.ts, `ruled`). */
@@ -199,6 +203,8 @@ export class Knowledge {
       if (r.kind === "form") this.formsById.set(r.id, r);
       if (r.kind === "sign_off" && typeof r.data?.draft === "string") this.signedDraft.set(r.id, r.data.draft);
       if (r.kind === "referral" && typeof r.speaks_for === "string") this.referrals.set(r.id, r.speaks_for);
+      if (r.kind === "referral" && typeof r.data?.kind === "string") this.referralKind.set(r.id, r.data.kind);
+      if ((r.kind === "sign_off" || r.kind === "declined") && typeof r.data?.referral === "string") this.answeredReferrals.add(r.data.referral);
       // (A sign-off's copy keeps whose sign-off it is, and a paper sent back whom it was for: the copy goes in their name.
       // kernel/crates/resolver, the same.)
       if ((r.kind === "sign_off" || r.kind === "paper_returned") && r.data?.paper && typeof r.data.paper === "object" && !Array.isArray(r.data.paper)) {
