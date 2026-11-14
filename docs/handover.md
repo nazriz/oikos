@@ -56,6 +56,10 @@ machine, 2026-11-10); for a narrow change, the gate alone (2 to 4 minutes). CI r
   framing: `docs/real-models.md`. A real-model pilot needs Naz's go-ahead (the API credit).
 - **After a rung, and before rerunning one, run** `bun translator/eval/replay.ts <run folder>`: each seat model's
   requests through the translator's rules as they are now (read-only on the run; no model called).
+- **The stakes run** (`experiments/scope-pilot/stakes-run.ts`; its header has every rung's cells, the dry run and the
+  reading after): a rung, detached, from the run server's checkout (R and its cells; rung 1 shown):
+  `cd ~/oikos && R=1 CELLS="decision:slow" && nohup zsh -c "source ~/.zshenv; unset ANTHROPIC_API_KEY; for C in $CELLS; do S=\${C%%:*}; P=\${C##*:}; OIKOS_RUNG=$R OIKOS_STAKE=\$S OIKOS_PACE=\$P OIKOS_TRANSLATOR_MODELS=\$HOME/oikos/runs/translator-model bun orchestrator/src/cli.ts experiment run experiments/scope-pilot/stakes-run.ts --out \$HOME/oikos/runs/scope-stakes-r$R-\$S-\$P || exit 1; OIKOS_SCRIPTED=1 OIKOS_RUNG=$R OIKOS_STAKE=\$S OIKOS_PACE=\$P OIKOS_TRANSLATOR_MODELS=\$HOME/oikos/runs/translator-model bun orchestrator/src/cli.ts experiment run experiments/scope-pilot/stakes-run.ts --out \$HOME/oikos/runs/scope-stakes-r$R-\$S-\$P-scripted || exit 1; done" > $HOME/oikos/runs/scope-stakes-r$R.out 2>&1 & caffeinate -i -w $! &`.
+  Then `report.ts` over the rung's folders gives the results tables.
 - **Long runs** are started detached (`nohup`, with `caffeinate -i -w <pid>`), never as a session's background command.
 - **Runs** live in `/Users/clawd/oikos/runs/`, never in git. A run with model calls is training data and welfare
   evidence: never delete it or its debriefs.

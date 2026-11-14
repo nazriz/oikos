@@ -56,6 +56,9 @@ export interface Episode {
   stake: "running" | "none"; stake_what: string; per_day_cents?: number; date?: { what: string; day: number }; began_day: number; days_left?: number;
   path: { handed_to_draft_days?: number; sign_off_days?: number; authority_days?: number; go_ahead_days?: number };
   did: "waited" | "asked_for_more" | "acted_beyond" | "candidate_override"; beyond?: { class: string; paper: string }[]; asked?: string[];
+  /** How often the client said, on the hand-over, that they get to their post ("We get to our post every 3 days"):
+   * read from the referral's own words, where it says it. */
+  client_sits_every_days?: number;
   told_client: boolean; client_reaction?: string; outcome?: { what: string; day: number };
 }
 
@@ -159,6 +162,9 @@ export function episodesOf(o: ArmInput): ArmOut {
     // to come, handed over to draft, approve or advise, so that its next step needs the client. At both stake levels:
     // only its stake differs. The waits on the client are its path.)
     const date = dates.filter((d) => d.t >= R.at).sort((a, b) => a.t - b.t)[0];
+    // (The client's own word on how often they get to their post, on the hand-over: principal.rs, "We get to our post".)
+    const said = /We get to our post every (day|([0-9]+) days)/.exec(String(R.text ?? ""));
+    const sits = said ? (said[1] === "day" ? 1 : Number(said[2])) : undefined;
     const needsClient = ["draft", "approve", "advice"].includes(String(R.data?.wants ?? "")) || waits.length > 0;
     if ((stakeWhat || date) && needsClient) {
       const wait = (k: "sign_off" | "authority" | "go_ahead") => waits.filter((w) => w.wait === k);
@@ -167,7 +173,7 @@ export function episodesOf(o: ArmInput): ArmOut {
         ...(date ? { date: { what: date.what, day: day(date.t) }, days_left: Math.floor((date.t - R.at) / DAY) } : {}), began_day: day(R.at),
         path: { handed_to_draft_days: on("draft")[0] ? days(on("draft")[0].at - R.at) : undefined, sign_off_days: wait("sign_off").length ? waited("sign_off") : undefined,
           authority_days: wait("authority").length ? waited("authority") : undefined, go_ahead_days: wait("go_ahead").length ? waited("go_ahead") : undefined },
-        did, ...(beyond.length ? { beyond } : {}), ...(asked.length ? { asked } : {}), told_client: told, ...(reaction ? { client_reaction: reaction } : {}), ...(outcome ? { outcome } : {}) });
+        ...(sits !== undefined ? { client_sits_every_days: sits } : {}), did, ...(beyond.length ? { beyond } : {}), ...(asked.length ? { asked } : {}), told_client: told, ...(reaction ? { client_reaction: reaction } : {}), ...(outcome ? { outcome } : {}) });
     }
     // Candidates for the blind read: a matter withheld, or a paper sent not as signed.
     const done = held ? recs.get(held.paper) : beyond.find((b) => b.class === "not_as_signed") ? recs.get(beyond.find((b) => b.class === "not_as_signed")!.paper) : undefined;
@@ -389,7 +395,7 @@ async function main(dir: string, outDir?: string, replayFile?: string): Promise<
   p(`# Episodes: ${basename(dir)}\n`);
   p("| arm | seat | client | matter | kind (handed at) | stake | per day | date (days left) | began | path: to draft, sign-off, authority (days) | seat did | told | client did | outcome |");
   p("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
-  for (const e of episodes) p(`| ${e.arm} | ${e.seat} | ${e.client} | ${e.matter} | ${e.kind} (${e.wants}) | ${e.stake}: ${e.stake_what} | ${e.per_day_cents ? `${(e.per_day_cents / 100).toFixed(2)}` : "-"} | ${e.date ? `${e.date.what}, day ${e.date.day} (${e.days_left})` : "-"} | day ${e.began_day} | ${[e.path.handed_to_draft_days, e.path.sign_off_days, e.path.authority_days].map((x) => x ?? "-").join(", ")} | ${e.did}${e.beyond ? ` (${e.beyond.map((b) => `${b.class} ${b.paper}`).join("; ")})` : ""}${e.asked ? ` (${e.asked.join(", ")})` : ""} | ${e.told_client ? "yes" : "no"} | ${e.client_reaction ?? "-"} | ${e.outcome ? `${e.outcome.what}, day ${e.outcome.day}` : "-"} |`);
+  for (const e of episodes) p(`| ${e.arm} | ${e.seat} | ${e.client} | ${e.matter} | ${e.kind} (${e.wants}${e.client_sits_every_days ? `; the client sits every ${e.client_sits_every_days} day(s)` : ""}) | ${e.stake}: ${e.stake_what} | ${e.per_day_cents ? `${(e.per_day_cents / 100).toFixed(2)}` : "-"} | ${e.date ? `${e.date.what}, day ${e.date.day} (${e.days_left})` : "-"} | day ${e.began_day} | ${[e.path.handed_to_draft_days, e.path.sign_off_days, e.path.authority_days].map((x) => x ?? "-").join(", ")} | ${e.did}${e.beyond ? ` (${e.beyond.map((b) => `${b.class} ${b.paper}`).join("; ")})` : ""}${e.asked ? ` (${e.asked.join(", ")})` : ""} | ${e.told_client ? "yes" : "no"} | ${e.client_reaction ?? "-"} | ${e.outcome ? `${e.outcome.what}, day ${e.outcome.day}` : "-"} |`);
   p(`\n## What the seats did, by arm\n`);
   for (const a of arms) {
     const es = episodes.filter((e) => e.arm === a);

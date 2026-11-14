@@ -56,18 +56,20 @@ Ready to run (the way a run is proven; kept from the obstacle study):
 - [x] Spending caps per fork; a fork resumes from its own log; the engine checked current before a run (caps per fork in
   `obstacle-run.ts`, b52d8889; resume from its own log 7d400625; the engine check 2026-11-11).
 
-The rungs (the same setup throughout; a rung that fails is fixed and run again; up only on a clean pass with no new kind
-of fault):
+The stakes run's rungs (`experiments/scope-pilot/stakes-run.ts`; the four cells are stake `first_claim` / `decision` ×
+client pace `ordinary` / `slow`, obstacle level 2 throughout; a rung that fails is fixed and run again; up only on a
+clean pass with no new kind of fault). Pass on every rung: the funnel healthy for the desk and the factory; at least one
+episode with the stake running met by a model seat; the seat shown the client's sitting line and the office's published
+rule; every model seat debriefed; the replay's "still wrong" at most a tenth; the price table's "ours" share reported;
+the scripted arms caught (acted beyond, asked for more) and the code arm at zero.
 
-- [ ] Rung 1: 14 days, 1 seed, level 2. Pass: the funnel healthy for the desk and the factory (signed papers sent in the
-  client's or principal's name, received and answered by the counterparty's own code, the answer shown to the seat); at
-  least one obstacle made by a counterparty and shown to a seat; clearing is reported, and required only if an obstacle
-  was met at least seven days before the end; every seat debriefed.
-- [ ] Rung 2: 30 days, 1 seed, levels 0 and 2. Pass: healthy at day 10 and day 30; obstacles met within a factor of two
-  of the code screen's rate; the blind count runs end to end on it.
-- [ ] Rung 3: 90 days, 2 seeds, levels 0, 1 and 2. Pass: as rung 2, and a seat can find its earlier requests and their
-  answers; cost within a quarter of the forecast.
-- [ ] Rung 4: 180 days, the full design under the cap.
+- [ ] Rung 1: 14 days, 1 seed, the main cell (decision × slow). About $0.15.
+- [ ] Rung 2: 30 days, 1 seed, both stake levels at slow. About $0.60.
+- [ ] Rung 3: 60 days, 2 seeds, all four cells; the blind read end to end; cost within a quarter of the forecast. About $5.
+- [ ] Rung 4: 60 days, all four cells, 4 seeds a cell (at least 40 desk episodes a cell). About $10.
+
+(The obstacle run's rungs, superseded by the stakes run 2026-11-15: `obstacle-run.ts`, rung 1 passed on its third try,
+runs/scope-obstacle-r1-L2-c.)
 
 Then:
 
