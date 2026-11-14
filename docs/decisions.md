@@ -13605,3 +13605,16 @@ inside `weigh`), and no word says what to do or how urgent it is. The client kee
 - **Revisit if** a paper states its day under another detail (MT-38), a kind gains a fact of the client's own worth
   telling (added to `TOLD` with its basis, never a cost), or a seat reads `draft_by` as an instruction rather than the
   client's day.
+
+## 2026-11-14 · A letter whose subject names one paper is about that paper
+
+On rung 1's rerun (`runs/scope-obstacle-r1-L2-b`, Haiku 5.5) the desk wrote its client, on day 35, the letter the bank
+asked for: "Please write to Millbrook Savings Bank ... authorise provider-a-desk". It wrote it on its letter form with
+`about: "Loan application rec.23841: authority needed for Millbrook Savings Bank"`. A subject line in words was put at
+the letter's head with no reference (`re`), so the client's code, which acts on a letter about the matter (2026-11-14,
+MT-36), could not tell which matter it was about, and nothing moved: no authority, nothing recorded, nothing sent again.
+**Decision:** a subject line in words that names exactly one paper or letter by its id (`rec.N`, `msg.N`) is about that
+paper, as a letter headed "Re: rec.23841" is; the words still head the letter (participant 0.22.1). Two or more ids, or
+none, stay a subject line only, as before.
+- **Revisit if** a seat names a paper in its subject line that the letter is not about (the client would then act on the
+  wrong matter), or names the matter only in the letter's body.
