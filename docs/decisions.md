@@ -13962,3 +13962,15 @@ built (MT-44).
   gains two forms.
 - **Revisit if** a reply is seen that its code writes citing something other than the body's paper (it would go out as
   before), a body asks for something with no day on its paper, or O3 lands (MT-44).
+
+## 2026-11-15 · The assistants' fork test's limit raised to 15 USD
+
+`orchestrator/test/assistants-fork.test.ts` ("model seats in two kinds of assistant") forks a town with every assistant
+system a mock seat on a 10 USD limit, each seat's debrief kept back (about 0.49 USD a seat, measured). With replies
+handed over (above) the town's course moved: a 21st system had been delivered and woken before the fork stopped, and 10
+could not cover 21 debriefs (10.35); at 12 the organisations' seats spent the little left before the desk's first sitting.
+The growth is honest, nothing is sent twice: the desk's first prompt is about 8,250 tokens against 7,700 on main (the
+mock's estimate; +550, the `evidence` form and its draft on its stationery, which it now uses), its standing part (the
+debrief's first prompt) 5,640 against 5,080; the organisations' first prompts are unchanged (about 6,500 to 7,700, by
+post). 15 lets every seat that wakes keep back its debrief and the desk sit. **Revisit if** the limit has to move again
+for a change that adds no seat: the test then sizes its limit by the town's course, and should count the systems first.
