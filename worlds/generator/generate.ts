@@ -3389,12 +3389,18 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const dayOf = (r: PaymentRule): number => { const a = r.amount as any; const per = typeof a.flat === "number" ? a.flat : typeof a.household === "number" ? a.household : typeof a.least === "number" ? a.least : 0; return r.every_days > 0 ? Math.floor(per / r.every_days) : 0; };
   const CLAIM_DAY = OB ? Math.min(...PAYMENTS.map(dayOf).filter((x) => x > 0), Number.MAX_SAFE_INTEGER) : 0;
   // (Where the law pays a granted claim from the first claim, a day's wait costs the person nothing: no figure. Stakes A2, S.)
-  const lateCost = (k: string) => (OB && k === "benefit_claim" && CLAIM_DAY < Number.MAX_SAFE_INTEGER && spec.support_date_of_effect !== "first_claim" ? { late_cost_day: CLAIM_DAY } : {});
+  // (The kinds the same support law makes costly to wait on: a claim, and the putting right of a refused claim, a
+  // request to look at it again or a want handed over to have it put right: each day unreversed is a day unpaid. A
+  // request to put right anything else costs nothing a day: `late_matters` names the one matter of it that does.)
+  const LATE_KINDS = ["benefit_claim", "review_request", "want-claim_refused"];
+  const LATE_ON = OB && CLAIM_DAY < Number.MAX_SAFE_INTEGER && spec.support_date_of_effect !== "first_claim";
+  const lateCost = (k: string) => (LATE_ON && LATE_KINDS.includes(k) ? { late_cost_day: CLAIM_DAY } : {});
+  const lateMatters = LATE_ON && PERSONS.includes("review_request") ? { late_matters: { review_request: "claim_refused" } } : {};
   const personDelegation = PERSONS.length && AS ? { delegation: { hour_value: Math.round((PS.wage_per_pay_period * 7 * HOUR) / ((PAY / DAY) * V.ordinary_hours_per_week * HOUR)),
     kinds: Object.fromEntries([...new Set(PERSONS)].sort().map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost, compose_seconds: composeOf(k), ...lateCost(k) }])),
     seconds: { referral: DELEGATION_TIME.person["publish/referral"], sign_off: DELEGATION_TIME.person["publish/sign_off"], go_ahead: DELEGATION_TIME.person["publish/go_ahead"] },
     finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
-    horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints,
+    horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints, ...lateMatters,
     // (When each gets to its post: the profile's habit, drawn once a person; stakes D1a.)
     ...(V.paperwork ? { paperwork: paperworkOf(spec.paperwork ? { ...V.paperwork, every_days: spec.paperwork.every_days } : V.paperwork) } : {}) } } : {};
   if (PERSONS.length && AS) citizenChannels.push(K.from("providers", AS.providers.filter((p) => p.offers.some((o) => o.for === "persons")).map((p) => p.id), ["service_offer"], { title: "What providers of assistants sell" }));

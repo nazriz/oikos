@@ -1035,3 +1035,10 @@ nothing new, and its saved state is as before.
   by nothing.
 - Generator only: an assistant's forms for papers in someone else's name say so in fixed words; the desk's claim form
   quotes the paying office's rule where `support_date_of_effect` is set.
+
+
+## A day's cost for putting right a refused claim (2026-11-15; docs/decisions.md, same title; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- A principal's `delegation` parameters gain `late_matters` (`kind -> matter`): a kind whose `late_cost_day` is for one
+  matter of it only (the matter word its paper's data names). The generator sets `review_request -> claim_refused`, and
+  gives `late_cost_day` to `review_request` and `want-claim_refused` beside `benefit_claim`, where a day's delay is costed.

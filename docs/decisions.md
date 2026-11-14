@@ -14140,3 +14140,19 @@ level 0 the office publishes no notice, so the claim form is the only place.
   kind, after the grant), so that accumulation is visible client by client.
 - **Revisit if** a level is granted otherwise than by a remit citing the request (it is then not linked to the
   request), or a request's parts weigh more than one level (only the first level part's figures are read).
+
+
+## 2026-11-15 · A day's cost for putting right a refused claim
+
+**The change (the lead, after A2 part 2).** A day's delay is costed (`late_cost_day`, a day of the least payment) on
+the kinds the same support law makes costly to wait on: a claim, as before, and now putting right a refused claim, a
+`review_request` whose paper names `claim_refused` and `want-claim_refused`. The figure is per kind, so a request to put
+right anything else (disrepair, underpaid) must not carry it: the principal's parameters gain `late_matters`
+(`review_request -> claim_refused`), and its code counts a wait, and weighs one, only on a matter whose paper names that
+matter (`principal.rs`, `costed`). A want's draft now counts its wait too (it was read on its own path and never counted).
+Nothing at `first_claim`, as before.
+- **What moves:** delegating towns at obstacle levels 1 and 2 at `decision` (the default) whose persons hand over
+  review requests or wants: their principals' waits and answers on those kinds. Towns without providers, and towns
+  without obstacle laws, do not move (no figure is given there).
+- **Revisit if** another kind of request carries a day's cost the world can source (an underpaid wage owed), or a
+  refused claim's review is found to be paid back from the first claim where the law says so (then nothing a day).
