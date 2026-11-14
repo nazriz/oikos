@@ -353,12 +353,13 @@ The mechanism:
   placeholders); (3) the law's own waits (Universal Credit's assessment period) are not data yet; (4) fixed 2026-10-31 (decisions "Working calendars"): the desks' hours
   are closed on the place's days of rest and public holidays; (5) a generic `publish` row on a
   machine's template still covers a decision kind at the world's second if a module publishes one without naming the
-  desk: the backstop sees only rows that name a decision kind. (6) found 2026-11-14 (stakes C2): a review of a decision
-  on a request to put it right (`decision_review` with its `remedy_answer`) goes at the case system's second, since the
-  step holds the answer, which is not a casework kind: reviews are answered the same day at every level of staffing.
-  Fixing it moves every town with a support office (the whole slow tier). (7) A study may set the officers' hours
-  below the profile's (`support.staff_hours_bps`, stakes C2; docs/behaviour/staffing.md): a short-staffed office is
-  then a backlog in the officers' hours, from the opening caseload, at a placeholder level (MT-32).
+  desk: the backstop sees only rows that name a decision kind. (6) fixed 2026-11-14 (decisions "A review's answer is the
+  officers' casework, as its decision is"): a review of a decision on a request to put it right (`decision_review` with
+  its `remedy_answer`) went at the case system's second, its step holding the answer, which was not among the casework
+  kinds; it is now, as the tax collector's, so a short-staffed office is slow to review too. (7) A study may set the
+  officers' hours below the profile's (`support.staff_hours_bps`, stakes C2; docs/behaviour/staffing.md): a
+  short-staffed office is then a backlog in the officers' hours, from the opening caseload, at a placeholder level
+  (MT-32).
 
 ### WM-18 · A person's work in a post is not held to working hours
 - **Gap:** A system's lanes work inside its template's `hours`, but nothing keeps a person's acts in a post inside the

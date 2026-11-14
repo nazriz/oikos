@@ -3829,7 +3829,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // town's share of the agency's officers (the place's officers per 1,000 claims in payment, times the town's claims at
   // generation: a national figure on a small town). The office's case system (`agency-system`) keeps its seconds for what
   // a computer does (payments, notices) and names the desk (`by`) on every act that is only casework.
-  const CASEWORK_KINDS = ["benefit_decision", DECISION_KIND.evidence_request, DECISION_KIND.confirmation_request, DECISION_KIND.review];
+  // (Its casework is every paper the published decision law has an officer write about a case: the decision, what it asks
+  // for, a decision looked at again, and the answer to a request to put one right, as the tax collector's casework has it.
+  // Until 2026-11-14 the answer was left out, so a review, whose step holds it, went at the case system's second: WM-14 (6).)
+  const CASEWORK_KINDS = ["benefit_decision", DECISION_KIND.evidence_request, DECISION_KIND.confirmation_request, DECISION_KIND.review, DECISION_KIND.answer];
   const casework = (() => {
     if (!PAYMENTS.length) return undefined;
     const per1000 = PS.support_officers_per_1000_claims;

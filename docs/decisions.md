@@ -14267,3 +14267,21 @@ their own line says it in fixed words, their own fact and nothing else: "We have
 - **Moves** every town where a person with the habit falls seriously ill while something waits in their post.
 - **Revisit if** a study needs clients away more often than illness makes them (WM-21), or the off-work severities
   change in the health model.
+
+## 2026-11-14 · A review's answer is the officers' casework, as its decision is
+
+**The law.** The support office's casework is every paper its published decision law has an officer write about a case:
+the decision, what it asks for, a decision looked at again, and now the answer to a request to put one right
+(`remedy_answer`), as the tax collector's casework already had it (`CASEWORK_KINDS`, generate.ts). The office's own rule
+is unchanged (`Casework::assign`: a step all of whose papers are casework goes to the desk); its step for a review holds
+the review, the answer and a new decision, so until now the answer kept the whole review at the case system's second
+(WM-14 (6), found with stakes C2). An answer takes the person table's row for a paper. Every town with a support office
+moves (the every-town batch, with D1b and D2).
+- **Measured** (the study town, level 2, seed 7, code arm, with D1b, D2 and C2's level; review request to the office's
+  review, the answer going with it): at 10,000, 60 days median 0.5 days, 90th percentile 0.9, longest 0.9 (8 reviews),
+  180 days 0.5, 0.9, 0.9 (13); at 3,000, 60 days 1.5, 2.9, 5.2 (10), 180 days 1.0, 2.9, 5.2 (19). Before, 0.0 at every
+  level. Claims on the same runs: at 10,000 claim to decision median 5.9 days over 60 (5.5 over 180), longer than C2's
+  1.0 because the claimant now reads the office's request for papers at a sitting (D1b); at 3,000, 12.9 over 60 and 7.5
+  over 180.
+- **Revisit if** a review in a backlog is seen to wait less than the claims around it (the desk's lane takes work in the
+  order it is ordered; the reviews measured mostly came after the opening backlog).
