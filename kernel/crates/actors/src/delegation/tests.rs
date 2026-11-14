@@ -152,6 +152,11 @@ fn a_referral_carries_the_day_its_papers_name_and_why_in_its_own_facts_and_no_fi
     let later = all(&h.wake(35 * DAY + 3600, world(vec![])));
     let line = later.lines().find(|l| l.contains("kind=referral")).unwrap_or_default().to_string();
     assert!(line.contains(&format!("\"due\":{}", 48 * DAY)), "kept in its files, the paper still names its day: {line}");
+    // (A person who gets to their post weekly, from day 3 at 19:00: their day for a draft is the last sitting that
+    // leaves their reading time before the paper's day, and none where even the next is too late.)
+    let weekly = (7, 3, 19 * 3600);
+    assert_eq!(super::principal::last_sitting(weekly, 30 * DAY, 45 * DAY, 300), Some(38 * DAY + 19 * 3600));
+    assert_eq!(super::principal::last_sitting(weekly, 30 * DAY, 31 * DAY, 300), None);
     // (Its own position: fixed words with no figure in them, never a cost worked out for it.)
     for (_, words) in super::principal::TOLD {
         assert!(!words.chars().any(|c| c.is_ascii_digit() || "$%".contains(c)) && words.matches('{').count() == words.matches('}').count(), "{words}");
@@ -348,6 +353,36 @@ fn a_body_s_paper_about_a_matter_handed_over_is_passed_on_and_no_other() {
     for (l, id) in fwd.iter().zip(["rec.dec", "rec.t1"]) {
         assert!(l.contains(&format!("basis={id}")) && l.contains(&format!("\"matter\":\"{referral}\"")) && l.contains("to=[\"ll\",\"ll-assistant\"]"), "passed on as it stands, to its assistant, naming the matter: {l}");
     }
+}
+
+/// A matter handed over stays handed over (docs/behaviour/assistants.md): a body's paper on it that asks something by a
+/// day is answered by the same assistant, under the matter's remit, the reply its own code wrote going as a referral that
+/// answers the body's paper and carries its day; a reply to a paper about no matter handed over goes as it did.
+#[test]
+fn a_reply_on_a_matter_handed_over_is_handed_over_too() {
+    // (Its notices day by day, as the others' are, so that the service pays and is taken; then its two replies.)
+    let mut script: Vec<Value> = (1..=34).map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
+    script.push(json!({ "at": 36 * DAY + 3600, "call": "statement(kind=evidence, text=\"Our papers.\", to=[\"court\"], basis=rec.ask)" }));
+    script.push(json!({ "at": 37 * DAY + 3600, "call": "statement(kind=evidence, text=\"Other papers.\", to=[\"court\"], basis=rec.other)" }));
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30 } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    let (mut h, _, remit) = engaged_on(h);
+    h.wake(34 * DAY + 3600, world(vec![remit]));
+    let referral = last_referral(&h);
+    let report = statement("rec.rep", 34 * DAY + 7200, ME, "report", &[ME], json!({ "referral": referral, "done": true, "created": { "sent0": "rec.sent" } }));
+    h.wake(34 * DAY + 7300, world(vec![report]));
+    let mut ask = statement("rec.ask", 35 * DAY, "court", "hearing_notice", &[ME], json!({ "answer_by": 45 * DAY }));
+    ask["basis"] = json!("rec.sent");
+    let other = statement("rec.other", 35 * DAY, "court", "hearing_notice", &[ME], json!({ "answer_by": 45 * DAY }));
+    h.wake(35 * DAY + 3600, world(vec![ask, other]));
+    let out = all(&h.wake(36 * DAY + 3600, world(vec![])));
+    let line = out.lines().find(|l| l.contains("kind=referral")).unwrap_or_else(|| panic!("the reply handed over: {out}"));
+    assert!(line.contains("\"kind\":\"evidence\"") && line.contains("\"reply_to\":\"rec.ask\"") && line.contains(&format!("\"follows\":\"{referral}\"")) && line.contains("\"remit\":\"rec.remit\"") && line.contains(&format!("\"due\":{}", 45 * DAY)), "under the matter's remit, with the body's day: {line}");
+    assert!(!out.lines().any(|l| l.starts_with("statement(basis=rec.ask")), "not sent by its own code: {out}");
+    let out = all(&h.wake(37 * DAY + 3600, world(vec![])));
+    assert!(out.lines().any(|l| l.contains("basis=rec.other") && l.contains("kind=evidence")) && !out.contains("kind=referral"), "a paper about no matter handed over is answered as before: {out}");
 }
 
 #[test]

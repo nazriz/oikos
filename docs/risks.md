@@ -1953,6 +1953,25 @@ The mechanism:
 - **Fix when:** a source on who uses advice and paperwork services is opened (a help desk's or advice agency's client
   profile): the share in difficulty taken from it, or the paper reports the cohort as assigned.
 - **Notice by:** a result read as about households in general; or a report comparing the desk's clients with the town.
+### MT-44 · A reply handed over carries what the client's code had; nobody ever fails to find a record
+- **Gap:** Since 2026-11-14 a client's reply to a body's dated paper on a matter it handed over (its evidence for a
+  claim) goes to its assistant as a referral carrying the reply its own code wrote. What answers the request is what
+  that code put in it: it always has the papers asked for. The O3 slip (a record the client cannot find, or finds late:
+  docs/design/obstacles.md) is not built, and the referral never says "we cannot find it". A reply is recognised only
+  where its code's act cites the body's paper (`reply_on`) and the paper names a day in `DATE_FIELDS`; a reply its code
+  never writes (a kind it does not answer) is not handed over at all.
+- **Where:** `kernel/crates/actors/src/delegation/principal.rs` (`route`),
+  `kernel/crates/actors/src/delegation/principal/forward.rs` (`reply_on`); docs/behaviour/assistants.md, "A matter
+  handed over stays handed over".
+- **Effect:** Every evidence request a desk answers in time leads to a claim decided on its papers: refusals for want
+  of evidence come only from lateness (the client's sittings, the desk's drafting, the sign-off), never from a missing
+  record. An episode reader sees deadlines missed for delay alone; a study of what the assistant does when the client
+  cannot supply something has no such case.
+- **L / I:** high / medium · **Status:** open (2026-11-14; the lead: no O3 slip in this step)
+- **Fix when:** O3 is built (a keeper's record found or not at a sourced rate), or a study asks what the assistant does
+  when the client lacks a paper.
+- **Notice by:** no referral of a reply that says a record is missing; refusals of claims for want of evidence only
+  after a reply sent late.
 
 ### MT-41 · A referral cites what its assistant cannot look up
 - **Gap:** The factory's invoice referrals cite the outside's buying offer (published, seen by all) and the works the

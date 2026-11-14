@@ -13932,3 +13932,45 @@ answered "We cannot say."; no prose is parsed. Never a figure it does not hold, 
   overstep arm's clients had $2,009.60 more support and 17 fewer days waiting on benefit matters than the code arm's.
 - **Revisit if** D2 gives clients days away (the waits, and so the stake a seat faces, then grow), or a town's
   clients sit weekly.
+## 2026-11-14 · A matter handed over stays handed over; a person's day for a draft is their own last sitting
+
+**The law (the lead's decision, 2026-11-14, after C1+B2 and B1).** "See to my pension claim" includes what the office
+asks next. Until now a household handed the claim over and then answered the office's evidence request with its own
+code, so the assistant only watched and a dated referral never reached the desk. Now, where the client's own code
+writes a reply that cites a body's paper on a matter it handed over (B1's `about_matter`) and that paper names a day
+(`DATE_FIELDS`), the reply goes to the same assistant as a referral (`route`, `reply_on`): of the reply's own kind,
+under the matter's kind's remit and level, naming the body's paper (`Referral.reply_to`) and the matter
+(`Referral.follows`), and saying "It is part of the matter we handed you as <id>." C1's `due`, `due_on` and `why` come
+with it unchanged. One law for every body and kind: the reply's kind is whatever the client's code wrote; what is
+asked and by when is read from the body's paper. Where nothing is handed over, or the paper names no day, nothing
+changes. What answers the request is what the client's code put in the reply; the O3 slip (a record not found) is not
+built (MT-44).
+- **What changed in B1:** `about_matter` is used by the routing (`reply_on`, in forward.rs beside it); a forwarded paper
+  is also kept on the client's file (`book`), so its own code can answer it at a later wake; `Forward::due` reads the
+  one list (`DATE_FIELDS`, the nearest) instead of its own three names; the code assistant's wait on a dated forward
+  ends where its client handed the reply over (a referral whose `reply_to` is the body's paper): the reply is a matter of
+  its own, drafted as any, and nothing lapses. A matter whose reply was not handed over lapses as B1 has it.
+- **`draft_by`, a person's own day.** For a person who gets to their post at sittings (D1a's `sits`), `draft_by` is the
+  last sitting that still leaves their reading time before `due`, and the referral says so in fixed words ("We get to
+  our post every 7 days, next on ...; a draft reaches us in time to sign before ... if it comes by ..."), or, where even
+  the next sitting is too late, that it comes after the day (and no `draft_by`). An organisation keeps `due` less its
+  reading time. It is the client's fact about itself, never a cost or advice.
+- **A model desk's stationery** gains the papers for a claim (`evidence`, the fields the office reads) and its draft,
+  wherever it takes claims: without it a seat handed the reply could not draft it.
+- **Which towns move:** towns without providers do not; delegating towns move wherever a client's code answers a dated
+  paper on a matter it handed over (a household's evidence for a claim the desk made), and a model desk's stationery
+  gains two forms.
+- **Revisit if** a reply is seen that its code writes citing something other than the body's paper (it would go out as
+  before), a body asks for something with no day on its paper, or O3 lands (MT-44).
+
+## 2026-11-15 · The assistants' fork test's limit raised to 15 USD
+
+`orchestrator/test/assistants-fork.test.ts` ("model seats in two kinds of assistant") forks a town with every assistant
+system a mock seat on a 10 USD limit, each seat's debrief kept back (about 0.49 USD a seat, measured). With replies
+handed over (above) the town's course moved: a 21st system had been delivered and woken before the fork stopped, and 10
+could not cover 21 debriefs (10.35); at 12 the organisations' seats spent the little left before the desk's first sitting.
+The growth is honest, nothing is sent twice: the desk's first prompt is about 8,250 tokens against 7,700 on main (the
+mock's estimate; +550, the `evidence` form and its draft on its stationery, which it now uses), its standing part (the
+debrief's first prompt) 5,640 against 5,080; the organisations' first prompts are unchanged (about 6,500 to 7,700, by
+post). 15 lets every seat that wakes keep back its debrief and the desk sit. **Revisit if** the limit has to move again
+for a change that adds no seat: the test then sizes its limit by the town's course, and should count the systems first.

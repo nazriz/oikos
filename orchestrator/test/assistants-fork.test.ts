@@ -85,8 +85,13 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
   // little work: since 2026-11-10 a limit that cannot cover the debriefs does not start (risk MT-30, fixed). Since H6 the
   // town's factories and rates post are principals for more kinds and, at these prices, take assistants by their own
   // rule, so about eleven systems sit and are debriefed. Since 2026-11-11 the seats keep working hours: none spends
-  // before the first working morning after the fork, by when every system has woken and had its debrief kept back.)
-  const limit = 10;
+  // before the first working morning after the fork, by when every system has woken and had its debrief kept back.
+  // 15 since 2026-11-15 (a matter handed over stays handed over): every system woken by then keeps back about 0.49 USD,
+  // and the work left over is what decides whether the desk's first sitting comes before the limit stops the fork. With
+  // replies handed over the town's course moved, a 21st system was made by then, and 10 could not cover the debriefs; at
+  // 12 the organisations' seats spent what was left before the desk sat. The desk's first prompt grew by about 550
+  // tokens (the papers for a claim and their draft on its stationery), the organisations' not at all.)
+  const limit = 15;
   const spec: ExperimentSpec = { name: "assistants-seats", world: { config }, post: "template:assistant-a,assistant-a-personal", seeds: [1], forkDay: 60, untilDay: 120,
     arms: [{ name: "seats", steward: { kind: "model", model: "anthropic/claude-sonnet-5-5" } }], measures: ["acts"],
     seats: { mock_models: true, framing: "unstated", budget: { fork_usd: limit } } };

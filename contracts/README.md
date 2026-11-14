@@ -997,3 +997,14 @@ unchanged to the byte.
 - The assistants' stationery gains the form `question_to_client` (where a model sits in an assistant seat).
 - The table of work gains `person.publish/question_answer` (300 seconds, a placeholder), and the assistants' templates
   `publish/question` at their paper's seconds, where a town has providers.
+
+## Stakes: a matter handed over stays handed over (2026-11-14; docs/decisions.md, "A matter handed over stays handed over"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additions with defaults, left out when empty.
+
+- `Referral.reply_to` (the body's paper a reply answers) and `Referral.follows` (the referral of the matter handed over
+  that the reply is part of): a reply the client's own code wrote on a matter it handed over goes to the same assistant
+  as a referral of its own kind, under the matter's remit.
+- `Forward.due()` reads `DATE_FIELDS` (the nearest day), as a referral's `due` does.
+- A model desk's stationery: the form `evidence` (papers for a claim, in a client's name: `office`, `request`, `claim`,
+  `need`, `last_employer`) and its draft, where the desk takes claims (generator only).

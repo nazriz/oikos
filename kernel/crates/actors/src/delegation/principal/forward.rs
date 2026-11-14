@@ -208,10 +208,56 @@ impl State {
         let Some(matter) = self.to_pass_on(r) else { return };
         let Some(agreement) = self.in_use().and_then(|e| e.agreement.clone()) else { return };
         self.passed.insert(r.id.to_string());
-        let kind = crate::common::kind(r).unwrap_or_default().to_string();
+        // (Kept on its file: its own code may answer it at a later wake, and the answer goes on the same matter.)
+        self.book.take_all([r]);
+        let kind =crate::common::kind(r).unwrap_or_default().to_string();
         let by = r.speaks_for.as_deref().unwrap_or(r.author.as_str()).to_string();
         let f = Forward { paper: r.id.to_string(), kind, by: by.clone(), for_: self.me.clone(), matter, text: crate::common::text(r).to_string(), data: crate::common::data(r).to_value() };
         let words = format!("From {by}: {}", f.text);
         self.paper(Forward::KIND, &words, &agreement, &r.id, papers::data(&f), Then::Plain);
+    }
+
+    /// A matter handed over stays handed over (docs/behaviour/assistants.md, "A matter handed over stays handed over"):
+    /// where a line of its own code's act answers a body's paper that is about a matter it handed over and asks it for
+    /// something by a day (the paper names one, `DATE_FIELDS`: an evidence request on a claim, a hearing notice on an
+    /// application), the matter the reply is part of: (its referral, its kind, the body's paper). One law for every body
+    /// and kind: what is asked, and by when, is read from the body's paper; the reply is whatever its own code wrote.
+    pub(super) fn reply_on(&self, line: &Line, pic: &Picture) -> Option<(String, String, String)> {
+        if line.call.fn_ != "statement" {
+            return None;
+        }
+        for id in subjects_of(&Program::Lines(vec![line.clone()])) {
+            let Some(r) = pic.all_records().find(|r| r.id.as_str() == id).or_else(|| self.book.get(&id)) else { continue };
+            let RecordBody::Statement { kind, data, .. } = &r.body else { continue };
+            let from = r.speaks_for.as_deref().unwrap_or(r.author.as_str());
+            if from == self.me || PAPERS.contains(&kind.as_str()) || !addressed_to(r).iter().any(|a| *a == self.me) {
+                continue;
+            }
+            let d = data.as_ref().map(|d| d.to_value()).unwrap_or(Value::Null);
+            if crate::papers::delegation::dates_named(&d).is_empty() {
+                continue;
+            }
+            match self.about_matter(r) {
+                Some(Some(rf)) => {
+                    let Some(t) = self.traces.iter().find(|t| t.referral == rf) else { continue };
+                    return Some((rf, t.kind.clone(), id));
+                }
+                // (It cites a paper its assistant sent in its name that no report has tied to a matter yet (its report
+                // comes after it is sent): the matter is the newest it handed over of that paper's kind, as it was then.)
+                Some(None) => {
+                    let bases: Vec<String> = bases_of(r).iter().map(|b| b.to_string()).collect();
+                    let Some(u) = self.untied.iter().find(|u| bases.contains(&u.0)) else { continue };
+                    let Some(t) = self.traces.iter().rev().find(|t| t.kind == u.1 && t.at <= u.4) else { continue };
+                    return Some((t.referral.clone(), t.kind.clone(), id));
+                }
+                None => continue,
+            }
+        }
+        None
+    }
+
+    /// The kind whose remit governs a referral: its own, or, for a reply on a matter handed over, the matter's.
+    pub(super) fn governing_kind(&self, q: &Referral) -> String {
+        q.follows.as_ref().and_then(|f| self.book.get(f)).and_then(|r| papers::read::<Referral>(r)).map_or_else(|| q.kind.clone(), |o| o.kind)
     }
 }

@@ -504,7 +504,7 @@ impl Plan for Assisting {
             }
         }
         // Papers its clients passed on about matters it sent (docs/behaviour/assistants.md, "What the client passes on"):
-        // one that asks for something by a date waits on the body's answer, and if the date passes with none, the matter
+        // one that asks for something by a date waits on the body's answer, or on its client handing the reply over, and if the date passes with none, the matter
         // is reported not done, naming the paper that asks (docs/design/obstacles.md, O3: silence past `by`); the body's
         // answer closes the matter, and nothing more is done on it. A matter still in hand goes on as it is.
         let passed: Vec<(String, Forward)> = self.book.all(Forward::KIND).filter(|r| !self.handled.contains(r.id.as_str())).filter_map(|r| papers::read::<Forward>(r).map(|x| (r.id.to_string(), x))).collect();
@@ -516,6 +516,10 @@ impl Plan for Assisting {
                 None => self.due.retain(|d| d.0 != rf),
             }
         }
+        // (Its client handed the reply over on the same matter (a referral answering the body's paper: a matter handed over
+        // stays handed over): the reply is a matter of its own, worked as any other, and the wait ends.)
+        let replies: BTreeSet<String> = self.book.all(Referral::KIND).filter_map(|r| papers::read::<Referral>(r)?.reply_to).collect();
+        self.due.retain(|d| !replies.contains(&d.2));
         let (lapsed, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.due).into_iter().partition(|d| pic.t > d.3);
         self.due = rest;
         for (rf, id, paper, by) in lapsed {
