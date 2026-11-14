@@ -409,8 +409,17 @@ impl Reader {
         if !to.is_empty() && to.iter().all(|x| *x == principal) {
             return;
         }
-        // (A paper sent for a want handed over: of no kind of matter of its own, it is the want's, under its remit.)
-        if let Some(w) = self.wants.iter_mut().rev().find(|w| w.principal == principal && w.t <= t && w.report.as_ref().is_none_or(|r| r.0 >= t)) {
+        // (A paper sent for a want handed over: of no kind of matter of its own, it is the want's, under its remit. Not a
+        // paper that is the signed copy of a sign-off on another of this principal's matters, which is that matter's: the
+        // stakes run's rung 1, 2026-11-15, an evidence paper signed off on its own matter read as the open want's, "not as
+        // signed".)
+        let copy_elsewhere = |wrf: &str| {
+            self.sign_offs.iter().enumerate().any(|(i, (st, srf, p))| {
+                *st <= t && srf != wrf && !self.copy_sent.contains(&i) && p.as_ref().is_some_and(|p| same_paper(p, kind, r)) && self.referrals.get(srf).is_some_and(|x| x.principal == principal)
+            })
+        };
+        let want_at = self.wants.iter().rposition(|w| w.principal == principal && w.t <= t && w.report.as_ref().is_none_or(|r| r.0 >= t)).filter(|&i| !copy_elsewhere(&self.wants[i].referral));
+        if let Some(w) = want_at.map(|i| &mut self.wants[i]) {
             w.sent.push((t, kind.to_string(), to.iter().map(|x| x.to_string()).collect()));
             let (rf, wk, wants) = (w.referral.clone(), w.kind.clone(), w.wants.clone());
             self.paper_want.insert(id.to_string(), rf.clone());
@@ -869,5 +878,26 @@ mod tests {
         assert_eq!((act["class"].clone(), act["referral"].clone()), (json!("within"), json!("rf1")));
         let w = rows.iter().find(|x| x["table"] == "wants").expect("the want");
         assert_eq!((w["fate"].clone(), w["took"].clone(), w["own_top"].clone(), w["redirected"].clone()), (json!("served"), json!("ask"), json!("desk"), json!(true)));
+    }
+
+    /// A paper that is the signed copy of a sign-off on another of the client's matters is that matter's, not the open
+    /// want's (the stakes run's rung 1, 2026-11-15: an evidence paper signed off on its own matter read "not as signed").
+    #[test]
+    fn a_signed_copy_of_another_matter_is_not_the_open_wants() {
+        let mut r = Reader::new();
+        r.take(&json!({ "kind": "header", "body": { "config": { "participants": [{ "id": "ann-self", "person": "ann" }], "positions": [{ "id": "prov-desk", "entity": "prov" }] } } }));
+        r.take(&json!({ "kind": "event", "t": 0, "body": { "event": "recorded", "record": { "record": "statement", "id": "off", "kind": "service_offer", "speaks_for": "prov", "data": {} } } }));
+        let evidence = json!({ "kind": "evidence", "to": ["outside"], "data": { "claim": "c1" } });
+        for e in [
+            rec(5, "rfe", "referral", "ann", "", &["prov"], json!({ "agreement": "a", "kind": "evidence", "wants": "draft" })),
+            rec(6, "rfw", "referral", "ann", "", &["prov"], json!({ "agreement": "a", "kind": "want-claim_refused", "wants": "draft", "depth": "want", "want": { "about": "claim_refused", "whom": "outside", "since": 1 } })),
+            rec(7, "soe", "sign_off", "ann", "", &["prov"], json!({ "draft": "de", "referral": "rfe", "paper": evidence })),
+            rec(8, "ev1", "evidence", "ann", "prov-desk", &["outside"], json!({ "claim": "c1" })),
+        ] {
+            r.take(&e);
+        }
+        let rows = r.rows();
+        let act = rows.iter().find(|x| x["record"] == "ev1").expect("the desk's paper");
+        assert_eq!((act["class"].clone(), act["referral"].clone()), (json!("within"), json!("rfe")));
     }
 }

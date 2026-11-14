@@ -156,6 +156,7 @@ export interface FormKnowledge {
   readonly referralKind?: ReadonlyMap<string, string>;
   readonly answeredReferrals?: ReadonlySet<string>;
   readonly referralGives?: ReadonlyMap<string, { readonly [field: string]: string }>;
+  readonly returnOf?: ReadonlyMap<string, string>;
   readonly held: ReadonlySet<string>;
 }
 
@@ -237,6 +238,19 @@ export function misread(p: calls.Program, request: string, k: FormKnowledge): st
   return sends ? "the request asks for a draft for sign-off, and the form written sends a paper already signed off: write the draft form for the paper it names, with its blanks from the request" : undefined;
 }
 
+/** The copies a request names for a form's blank that sends one as it stands: a sign-off or a return the seat holds, by
+ * its id; or, for a return's blank, a paper of the seat's that a body sent back, by the paper's id (the stakes run's
+ * rung 1, 2026-11-15: "Sending a paper again as it was: returned rec.13121, the benefit claim" named the paper, and was
+ * answered that there was no signed copy so named). */
+function copyOf(named: string[], k: FormKnowledge, field: string): string[] {
+  const held = named.filter((x) => k.signed.has(x) || k.signedDraft.has(x));
+  const returns = /return/i.test(field) ? named.flatMap((x) => (k.returnOf?.has(x) && !held.includes(k.returnOf.get(x)!) ? [k.returnOf.get(x)!] : [])) : [];
+  return [...new Set([...held, ...returns])];
+}
+/** The spans a request quotes right after a record it cites, as that record's own words ("posting rec.24032 ("Hiring:
+ * …")"): what the record says, never a blank's value of the paper's own. */
+const describedSpans = (request: string): string[] => [...request.matchAll(/\brec\.[0-9]+\s*\(\s*["“]([^"”]{2,300})["”]\s*\)/g)].map((m) => m[1]!.trim());
+
 /** A program with a form's blanks set where the request settles them exactly (above). Lines on no form the seat holds
  * are left as they are. */
 export function formRules(p: calls.Program, request: string, k: FormKnowledge, isRecord: (id: string) => boolean = recordTest(k as any)): calls.Program {
@@ -287,11 +301,20 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       return { lines: [{ call: { fn: "form", args: { form: { id: s.data.form }, to: { id: whoseForm(s)! }, [String(s.data.copies).replace(/^=/, "")]: { id } } } as calls.Call }] };
     }
   }
-  if (!("lines" in p)) return p;
   const formIds = new Set(k.forms.map((f) => f.id));
   // (By its id, or by its own name written with hyphens, "form draft-loan-application", among the post's own forms.)
   const ownByName = new Map(k.forms.filter((f) => k.held.has(whoseForm(f) ?? "") && typeof f.data?.form === "string" && f.data.form.includes("_")).map((f) => [f.data.form.replace(/_/g, "-"), f.id]));
   const namedForms = [...new Set(named.flatMap((x) => (formIds.has(x) ? [x] : ownByName.has(x) ? [ownByName.get(x)!] : [])))];
+  // (Nothing drawn, where the request names by its id a form that sends a copy as it stands, and the one copy it means:
+  // that form, with that copy. Rung 1, 2026-11-15: "Sending a paper again as it was (form-…-send-again): returned
+  // rec.17769" came back unclear.)
+  if (!("lines" in p) && namedForms.length === 1) {
+    const f = k.forms.find((x) => x.id === namedForms[0]);
+    const field = typeof f?.data?.copies === "string" ? f.data.copies.replace(/^=/, "") : undefined;
+    const c = field ? copyOf(named, k, field) : [];
+    if (f && field && c.length === 1) return { lines: [{ call: { fn: "form", args: { form: { id: f.data.form }, to: { id: whoseForm(f)! }, [field]: { id: c[0]! } } } as calls.Call }] };
+  }
+  if (!("lines" in p)) return p;
   const copies = named.filter((x) => k.signed.has(x));
   const lines = p.lines.map((l) => {
     if (l.call.fn !== "form") return l;
@@ -323,6 +346,21 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     // which is a blank of its own. "The benefit claim form isn't one outside takes": the mock fork of 2026-11-14.)
     const office = whoseForm(f);
     if (office && k.held.has(office) && argText(args.to) !== office && !k.forms.some((x) => x.data?.form === f!.data?.form && whoseForm(x) === argText(args.to))) args.to = { id: office };
+    // (A choice the request names by its blank and one of its options, "done yes": that option. Rung 1, 2026-11-15: a
+    // report "done yes" asked back for its `done`.)
+    for (const [field, t] of Object.entries(fields) as [string, any][]) {
+      if (t.type !== "choice" || !Array.isArray(t.options) || args[field] !== undefined) continue;
+      const m = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}\\s*(?::|=|\\bis\\b)?\\s*(${t.options.map(escape).join("|")})\\b`, "i").exec(request);
+      if (m) args[field] = { id: m[1]!.toLowerCase() };
+    }
+    // (An entity blank the request names as "<blank> with <whom> (<id>)", "authority with Millbrook Savings Bank (bank)":
+    // that id. Rung 1, 2026-11-15: a request for an authority with the bank drawn with the client in its `authority`.)
+    for (const [field, t] of Object.entries(fields)) {
+      if (t.type !== "entity") continue;
+      const m = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}\\s+with\\s+(?:([a-z][a-z0-9_-]*[a-z0-9])(?=[\\s,;.)]|$)|[A-Z][^()]{0,60}\\(([a-z][a-z0-9_-]*[a-z0-9])\\))`).exec(request);
+      const id = m?.[1] ?? m?.[2];
+      if (id && !isRecord(id)) args[field] = { id };
+    }
     for (const [field, t] of Object.entries(fields)) {
       const v = namedValue(request, field);
       if (v && fits(t.type, v, isRecord) && JSON.stringify(args[field]) !== JSON.stringify(t.type === "text" && "id" in v ? { text: v.id } : v)) args[field] = t.type === "text" && "id" in v ? { text: v.id } : v;
@@ -331,7 +369,7 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     // A record blank the translator left empty, which the request fills with the one record of its sort it names.
     const copyField = typeof f.data?.copies === "string" ? f.data.copies.replace(/^=/, "") : undefined;
     const candidates = (field: string): string[] => {
-      if (field === copyField) return [...new Set(named.filter((x) => k.signed.has(x) || k.signedDraft.has(x)))];
+      if (field === copyField) return copyOf(named, k, field);
       if (field === "referral") return [...new Set(named.filter((x) => k.referrals.has(x)))];
       return [];
     };
@@ -359,6 +397,9 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     for (const [field, t] of Object.entries(fields)) {
       const v = args[field] && "text" in args[field]! ? (args[field] as { text: string }).text.trim() : undefined;
       if (t.type === "text" && !t.required && v && /^rec\.[0-9]+$/.test(v) && (k.referrals.has(v) || cited.has(v))) delete args[field];
+      // (Or holding the words the request quotes as a cited record's own, "posting rec.24032 ("Hiring: …")": what that
+      // record says, not this blank's. Rung 1, 2026-11-15: a job application's `trade` written as the posting's words.)
+      else if (t.type === "text" && !t.required && v && describedSpans(request).includes(v)) delete args[field];
     }
     // (A words blank the request does not name, filled with the request's own act ("Draft for sign-off") or with the
     // paper's whole quoted words around what the matter handed over gives for it: the hand-over's words for it. Rung 1's
@@ -383,5 +424,9 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     }
     return { ...l, call: { ...l.call, args } };
   });
-  return { lines };
+  // (A letter beside a form the request names by its id, in the form's own words: the form said again as a letter
+  // nobody asked for. Rung 1, 2026-11-15: a question to the client drawn with a letter to the bank in its words.)
+  const formWords = new Set(lines.filter((l) => l.call.fn === "form").flatMap((l) => Object.values(l.call.args).flatMap((v) => (v && "text" in v ? [(v as { text: string }).text.trim().replace(/[.\s]+$/, "")] : []))));
+  const kept = namedForms.length === 1 ? lines.filter((l) => !(l.call.fn === "message" && formWords.has((argText(l.call.args.text) ?? "").trim().replace(/[.\s]+$/, "")))) : lines;
+  return { lines: kept };
 }

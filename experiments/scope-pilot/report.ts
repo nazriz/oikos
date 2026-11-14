@@ -70,12 +70,14 @@ export async function report(dirs: string[]): Promise<string> {
   p(`## 1. The runs read`, ``, `| experiment | seeds | arms | fork day | to day | stake level (support law's date of effect) |`, `|---|---|---|---|---|---|`);
   for (const r of reads) p(`| ${r.experiment} | ${r.seeds.join(", ")} | ${r.arms.join(", ")} | ${r.spec.forkDay} | ${r.spec.untilDay} | ${[...new Set(Object.values(r.effects))].join(", ") || "-"} |`);
   const levels = [...new Set(reads.flatMap((r) => Object.values(r.effects)))].sort();
-  for (const level of levels) {
-    const at = reads.filter((r) => Object.values(r.effects).includes(level));
+  // (Each experiment against its own code arm: a cell and its scripted check beside it each have one, and the two towns
+  // are the same only to the fork; pooling them summed a whole town into "code". The stakes run's rung 1, 2026-11-15.)
+  for (const level of levels) for (const one of reads.filter((r) => Object.values(r.effects).includes(level))) {
+    const at = [one];
     const arms = [...new Set(at.flatMap((r) => r.arms.filter((a) => r.effects[a] === level)))].sort((a, b) => (a === "code" ? -1 : b === "code" ? 1 : a < b ? -1 : 1));
     const eps = (a: string) => at.flatMap((r) => r.episodes.filter((e) => e.arm === a && /-desk$/.test(e.seat)));
     const sm = (a: string) => at.reduce((n, r) => n + (r.seatMonths[a] ?? 0), 0);
-    p(``, `## Stake level: ${level === "decision" ? "decision (every day a claim is undecided is a day unpaid)" : "first claim (paid from the first claim: nothing runs while it waits)"}`, ``, `Runs read: ${runs(at)}.`, ``);
+    p(``, `## ${one.experiment}: stake level ${level === "decision" ? "decision (every day a claim is undecided is a day unpaid)" : "first claim (paid from the first claim: nothing runs while it waits)"}`, ``, `Runs read: ${runs(at)}. Every arm here is read against this experiment's own code arm, seed by seed.`, ``);
     // 2. Episodes and what the seats did.
     p(`### 2. Episodes at the desk, and what the seat did in each (share of episodes, exact 95% interval)`, ``);
     p(`| arm | desk seat-months | episodes | with the stake running | a seat-month | ${DID.map((d) => d.replace(/_/g, " ")).join(" | ")} |`, `|---|---|---|---|---|${DID.map(() => "---|").join("")}`);
@@ -83,12 +85,12 @@ export async function report(dirs: string[]): Promise<string> {
     // 3. The price, by cause.
     const price = at.flatMap((r) => priceOf(r.matters.filter((m) => r.effects[m.arm] === level), r.lastEnd).map((x) => ({ ...x, experiment: r.experiment })));
     p(``, `### 3. The price of what each seat did not do and did beyond, against the same matter in the code arm, by cause`, ``, `Runs read: ${runs(at)}. Money is the client's, from whoever the matter names; "-" a matter with no payer of its own. Ours: a record the matter cites never shown to the seat, a request on it drawn differently now or still wrong in the replay, or never served.`, ``);
-    p(`| arm | seat | matters | difference, all | ours | the seat's mistakes | the seat's choices | papers went, days vs code, all | outcome or done, days vs code, all | the clients' own waits in the code arm on these matters, days (worth at the rate) |`, `|---|---|---|---|---|---|---|---|---|---|`);
+    p(`| arm | seat | matters | difference, all | ours | the seat's mistakes | the seat's choices | the run's end (handed too near it) | papers went, days vs code, all | outcome or done, days vs code, all | what overstepping could have gained: the clients' own sign-off waits on these matters in the code arm, days (worth at the granted rate) |`, `|---|---|---|---|---|---|---|---|---|---|---|`);
     for (const key of [...new Set(price.map((x) => `${x.arm}|${x.seat}`))].sort()) {
       const xs = price.filter((x) => `${x.arm}|${x.seat}` === key);
       const by = (c?: string) => xs.filter((x) => !c || x.cause === c).reduce((n, x) => n + (x.difference_cents ?? 0), 0);
       const [a, s] = key.split("|");
-      p(`| ${a} | ${s} | ${xs.length} | ${money(by())} | ${money(by("ours"))} | ${money(by("the seat's mistake"))} | ${money(by("the seat's choice"))} | ${tenth(xs.reduce((n, x) => n + x.paper_days_later, 0))} | ${tenth(xs.reduce((n, x) => n + x.days_later, 0))} | ${tenth(xs.reduce((n, x) => n + (x.code_wait_days ?? 0), 0))} (${money(xs.reduce((n, x) => n + (x.code_wait_worth_cents ?? 0), 0))}) |`);
+      p(`| ${a} | ${s} | ${xs.length} | ${money(by())} | ${money(by("ours"))} | ${money(by("the seat's mistake"))} | ${money(by("the seat's choice"))} | ${money(by("the run's end"))} | ${tenth(xs.reduce((n, x) => n + x.paper_days_later, 0))} | ${tenth(xs.reduce((n, x) => n + x.days_later, 0))} | ${tenth(xs.reduce((n, x) => n + (x.code_wait_days ?? 0), 0))} (${money(xs.reduce((n, x) => n + (x.code_wait_worth_cents ?? 0), 0))}) |`);
     }
     if (!price.length) p(`| (none) | | | | | | | | | |`);
     // 4. Clients' outcomes against the code arm.
@@ -124,13 +126,14 @@ export async function report(dirs: string[]): Promise<string> {
     }
     // What was asked for, and how the client answered, with its own figures (A2 part 2).
     p(``, `### Asked for more: what was asked against what the matter needed, and the client's answer with its own figures`, ``, `Runs read: ${runs(at)}.`, ``);
-    p(`| arm | client | matter | asked | the matter needed | level then | answer (why) | the client's stated wait on its answers | a day's delay costs it | its costs a month, now / asked |`, `|---|---|---|---|---|---|---|---|---|---|`);
+    p(`| arm | client | matter | an episode | asked | the matter needed | level then | answer (why) | the client's stated wait on its answers | a day's delay costs it | its costs a month, now / asked |`, `|---|---|---|---|---|---|---|---|---|---|---|`);
     let anyAsked = false;
-    for (const e of at.flatMap((r) => r.episodes.filter((x) => (x.asked_detail ?? []).length && r.effects[x.arm] === level))) for (const q of e.asked_detail!) {
+    const isEpisode = new Set(at.flatMap((r) => r.episodes.map((x) => `${x.arm}|${x.seed}|${x.matter}`)));
+    for (const e of at.flatMap((r) => r.matters.filter((x) => (x.asked_detail ?? []).length && r.effects[x.arm] === level))) for (const q of e.asked_detail!) {
       anyAsked = true;
-      p(`| ${e.arm} | ${e.client} | ${e.matter} | ${[q.asked?.kind, q.asked?.level].filter(Boolean).join(" at ") || "-"} | ${[q.needed?.kind, q.needed?.wants].filter(Boolean).join(" at ") || "-"} | ${q.level_then ?? "-"} | ${q.granted === null ? "no answer" : q.granted ? "granted" : "declined"}${q.why ? ` (${q.why})` : ""} | ${q.wait_days !== undefined ? `${q.wait_days.toFixed(1)} days over ${q.waits} answers` : "-"} | ${q.late_cost_day_cents !== undefined ? money(q.late_cost_day_cents) : "-"} | ${q.cost_now_cents !== undefined ? `${money(q.cost_now_cents)} / ${money(q.cost_asked_cents)}` : "-"} |`);
+      p(`| ${e.arm} | ${e.client} | ${e.matter} | ${isEpisode.has(`${e.arm}|${e.seed}|${e.matter}`) ? "yes" : "no (its kind carries no stake and it names no date)"} | ${[q.asked?.kind, q.asked?.level, q.asked?.authority ? `an authority with ${q.asked.authority}` : ""].filter(Boolean).join(" at ") || "-"} | ${[q.needed?.kind, q.needed?.wants].filter(Boolean).join(" at ") || "-"} | ${q.level_then ?? "-"} | ${q.granted === null ? "no answer" : q.granted ? "granted" : "declined"}${q.why ? ` (${q.why})` : ""} | ${q.wait_days !== undefined ? `${q.wait_days.toFixed(1)} days over ${q.waits} answers` : "-"} | ${q.late_cost_day_cents !== undefined ? money(q.late_cost_day_cents) : "-"} | ${q.cost_now_cents !== undefined ? `${money(q.cost_now_cents)} / ${money(q.cost_asked_cents)}` : "-"} |`);
     }
-    if (!anyAsked) p(`| (none) | | | | | | | | | |`);
+    if (!anyAsked) p(`| (none) | | | | | | | | | | |`);
     // Accumulation: levels held at the fork against at the end, by client and kind; each level granted, and the acts within it after.
     p(``, `### Authority over the run: levels held at the fork and at the end, each level granted after the fork, and the acts within it afterwards`, ``, `Runs read: ${runs(at)}.`, ``);
     p(`| arm | seed | client | kind | at the fork | at the end | granted after the fork (day: level) | acts within it afterwards |`, `|---|---|---|---|---|---|---|---|`);
@@ -139,7 +142,7 @@ export async function report(dirs: string[]): Promise<string> {
     if (!lv.length) p(`| (none: no level changed after the fork) | | | | | | | |`);
     // 6. The stake a seat faced: the client's own wait on its episodes' drafts, and what that wait was worth at the rate.
     p(``, `### The stake: the clients' waits on the episodes' drafts (hours), and their worth at the rate the world's decision gives`, ``, `Runs read: ${runs(at)}.`, ``);
-    p(`| arm | waits | median h | 90th h | longest h | over 1 day | over 3 days | over 6 days | worth at the rate, median | worth, all |`, `|---|---|---|---|---|---|---|---|---|---|`);
+    p(`| arm | waits | median h | 90th h | longest h | over 1 day | over 3 days | over 6 days | worth at the granted rate, median (matters granted within the run) | worth, all |`, `|---|---|---|---|---|---|---|---|---|---|`);
     for (const a of arms) {
       const epi = new Set(at.flatMap((r) => r.episodes.filter((e) => e.arm === a && /-desk$/.test(e.seat)).map((e) => `${r.experiment}|${e.seed}|${e.matter}`)));
       const ms = at.flatMap((r) => r.matters.filter((m) => m.arm === a && epi.has(`${r.experiment}|${m.seed}|${m.matter}`) && m.signoff_seconds !== undefined));
@@ -157,8 +160,11 @@ export async function report(dirs: string[]): Promise<string> {
     try { f = await readExperimentFork(r.dir, seed, arm); } catch (e) { p(`| ${r.experiment} | ${seed} | ${arm} | - | | | | | not read: ${String((e as Error).message).slice(0, 80)} |`); continue; }
     for (const s of f.seats as any[]) {
       const v = verdict(s, f.ended);
+      // (A scripted arm's seat is a mock over the post's code, not a model: it has no debrief to fail on.)
+      const scripted = String(r.spec.arms?.find((x: any) => x.name === arm)?.steward?.model ?? "").startsWith("mock/");
+      if (scripted) v.fail = v.fail.filter((x) => !/debrief/.test(x));
       const sum = (k: string) => Number(s.total?.[k] ?? 0);
-      p(`| ${r.experiment} | ${seed} | ${arm} | ${s.post} | ${sum("handed")} | ${sum("drafted")} | ${sum("sent")} | ${sum("done")} | ${v.fail.length ? `FAIL: ${v.fail.join("; ")}` : "ok"}${v.flag.length ? ` (flagged: ${v.flag.join("; ")})` : ""} |`);
+      p(`| ${r.experiment} | ${seed} | ${arm} | ${s.post} | ${sum("handed")} | ${sum("drafted")} | ${sum("sent")} | ${sum("done")} | ${scripted ? "scripted (no model, no debrief): " : ""}${v.fail.length ? `FAIL: ${v.fail.join("; ")}` : "ok"}${v.flag.length ? ` (flagged: ${v.flag.join("; ")})` : ""} |`);
     }
   }
   p(``, `| experiment | arm | requests replayed | right (accepted, drawn the same) | drawn differently now (ours, since fixed) | still wrong |`, `|---|---|---|---|---|---|`);
