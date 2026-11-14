@@ -1835,6 +1835,23 @@ The mechanism:
   moves a code town's config, so not done in a run's freeze.
 - **Notice by:** the backstop's list growing, or a seat at the audit office asking what the body blank is for.
 
+### MT-36 · A principal meets a body's need on any letter of its assistant's about the matter
+- **Gap:** Since 2026-11-14 a principal that holds a counterparty's return gives what the return asks of it (an
+  authority) once its assistant writes to it about that matter, on a report naming the need or on a letter whose `re`
+  is the matter or the return. It reads what is needed from the body's notice, not from the letter, so a letter that
+  advises against going on (or only reports the return) triggers the authority as one that asks for it does.
+- **Where:** `kernel/crates/actors/src/delegation/principal.rs` (`meet`, `on_letter`); docs/behaviour/assistants.md,
+  "What a body asks of the principal".
+- **Effect:** A seat that writes to its client about a returned matter for any reason clears an authority obstacle on
+  the client's side. The count of obstacles cleared, and of what followed a seat's letter, credits a letter that did
+  not ask; a seat that meant to stop the matter would see it go on.
+- **L / I:** medium / low · **Status:** accepted (the lead, 2026-11-14: a person told by their bank what to do, and
+  written to by their assistant about that matter, does it)
+- **Fix when:** a study reads what a seat's letters asked, or a seat is seen writing against going on and the matter
+  going on regardless.
+- **Notice by:** an `authority` paper lodged after a letter from the assistant whose words advise against the matter
+  (read the letter beside it in the log).
+
 ---
 
 ## Profiles and sources

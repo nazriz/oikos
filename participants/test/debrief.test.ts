@@ -104,6 +104,8 @@ test("a seat may decline any question, the whole interview, or stop part-way; ea
   const stopped = await runDebrief(harness().io, seat({ stop_at: "values" }), input(), new Set());
   expect(stopped.ended).toBe("stopped");
   expect(stopped.steps.map((s) => s.id)).toEqual(["consent", "took", "like", "distress", "values"]);
+  // (Nothing more to say at the last question is not leaving: what may be published is still asked.)
+  expect((await runDebrief(harness().io, seat({ stop_at: "last" }), input(), new Set())).steps.map((s) => s.id).slice(-2)).toEqual(["last", "publication"]);
 });
 
 test("a seat that left the study is asked too, more briefly, starting from its own statement", async () => {

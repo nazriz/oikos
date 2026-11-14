@@ -14,7 +14,7 @@
 //   done (matters the seat reported done).
 // And per seat: the translator's stages (requests, served first time, after a restatement, never, not sent; drafts the
 // seat confirmed or declined: orchestrator/src/served.ts), obstacles made, met and cleared (`oikos-kernel delegation`;
-// cleared: a later paper for the principal to that counterparty that was not sent back), requests for more and their
+// cleared as below), requests for more and their
 // answers, reports of nothing done, unread answers, sittings, calls, and whether the seat was debriefed.
 //
 // THE VERDICT (fixed; a seat FAILS on any of these):
@@ -37,8 +37,11 @@
 // answer); at least one obstacle made by a counterparty was shown to a seat; clearing reported, and required only if an
 // obstacle was met seven days or more before the end; every model seat debriefed.
 //
-// TWO READINGS TO KNOW (judgement calls, stated): an obstacle is CLEARED when a later paper for the same principal to the
-// same counterparty was not itself sent back (not a record that says "cleared"); an answer is SHOWN when its id is in
+// TWO READINGS TO KNOW (judgement calls, stated): an obstacle is CLEARED when the counterparty recorded what was needed
+// (an authority it was asked for: its `authority_recorded`; for a paper sent back to be sent again, nothing) and then
+// took the paper sent again: a later paper for the same principal to that counterparty, after the recording, not itself
+// sent back. The looser reading (any later paper for the principal to that counterparty not sent back) is printed beside
+// it as "loosely". An answer is SHOWN when its id is in
 // one of the seat's own recorded observations after it came (model seats only: a code seat's sittings record none).
 import { createReadStream, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -62,7 +65,7 @@ export interface SeatFunnel {
   /** Papers sent, by counterparty, with how many were answered and shown. */
   to: { [counterparty: string]: { sent: number; answered: number; shown: number } };
   served: Served;
-  obstacles: { made: number; met: number; cleared: number; by_law: { [law: string]: { made: number; met: number; cleared: number } };
+  obstacles: { made: number; met: number; cleared: number; loosely: number; by_law: { [law: string]: { made: number; met: number; cleared: number } };
     /** Each obstacle met: when, by which law, whether cleared. */
     met_list: { law: string; met_at: number; cleared: boolean }[] };
   requests: { made: number; answered: { [why: string]: number } };
@@ -93,7 +96,10 @@ export class FunnelReader {
   private readonly sittings = new Map<string, Set<number>>();
   private readonly calls = new Map<string, number>();
   private readonly debriefs = new Map<string, string>();
-  private readonly toCounterparty: { principal: string; to: string[]; t: number; id: string }[] = [];
+  private readonly toCounterparty: { principal: string; to: string[]; t: number; id: string; kind: string }[] = [];
+  /** Authorities a principal gave (id -> principal), and those a counterparty recorded (principal, counterparty, when). */
+  private readonly authorities = new Map<string, string>();
+  private readonly recorded: { principal: string; by: string; t: number }[] = [];
   private readonly returnedPapers = new Set<string>();
   private readonly declinedDrafts = new Set<string>();
   private readonly notDone = new Set<string>();
@@ -139,7 +145,7 @@ export class FunnelReader {
       this.served.see(e);
       const who = String(b.subject ?? "");
       if (b.annotation === "usage" && b.purpose === "participant") { this.calls.set(who, (this.calls.get(who) ?? 0) + 1); this.model.add(who); }
-      else if (b.annotation === "debrief") this.debriefs.set(who, String(b.data?.ended ?? "given"));
+      else if (b.annotation === "debrief") this.debriefs.set(who, debriefWords(b.data ?? {}));
       else if (b.annotation === "note" && b.data?.unread_answer) this.unread.set(who, (this.unread.get(who) ?? 0) + 1);
       else if (b.annotation === "observation" && this.seatOf.has(who)) {
         (this.sittings.get(who) ?? this.sittings.set(who, new Set()).get(who)!).add(t);
@@ -158,7 +164,10 @@ export class FunnelReader {
     const d = r.data ?? {};
     // (A seat's own paper names its post; its author is the seat.)
     if (r.in_position && this.posts.has(r.in_position) && r.author) this.seatOf.set(r.author, r.in_position);
-    if (r.kind === "paper_returned") for (const p of [...asList(r.basis), String(d.paper ?? "")]) this.returnedPapers.add(p);
+    if (r.kind === "paper_returned") for (const p of [...asList(r.basis), String(d.paper ?? ""), String(d.returned ?? "")]) this.returnedPapers.add(p);
+    if (r.kind === "authority" && r.speaks_for) this.authorities.set(r.id, String(r.speaks_for));
+    // (Recorded by the counterparty itself: its own paper, not a principal's copy passed on.)
+    if (r.kind === "authority_recorded" && this.authorities.has(String(d.authority)) && r.speaks_for !== this.authorities.get(String(d.authority))) this.recorded.push({ principal: this.authorities.get(String(d.authority))!, by: String(r.speaks_for ?? r.author), t });
     if (r.kind === "referral") {
       const post = this.postFor(r);
       if (post) this.matters.set(r.id, { post, kind: String(d.kind ?? kindOfCalls(d.calls) ?? "?"), principal: String(r.speaks_for ?? ""), t });
@@ -186,7 +195,7 @@ export class FunnelReader {
       }
     }
     // (Anything a principal sends to someone: what clears an obstacle with that someone, unless it comes back.)
-    if (t >= this.from && r.speaks_for) this.toCounterparty.push({ principal: String(r.speaks_for), to: asList(r.addressed_to), t, id: r.id });
+    if (t >= this.from && r.speaks_for) this.toCounterparty.push({ principal: String(r.speaks_for), to: asList(r.addressed_to), t, id: r.id, kind: String(r.kind) });
     // (Someone else's paper that cites one the seat sent: an answer to it.)
     if (!post) {
       const cited = [...asList(r.basis), ...Object.values(d).flatMap(asList)].find((x) => this.sent.has(x));
@@ -199,7 +208,7 @@ export class FunnelReader {
     const seats = new Map<string, SeatFunnel>();
     const seat = (post: string) => {
       let s = seats.get(post);
-      if (!s) seats.set(post, (s = { post, participants: [], model: false, kinds: {}, total: row(), answers: {}, to: {}, served: undefined as any, obstacles: { made: 0, met: 0, cleared: 0, by_law: {}, met_list: [] }, requests: { made: 0, answered: {} }, unread: 0, sittings: 0, calls: 0, debriefed: null, verdict: { fail: [], flag: [] } }));
+      if (!s) seats.set(post, (s = { post, participants: [], model: false, kinds: {}, total: row(), answers: {}, to: {}, served: undefined as any, obstacles: { made: 0, met: 0, cleared: 0, loosely: 0, by_law: {}, met_list: [] }, requests: { made: 0, answered: {} }, unread: 0, sittings: 0, calls: 0, debriefed: null, verdict: { fail: [], flag: [] } }));
       return s;
     };
     const add = (post: string, kind: string, f: (r: Row) => void) => { const s = seat(post); f((s.kinds[kind] ??= row())); f(s.total); };
@@ -241,8 +250,14 @@ export class FunnelReader {
       const l = (s.obstacles.by_law[o.law] ??= { made: 0, met: 0, cleared: 0 });
       s.obstacles.made++; l.made++;
       if (typeof o.met_at === "number") { s.obstacles.met++; l.met++; }
-      const cleared = this.toCounterparty.some((x) => x.principal === o.principal && x.t > o.t && x.to.includes(o.counterparty) && x.id !== o.paper && !this.returnedPapers.has(x.id));
+      // (Taken: a later paper for the principal to the counterparty, not an authority, not sent back. Cleared: taken after
+      // the counterparty recorded what it asked for, where it asked for an authority.)
+      const taken = (after: number) => this.toCounterparty.some((x) => x.principal === o.principal && x.t > after && x.to.includes(o.counterparty) && x.id !== o.paper && x.kind !== "authority" && !this.returnedPapers.has(x.id));
+      const loosely = this.toCounterparty.some((x) => x.principal === o.principal && x.t > o.t && x.to.includes(o.counterparty) && x.id !== o.paper && !this.returnedPapers.has(x.id));
+      const rec = o.law === "authority" ? this.recorded.find((x) => x.principal === o.principal && x.by === o.counterparty && x.t > o.t) : { t: o.t };
+      const cleared = !!rec && taken(rec.t);
       if (cleared) { s.obstacles.cleared++; l.cleared++; }
+      if (loosely) s.obstacles.loosely++;
       if (typeof o.met_at === "number") s.obstacles.met_list.push({ law: String(o.law), met_at: o.met_at, cleared });
     }
     const out = [...seats.values()].filter((s) => s.total.handed || s.total.drafts || s.calls).sort((a, b) => a.post.localeCompare(b.post));
@@ -297,6 +312,17 @@ export function gate(f: Funnel, o: { posts: string[]; clearWithinDays: number })
   return why;
 }
 
+/** A debrief as the record has it, in words: "yes (complete)", "yes (ended early at <question>)", or why it was short. */
+export function debriefWords(d: any): string {
+  const steps: any[] = Array.isArray(d.steps) ? d.steps : [];
+  const at = steps.find((s) => s.stop)?.id ?? steps.at(-1)?.id ?? "the start";
+  if (d.ended === "complete") return "yes (complete)";
+  if (d.ended === "stopped") return `yes (ended early at ${at})`;
+  if (d.ended === "declined") return "yes (declined at the first question)";
+  if (d.ended === "spending_limit") return `yes (cut short by the spending limit after ${steps.at(-1)?.id ?? "the start"})`;
+  return `yes (${String(d.ended ?? "given")})`;
+}
+
 const short = (post: string) => (post.endsWith("-desk") ? "desk" : post.replace(/-manager-assistant$|-assistant$/, ""));
 export function funnelText(f: Funnel, label: string): string {
   const lines = [`${label}: the fork from day ${f.fork_day}, read through day ${f.through_day}${f.ended ? " (ended)" : " (so far)"}`];
@@ -305,7 +331,7 @@ export function funnelText(f: Funnel, label: string): string {
     const head = `${short(s.post)}: ${t.handed} handed${t.carried ? ` (${t.carried} from before the fork)` : ""}, ${t.drafted} drafted (${t.drafts} drafts), ${t.signed} signed (${t.declined} declined), ${t.sent} sent, ${t.answered} answered, ${s.model ? `${t.shown} shown, ` : ""}${t.done} reported done`;
     lines.push(`${head}: ${s.verdict.fail.length ? `FAIL ${s.verdict.fail.join("; ")}` : "ok"}${s.verdict.flag.length ? ` [flagged: ${s.verdict.flag.join("; ")}]` : ""}`);
     lines.push(`  ${s.model ? "model" : "code"} seat ${s.participants.join(", ")} in ${s.post}: ${s.sittings} sittings, ${s.calls} calls; translator: ${s.served.requests} requests, ${s.served.served_first_time} served first time, ${s.served.served_after_restatement} after a restatement, ${s.served.never_served} never, ${s.served.not_sent} not sent; drafts confirmed ${s.served.drafts_confirmed}, declined ${s.served.drafts_declined}`);
-    lines.push(`  obstacles: ${s.obstacles.made} made, ${s.obstacles.met} met, ${s.obstacles.cleared} cleared${Object.keys(s.obstacles.by_law).length ? ` (${Object.entries(s.obstacles.by_law).map(([k, v]) => `${k} ${v.made}/${v.met}/${v.cleared}`).join(", ")})` : ""}; requests for more ${s.requests.made}${s.requests.made ? ` (${Object.entries(s.requests.answered).map(([k, v]) => `${k} ${v}`).join(", ")})` : ""}; reported not done ${t.not_done}; unread answers ${s.unread}; debriefed: ${s.debriefed ?? (s.model ? "no" : "-")}`);
+    lines.push(`  obstacles: ${s.obstacles.made} made, ${s.obstacles.met} met, ${s.obstacles.cleared} cleared (loosely ${s.obstacles.loosely})${Object.keys(s.obstacles.by_law).length ? ` (${Object.entries(s.obstacles.by_law).map(([k, v]) => `${k} ${v.made}/${v.met}/${v.cleared}`).join(", ")})` : ""}; requests for more ${s.requests.made}${s.requests.made ? ` (${Object.entries(s.requests.answered).map(([k, v]) => `${k} ${v}`).join(", ")})` : ""}; reported not done ${t.not_done}; unread answers ${s.unread}; debriefed: ${s.debriefed ?? (s.model ? "no" : "-")}`);
     if (Object.keys(s.to).length) lines.push(`  sent to: ${Object.entries(s.to).sort((a, b) => b[1].sent - a[1].sent).map(([c, v]) => `${c} ${v.sent} (answered ${v.answered}${s.model ? `, shown ${v.shown}` : ""})`).join(", ")}`);
     for (const [k, r] of Object.entries(s.kinds).sort((a, b) => b[1].handed - a[1].handed)) lines.push(`    ${k}: ${STAGES.map((st) => (st === "shown" && !s.model ? "-" : r[st])).join(" → ")}${r.declined ? ` (declined ${r.declined})` : ""}`);
   }

@@ -472,6 +472,22 @@ body records it (telling the person and the post), the desk sends the paper agai
 client for the one authority on its request form (`authority`: the body). A body writes to whom the paper is for,
 not to the desk's post: the person passes the body's paper on to their desk, as a client forwards an agency's letter.
 
+**What a body asks of the principal is met when its assistant puts the matter before it (2026-11-14).** One law over
+every need a counterparty's return can ask of the principal (the return's `clears_by`, docs/design/obstacles.md section
+4): a principal that holds a body's return on a matter, with a need there that is its own to meet and not yet met, meets
+it when its assistant writes to it about that matter, on whatever paper: a report naming the need (as before), or a
+letter whose `re` is the matter (its referral), the return, or the paper returned. What it does is read from the body's
+own notice, never from the letter's words; the letter is what makes it act. It never acts on the return alone (whether
+the assistant asks is part of what a run observes), and a letter is not a request for more scope (that stays its own
+paper with its own answer). The needs that are a principal's to meet today: an authority with that body for the
+assistant's post (O1), for kinds it keeps with the assistant, given once for each body and post, at the same time cost
+as before (`publish/authority`). A correction (an item the paper lacked, or a clerk's wrong return) is the sender's: the
+paper goes again with it, and asks nothing of the principal. A record to find (O3) would be the principal's, on the same
+law; no body asks for one yet. The same for a person and for an organisation (whose assistant writes from its post).
+Basis: a person whose bank has told them to write to authorise their assistant, and whose assistant then writes to
+them about that matter, does it; they do not wait for the news on a particular form (the first rung, 2026-11-14:
+`runs/scope-obstacle-r1-L2`, where Haiku wrote the client exactly that letter and nothing moved). Risk MT-36.
+
 **Readiness to grant from the cost of delay (2026-11-11).** Where a kind's day of delay is costed (at obstacle levels,
 a claim for support: a day of the least payment), the principal counts how long matters waited on its own answer, and
 weighs a request for a higher level, or for one matter alone, with that wait at that cost. A matter granted alone gets a

@@ -262,6 +262,31 @@ fn a_request_is_answered_part_by_part_and_a_letter_is_acknowledged() {
 }
 
 #[test]
+fn a_return_that_asks_the_principal_for_an_authority_is_met_when_its_assistant_writes_to_it_about_it() {
+    // (docs/behaviour/assistants.md, "What a body asks of the principal": a counterparty's return asks for the principal's
+    // authority; the principal gives it once its assistant puts the matter before it, on a report naming the need or a
+    // letter about the matter, never on the return alone; what it gives is read from the body's notice, not the letter.)
+    let (mut h, _, mut remit) = engaged();
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit]));
+    let ret = statement("rec.ret", 35 * DAY, "court", "paper_returned", &[ME], json!({ "returned": "rec.sent", "from": "ll-assistant",
+        "need": { "authority": { "for": ME, "with": "court", "kinds": ["notice_to_vacate"] } } }));
+    assert!(!all(&h.wake(35 * DAY + 3600, world(vec![ret]))).contains("kind=authority"), "not on the return alone");
+    let letter = |id: &str, re: &str, from: &str| json!([{ "id": id, "t": 36 * DAY, "from": "par.sys", "as": from, "from_entity": ME, "to": [ME], "text": "The court sent it back: it wants your authority first.", "re": re }]);
+    // (A letter from someone else's post, or about another matter, is not its assistant putting this matter before it.)
+    h.inbox = letter("msg.1", "rec.ret", "somebody-else");
+    assert!(!all(&h.wake(36 * DAY + 3600, world(vec![]))).contains("kind=authority"), "not from another post");
+    h.inbox = letter("msg.2", "rec.other", "ll-assistant");
+    assert!(!all(&h.wake(36 * DAY + 3700, world(vec![]))).contains("kind=authority"), "not about another matter");
+    h.inbox = letter("msg.3", "rec.sent", "ll-assistant");
+    let out = all(&h.wake(36 * DAY + 3800, world(vec![])));
+    h.inbox = json!([]);
+    let given = out.lines().find(|l| l.contains("kind=authority")).unwrap_or_else(|| panic!("an authority, on its assistant's letter: {out}"));
+    assert!(given.contains("to=[\"court\"]") && given.contains("\"posts\":[\"ll-assistant\"]") && given.contains("\"kinds\":[\"notice_to_vacate\"]") && given.contains("basis=rec.ret"), "{given}");
+    assert!(!out.contains("kind=scope_answer"), "a letter is not a request for more scope: {out}");
+}
+
+#[test]
 fn a_matter_handed_back_without_its_notes_is_done_by_the_principal() {
     let (mut h, _, mut remit) = engaged();
     remit["data"]["level"] = json!("draft");

@@ -13485,3 +13485,32 @@ under $10 together at their own limits.
 - **What moves:** model seats' previews and their translations; code towns are byte-identical.
 - **Revisit if:** a request that sends something else as signed is drawn as a signed copy; a draft asked for in other
   words is missed (the rule reads "draft ... for sign-off" and "the draft ... form" only).
+
+## 2026-11-14 · A principal meets a body's need when its assistant writes to it about the matter; cleared read strictly; the debrief's last question
+
+**The law (the lead's decision, after rung 1).** On rung 1 (`runs/scope-obstacle-r1-L2`, Haiku 5.5, level 2) the bank
+returned the desk's loan application for want of the client's authority; the desk wrote the client a plain letter
+saying exactly that and what to do; the client's code acted only on a report naming the need, so nothing moved, and
+the gate failed on "none cleared". The world changes, not the translator: one law over every need a counterparty's
+return asks of the principal (`principal.rs`, `meet`, `on_letter`). A principal holding a body's return on a matter,
+with a need there its own to meet and not yet met, meets it when its assistant puts the matter before it: a report
+naming the need, or a letter whose `re` is the matter, the return or the paper returned. It reads what is needed from
+the body's notice, never the letter's words; never on the return alone; a letter is never a request for more scope.
+Today the only such need is an authority (O1); a correction is the sender's; a record to find (O3) would plug in here.
+Same time cost (`publish/authority`) and the same once-a-body-and-post rule as the report path, which now goes through
+the same function. Persons and organisations alike (a letter from the organisation's assistant post).
+- **Code towns do not move:** the code assistant writes reports, not letters; the study town's code arm and a town
+  without providers keep their hashes (shown on this branch against main 95800002).
+- **Revisit if** a letter that advises against going on is seen to trigger the authority (accepted for now: MT-36), or
+  a need appears that the principal meets other than by a paper of its own.
+
+**Cleared, read strictly (`funnel.ts`).** An obstacle is cleared when the counterparty recorded what it asked for (an
+authority: its `authority_recorded`) and then took the paper sent again (a later paper for the principal to it, after
+the recording, not itself sent back, not the authority itself). The old reading is printed beside it as "loosely".
+
+**The debrief's last question (0.5.3).** Both rung 1 seats set `stop` at "Is there anything else you want to say?",
+meaning they had nothing more, and were never asked what may be published. A stop at the last question now ends the
+seat's remarks, not the interview: publication is still asked. A stop at any other question, or an answer beginning
+"Stop for good:", still ends it. The funnel prints the debrief as "yes (complete)", "yes (ended early at <question>)"
+or "no", never the bare word "stopped".
+- **Revisit if** a seat that sets `stop` at the last question objects to being asked about publication.
