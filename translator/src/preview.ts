@@ -345,7 +345,8 @@ export class Preview {
       if (Array.isArray(v)) return v.length ? v.map((x) => (typeof x === "string" ? x : x !== null && typeof x === "object" ? `(${this.facts(x)})` : String(x))).join(", ") : "none";
       if (type === "amount" && (typeof v === "string" || typeof v === "number") && /^[0-9]+$/.test(String(v))) return this.sum(v);
       if (type === "duration" && typeof v === "number") return span(v);
-      if (type === "date" && typeof v === "number") return forms.dateWords(v);
+      // (A day before the start as the seat is shown it everywhere else: render.ts `moment`, never "day -330": rung 1b.)
+      if (type === "date" && typeof v === "number") return v < 0 ? moment(v) : forms.dateWords(v);
       if (type === "text" && typeof v === "string") return `"${v}"`;
       return v !== null && typeof v === "object" ? `(${this.facts(v)})` : String(v);
     };

@@ -449,7 +449,10 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     // A program that composed data is asked back; another attempt may write the form.
     // (The mock translator hands back a mock seat's code call word for word, `verbatim`: that is code's, and not ruled.)
     // (And a form's blanks the request settles in so many words: rules.ts, `formRules`.)
-    const r0 = out?.input?.verbatim === true ? { ok: true as const, program } : ruled(formRules(program, req.proposal, req.knowledge), req.proposal, recordTest(req.knowledge));
+    const byRules = out?.input?.verbatim === true ? program : formRules(program, req.proposal, req.knowledge);
+    // (Whether the rules drew something other than what the model wrote: then what it was unsure of is not what was drawn.)
+    const drawnByRule = calls.programText(byRules) !== calls.programText(program);
+    const r0 = out?.input?.verbatim === true ? { ok: true as const, program } : ruled(byRules, req.proposal, recordTest(req.knowledge));
     if (!r0.ok) return { ok: false, notices: [r0.ask], call: calls.programText(program), invalid: [r0.invalid] };
     program = r0.program;
     const call = calls.programText(program);
@@ -494,7 +497,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
       check: { ok: k.ok, ...(k.refusal ? { refusal: k.refusal } : {}), ...(warnings.length ? { warnings } : {}) },
       translator: tid,
     };
-    return { ok: true, draft, hash: draftHash(draft) };
+    return { ok: true, draft, hash: draftHash(draft), ...(drawnByRule ? { drawnByRule: true as const } : {}) };
   }
   return {
     id: tid,
@@ -519,10 +522,19 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
           // request read as several things, what a request that can be drawn up says.)
           if (!r.ok) t.notices = plainer(t.notices, req, t.call);
           // (What a model that says how sure it is said with its answer: for an arrangement of translators, arrangement.ts.)
-          const answered = typeof out?.input?.sure_ppm === "number" ? (({ program: _p, ...more }) => more)(out.input as { program?: unknown }) as Answered : undefined;
+          let answered = typeof out?.input?.sure_ppm === "number" ? (({ program: _p, ...more }) => more)(out.input as { program?: unknown }) as Answered : undefined;
+          // (A draft the rules drew, not the call the model wrote (a send the request named, a blank it filled in so
+          // many words): what the model was unsure of is not what was drawn, and the seat is not told it. The rung 1
+          // rerun, 2026-11-14: a right send drawn by rule came with "Nothing was drawn up ... these blanks are still
+          // empty", and was declined as "drawn up from free text".)
+          if (answered && r.ok && (r as { drawnByRule?: true }).drawnByRule) {
+            const { unsure: _un, withheld: _w, ...rest } = answered as Answered & { unsure?: unknown; withheld?: unknown };
+            answered = rest as Answered;
+          }
           // (Whether the paper words of the call that went were quoted in the request: for the record, by seat model.)
           const words = r.ok ? paperWordsOf(req, r.draft.call) : undefined;
-          return { ...(r.ok ? r : t), ...(retries.length ? { retries } : {}), ...(answered ? { answered } : {}), ...(words ? { paper_words: words } : {}) };
+          const { drawnByRule: _d, ...ok } = (r.ok ? r : t) as typeof r & { drawnByRule?: true };
+          return { ...(ok as typeof r), ...(retries.length ? { retries } : {}), ...(answered ? { answered } : {}), ...(words ? { paper_words: words } : {}) };
         }
         if (r.unit) {
           const { final: _, unit: _u, none: _n, ...t } = r;

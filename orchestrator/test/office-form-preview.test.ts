@@ -8,6 +8,7 @@ import Ajv2020 from "ajv/dist/2020";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { calls, modules } from "@oikos/participants";
+import { factWords, moment } from "@oikos/participants/llm";
 import { stationeryForm } from "@oikos/worlds/generator/generate";
 import { Knowledge, Preview, resolve } from "@oikos/translator";
 
@@ -129,4 +130,15 @@ test("every blank of every form is written on its paper, worked into a figure it
   const p = new Preview(k, k.actingFor("factory-1-office"), () => undefined, "factory-1-office").of(r.blocks, { price_each: "XYZ 10,000", owed: "XYZ 860,000" });
   expect(p).toContain("Used, not written on the paper: price each XYZ 10,000.00: owed, XYZ 860,000.00, is worked from it.");
   expect(p).not.toMatch(/Left empty: [^\n]*price each/);
+});
+
+test("a day before the start reads the same in what a seat is handed, in a draft's preview and in a signed copy's (the rung 1 rerun, 2026-11-14)", () => {
+  // (A referral read "born at: year -66, day 35"; the draft's preview of the same instant read "year -66, day -330".)
+  const t = -24_421 * 86_400;
+  const papers = stationery("city.registry", "registry", "city", REGISTRY, "Registrar");
+  const k = seat("registry", "city", papers);
+  const p = preview(k, "registry", 'form(form=birth_registration, child=c0362, born_at="year -66, day 35", notification=rec.5, reported_by=c0900, to=registry)');
+  expect(moment(t)).toBe("year -66, day 35");
+  expect(p).toContain("born at: year -66, day 35");
+  expect(factWords({ born_at: t }, { born_at: { type: "date" } })).toContain("year -66, day 35");
 });

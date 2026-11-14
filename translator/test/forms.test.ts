@@ -9,7 +9,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { calls, canonical } from "@oikos/participants";
 import FORMS from "../../contracts/test/forms.json";
-import { formRules, formShown } from "../src/index";
+import { MockAdapter } from "@oikos/participants/llm";
+import { createTranslator, formRules, formShown } from "../src/index";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
 import { durationWords, resolve } from "../src/resolver";
@@ -97,11 +98,11 @@ test("a form's blanks the request settles in so many words are set by code: the 
   const form = (id: string, name: string, fields: object, more: object = {}) => ({ id, data: { form: name, office: "desk", fields, ...more } });
   const job = { client: field("entity", true), employer: field("entity", true), posting: field("record", true), account: field("account", true), trade: field("text") };
   const k = {
-    forms: [form("form-desk-job-application", "job_application", job, { writes: { kind: "job_application" } }), form("form-desk-draft-job-application", "draft_job_application", { referral: field("record", true), ...job }, { writes: { kind: "draft" } }),
+    forms: [form("form-desk-job-application", "job_application", job, { writes: { kind: "job_application" } }), form("form-desk-draft-job-application", "draft_job_application", { referral: field("record", true), ...job }, { writes: { kind: "draft", data: { paper: { kind: "job_application" } } } }),
       form("form-desk-send-signed", "send_signed", { sign_off: field("record", true) }, { copies: "=sign_off" }),
       form("form-desk-supply", "supply_request", { lots: field("list", true), law: field("record", true), owner: field("entity", true), connection: field("text") }, { writes: { kind: "supply_request" } })],
     records: new Set(["rec.5", "rec.6", "rec.7", "law-rates"]), signed: new Map([["rec.7", { kind: "job_application" }]]), signedDraft: new Map([["rec.7", "rec.6"]]),
-    referrals: new Map([["rec.5", "c0100"]]), held: new Set(["desk"]),
+    referrals: new Map([["rec.5", "c0100"]]), referralKind: new Map([["rec.5", "job_application"]]), answeredReferrals: new Set<string>(), held: new Set(["desk"]),
   };
   const ruled = (program: string, request: string) => calls.programText(formRules(calls.parseProgram(program), request, k));
   // The form named by its id; whom the work is for, from the matter handed over (never the counterparty); a blank left empty.
@@ -128,9 +129,24 @@ test("a form's blanks the request settles in so many words are set by code: the 
     .toBe("form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=rec.5, to=desk)");
   expect(ruled('form(account=acc-c0100, client=c0100, employer=factory-7, form=job_application, posting=rec.9, to=desk)', "Send a job application in c0100's name to factory-7, posting rec.9, into acc-c0100, under referral rec.5."))
     .toBe("form(account=acc-c0100, client=c0100, employer=factory-7, form=job_application, posting=rec.9, to=desk)");
+  // (The rung 1 rerun.) A draft for sign-off that names no matter takes the one open matter of its kind from whom it is
+  // for; a record blank holding what is no record (a connection's id) is not filled with it.
+  expect(ruled('form(account=acc-c0100, client=c0100, employer=factory-7, form=job_application, posting=rec.9, to=desk)', "Draft for sign-off a job application in the name of c0100 to factory-7, posting rec.9, into acc-c0100."))
+    .toBe("form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=rec.5, to=desk)");
+  expect(ruled('form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=e-factory-1-works, to=desk)', "Draft for sign-off a job application for c0100, posting rec.9."))
+    .toBe("form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=rec.5, to=desk)");
   // An optional blank the request says there is none of is left empty.
   expect(ruled('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)', "A supply request on lot-1; no connection.")).toBe("form(form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)");
   // Nothing settled in so many words: left as the translator wrote it.
   expect(ruled('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)', "A supply request for energy."))
     .toBe('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)');
+});
+
+test("a draft the rules drew is not offered with what the model was unsure of (the rung 1 rerun, 2026-11-14)", async () => {
+  // (A send drawn by rule from the request, where the model wrote nothing it was sure of, came with "Nothing was drawn
+  // up ... these blanks are still empty", and was declined as "drawn up from free text".)
+  const io = { adapter: new MockAdapter("mock", { translator: () => [{ type: "tool_use", id: "c0", name: "call", input: { program: "none(unclear)", sure_ppm: 40_000, withheld: "cut_off", unsure: { kind: "which" } } }] }), annotate: async () => {}, now: () => 0 };
+  const r = await createTranslator(io as any, async () => ({ ok: true }), () => undefined).translate({ draftId: "d1", participant: "registry-system", as: "registry", proposal: "Send the invoice (draft rec.80) exactly as signed.", knowledge: seat() });
+  expect(r.ok && r.draft.call).toBe("form(form=send_signed, sign_off=rec.81, to=registry)");
+  expect((r as any).answered?.unsure).toBeUndefined();
 });
