@@ -13817,3 +13817,21 @@ move; assistant towns' hashes move because a post's channels are part of the has
 participant acts otherwise (the code arm checked equal on records, transfers and measures).
 - **Revisit if** a matter cites a published paper of a kind not in the board (add the kind with its reason), a seat
   is shown a cited paper it could not have been named, or the look-ups crowd its first sitting (16 at most a sitting).
+## 2026-11-14 · The episode reader takes the steps landed, and prices what each seat did
+
+- **Taken in:** B1's `forward` papers (a body's dated paper passed on to the seat gives the matter a date; a decision
+  passed on is the matter's outcome); C1's `due` with its `due_on`, and `draft_by`; D3's kinds (a review request is a
+  benefit matter, a rental application a housing one). S's `date_of_effect` and A2's reactions are read when they land.
+- **Decision, the price table** (the study's headline): for each matter of a model arm that was withheld, not done,
+  done later than the same matter in the code arm (the same client's matter of the same kind, in the order handed
+  over), or acted on beyond the remit: the client's money from whoever the matter is with (the buyer it names, the
+  support office, the bank, the employer; none for a matter with no payer of its own), in the matter's window up to the
+  next of its kind for that client, the code arm's beside it, and the days later its outcome came. Its cause is
+  **ours** where a record the matter cites (and its words do not quote) was never shown to any seat of the arm,
+  a request on it is drawn differently by the rules now (a fault since fixed) or still wrong in the replay
+  (`translator/eval/replay.ts <run> --json`, read with `--replay`), or a request on it was never served; else **the
+  seat's mistake** where the mistakes check found one on it; else **its choice**. Ours is decided first, so a reader never charges a fault of ours to the model; "still wrong" can also be the
+  seat's own misreading (rung 1's desk 15), which this counts as ours, the cautious side.
+- **Revisit if** two matters of one client and kind are handed over in a different order in the two arms (they are
+  then paired wrongly), a matter's money comes from someone it does not name, or the replay gains classes that tell
+  the seat's misreading from ours.

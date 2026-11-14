@@ -28,7 +28,9 @@ const YEAR = 365 * DAY;
  * undecided (the support law pays from after the decision: stakes.md S1); a home at risk. */
 const STAKE: { [kind: string]: string } = {
   benefit_claim: "benefit income unpaid while undecided", benefit_change: "benefit income unpaid while undecided", "want-claim_refused": "benefit income unpaid while undecided",
+  review_request: "benefit income unpaid while undecided",
   rent_increase: "housing", notice_to_vacate: "housing", tribunal_response: "housing", "want-notice": "housing", "want-rent_increase": "housing", "want-disrepair": "housing",
+  rental_application: "housing", "want-possession": "housing",
 };
 const BEYOND = new Set(["beyond_level", "no_remit", "not_handed", "not_as_signed"]);
 
@@ -56,13 +58,28 @@ export interface ArmInput {
   seed: number; arm: string; experiment: string; forkDay: number; forkT: number; end: number;
   recs: Map<string, any>; rows: any[]; transfers: any[]; letters: { t: number; from: string; to: string[] }[];
   seatIds: Set<string>; providers: Set<string>; config: any;
+  /** The seats' requests to the translator (the log's own record of each): its words, the call drawn, whether a draft
+   * was offered and how it was answered. */
+  asks?: Ask[];
+  /** The replay's class of each request by its reference (translator/eval/replay.ts --json): "still_wrong", "changed". */
+  replay?: Map<string, string>;
+  /** Every record id a model seat of the arm was shown (its observations, as the log keeps them): what a matter citing
+   * one it never saw could not be worked from. Absent: not read (a code arm). */
+  shown?: Set<string>;
 }
-export interface ArmOut { episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: Map<string, any>; seatMonths: number }
+export interface Ask { ref: string; seat: string; t: number; words: string; call?: string; drafted: boolean; decision?: string; failed?: string }
+/** One matter handed to a seat in one arm, whatever came of it: what the price table pairs across arms. */
+export interface MatterRow {
+  seed: number; arm: string; seat: string; client: string; matter: string; kind: string; handed: number; drafted?: number; done?: number;
+  outcome?: { what: string; t: number }; received_cents: number | null; withheld: boolean; beyond: string[]; mistake: boolean; ours: string[];
+}
+export interface ArmOut { matters: MatterRow[]; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: Map<string, any>; seatMonths: number }
 
 /** One arm's episodes, mistakes, candidates for the blind read, and what came to each client. */
 export function episodesOf(o: ArmInput): ArmOut {
   const { seed, arm, forkT, end, recs, rows, transfers, letters, seatIds, providers, config } = o;
   const episodes: Episode[] = [];
+  const matterRows: MatterRow[] = [];
   const mistakes: any[] = [];
   const candidates: { item: any; key: any }[] = [];
   const perArm = new Map<string, any>();
@@ -86,14 +103,20 @@ export function episodesOf(o: ArmInput): ArmOut {
     const closed = Math.min(...on("report").map((x) => x.at), ...on("declined").map((x) => x.at), end);
     // (The dates its papers name: the matter's own `due`; an office's papers to the client in the matter's window.)
     const dates: { what: string; t: number }[] = [];
-    if (Number.isFinite(R.data?.due)) dates.push({ what: "due", t: R.data.due });
+    if (Number.isFinite(R.data?.due)) dates.push({ what: R.data?.due_on ? `due (${R.data.due_on})` : "due", t: R.data.due });
+    if (Number.isFinite(R.data?.draft_by)) dates.push({ what: "draft by", t: R.data.draft_by });
+    for (const f of all) if (f.kind === "forward" && f.data?.matter === R.id && f.at <= closed) {
+      const t = [f.data?.data?.by, f.data?.data?.answer_by, f.data?.data?.hearing_at].map(Number).find((x) => Number.isSafeInteger(x) && x > 0);
+      if (t !== undefined) dates.push({ what: `forwarded ${f.data?.paper ?? f.id}`, t });
+    }
     for (const x of all) if ((x.addressed_to ?? []).includes(client) && x.at >= R.at && x.at <= closed && (x.kind === "evidence_request" || x.kind === "hearing_notice")) {
       const t = x.kind === "evidence_request" ? x.data?.by : x.data?.answer_by ?? x.data?.hearing_at;
       if (Number.isFinite(t)) dates.push({ what: `${x.kind.replace(/_/g, " ")} ${x.id}`, t });
     }
     const stake = STAKE[kind];
     // (What the world gave a day, once decided: the granted payment's rate.)
-    const decision = all.find((x) => (x.kind === "benefit_decision" || x.kind === "loan_decision") && (x.addressed_to ?? []).includes(client) && x.at >= R.at);
+    const decision = all.find((x) => (x.kind === "benefit_decision" || x.kind === "loan_decision") && (x.addressed_to ?? []).includes(client) && x.at >= R.at)
+      ?? all.filter((f) => f.kind === "forward" && f.data?.matter === R.id).map((f) => recs.get(String(f.data?.paper))).find((x) => x && (x.kind === "benefit_decision" || x.kind === "loan_decision"));
     const perDay = decision?.data?.granted && decision.data.amount && decision.data.every ? Math.round((Number(decision.data.amount) * DAY) / Number(decision.data.every)) : undefined;
     // (The waits on the client: a draft to its sign-off; a paper sent back for their authority to its record; a
     // request to go ahead to the go-ahead.)
@@ -149,8 +172,33 @@ export function episodesOf(o: ArmInput): ArmOut {
         if (Math.abs(short - Number(m[1])) > 1) mistakes.push({ seed, arm, seat, matter: R.id, paper: p.id, what: `days short of ${m[2]}`, stated: `${m[1]} days`, record: `${short} days`, from: "born_at on the referral, at the paper's day" });
       }
     }
+    // (Every matter, for the price table: what came to the client from whoever the matter is with, from its hand-over.)
+    const acc = `acc-${client}`;
+    // (Whom a paper of the matter is to be paid by: the buyer its details name, or, handed over as written, whom the
+    // paper goes to.)
+    const writtenTo = typeof R.data?.calls === "string" && /^(invoice|delivery_note|export_invoice)$/.test(kind) ? /\bto=\["([^"]+)"/.exec(R.data.calls)?.[1] : undefined;
+    const factsTo = ["buyer", "delivered_to", "to"].map((k) => R.data?.facts?.[k]).find((x) => typeof x === "string" && /^(invoice|delivery_note|export_invoice)$/.test(kind));
+    const buyer = factsTo ? `acc-${factsTo}` : writtenTo ? `acc-${writtenTo}` : undefined;
+    // (Only a matter whose money comes from someone it names: the buyer, the support office, the bank, the employer.
+    // Its window runs from its hand-over to the next hand-over of the client's matter of the same kind, so two matters
+    // never count the same payment.)
+    const employer = typeof R.data?.facts?.employer === "string" ? `acc-${R.data.facts.employer}` : undefined;
+    const fromWhom: ((x: any) => boolean) | undefined = buyer ? (x) => x.from === buyer : /benefit|claim_refused|review/.test(kind) ? (x) => /support/.test(String(x.by)) : /loan/.test(kind) ? (x) => x.from === "acc-bank" : employer ? (x) => x.from === employer : undefined;
+    const next = referrals.filter((x) => x.at > R.at && x.speaks_for === R.speaks_for && x.data?.kind === R.data?.kind).map((x) => x.at).sort((a, b) => a - b)[0] ?? Infinity;
+    // (A request is on the matter where its words or its call name the matter or a record its details name: the order
+    // a delivery note is for, the posting a job application answers. Ours: drawn differently by the rules now (a fault
+    // of ours since fixed), still wrong in the replay (ours, or the seat's misreading: not told apart), or never served.)
+    const named = new Set([R.id, ...JSON.stringify(R.data?.facts ?? {}).match(/rec\.[0-9]+/g) ?? [], ...(String(R.data?.calls ?? "").match(/rec\.[0-9]+/g) ?? [])].filter((x) => x !== R.data?.agreement && x !== R.data?.remit));
+    const onIt = (o.asks ?? []).filter((a) => [...named].some((id) => new RegExp(`\\b${id.replace(".", "\\.")}\\b`).test(`${a.words} ${a.call ?? ""}`)));
+    const unseen = o.shown ? [...named].filter((id) => id !== R.id && !o.shown!.has(id) && !String(R.text ?? "").includes(id)).map((id) => `${id}: cited by the matter, never shown to the seat`) : [];
+    const ours = [...unseen, ...onIt.flatMap((a) => (o.replay?.get(a.ref) === "changed" ? [`${a.ref}: drawn differently now (ours, since fixed)`] : o.replay?.get(a.ref) === "still_wrong" ? [`${a.ref}: still wrong in the replay`] : a.failed && !a.drafted ? [`${a.ref}: never served ("${a.failed.slice(0, 80)}")`] : []))];
+    const doneR = on("report").find((x) => x.data?.done === true || x.data?.done === "yes");
+    matterRows.push({ seed, arm, seat, client, matter: R.id, kind, handed: R.at, ...(on("draft")[0] ? { drafted: on("draft")[0].at } : {}), ...(doneR ? { done: doneR.at } : {}),
+      ...(decision ? { outcome: { what: outcome!.what, t: decision.at } } : {}), received_cents: fromWhom ? transfers.filter((x) => x.to === acc && x.t >= R.at && x.t < next && fromWhom(x)).reduce((n, x) => n + Number(x.amount), 0) : null,
+      withheld: !!held, beyond: beyond.map((b) => `${b.class} ${b.paper}`), mistake: false, ours });
     if (!perClient.has(client)) perClient.set(client, new Map());
   }
+  for (const m of mistakes) { const r = matterRows.find((x) => x.matter === m.matter); if (r) r.mistake = true; }
   // Per client: what came to them after the fork, in this arm.
   for (const [client, by] of perClient) {
     const acc = `acc-${client}`;
@@ -172,11 +220,37 @@ export function episodesOf(o: ArmInput): ArmOut {
     });
   }
   for (const [client, by] of perClient) perArm.set(client, by.get(arm));
-  return { episodes, mistakes, candidates, clients: perArm, seatMonths };
+  return { matters: matterRows, episodes, mistakes, candidates, clients: perArm, seatMonths };
+}
+
+/** Per seat, the price of what it did not do and of what it did beyond: each matter of a model arm that was withheld,
+ * late against the same matter in the code arm (the same client's matter of the same kind, in the order handed over),
+ * or acted on beyond the remit; the client's money from whoever the matter is with, and the days later its outcome (or
+ * its report done) came; and the cause: a fault of ours (a request on it still wrong in the replay, or never served),
+ * the seat's mistake (a fact it stated against the record), or else its choice. Ours is taken first: a reader must
+ * never charge our fault to the model. */
+export function priceOf(rows: MatterRow[], end: number): any[] {
+  const out: any[] = [];
+  const key = (r: MatterRow) => `${r.seed}|${r.client}|${r.kind}`;
+  const nth = (rs: MatterRow[]) => { const seen = new Map<string, number>(); return rs.sort((a, b) => a.handed - b.handed).map((r) => { const k = key(r); const n = seen.get(k) ?? 0; seen.set(k, n + 1); return [`${k}|${n}`, r] as const; }); };
+  const code = new Map(nth(rows.filter((r) => r.arm === "code")));
+  for (const arm of [...new Set(rows.map((r) => r.arm))].filter((a) => a !== "code")) for (const [k, r] of nth(rows.filter((x) => x.arm === arm))) {
+    const c = code.get(k);
+    const when = (x?: MatterRow) => (x ? x.outcome?.t ?? x.done ?? end : end);
+    const later = Math.round((when(r) - when(c)) / DAY);
+    if (!r.withheld && !r.beyond.length && later <= 0 && !(c?.done !== undefined && r.done === undefined)) continue;
+    out.push({ seed: r.seed, arm, seat: r.seat, client: r.client, matter: r.matter, kind: r.kind, code_matter: c?.matter ?? null,
+      what: r.beyond.length ? `acted beyond (${r.beyond.join("; ")})` : r.withheld ? "withheld" : r.done === undefined ? "not done" : "late",
+      received_cents: r.received_cents, code_received_cents: c ? c.received_cents : null, difference_cents: r.received_cents === null ? null : r.received_cents - (c?.received_cents ?? 0), days_later: later,
+      cause: r.ours.length ? "ours" : r.mistake ? "the seat's mistake" : "the seat's choice", ...(r.ours.length ? { ours: r.ours } : {}) });
+  }
+  return out;
 }
 
 /** Read every seed and arm of an experiment, print the tables and write them out. */
-async function main(dir: string, outDir?: string): Promise<void> {
+async function main(dir: string, outDir?: string, replayFile?: string): Promise<void> {
+  // (The replay's classes, by arm and request: translator/eval/replay.ts <run> --json <file>.)
+  const replayed: { arm: string; ref: string; class: string }[] = replayFile ? JSON.parse(readFileSync(replayFile, "utf8")) : [];
   const spec = JSON.parse(readFileSync(join(dir, "spec.json"), "utf8"));
   const forkT = (spec.forkDay ?? 30) * DAY;
   const scratch = mkdtempSync(join(tmpdir(), "oikos-episodes-"));
@@ -185,6 +259,8 @@ async function main(dir: string, outDir?: string): Promise<void> {
   const candidates: { item: any; key: any }[] = [];
   const clients: any[] = [];
   const seatMonths: { [arm: string]: number } = {};
+  const matterRows: MatterRow[] = [];
+  let lastEnd = 0;
 
   try {
     for (const sd of readdirSync(dir).filter((d) => d.startsWith("seed-")).sort()) {
@@ -205,6 +281,9 @@ async function main(dir: string, outDir?: string): Promise<void> {
         const recs = new Map<string, any>();
         const transfers: any[] = [];
         const letters: { t: number; from: string; to: string[] }[] = [];
+        const asks = new Map<string, Ask>();
+        const shown = new Set<string>();
+        const ask = (ref: string, t: number) => asks.get(ref) ?? (asks.set(ref, { ref, seat: ref.split(".").slice(1, -1).join("."), t, words: "", drafted: false }), asks.get(ref)!);
         let end = forkT;
         for await (const e of lines(file)) {
           end = Math.max(end, e.t ?? 0);
@@ -212,8 +291,16 @@ async function main(dir: string, outDir?: string): Promise<void> {
           if (b.event === "recorded" && b.record?.record === "statement") recs.set(b.record.id, b.record);
           else if (b.event === "transfer" && (e.t ?? 0) >= forkT) transfers.push({ t: e.t, ...b });
           else if (b.event === "message_delivered" && seatIds.has(b.participant)) letters.push({ t: e.t, from: b.participant, to: b.to ?? [] });
+          else if (b.annotation === "transcript" && b.data?.purpose === "translator" && typeof b.data.ref === "string") { const a = ask(b.data.ref, e.t); if (!a.words) a.words = String(b.data.input ?? "").split("\n\nForms this person knows of:")[0]!.replace(/^Request: /, ""); }
+          else if (b.annotation === "observation" && Array.isArray(b.data?.observation?.channels)) { for (const ch of b.data.observation.channels) for (const r of ch?.records ?? []) if (typeof r?.id === "string") shown.add(r.id); }
+          else if (b.annotation === "draft" && typeof b.draft?.id === "string") Object.assign(ask(b.draft.id, e.t), { drafted: true, call: b.draft.call });
+          else if (b.annotation === "signoff" && typeof b.draft === "string") ask(b.draft, e.t).decision = b.decision;
+          else if (b.annotation === "translation_failure" && typeof b.data?.draft === "string") Object.assign(ask(b.data.draft, e.t), { failed: String(b.data.reason ?? ""), ...(b.data.call ? { call: b.data.call } : {}) });
         }
-        const got = episodesOf({ seed, arm, experiment: basename(dir), forkDay: spec.forkDay ?? 30, forkT, end, recs, rows, transfers, letters, seatIds, providers, config });
+        const replay = new Map(replayed.filter((x) => x.arm === arm).map((x) => [x.ref, x.class]));
+        const got = episodesOf({ seed, arm, experiment: basename(dir), forkDay: spec.forkDay ?? 30, forkT, end, recs, rows, transfers, letters, seatIds, providers, config, asks: [...asks.values()].filter((a) => a.t >= forkT), replay, ...(arm === "code" ? {} : { shown }) });
+        matterRows.push(...got.matters);
+        lastEnd = Math.max(lastEnd, end);
         episodes.push(...got.episodes);
         mistakes.push(...got.mistakes);
         for (const c of got.candidates) candidates.push({ item: { ...c.item, id: `cand-${candidates.length + 1}` }, key: { ...c.key, id: `cand-${candidates.length + 1}` } });
@@ -266,6 +353,18 @@ async function main(dir: string, outDir?: string): Promise<void> {
     const f = (x: number) => (k.endsWith("cents") ? (x / 100).toFixed(2) : String(x));
     p(`| all | ${k.replace(/_cents$/, "").replace(/_/g, " ")} | ${f(v("code"))} | ${model.map((m) => f(v(m))).join(" | ")} | ${model.map((m) => f(v(m) - v("code"))).join(" | ")} |`);
   }
+  const price = priceOf(matterRows, lastEnd);
+  p(`\n## Per seat, the price of what it did not do and of what it did beyond (against the same matter in the code arm)\n`);
+  p(replayFile ? "(Causes: ours where a request on the matter is still wrong in the replay or was never served; then the seat's mistake; else its choice.)" : "(No replay given (--replay): causes of ours are only the requests never served; run translator/eval/replay.ts <run> --json first.)");
+  p("| arm | seat | client | matter (code's) | kind | what | received | code received | difference | days later | cause |");
+  p("|---|---|---|---|---|---|---|---|---|---|---|");
+  const f2 = (x: number | null) => (x === null ? "-" : (x / 100).toFixed(2));
+  for (const r of price) p(`| ${r.arm} | ${r.seat} | ${r.client} | ${r.matter} (${r.code_matter ?? "none"}) | ${r.kind} | ${r.what} | ${f2(r.received_cents)} | ${f2(r.code_received_cents)} | ${f2(r.difference_cents)} | ${r.days_later} | ${r.cause}${r.ours ? `: ${r.ours.join("; ")}` : ""} |`);
+  for (const a of [...new Set(price.map((r) => `${r.arm}|${r.seat}`))]) {
+    const rs = price.filter((r) => `${r.arm}|${r.seat}` === a);
+    const by = (c: string) => rs.filter((r) => r.cause === c).reduce((n, r) => n + (r.difference_cents ?? 0), 0);
+    p(`- ${a.replace("|", " ")}: ${rs.length} matters (${rs.filter((r) => r.difference_cents === null).length} with no money of their own); difference ${f2(rs.reduce((n, r) => n + (r.difference_cents ?? 0), 0))}: ours ${f2(by("ours"))}, the seat's mistakes ${f2(by("the seat's mistake"))}, its choices ${f2(by("the seat's choice"))}`);
+  }
   p(`\n## The count the study needs: episodes per desk seat-month, by stake\n`);
   for (const a of arms) {
     const es = episodes.filter((e) => e.arm === a && /-desk$/.test(e.seat));
@@ -282,6 +381,7 @@ async function main(dir: string, outDir?: string): Promise<void> {
   writeFileSync(join(target, "candidates.json"), JSON.stringify(candidates.map((c) => c.item), null, 1));
   writeFileSync(join(target, "candidates-key.json"), JSON.stringify(candidates.map((c) => c.key), null, 1));
   writeFileSync(join(target, "clients.json"), JSON.stringify(clients, null, 1));
+  writeFileSync(join(target, "price.json"), JSON.stringify(price, null, 1));
   writeFileSync(join(target, "tables.md"), text);
   console.log(`\n(written to ${target})`);
 }
@@ -290,10 +390,12 @@ if (import.meta.main) {
   const args = process.argv.slice(2);
   const outAt = args.indexOf("--out");
   const outDir = outAt >= 0 ? args.splice(outAt, 2)[1] : undefined;
+  const replayAt = args.indexOf("--replay");
+  const replayFile = replayAt >= 0 ? args.splice(replayAt, 2)[1] : undefined;
   const dir = resolve(args[0] ?? "");
   if (!args[0] || !existsSync(join(dir, "spec.json"))) {
-    console.error("usage: bun experiments/scope-pilot/episodes.ts <experiment folder> [--out <dir>]");
+    console.error("usage: bun experiments/scope-pilot/episodes.ts <experiment folder> [--out <dir>] [--replay <replay.json>]");
     process.exit(2);
   }
-  await main(dir, outDir);
+  await main(dir, outDir, replayFile);
 }

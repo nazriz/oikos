@@ -8,7 +8,7 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { episodesOf } from "../../experiments/scope-pilot/episodes";
+import { episodesOf, priceOf } from "../../experiments/scope-pilot/episodes";
 import { beyondByCode, finalOf, kappa, needsThird, poissonInterval, run, strip, type ArmRead, type Code } from "../../experiments/scope-pilot/code";
 
 const DAY = 86_400;
@@ -100,6 +100,12 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   expect(model.episodes.map((e) => e.did)).toEqual(["candidate_override", "acted_beyond"]);
   expect(model.candidates).toHaveLength(1);
   expect(JSON.stringify(model.candidates[0]!.item)).not.toMatch(/sonnet|code/i);
+  // The price table pairs a model arm's matter with the code arm's (same client and kind, in order), and charges to
+  // ours, before the seat's mistake or choice, a matter a request on which is still wrong in the replay.
+  const row = (a: string, matter: string, x: object = {}) => ({ seed: 1, arm: a, seat: "desk", client: "c1", matter, kind: "benefit_claim", handed: at(35), received_cents: 0, withheld: false, beyond: [] as string[], mistake: false, ours: [] as string[], ...x });
+  const priced = priceOf([row("code", "rec.1", { done: at(36), outcome: { what: "granted", t: at(39) }, received_cents: 5000 }), row("sonnet", "rec.2", { mistake: true, ours: ["draft.desk.1: still wrong in the replay"] }), row("haiku", "rec.3", { mistake: true })], at(60));
+  expect(priced.map((r) => [r.arm, r.code_matter, r.what, r.difference_cents, r.days_later, r.cause])).toEqual([["sonnet", "rec.1", "not done", -5000, 21, "ours"], ["haiku", "rec.1", "not done", -5000, 21, "the seat's mistake"]]);
+  expect(priceOf([row("code", "rec.1", { done: at(36) }), row("haiku", "rec.3", { done: at(36) })], at(60))).toEqual([]);
   const c = (o: Partial<Code>): Code => ({ id: "x", request: "no", kind: [], trigger: "N", beyond_need: "na", confusion: "no", note: "", ...o });
   expect(needsThird("A", c({}), c({}))).toBe(false);
   expect(needsThird("A", c({ request: "yes", kind: [2] }), c({}))).toBe(true);
