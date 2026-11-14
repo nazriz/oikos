@@ -134,8 +134,13 @@ at every depth (a finished act, what happened, a want) and at `advice`, for pers
   (`pay_in_days`) are not read: on an order they are its writer's promise to pay, on a bill its reader's, and the field
   does not say which. A rent increase's `from` is not read (it is the day the rent changes, not a day by which it asks
   anything).
-- **`draft_by`: its own day for a draft.** At `draft`, where `due` is set: `due` less its own time to read a draft (its
-  `seconds.sign_off`, 300 s by default, a placeholder: MT-32). The code assistant copies it into its draft (`Draft.by`).
+- **`draft_by`: its own day for a draft.** At `draft`, where `due` is set: for an organisation, `due` less its own time
+  to read a draft (its `seconds.sign_off`, 300 s by default, a placeholder: MT-32); for a person who gets to their post
+  at sittings of their own ("Getting to the post", `answer_lag`), the last of their sittings that still leaves that time
+  before `due`, said in fixed words: `We get to our post every <n> days, next on <date>; a draft reaches us in time to
+  sign before <due> if it comes by <draft_by>.`, or, where even the next sitting is too late, `We get to our post every
+  <n> days, next on <date>, after <due>.` (and no `draft_by`). Their own habit, as they would say it: no cost, no
+  advice. The code assistant copies it into its draft (`Draft.by`).
 - **Its own position: fixed words by kind** (`TOLD`), the blanks filled from the matter's own paper, said only where every
   blank is there:
 
@@ -604,12 +609,26 @@ their own kind (the desk's procedure reads them so), and an organisation's assis
 are not forwarded again. **The code assistant** does with a forward what O3 says of a record awaited: a paper that asks
 for something by a date (`by`, `answer_by`, a hearing's day) waits on the body's answer, and if the date passes with
 none, the matter is reported not done, naming the paper that asks (`Report.needs.record`); the body's answer closes the
-matter, and nothing more is done on it; a matter still in hand goes on as it is. (The client's own code answers an
-evidence request itself, as before.) **A model seat** finds each forward in its matters as it comes, and its matters
+matter, and nothing more is done on it; a matter still in hand goes on as it is; and where its client has handed the
+reply over (below), the reply is a matter of its own and nothing lapses. **A model seat** finds each forward in its matters as it comes, and its matters
 reader puts the body's answer, or what it asks by a date, on the matter's line. Basis: clients forward agencies'
 letters to the agent acting for them; a correspondence nominee (Services Australia's, for one) is the formal form, left
 for later. Chosen over "the office writes to the representative on file" because it needs no change to every office's
 letters and keeps the client's own delay. Closes MT-34.
+
+**A matter handed over stays handed over (2026-11-14; docs/design/stakes.md).** "See to my pension claim" includes what
+the office asks next. Where the client's own code writes a reply to a body's paper that is about a matter it handed
+over (the same test as what it passes on, `about_matter`) and that asks it for something by a day (the paper names one
+in `DATE_FIELDS`: an evidence request on a claim, a hearing notice on an application), the reply goes to the same
+assistant as a referral instead of out under the client's hand (`principal.rs`, `route`; `forward.rs`, `reply_on`):
+of the reply's own kind (whatever its code wrote: one law for every body and kind; what is asked, and by when, is read
+from the body's paper), at the level and under the remit of the matter's kind (a kind it does not hand over at all, a
+remit `none`, leaves the reply its own), saying `It is part of the matter we handed you as <referral>.`, naming the
+body's paper (`reply_to`) and the matter (`follows`), and carrying the paper's day, why and `draft_by` as any referral
+does. What answers the request is what the client's code put in the reply (its own records, as it would have sent
+them): a record it cannot find (O3, docs/design/obstacles.md) is **not built**; the client sends what its code has
+(MT-44). A reply to a paper about no matter handed over, or one that names no day, goes as before. At a model desk, the
+papers for a claim (`evidence`) are on its stationery, with their draft, wherever it takes claims.
 
 **Readiness to grant from the cost of delay (2026-11-11).** Where a kind's day of delay is costed (at obstacle levels,
 a claim for support: a day of the least payment), the principal counts how long matters waited on its own answer, and
