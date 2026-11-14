@@ -21,6 +21,11 @@ pub struct Requirements {
     /// Why, in words, with the form or rule it follows (the profile's source).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub basis: Option<String>,
+    /// What else the body's law says that whoever sends it a paper should know, in the law's own words, said on its notice
+    /// beside what it requires (the support office's rule on from when a granted claim is paid: docs/design/stakes.md, S).
+    /// Words only: nothing in it is checked.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub also: Vec<String>,
 }
 
 /// One item a form asks for: the field, and what it is called on the form.
@@ -76,6 +81,7 @@ mod tests {
             items: [("loan_application".to_string(), vec![Item { field: "account".into(), says: "the account to pay it into".into() }, Item { field: "purpose".into(), says: "what it is for".into() }])].into(),
             authority: vec!["loan_application".into()],
             basis: None,
+            also: vec![],
         }
     }
 

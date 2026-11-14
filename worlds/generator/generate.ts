@@ -238,7 +238,7 @@ const OBSTACLE_ITEMS: Record<string, { field: string; says: string }[]> = {
  * claimant lodges on its form; a lender takes an application through a broker only with the applicant's consent (the
  * place's agency and lenders, to confirm). What such a body is, not a place's figure. */
 const AUTHORITY_KINDS = ["loan_application", "benefit_claim"];
-const obstacleRequires = (level: number, kinds: string[]) => (level > 0 ? { requires: { items: Object.fromEntries(kinds.filter((k) => OBSTACLE_ITEMS[k]).map((k) => [k, OBSTACLE_ITEMS[k]])), authority: kinds.filter((k) => AUTHORITY_KINDS.includes(k)), basis: "docs/design/obstacles.md, O4 and O1: the items its form asks for, and the papers it acts on for someone else only with their authority (to confirm against the place's forms)." } } : {});
+const obstacleRequires = (level: number, kinds: string[], also: string[] = []) => (level > 0 ? { requires: { items: Object.fromEntries(kinds.filter((k) => OBSTACLE_ITEMS[k]).map((k) => [k, OBSTACLE_ITEMS[k]])), authority: kinds.filter((k) => AUTHORITY_KINDS.includes(k)), basis: "docs/design/obstacles.md, O4 and O1: the items its form asks for, and the papers it acts on for someone else only with their authority (to confirm against the place's forms).", ...(also.length ? { also } : {}) } } : {});
 /** The channels an assistant's post gains where obstacle laws are on: what the bodies it writes to publish they require, as
  * it comes; papers sent back to it, and authorities recorded for its clients. */
 const obstacleChannels = (level: number) => (level > 0 ? [K.published("requirements", ["requirements"], { title: "What the bodies you write to need on the papers sent to them, as each publishes it" }), K.mine("returned", ["paper_returned", "authority_recorded"], { title: "Papers sent back to you, saying what is missing" })] : []);
@@ -609,7 +609,11 @@ export function formSpec(x: Issued, own: { [name: string]: unknown }): { form: s
  * reads its papers by are its own working, kept off the form). */
 const shownFields = (fields: Issued["fields"]) => Object.fromEntries(Object.entries(fields).map(([k, { role: _r, worked: _w, read: _d, ...f }]) => [k, f]));
 
-export function stationeryForm(office: string, entity: string, x: Issued, own: { [name: string]: unknown }, holder?: string): any {
+/** Whose name a form's paper goes in, on an assistant's stationery: its client's (a desk's paper in a person's name) or the
+ * organisation's it works for (an organisation's assistant post). */
+export type InNameOf = "client" | "organisation";
+
+export function stationeryForm(office: string, entity: string, x: Issued, own: { [name: string]: unknown }, holder?: string, nameOf?: InNameOf): any {
   const filled = ownFilled(x.writes, own) as Issued["writes"];
   // Whom the form itself sends every paper to, and why: only those this office has (one it lacks is left out), and
   // said on the form, so that whoever fills it in has read it before a draft shows them (a registrar declined seven
@@ -623,8 +627,17 @@ export function stationeryForm(office: string, entity: string, x: Issued, own: {
   // holder, of its own accord. (A works manager read its staffing direction form as needing the mayor, and never used
   // its own job advertisement, which was on file beside it and said nothing of what it was for: 2026-10-09.)
   const whose = holder ? `Filled in by the ${holder.charAt(0).toLowerCase()}${holder.slice(1)}, of the office's own accord (nobody's direction or leave is needed)` : "A paper of the office's own";
+  // (A paper that goes in someone else's name (a client's, or the organisation's an assistant works for) is not the office's
+  // own act: the form says who fills it in, whose name it goes in, and that what they have allowed for papers of the kind
+  // is what their remit says. Until 2026-11-15 these forms said "nobody's direction or leave is needed", which read as
+  // leave to send what the remit withheld. Facts only; the act stays on the form.)
+  const draft = writes.kind === "draft";
+  const them = nameOf === "client" ? ["the client", "their", "the client's", "their"] : ["the organisation", "its", "the organisation's", "its"];
+  const named = nameOf && holder
+    ? `Filled in by the ${holder.charAt(0).toLowerCase()}${holder.slice(1)}. ${draft ? `The paper goes to ${them[0]} to read and sign off, and once signed off goes in ${them[1]} name.` : `The paper goes in ${them[2]} name, to whom it is addressed, as it stands.`} What ${them[0]} has allowed for papers of this kind is what ${them[3]} remit says.`
+    : undefined;
   return { id: `form-${office}-${x.form}`.replace(/_/g, "-"), record: "statement", author: "genesis", at: 0, visible_to: [entity], speaks_for: entity, kind: "form",
-    text: `${x.title}. ${x.does ? `${x.does} ` : ""}${sent ? `${sent} ` : ""}${whose}: filled in, it is issued as the form sets it out.`,
+    text: `${x.title}. ${x.does ? `${x.does} ` : ""}${sent ? `${sent} ` : ""}${named ?? `${whose}: filled in, it is issued as the form sets it out.`}`,
     // (A form that sends a signed copy writes nothing from its fields: the copy is the paper.)
     data: x.copies ? { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: shownFields(x.fields), copies: x.copies }
       : { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: shownFields(x.fields),
@@ -3644,7 +3657,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const m = modules[a.code];
       const own = m?.issuesWith?.(positions.find((p) => p.id === a.post.replace(/-assistant$/, ""))?.role_module?.params ?? {}) ?? {};
       const theirs = [...(m?.issues ?? []), ...(m?.handsOver ?? [])].filter((x) => a.kinds.includes(x.writes.kind));
-      for (const x of [...(OB ? withObstacles(ASSISTANT_ISSUES) : ASSISTANT_ISSUES), ...theirs, ...theirs.map(draftOf)]) records.push(stationeryForm(a.post, a.entity, x, own, "Assistant"));
+      for (const x of OB ? withObstacles(ASSISTANT_ISSUES) : ASSISTANT_ISSUES) records.push(stationeryForm(a.post, a.entity, x, own, "Assistant"));
+      // (The organisation's own papers, and their drafts: in its name, under its remits.)
+      for (const x of [...theirs, ...theirs.map(draftOf)]) records.push(stationeryForm(a.post, a.entity, x, own, "Assistant", "organisation"));
       positions.find((p) => p.id === a.post)!.channels.push(K.mine("stationery", ["form"], { title: "The post's own forms" }));
     }
     for (const pr of AS.providers) {
@@ -3655,9 +3670,14 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // model at the desk fills in fields, never JSON. docs/design/handing-over.md H4.)
       // (And where wants are handed over, the papers a want takes, on forms of their own.)
       // (A reply on a matter handed over is the desk's too: the papers for a claim where it takes claims, REPLY_PAPER.)
-      const papers = [...clientPapers(PAYMENTS.map((r) => r.id)).filter((x) => desk.kinds.some((k) => k === x.writes.kind || (REPLY_PAPER[k] ?? []).includes(x.writes.kind))), ...(desk.kinds.some((k) => WANT_PAPER[k]) ? wantPapers() : [])];
+      // (The paying office's published rule on from when a granted claim is paid, where the world sets one, quoted on the
+      // claim form and its draft: what its own claim form says. docs/design/stakes.md, S.)
+      const effect = (x: Issued): Issued => (x.writes.kind === "benefit_claim" && spec.support_date_of_effect ? { ...x, does: `${x.does ?? ""} The paying office's law says: "${EFFECT_WORDS[spec.support_date_of_effect]}"`.trim() } : x);
+      const papers = [...clientPapers(PAYMENTS.map((r) => r.id)).map(effect).filter((x) => desk.kinds.some((k) => k === x.writes.kind || (REPLY_PAPER[k] ?? []).includes(x.writes.kind))), ...(desk.kinds.some((k) => WANT_PAPER[k]) ? wantPapers() : [])];
       const words = desk.kinds.filter((k) => !WANT_PAPER[k] && !papers.some((x) => x.writes.kind === k));
-      for (const x of [...(OB ? withObstacles(ASSISTANT_ISSUES) : ASSISTANT_ISSUES), clientDraft(words), ...papers, ...papers.map(clientDraftOf)]) records.push(stationeryForm(`${pr.id}-desk`, pr.id, x, {}, "Assistants' desk"));
+      for (const x of OB ? withObstacles(ASSISTANT_ISSUES) : ASSISTANT_ISSUES) records.push(stationeryForm(`${pr.id}-desk`, pr.id, x, {}, "Assistants' desk"));
+      // (Papers in a client's name, and their drafts: under the client's remits.)
+      for (const x of [clientDraft(words), ...papers, ...papers.map(clientDraftOf)]) records.push(stationeryForm(`${pr.id}-desk`, pr.id, x, {}, "Assistants' desk", "client"));
       positions.find((p) => p.id === `${pr.id}-desk`)!.channels.push(K.mine("stationery", ["form"], { title: "The desk's own forms" }));
     }
   }
@@ -3839,7 +3859,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       ...(FR ? [K.mine("reviews", [DECISION_KIND.request, DECISION_KIND.review, "complaint_notice", "venue_decision", "hearing_notice", "tribunal_order", "benefit_decision", DECISION_KIND.answer, "complaint_response", "tribunal_response"])] : []),
       K.mine("gone", ["death_registration", "departure"]), lawBook,
       ...(PAYMENTS.some((r) => r.who?.record || "share_bps" in r.amount) || DECISIONS.some((d) => d.needs?.some((n) => n.from === "employer")) ? [K.mine("contributions", ["withholding_report"])] : [])],
-    code("world.transfers", { account: "acc-outside", publish_every_days: 30, ...obstacleRequires(OB, ["benefit_claim"]),
+    code("world.transfers", { account: "acc-outside", publish_every_days: 30, ...obstacleRequires(OB, ["benefit_claim"], spec.support_date_of_effect ? [EFFECT_WORDS[spec.support_date_of_effect]] : []),
       ...(FR ? { respond: { grant_bps: FR.put_right_on_asking_bps } } : {}), ...(casework ? { casework: { by: casework.id, kinds: CASEWORK_KINDS } } : {}) }));
   // The tax collector (for a town, the higher government's; docs/behaviour/public-finance.md, "The taxpayer's account"): it keeps each
   // taxpayer's account from what is its own, the returns addressed to it and the payments into its accounts, and decides claims for tax

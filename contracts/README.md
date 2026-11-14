@@ -1028,3 +1028,10 @@ nothing new, and its saved state is as before.
   service offers (`alone` among them), where it gave the next one only.
 - The generator gives a person's `benefit_claim` no `late_cost_day` where the town's support law pays from the first
   claim (`support_date_of_effect: first_claim`).
+## Assistant forms and the office's published rule (2026-11-15; docs/decisions.md, "An assistant's forms say whose name a paper goes in"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- `Requirements.also` (rules `acceptance.rs`; a body's `requires` parameter): words of the body's law said on its
+  requirements notice beside what it requires (the support office's rule on from when a granted claim is paid); checked
+  by nothing.
+- Generator only: an assistant's forms for papers in someone else's name say so in fixed words; the desk's claim form
+  quotes the paying office's rule where `support_date_of_effect` is set.

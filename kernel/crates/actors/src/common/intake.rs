@@ -101,6 +101,7 @@ pub fn notice(me: &str, req: &Requirements) -> Call {
             req.authority.iter().map(|k| k.replace('_', " ")).collect::<Vec<_>>().join(" or ")
         ));
     }
+    said.extend(req.also.iter().cloned());
     say(NOTICE, &format!("What {me} needs on the papers sent to it. {}", said.join(" ")), Say { visible: Some(Visible::Public), data: Some(json!({ "requires": req })), ..Default::default() })
 }
 

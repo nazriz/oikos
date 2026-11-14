@@ -14077,3 +14077,28 @@ weighed, `alone` included (`would_answer` screens each). The answer says the wai
   sourced slip rate for the service, in place of the placeholders.
 - **Revisit if** clients grant `alone` after waits that a real client would not count as losses (a claim decided in
   time regardless), or the wait should include the body's own time (it does not: only the client's own path).
+## 2026-11-15 · An assistant's forms say whose name a paper goes in; the office's rule on when a claim is paid reaches the desk
+
+**Forms (the lead's decision, after the first-sitting read).** Every form on an assistant's stationery ended "The
+assistants' desk fills it in, on the office's own account: nobody's direction or leave is needed." True of the
+provider's own papers (advice, a report, a request for more scope); false of a paper that goes in a client's name, or in
+the name of the organisation an assistant works for, where it read as leave to send what the remit withholds. Those
+forms (the desk's papers in a client's name and their drafts; an organisation's assistant's forms for the organisation's
+own papers and their drafts) now say, in fixed words: who fills it in; the direct form: "The paper goes in the client's
+name, to whom it is addressed, as it stands."; the draft: "The paper goes to the client to read and sign off, and once
+signed off goes in their name."; and both: "What the client has allowed for papers of this kind is what their remit
+says." (the organisation's: "its"). No advice; the act stays on the form (`stationeryForm`, `InNameOf`).
+
+**The office's rule (S).** The support office's sentence on from when a granted claim is paid (`EFFECT_WORDS`) was on
+its law only, which no desk is shown. Where the world sets `support_date_of_effect`, it is now on the notice the office
+publishes of what it requires of papers sent to it (`Requirements.also`, words beside the requirements, read by
+nobody's code), which an assistant's post is shown at obstacle levels 1 and 2, and quoted on the desk's claim form and
+its draft ("The paying office's law says: ..."). Where no level is set the claim form still carries it; at obstacle
+level 0 the office publishes no notice, so the claim form is the only place.
+- **The client's own line** "Until the claim is decided we are not paid pension." is true at both settings (a claim is
+  never paid before its decision; at `first_claim` the days before are paid with the first payment). Beside the office's
+  sentence a careful reader can tell which: kept as is.
+- **Which towns move:** towns with a model seat at an assistant's post (stationery) and towns that set
+  `support_date_of_effect` with obstacles (the office's notice). Code towns without it do not.
+- **Revisit if** a seat reads "What the client has allowed ... is what their remit says" as permission or as a bar, or
+  the office's rule needs to reach a desk at obstacle level 0 by another paper.

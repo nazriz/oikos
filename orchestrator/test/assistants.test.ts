@@ -8,6 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
+import { ASSISTANT_ISSUES } from "@oikos/participants";
 import { runWorld } from "../src/run";
 import { FORM_CALL_NAMES } from "../../translator/src/resolver";
 import { build, inDifficulty } from "../../experiments/scope-pilot/build";
@@ -56,6 +57,24 @@ test("a town that does not ask for assistants is generated as before; one that d
   for (const r of details) expect(r).toMatchObject({ speaks_for: "outside", visible_to: "public", data: { outcome: { money: { to: expect.any(String) } } } });
   expect(plain.world.records.some((r: any) => r.kind === "payment_details")).toBe(false);
   expect(forms.some((x: string) => x.startsWith("draft_"))).toBe(true);
+  // No form whose paper goes in someone else's name (a client's, the organisation's an assistant works for) says that
+  // nobody's leave is needed: it says whose name it goes in and that their remit says what they have allowed (2026-11-15:
+  // the line read as leave to send what the remit withheld). The assistant's own papers are its office's own.
+  for (const r of seated.world.records.filter((r: any) => r.kind === "form" && (r.data?.office === post || r.data?.office === "provider-a-desk"))) {
+    const theirs = !!r.data.writes?.in_name_of || (r.data.writes?.kind === "draft" && !!r.data.writes.data?.paper) || (r.data.office === post && !ASSISTANT_ISSUES.some((x) => x.form === r.data.form));
+    if (theirs) expect(r.text, r.id).toMatch(/goes in (the client's|the organisation's|their|its) name[^.]*\. What the (client|organisation) has allowed for papers of this kind is what (their|its) remit says\.$/);
+    if (theirs) expect(r.text, r.id).not.toMatch(/leave is needed/);
+  }
+  // The paying office's rule on from when a granted claim is paid, where the world sets one: in what it publishes it
+  // requires (the notice a desk is shown) and on the desk's claim form; nowhere where none is set (docs/design/stakes.md, S).
+  for (const effect of ["first_claim", "decision"] as const) {
+    const t = generate({ ...base, assistants: true, assistant_seats: ["assistant-a", "assistant-a-personal"], obstacles: 2, support_date_of_effect: effect }) as any;
+    const transfers = t.positions.find((p: any) => p.role_module?.code === "world.transfers") ?? t.participants.find((p: any) => p.controller?.code === "world.transfers");
+    const also = JSON.stringify(transfers ?? t).match(/"also":\["([^"]+)"/)?.[1] ?? "";
+    expect(also, effect).toMatch(effect === "decision" ? /nothing is paid for the days before/ : /from the day the person first claimed it/);
+    expect(t.world.records.find((r: any) => r.kind === "form" && r.data?.office === "provider-a-desk" && r.data.form === "benefit_claim").text).toContain(also);
+  }
+  expect(JSON.stringify(seated)).not.toMatch(/"also":\[/);
   expect(seated.world.records.some((r: any) => r.kind === "form" && r.data?.office === "provider-a-desk" && r.data.form === "scope_request")).toBe(true);
   // Every kind a principal may hand over (its own kinds: it hands over no other) has its form and its draft at its
   // assistant's post, the return of tax withheld that a factory files among them (the scope pilot's W2: a factory's
