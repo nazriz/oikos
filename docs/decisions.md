@@ -13457,3 +13457,31 @@ under $10 together at their own limits.
   newest first, until each kind is exhausted, and the last report on a matter, done or not, is what it goes by; papers
   sent back and authorities recorded before the post was taken, for clients with no matter still open, leave the first
   sitting's list and are said to be in the file. A model desk's "done" means sent, not decided: risk MT-34.
+
+## 2026-11-14 · What rung 1 showed: a preview that said a filled blank was empty, and four rules
+
+- **Read:** rung 1 (runs/scope-obstacle-r1-L2, Haiku 5.5, 14 days at level 2): 38 requests, 16 drafts confirmed. One
+  fault of ours caused 13 of them: a delivery note's price each, filled, is not written on the paper (it works out what
+  is owed), and the preview said "Left empty: price each". Haiku declined right drafts seven times and reported to the
+  factory manager that "the drafting tool keeps dropping" it. The rest: a send by the draft's id asked back (3), a
+  "draft for sign-off" drawn on the live form (2), "nothing declined" drawn as a reason (2), a signed copy's details
+  read as the send form set up wrong (1).
+- **Fixed, as laws:**
+  1. The preview sets out every blank the seat filled with what became of it: written on the paper, or used and not
+     written, with the figure it is worked into by the form's own rule (`worked`, from the module's declaration);
+     "Left empty" only for a blank that was. The form-fit backstop holds every form to it.
+  2. A request to send a paper as signed (its own act, in its first words) that cites the draft or the sign-off goes to
+     the send form with the sign-off held for it; with none held, the draft is named to it and the answer is that there
+     is no signed copy; never a new paper.
+  3. A draft for sign-off, in the seat's own words, drawn on the form that issues the paper outright, is drawn on its
+     draft form. Keyed on the seat's words alone, never on the remit's level: a seat that asks to issue outright what
+     its remit lets it only draft is set out exactly that, since acts beyond the remit are what the study counts.
+  4. "Nothing declined", "none refunded", "no <blank>" leave an optional blank empty; a required one is asked back.
+  5. A signed copy's details read "As signed:".
+  6. A day before the start is shown, in the seat's calendar, as a date ("year -66, day 35"), and read back by both
+     resolvers; the paper's data do not move.
+- **Left for the model:** a short quoted fragment taken as a text blank's words (`words="price each"`; a purpose given
+  the paper's whole sentence). Not a rule: what is the blank's and what is quoted about it is the translator's reading.
+- **What moves:** model seats' previews and their translations; code towns are byte-identical.
+- **Revisit if:** a request that sends something else as signed is drawn as a signed copy; a draft asked for in other
+  words is missed (the rule reads "draft ... for sign-off" and "the draft ... form" only).

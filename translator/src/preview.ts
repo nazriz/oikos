@@ -16,7 +16,7 @@
 // change. It renders what the draft is, from the draft and the seat's own papers, and nothing else: it does not read
 // the request, and says nothing of what the draft does not touch.
 
-import { basesOf, citedWords, formatMoney, forms, type Block } from "@oikos/participants";
+import { basesOf, calls, citedWords, formatMoney, forms, modules, type Block } from "@oikos/participants";
 import { duration, factWords, moment, readable, ruleWords, type FieldKinds } from "@oikos/participants/llm";
 import type { Knowledge } from "./knowledge";
 
@@ -350,9 +350,31 @@ export class Preview {
       return v !== null && typeof v === "object" ? `(${this.facts(v)})` : String(v);
     };
     const given = Object.keys(fields).filter((k) => fields[k] !== undefined && !skip.includes(k));
-    const empty = Object.keys(spec.fields).filter((k) => fields[k] === undefined && !skip.includes(k));
+    // A blank the seat filled that the paper does not carry (the form writes no field of it): set out with what
+    // became of it, from the form's own declaration, the figure it is worked into where there is one. "Left empty"
+    // only for a blank that truly was. (Rung 1, 2026-11-14: a delivery note's price each, filled and used to work out
+    // what is owed, read "Left empty", and Haiku declined a right draft seven times.)
+    const filledIn = (k: string) => this.given?.[k] !== undefined;
+    const used = Object.keys(spec.fields).filter((k) => fields[k] === undefined && !skip.includes(k) && filledIn(k));
+    const empty = Object.keys(spec.fields).filter((k) => fields[k] === undefined && !skip.includes(k) && !filledIn(k));
+    const usedWords = used.map((k) => {
+      const v = this.givenWords(spec.fields[k]?.type, this.given![k]);
+      const into = workedInto(String(spec.form ?? ""), k).find((w) => fields[w] !== undefined);
+      return into ? `${k.replace(/_/g, " ")} ${v}: ${into.replace(/_/g, " ")}, ${word(into, fields[into])}, is worked from it` : `${k.replace(/_/g, " ")} ${v}: used in drawing it up, and not written on the paper itself`;
+    });
     return [`Filled in: ${given.length ? given.map((k) => `${k.replace(/_/g, " ")}: ${word(k, fields[k])}`).join("; ") : "nothing"}.`,
+      ...(usedWords.length ? [`Used, not written on the paper: ${usedWords.join("; ")}.`] : []),
       ...(empty.length ? [`Left empty: ${empty.map((k) => k.replace(/_/g, " ")).join(", ")}.`] : [])];
+  }
+
+  /** A blank's value as the seat gave it in its call, read as the form says it is (an amount as money, a count). */
+  private givenWords(type: string | undefined, v: unknown): string {
+    const text = typeof v === "string" ? v : String(v);
+    try {
+      if (type === "amount") return this.sum(calls.parseAmount(text, this.k.currency));
+      if (type === "count") return String(calls.parseCount(text, this.k.currency, true));
+    } catch { /* (as written) */ }
+    return type === "text" ? `"${text}"` : text;
   }
 
   /** What a paper offers to whoever takes it up (a listing, an advertisement), in words: each side's part, how it is
@@ -479,7 +501,8 @@ export class Preview {
           const kind = String(b.kind).replace(/_/g, " ");
           const goes = made ? this.goesTo(b, made).trim() : "";
           return one(`You will send ${an(kind)} exactly as it was signed off under ${copy.signOff}${copy.draft ? ` (your draft ${copy.draft})` : ""}${named(b)}: "${b.text}". Nothing in it is written again.`, [...PAPER, ...(b.offer !== undefined ? ["offer"] : [])],
-            [...(made ? this.filled(made.form.data as forms.FormData, made.fields, forms.claimFields(made.form.data as forms.FormData).filter((n) => made.fields[n] === undefined)) : this.details(b.data) ? [`With these details: ${this.details(b.data)}.`] : []),
+            // (Its details as they were signed: "As signed", not "Filled in", which read as the send form set up wrong.)
+            [...(made ? this.filled(made.form.data as forms.FormData, made.fields, forms.claimFields(made.form.data as forms.FormData).filter((n) => made.fields[n] === undefined)).map((l) => l.replace(/^Filled in: /, "As signed: ").replace(/^Left empty: /, "Left empty when it was signed: ")) : this.details(b.data) ? [`As signed: ${this.details(b.data)}.`] : []),
               ...(goes ? [goes] : seen(b)), ...(made ? [] : cites(b)), ...rule(b)], `the signed ${kind}`);
         }
         if (made) {
@@ -639,7 +662,12 @@ export class Preview {
    * The whole preview. Its first line says how many things the draft does; each is numbered, one alone too, with its
    * lines under it. An offer and its signature read as one.
    */
-  of(blocks: Block[]): string {
+  /** The blanks the seat filled, as its call gave them (by name: those a form takes): what the preview says became of
+   * each, where the paper does not carry it. */
+  private given?: { [field: string]: unknown };
+
+  of(blocks: Block[], given?: { [field: string]: unknown }): string {
+    this.given = given;
     const acts: Act[] = [];
     for (let i = 0; i < blocks.length; i++) {
       const b = blocks[i]!;
@@ -674,3 +702,13 @@ const WHAT: { [block: string]: string } = { sign_agreement: "a signature", give_
 
 /** An act as the preview sets it out: what happens, the lines under it, and which of the act's fields they say. */
 interface Act { head: string; lines: string[]; said: string[]; /** What kind of thing it is, in a word or three ("a payment", "a letter"). */ what: string }
+
+/** The fields of a paper a blank of a form is worked into, by the form's own declaration (its module's `worked` rules:
+ * contracts' FormField, kept off the form a seat is shown). A draft's form is its paper's. */
+export function workedInto(form: string, blank: string): string[] {
+  const fields = declared().get(form.replace(/^draft_/, ""));
+  if (!fields) return [];
+  return Object.entries(fields).filter(([, f]) => typeof (f as any).worked === "string" && new RegExp(`\\b${blank}\\b`).test((f as any).worked)).map(([k]) => k);
+}
+let declaredForms: Map<string, { [name: string]: unknown }> | undefined;
+const declared = () => (declaredForms ??= new Map(Object.values(modules).flatMap((m: any) => [...(m.issues ?? []), ...(m.handsOver ?? [])]).map((x: any) => [x.form, x.fields])));

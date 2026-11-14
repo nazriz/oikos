@@ -490,7 +490,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
     const draft: Draft = {
       id: req.draftId, participant: req.participant, ...(req.as ? { as: req.as } : {}), proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,
-      blocks: r.blocks, summary: new Preview(req.knowledge, req.knowledge.actingFor(req.as), req.called, req.as).of(r.blocks).slice(0, 16384),
+      blocks: r.blocks, summary: new Preview(req.knowledge, req.knowledge.actingFor(req.as), req.called, req.as).of(r.blocks, givenOf(program)).slice(0, 16384),
       check: { ok: k.ok, ...(k.refusal ? { refusal: k.refusal } : {}), ...(warnings.length ? { warnings } : {}) },
       translator: tid,
     };
@@ -580,3 +580,12 @@ export { Knowledge } from "./knowledge";
 export { Preview } from "./preview";
 export { LABEL_TEXT, RESOLVER, resolve, type Resolution } from "./resolver";
 export { formRules, idsIn, ON_ITS_FORM, paperWords, quotedSpans, recordTest, ruled, type Ruled } from "./rules";
+
+/** The blanks a call's form lines filled, by name, as written (the preview says what became of each that the paper does
+ * not carry). Not a form's own arguments: which form, whose, for whom. */
+function givenOf(p: calls.Program): { [field: string]: unknown } | undefined {
+  if (!("lines" in p)) return undefined;
+  const out: { [field: string]: unknown } = {};
+  for (const l of p.lines) if (l.call.fn === "form") for (const [k, v] of Object.entries(l.call.args)) if (!["form", "to", "for"].includes(k)) out[k] = "text" in v ? v.text : "id" in v ? v.id : undefined;
+  return Object.keys(out).length ? out : undefined;
+}

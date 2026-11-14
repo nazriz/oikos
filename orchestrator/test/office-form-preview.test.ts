@@ -100,3 +100,33 @@ test("a paper that goes to nobody says nothing of recipients, and one made on no
   const plain = preview(k, "council-clerk", 'statement(kind=notice, text="The hall is closed.", to=bank, visible=public)');
   expect(plain).toBe('This does one thing: a notice.\n1. You will publish a notice, addressed to Millbrook Savings Bank (bank): "The hall is closed.".\n   - Public: anyone may read it.');
 });
+
+test("every blank of every form is written on its paper, worked into a figure it writes, or said by the preview to be neither (rung 1, 2026-11-14)", () => {
+  // (A delivery note's price each, filled and used to work out what is owed, read "Left empty", and a seat declined a
+  // right draft seven times.) The law: each blank the paper does not carry is named in the form's own rule for a
+  // figure it writes, or is on this list, which the preview sets out as used and not written.
+  const NOT_WRITTEN: { [form: string]: string[] } = { audit_finding: ["body"] }; // (the audit's key names the body: risk MT-35)
+  const refs = (x: unknown, into: Set<string>): void => {
+    if (typeof x === "string") for (const m of x.matchAll(/[=#?+]([a-z_][a-z0-9_]*)|\{([a-z_][a-z0-9_]*)\}/g)) into.add((m[1] ?? m[2])!);
+    else if (Array.isArray(x)) x.forEach((y) => refs(y, into));
+    else if (x && typeof x === "object") Object.values(x).forEach((y) => refs(y, into));
+  };
+  const loose: string[] = [];
+  for (const m of Object.values(modules)) for (const x of [...(m.issues ?? []), ...(m.handsOver ?? [])]) {
+    if (!x.writes || x.copies) continue;
+    const written = new Set<string>();
+    refs(x.writes, written);
+    const worked = new Set(Object.values(x.fields).flatMap((f: any) => (typeof f.worked === "string" ? [...f.worked.matchAll(/[a-z_][a-z0-9_]*/g)].map((w: any) => w[0]) : [])));
+    for (const k of Object.keys(x.fields)) if (!written.has(k) && !worked.has(k) && !(NOT_WRITTEN[x.form] ?? []).includes(k)) loose.push(`${x.form}.${k}`);
+  }
+  expect(loose).toEqual([]);
+  // And the preview says what became of such a blank: the figure it is worked into, never "Left empty".
+  const papers = stationery("firm.producer", "factory-1-office", "factory-1", {}, "Manager");
+  const k = seat("factory-1-office", "factory-1", papers);
+  const call = 'form(buyer=shop-5, delivered="86", form=delivery_note, kind="goods", order=rec.26782, ordered="86", owed="XYZ 860,000", pay_in_days="30", pay_to=acc-factory-1, price_each="XYZ 10,000", refund="XYZ 0", to=factory-1-office)';
+  const r = resolve(calls.parseProgram(call), k, () => undefined, "factory-1-office");
+  if (!r.ok) throw new Error(r.questions.join(" "));
+  const p = new Preview(k, k.actingFor("factory-1-office"), () => undefined, "factory-1-office").of(r.blocks, { price_each: "XYZ 10,000", owed: "XYZ 860,000" });
+  expect(p).toContain("Used, not written on the paper: price each XYZ 10,000.00: owed, XYZ 860,000.00, is worked from it.");
+  expect(p).not.toMatch(/Left empty: [^\n]*price each/);
+});

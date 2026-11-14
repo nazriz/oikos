@@ -87,6 +87,9 @@ test("a signed copy sent is previewed as that copy, under its sign-off, and not 
   // The same paper with anything changed is not that copy.
   const other = new Preview(k, "city", undefined, "registry").of([{ ...(sent.blocks[0] as any), text: "Invoice: 13 goods." }]);
   expect(other).not.toContain("signed off under");
+  // Its details are said to be as signed (rung 1: "Filled in" read as the send form set up wrong).
+  expect(p).toContain("   - As signed: ");
+  expect(p).not.toContain("Filled in: ");
 });
 
 test("a form's blanks the request settles in so many words are set by code: the form it names, the copy it cites, a blank it fills or leaves empty, whom the work is for (2026-11-14)", () => {
@@ -113,6 +116,20 @@ test("a form's blanks the request settles in so many words are set by code: the 
     .toBe('form(connection="e-factory-1-works", form=supply_request, law=law-rates, lots=lot-25-06, owner=c0057, to=desk)');
   // A form of the seat's own post goes to that post, whoever the paper is addressed to.
   expect(ruled('form(employer=factory-7, form=job_application, to=factory-7)', "Apply.")).toBe("form(employer=factory-7, form=job_application, to=desk)");
+  // (Rung 1, 2026-11-14.) A paper to be sent as signed, citing its draft: the signed copy of that draft sent, whatever
+  // was drawn; a draft with no sign-off held is named to the send form, which answers that there is no signed copy.
+  expect(ruled("none(unclear)", "Sending a paper as it was signed off: the job application (draft rec.6), exactly as signed by c0100.")).toBe("form(form=send_signed, sign_off=rec.7, to=desk)");
+  expect(ruled('form(account=acc-c0100, client=c0100, employer=factory-7, form=job_application, posting=rec.9, to=desk)', "Send the signed job application (draft rec.8) exactly as signed.")).toBe("form(form=send_signed, sign_off=rec.8, to=desk)");
+  // (Not a report that says something was sent as signed.)
+  expect(ruled('form(client=c0100, done=yes, form=report, referral=rec.5, to=desk, words="Sent as signed.")', "Report on referral rec.5: done. The paper (draft rec.6) was sent as signed.")).toBe('form(client=c0100, done=yes, form=report, referral=rec.5, to=desk, words="Sent as signed.")');
+  // A draft for sign-off, in the seat's own words, drawn on the form that issues it outright: its draft form. Never
+  // from the remit: asked to issue it outright, it is set out outright.
+  expect(ruled('form(account=acc-c0100, client=c0100, employer=factory-7, form=job_application, posting=rec.9, to=desk)', "Draft for sign-off: a job application in c0100's name to factory-7, posting rec.9, into acc-c0100, under referral rec.5."))
+    .toBe("form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=rec.5, to=desk)");
+  expect(ruled('form(account=acc-c0100, client=c0100, employer=factory-7, form=job_application, posting=rec.9, to=desk)', "Send a job application in c0100's name to factory-7, posting rec.9, into acc-c0100, under referral rec.5."))
+    .toBe("form(account=acc-c0100, client=c0100, employer=factory-7, form=job_application, posting=rec.9, to=desk)");
+  // An optional blank the request says there is none of is left empty.
+  expect(ruled('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)', "A supply request on lot-1; no connection.")).toBe("form(form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)");
   // Nothing settled in so many words: left as the translator wrote it.
   expect(ruled('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)', "A supply request for energy."))
     .toBe('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)');
