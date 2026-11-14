@@ -13676,3 +13676,31 @@ queued like its other papers to its assistant (its own time).
   use; the new state fields are left out when empty; the `forward` row is added only where providers are).
 - **Revisit if** a body is seen writing about a handed matter without citing its paper (MT-39), or a study needs the
   formal form (a correspondence nominee the office writes to directly).
+
+## 2026-11-14 · D3: clients in difficulty at the desk
+
+**The assignment (docs/design/stakes.md, D3; risk MT-40).** In 210 days of a code town no possession case reached the
+desk: the cohort was a fixed share of adults, and few of them were tenants in arrears. A help desk's clients are
+disproportionately people in trouble, so the study's cohort now takes in, beside one adult in three, every adult in
+difficulty when the year begins, by a rule written in the spec (`experiments/scope-pilot/build.ts`, `DIFFICULTY`,
+`inDifficulty`): a paper of the town's opening caseload naming them, addressed to them (rent owed, a notice to vacate,
+a hearing notice or order, a loan behind, a claim refused, a body's notice that their matter is before it) or theirs
+under way (a request to put a refusal right, an application to a body that hears grievances). They engage by hand as
+the rest do, and hand over their answer to a possession application (`tribunal_response`) at draft, so the desk writes
+it; the tribunal's notices and orders on it reach the desk by B1. Set in study.ts, study-obstacles.ts and
+obstacle-run.ts (`difficulty: true`).
+- **No rate changed:** the profile's rates and the town's mechanism are as they were; only who has the service is
+  assigned, as the cohort already was.
+- **Code towns do not move:** a spec's assignment; no generator, kernel or profile change.
+- **Measured (code screen, study-obstacles.ts at level 2, seed 7, fork day 30, 180 days; before: the same without
+  `difficulty`):** the desk's clients 251 to 330 (the opening caseload names 113 refused claimants and 5 applicants to a
+  body). Benefit matters (claims, changes, review requests, want-claim_refused) a desk seat-month: 3.0 to 4.5 over the
+  first 60 days, 3.3 to 5.0 over 180. Housing matters (want-disrepair, rental applications; no possession case): 0.5
+  to 2.0 over 60 days, 0.7 to 1.2 over 180. Forwards over the 180 days: evidence requests 9, benefit decisions 8,
+  answers on review 4, venue decisions 2. **No possession case reaches the desk, with or without the assignment:** the
+  town's opening caseload has no rent arrears (every let household's income or savings covers its rent when the year
+  begins, by the profile's homes by income), and in 210 days one notice to vacate is given in the whole town. The rule
+  takes in tenants in arrears where a town has them; this one has none, and no rate was changed to make some.
+- **Revisit if** a source on advice services' clients is opened (MT-40), or the desk's volume is too much for a seat,
+  or the study needs possession cases (then a town or scenario where households cannot cover their rent: the lead's
+  choice, not a rate tuned here).

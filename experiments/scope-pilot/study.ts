@@ -23,4 +23,4 @@ import { ALLOW, ARMS, DAYS } from "./plan";
 export const study = (cohort: Cohort, holdLevels: "month" | "run", name: string, depth: "act" | "matter" = "matter") =>
   build({ name, days: DAYS, seeds: [7], reviewDays: 14, arms: ARMS, budget: { experiment_usd: 0, arm_usd: {} }, allow: ALLOW, offices: [...OFFICES, RATES_POST], cohort, holdLevels, depth, wants: depth !== "act" });
 
-export default study({ by: "hand", every: 3, only: true }, "run", "scope-study");
+export default study({ by: "hand", every: 3, only: true, difficulty: true }, "run", "scope-study");

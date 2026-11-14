@@ -56,7 +56,37 @@ export const RATES_POST = "rates";
  * person's own rule, from their own papers and the offer's terms. Nothing is decided for them. */
 /** `only`: nobody outside the cohort is offered the service (they see no offer and have no rule for one), so that who
  * has an assistant is the experiment's assignment alone; `reach` always works so. */
-export type Cohort = { by: "hand" | "reach"; every: number; only?: boolean };
+/** `difficulty`: the cohort also takes in every adult already in difficulty when the year begins (`inDifficulty`): a
+ * help desk's clients are not the town's, but disproportionately people in trouble (docs/design/stakes.md, D3). They
+ * engage as the rest of the cohort does, and hand over their answer to a case against them at draft
+ * (`DIFFICULTY_LEVELS`), so that the desk writes it. An assignment of the study's, stated: who is in difficulty is read
+ * from the papers on file at the start, and nothing about the town's rates changes. */
+export type Cohort = { by: "hand" | "reach"; every: number; only?: boolean; difficulty?: boolean };
+
+/** The papers on file when the year begins (the town's opening caseload, `brought_forward`) that put a person in
+ * difficulty (docs/design/stakes.md, D3): addressed to them, rent owed (a landlord's statement of the rent account), a
+ * notice to vacate, a hearing or an order on an application against them, a loan behind, a claim refused, a body's
+ * notice that a matter they took to it is before it; or a paper of theirs under way, a request to put a refusal right,
+ * an application to a body that hears grievances. The rule, written down: an adult is in difficulty at the start when
+ * one of these names them. */
+export const DIFFICULTY = {
+  to: ["rent_statement", "notice_to_vacate", "hearing_notice", "tribunal_order", "loan_arrears", "benefit_decision", "complaint_notice"],
+  by: ["review_request", "application"],
+};
+/** What a client in difficulty hands over at draft beyond the cohort's levels: the answer to an application against them
+ * (a tenant's response to a possession application). */
+export const DIFFICULTY_LEVELS = { tribunal_response: "draft" };
+
+/** The people in difficulty when the year begins, by the rule `DIFFICULTY` states, from a town's config. */
+export function inDifficulty(config: any): Set<string> {
+  const out = new Set<string>();
+  for (const r of config.world?.records ?? []) {
+    if (r.record !== "statement" || r.data?.brought_forward !== true) continue;
+    if (DIFFICULTY.to.includes(r.kind)) for (const a of r.addressed_to ?? []) out.add(a);
+    if (DIFFICULTY.by.includes(r.kind) && typeof r.speaks_for === "string") out.add(r.speaks_for);
+  }
+  return out;
+}
 
 /** The request form's title as the assistants' stationery has it (participants/src/kinds/assistants.ts). */
 const SCOPE_TITLE = ASSISTANT_ISSUES.find((x) => x.form === "scope_request")!.title;
@@ -151,9 +181,12 @@ export function build(o: Options): ExperimentSpec {
         const adults = new Set(config.world.entities.filter((e: any) => e.kind === "person" && typeof e.born_at === "number" && e.born_at <= start - 18 * 365.25 * DAY).map((e: any) => e.id));
         const people = config.participants.filter((p: any) => p.kind === "person" && adults.has(p.person) && p.controller?.params?.delegation && !p.shares_body).sort((a: any, b: any) => (a.id < b.id ? -1 : 1));
         const c = o.cohort ?? { by: "hand", every: COHORT_EVERY };
-        const cohort = people.filter((_: any, i: number) => i % c.every === seed % c.every);
+        // (And, where the spec says, every adult in difficulty at the start: `inDifficulty`, D3.)
+        const troubled = c.difficulty ? inDifficulty(config) : new Set<string>();
+        const cohort = people.filter((p: any, i: number) => i % c.every === seed % c.every || troubled.has(p.person));
+        const levels = (p: any) => ({ ...PERSON_LEVELS, ...(o.wants ? WANT_LEVELS : {}), ...(troubled.has(p.person) ? DIFFICULTY_LEVELS : {}) });
         // (With a second desk, every other member of the cohort engages provider B's paid offer at the same levels.)
-        if (c.by === "hand") cohort.forEach((p: any, i: number) => { p.controller = { ...p.controller, params: { ...p.controller.params, delegation: { ...structuredClone(p.controller.params.delegation), review_days: o.reviewDays, ...ready, commit: commit(o.secondDesk && i % 2 === 1 ? "personal-assistant-b" : "personal-assistant-a", o.wants ? { ...PERSON_LEVELS, ...WANT_LEVELS } : PERSON_LEVELS) } } }; });
+        if (c.by === "hand") cohort.forEach((p: any, i: number) => { p.controller = { ...p.controller, params: { ...p.controller.params, delegation: { ...structuredClone(p.controller.params.delegation), review_days: o.reviewDays, ...ready, commit: commit(o.secondDesk && i % 2 === 1 ? "personal-assistant-b" : "personal-assistant-a", levels(p)) } } }; });
         if (c.by === "reach" || c.only) {
           // (The offer reaches the cohort and nobody else: the rest are shown no provider's offer, and have no rule for one.)
           const reached = new Set(cohort.map((p: any) => p.id));

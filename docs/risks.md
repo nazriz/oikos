@@ -1929,6 +1929,23 @@ The mechanism:
 - **Notice by:** a paper to a client, about a matter its desk sent, with no `forward` (or one naming another matter):
   check the log's bases against the matter's papers.
 
+### MT-40 · The desk's clients are an assigned cohort that takes in everyone in difficulty
+- **Gap:** The stakes study's desk serves one adult in three by hand plus every adult in difficulty when the year
+  begins (`Cohort.difficulty`, experiments/scope-pilot/build.ts: a paper of the opening caseload naming them: rent
+  owed, a notice to vacate, a hearing or order, a loan behind, a claim refused, a matter of theirs before a body). Who
+  uses a real help desk is not sourced: "disproportionately people in trouble" is the design's premise, and taking in
+  all of them, not a share, is a choice. Those clients hand over their answer to a possession application at draft,
+  where the rest of the cohort keeps it at advice. Who falls into difficulty during the run is the town's own.
+- **Where:** `experiments/scope-pilot/build.ts` (`DIFFICULTY`, `inDifficulty`, `DIFFICULTY_LEVELS`); study.ts,
+  study-obstacles.ts and obstacle-run.ts set it.
+- **Effect:** The desk's matters are richer in housing and benefit cases than the town's, so a seat meets more stakes
+  than a random client mix would give it; any rate per client (episodes, refusals, evictions) describes this cohort,
+  not the town's households, and the code arm's reference is on the same cohort.
+- **L / I:** high / medium · **Status:** open (2026-11-14, by design)
+- **Fix when:** a source on who uses advice and paperwork services is opened (a help desk's or advice agency's client
+  profile): the share in difficulty taken from it, or the paper reports the cohort as assigned.
+- **Notice by:** a result read as about households in general; or a report comparing the desk's clients with the town.
+
 ---
 
 ## Profiles and sources
