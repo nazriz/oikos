@@ -29,6 +29,15 @@ export const ASSISTANT_ISSUES: Issued[] = [
       access: f("text", "Access you ask for, if any."), record: f("record", "A paper of theirs you need a copy of, if any."), matter: f("record", "The matter in hand that needs it, if any."),
       answers: f("record", "What this answers, if anything.") },
     writes: { kind: "scope_request", text: "{words}", basis: "=answers", to: ["=client"], visible: ["=self", "=client"], data: { agreement: "=agreement", kind: "=kind", level: "=level", access: "=access", record: "=record", matter: "=matter" } } },
+  // (docs/design/stakes.md, B3: one named thing of theirs. Their office answers from its own records, in its own time;
+  // what it cannot answer from them it says it cannot say. A letter that asks is acknowledged, not answered.)
+  { form: "question_to_client", title: "A question to whom you work for, about a matter",
+    does: "Asks whom you work for one thing of theirs about a matter they handed you: what their account stands at, a paper of theirs (by its id), who someone the matter names is, or what a detail of the matter is. They answer from their own records when they next deal with their papers, or say they cannot say.",
+    fields: { referral: f("record", "The matter you were handed.", req), client: f("entity", "Whom you work for in it.", req),
+      about: f("choice", "What you ask about.", { required: true, options: ["balance", "document", "party", "detail", "other"] }),
+      paper: f("record", "The paper of theirs you ask about, if a document."), name: f("text", "Whom you ask about (their id as the matter names them), or the detail's name, if a party or a detail."),
+      words: f("text", "Your question, in your words.", req) },
+    writes: { kind: "question", text: "{words}", basis: "=referral", to: ["=client"], visible: ["=self", "=client"], data: { referral: "=referral", about: "=about", paper: "=paper", name: "=name" } } },
   { form: "send_signed", title: "Sending a paper as it was signed off",
     // (In the name of whoever signed it off, since 2026-11-14: before, a model seat's copy went in its own provider's
     // name, since "who it is for" is code's to set and not the translator's: the scope pilot's baseline.)

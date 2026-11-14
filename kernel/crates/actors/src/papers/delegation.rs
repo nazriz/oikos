@@ -31,6 +31,8 @@ pub const KINDS: &[&str] = &[
     Acknowledgement::KIND,
     Handover::KIND,
     Forward::KIND,
+    Question::KIND,
+    QuestionAnswer::KIND,
 ];
 
 /// What would clear an obstacle, as the law that made it names it (docs/design/obstacles.md section 4): an authority
@@ -664,6 +666,61 @@ impl Forward {
     pub fn due(&self) -> Option<i64> {
         ["by", "answer_by", "hearing_at"].iter().find_map(|k| crate::papers::lenient::whole(&self.data[*k]))
     }
+}
+
+/// What an assistant may ask its principal about a matter (docs/behaviour/assistants.md, "A question to the client"):
+/// one named thing of the principal's own. Anything else is `other`, which its code answers "we cannot say".
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Asked {
+    /// What its account stands at.
+    Balance,
+    /// A paper of its own, or one sent to it, named by id: who it is from, its days, its words.
+    Document,
+    /// Who someone the matter names is, as its own papers have them.
+    Party,
+    /// What a named detail of the hand-over is.
+    Detail,
+    #[default]
+    #[serde(other)]
+    Other,
+}
+
+/// An assistant's question to its principal about a matter it was handed: one named thing (`about`; the paper, or the
+/// party or detail named), and its words.
+///
+/// Written by: a model in an assistant seat (the form `question_to_client`); a code assistant asks nothing. Addressed
+/// to the principal; `basis` is the referral. Read by: the principal (`answer_question`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Question {
+    pub referral: String,
+    #[serde(default)]
+    pub about: Asked,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paper: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+impl Paper for Question {
+    const KIND: &'static str = "question";
+}
+
+/// The principal's answer to a question: whether it could say (`known`), and what it said, typed (`answer`) and in its
+/// words. `basis` is the question.
+///
+/// Written by: the principal (`answer_question`). Addressed to the assistant. Read by: the assistant's seat.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct QuestionAnswer {
+    pub question: String,
+    pub referral: String,
+    pub about: Asked,
+    #[serde(deserialize_with = "lenient::yes")]
+    pub known: bool,
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub answer: Value,
+}
+impl Paper for QuestionAnswer {
+    const KIND: &'static str = "question_answer";
 }
 
 #[cfg(test)]

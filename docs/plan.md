@@ -25,7 +25,7 @@ The build (docs/design/stakes.md section 7; first S, C1+B2, B1, D1a, A2, E by We
   the wait it can see, `alone` screened.
 - [x] B1. The client passes on every paper about a matter it handed over (closes MT-34). Done 2026-11-14 (`forward`).
 - [x] B2. The hand-over carries why and by when, in the client's facts and the counterparty's dates.
-- [ ] B3. The assistant may ask its client one named thing.
+- [x] B3. The assistant may ask its client one named thing. Done 2026-11-14 (`question_to_client`; MT-43).
 - [x] C1. `Referral.due` and `Draft.by` (with `due_on`, `draft_by`, `why`; risk MT-38).
 - [x] C2. A backlog at the support office from too few staff hours (`support.staff_hours_bps`; the study's
   `SHORT_STAFFED_BPS`, 3,000, risk MT-32; a slow office for weeks from the opening caseload, stable after).

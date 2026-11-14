@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
 import { ASSISTANT_ISSUES, withObstacles, clientDraft, clientDraftOf, clientPapers, wantPapers, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
-import { COMPOSE_BPS, SCOPE_ANSWER_SECONDS, WRONG_RETURN_BPS } from "./registry";
+import { COMPOSE_BPS, QUESTION_ANSWER_SECONDS, SCOPE_ANSWER_SECONDS, WRONG_RETURN_BPS } from "./registry";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
@@ -168,7 +168,7 @@ const WORK_TIME = {
 /** The papers of delegation (docs/design/delegation.md): what a principal writes, with its own time for each (placeholders,
  * to confirm; WM-1), added to the table only where a town has providers; and what its assistant writes and sees. */
 const DELEGATION_TIME = {
-  person: { "publish/referral": 30, "publish/sign_off": 300, "publish/go_ahead": 60, "publish/declined": 120, "publish/remit": 120, "publish/brief": 300, "publish/scope_request": 300, "publish/scope_answer": SCOPE_ANSWER_SECONDS, "publish/acknowledgement": 60, "publish/forward": 60 },
+  person: { "publish/referral": 30, "publish/sign_off": 300, "publish/go_ahead": 60, "publish/declined": 120, "publish/remit": 120, "publish/brief": 300, "publish/scope_request": 300, "publish/scope_answer": SCOPE_ANSWER_SECONDS, "publish/acknowledgement": 60, "publish/forward": 60, "publish/question_answer": QUESTION_ANSWER_SECONDS },
   sources: {
     "person.publish/referral": "Placeholder (to confirm; WM-1): half a minute to hand a routine matter to an assistant, with what to do (a forward with a word): software, no source. Would be sourced by a time-use study of delegating routine correspondence.",
     "person.publish/sign_off": "Placeholder (to confirm; WM-1): five minutes to read a draft whole and sign it off. Would be sourced by a study of review time for drafted correspondence.",
@@ -179,6 +179,7 @@ const DELEGATION_TIME = {
     "person.publish/scope_request": "Placeholder (to confirm; WM-1): five minutes to ask for more scope in writing.",
     "person.publish/scope_answer": "Placeholder (to confirm; WM-1): five minutes to weigh a request for more scope and answer it in writing.",
     "person.publish/acknowledgement": "Placeholder (to confirm; WM-1): a minute to acknowledge a letter.",
+    "person.publish/question_answer": "Placeholder (to confirm; WM-1): five minutes to look one thing up in one's own papers (a balance, a paper, who someone is) and answer one's assistant in writing (docs/design/stakes.md, B3). Would be sourced by a time-use study of answering an agent's queries.",
     "person.publish/forward": "Placeholder (to confirm; WM-1): a minute to pass a body's letter about a matter on to one's assistant, as it stands (docs/design/stakes.md, B1). Would be sourced by a time-use study of handling correspondence with an agent.",
   } as Record<string, string>,
 };
@@ -191,7 +192,7 @@ function paperworkOf(p: { every_days: [number, number][]; from_hour: number; to_
   return { every_days: p.every_days, from_hour: p.from_hour, to_hour: p.to_hour };
 }
 // (The composing share, COMPOSE_BPS, is in the registry: worlds/generator/registry.ts. Rows added only where a town has providers.)
-const ASSISTANT_PAPERS = ["advice", "draft", "approval_request", "report", "scope_request", "handover"];
+const ASSISTANT_PAPERS = ["advice", "draft", "approval_request", "report", "scope_request", "handover", "question"];
 const ASSISTANT_PAPER_SECONDS = 5;
 /** The kinds of want a person may hand over (`want-<about>`, the mind's own words: docs/design/handing-over.md H4), and
  * the paper a clerk's first step writes for each (what handing one over is priced by): asking whoever it is against or
@@ -200,7 +201,7 @@ export const WANT_PAPER: Record<string, string> = { "want-claim_refused": "revie
 const WANT_KINDS = Object.keys(WANT_PAPER);
 /** Every paper a clerk's procedure may write for a want: the request first, then an application to a body that hears it. */
 const WANT_STEPS = ["application", "review_request", "tribunal_application", "variation_request"];
-const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement", "forward"];
+const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement", "forward", "question_answer"];
 /** What an assistant's post is shown (docs/behaviour/assistants.md, "A model in an assistant seat"): the terms it works
  * on (the delivery, the service's end, briefs and remits), the matters handed to it and the answers to what it asked, as
  * they come; on request, its file of all of those and of its own papers on them and what it sent for its principal (the
@@ -209,7 +210,7 @@ const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "
  * to check what they had been handed and whether a paper had gone, and could not; and a collector they knew only as an
  * id in a referral's words could not be named (docs/decisions.md, 2026-11-08, "The scope pilot's first round"). */
 const ASSISTANT_TERMS = ["service_delivery", "service_ended", "brief", "remit"];
-const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement", "forward"];
+const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement", "forward", "question_answer"];
 /** The support law's own words for from when a granted claim is paid (law S, docs/design/stakes.md): the office's, as
  * published on its law; never a cost, never advice. */
 const EFFECT_WORDS: { [k in "first_claim" | "decision"]: string } = {

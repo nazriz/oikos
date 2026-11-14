@@ -565,6 +565,27 @@ Basis: a person whose bank has told them to write to authorise their assistant, 
 them about that matter, does it; they do not wait for the news on a particular form (the first rung, 2026-11-14:
 `runs/scope-obstacle-r1-L2`, where Haiku wrote the client exactly that letter and nothing moved). Risk MT-36.
 
+**A question to the client (2026-11-14; docs/design/stakes.md, B3).** An assistant may ask its principal one named
+thing about a matter it was handed, on its form `question_to_client` (a `question` paper: the matter, what it asks
+about, and the paper, party or detail named). What it may ask about is a small set the principal's code answers from
+what is its own:
+- `balance`: "Our account {account} stands at {sum} today." (its own account, as it sees it when it answers);
+- `document`, a paper named by id: "Our {kind} {id} from {whom}, of {date}, naming {each day the paper names}: "{its words}""
+  (a paper sent to it, or one of its own; any other: "We hold no paper {id}.");
+- `party`, named as the matter names them: "In this matter {who} is the {the details that name them}. Our {papers of
+  the act} goes to {who}. We hold {who}'s {kind} {id} of {date}: "{words}"" (none of that: "We know nothing of {who}
+  beyond this matter's papers.");
+- `detail`, by name: "In this matter, {detail} is {value}." (none: "The matter has no {detail}.");
+- `other`: "We cannot say.", and where its referral gave the matter's grounds (B2's `why`), "What we told you of
+  this matter when we handed it over: {those words}"; a matter not its own: "{id} is not a matter we handed you."
+It answers in its own time (a person when they next sit down to their post, D1a; an organisation's post on its next
+wake), at the table's row `publish/question_answer` (five minutes, **placeholder**, WM-1), with a `question_answer`
+paper (`known`, and the answer typed) to its assistant, seen in its matters as it comes. It never works out a figure it
+does not hold and never advises. A letter that asks a question is acknowledged, as before, not answered: its code reads
+no prose. A code assistant asks nothing. Basis: an agent asks its principal for the facts it needs (the factory's
+assistant, three times, wrote to ask who "outside" was and was never answered; a desk with a client's deadline had no
+way to ask about their position). Risk MT-43.
+
 **What the client passes on (2026-11-14; docs/design/stakes.md, B1).** One law for every kind of paper and every body,
 for persons and organisations alike: a principal who has handed a matter to an assistant passes on to it every paper
 it receives about that matter, as it stands, as its own act. A paper is about a matter when it cites a paper sent on
