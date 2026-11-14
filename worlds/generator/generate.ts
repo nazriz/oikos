@@ -210,6 +210,13 @@ const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "
  * id in a referral's words could not be named (docs/decisions.md, 2026-11-08, "The scope pilot's first round"). */
 const ASSISTANT_TERMS = ["service_delivery", "service_ended", "brief", "remit"];
 const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement", "forward"];
+/** The support law's own words for from when a granted claim is paid (law S, docs/design/stakes.md): the office's, as
+ * published on its law; never a cost, never advice. */
+const EFFECT_WORDS: { [k in "first_claim" | "decision"]: string } = {
+  first_claim: "A granted claim is paid from the day the person first claimed it, even if they had to claim it again because something we asked for came too late; what is owed for the days before is paid with the first payment.",
+  decision: "A granted claim is paid from one payment period after it is decided; nothing is paid for the days before.",
+};
+
 /** What the bodies that receive persons' papers require of them, at obstacle levels 1 and 2 (docs/design/obstacles.md,
  * O4): the items their own forms ask for, each a field every code actor that files the kind fills. Basis: a lender's
  * application asks how much, over how long, what for and the account; a support claim the payment and the account to
@@ -383,6 +390,11 @@ export interface TownSpec {
    * absent, the profile's own, and the town exactly as before). Fewer hours, and the casework queues behind itself in
    * them: a backlog from hours, never a dial. A study states the level it sets, and why. */
   support?: { staff_hours_bps?: number };
+  /** From when the support law pays a granted claim (docs/design/stakes.md, law S), published in the law's own words:
+   * `first_claim` (the stakes study's S0: from the day of the first claim, kept through a claim that lapsed for want of
+   * what was asked and was made again) or `decision` (S1: from one period after the decision, as the office pays without
+   * it). Absent: the law says nothing of it and pays from the decision, exactly as before. */
+  support_date_of_effect?: "first_claim" | "decision";
   /** What a person keeps of public goings-on (docs/behaviour/citizen.md, "What a person remembers of public goings-on";
    * risk SC-1): on unless set false (then everyone keeps every published paper for good, as before 2026-10-24); or the
    * bound's sizes in place of the generator's placeholders. */
@@ -2510,9 +2522,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // The support law (the outside world's, as the income tax is): the payments, published for anyone to read; the
   // payments office applies it, and people claim under it.
   if (PAYMENTS.length) records.push({ id: "law-support", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
-    text: `Support payments. ${paymentsInWords(PAYMENTS, V.currency, payees(PAYMENTS))}. A person claims a payment from whoever pays it, stating their date of birth, the account to pay and what the payment asks them to declare.`,
+    text: `Support payments. ${paymentsInWords(PAYMENTS, V.currency, payees(PAYMENTS))}. A person claims a payment from whoever pays it, stating their date of birth, the account to pay and what the payment asks them to declare.${spec.support_date_of_effect ? ` ${EFFECT_WORDS[spec.support_date_of_effect]}` : ""}`,
     adico: { attribute: "the payments office", deontic: "must", aim: "pay each person who claims a payment and fits its rule", condition: "on the payment's schedule, for as long as the payment lasts" },
-    data: { support: "payments", payments: PAYMENTS } });
+    data: { support: "payments", payments: PAYMENTS, ...(spec.support_date_of_effect ? { date_of_effect: spec.support_date_of_effect } : {}) } });
   // Tax paid and not owed (docs/behaviour/public-finance.md, "The taxpayer's account"; risk PB-23): where the profile states the place's
   // law on it, the outside world's collector keeps each taxpayer's account, a credit may be claimed back (or set against the next return,
   // where the law allows), and the forms for a claim and for a statement of one's own account are published for anyone who pays tax over.

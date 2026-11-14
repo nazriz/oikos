@@ -117,6 +117,21 @@ It grants or refuses (`benefit_decision`: the sum, how often, and `until` where 
 
 **Looking again and waiting (0.10.0, foundations F8; docs/behaviour/decisions.md).** A claim waits for what the decisions law says it needs before it is decided (papers from the claimant, a confirmation from their last employer, within the law's days: asked for once, by the office, as work with its time); a refusal asked about inside the law's days is decided again on the facts, recorded (`decision_review`) and, if found wrong, put right by the office itself (a new `benefit_decision` with `on_review`) or on a venue's setting it aside. The office no longer keeps a memory of which refusals were wrong: the review recomputes the decision from the claim. The 6 days of the real agency come, if at all, from the claimant's and the employer's time and the office's rounds; nothing sets them.
 
+**From when a granted claim is paid (2026-11-14; docs/design/stakes.md, law S).** The law may say (`data.date_of_effect`),
+and then its published words say so too, in the office's own terms:
+- `decision`: from one payment period after the decision; nothing for the days before. "A granted claim is paid from
+  one payment period after it is decided; nothing is paid for the days before." This is what the office does when the
+  law is silent, as before.
+- `first_claim`: from the day of the person's first claim for the payment. That day is kept through earlier claims of
+  theirs for it that lapsed for want of what was asked, or could not be verified, and were made again; a claim decided
+  otherwise (refused on the law's conditions, or granted and ended) starts the count again. What is owed for the days
+  from it to the decision, pro rata, is paid with the first payment ("with what was owed from the first claim"). "A
+  granted claim is paid from the day the person first claimed it, even if they had to claim it again because something
+  we asked for came too late; what is owed for the days before is paid with the first payment."
+- Basis: Services Australia's date of effect from an intent to claim, and its start date kept for a claim completed in
+  the time given (recalled, not opened: MT-37; keeping the day through a lapse is a placeholder rule until then). The
+  generator's `support_date_of_effect` sets it; absent, the law and its words are as before, to the byte.
+
 **Mistakes** (0.4.0; the load of 0.4.0 removed in 0.8.0, foundations F6; the rate a slip of the world's table from 0.9.0, foundations F7). A payments office makes mistakes: a slip of whoever decides a claim, at the rate of the row `publish/benefit_decision` of the world's table of slips (`orchestration.slip`; of claims that qualify, the share wrongly refused, scaled by the world's friction dial `dials.friction_bps`; the same share however many claims are waiting; no row, no slip), drawn by `slip()` (participants/src/slip.ts). Until 0.8.0 there were also `processing_days` (a claim decided that long after it was made) and `capacity_per_day` (how many its staff decide in a day), and the share was doubled while more claims waited than a day's capacity: three dials that set the office's throughput and delay directly. How long a claim takes is now the hours of whoever decides it: a system's lanes and the seconds a decision takes in the world's table, a person's timeline. The wait of the real agency (Victoria: 6 days in July 2024, Services Australia annual report 2023-24) is not the town's to make, and returns when the keepers it asks take time to answer (foundations F11). A wrong refusal is a `benefit_decision` that says "the claim could not be verified" (drawn from a stream named for the claim); the office remembers it as wrong. A claimant who asks the office to review the refusal (`review_request`, matter `claim_refused`, `about` the decision, answered by `respond`: docs/behaviour/frictions.md) is told yes if its books show the refusal was wrong and no if the claim was rightly refused; a review pays nothing, but that person's next claim for the payment is decided on its facts, with no error draw, and they claim again. The figures are the profile's, with their sources (`frictions.support`: docs/behaviour/frictions.md).
 
 **Who claims what** is the citizen's (docs/behaviour/citizen.md, "Retiring and support").

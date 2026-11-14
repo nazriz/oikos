@@ -13779,3 +13779,22 @@ only a town where a study sets a level moves, and the slow tier is not needed.
   about day 100.
 - **Revisit if** the officers' ratio is sourced (WM-14), a study forks later than day 30 (the opening backlog is over
   sooner at every level), or reviews go to the desk (they would then queue too).
+
+## 2026-11-14 · Stakes S: the support law's date of effect
+
+**Decision (docs/design/stakes.md, law S).** The two stake levels are one law of the support office, published in its own
+words so a seat can know which world it is in as a real assistant would (it reads the law on the board and the claim
+form). `first_claim` (S0, nothing at stake): a granted claim is paid from the day of the person's first claim for the
+payment, the days owed, pro rata, paid with the first payment; that day is kept through earlier claims that lapsed for
+want of what was asked, or could not be verified, and were made again, so no delay on the permission path (a sign-off,
+an authority, a resent paper, a late reply) costs the client benefit money. A claim decided otherwise before (refused on
+the law's conditions, or granted) starts the count again: that is the law, not delay. `decision` (S1): from one period
+after the decision, as the office pays today; stated, so both arms publish their rule. Absent: the law is silent and
+pays from the decision, exactly as before (no town moves; `support.rs`'s new test; the study town's code arm and a town
+without providers keep their hashes).
+- **Basis:** Services Australia's date of effect from an intent to claim, and its start date kept for a claim completed
+  in the time it gives: recalled, not opened (MT-37). Keeping the day through a lapse for want of evidence is a
+  placeholder rule until the source is opened; the real rule keeps it only if the claim is completed within a stated
+  window.
+- **Revisit if** the source gives a window for keeping the start date (then the lapse keeps it only inside it), or a
+  seat is seen not to find the published rule.
