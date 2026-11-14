@@ -13452,3 +13452,8 @@ under $10 together at their own limits.
   its `why`, parts and inputs are as before); a code town's scope answers change in that one case and nothing else.
 - **Revisit if:** a matter is closed by something other than a report or a decline (then the reader learns that paper);
   a seat's own report is refused by the world (it is counted as made when confirmed).
+- **Corrected the same day:** the first reading took a search's newest twenty only, and six matters long finished (each
+  reported done, sent again and decided before the fork) stood open at the desk. The reading now pages the file,
+  newest first, until each kind is exhausted, and the last report on a matter, done or not, is what it goes by; papers
+  sent back and authorities recorded before the post was taken, for clients with no matter still open, leave the first
+  sitting's list and are said to be in the file. A model desk's "done" means sent, not decided: risk MT-34.

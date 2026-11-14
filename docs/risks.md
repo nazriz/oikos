@@ -1812,6 +1812,17 @@ The mechanism:
   the result's sensitivity to it.
 - **Notice by:** a profile's `accept/<kind>` source still saying "PLACEHOLDER".
 
+### MT-34 · A desk's "done" means sent, not decided
+- **Gap:** A paper the assistants' desk sends for a client goes in the client's name, so the lender's or office's
+  decision on it goes to the client, whose code does not tell the desk. The desk learns only that a paper came back.
+- **Where:** the code client (`kernel/crates/actors/src/delegation/`); the desk's reports; the matters reader
+  (`participants/src/readers/matters.ts`), which goes by the last report.
+- **Effect:** A matter reported done may have been refused. A seat cannot follow a refusal up, and the count of what an
+  assistant does after an obstacle sees returned papers only, not decisions.
+- **L / I:** high / low · **Status:** open (found 2026-11-14)
+- **Fix when:** a study needs what an assistant does after a decision: the client passes the answer on, as a person would.
+- **Notice by:** a desk matter whose last report says done while the counterparty's answer to the client is a refusal.
+
 ---
 
 ## Profiles and sources

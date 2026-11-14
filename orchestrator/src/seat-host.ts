@@ -258,7 +258,11 @@ export class ModelSeat {
       // (An assistant's seat reads its post's own file on arrival, as a successor does, before anything else: a look, which
       // takes no time, as any look at its own papers; a search, which leaves the file as if never looked at. Its answer
       // comes with the next wake, at once, and the hand-over is made then. readers/matters.ts, 2026-11-14.)
-      if (this.matters?.toRead && !this.fileRead) { this.fileRead = true; return { action: { type: "look", looks: this.matters.read() } }; }
+      if (this.matters?.toRead) {
+        if (this.fileRead) this.matters.absorbRead(raw);
+        this.fileRead = true;
+        if (this.matters.toRead) return { action: { type: "look", looks: this.matters.read() } };
+      }
       this.handedOver = true;
     }
     // (What a model seat was shown is recorded in full: training data, as in every pilot.)
