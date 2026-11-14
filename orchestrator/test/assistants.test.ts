@@ -10,7 +10,7 @@ import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
 import { runWorld } from "../src/run";
 import { FORM_CALL_NAMES } from "../../translator/src/resolver";
-import { build } from "../../experiments/scope-pilot/build";
+import { build, inDifficulty } from "../../experiments/scope-pilot/build";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -128,6 +128,21 @@ test("a town that does not ask for assistants is generated as before; one that d
   const ready = hand(500).participants.filter((p: any) => p.controller?.params?.delegation);
   expect(ready.length).toBeGreaterThan(0);
   for (const p of ready) expect([p.controller.params.delegation.hurdle_bps, !!p.controller.params.delegation.commit]).toEqual([500, true]);
+  // The clients in difficulty (docs/design/stakes.md, D3): where the cohort says so, an adult a paper of the opening
+  // caseload names (here a notice to vacate) joins it, handing over their answer to a case against them at draft; the
+  // rest of the cohort is as before.
+  const cohortIds = new Set(ready.map((p: any) => p.id));
+  const outside = on.participants.find((p: any) => p.kind === "person" && p.controller?.params?.delegation && !p.shares_body && !cohortIds.has(p.id) && on.world.entities.some((e: any) => e.id === p.person && e.born_at <= -18 * 365.25 * 86_400));
+  const troubled = structuredClone(on);
+  troubled.world.records.push({ id: "t-vacate", record: "statement", author: "genesis", at: 0, visible_to: [outside.person], speaks_for: "someone", kind: "notice_to_vacate", addressed_to: [outside.person], text: "Leave.", data: { brought_forward: true } });
+  const withTrouble = (build({ name: "t", days: 1, seeds: [1], reviewDays: 14, arms: [], budget: { experiment_usd: 0, arm_usd: {} }, offices: [], cohort: { by: "hand", every: 3, only: true, difficulty: true } }).world as any).prepare(troubled, 1);
+  const joined = withTrouble.participants.find((p: any) => p.id === outside.id).controller.params.delegation.commit;
+  expect(joined?.levels?.tribunal_response).toBe("draft");
+  // (Everyone else engaged is the cohort as before or named by a paper of the opening caseload, and keeps its answer at advice.)
+  const named = inDifficulty(troubled);
+  const extra = withTrouble.participants.filter((p: any) => p.controller?.params?.delegation?.commit && !cohortIds.has(p.id));
+  expect(extra.filter((p: any) => !named.has(p.person)).map((p: any) => p.id)).toEqual([]);
+  expect(withTrouble.participants.filter((p: any) => cohortIds.has(p.id) && !named.has(p.person)).map((p: any) => p.controller.params.delegation.commit.levels.tribunal_response)).not.toContain("draft");
   const profile = on.participants.find((x: any) => x.controller?.params?.delegation).controller.params.delegation.hurdle_bps;
   expect(new Set(hand().participants.filter((p: any) => p.controller?.params?.delegation).map((p: any) => p.controller.params.delegation.hurdle_bps))).toEqual(new Set([profile]));
 });

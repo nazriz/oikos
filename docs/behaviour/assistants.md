@@ -452,6 +452,18 @@ levels again before the day, and a request is declined with it ("we look at leve
 study who has an assistant and at what level is assigned for the whole run, and as a freeze every request would be
 refused, leaving no grants to compare. Test: `a_level_decided_by_hand_as_a_floor_is_kept_at_least_and_its_rule_may_raise_it_or_grant_more`.
 
+**Clients in difficulty (a study's assignment, 2026-11-14; docs/design/stakes.md, D3).** A help desk's clients are not
+the town's: they are disproportionately people already in trouble. A study's cohort may say so (`Cohort.difficulty`,
+experiments/scope-pilot/build.ts): besides its share of adults, it takes in every adult in difficulty when the year
+begins, by a rule written down (`DIFFICULTY`, `inDifficulty`): a paper of the town's opening caseload that names them,
+addressed to them (a landlord's statement of rent owed, a notice to vacate, a hearing notice or an order on an
+application against them, a loan behind, a claim refused, a body's notice that a matter of theirs is before it), or one
+of theirs under way (a request to put a refusal right, an application to a body that hears grievances). They engage by
+hand as the rest of the cohort does, and hand over their answer to an application against them (`tribunal_response`)
+at draft, not advice, so the desk writes it; the hearing notices and orders on it reach the desk by what the client
+passes on. It is an assignment, not a law: nobody's rates change, and who falls into difficulty during the run is the
+town's own mechanism. Risk MT-40.
+
 **A set-up of nothing is paid as placed.** An order whose total is nothing (au-vic's offers to organisations cost
 nothing to set up) is set up at once: before 2026-11-07 the seller waited for a payment that never came and declined the
 order as unpaid after a week, so no organisation could ever be delivered an assistant at the sourced prices

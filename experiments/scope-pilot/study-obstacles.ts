@@ -12,5 +12,5 @@ const two = process.env.OIKOS_DESKS === "2";
 
 export default build({
   name: `scope-study-obstacles-${level}${two ? "-two-desks" : ""}`, days: DAYS, seeds: [7], reviewDays: 14, arms: ARMS, budget: { experiment_usd: 0, arm_usd: {} },
-  allow: ALLOW, offices: [...OFFICES, RATES_POST], cohort: { by: "hand", every: 3, only: true }, holdLevels: "run", depth: "matter", wants: true, obstacles: level, secondDesk: two,
+  allow: ALLOW, offices: [...OFFICES, RATES_POST], cohort: { by: "hand", every: 3, only: true, difficulty: true }, holdLevels: "run", depth: "matter", wants: true, obstacles: level, secondDesk: two,
 });

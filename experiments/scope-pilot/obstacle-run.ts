@@ -95,7 +95,7 @@ export const HEALTH_DAYS = [10, 30];
 export function obstacleRun(o: { name: string; level: 0 | 1 | 2; days: number; seeds: number[]; forkUsd: number }): ExperimentSpec {
   const total = o.forkUsd * o.seeds.length;
   const spec = build({ name: o.name, days: o.days, seeds: o.seeds, reviewDays: 14, arms: ARMS, budget: { experiment_usd: total, arm_usd: { haiku: total } },
-    offices: [...OFFICES, RATES_POST], cohort: { by: "hand", every: 3, only: true }, holdLevels: "run", depth: "matter", wants: true, obstacles: o.level });
+    offices: [...OFFICES, RATES_POST], cohort: { by: "hand", every: 3, only: true, difficulty: true }, holdLevels: "run", depth: "matter", wants: true, obstacles: o.level });
   // (Two model seats a fork; a few calls at once: the API's rate is not the bound, the machine's memory is.)
   spec.seats = { ...spec.seats, calls_at_once: 2, budget: { ...spec.seats!.budget, fork_usd: o.forkUsd } };
   spec.healthCheck = {
