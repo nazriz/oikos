@@ -156,14 +156,7 @@ impl PaymentRule {
 /// The support law in force that has been seen: the latest published and not withdrawn (none: no payments). A payment
 /// of it that cannot be read is left out, as a law with a part not understood binds in the parts that are.
 pub fn support_law(book: &Book) -> Option<(String, Vec<PaymentRule>)> {
-    let l = book
-        .open("law")
-        .filter(|r| data(r).get("payments").is_some_and(|x| x.is_array()))
-        .fold(None::<&Arc<Record>>, |a, b| match a {
-            // (Newest first; of two made together, the later filed.)
-            Some(a) if b.at < a.at || (b.at == a.at && filed_before(&b.id, &a.id).is_le()) => Some(a),
-            _ => Some(b),
-        })?;
+    let l = newest_support_law(book)?;
     let payments = data(l)
         .get("payments")
         .and_then(|x| x.as_array())?
@@ -177,6 +170,21 @@ pub fn support_law(book: &Book) -> Option<(String, Vec<PaymentRule>)> {
         })
         .collect();
     Some((l.id.to_string(), payments))
+}
+
+/// The support law in force: the newest with payments; of two made together, the later filed.
+fn newest_support_law(book: &Book) -> Option<&Arc<Record>> {
+    book.open("law").filter(|r| data(r).get("payments").is_some_and(|x| x.is_array())).fold(None::<&Arc<Record>>, |a, b| match a {
+        Some(a) if b.at < a.at || (b.at == a.at && filed_before(&b.id, &a.id).is_le()) => Some(a),
+        _ => Some(b),
+    })
+}
+
+/// From when the support law pays a granted claim (docs/design/stakes.md, law S): `first_claim`, from the day of the
+/// person's first claim for the payment, that day kept through a claim that lapsed or could not be verified and was made
+/// again; else (`decision`, or the law silent) from one period after the decision, as before.
+pub fn pays_from_first_claim(book: &Book) -> bool {
+    newest_support_law(book).is_some_and(|l| data(l).s("date_of_effect") == Some("first_claim"))
 }
 
 // ------------------------------------------------------------------ tax.ts

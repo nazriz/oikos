@@ -974,3 +974,16 @@ unchanged to the byte.
 - The table of work gains `person.publish/forward` (60 seconds, a placeholder), where a town has providers.
 - `Report.needs.record` may name the paper that asks for a record (an evidence request passed on), where the record
   asked for has no id of its own.
+
+## Stakes S: from when a granted claim is paid (2026-11-14; docs/design/stakes.md, law S; docs/decisions.md, "Stakes S: the support law's date of effect"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additions with defaults: a support law that does not say is as before, and a town generated without the setting is
+unchanged to the byte.
+
+- The support law's data (`law-support`, `data`) may carry `date_of_effect`: `decision` (from one period after the
+  decision) or `first_claim` (from the person's first claim for the payment, kept through a lapse or a claim not
+  verified and made again; the days owed paid with the first payment). The law's text then says which, in its words.
+- The generator's spec gains `support_date_of_effect` (`first_claim` | `decision`); the scope pilot's `build.ts`,
+  `dateOfEffect`.
+- The payments office's saved state gains `back` on a payment it pays (what is owed with the first payment; absent when
+  nothing is).

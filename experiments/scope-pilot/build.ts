@@ -152,6 +152,10 @@ export interface Options {
    * still weighs every request by its own figures; one that costs them more is declined at any hurdle
    * (docs/design/obstacles.md section 10; docs/experiments.md, "Readiness to grant"). */
   hurdleBps?: number;
+  /** The stake (docs/design/stakes.md, law S): from when the support law pays a granted claim, published in its own words.
+   * `first_claim` (S0, nothing at stake: from the first claim, kept through a lapse) or `decision` (S1: benefit income
+   * lost per day of delay). Absent: the law says nothing of it (pays from the decision), as before. */
+  dateOfEffect?: "first_claim" | "decision";
 }
 
 /** Our own trained translator, held fixed for every arm. */
@@ -178,7 +182,7 @@ export function build(o: Options): ExperimentSpec {
     name: o.name,
     world: {
       file: "worlds/town-1000.yaml",
-      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : [])],
+      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : []), ...(o.dateOfEffect ? [`support_date_of_effect=${o.dateOfEffect}`] : [])],
       prepare(config: any, seed: number) {
         for (const post of o.offices ?? OFFICES) {
           const pos = config.positions.find((x: any) => x.id === post);

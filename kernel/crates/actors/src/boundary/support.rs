@@ -278,6 +278,14 @@ struct Paying {
     next: i64,
     until: Option<i64>,
     then: Option<String>,
+    /// What is owed for the days before the first payment where the law pays from the first claim (law S): paid with the
+    /// first payment, then nothing.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    back: i64,
+}
+
+fn is_zero(x: &i64) -> bool {
+    *x == 0
 }
 
 /// A claim, decided on the rule: granted (with the sum and how long), or why not.
@@ -603,7 +611,41 @@ impl Support {
         let account = data(claim).s("account").unwrap_or("").to_string();
         let from = self.from_account(rule);
         let then = rule.and_then(|r| r.lasts.as_ref()).and_then(|l| l.then.clone());
-        self.paying.insert(claim.id.to_string(), Paying { person: person.to_string(), account, payment, from, amount, every, next, until, then });
+        // (Where the law pays from the first claim: the days from it to the decision, pro rata, with the first payment.)
+        let back = self.first_claimed(claim, &payment).map_or(0, |since| {
+            let decided = next - every;
+            if decided > since && every > 0 { (i128::from(amount) * i128::from(decided - since) / i128::from(every)) as i64 } else { 0 }
+        });
+        self.paying.insert(claim.id.to_string(), Paying { person: person.to_string(), account, payment, from, amount, every, next, until, then, back });
+    }
+
+    /// Where the published law pays from the first claim (law S, `first_claim`): the day of this person's first claim for
+    /// the payment, that day kept through earlier claims of theirs for it that lapsed for want of what was asked, or could
+    /// not be verified, and were made again; a claim decided otherwise before (refused on the law's conditions, or granted)
+    /// starts the count again. None where the law pays from the decision, or for a claim brought forward.
+    fn first_claimed(&self, claim: &Record, payment: &str) -> Option<i64> {
+        if !super::support_law::pays_from_first_claim(&self.book) || data(claim).get("brought_forward").is_some_and(truthy) {
+            return None;
+        }
+        let who = claim.speaks_for?;
+        let mut theirs: Vec<&Arc<Record>> = self.book.all("benefit_claim").filter(|c| c.speaks_for == Some(who) && data(c).s("payment") == Some(payment) && c.at <= claim.at).collect();
+        theirs.sort_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
+        let mut since = None;
+        for c in theirs {
+            since.get_or_insert(c.at);
+            if c.id == claim.id {
+                break;
+            }
+            // (How the earlier claim ended: a lapse or a claim not verified keeps the day; any other decision on it starts again.)
+            let ended = self.book.all("benefit_decision").filter(|d| d.speaks_for.as_deref() == Some(self.me.as_str()) && data(d).s("claim") == Some(c.id.as_str())).last().cloned();
+            if let Some(d) = ended {
+                let keeps = self.lapsed_claims.contains(c.id.as_str()) || data(&d).get("could_not_verify").is_some_and(truthy);
+                if !keeps {
+                    since = None;
+                }
+            }
+        }
+        since
     }
 
     /// A claim granted on the office's second look (a review, or a venue setting its refusal aside): the office decides
@@ -1009,7 +1051,9 @@ impl Support {
         for id in ids {
             let Some(x) = self.paying.get_mut(&id) else { continue };
             while x.next <= t && x.next <= x.until.unwrap_or(i64::MAX) && x.every > 0 {
-                due.push(pay(&x.account, x.amount, Pay { from: Some(x.from.clone()), for_: Some(format!("{} support.", x.payment)), ..Default::default() }, cx));
+                let back = std::mem::take(&mut x.back);
+                let for_ = if back > 0 { format!("{} support, with what was owed from the first claim.", x.payment) } else { format!("{} support.", x.payment) };
+                due.push(pay(&x.account, x.amount + back, Pay { from: Some(x.from.clone()), for_: Some(for_), ..Default::default() }, cx));
                 x.next += x.every;
             }
             if x.until.is_some_and(|u| x.next > u || t >= u) {
@@ -1488,6 +1532,32 @@ mod transfer_tests {
         let d = decisions(&at(&mut late, 6 * DAY, vec![]));
         assert_eq!(d[0]["granted"], false);
         assert!(d[0]["reason"].as_str().unwrap().contains("papers asked for did not come within 5 days"));
+    }
+
+    #[test]
+    fn where_the_law_pays_from_the_first_claim_a_claim_made_again_after_a_lapse_is_paid_from_the_first() {
+        // (docs/design/stakes.md, law S: S0 keeps the first claim's day through a lapse; S1, the law silent, pays from the
+        // decision. A$100 a day, a fortnightly payment.)
+        let run = |effect: Option<&str>| {
+            let mut data = json!({ "support": "payments", "payments": [rule(json!({ "id": "pension", "every_days": 14, "who": { "from_age": 67 }, "amount": { "flat": 1_400_000 } }))] });
+            if let Some(e) = effect {
+                data["date_of_effect"] = json!(e);
+            }
+            let dec = st("law-dec", 0, "law", "outside", json!({ "decisions": [{ "kind": "benefit_decision", "needs": [{ "id": "n1", "from": "claimant", "what": "proof of age", "within_days": 5, "else": "refuse" }] }] }));
+            let mut m = office();
+            at(&mut m, 0, vec![st("law-support", 0, "law", "outside", data), dec, claim("c1", 0, "old", "pension", 70, None)]);
+            let lapsed = decisions(&at(&mut m, 6 * DAY, vec![]));
+            assert_eq!(lapsed[0]["granted"], false, "the first claim lapses for want of its papers");
+            let refusal = st_to("rec.60", 6 * DAY, "benefit_decision", "outside", &["old"], lapsed[0].clone());
+            at(&mut m, 10 * DAY, vec![refusal, claim("c2", 10 * DAY, "old", "pension", 70, None)]);
+            let evidence = st_to("rec.61", 11 * DAY, "evidence", "old", &["outside"], json!({ "claim": "c2", "need": "n1" }));
+            assert_eq!(decisions(&at(&mut m, 11 * DAY, vec![evidence]))[0]["granted"], true);
+            paid(&at(&mut m, 25 * DAY, vec![])).into_iter().map(|(_, cents, _)| cents).collect::<Vec<_>>()
+        };
+        // Paid from day 0 (the first claim): eleven days owed (to the decision on day 11) come with the first payment.
+        assert_eq!(run(Some("first_claim")), [1_400_000 + 1_100_000]);
+        assert_eq!(run(Some("decision")), [1_400_000]);
+        assert_eq!(run(None), [1_400_000]);
     }
 
     #[test]
