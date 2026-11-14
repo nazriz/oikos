@@ -359,6 +359,13 @@ pub struct Referral {
     /// holds, by who sent it, when, and in its sender's own words (B2). Never a cost worked out for it, never what to do.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub why: Vec<String>,
+    /// A reply the principal hands over on a matter it handed over already: the body's paper it answers (an evidence
+    /// request on a claim, a hearing notice on an application), and the referral of the matter it is part of
+    /// (docs/design/stakes.md; docs/behaviour/assistants.md, "A matter handed over stays handed over").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reply_to: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub follows: Option<String>,
 }
 
 /// The details in which a paper names a day by which it asks something of whom it is to (an evidence request's `by`,
@@ -664,7 +671,8 @@ impl Forward {
     /// The date the paper asks something by, where it names one (an evidence request's `by`, a notice's `answer_by` or the day of its hearing):
     /// none, it asks for nothing by a date.
     pub fn due(&self) -> Option<i64> {
-        ["by", "answer_by", "hearing_at"].iter().find_map(|k| crate::papers::lenient::whole(&self.data[*k]))
+        // (The details any paper names a day in, read by the one law: `DATE_FIELDS`, the nearest.)
+        dates_named(&self.data).into_iter().map(|(_, d)| d).min()
     }
 }
 

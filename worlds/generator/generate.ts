@@ -3645,7 +3645,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // (A client's papers that the receiving office reads for its figures, on forms of their own with their drafts: a
       // model at the desk fills in fields, never JSON. docs/design/handing-over.md H4.)
       // (And where wants are handed over, the papers a want takes, on forms of their own.)
-      const papers = [...clientPapers(PAYMENTS.map((r) => r.id)).filter((x) => desk.kinds.includes(x.writes.kind)), ...(desk.kinds.some((k) => WANT_PAPER[k]) ? wantPapers() : [])];
+      // (A reply on a matter handed over is the desk's too: the papers for a claim where it takes claims.)
+      const replies: Record<string, string> = { evidence: "benefit_claim" };
+      const papers = [...clientPapers(PAYMENTS.map((r) => r.id)).filter((x) => desk.kinds.includes(x.writes.kind) || desk.kinds.includes(replies[x.writes.kind] ?? "")), ...(desk.kinds.some((k) => WANT_PAPER[k]) ? wantPapers() : [])];
       const words = desk.kinds.filter((k) => !WANT_PAPER[k] && !papers.some((x) => x.writes.kind === k));
       for (const x of [...(OB ? withObstacles(ASSISTANT_ISSUES) : ASSISTANT_ISSUES), clientDraft(words), ...papers, ...papers.map(clientDraftOf)]) records.push(stationeryForm(`${pr.id}-desk`, pr.id, x, {}, "Assistants' desk"));
       positions.find((p) => p.id === `${pr.id}-desk`)!.channels.push(K.mine("stationery", ["form"], { title: "The desk's own forms" }));

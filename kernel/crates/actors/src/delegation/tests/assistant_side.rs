@@ -52,6 +52,33 @@ fn alone_it_does_the_matter_and_reports_with_what_its_act_made() {
     assert!(acted(&out) && out.contains("kind=report") && out.contains("\"done\":true"), "{out}");
 }
 
+/// A paper its client passed on that asks for something by a day: past the day with nothing come of it, the matter is
+/// reported not done (B1); where its client handed the reply over, the reply is a matter of its own, drafted as any, and
+/// nothing lapses (a matter handed over stays handed over).
+#[test]
+fn a_dated_paper_passed_on_lapses_unless_its_reply_was_handed_over() {
+    for handed in [false, true] {
+        let mut h = assistant(None);
+        h.wake(34 * DAY + 3600, world(handed_alone()));
+        let fwd = statement("rec.fwd", 35 * DAY, ME, "forward", &[ME], json!({ "paper": "rec.ask", "kind": "hearing_notice", "by": "court", "for": ME, "matter": "rec.ref", "text": "Answer by day 40.", "data": { "answer_by": 40 * DAY } }));
+        let mut papers = vec![fwd];
+        if handed {
+            papers.push(statement("rec.ref3", 35 * DAY, ME, "referral", &[PROV], json!({ "agreement": "agr.1", "kind": "evidence", "wants": "draft", "calls": NOTICE, "reply_to": "rec.ask", "follows": "rec.ref", "due": 40 * DAY })));
+        }
+        let first = all(&h.wake(35 * DAY + 3600, world(papers)));
+        let late = all(&h.wake(41 * DAY + 3600, world(vec![])));
+        if handed {
+            assert!(first.contains("kind=draft") && first.contains("\"referral\":\"rec.ref3\"") && !late.contains("\"done\":false"), "{first}\n{late}");
+        } else {
+            assert!(late.contains("kind=report") && late.contains("\"done\":false") && late.contains("Nothing has come of it"), "{late}");
+        }
+    }
+}
+
+fn handed_alone() -> Vec<Value> {
+    handed("alone", "agr.1")
+}
+
 #[test]
 fn a_draft_waits_for_its_sign_off_and_a_request_for_its_go_ahead() {
     let mut h = assistant(None);
