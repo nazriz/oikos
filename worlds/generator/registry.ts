@@ -16,6 +16,10 @@ export const COMPOSE_BPS = 5_000;
  * writing (`publish/scope_answer`), as long as the request takes to write. */
 export const SCOPE_ANSWER_SECONDS = 300;
 
+/** placeholder (to confirm; WM-1): five minutes for a principal to look one thing up in its own papers (a balance, a paper,
+ * who someone is) and answer its assistant in writing (`publish/question_answer`; docs/design/stakes.md, B3). */
+export const QUESTION_ANSWER_SECONDS = 300;
+
 /** placeholder (to confirm; MT-32): how often a body's clerk wrongly sends back a paper in order, in basis points of the
  * papers it checks, at obstacle levels 0, 1 and 2 (docs/design/obstacles.md section 6). Leads: e-filing reject rates,
  * accounts-payable exception rates. Level 0: no check at all. */

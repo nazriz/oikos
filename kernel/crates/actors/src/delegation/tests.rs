@@ -351,6 +351,52 @@ fn a_body_s_paper_about_a_matter_handed_over_is_passed_on_and_no_other() {
 }
 
 #[test]
+fn a_question_on_a_matter_is_answered_from_the_principal_s_own_records_and_nothing_else() {
+    // (docs/behaviour/assistants.md, "A question to the client"; docs/design/stakes.md, B3. The factory's case: an
+    // invoice handed over whose buyer is "outside", the assistant asking who that is; three Haiku runs wrote a letter to
+    // ask, which no code reads, and the invoices were never drafted.)
+    let (mut h, _, remit) = engaged();
+    h.wake(34 * DAY + 3600, world(vec![remit]));
+    let mut handed = statement("rec.inv", 34 * DAY + 5000, ME, "referral", &[ME, "ll-assistant"], json!({ "agreement": "agr.1", "kind": "invoice", "wants": "draft", "depth": "matter",
+        "facts": { "buyer": "outside", "offer": "rec.17", "quantity": 2424, "kind": "goods", "unit_price": "10000", "account": "acc-ll", "from_at": "ll-works" } }));
+    handed["in_position"] = json!("ll-office");
+    let ask = |id: &str, about: &str, extra: Value, from: &str| {
+        let mut d = json!({ "referral": "rec.inv", "about": about });
+        for (k, v) in extra.as_object().into_iter().flatten() {
+            d[k] = v.clone();
+        }
+        let mut q = statement(id, 35 * DAY, ME, "question", &[ME], d);
+        q["in_position"] = json!(from);
+        q
+    };
+    let qs = vec![
+        handed,
+        ask("rec.q1", "party", json!({ "name": "outside" }), "ll-assistant"),
+        ask("rec.q2", "detail", json!({ "name": "quantity" }), "ll-assistant"),
+        ask("rec.q3", "balance", json!({}), "ll-assistant"),
+        ask("rec.q4", "document", json!({ "paper": "rec.nobodys" }), "ll-assistant"),
+        ask("rec.q5", "other", json!({}), "ll-assistant"),
+        // (From someone else's post: not its assistant asking.)
+        ask("rec.q6", "balance", json!({}), "somebody-else"),
+    ];
+    let mut out = all(&h.wake(35 * DAY + 7200, world(qs)));
+    for i in 1..12 {
+        out.push('\n');
+        out.push_str(&all(&h.wake(35 * DAY + 7200 + i * 600, world(vec![]))));
+    }
+    let answer = |q: &str| out.lines().find(|l| l.contains("kind=question_answer") && l.contains(&format!("basis={q}"))).map(String::from);
+    // (Shown with --nocapture: the proof of the factory's case, B3.)
+    println!("B3-PROOF The factory's case, as its principal's code answers its assistant (each answer as the program it sends):\n\n{}\n", out.lines().filter(|l| l.contains("kind=question_answer")).collect::<Vec<_>>().join("\n\n"));
+    let party = answer("rec.q1").unwrap_or_else(|| panic!("the party asked about is answered: {out}"));
+    assert!(party.contains("In this matter outside is the buyer") && party.contains("The matter rests on its offer rec.17") && party.contains("\"known\":true") && party.contains("to=[\"ll\",\"ll-assistant\"]"), "{party}");
+    assert!(answer("rec.q2").is_some_and(|l| l.contains("In this matter, quantity is 2424")), "{out}");
+    assert!(answer("rec.q3").is_some_and(|l| l.contains("Our account acc-ll stands at")), "its own account, as it sees it: {out}");
+    assert!(answer("rec.q4").is_some_and(|l| l.contains("We hold no paper rec.nobodys") && l.contains("\"known\":false")), "{out}");
+    assert!(answer("rec.q5").is_some_and(|l| l.contains("We cannot say.") && l.contains("\"known\":false")), "nothing typed, nothing said: {out}");
+    assert!(answer("rec.q6").is_none(), "only its own assistant is answered: {out}");
+}
+
+#[test]
 fn a_matter_handed_back_without_its_notes_is_done_by_the_principal() {
     let (mut h, _, mut remit) = engaged();
     remit["data"]["level"] = json!("draft");
@@ -733,4 +779,28 @@ fn a_person_deals_with_what_comes_by_post_when_it_next_sits_down_to_it_and_not_b
     }
     // (The second draft came days after a sitting: it waited for the next, a whole number of its three days on.)
     assert!(signed_at[1] - signed_at[0] >= 3 * DAY && (signed_at[1] - signed_at[0]) % (3 * DAY) == 0, "{signed_at:?}");
+    // (A question from the desk, about a paper the client holds, a hearing notice with its day to answer by: answered
+    // from the client's own file, at its next sitting, never before. docs/design/stakes.md, B3.)
+    let referral = last_referral(&h);
+    let came = 41 * DAY + 7200;
+    let mut notice = statement("rec.hn", 41 * DAY, "tribunal", "hearing_notice", &[ME], json!({ "application": "rec.app", "answer_by": 50 * DAY + 9 * 3600 }));
+    notice["text"] = json!("You may answer by day 50.");
+    let q = statement("rec.q", came, PROV, "question", &[ME], json!({ "referral": referral, "about": "document", "paper": "rec.hn" }));
+    // (Its referral, as the world files its own paper.)
+    let mut own = statement(&referral, 40 * DAY + 3600, ME, "referral", &[PROV], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "wants": "draft", "calls": NOTICE }));
+    own["author"] = json!("ll-system");
+    h.wake(41 * DAY + 100, world(vec![notice, own]));
+    assert!(!all(&h.wake(came, world(vec![q]))).contains("kind=question_answer"), "it waits in the post");
+    let mut t = came;
+    let (at, line) = loop {
+        t += 3600;
+        assert!(t < came + 4 * DAY, "answered by the next sitting");
+        if let Some(l) = all(&h.wake(t, world(vec![]))).lines().find(|l| l.contains("kind=question_answer")).map(String::from) {
+            break (t, l);
+        }
+    };
+    assert!((19 * 3600..=20 * 3600).contains(&at.rem_euclid(DAY)), "at a sitting: {}", at.rem_euclid(DAY));
+    assert!(line.contains("Our hearing notice rec.hn from tribunal") && line.contains("naming answer by") && line.contains("to=[\"prov-a\"]"), "{line}");
+    // (Shown with --nocapture: the proof of the desk's case, B3.)
+    println!("B3-PROOF The desk's case: a client with a hearing notice and its day to answer by; the desk asks about the paper (rec.q, at {}h on day {}), the client answers at its next sitting (day {}, {}h):\n\n{line}\n", (came % DAY) / 3600, came / DAY, at / DAY, (at % DAY) / 3600);
 }

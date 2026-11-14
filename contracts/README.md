@@ -987,3 +987,13 @@ unchanged to the byte.
   `dateOfEffect`.
 - The payments office's saved state gains `back` on a payment it pays (what is owed with the first payment; absent when
   nothing is).
+
+## A question to the client (2026-11-14; docs/design/stakes.md, B3; docs/decisions.md, "B3: an assistant asks its principal one named thing"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- New delegation papers: `question` (`papers::delegation::Question`: `referral`, `about` one of `balance` | `document` |
+  `party` | `detail` | `other`, `paper` and `name` where it names one; `basis` the referral), from an assistant to its
+  principal; and `question_answer` (`QuestionAnswer`: `question`, `referral`, `about`, `known`, `answer` typed; `basis`
+  the question), from the principal to its assistant, in the assistant post's `matters` channel and its file.
+- The assistants' stationery gains the form `question_to_client` (where a model sits in an assistant seat).
+- The table of work gains `person.publish/question_answer` (300 seconds, a placeholder), and the assistants' templates
+  `publish/question` at their paper's seconds, where a town has providers.

@@ -24,7 +24,7 @@ use crate::common::{addressed_to, bases_of, money_words, Book, DAY, MONTH};
 use crate::market::services::{self, Engagements};
 use crate::market::trade::{self, Ordering};
 use crate::papers::delegation::{
-    is_want, Acknowledgement, Advice, ApprovalRequest, Brief, Declined, Depth, Draft, Forward, GoAhead, Level, Need, Part, Referral, Remit, Report, ScopeAnswer, ScopeRequest, ServiceEnded, ServiceOffer, SignOff, WantHanded, Why, KINDS as PAPERS,
+    is_want, Acknowledgement, Asked, Advice, ApprovalRequest, Brief, Declined, Depth, Draft, Forward, GoAhead, Level, Need, Part, Question, QuestionAnswer, Referral, Remit, Report, ScopeAnswer, ScopeRequest, ServiceEnded, ServiceOffer, SignOff, WantHanded, Why, KINDS as PAPERS,
 };
 use crate::papers::{self, Paper};
 use crate::steps::{arg, because, call, say, Say, Step, Visible};
@@ -325,9 +325,13 @@ pub struct State {
     traces: Vec<forward::Trace>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     untied: Vec<forward::Untied>,
+    /// Questions from its assistant not answered yet (their ids): each answered in its own time (`answer_question`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    questions: Vec<String>,
 }
 
 mod forward;
+mod question;
 
 pub struct Delegating {
     inner: Box<dyn Actor>,
@@ -397,6 +401,7 @@ impl Delegating {
                 papers_in: vec![],
                 traces: vec![],
                 untied: vec![],
+                questions: vec![],
             },
         })
     }
@@ -875,6 +880,12 @@ impl State {
             // (A remit of its own that hands a kind over no longer, however it came to be written (its rule's, or an
             // owner's act at a fork in its name): what it had open of that kind it takes back, as its rule's remit does.)
             self.take_back(&x.agreement, &x.kind);
+        } else if papers::is::<Question>(r) && self.letter(r) {
+            // (A question from its assistant about a matter: answered in its own time, `answer_question`.)
+            let id = r.id.to_string();
+            if !self.questions.contains(&id) {
+                self.questions.push(id);
+            }
         } else if let Some(x) = papers::read::<ScopeRequest>(r) {
             if self.eng.by_agreement(&x.agreement).is_some() {
                 // (Answered in its own time, part by part, by its rule: `answer`. Before 2026-11-10 a request only brought
@@ -1702,6 +1713,9 @@ impl State {
         // answered it; a letter was never answered: the scope pilot.)
         for id in std::mem::take(&mut self.asked) {
             self.answer(&id, pic, cx);
+        }
+        for id in std::mem::take(&mut self.questions) {
+            self.answer_question(&id, pic, cx);
         }
         for id in std::mem::take(&mut self.letters) {
             self.acknowledge(&id);

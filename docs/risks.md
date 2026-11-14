@@ -1971,6 +1971,40 @@ The mechanism:
 - **Notice by:** a seat's letter or note saying a paper its referral cites is not on its file, or a place id is not
   entered.
 
+### MT-42 · The opening caseload has no household in rent arrears
+- **Gap:** Where the generator opens a town in the middle of things (`opening_caseload`), the tenancies behind with the
+  rent are those whose household cannot pay it on the first day: nothing coming in that covers it and not a month's
+  rent put by (worlds/generator/generate.ts, the opening caseload's possession part). Homes are dealt by income (the
+  profile's renters' rent as a share of income), so in the study's town every let household covers its rent on day 1:
+  no rent statement of arrears, no notice to vacate, no hearing is on file at the start. No real town has none.
+- **Where:** `worlds/generator/generate.ts` (the opening caseload; homes by income); the study's towns
+  (experiments/scope-pilot/build.ts, which reads the caseload for clients in difficulty: D3, MT-40).
+- **Effect:** No possession case reaches an assistant: in the D3 screen (180 days, level 2) none did, and one notice to
+  vacate was given in the whole town. The stakes study measures housing consequences only where they arise by
+  themselves (a backlog at the support office, slow clients), so its housing outcomes rest on few or no cases.
+- **L / I:** high / medium · **Status:** open (2026-11-14; the lead: no shock and no tuning now)
+- **Fix when:** a study needs housing cases at the desk: an opening share of tenancies in arrears, at their stages, from
+  the profile (the share of renting households behind with the rent, sourced: a housing survey's arrears rate), in
+  place of "cannot pay on day 1".
+- **Notice by:** an opening caseload with no `rent_statement` of arrears; a study run with no notice to vacate.
+
+### MT-43 · What an assistant may ask its principal is a small typed set
+- **Gap:** An assistant's question to its principal (`question_to_client`, docs/design/stakes.md B3) is answered only
+  for a balance, a paper held (by id), a party the matter names, and a named detail of the hand-over. Anything else
+  (income over months, rent, arrears as a figure, what the client wants done) is "We cannot say." even where a real
+  client would know it; a party is described only by what the principal's papers say, and a paper held only by its
+  days and its first words. A letter that asks is still only acknowledged.
+- **Where:** `kernel/crates/actors/src/delegation/principal/question.rs` (`answer_question`); the form in
+  `participants/src/kinds/assistants.ts`.
+- **Effect:** A seat that asks a reasonable question outside the set gets no answer, and may act without the fact or
+  stop; the count of what an assistant does after asking mixes answered and unanswerable questions. A seat may also
+  take "We cannot say." as the client's refusal.
+- **L / I:** medium / medium · **Status:** open (2026-11-14)
+- **Fix when:** the log shows seats asking `other` or writing letters with questions often; add the subjects asked
+  (each answered from the principal's own state), or a client model that reads words.
+- **Notice by:** `question_answer` papers with `known: false` in a run, by subject; letters to a principal with a
+  question mark acknowledged and nothing done.
+
 ---
 
 ## Profiles and sources

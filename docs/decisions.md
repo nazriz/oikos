@@ -13835,3 +13835,26 @@ participant acts otherwise (the code arm checked equal on records, transfers and
 - **Revisit if** two matters of one client and kind are handed over in a different order in the two arms (they are
   then paired wrongly), a matter's money comes from someone it does not name, or the replay gains classes that tell
   the seat's misreading from ours.
+
+## 2026-11-14 · B3: an assistant asks its principal one named thing
+
+**The law (docs/design/stakes.md, B3; risk MT-43).** An assistant may ask its principal one named thing about a matter
+it was handed (`question`, on its form `question_to_client`), and the principal answers from its own records in its own
+time (a person at their next sitting, D1a; an organisation's post on its next wake), at `publish/question_answer` (five
+minutes, placeholder: WM-1), or says it cannot say (`kernel/crates/actors/src/delegation/principal/question.rs`,
+`answer_question`). What may be asked is typed, a set its code can answer from what is its own: its account's balance;
+a paper it holds, by id (who from, its days, its words); who someone the matter names is (the matter's details that
+name them, its act's papers to them, the papers it holds from them); a named detail of the hand-over. `other` is
+answered "We cannot say."; no prose is parsed. Never a figure it does not hold, never advice.
+- **Why:** in three Haiku runs the factory's assistant, handed invoices whose buyer was "outside", wrote to its manager
+  to ask who that was; a principal's code reads no letters, so it was never answered and the invoices were never
+  drafted. A desk with a client's deadline before it had no way to ask the client about their position.
+- **Why typed, not a letter answered:** a code principal cannot read words; a form with a small typed subject is what
+  it can answer truthfully, and the seat's words ride along for the log. A letter that asks still gets the
+  acknowledgement it got before.
+- **What moves:** towns with providers where a model sits in an assistant seat (the form is in the stationery there);
+  the code assistant asks nothing, so code arms and towns without providers do not move.
+- **The translator:** the form is published like the others and needs no rule in translator/src/rules.ts. Whether our
+  translator draws "ask the client X" onto it is a question of its training: its data has no request on this form yet.
+- **Revisit if** seats ask about things outside the set often (the `other` answers in the log), or a principal is seen
+  answering with something not its own.
