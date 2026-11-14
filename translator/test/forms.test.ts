@@ -11,6 +11,7 @@ import { calls, canonical } from "@oikos/participants";
 import FORMS from "../../contracts/test/forms.json";
 import { MockAdapter } from "@oikos/participants/llm";
 import { createTranslator, formRules, formShown } from "../src/index";
+import { misread } from "../src/rules";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
 import { durationWords, resolve } from "../src/resolver";
@@ -101,8 +102,9 @@ test("a form's blanks the request settles in so many words are set by code: the 
     forms: [form("form-desk-job-application", "job_application", job, { writes: { kind: "job_application" } }), form("form-desk-draft-job-application", "draft_job_application", { referral: field("record", true), ...job }, { writes: { kind: "draft", data: { paper: { kind: "job_application" } } } }),
       form("form-desk-send-signed", "send_signed", { sign_off: field("record", true) }, { copies: "=sign_off" }),
       form("form-desk-supply", "supply_request", { lots: field("list", true), law: field("record", true), owner: field("entity", true), connection: field("text") }, { writes: { kind: "supply_request" } })],
-    records: new Set(["rec.5", "rec.6", "rec.7", "law-rates"]), signed: new Map([["rec.7", { kind: "job_application" }]]), signedDraft: new Map([["rec.7", "rec.6"]]),
+    records: new Set(["rec.5", "rec.6", "rec.7", "rec.10", "rec.11", "law-rates"]), signed: new Map([["rec.7", { kind: "job_application" }]]), signedDraft: new Map([["rec.7", "rec.6"], ["rec.11", "rec.10"]]),
     referrals: new Map([["rec.5", "c0100"]]), referralKind: new Map([["rec.5", "job_application"]]), answeredReferrals: new Set<string>(), held: new Set(["desk"]),
+    referralGives: new Map([["rec.5", { trade: "retail" }]]),
   };
   const ruled = (program: string, request: string) => calls.programText(formRules(calls.parseProgram(program), request, k));
   // The form named by its id; whom the work is for, from the matter handed over (never the counterparty); a blank left empty.
@@ -137,6 +139,18 @@ test("a form's blanks the request settles in so many words are set by code: the 
     .toBe("form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=rec.5, to=desk)");
   // An optional blank the request says there is none of is left empty.
   expect(ruled('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)', "A supply request on lot-1; no connection.")).toBe("form(form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)");
+  // (Rung 1's third run.) A words blank holding only the id of the matter, or of a record the paper cites, is left
+  // empty; one holding the request's own act, or the paper's whole quoted words around what the matter gives for it,
+  // takes the matter's words. A send citing a sign-off with no copy on it is drawn as that send, never a file entry.
+  const draft = "form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=rec.5, to=desk";
+  expect(ruled(`${draft}, trade="rec.5")`, "Draft for sign-off a job application for c0100 to factory-7, posting rec.9, into acc-c0100, under referral rec.5.")).toBe(`${draft})`);
+  expect(ruled(`${draft}, trade="Draft for sign-off")`, "Draft for sign-off a job application for c0100 to factory-7, posting rec.9, into acc-c0100, under referral rec.5.")).toBe(`${draft}, trade="retail")`);
+  expect(ruled(`${draft}, trade="Retail work, for c0100.")`, 'Draft for sign-off a job application for c0100, posting rec.9, referral rec.5, in the words "Retail work, for c0100."')).toBe(`${draft}, trade="retail")`);
+  expect(ruled(`${draft}, trade="shop work")`, "Draft for sign-off a job application for c0100, posting rec.9, referral rec.5, trade shop work.")).toBe(`${draft}, trade="shop work")`);
+  expect(ruled('statement(basis=["rec.10","rec.11"], kind=entry, text="draft rec.10 as signed off", visible=own)', "Send draft rec.10 as it was signed off under rec.11")).toBe("form(form=send_signed, sign_off=rec.11, to=desk)");
+  // A draft for sign-off drawn as the send of a signed paper is a reading code knows is wrong: the translator is asked again.
+  expect(misread(calls.parseProgram("form(form=send_signed, sign_off=rec.5, to=desk)"), "Draft for sign-off a job application in c0100's name; referral rec.5", k)).toContain("draft for sign-off");
+  expect(misread(calls.parseProgram("form(form=send_signed, sign_off=rec.7, to=desk)"), "Send the paper signed off in rec.7 as it was signed.", k)).toBeUndefined();
   // Nothing settled in so many words: left as the translator wrote it.
   expect(ruled('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)', "A supply request for energy."))
     .toBe('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)');

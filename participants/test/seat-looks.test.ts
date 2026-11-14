@@ -10,6 +10,7 @@ import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { inCurrency } from "../src/money";
 import { createLlmParticipant, type LlmParticipantConfig } from "../src/llm/participant";
 import { renderObservation } from "../src/llm/render";
+import { Matters } from "../src/readers/matters";
 
 inCurrency(PROFILE.values.currency as any);
 const DAY = 86_400;
@@ -83,4 +84,21 @@ test("the seat's look with from_entry asks for the list from there on, and is to
   expect(shown).toContain("- [rec.124] service address");
   expect(shown).not.toContain("[rec.144]");
   expect(shown).toContain("(Entries 21 to 40 of 45. For the next: look again the same way with from_entry: 41.)");
+});
+
+test("a look into an assistant's matters says which of what it found is on a matter its post has finished, from its own reports", () => {
+  // (Rung 1's third run, 2026-11-14: told "None is open", the factory's seat looked through its matters, found two
+  // sign-offs from before it took the post, "send it as it stands", and sent a second delivery note for an order already
+  // delivered: the matters hold what was handed over and the answers; the reports are in the file.)
+  const m = new Matters("mine/matters", "mine/file");
+  const st = (id: string, kind: string, at: number, data: object) => ({ id, record: "statement", kind, at, author: "x", data, text: kind }) as any;
+  const chans = (matters: any[], search = false) => ({ t: 31 * DAY, channels: { "mine/matters": { kind: "records", records: matters, ...(search ? { search: true } : {}) } } }) as any;
+  const handed = [st("rec.1", "referral", 28 * DAY, { kind: "delivery_note", wants: "draft" }), st("rec.2", "sign_off", 28.5 * DAY, { referral: "rec.1", draft: "rec.3" }), st("rec.5", "referral", 29 * DAY, { kind: "invoice", wants: "draft" })];
+  m.absorbRead({ t: 31 * DAY, channels: { "mine/file": { kind: "records", search: true, records: [st("rec.4", "report", 28.6 * DAY, { referral: "rec.1", done: true })] } } } as any);
+  m.absorb(chans(handed));
+  expect(m.text()).toContain("[rec.5] invoice");
+  const said = m.finishedIn(m.absorb(chans(handed, true)));
+  expect(said).toContain("rec.1 (reported on in rec.4 on year 1, day 29, before you took this post)");
+  expect(said).not.toContain("rec.5");
+  expect(m.finishedIn(m.absorb(chans([handed[2]], true)))).toBe("");
 });

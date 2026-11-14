@@ -269,7 +269,11 @@ export class ModelSeat {
     this.o.world.annotate({ annotation: "observation", subject: this.o.seat, data: { t: w.t, observation: { ...raw, channels: Object.entries(raw.channels ?? {}).map(([path, c]) => ({ path, ...(c as object) })) } } });
     for (let turn = 0; turn < TURNS_PER_WAKE; turn++) {
       this.knowledge.absorb(raw);
-      if (this.matters) raw = this.matters.absorb(raw);
+      if (this.matters) {
+        raw = this.matters.absorb(raw);
+        const finished = this.matters.finishedIn(raw);
+        if (finished) this.notices.push({ t: raw.t, text: finished });
+      }
       const obs: Observation = { ...this.view.apply(raw), woke_for: w.woke_for as Observation["woke_for"], since: w.since };
       (obs as any)[RAW] = turn === 0 ? sent : raw;
       this.tally?.absorb(obs);

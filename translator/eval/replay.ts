@@ -23,7 +23,7 @@ import { kernelBinary } from "../../orchestrator/src/kernel";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
 import { resolve } from "../src/resolver";
-import { formRules, recordTest, ruled } from "../src/rules";
+import { formRules, misread, recordTest, ruled } from "../src/rules";
 import { PILOT_CASES } from "./pilot-cases";
 
 const folder = process.argv[2];
@@ -102,8 +102,12 @@ try {
       let now = r.raw!, preview = "";
       try {
         const p = calls.parseProgram(r.raw!);
-        const ru = ruled(formRules(p, r.request, k), r.request, recordTest(k));
-        if (ru.ok) {
+        const fr = formRules(p, r.request, k);
+        const wrong = misread(fr, r.request, k);
+        const ru = ruled(fr, r.request, recordTest(k));
+        // (A reading code tells is wrong goes back to the translator with why: a fresh model call, not replayed here.)
+        if (wrong) [now, preview] = [`(the translator asked again: ${wrong})`, ""];
+        else if (ru.ok) {
           now = calls.programText(ru.program);
           const as = [...k.held][0];
           const res = resolve(ru.program, k, () => undefined, as, { written: true });

@@ -23,6 +23,19 @@ export interface Mention { record: string; what: string; how: "from" | "to" | "p
 /** How many papers naming one entity are kept. */
 const MENTIONS_KEPT = 3;
 
+/** The words a referral gives for a paper's details, by name: the paper's own data where the matter is handed over as
+ * written (`calls`), then what the client wants seen to (`facts.data.matter`), then its other facts. Words only; the
+ * first a name is given wins. */
+export function givenBy(d: any): { [field: string]: string } {
+  const out: { [field: string]: string } = {};
+  const add = (o: any) => { if (o && typeof o === "object" && !Array.isArray(o)) for (const [k, v] of Object.entries(o)) if (typeof v === "string" && v && !(k in out)) out[k] = v; };
+  if (typeof d?.calls === "string") { const m = /\bdata=(\{[^{}]*\})/.exec(d.calls); if (m) { try { add(JSON.parse(m[1]!)); } catch { /* not a flat object: nothing from it */ } } }
+  add(d?.facts?.data?.matter);
+  add(d?.facts?.data);
+  add(d?.facts);
+  return out;
+}
+
 export class Knowledge {
   /** `currency`: how the world's money is written (its config's first currency): what the resolver reads and writes
    * amounts in. The platform has none of its own. `named`: whether the world's people and bodies have names of their
@@ -68,6 +81,9 @@ export class Knowledge {
    * citing them): which matter a draft for sign-off that names none is on. translator/src/rules.ts. */
   readonly referralKind = new Map<string, string>();
   readonly answeredReferrals = new Set<string>();
+  /** The words each matter handed over gives for a paper's details, by name (`givenBy`): what a blank on it the
+   * translator filled with other words is held to (translator/src/rules.ts). */
+  readonly referralGives = new Map<string, { [field: string]: string }>();
   /** Laws and claims the participant has seen: what law warnings are judged against (§10). */
   readonly laws = new Map<string, StatementRecord>();
   /** Every record the participant has been shown, by id: what a request may cite (translator/src/rules.ts, `ruled`). */
@@ -204,6 +220,7 @@ export class Knowledge {
       if (r.kind === "sign_off" && typeof r.data?.draft === "string") this.signedDraft.set(r.id, r.data.draft);
       if (r.kind === "referral" && typeof r.speaks_for === "string") this.referrals.set(r.id, r.speaks_for);
       if (r.kind === "referral" && typeof r.data?.kind === "string") this.referralKind.set(r.id, r.data.kind);
+      if (r.kind === "referral") this.referralGives.set(r.id, givenBy(r.data));
       if ((r.kind === "sign_off" || r.kind === "declined") && typeof r.data?.referral === "string") this.answeredReferrals.add(r.data.referral);
       // (A sign-off's copy keeps whose sign-off it is, and a paper sent back whom it was for: the copy goes in their name.
       // kernel/crates/resolver, the same.)

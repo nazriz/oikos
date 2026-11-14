@@ -179,6 +179,26 @@ export class Matters {
     return out;
   }
 
+  /** What a look into the matters found that is on a matter already finished, said from the post's own papers on it.
+   * The matters channel holds what was handed over and the answers, not the post's reports, so a look there set out a
+   * finished matter and its "send it as it stands" with nothing to say it was done: rung 1's third run (2026-11-14),
+   * where the factory's seat, told "None is open", looked since day 25, found two sign-offs from before it took the post,
+   * tried four times to send them and issued a second delivery note for an order already delivered. Empty if none. */
+  finishedIn(obs: Observation): string {
+    const ch = (obs.channels as any)?.[this.matterPath];
+    if (!ch?.search || ch.kind !== "records") return "";
+    const day = (t: number) => dateWords(Math.floor(t / DAY) * DAY);
+    const said = new Map<string, string>();
+    for (const r of (ch.records ?? []) as Paper[]) {
+      const m = this.matters.get((r as any).kind === "referral" ? r.id : ref(r) ?? "");
+      if (!m || !this.closed(m) || said.has(m.id)) continue;
+      const how = m.report ? `reported on${m.report.id ? ` in ${m.report.id}` : ""} on ${day(m.report.at)}${m.report.done ? "" : ", as not done"}` : m.declined !== undefined ? `declined on ${day(m.declined)}` : `advice given on ${day(m.advised!)}`;
+      said.set(m.id, `${m.id} (${how}${this.before.has(m.id) ? ", before you took this post" : ""})`);
+    }
+    if (!said.size) return "";
+    return `Of what you looked up in your matters, ${said.size === 1 ? "this matter is" : "these matters are"} finished, by your post's own papers on ${said.size === 1 ? "it" : "them"} in your file: ${[...said.values()].join("; ")}.`;
+  }
+
   /** The seat's own confirmed acts (their blocks), when they are done: a draft, a report, a signed copy sent. */
   own(blocks: any[], t: number): void {
     for (const b of blocks) {
