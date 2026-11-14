@@ -675,7 +675,12 @@ sittings, so a weekly sitter's matters wait days), averaged over the matters it 
 still waiting on it now (each has waited since its hand-over: its own records); a kind it has a matter of in hand is
 weighed as at least that many a month (a person's one claim in a year is still the claim before it). It is costed at its own
 figure for a day's delay, `late_cost_day`, which is nothing where the town's support law pays a granted claim from the
-first claim (`date_of_effect: first_claim`: the generator gives no figure), so there the wait moves nothing. A request
+first claim (`date_of_effect: first_claim`: the generator gives no figure), so there the wait moves nothing. The kinds
+with the figure are those the support law makes costly to wait on: a claim; and putting right a refused claim, a
+request to look at it again (`review_request` whose paper names the matter `claim_refused`: `late_matters` says the
+figure is for that matter only; a request about disrepair costs nothing a day) or a want handed over to have it put
+right (`want-claim_refused`). Basis: a refused claim not yet reversed is a payment not yet coming, day by day, as a
+claim not yet decided is (the same support law's payments; at `decision` only). A request
 to go ahead waits on the same answer as a draft, so a wait never makes `approve` the gain; `alone` escapes it, and is
 weighed like any level the service offers (the grants reader screens every level above the one held, `alone` with the
 rest). Against it, the slips it expects at the level asked (the offer's claim, moved by what it has seen) at its own

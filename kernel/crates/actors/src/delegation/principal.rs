@@ -76,6 +76,10 @@ pub struct Params {
     /// G2). A kind with none goes as the finished act.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub forms: BTreeMap<String, Value>,
+    /// Kinds whose day's delay is costed only for one matter of theirs (`kind -> matter`, the matter word its paper
+    /// names): a request to put right a refused claim costs a day of the payment, one about disrepair does not.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub late_matters: BTreeMap<String, String>,
     /// A person's habit of getting to its post (the profile's `paperwork`; docs/behaviour/assistants.md, "Getting to the
     /// post"): what its assistant and the bodies send it waits there until it sits down to it (`answer_lag`). Absent, or
     /// an organisation's: dealt with when it next wakes, as before.
@@ -899,11 +903,16 @@ impl State {
             // (Handed over as what happened, the paper is the assistant's: it is read on the kind's material details and
             // whom it goes to, against what its own code would have sent, never its words.)
             if m.depth == Depth::Want {
+                // (A want's draft waited on it too: from the hand-over to its own reading.)
+                self.waited(&m, t - m.at);
+                if let Some(mm) = self.matters.get_mut(&action) {
+                    mm.answered = true;
+                }
                 self.read_for_want(r, &action, &m, &x, t, cx);
                 return;
             }
             // (The wait on the permission path: from the hand-over to its own answer, its own records.)
-            self.waited(&m.kind, &m.agreement, t - m.at);
+            self.waited(&m, t - m.at);
             if let Some(mm) = self.matters.get_mut(&action) {
                 mm.answered = true;
             }
@@ -938,7 +947,7 @@ impl State {
         } else if let Some(x) = papers::read::<ApprovalRequest>(r) {
             let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
             let Some(m) = self.matters.get(&action).cloned() else { return };
-            self.waited(&m.kind, &m.agreement, t - m.at);
+            self.waited(&m, t - m.at);
             if let Some(mm) = self.matters.get_mut(&action) {
                 mm.answered = true;
             }
@@ -1023,9 +1032,26 @@ impl State {
     }
 
     /// A matter of a kind whose delay it costs waited `secs` on its answer (docs/design/obstacles.md section 10).
-    fn waited(&mut self, kind: &str, agreement: &str, secs: i64) {
-        if self.p.kinds.get(kind).is_some_and(|f| f.late_cost_day > 0) {
-            self.seen.entry(Self::key(agreement, kind)).or_default().waited_for(secs);
+    fn waited(&mut self, m: &Matter, secs: i64) {
+        if self.costed(m) {
+            self.seen.entry(Self::key(&m.agreement, &m.kind)).or_default().waited_for(secs);
+        }
+    }
+
+    /// Whether a matter's day of delay costs it: its kind has a figure, and, where the figure is for one matter of the
+    /// kind (`late_matters`), the matter's paper names that matter.
+    fn costed(&self, m: &Matter) -> bool {
+        if !self.p.kinds.get(&m.kind).is_some_and(|f| f.late_cost_day > 0) {
+            return false;
+        }
+        let Some(want) = self.p.late_matters.get(&m.kind) else { return true };
+        let named = |d: &Value| d.get("matter").and_then(Value::as_str) == Some(want.as_str());
+        if m.facts.as_ref().is_some_and(named) {
+            return true;
+        }
+        match parse_program(&m.program) {
+            Ok(Program::Lines(ls)) => ls.iter().any(|l| matches!(l.call.get("data"), Some(oikos_sight::calls::Value::Json(d)) if named(d))),
+            _ => false,
         }
     }
 
@@ -1872,7 +1898,7 @@ impl State {
         // (The matters of the kind it has with this assistant now, waiting on the permission path: each has waited since it
         // was handed over, as its own records show. Counted in the wait it sees, and a kind it has one of in hand is
         // weighed as at least that many a month: a person's one claim in a year is still the claim before it.)
-        let open: Vec<i64> = self.matters.values().filter(|m| m.agreement == a && m.kind == k && m.referral.is_some() && !m.answered && matches!(m.level, Level::Draft | Level::Approve)).map(|m| (t - m.at).max(0)).collect();
+        let open: Vec<i64> = self.matters.values().filter(|m| m.agreement == a && m.kind == k && m.referral.is_some() && !m.answered && matches!(m.level, Level::Draft | Level::Approve) && self.costed(m)).map(|m| (t - m.at).max(0)).collect();
         let mut seen = seen;
         for secs in &open {
             seen.waited_for(*secs);

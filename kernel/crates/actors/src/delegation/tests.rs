@@ -660,10 +660,15 @@ fn the_grants_reader_answers_as_the_rule_would_and_changes_nothing() {
 /// A principal whose matters of a kind cost it `late_cost_day` a day of delay, whose drafts come back `lag_days` after
 /// each hand-over, asked after ten such matters for `alone`: its answer.
 fn asked_alone_after_waits(late_cost_day: i64, lag_days: i64) -> String {
-    let script: Vec<Value> = (1..=100).map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
+    asked_alone_after_waits_on(late_cost_day, lag_days, NOTICE, json!({}))
+}
+
+/// The same, its own act `call`, its figure for a day's delay for one matter of the kind only (`late_matters`).
+fn asked_alone_after_waits_on(late_cost_day: i64, lag_days: i64, call: &str, late_matters: Value) -> String {
+    let script: Vec<Value> = (1..=100).map(|d| json!({ "at": d * DAY + 3600, "call": call })).collect();
     let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 34 * DAY, "keep_until": 120 * DAY, "why": "the study's design" });
     let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
-        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 500_000, "late_cost_day": late_cost_day } }, "hour_value": 4000, "review_days": 300, "commit": commit } }));
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 500_000, "late_cost_day": late_cost_day } }, "hour_value": 4000, "review_days": 300, "commit": commit, "late_matters": late_matters } }));
     let inner = crate::stub::Script.create(&h.ctx).unwrap();
     h.actor = wrap(&h.ctx, inner).unwrap();
     h.wake(DAY + 3600, world(vec![offer_rec(10_000)]));
@@ -679,7 +684,7 @@ fn asked_alone_after_waits(late_cost_day: i64, lag_days: i64) -> String {
         let mut came = vec![];
         for (i, (at, rf)) in handed.iter().enumerate() {
             if *at + lag_days == d && lag_days > 0 {
-                came.push(statement(&format!("rec.dr{i}"), d * DAY + 1800, ME, "draft", &[ME], json!({ "referral": rf, "calls": NOTICE })));
+                came.push(statement(&format!("rec.dr{i}"), d * DAY + 1800, ME, "draft", &[ME], json!({ "referral": rf, "calls": call })));
             }
         }
         let out = all(&h.wake(d * DAY + 3600, world(came)));
@@ -687,7 +692,7 @@ fn asked_alone_after_waits(late_cost_day: i64, lag_days: i64) -> String {
             handed.push((d, last_referral(&h)));
         }
         // (No lag: its draft comes within the hour, and is signed off at once.)
-        let same: Vec<Value> = handed.iter().enumerate().filter(|(_, (at, _))| lag_days == 0 && *at == d).map(|(i, (_, rf))| statement(&format!("rec.dr{i}"), d * DAY + 5400, ME, "draft", &[ME], json!({ "referral": rf, "calls": NOTICE }))).collect();
+        let same: Vec<Value> = handed.iter().enumerate().filter(|(_, (at, _))| lag_days == 0 && *at == d).map(|(i, (_, rf))| statement(&format!("rec.dr{i}"), d * DAY + 5400, ME, "draft", &[ME], json!({ "referral": rf, "calls": call }))).collect();
         h.wake(d * DAY + 7200, world(same));
     }
     let t = (44 + lag_days) * DAY;
@@ -705,6 +710,12 @@ fn a_principal_whose_own_waits_cost_it_grants_alone_and_one_whose_waits_cost_not
     assert!(slow.contains("\"why\":\"granted\"") && slow.contains("\"late_cost_day\":5000") && slow.contains("have waited on our own answers about"), "{slow}");
     let free = asked_alone_after_waits(0, 6);
     assert!(free.contains("\"why\":\"costs_more\"") && free.contains("\"late_cost_day\":0") && !free.contains("have waited on our own answers"), "a wait that costs it nothing: no reason to let go: {free}");
+    // (A figure for one matter of the kind only: a matter its paper names is costed, any other is not. The day's cost of
+    // putting right a refused claim, not of any request to put something right.)
+    let named = "statement(basis=lease-1, data={\"matter\":\"claim_refused\"}, kind=notice_to_vacate, text=\"Please leave.\", to=[\"t1\"])";
+    let only = json!({ "notice_to_vacate": "claim_refused" });
+    assert!(asked_alone_after_waits_on(5_000, 6, named, only.clone()).contains("\"why\":\"granted\""), "the matter named: costed");
+    assert!(asked_alone_after_waits_on(5_000, 6, NOTICE, only).contains("\"why\":\"costs_more\""), "another matter of the kind: not costed");
     let quick = asked_alone_after_waits(5_000, 0);
     assert!(quick.contains("\"why\":\"costs_more\""), "no wait: the draft stays: {quick}");
 }
