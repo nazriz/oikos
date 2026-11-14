@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { calls, canonical } from "@oikos/participants";
 import FORMS from "../../contracts/test/forms.json";
-import { formShown } from "../src/index";
+import { formRules, formShown } from "../src/index";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
 import { durationWords, resolve } from "../src/resolver";
@@ -75,4 +75,45 @@ test("the preview of a direction says what is filed and to whom, and nothing of 
 
 test("a length of time in words", () => {
   expect([86_400, 14 * 86_400, 3600, 0].map(durationWords)).toEqual(["1 day", "14 days", "1 hour", "0 days"]);
+});
+
+test("a signed copy sent is previewed as that copy, under its sign-off, and not as a paper newly made (the scope pilot's baseline, 2026-11-14)", () => {
+  // Haiku declined 26 right sends whose preview read "You will issue a job application (form-…)", as a fresh one does.
+  const k = seat();
+  const sent = resolve(calls.parseProgram("form(form=send_signed, sign_off=rec.81)"), k, () => undefined, "registry");
+  if (!sent.ok) throw new Error(sent.questions.join(" "));
+  const p = new Preview(k, "city", undefined, "registry").of(sent.blocks);
+  expect(p).toStartWith('This does one thing: the signed invoice.\n1. You will send an invoice exactly as it was signed off under rec.81 (your draft rec.80): "Invoice: 12 goods, XYZ 120.00.". Nothing in it is written again.');
+  // The same paper with anything changed is not that copy.
+  const other = new Preview(k, "city", undefined, "registry").of([{ ...(sent.blocks[0] as any), text: "Invoice: 13 goods." }]);
+  expect(other).not.toContain("signed off under");
+});
+
+test("a form's blanks the request settles in so many words are set by code: the form it names, the copy it cites, a blank it fills or leaves empty, whom the work is for (2026-11-14)", () => {
+  const field = (type: string, required = false) => ({ type, ...(required ? { required: true } : {}) });
+  const form = (id: string, name: string, fields: object, more: object = {}) => ({ id, data: { form: name, office: "desk", fields, ...more } });
+  const job = { client: field("entity", true), employer: field("entity", true), posting: field("record", true), account: field("account", true), trade: field("text") };
+  const k = {
+    forms: [form("form-desk-job-application", "job_application", job, { writes: { kind: "job_application" } }), form("form-desk-draft-job-application", "draft_job_application", { referral: field("record", true), ...job }, { writes: { kind: "draft" } }),
+      form("form-desk-send-signed", "send_signed", { sign_off: field("record", true) }, { copies: "=sign_off" }),
+      form("form-desk-supply", "supply_request", { lots: field("list", true), law: field("record", true), owner: field("entity", true), connection: field("text") }, { writes: { kind: "supply_request" } })],
+    records: new Set(["rec.5", "rec.6", "rec.7", "law-rates"]), signed: new Map([["rec.7", { kind: "job_application" }]]), signedDraft: new Map([["rec.7", "rec.6"]]),
+    referrals: new Map([["rec.5", "c0100"]]), held: new Set(["desk"]),
+  };
+  const ruled = (program: string, request: string) => calls.programText(formRules(calls.parseProgram(program), request, k));
+  // The form named by its id; whom the work is for, from the matter handed over (never the counterparty); a blank left empty.
+  expect(ruled('form(account=acc-c0100, client=factory-7, employer=factory-7, form=job_application, posting=rec.9, to=desk, trade="Application for the advertised job.")',
+    "Draft for c0100's sign-off, using form-desk-draft-job-application: to factory-7 for posting rec.9, into acc-c0100, referral rec.5; leave trade empty."))
+    .toBe("form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=rec.5, to=desk)");
+  // The signed copy the request cites, drawn as its own paper written anew: that copy sent.
+  expect(ruled("form(account=acc-c0100, client=c0100, employer=factory-7, form=job_application, posting=rec.9, to=desk)", "Send, as signed, the paper signed off under rec.7, in c0100's name."))
+    .toBe("form(form=send_signed, sign_off=rec.7, to=desk)");
+  // A blank the request names with its value takes it, where the value is of the blank's type (a law is no lot's).
+  expect(ruled('form(connection="energy", form=supply_request, law=law-rates, lots=law-rates, owner=c0057, to=desk)', "On form-desk-supply: law law-rates; lots lot-25-06; owner c0057; connection: e-factory-1-works."))
+    .toBe('form(connection="e-factory-1-works", form=supply_request, law=law-rates, lots=lot-25-06, owner=c0057, to=desk)');
+  // A form of the seat's own post goes to that post, whoever the paper is addressed to.
+  expect(ruled('form(employer=factory-7, form=job_application, to=factory-7)', "Apply.")).toBe("form(employer=factory-7, form=job_application, to=desk)");
+  // Nothing settled in so many words: left as the translator wrote it.
+  expect(ruled('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)', "A supply request for energy."))
+    .toBe('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)');
 });

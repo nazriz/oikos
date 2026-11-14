@@ -83,6 +83,11 @@ export function parseDate(s: string, now = 0): number {
   s = s.replace(/^\s*day\s*([0-9]{1,3})\s*,?\s+of\s+year\s*([0-9]{1,6})\s*$/i, (_, day, year) => `year ${year}, day ${day}`);
   // (A moment as a record has it, in seconds: bare digits.)
   if (/^\s*[0-9]{1,15}\s*$/.test(s)) return Number(s.trim());
+  // (A day before the start, as the world itself writes one: "24,450 days before the start", "3 days before the year
+  // began". kernel/crates/resolver forms.rs, the same. The scope pilot's baseline, 2026-11-14: a client's date of birth
+  // copied as shown was "not a date".)
+  const before = /^\s*([0-9][0-9,]{0,10})\s+days?\s+before\s+(?:the\s+start|the\s+year\s+began)\s*$/i.exec(s);
+  if (before && /^[0-9]{1,9}$/.test(before[1]!.replace(/,/g, ""))) return -Number(before[1]!.replace(/,/g, "")) * DAY;
   const cal = calendarNow();
   const civil = cal ? readCalendarDate(cal, s, now) : undefined;
   if (civil !== undefined) return civil;

@@ -330,7 +330,28 @@ impl RecordFacts {
             }
             match s(&r["kind"]) {
                 // (And a paper a body sent back, carrying it as it was: sent again as it stands, docs/design/obstacles.md.)
-                Some("sign_off" | "paper_returned") if r["data"]["paper"].is_object() => facts.signed = Some((id, Arc::new(r["data"]["paper"].clone()))),
+                // (A sign-off's copy keeps whose sign-off it is, `signed_by`: the copy goes in their name. The scope pilot's
+                // baseline sent every desk paper in the provider's name, 2026-11-14: a lender refused "we don't keep that
+                // account for you", and an employer hired the provider.)
+                Some("sign_off") if r["data"]["paper"].is_object() => {
+                    let mut paper = r["data"]["paper"].clone();
+                    if let (Some(p), Some(by)) = (paper.as_object_mut(), s(&r["speaks_for"])) {
+                        p.insert("signed_by".into(), Value::from(by));
+                    }
+                    facts.signed = Some((id, Arc::new(paper)))
+                }
+                // (A paper sent back goes again in the name of whom it was for, as the body's paper names them.)
+                Some("paper_returned") if r["data"]["paper"].is_object() => {
+                    let mut paper = r["data"]["paper"].clone();
+                    if let (Some(p), Some(by)) = (paper.as_object_mut(), s(&r["data"]["for"])) {
+                        p.insert("signed_by".into(), Value::from(by));
+                    }
+                    facts.signed = Some((id, Arc::new(paper)))
+                }
+                // (A sign-off of a draft written as acts, not on a form, carries no paper: kept as that, with the draft it
+                // signed, so that a seat naming it is told so and not that it named the wrong record. The scope pilot's
+                // baseline: 55 sends of a predecessor's sign-offs answered "no signed copy on file", 2026-11-14.)
+                Some("sign_off") => facts.signed = Some((id, Arc::new(serde_json::json!({ "no_paper": true, "draft": r["data"]["draft"] })))),
                 Some("form") => facts.form = Some((id, Arc::new(r.clone()))),
                 Some("lot") => {
                     if let Some(cells) = r["data"]["cells"].as_array() {

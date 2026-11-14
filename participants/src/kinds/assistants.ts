@@ -18,6 +18,9 @@ export const ASSISTANT_ISSUES: Issued[] = [
     fields: { referral: f("record", "The matter you were handed.", req), client: f("entity", "Whom you work for in it.", req), gist: f("text", "What you mean to do, in a sentence.", req) },
     writes: { kind: "approval_request", text: "May we go ahead? {gist}", basis: "=referral", to: ["=client"], visible: ["=self", "=client"], data: { referral: "=referral", gist: "=gist" } } },
   { form: "report", title: "What became of a matter",
+    // (Said on the form since 2026-11-14: the scope pilot's baseline seats filed 5, 6 and 4 reports where the code filed
+    // 41, and nothing they were shown said that the office goes by the report: its own code hears of the act from it.)
+    does: "Tells whom you work for what became of a matter they handed you: done, or not and why. Their office goes by it: until they have it, the matter is open on their file, and one not done is theirs to do again.",
     fields: { referral: f("record", "The matter you were handed.", req), client: f("entity", "Whom you work for in it.", req), done: f("choice", "Whether it is done.", { required: true, options: ["yes", "no"] }), words: f("text", "What was done, or why not.") },
     writes: { kind: "report", text: "{words}", basis: "=referral", to: ["=client"], visible: ["=self", "=client"], data: { referral: "=referral", done: "=done", why: "=words" } } },
   { form: "scope_request", title: "A request for more scope or means",
@@ -27,7 +30,9 @@ export const ASSISTANT_ISSUES: Issued[] = [
       answers: f("record", "What this answers, if anything.") },
     writes: { kind: "scope_request", text: "{words}", basis: "=answers", to: ["=client"], visible: ["=self", "=client"], data: { agreement: "=agreement", kind: "=kind", level: "=level", access: "=access", record: "=record", matter: "=matter" } } },
   { form: "send_signed", title: "Sending a paper as it was signed off",
-    does: "Sends the paper a sign-off came back with, exactly as it was signed, to whom it is addressed, in the name of whom you work for (for a client, name them as who it is for). Nothing in it can be changed: to change anything, draft it again for sign-off.",
+    // (In the name of whoever signed it off, since 2026-11-14: before, a model seat's copy went in its own provider's
+    // name, since "who it is for" is code's to set and not the translator's: the scope pilot's baseline.)
+    does: "Sends the paper a sign-off came back with, exactly as it was signed, to whom it is addressed, in the name of whoever signed it off. Nothing in it can be changed: to change anything, draft it again for sign-off.",
     fields: { sign_off: f("record", "The sign-off that came back with the paper signed.", req) }, copies: "=sign_off",
     writes: { kind: "signed_paper", text: "Sent as signed." } },
   { form: "handover", title: "A handover of what is open, at a service's end",

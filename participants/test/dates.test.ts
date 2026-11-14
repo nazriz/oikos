@@ -34,6 +34,8 @@ test("the rules' words read the calendar of the world now being stepped; with no
   expect(calendarNow()).toBeUndefined();
   expect(dateWords(0)).toBe("year 1, day 1");
   expect(parseDate("year 1, day 22")).toBe(21 * DAY);
+  // (A day before the start, read as the world writes it: a client's date of birth copied as shown, 2026-11-14.)
+  expect([parseDate("24,450 days before the start"), parseDate("1 day before the year began")]).toEqual([-24_450 * DAY, -DAY]);
   inCalendar(table.calendars.dmy);
   expect(dateWords(DAY)).toBe("13 March 2026");
   expect(dateWords(DAY, true)).toBe("Friday 13 March 2026");

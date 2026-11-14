@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
-import { paperWords, recordTest, ruled } from "./rules";
+import { formRules, paperWords, recordTest, ruled } from "./rules";
 
 export const TRANSLATOR_VERSION = "0.10.0"; // 0.10.0: one right call (docs/decisions.md, 2026-11-10): basis=, for= and statement data= are no longer written (code sets the records cited and the capacity; a paper code reads goes on its form, or is no_such_act where none is listed); a payment's purpose is memo=; sentences and worked examples changed to match, nothing else. 0.9.5: the call language gained since taught (docs/design/translator-round-3.md, section 1; docs/decisions.md, 2026-10-14), sentences and worked examples only, nothing removed: a payment drawn on a line of the budget carries line=; hours= on an agreement; a notice of something held again and again is one statement with practice= and on=, an offer anyone may take up one statement with offer=. 0.9.4: the rulings of 2026-10-10 on what readers disagreed over (docs/decisions.md), sentences and worked examples only: what a payment's for= is and is not; where a letter's text ends and what re= is; a payment together with its report is one program of two lines; an act made to hang on something still to be found out is look_first, and telling someone else to act on things described is a message; an amount that needs a count is needs_calculation; unknown_form only where a form is named, an office's own decision or notice with no form listed is a statement, sending someone unnamed is no_such_act; no first= on a single payment made now; a paragraph on agreements; 0.9.3: a figure named with something to be taken off or added that is not given as a figure is an amount to be worked out, never copied (one sentence and its bracket in needs_calculation, two worked examples); telling an office, a post or a person to do something is a message to them where no form is listed for it, never no_such_act (one sentence in no_such_act, one worked example); what per_request is (the gloss of money); 0.9.2: when a payment or a job done again and again starts (first=) is a date or a length of time, copied as the request wrote it (one rule, one line of the syntax, one worked example; the standing-work rule's words for first= and until= say the same); 0.9.1: a form listed as a direction to the person's own office is marked so in the list, and the standing-work rule says the office's own order to its staff is never that form; a worked example each of a direction on a form and of an own paper on a form; 0.9.0: a direction to an office and a paper of one's own office go on the form listed for them; work done again and again is a standing order (work with every=)
 
@@ -448,7 +448,8 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     // What code sets and the translator does not choose: the records cited, on whose behalf, a paper's data (rules.ts).
     // A program that composed data is asked back; another attempt may write the form.
     // (The mock translator hands back a mock seat's code call word for word, `verbatim`: that is code's, and not ruled.)
-    const r0 = out?.input?.verbatim === true ? { ok: true as const, program } : ruled(program, req.proposal, recordTest(req.knowledge));
+    // (And a form's blanks the request settles in so many words: rules.ts, `formRules`.)
+    const r0 = out?.input?.verbatim === true ? { ok: true as const, program } : ruled(formRules(program, req.proposal, req.knowledge), req.proposal, recordTest(req.knowledge));
     if (!r0.ok) return { ok: false, notices: [r0.ask], call: calls.programText(program), invalid: [r0.invalid] };
     program = r0.program;
     const call = calls.programText(program);
@@ -578,4 +579,4 @@ export { createAlone, createArrangement, STANDS, STILL_NOT_READ, UNSURE_DRAFT, t
 export { Knowledge } from "./knowledge";
 export { Preview } from "./preview";
 export { LABEL_TEXT, RESOLVER, resolve, type Resolution } from "./resolver";
-export { idsIn, ON_ITS_FORM, paperWords, quotedSpans, recordTest, ruled, type Ruled } from "./rules";
+export { formRules, idsIn, ON_ITS_FORM, paperWords, quotedSpans, recordTest, ruled, type Ruled } from "./rules";

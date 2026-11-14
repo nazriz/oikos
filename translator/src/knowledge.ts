@@ -58,6 +58,12 @@ export class Knowledge {
   /** Signed copies seen: a sign-off's id -> the paper it signed, as it is to go (kind, text, to, visible, data, basis).
    * What a form that sends a signed copy (`copies`) sends. */
   readonly signed = new Map<string, { [k: string]: unknown }>();
+  /** A sign-off's id -> the draft it signed, of every sign-off seen (one carrying no paper too): what the preview names
+   * a signed copy by, and what a seat naming a sign-off with no copy on it is told. */
+  readonly signedDraft = new Map<string, string>();
+  /** The matters handed to the participant (referrals): id -> whom it is handed over by (who the work is for, the
+   * `client` of the assistant's papers on it). translator/src/rules.ts, `formRules`. */
+  readonly referrals = new Map<string, string>();
   /** Laws and claims the participant has seen: what law warnings are judged against (§10). */
   readonly laws = new Map<string, StatementRecord>();
   /** Every record the participant has been shown, by id: what a request may cite (translator/src/rules.ts, `ruled`). */
@@ -191,7 +197,14 @@ export class Knowledge {
     if (r.record === "statement") {
       if (r.addressed_to?.length) this.addressed.set(r.id, r.addressed_to);
       if (r.kind === "form") this.formsById.set(r.id, r);
-      if ((r.kind === "sign_off" || r.kind === "paper_returned") && r.data?.paper && typeof r.data.paper === "object" && !Array.isArray(r.data.paper)) this.signed.set(r.id, r.data.paper);
+      if (r.kind === "sign_off" && typeof r.data?.draft === "string") this.signedDraft.set(r.id, r.data.draft);
+      if (r.kind === "referral" && typeof r.speaks_for === "string") this.referrals.set(r.id, r.speaks_for);
+      // (A sign-off's copy keeps whose sign-off it is, and a paper sent back whom it was for: the copy goes in their name.
+      // kernel/crates/resolver, the same.)
+      if ((r.kind === "sign_off" || r.kind === "paper_returned") && r.data?.paper && typeof r.data.paper === "object" && !Array.isArray(r.data.paper)) {
+        const by = r.kind === "sign_off" ? r.speaks_for : r.data.for;
+        this.signed.set(r.id, typeof by === "string" ? { ...r.data.paper, signed_by: by } : r.data.paper);
+      }
       // Job advertisements, and the applications that answer them: an offer of employment made on one is on its terms.
       if (r.kind === "job_posting") this.jobs.set(r.id, { advertisement: r.id, ...(typeof r.data?.space === "string" && r.data.space ? { space: r.data.space } : {}) });
       if (r.kind === "job_application" && typeof r.data?.posting === "string") this.applications.set(r.id, r.data.posting);
