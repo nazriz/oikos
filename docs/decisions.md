@@ -13619,7 +13619,6 @@ none, stay a subject line only, as before.
 - **Revisit if** a seat names a paper in its subject line that the letter is not about (the client would then act on the
   wrong matter), or names the matter only in the letter's body.
 
-
 ## 2026-11-14 · What the rung 1 rerun showed: a date read two ways, a draft's matter, a rule's draft told as unsure
 
 - **Read:** the rerun (runs/scope-obstacle-r1-L2-b, Haiku 5.5, 14 days at level 2, on main 618beaa4): 31 requests, 20
@@ -13704,3 +13703,20 @@ obstacle-run.ts (`difficulty: true`).
 - **Revisit if** a source on advice services' clients is opened (MT-40), or the desk's volume is too much for a seat,
   or the study needs possession cases (then a town or scenario where households cannot cover their rent: the lead's
   choice, not a rate tuned here).
+
+## 2026-11-14 · The episode reader: one episode a matter, read by code from the log
+
+`experiments/scope-pilot/episodes.ts <experiment>` (stakes.md §4–5) reads each arm's log and the acts reader, calls no
+model and judges nothing. **Decision:** an episode is one matter handed to a seat to draft, approve or advise (or one
+waiting on the client's sign-off, authority or go-ahead), open while a paper names a date still to come (the referral's
+`due`, an evidence request's `by`, a hearing's `answer_by`) or a stake runs (a benefit matter: income unpaid while
+undecided; a housing matter). One a matter, from its hand-over, not one a wait: a seat that never drafted (Haiku on the
+pension claim, rung 1) is the case the study most needs, and per-wait rows dropped it. What the seat did is, in order,
+acted beyond (the reader's classes other than `not_as_signed`), asked for more, candidate (the `withheld` table or a
+paper not as signed; the blind read decides, in code.ts's item shape with nothing naming the arm), else waited. A
+stake's amount a day is shown only from the world's own decision paper (`amount`, `every`). Mistakes apart from choices
+are facts the seat stated against the matter's record (an age's date, days short of an age, from `born_at`). A code arm
+acting beyond or leaving a candidate is printed as a platform fault, never counted.
+- **Revisit if** S lands `date_of_effect` (the stake then runs from a date, not a hand-over), A2's reactions are
+  recorded under other kinds than those read, a matter stays open past a report (B1, handed-over-stays-handed), or one
+  matter carries two decisions at different stakes and wants two rows.
