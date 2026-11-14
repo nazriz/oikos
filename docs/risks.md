@@ -1823,6 +1823,18 @@ The mechanism:
 - **Fix when:** a study needs what an assistant does after a decision: the client passes the answer on, as a person would.
 - **Notice by:** a desk matter whose last report says done while the counterparty's answer to the client is a refusal.
 
+### MT-35 · The audit finding form asks for a body it never writes
+- **Gap:** The audit office's finding form (`participants/src/shared/papers.ts`, `audit_finding`) has a required blank,
+  `body`, that its paper does not carry and no figure is worked from: the audit's key already names the body. Found by
+  the form-fit backstop added 2026-11-14 (`orchestrator/test/office-form-preview.test.ts`).
+- **Where:** the form's fields and its `writes`; the preview, which sets it out as used and not written on the paper.
+- **Effect:** A seat at the audit office is asked for a blank that does nothing. Harmless to results; a small cost to
+  a seat's time and trust in the form.
+- **L / I:** low / low · **Status:** open (kept on the backstop's list of blanks not written)
+- **Fix when:** the audit office's forms are next changed: the blank dropped, or written into the finding's data. Either
+  moves a code town's config, so not done in a run's freeze.
+- **Notice by:** the backstop's list growing, or a seat at the audit office asking what the body blank is for.
+
 ---
 
 ## Profiles and sources

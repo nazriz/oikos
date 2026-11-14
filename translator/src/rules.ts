@@ -194,7 +194,20 @@ function namedValue(request: string, field: string): { id: string } | { text: st
 /** Whether the request says to leave a blank empty ("leave trade empty", "trade: left empty", "omitting the optional
  * trade", "trade left blank"). */
 const leftEmpty = (request: string, field: string): boolean =>
-  new RegExp(`\\b(leave|leaving|omit|omitting|without)\\s+(the\\s+)?(optional\\s+)?${spoken(field)}\\b|\\b${spoken(field)}(\\s+field)?\\s*(:|=|is)?\\s*(left\\s+|to\\s+be\\s+left\\s+|kept\\s+)?(empty|blank)\\b`, "i").test(request);
+  new RegExp(`\\b(leave|leaving|omit|omitting|without)\\s+(the\\s+)?(optional\\s+)?${spoken(field)}\\b|\\b${spoken(field)}(\\s+field)?\\s*(:|=|is)?\\s*(left\\s+|to\\s+be\\s+left\\s+|kept\\s+)?(empty|blank)\\b`, "i").test(request)
+  // (Or that there is none of it: "nothing declined", "none refunded", "no trade". Rung 1, 2026-11-14: "nothing
+  // declined" was drawn as declined=unpaid, then overdue. Only an optional blank is left empty so; a required one is
+  // asked back, as before.)
+  || new RegExp(`\\b(nothing|none|no)\\s+(was\\s+|is\\s+)?${spoken(field)}(ed|d|s)?\\b`, "i").test(request);
+
+/** Whether the request asks for a paper to be sent as it was signed off (not for one to be drafted for sign-off). */
+const SEND_AS_SIGNED = /\bas (?:it was |they were )?signed\b|\bsend[- ]signed\b|\bthe signed (?:copy|paper|[a-z]+ (?:request|application|note|invoice|claim|notice|return))\b/i;
+/** Whether the request's own act, in its first words, is a sending. */
+const SENDS = /^\s*(?:please\s+)?(?:send(?:ing)?\b|re-?send\b|fill (?:in|out) (?:the |form[- ])?(?:[a-z0-9-]*[- ])?send[- ]signed\b|send[- ]signed\b)/i;
+/** Whether the seat's own words ask for a draft for sign-off. Keyed on the seat's words alone, never on what its remit
+ * allows: a seat that asks to issue outright what its remit lets it only draft is set out exactly that, since acts
+ * beyond the remit are what the study counts (the coordinator, 2026-11-14). */
+const DRAFT_FOR_SIGN_OFF = /\bdraft\b[^.;:]{0,60}?\bfor\b[^.;:]{0,30}?\bsign[- ]?off\b|\bfor (?:[a-z0-9']+(?:'s)? )?sign[- ]?off\b[^.]{0,12}\bdraft\b|\bon the draft [a-z ]{0,40}form\b/i;
 
 /** Whether a value may stand in a blank of this type, as far as the seat's knowledge says (a record is a record it
  * may cite; nobody or nothing else is). Figures, dates, lengths of time and choices are not judged here. */
@@ -207,8 +220,25 @@ function fits(type: string, v: { id: string } | { text: string }, isRecord: (id:
 /** A program with a form's blanks set where the request settles them exactly (above). Lines on no form the seat holds
  * are left as they are. */
 export function formRules(p: calls.Program, request: string, k: FormKnowledge, isRecord: (id: string) => boolean = recordTest(k as any)): calls.Program {
-  if (!("lines" in p)) return p;
   const named = idsIn(request);
+  // A request to send a paper as it was signed off, citing its sign-off or its draft: that signed copy sent, on the
+  // post's form for sending one, whatever was drawn (a new paper, or nothing). Its draft cited and no sign-off of it
+  // held: the same form with the draft named, which is answered that there is no signed copy of it; never a new
+  // paper. (Rung 1, 2026-11-14: three such requests, citing the draft, were read as the paper itself and asked back.)
+  // (Asked for as the request's own act, in its first words, "Send ...", "Sending a paper ...", "Fill in the send-signed
+  // form ...": never a report or a letter that says something was sent as signed.)
+  if (SENDS.test(request) && SEND_AS_SIGNED.test(request) && !DRAFT_FOR_SIGN_OFF.test(request.slice(0, 80))) {
+    const byDraft = new Map([...k.signedDraft].map(([so, d]) => [d, so]));
+    const offs = [...new Set(named.flatMap((x) => (k.signed.has(x) && k.signedDraft.has(x) ? [x] : byDraft.has(x) && k.signed.has(byDraft.get(x)!) ? [byDraft.get(x)!] : [])))];
+    const drafts = [...new Set([...request.matchAll(/\bdraft\s+(rec\.[0-9]+)/gi)].map((m) => m[1]!.toLowerCase()))].filter((d) => !byDraft.has(d));
+    const senders = k.forms.filter((x) => typeof x.data?.copies === "string" && k.held.has(whoseForm(x) ?? "") && /sign/i.test(`${String(x.data.copies)} ${String(x.data.fields?.[String(x.data.copies).replace(/^=/, "")]?.description ?? "")}`));
+    const id = offs.length === 1 ? offs[0] : !offs.length && drafts.length === 1 ? drafts[0] : undefined;
+    if (id && senders.length === 1) {
+      const s = senders[0]!;
+      return { lines: [{ call: { fn: "form", args: { form: { id: s.data.form }, to: { id: whoseForm(s)! }, [String(s.data.copies).replace(/^=/, "")]: { id } } } as calls.Call }] };
+    }
+  }
+  if (!("lines" in p)) return p;
   const formIds = new Set(k.forms.map((f) => f.id));
   // (By its id, or by its own name written with hyphens, "form draft-loan-application", among the post's own forms.)
   const ownByName = new Map(k.forms.filter((f) => k.held.has(whoseForm(f) ?? "") && typeof f.data?.form === "string" && f.data.form.includes("_")).map((f) => [f.data.form.replace(/_/g, "-"), f.id]));
@@ -225,7 +255,12 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     // (Of the post's forms that send a copy as it stands, the one whose blank for it the request names, or the only one.)
     const senders = signed && !f?.data?.copies && f?.data?.writes?.kind === signed.kind ? k.forms.filter((x) => typeof x.data?.copies === "string" && k.held.has(whoseForm(x) ?? "")) : [];
     const sender = senders.length === 1 ? senders[0] : senders.find((x) => new RegExp(`\\b${spoken(String(x.data.copies).replace(/^=/, ""))}\\b`, "i").test(request));
-    const to = sender ?? (byId && byId.id !== f?.id ? byId : undefined);
+    // (A draft for sign-off, in the seat's own words, drawn on the form that issues the paper outright: its draft form,
+    // where the post holds one. Rung 1, 2026-11-14: "Draft for sign-off: a job application ..." drawn as the job
+    // application itself.)
+    const draftOf = !sender && !byId && f && f.data?.writes?.kind !== "draft" && DRAFT_FOR_SIGN_OFF.test(request)
+      ? k.forms.find((x) => x.data?.form === `draft_${f!.data.form}` && whoseForm(x) === whoseForm(f!)) : undefined;
+    const to = sender ?? (byId && byId.id !== f?.id ? byId : undefined) ?? draftOf;
     if (to) {
       f = to;
       for (const a of Object.keys(args)) if (!["form", "to", "for"].includes(a) && !(a in (to.data?.fields ?? {}))) delete args[a];

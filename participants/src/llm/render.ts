@@ -17,7 +17,10 @@ const YEAR = 365 * DAY;
 export const money = moneyNow;
 
 export function when(t: number): string {
-  return `year ${Math.floor(t / YEAR) + 1}, day ${Math.floor((t % YEAR) / DAY) + 1}`;
+  // (A day before the start in the same calendar, the years counted back through year 0: "year -66, day 35". Until
+  // 2026-11-14 it read "24,421 days before the start", and a seat worked a client's age out of a count of days four
+  // times over, wrongly: rung 1.)
+  return `year ${Math.floor(t / YEAR) + 1}, day ${Math.floor((((t % YEAR) + YEAR) % YEAR) / DAY) + 1}`;
 }
 
 /** A length of time as people say one: whole years, else whole days, else hours and minutes; seconds only where it
@@ -56,7 +59,7 @@ const percent = (v: number, per: number) => `${String(Number(((v * 100) / per).t
 export function moment(t: number): string {
   const s = ((t % DAY) + DAY) % DAY;
   const two = (x: number) => String(x).padStart(2, "0");
-  const day = t < 0 ? `${duration(Math.ceil(-t / DAY) * DAY)} before the start` : when(t);
+  const day = when(t);
   return s === 0 ? day : `${day}, ${two(Math.floor(s / 3_600))}:${two(Math.floor((s % 3_600) / 60))}${s % 60 ? `:${two(s % 60)}` : ""}`;
 }
 /** What a form says each of its fields is (`amount`, `duration`, `date`...), for a paper filled in on it. */

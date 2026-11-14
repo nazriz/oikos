@@ -60,8 +60,10 @@ pub fn parse_date(s: &str) -> Result<i64, String> {
     let (mut year, mut day) = (None, None);
     if word(rest, "year") {
         let after = rest[4..].trim_start();
+        // (A year before year 1, year 0 and back, as a seat is shown a day before the start: render.ts `when`.)
+        let (sign, after) = match after.strip_prefix('-') { Some(a) => (-1, a), None => (1, after) };
         let Some((n, len)) = digits(after, 6) else { return Err(not_a_date(s)) };
-        year = Some(n);
+        year = Some(sign * n);
         rest = after[len..].trim_start();
     }
     if let Some(r) = rest.strip_prefix(',') {
@@ -98,7 +100,7 @@ pub fn parse_date(s: &str) -> Result<i64, String> {
         return Err(not_a_date(s));
     }
     let (year, day) = (year.unwrap_or(1), day.unwrap_or(1));
-    if year < 1 || !(1..=365).contains(&day) {
+    if !(1..=365).contains(&day) {
         return Err(not_a_date(s));
     }
     Ok(((year - 1) * 365 + (day - 1)) * DAY + of_day)
@@ -122,6 +124,7 @@ mod tests {
         assert_eq!(date_words_in(0, None), "year 1, day 1");
         // (A day before the start, read as the world writes it: participants/test/dates.test.ts, the same.)
         assert_eq!((parse_date("24,450 days before the start"), parse_date("1 day before the year began")), (Ok(-24_450 * day), Ok(-day)));
+        assert_eq!((parse_date("year -66, day 35"), parse_date("year 0, day 365")), (Ok(-24_421 * day), Ok(-day)));
         assert_eq!(parse_date_in("15 April 2026", now, Some(&dated)), Ok(34 * day));
         assert_eq!(parse_date_in("year 1, day 22", now, Some(&dated)), Ok(21 * day), "an old paper still reads");
         assert_eq!(parse_date_in("15 April", now, Some(&dated)), Ok(34 * day), "this year's");
