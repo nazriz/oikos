@@ -400,6 +400,10 @@ export interface TownSpec {
    * absent, the profile's own, and the town exactly as before). Fewer hours, and the casework queues behind itself in
    * them: a backlog from hours, never a dial. A study states the level it sets, and why. */
   support?: { staff_hours_bps?: number };
+  /** How often persons get to their post (docs/behaviour/assistants.md, "Getting to the post"): a study's stated shares
+   * of persons by days apart (`[days, bps]`, summing to 10,000) in place of the profile's, its hours kept. Absent: the
+   * profile's own, and the town exactly as before. */
+  paperwork?: { every_days: [number, number][] };
   /** From when the support law pays a granted claim (docs/design/stakes.md, law S), published in the law's own words:
    * `first_claim` (the stakes study's S0: from the day of the first claim, kept through a claim that lapsed for want of
    * what was asked and was made again) or `decision` (S1: from one period after the decision, as the office pays without
@@ -3374,7 +3378,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
     horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints,
     // (When each gets to its post: the profile's habit, drawn once a person; stakes D1a.)
-    ...(V.paperwork ? { paperwork: paperworkOf(V.paperwork) } : {}) } } : {};
+    ...(V.paperwork ? { paperwork: paperworkOf(spec.paperwork ? { ...V.paperwork, every_days: spec.paperwork.every_days } : V.paperwork) } : {}) } } : {};
   if (PERSONS.length && AS) citizenChannels.push(K.from("providers", AS.providers.filter((p) => p.offers.some((o) => o.for === "persons")).map((p) => p.id), ["service_offer"], { title: "What providers of assistants sell" }));
   const citizenController = code("citizen.default", { ...personDelegation, outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
     complain_to: "city", complain_bps: V.services.complain_bps, complain_about_held: true,

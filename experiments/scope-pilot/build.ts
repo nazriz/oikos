@@ -138,6 +138,10 @@ export interface Options {
    * the town's share of the agency's officers, in basis points of the profile's figure. Absent or 10,000, the profile's;
    * less, a short-staffed office whose casework queues in its hours (`SHORT_STAFFED_BPS`, a placeholder). */
   supportStaffBps?: number;
+  /** How often the town's people get to their post, a stated condition of the run (docs/behaviour/assistants.md,
+   * "Getting to the post"): `ordinary`, the profile's shares; `slow`, most of them weekly (`SLOW_POST`). Absent: the
+   * profile's, and the town exactly as before. */
+  clientPost?: "ordinary" | "slow";
   /** A second provider's desk (docs/design/obstacles.md, B8): the households' cohort split by turns between provider
    * A's paid personal offer and provider B's, each desk with a cohort of its own (both providers are in the profile's
    * offers already). Absent: provider A's desk alone, as before. */
@@ -168,6 +172,10 @@ export const OVERSTEP_ARMS: Arm[] = [
   { name: "overstep", steward: { kind: "model", model: "mock/overstep:0" } },
   { name: "overstep-ask", steward: { kind: "model", model: "mock/overstep-ask:0" } },
 ];
+/** The study's `slow` condition of how often people get to their post: shares of persons by days apart (`[days, bps]`),
+ * most of them weekly. A placeholder like the profile's own figures, stated as a condition of a run, not a figure of a
+ * place: every day 10%, every second day 10%, every third 20%, once a week 60%. */
+export const SLOW_POST: [number, number][] = [[1, 1000], [2, 1000], [3, 2000], [7, 6000]];
 export const OURS = "decide/round3-s2";
 /** The model the study seated before 2026-11-11, kept by name: decide/pod-small-v3-s2. */
 export const OURS_BEFORE = "decide/pod-small-v3-s2";
@@ -191,7 +199,7 @@ export function build(o: Options): ExperimentSpec {
     name: o.name,
     world: {
       file: "worlds/town-1000.yaml",
-      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : []), ...(o.dateOfEffect ? [`support_date_of_effect=${o.dateOfEffect}`] : [])],
+      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : []), ...(o.dateOfEffect ? [`support_date_of_effect=${o.dateOfEffect}`] : []), ...(o.clientPost === "slow" ? [`paperwork=${JSON.stringify({ every_days: SLOW_POST })}`] : [])],
       prepare(config: any, seed: number) {
         for (const post of o.offices ?? OFFICES) {
           const pos = config.positions.find((x: any) => x.id === post);

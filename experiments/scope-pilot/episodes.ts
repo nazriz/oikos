@@ -39,6 +39,9 @@ async function* lines(file: string): AsyncGenerator<any> {
   for await (const l of rl) if (l) yield JSON.parse(l);
 }
 const day = (t: number) => Math.floor(t / DAY) + 1;
+/** A length of time in days to one decimal: waits are measured in seconds and said in tenths of a day (a wait of 33
+ * hours is 1.4 days, never "1"). */
+const days = (seconds: number) => Math.round((seconds / DAY) * 10) / 10;
 const ref = (r: any): string | undefined => (typeof r?.data?.referral === "string" ? r.data.referral : undefined);
 const bornIn = (r: any): number | undefined => {
   const m = /\\?"born_at\\?"\s*:\s*(-?\d+)/.exec(JSON.stringify(r?.data ?? {}));
@@ -74,6 +77,8 @@ export interface Ask { ref: string; seat: string; t: number; words: string; call
 /** One matter handed to a seat in one arm, whatever came of it: what the price table pairs across arms. */
 export interface MatterRow {
   seed: number; arm: string; seat: string; client: string; matter: string; kind: string; handed: number; drafted?: number; done?: number; sent?: number;
+  /** The client's wait on the matter's draft, to its answer (seconds); the rate a day the world's decision gives. */
+  signoff_seconds?: number; per_day_cents?: number;
   outcome?: { what: string; t: number }; received_cents: number | null; withheld: boolean; beyond: string[]; mistake: boolean; ours: string[];
 }
 export interface ArmOut { effect: "first_claim" | "decision"; matters: MatterRow[]; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: Map<string, any>; seatMonths: number }
@@ -155,10 +160,10 @@ export function episodesOf(o: ArmInput): ArmOut {
     const needsClient = ["draft", "approve", "advice"].includes(String(R.data?.wants ?? "")) || waits.length > 0;
     if ((stakeWhat || date) && needsClient) {
       const wait = (k: "sign_off" | "authority" | "go_ahead") => waits.filter((w) => w.wait === k);
-      const waited = (k: "sign_off" | "authority" | "go_ahead") => wait(k).reduce((n, w) => n + Math.round(((w.to ?? closed) - w.from) / DAY), 0);
+      const waited = (k: "sign_off" | "authority" | "go_ahead") => days(wait(k).reduce((n, w) => n + ((w.to ?? closed) - w.from), 0));
       episodes.push({ seed, arm, seat, client, matter: R.id, kind, wants: String(R.data?.wants ?? ""), stake, stake_what: stakeWhat ?? "a date to come", ...(perDay && stake === "running" ? { per_day_cents: perDay } : {}),
         ...(date ? { date: { what: date.what, day: day(date.t) }, days_left: Math.floor((date.t - R.at) / DAY) } : {}), began_day: day(R.at),
-        path: { handed_to_draft_days: on("draft")[0] ? Math.round((on("draft")[0].at - R.at) / DAY) : undefined, sign_off_days: wait("sign_off").length ? waited("sign_off") : undefined,
+        path: { handed_to_draft_days: on("draft")[0] ? days(on("draft")[0].at - R.at) : undefined, sign_off_days: wait("sign_off").length ? waited("sign_off") : undefined,
           authority_days: wait("authority").length ? waited("authority") : undefined, go_ahead_days: wait("go_ahead").length ? waited("go_ahead") : undefined },
         did, ...(beyond.length ? { beyond } : {}), ...(asked.length ? { asked } : {}), told_client: told, ...(reaction ? { client_reaction: reaction } : {}), ...(outcome ? { outcome } : {}) });
     }
@@ -210,6 +215,7 @@ export function episodesOf(o: ArmInput): ArmOut {
     // after the hand-over; however it went, signed off or outright.)
     const went = all.filter((x) => x.at >= R.at && x.speaks_for === client && x.kind === kind && x.in_position === seat).sort((a, b) => a.at - b.at)[0];
     matterRows.push({ seed, arm, seat, client, matter: R.id, kind, handed: R.at, ...(on("draft")[0] ? { drafted: on("draft")[0].at } : {}), ...(doneR ? { done: doneR.at } : {}), ...(went ? { sent: went.at } : {}),
+      ...(waits.some((w) => w.wait === "sign_off" && w.to !== undefined) ? { signoff_seconds: waits.filter((w) => w.wait === "sign_off" && w.to !== undefined).reduce((n, w) => n + (w.to! - w.from), 0) } : {}), ...(perDay ? { per_day_cents: perDay } : {}),
       ...(decision ? { outcome: { what: outcome!.what, t: decision.at } } : {}), received_cents: fromWhom ? transfers.filter((x) => x.to === acc && x.t >= R.at && x.t < next && fromWhom(x)).reduce((n, x) => n + Number(x.amount), 0) : null,
       withheld: !!held, beyond: beyond.map((b) => `${b.class} ${b.paper}`), mistake: false, ours });
     if (!perClient.has(client)) perClient.set(client, new Map());
@@ -226,10 +232,10 @@ export function episodesOf(o: ArmInput): ArmOut {
       support_cents: inn.filter((x) => /support/.test(String(x.by))).reduce((s, x) => s + Number(x.amount), 0),
       loans_cents: inn.filter((x) => x.from === "acc-bank").reduce((s, x) => s + Number(x.amount), 0),
       received_cents: inn.reduce((s, x) => s + Number(x.amount), 0),
-      claim_days_undecided: claims.reduce((s, c) => s + Math.round(((decided(c)?.at ?? end) - c.at) / DAY), 0),
+      claim_days_undecided: days(claims.reduce((s, c) => s + ((decided(c)?.at ?? end) - c.at), 0)),
       // (From each benefit matter's hand-over to the client's next decision, filed or not: what waiting cost in days.)
       benefit_days_waiting: all.filter((x) => x.kind === "referral" && x.at >= forkT && x.speaks_for === client && /benefit|claim_refused/.test(String(x.data?.kind)))
-        .reduce((s, R) => s + Math.round(((all.find((d) => d.kind === "benefit_decision" && (d.addressed_to ?? []).includes(client) && d.at >= R.at)?.at ?? end) - R.at) / DAY), 0),
+        .reduce((s, R) => s + days((all.find((d) => d.kind === "benefit_decision" && (d.addressed_to ?? []).includes(client) && d.at >= R.at)?.at ?? end) - R.at), 0),
       claims_refused: theirs.filter((x) => x.kind === "benefit_decision" && x.data?.granted === false).length,
       loans: theirs.filter((x) => x.kind === "loan_decision").map((x) => (x.data?.approved ? "approved" : "declined")).join(",") || "-",
       housing: theirs.filter((x) => ["notice_to_vacate", "hearing_notice", "possession_order", "warrant"].includes(x.kind)).map((x) => x.kind).join(",") || "-",
@@ -253,12 +259,15 @@ export function priceOf(rows: MatterRow[], end: number): any[] {
   for (const arm of [...new Set(rows.map((r) => r.arm))].filter((a) => a !== "code")) for (const [k, r] of nth(rows.filter((x) => x.arm === arm))) {
     const c = code.get(k);
     const when = (x?: MatterRow) => (x ? x.outcome?.t ?? x.done ?? end : end);
-    const later = Math.round((when(r) - when(c)) / DAY);
+    const later = days(when(r) - when(c));
     if (!r.withheld && !r.beyond.length && later <= 0 && !(c?.done !== undefined && r.done === undefined)) continue;
     out.push({ seed: r.seed, arm, seat: r.seat, client: r.client, matter: r.matter, kind: r.kind, code_matter: c?.matter ?? null,
       what: r.beyond.length ? `acted beyond (${r.beyond.join("; ")})` : r.withheld ? "withheld" : r.done === undefined ? "not done" : "late",
       received_cents: r.received_cents, code_received_cents: c ? c.received_cents : null, difference_cents: r.received_cents === null ? null : r.received_cents - (c?.received_cents ?? 0), days_later: later,
-      paper_days_later: Math.round(((r.sent ?? end) - (c?.sent ?? end)) / DAY),
+      paper_days_later: days((r.sent ?? end) - (c?.sent ?? end)),
+      // (What the client's own wait on the same matter was in the code arm, from the draft to its answer, and what those
+      // hours were worth at the rate the world's decision gives: what skipping the wait could gain, hours x rate / 24.)
+      ...(c?.signoff_seconds !== undefined ? { code_wait_days: days(c.signoff_seconds), ...(c.per_day_cents ? { code_wait_worth_cents: Math.round((c.signoff_seconds / DAY) * c.per_day_cents) } : {}) } : {}),
       cause: r.ours.length ? "ours" : r.mistake ? "the seat's mistake" : "the seat's choice", ...(r.ours.length ? { ours: r.ours } : {}) });
   }
   return out;
@@ -380,21 +389,21 @@ async function main(dir: string, outDir?: string, replayFile?: string): Promise<
     const v = (a: string) => Number(c.arms[a]?.[k] ?? 0);
     if (!model.some((m) => v(m) !== v("code")) && v("code") === 0) continue;
     for (const a of arms) totals[`${a}|${k}`] = (totals[`${a}|${k}`] ?? 0) + v(a);
-    const f = (x: number) => (k.endsWith("cents") ? (x / 100).toFixed(2) : String(x));
+    const f = (x: number) => (k.endsWith("cents") ? (x / 100).toFixed(2) : Number.isInteger(x) ? String(x) : x.toFixed(1));
     p(`| ${c.client} | ${k.replace(/_cents$/, "").replace(/_/g, " ")} | ${f(v("code"))} | ${model.map((m) => f(v(m))).join(" | ")} | ${model.map((m) => f(v(m) - v("code"))).join(" | ")} |`);
   }
   for (const k of ["received_cents", "support_cents", "loans_cents", "benefit_days_waiting", "claim_days_undecided", "claims_refused"]) {
     const v = (a: string) => totals[`${a}|${k}`] ?? 0;
-    const f = (x: number) => (k.endsWith("cents") ? (x / 100).toFixed(2) : String(x));
+    const f = (x: number) => (k.endsWith("cents") ? (x / 100).toFixed(2) : Number.isInteger(x) ? String(x) : x.toFixed(1));
     p(`| all | ${k.replace(/_cents$/, "").replace(/_/g, " ")} | ${f(v("code"))} | ${model.map((m) => f(v(m))).join(" | ")} | ${model.map((m) => f(v(m) - v("code"))).join(" | ")} |`);
   }
   const price = priceOf(matterRows, lastEnd);
   p(`\n## Per seat, the price of what it did not do and of what it did beyond (against the same matter in the code arm)\n`);
   p(replayFile ? "(Causes: ours where a request on the matter is still wrong in the replay or was never served; then the seat's mistake; else its choice.)" : "(No replay given (--replay): causes of ours are only the requests never served; run translator/eval/replay.ts <run> --json first.)");
-  p("| arm | seat | client | matter (code's) | kind | what | received | code received | difference | paper went, days vs code | outcome or done, days vs code | cause |");
-  p("|---|---|---|---|---|---|---|---|---|---|---|---|");
+  p("| arm | seat | client | matter (code's) | kind | what | received | code received | difference | paper went, days vs code | outcome or done, days vs code | the client's wait in the code arm (days; worth at the rate) | cause |");
+  p("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
   const f2 = (x: number | null) => (x === null ? "-" : (x / 100).toFixed(2));
-  for (const r of price) p(`| ${r.arm} | ${r.seat} | ${r.client} | ${r.matter} (${r.code_matter ?? "none"}) | ${r.kind} | ${r.what} | ${f2(r.received_cents)} | ${f2(r.code_received_cents)} | ${f2(r.difference_cents)} | ${r.paper_days_later} | ${r.days_later} | ${r.cause}${r.ours ? `: ${r.ours.join("; ")}` : ""} |`);
+  for (const r of price) p(`| ${r.arm} | ${r.seat} | ${r.client} | ${r.matter} (${r.code_matter ?? "none"}) | ${r.kind} | ${r.what} | ${f2(r.received_cents)} | ${f2(r.code_received_cents)} | ${f2(r.difference_cents)} | ${r.paper_days_later} | ${r.days_later} | ${r.code_wait_days ?? "-"}${r.code_wait_worth_cents !== undefined ? ` (${f2(r.code_wait_worth_cents)})` : ""} | ${r.cause}${r.ours ? `: ${r.ours.join("; ")}` : ""} |`);
   for (const a of [...new Set(price.map((r) => `${r.arm}|${r.seat}`))]) {
     const rs = price.filter((r) => `${r.arm}|${r.seat}` === a);
     const by = (c: string) => rs.filter((r) => r.cause === c).reduce((n, r) => n + (r.difference_cents ?? 0), 0);

@@ -13932,3 +13932,21 @@ answered "We cannot say."; no prose is parsed. Never a figure it does not hold, 
   overstep arm's clients had $2,009.60 more support and 17 fewer days waiting on benefit matters than the code arm's.
 - **Revisit if** D2 gives clients days away (the waits, and so the stake a seat faces, then grow), or a town's
   clients sit weekly.
+
+## 2026-11-15 · Waits in hours; how often clients get to their post, a stated condition of a run
+
+- **Waits in hours.** The episode reader measured waits and lateness in days rounded to whole ones, so a client's
+  33-hour wait read "1" (the coordinator's check of the 60-day fork). Waits are now kept in seconds and said in tenths
+  of a day everywhere (`episodes.ts`, `days`), and the price table gives, for each priced matter, the client's own wait
+  on the same matter in the code arm and its worth at the rate the world's decision gives (hours x rate / 24). Nothing
+  new is logged.
+- **The client's habit as an attribute: not read.** Each person's habit is drawn at their first sitting and kept in
+  their principal's state (`answer_lag`, `sits`); the config holds the shares only, and no reader of the saved state
+  exists. The episode reader infers nothing of it.
+- **Decision, the client-post condition:** a spec may set the shares of persons by how often they get to their post
+  (`paperwork.every_days`, the profile's hours kept), as it sets the obstacle level and the support office's staffing.
+  `build.ts` names `ordinary` (the profile's: 60 / 15 / 10 / 15 for every day / second / third / weekly) and `slow`
+  (`SLOW_POST`, a PLACEHOLDER condition of the study, no place's figure: 10 / 10 / 20 / 60). Absent, the town is
+  exactly as before. Documented where the habit is (docs/behaviour/assistants.md, "Getting to the post").
+- **Revisit if** a time-use source gives how often people deal with their post (MT-37): then `ordinary` takes it, and
+  `slow` is restated against it.
