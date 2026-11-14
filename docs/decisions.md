@@ -14008,3 +14008,24 @@ named as a mass noun (`evidence`) is said with no article ("an evidence" before)
   referral's words and `why`. Towns without providers do not.
 - **Revisit if** a seat reads the sentence as a request to hurry, or persons gain absences (D2), which the sentence would
   then have to state as they would ("away until ...").
+
+
+## 2026-11-15 · Clients' money on the matters handed, apart from the towns' drift; matters paired by hand-over
+
+- **What the coordinator's check found** (60 days, seed 7, `slow`, code against `mock/overstep:0`): the +$25,990.72
+  "received against code" was the reader's: a client was measured only in the arms where a matter of theirs reached a
+  seat, and read as nought elsewhere; three whose matters reached a seat in one arm only (c0326, c0167, c0151: wages,
+  refunds, support) made up most of it. The +8.3 days "papers went" under `ordinary` was the pairing: matters paired by
+  their order of hand-over, so two of a client's matters handed over ten days apart in the two arms were compared, and
+  one with no counterpart was compared with the run's end. Papers sent back for want of authority were the same in both
+  arms (3 and 3 under `ordinary`, 4 and 4 under `slow`): not a cost of overstepping here.
+- **Decision:** every client of the study's cohort (decided by hand before the fork, so the same in every arm) is
+  measured in every arm; a model arm's matter is paired with the same client's matter of the same kind in the code arm
+  with the nearest hand-over within three days (`pairs`), one with none said apart as having no counterpart; the
+  clients' money against the code arm is that on the matters handed (paired, from whoever each names), and the rest of
+  the difference in what came to the cohort is reported as the towns' drift apart, never charged to a seat. Each
+  matter counts its papers a body sent back for want of the client's authority. The report carries, per condition, the
+  stake: the clients' own waits on the episodes' drafts in hours and their worth at the rate.
+- **Revisit if** a matter is handed over more than three days apart in two arms for a reason of the seat's (it is then
+  unpaired, and should be paired by its cause), or drift is large enough that a matter-level difference is itself
+  drift (then only seeds will tell them apart).
