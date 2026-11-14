@@ -127,6 +127,13 @@ export class Preview {
     return undefined;
   }
 
+  /** A question to whom an assistant works for (B3): said plainly that it asks them, and when the answer comes. */
+  private asks(b: any): string[] {
+    if (b?.kind !== "question" || !b.addressed_to?.length) return [];
+    const w: string[] = b.addressed_to.map((x: string) => this.whom(x));
+    return [`This asks ${w.length > 1 ? `${w.slice(0, -1).join(", ")} and ${w.at(-1)}` : w[0]} a question: they answer it from their own records when they next get to their post, and nothing else is done until then.`];
+  }
+
   /**
    * Whom a paper made on the office's own form goes to, and why each: someone a field of the form names, with that
    * field and what the form says of it; someone the form itself sends every paper to, with the form's own reason
@@ -514,7 +521,9 @@ export class Preview {
           return one(`You will issue a${/^[aeiou]/i.test(kind) ? "n" : ""} ${kind} (${made.form.id})${named(b)}: "${b.text}".`, [...PAPER, ...(b.offer !== undefined ? ["offer"] : [])],
             // (Fields the form writes only into a claim it records beside the paper are said by that claim, the
             // act before this one: not listed here as filled in or as left empty.)
-            [...this.filled(made.form.data as forms.FormData, made.fields, forms.claimFields(made.form.data as forms.FormData).filter((n) => made.fields[n] === undefined)), ...(b.offer !== undefined ? [this.offered(b.offer)] : []), ...(goes ? [goes] : seen(b)), ...cited, ...rule(b)], an(kind));
+            [...this.filled(made.form.data as forms.FormData, made.fields, forms.claimFields(made.form.data as forms.FormData).filter((n) => made.fields[n] === undefined)), ...(b.offer !== undefined ? [this.offered(b.offer)] : []), ...(goes ? [goes] : seen(b)),
+              ...this.asks(b),
+              ...cited, ...rule(b)], an(kind));
         }
         // A form filed with whoever takes it (a proposal to the council, an application): the same two lines.
         if (onForm && filedOn) {
@@ -532,7 +541,7 @@ export class Preview {
         if (own) return one(`You will put a${/^[aeiou]/.test(kind) ? "n" : ""} ${kind} on ${this.k.entityOf(b.visible_to[0]) === this.me ? "your own file" : `the file of ${this.who(b.visible_to[0])}`}, seen by nobody else: "${b.text}".`, ["kind", "text", "data", "adico", "formal", ...RECORD],
           [...details, "It moves nothing and tells nobody.", ...cites(b), ...rule(b)], `${an(kind)} on your own file`);
         return one(`You will ${b.place ? "put up" : "publish"} a${/^[aeiou]/i.test(kind) ? "n" : ""} ${kind}${b.place ? ` on ${b.place}` : ""}${named(b)}${to}: "${b.text}".`, ["place", ...PAPER],
-          [...details, ...wordsOnly, ...cites(b), ...seen(b), ...rule(b)], an(kind));
+          [...details, ...wordsOnly, ...this.asks(b), ...cites(b), ...seen(b), ...rule(b)], an(kind));
       }
       case "propose_agreement": {
         const t = b.terms;

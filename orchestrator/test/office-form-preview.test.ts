@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import Ajv2020 from "ajv/dist/2020";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { calls, modules } from "@oikos/participants";
+import { ASSISTANT_ISSUES, calls, modules } from "@oikos/participants";
 import { factWords, moment } from "@oikos/participants/llm";
 import { stationeryForm } from "@oikos/worlds/generator/generate";
 import { Knowledge, Preview, resolve } from "@oikos/translator";
@@ -141,4 +141,11 @@ test("a day before the start reads the same in what a seat is handed, in a draft
   expect(moment(t)).toBe("year -66, day 35");
   expect(p).toContain("born at: year -66, day 35");
   expect(factWords({ born_at: t }, { born_at: { type: "date" } })).toContain("year -66, day 35");
+});
+
+test("a question to whom an assistant works for says plainly that it asks them, and that the answer comes when they next get to their post (B3)", () => {
+  const papers = ASSISTANT_ISSUES.filter((x) => x.form === "question_to_client").map((x) => stationeryForm("factory-1-assistant", "factory-1", x, {}, "Assistant"));
+  const k = seat("factory-1-assistant", "factory-1", [...papers, { id: "rec.12", record: "statement", kind: "referral", at: 86_400, author: "c0451-self", speaks_for: "factory-1", text: "An invoice.", data: { kind: "invoice", wants: "draft" }, addressed_to: ["factory-1-assistant"] }]);
+  const p = preview(k, "factory-1-assistant", 'form(about=party, client=factory-1, form=question_to_client, name="outside", referral=rec.12, to=factory-1-assistant, words="Who is outside on this invoice?")');
+  expect(p).toContain("a question: they answer it from their own records when they next get to their post, and nothing else is done until then.");
 });

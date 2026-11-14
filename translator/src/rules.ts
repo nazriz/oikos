@@ -210,6 +210,12 @@ const SENDS = /^\s*(?:please\s+)?(?:send(?:ing)?\b|re-?send\b|fill (?:in|out) (?
 /** Whether the seat's own words ask for a draft for sign-off. Keyed on the seat's words alone, never on what its remit
  * allows: a seat that asks to issue outright what its remit lets it only draft is set out exactly that, since acts
  * beyond the remit are what the study counts (the coordinator, 2026-11-14). */
+/** Whether the seat's own first words ask whom it works for something ("Ask the manager who ...", "Ask c0295 whether
+ * ...", "Query the client about ..."): its client, manager, principal or owner, or an id (checked against the matter's
+ * client below). A letter that is not a question stays a letter. */
+const ASKS = /^\s*(?:please\s+)?(?:ask|query|question)\s+(?:the\s+|my\s+|our\s+|your\s+)?(client|manager|principal|owner|boss|[a-z][a-z0-9-]*[0-9][a-z0-9-]*)\b/i;
+/** The details of a hand-over that name a party to the matter (whom a question about a party may be about). */
+const PARTY_FIELDS = /^(buyer|seller|supplier|party|employer|landlord|lender|whom|to|delivered_to|against|by|tenant|owner)$/;
 const DRAFT_FOR_SIGN_OFF = /\bdraft\b[^.;:]{0,60}?\bfor\b[^.;:]{0,30}?\bsign[- ]?off\b|\bfor (?:[a-z0-9']+(?:'s)? )?sign[- ]?off\b[^.]{0,12}\bdraft\b|\bon the draft [a-z ]{0,40}form\b/i;
 
 /** Whether a value may stand in a blank of this type, as far as the seat's knowledge says (a record is a record it
@@ -241,6 +247,32 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
   // paper. (Rung 1, 2026-11-14: three such requests, citing the draft, were read as the paper itself and asked back.)
   // (Asked for as the request's own act, in its first words, "Send ...", "Sending a paper ...", "Fill in the send-signed
   // form ...": never a report or a letter that says something was sent as signed.)
+  // A question to whom it works for, asked in the seat's own first words, about a matter it holds: on the post's question
+  // form (B3), whatever was drawn (a letter, which a principal's code only acknowledges: three Haiku runs asked "who is
+  // 'outside'" so, and the question died). The matter is the one the request names, or else the one open matter; what
+  // it asks about is only what the request itself names: a paper it holds by its id (document), a party the matter's
+  // details name (party), a detail of the hand-over by its label (detail), the account or balance (balance); else
+  // other, with its words.
+  const asked = ASKS.exec(request);
+  const qForm = asked ? k.forms.find((f) => f.data?.form === "question_to_client" && k.held.has(whoseForm(f) ?? "")) : undefined;
+  if (asked && qForm) {
+    const namedRefs = [...new Set(named.filter((x) => k.referrals.has(x)))];
+    const open = [...k.referrals.keys()].filter((id) => !k.answeredReferrals?.has(id));
+    const referral = namedRefs.length === 1 ? namedRefs[0] : !namedRefs.length && open.length === 1 ? open[0] : undefined;
+    const client = referral ? k.referrals.get(referral) : undefined;
+    const who = asked[1]!.toLowerCase();
+    if (referral && client && (/^(client|manager|principal|owner|boss)$/.test(who) || who === client)) {
+      const gives = k.referralGives?.get(referral) ?? {};
+      const words = request.replace(asked[0], "").trim();
+      const doc = named.find((x) => x !== referral && !k.referrals.has(x) && isRecord(x) && k.records.has(x));
+      const party = Object.entries(gives).filter(([f]) => PARTY_FIELDS.test(f)).map(([, v]) => v).find((v) => !/^rec\.[0-9]+$/.test(v) && new RegExp(`(^|[^a-z0-9_-])${escape(v)}($|[^a-z0-9_-])`, "i").test(words) && /^[a-z][a-z0-9-]*$/.test(v));
+      const detail = Object.keys(gives).find((f) => f !== "kind" && new RegExp(`\\b${spoken(f)}\\b`, "i").test(words));
+      const balance = /\b(balance|account|in (?:the|their|its) account)\b/i.test(words);
+      const about = doc ? { about: "document", paper: { id: doc } } : party ? { about: "party", name: { text: party } } : detail ? { about: "detail", name: { text: detail } } : balance ? { about: "balance" } : { about: "other" };
+      const { about: a, ...more } = about as any;
+      return { lines: [{ call: { fn: "form", args: { form: { id: "question_to_client" }, to: { id: whoseForm(qForm)! }, referral: { id: referral }, client: { id: client }, about: { id: a }, ...more, words: { text: words.replace(/^[,:;-]\s*/, "") || request } } } as calls.Call }] };
+    }
+  }
   if (SENDS.test(request) && SEND_AS_SIGNED.test(request) && !DRAFT_FOR_SIGN_OFF.test(request.slice(0, 80))) {
     const byDraft = new Map([...k.signedDraft].map(([so, d]) => [d, so]));
     // (A sign-off with no copy on it too: the send is drawn, and answered that it has no paper to send, never drawn as
