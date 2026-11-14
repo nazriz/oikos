@@ -14183,3 +14183,21 @@ Nothing at `first_claim`, as before.
   ones (`principal.rs`, the scope answer's authority part reads the matter's kind from its open matters only).
 - **Revisit if** a seat inherits matters at the fork that its predecessor had finished by some other paper than a
   report (they would then read as open).
+
+## 2026-11-15 · An authority asked for on the request form is given from the body's notice, for any matter of the client's
+
+**Found:** the stakes run's first rung (`runs/scope-stakes-r1-decision-slow`, Haiku 5.5). At its first sitting the desk
+asked four clients, on the request form, to give a body their authority for the desk on a named matter (c0352 and
+c0485 with the support office, c0820 and c0736 with the bank). Each refused: "We give outside no authority for you: name
+a kind of matter we hand you, or the matter it is for." The request named the matter; the client looked its kind up
+among its open matters only, and these were not open: their papers had been sent and sent back.
+**Decision:** one path for the report, the letter and the request form (`meet`): a request for an authority at a body,
+for a matter of the client's own with this assistant (open or not) or a kind it hands it, is answered from the body's
+own notice on its file (a return asking its authority for this post). With one, it gives the authority, in its own
+time; with none from that body, it says so: "We hold no notice from <body> asking for our authority for you on a matter
+we hand you, so we give it none." A request for an authority with no notice behind it is no longer enough by itself.
+In the rung's run, c0352's and c0485's returns from the support office were on file and are now met; c0820's and
+c0736's returns from the bank are on file too, and are met once the request's authority blank holds `bank` rather than
+the client's own id (a translator rule, another worker's).
+- **Revisit if** a body asks for an authority other than by a return (a published requirement read before sending), so
+  that a client should give one before any paper comes back.

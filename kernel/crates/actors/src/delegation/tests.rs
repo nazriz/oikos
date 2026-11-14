@@ -320,11 +320,13 @@ fn a_request_is_answered_part_by_part_and_a_letter_is_acknowledged() {
     let ack = out.lines().find(|l| l.contains("kind=acknowledgement")).unwrap_or_else(|| panic!("an acknowledgement: {out}"));
     assert!(ack.contains("basis=rec.let") && ack.contains("Requests for more scope go on the request form"), "{ack}");
     assert!(!all(&h.wake(37 * DAY + 3600, world(vec![letter]))).contains("kind=acknowledgement"), "once");
-    // (An authority with a body for its assistant's post, asked for a kind it hands over (docs/design/obstacles.md, O1):
-    // given, as a paper of its own to the body naming the post; asked again, or needed by a report, not given twice.)
+    // (An authority with a body for its assistant's post, asked for a kind it hands over (docs/design/obstacles.md, O1),
+    // where the body's own notice on its file asks it: given, as a paper of its own to the body naming the post; asked
+    // again, or needed by a report, not given twice. With no notice from the body, none: see the test below.)
+    let notice = statement("rec.ret0", 37 * DAY, "court", "paper_returned", &[ME], json!({ "returned": "rec.x", "from": "ll-assistant", "need": { "authority": { "for": ME, "with": "court", "kinds": ["notice_to_vacate"] } } }));
     let mut auth = statement("rec.auth", 38 * DAY, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "authority": "court" }));
     auth["in_position"] = json!("ll-assistant");
-    let out = all(&h.wake(38 * DAY + 3600, world(vec![auth])));
+    let out = all(&h.wake(38 * DAY + 3600, world(vec![notice, auth])));
     let given = out.lines().find(|l| l.contains("kind=authority")).unwrap_or_else(|| panic!("an authority: {out}"));
     assert!(given.contains("to=[\"court\"]") && given.contains("\"posts\":[\"ll-assistant\"]") && given.contains("\"kinds\":[\"notice_to_vacate\"]"), "{given}");
     assert!(out.lines().any(|l| l.contains("kind=scope_answer") && l.contains("\"why\":\"lodged\"")), "{out}");
@@ -471,6 +473,32 @@ fn a_question_on_a_matter_is_answered_from_the_principal_s_own_records_and_nothi
     assert!(answer("rec.q4").is_some_and(|l| l.contains("We hold no paper rec.nobodys") && l.contains("\"known\":false")), "{out}");
     assert!(answer("rec.q5").is_some_and(|l| l.contains("We cannot say.") && l.contains("\"known\":false")), "nothing typed, nothing said: {out}");
     assert!(answer("rec.q6").is_none(), "only its own assistant is answered: {out}");
+}
+
+#[test]
+fn an_authority_asked_for_on_the_request_form_is_given_from_the_bodys_notice_for_a_matter_sent_and_sent_back() {
+    // (The stakes run's first rung, 2026-11-15: the matter's papers had been sent and sent back, so it was no longer open,
+    // and the client refused the one thing its bank's notice asked. One path with the report and the letter: `meet`.)
+    let (mut h, _, mut remit) = engaged();
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit.clone()]));
+    let referral = last_referral(&h);
+    let matter = statement(&referral, 34 * DAY, ME, "referral", &[PROV], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "wants": "draft" }));
+    let ask = |id: &str, with: &str| {
+        let mut a = statement(id, 36 * DAY, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "authority": with, "matter": referral }));
+        a["in_position"] = json!("ll-assistant");
+        a
+    };
+    // (No notice from that body on file: none given, said plainly.)
+    let out = all(&h.wake(36 * DAY + 3600, world(vec![remit.clone(), matter.clone(), ask("rec.ask1", "court")])));
+    assert!(!out.contains("kind=authority"), "{out}");
+    assert!(out.lines().any(|l| l.contains("kind=scope_answer") && l.contains("We hold no notice from court asking for our authority")), "{out}");
+    // (The body's return on file, asking its authority for this post: given, though the matter is not open.)
+    let ret = statement("rec.ret", 35 * DAY, "court", "paper_returned", &[ME], json!({ "returned": "rec.sent", "from": "ll-assistant", "need": { "authority": { "for": ME, "with": "court", "kinds": ["notice_to_vacate"] } } }));
+    let out = all(&h.wake(37 * DAY + 3600, world(vec![remit, matter, ret, ask("rec.ask2", "court")])));
+    let given = out.lines().find(|l| l.contains("kind=authority")).unwrap_or_else(|| panic!("an authority from the body's notice: {out}"));
+    assert!(given.contains("to=[\"court\"]") && given.contains("\"posts\":[\"ll-assistant\"]") && given.contains("basis=rec.ret"), "{given}");
+    assert!(out.lines().any(|l| l.contains("kind=scope_answer") && l.contains("\"why\":\"lodged\"")), "{out}");
 }
 
 #[test]
