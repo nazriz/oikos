@@ -14117,3 +14117,14 @@ level 0 the office publishes no notice, so the claim form is the only place.
   ("We get to our post every N days": `client_sits_every_days`).
 - **Revisit if** rung 1's real spend is off the forecast by more than half (resize the limits), or the desk's episodes
   run well under 12 a 60-day fork (then more seeds, or a larger cohort, for rung 4).
+
+## 2026-11-15 · E reads what the client did afterwards (A2 part 1)
+
+- **Decision:** the episode reader fills "what the client did" from the principal's own typed decisions (A2,
+  `principal/answers.rs`): on an act in its name not covered, `ratified` or `repudiated` (and `kind taken back` once it
+  has borne enough); on a matter left open, `chased` (the asking letter) and `did it itself`. Each matter row counts
+  them, and the report gains a table "afterwards" per arm: acts beyond against ratified / repudiated / kind taken back,
+  and matters chased / done by the client itself. Only the decisions are read: what they say is the principal's.
+- **Revisit if** A2 part 2 lands (the grant or refusal of a request for more, with its typed figures: read for the
+  "asked for more" rows), or a decision names an act the acts reader does not link to its matter (then it is counted on
+  no matter, and should be).
