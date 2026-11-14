@@ -153,6 +153,31 @@ the citizen's code on no form of their own; until 2026-11-08 the desk had no dra
 at `draft` with a request to go ahead (the scope pilot's W6). It reads its service agreements with its clients on
 request (`agreements`).
 
+### Getting to the post (stakes D1a, 2026-11-14)
+
+A person deals with what comes to them by post when they next sit down to it, not as it comes: what their assistant
+sends (a draft to sign off, a request to go ahead, a request for more scope, a letter, a report) and what a body writes
+to them (a paper returned, an authority recorded, a complaint, a notice that a service has ended) waits in their post.
+At their sitting they deal with all of it, in the order it came, as before: each act on it (a sign-off, a go-ahead, an
+authority given to a body, an answer, a paper passed on to the desk) is their own act, placed on their timeline at the
+table of work's row for it. What their own code does (a matter handed over, a want) is not held: that is D1b.
+
+- **The habit** (`paperwork` in the profile; `delegation.paperwork` on every person who may engage an assistant): how
+  many days apart a person sits down to their post, with the share of persons of each, and the hours of the day they do
+  it in. Each person's is drawn once from the world's seeded draws (`answer_lag`, `cx.chance("paperwork-<person>")`, as
+  a landlord's day for its rent book is): how many days apart, which day of those, and a minute in the window.
+- **The distribution, a PLACEHOLDER** (to be sourced: MT-37; every profile the same): every day 60%, every second day 15%, every
+  third day 10%, once a week 15%; in a three-hour window starting two hours after the profile's working day ends (19:00
+  to 22:00 where work ends at 17:00), their free hours outside work. It would be sourced by a time-use survey's
+  household management (mail and paperwork: how often, at what time of day; the American Time Use Survey's household
+  and personal mail and messages, to confirm: MT-37). The shape is the brief's (most daily, a tail every few days up to about a
+  week); no figure is from a place.
+- **Who it is not.** An organisation's principal (an office, a factory's manager) deals with its post whenever its post's
+  code wakes, as before: news wakes it at any hour, and the world gives the post no working hours a principal could read
+  (WM-20). A person with no habit given (a town generated before it) is as before.
+- **What a desk sees:** nothing new. A draft simply waits for its client, as a real one does.
+- Towns without providers are unchanged, to the hash: the habit is read only by a principal.
+
 ## A model in an assistant seat
 
 A town that seats a model in a kind of assistant (`assistant_seats`, templates by id) makes every system of that kind a

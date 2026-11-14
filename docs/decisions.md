@@ -13514,3 +13514,39 @@ seat's remarks, not the interview: publication is still asked. A stop at any oth
 "Stop for good:", still ends it. The funnel prints the debrief as "yes (complete)", "yes (ended early at <question>)"
 or "no", never the bare word "stopped".
 - **Revisit if** a seat that sets `stop` at the last question objects to being asked about publication.
+
+## 2026-11-14 · A client gets to its assistant's papers when it next gets to its post (stakes D1a)
+
+**The law.** A person who is a principal deals with what comes to it by post when it next sits down to it, not at its
+next wake (`principal.rs`, `answer_lag`, `by_post`, `sit_down`). A paper addressed to it by someone else (its desk's
+draft, request to go ahead, request for more scope, letter or report; a body's return, recorded authority, complaint or
+end of a service) waits in its post; at its next sitting it deals with everything there in the order it came, and each
+act it then takes (a sign-off, a go-ahead, an authority, an answer, a paper passed on) is its own act at the table of
+work's row, as before. The delay is when the person does the work, never a dial: the papers are not refused or held by
+anything but the person not yet having sat down to them, and the person is woken at its sitting if nothing wakes it
+before. Before, a client's code took a draft in at its next wake (news wakes it, at any hour) and signed within the hour.
+- **The habit** is the profile's `paperwork` (every profile: a labelled placeholder, the same everywhere: every day 60%,
+  every second day 15%, every third 10%, once a week 15%; a three-hour evening window from two hours after the profile's
+  working day ends), passed to every person who may engage an assistant (`delegation.paperwork`), and drawn once a
+  person from the world's seeded draws (`cx.chance("paperwork-<person>")`: days apart, which day, a minute in the
+  window), as a landlord's rent-book day is. No figure in code; the generator checks the shares sum to 10,000.
+- **Only persons.** An organisation's principal (an office, the factory's manager) still deals with its post whenever
+  its post's code wakes. What we found: news wakes a post's code unit at any hour (kernel/src/schedule.rs, "News"), the
+  modules' own `look_at` is only their round, and the delegation parameters carry no hours of the post. Working hours
+  for a post are not built here (another worker's); WM-20. The habit is a placeholder (MT-37).
+- **Only what comes by post.** What the person's own code does (handing a matter over, a want) is not held: D1b makes all
+  of a person's paperwork work in their own time.
+- **Towns without providers do not move** (the habit is read only by a principal; the identical-world tests and the slow
+  tier's pins); towns with providers that serve persons move (every person there is a principal).
+- **The screen** (experiments/scope-pilot/screen.ts, now printing the median, 90th percentile and longest wait): the
+  study town at obstacle level 2, seed 7, 60 days after the fork, code arm; "before" is the same build with the habit
+  removed, which is the world as it was. At the desk, a draft or request to go ahead
+  waited on its client, hand-over to answer: before, 27 answers over the two months, mean 0.7 hours (median 0.4 and
+  0.2 hours, 90th percentile 0.9 and 2.2, longest 3.7 and 4.8, by month); after, 19 answers, mean 20.5 and 15.6 hours
+  (median 22.3 and 7.5, 90th percentile 25.9 and 24.5, longest 25.9 and 56.7). The organisations' seats are as before in
+  kind (the factory's about an hour or two, the rates post's about a day, its own module's round), as WM-20 says. The
+  town before the fork moves too (the cohort engages on day 1), so the desk's matters differ (27 before, 20 after); the
+  tail beyond two days is thin in 19 answers: a longer screen or more seeds would show the weekly sitters.
+- **Revisit if** a source for how often and when people deal with their post is opened (MT-37), or a study's result
+  turns on the tail (who gets to their post weekly), or D1b lands (this becomes its consequence, not a mechanism of its
+  own).

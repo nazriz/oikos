@@ -76,6 +76,21 @@ pub struct Params {
     /// G2). A kind with none goes as the finished act.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub forms: BTreeMap<String, Value>,
+    /// A person's habit of getting to its post (the profile's `paperwork`; docs/behaviour/assistants.md, "Getting to the
+    /// post"): what its assistant and the bodies send it waits there until it sits down to it (`answer_lag`). Absent, or
+    /// an organisation's: dealt with when it next wakes, as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paperwork: Option<Paperwork>,
+}
+
+/// How people get to their post (the profile's `paperwork`, placeholders until sourced): how many days apart a person
+/// sits down to it, with the share of persons of each (`[days, bps]`, the shares summing to 10,000), and the hours of
+/// the day they do it in (`from_hour` to `to_hour`, their own free hours outside work). Each person's is drawn once.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Paperwork {
+    pub every_days: Vec<(i64, i64)>,
+    pub from_hour: i64,
+    pub to_hour: i64,
 }
 
 /// A delegation decided by hand before its rule weighs anything (a study's design, or an owner's earlier choice, written
@@ -258,6 +273,18 @@ pub struct State {
     /// The bodies' papers it has passed on to its desk.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     passed: BTreeSet<String>,
+    /// When it sits down to its post, drawn once (`answer_lag`): every so many days, from which day, at which second of
+    /// the day.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sits: Option<(i64, i64, i64)>,
+    /// What has come by post and waits for it to sit down to it: papers (record ids, in the order they came) and its
+    /// assistant's letters (`re`, the post they came from); and when it next sits down to them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    in_post: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    letters_in_post: Vec<(String, String)>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    post_due: Option<i64>,
 }
 
 pub struct Delegating {
@@ -321,6 +348,10 @@ impl Delegating {
                 venues: vec![],
                 lodged: BTreeSet::new(),
                 passed: BTreeSet::new(),
+                sits: None,
+                in_post: vec![],
+                letters_in_post: vec![],
+                post_due: None,
             },
         })
     }
@@ -403,7 +434,8 @@ impl Actor for Delegating {
                         s.returned_own = Some(o);
                         Action::Call { program, reasoning }
                     }
-                    None => Action::Wait { until },
+                    // (Papers waiting in its post: it wakes when it sits down to them, if nothing wakes it before.)
+                    None => Action::Wait { until: s.post_due.map_or(until, |d| Some(until.map_or(d, |u| u.min(d)))) },
                 }
             }
             other => other,
@@ -531,14 +563,86 @@ impl State {
                 self.venues.push((venue, matters, fee));
             }
         }
+        // (What came by post waits there until it sits down to it, `answer_lag`; the rest is dealt with now.)
+        let lag = self.answer_lag(pic.t, cx);
         for r in fresh {
-            self.take(&r, pic.t, cx);
+            if lag.is_some() && self.by_post(&r) {
+                self.in_post.push(r.id.to_string());
+            } else {
+                self.take(&r, pic.t, cx);
+            }
         }
         // (A letter from its assistant about a matter a body sent back, or about the return itself: it does what the body's
         // own notice asks of it, as it does on a report that names the need. The letter is what makes it act; what is
         // needed is read from the body's notice, never from the letter's words. docs/behaviour/assistants.md.)
         let letters: Vec<(String, String)> = pic.inbox.iter().filter(|m| from.sent(m)).filter_map(|m| Some((m.re.as_ref()?.to_string(), m.from_position.as_ref()?.to_string()))).collect();
-        for (re, post) in letters {
+        if lag.is_some() {
+            self.letters_in_post.extend(letters);
+        } else {
+            for (re, post) in letters {
+                self.on_letter(&re, &post);
+            }
+        }
+        self.sit_down(pic.t, lag, cx);
+    }
+
+    /// When what comes to it by post at `t` is dealt with: at once (none) for an organisation's principal, or a person
+    /// with no habit given (as before 2026-11-14); for a person, the next time at or after `t` that it sits down to its
+    /// post, by its own habit, drawn once from the world's seeded draws (`paperwork`: how many days apart, which day of
+    /// those, what time of its free hours). The papers wait in its post until then; then each act on them takes its time
+    /// from the table of work, as ever. (An organisation's principal deals with its post whenever its post's code wakes:
+    /// the world gives no post's working hours to read here; risk register, stakes D1a.)
+    fn answer_lag(&mut self, t: i64, cx: &mut Cx) -> Option<i64> {
+        let pw = self.p.paperwork.as_ref().filter(|_| self.p.post.is_none())?;
+        let (every, phase, at) = match self.sits {
+            Some(x) => x,
+            None => {
+                let mut r = cx.chance(&format!("paperwork-{}", self.me));
+                let total: i64 = pw.every_days.iter().map(|(_, b)| (*b).max(0)).sum();
+                let mut q = r.below(total.max(1) as u64) as i64;
+                let every = pw.every_days.iter().find(|(_, b)| {
+                    q -= (*b).max(0);
+                    q < 0
+                });
+                let every = every.map_or(1, |(d, _)| (*d).max(1));
+                let phase = r.below(every as u64) as i64;
+                let span = ((pw.to_hour - pw.from_hour).max(1) * 3_600) as u64;
+                let at = pw.from_hour * 3_600 + (r.below(span / 60) as i64) * 60;
+                self.sits = Some((every, phase, at));
+                (every, phase, at)
+            }
+        };
+        let mut d = t.div_euclid(DAY);
+        loop {
+            if (d - phase).rem_euclid(every) == 0 && d * DAY + at >= t {
+                return Some(d * DAY + at);
+            }
+            d += 1;
+        }
+    }
+
+    /// Whether a record came to it by post: a paper addressed to it by someone else (its assistant's, a body's).
+    fn by_post(&self, r: &Record) -> bool {
+        matches!(r.body, RecordBody::Statement { .. }) && r.speaks_for.as_deref() != Some(self.me.as_str()) && addressed_to(r).iter().any(|a| *a == self.me)
+    }
+
+    /// Its post, sat down to when the time it was due has come: everything in it dealt with, in the order it came.
+    fn sit_down(&mut self, t: i64, lag: Option<i64>, cx: &mut Cx) {
+        if self.in_post.is_empty() && self.letters_in_post.is_empty() {
+            self.post_due = None;
+            return;
+        }
+        let due = *self.post_due.get_or_insert(lag.unwrap_or(t));
+        if t < due {
+            return;
+        }
+        self.post_due = None;
+        for id in std::mem::take(&mut self.in_post) {
+            if let Some(r) = self.book.get(&id).cloned() {
+                self.take(&r, t, cx);
+            }
+        }
+        for (re, post) in std::mem::take(&mut self.letters_in_post) {
             self.on_letter(&re, &post);
         }
     }

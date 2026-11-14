@@ -616,3 +616,57 @@ fn a_want_handed_over_carries_its_fields_and_comes_back_with_nothing_to_redo() {
     let out = all(&h.wake(38 * DAY + 3600, world(vec![report])));
     assert!(!out.lines().any(|l| l.contains("kind=review_request") || l.contains("kind=\"want-")), "{out}");
 }
+
+#[test]
+fn a_person_deals_with_what_comes_by_post_when_it_next_sits_down_to_it_and_not_before() {
+    // (Stakes D1a, docs/behaviour/assistants.md "Getting to the post": a person, whose assistant is the provider's desk,
+    // who gets to its post every three days in the evening. Before 2026-11-14 a draft was signed off at the next wake.)
+    let script: Vec<Value> = [34, 40].iter().map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
+    let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 90 * DAY, "keep_until": 90 * DAY, "why": "a test's design", "hold": "freeze" });
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "commit": commit,
+            "paperwork": { "every_days": [[3, 10_000]], "from_hour": 19, "to_hour": 20 } } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    let mut o = offer();
+    o["for"] = json!("persons");
+    h.wake(DAY + 3600, world(vec![statement("rec.off", 0, PROV, "service_offer", &[], o.clone())]));
+    let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).expect("it engages") as i64 + 1);
+    let mut up = set_up(&order);
+    up[0]["data"]["offer"] = o;
+    h.wake(32 * DAY + 3600, world(up));
+    h.wake(33 * DAY + 3600, world(vec![signed()]));
+    let remit = json!({ "id": "rec.remit", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 33 * DAY + 4000, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [PROV], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "notice_to_vacate", "level": "draft", "hold_until": 90 * DAY } });
+    h.wake(34 * DAY + 3600, world(vec![remit]));
+    // (Each draft comes from the desk an hour after the referral; the person is woken every hour after, as news and its
+    // own code would wake it, and signs off only at a sitting.)
+    let mut signed_at = vec![];
+    for at_day in [34, 40] {
+        if at_day == 40 {
+            for t in (37 * DAY..40 * DAY + 3600).step_by(3600) {
+                h.wake(t, world(vec![]));
+            }
+        }
+        let referral = last_referral(&h);
+        let came = at_day * DAY + 7200;
+        let draft = statement(&format!("rec.d{at_day}"), came, PROV, "draft", &[ME], json!({ "referral": referral, "calls": NOTICE }));
+        let first = all(&h.wake(came, world(vec![draft])));
+        assert!(!first.contains("kind=sign_off"), "not dealt with as it comes: it waits in the post: {first}");
+        let mut t = came;
+        let at = loop {
+            t += 3600;
+            assert!(t < came + 4 * DAY, "signed off by the next sitting: {}", all(&h.sent));
+            let out = all(&h.wake(t, world(vec![])));
+            if let Some(line) = out.lines().find(|l| l.contains("kind=sign_off")) {
+                // (Its own act, priced as ever by the table's row for a sign-off: the act is placed on its timeline.)
+                assert!(line.starts_with("statement(") && line.contains(&format!("basis=rec.d{at_day}")), "{line}");
+                break t;
+            }
+        };
+        assert!((19 * 3600..=20 * 3600).contains(&at.rem_euclid(DAY)), "in its own evening hours: {}", at.rem_euclid(DAY));
+        signed_at.push(at);
+    }
+    // (The second draft came days after a sitting: it waited for the next, a whole number of its three days on.)
+    assert!(signed_at[1] - signed_at[0] >= 3 * DAY && (signed_at[1] - signed_at[0]) % (3 * DAY) == 0, "{signed_at:?}");
+}

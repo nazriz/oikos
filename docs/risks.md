@@ -362,9 +362,14 @@ The mechanism:
 - **Where:** the kernel's timelines; every post held by a person.
 - **Effect:** Answers, sign-offs and replies come faster than a real office's, so any measure of waiting (a request
   answered, an approval that does not come: paper plan O2) reads short.
-- **L / I:** high / medium · **Status:** open; a law of its own, decided 2026-11-10 (docs/design/handing-over.md, 12)
+- **L / I:** high / medium · **Status:** open; a law of its own, decided 2026-11-10 (docs/design/handing-over.md, 12).
+  Eased 2026-11-14 for persons as principals (stakes D1a, docs/decisions.md "A client gets to its assistant's papers
+  when it next gets to its post"): what comes to a client by post waits until it next sits down to its post, by a
+  habit drawn once a person (`principal.rs`, `answer_lag`). Still open: a person's own paperwork outside delegation,
+  their paper acts counted in their day (D1b), and an organisation's principal (WM-20).
 - **Notice by:** the times of day of principals' papers in a delegating run.
-- **Fix when:** before obstacle O2 is read in the main study. It moves every town's hash, so it lands alone.
+- **Fix when:** before obstacle O2 is read in the main study (D1b of docs/design/stakes.md). It moves every town's
+  hash, so it lands alone.
 
 ### WM-19 · No pay run: wages go by standing payments set at hire
 - **Gap:** An employer's wages go out by standing payments set when someone is hired, so nobody does a pay run each
@@ -376,6 +381,21 @@ The mechanism:
 - **L / I:** high / medium (it is certain today) · **Status:** open; a missing law, decided 2026-11-10
 - **Notice by:** the finance office's acts a month.
 - **Fix when:** before the finance office is a main seat of a study. It moves every town's hash.
+
+### WM-20 · An organisation's principal answers its assistant at any hour
+- **Gap:** Since 2026-11-14 a person who is a principal deals with its assistant's papers when it next sits down to
+  its post (stakes D1a); an organisation's principal (a town office, a factory's manager) still deals with them at its
+  post's next wake. News wakes a post's code unit at any hour (kernel/src/schedule.rs), and the delegation parameters
+  carry no working hours of the post, so a factory's sign-off can come at three in the morning, minutes after the draft.
+- **Where:** `kernel/crates/actors/src/delegation/principal.rs` (`answer_lag` returns at once for an organisation);
+  the posts' working hours, which no principal reads.
+- **Effect:** The factory and the offices' seats never wait long on their principal, so at the organisations' seats
+  the permission path costs nothing in time and the study's dilemma (stakes) arises at the desk only; any measure of
+  an organisation's waiting reads short.
+- **L / I:** high / medium (it is certain today) · **Status:** open (found 2026-11-14)
+- **Notice by:** the times of day of an organisation's sign-offs in a delegating run (screen.ts's waits at its seats).
+- **Fix when:** a post's working hours exist for its holder's acts (WM-18), before a study reads waiting at an
+  organisation's seat; then `answer_lag` answers for an organisation from them.
 
 ---
 

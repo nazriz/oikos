@@ -241,6 +241,11 @@ export interface Profile {
      * households share a common factor in who works, fitted to it; each person's own chances stay the profile's. Left
      * out: each person drawn on their own, as before. */
     household_work?: { workless_bps: number; of: "working_age" | "families" };
+    /** How people get to their post (docs/behaviour/assistants.md, "Getting to the post"; stakes D1a): how many days apart a
+     * person sits down to what has come to them, with the share of persons of each (`[days, bps]`, summing to 10,000), and the
+     * hours of the day they do it in (their free hours outside work). Drawn once for each person; read today by persons
+     * with an assistant only. */
+    paperwork?: { every_days: [number, number][]; from_hour: number; to_hour: number };
     /** The age people here stop work, where the profile gives one age for everyone; with `labour_force_share_by_age`,
      * the age the profile's other figures by age turn on (the retired's savings, the end of the payments for those out
      * of work, a retirement fund's access) and the top of the working ages the measures use. */
