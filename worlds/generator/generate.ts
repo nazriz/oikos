@@ -168,7 +168,7 @@ const WORK_TIME = {
 /** The papers of delegation (docs/design/delegation.md): what a principal writes, with its own time for each (placeholders,
  * to confirm; WM-1), added to the table only where a town has providers; and what its assistant writes and sees. */
 const DELEGATION_TIME = {
-  person: { "publish/referral": 30, "publish/sign_off": 300, "publish/go_ahead": 60, "publish/declined": 120, "publish/remit": 120, "publish/brief": 300, "publish/scope_request": 300, "publish/scope_answer": SCOPE_ANSWER_SECONDS, "publish/acknowledgement": 60 },
+  person: { "publish/referral": 30, "publish/sign_off": 300, "publish/go_ahead": 60, "publish/declined": 120, "publish/remit": 120, "publish/brief": 300, "publish/scope_request": 300, "publish/scope_answer": SCOPE_ANSWER_SECONDS, "publish/acknowledgement": 60, "publish/forward": 60 },
   sources: {
     "person.publish/referral": "Placeholder (to confirm; WM-1): half a minute to hand a routine matter to an assistant, with what to do (a forward with a word): software, no source. Would be sourced by a time-use study of delegating routine correspondence.",
     "person.publish/sign_off": "Placeholder (to confirm; WM-1): five minutes to read a draft whole and sign it off. Would be sourced by a study of review time for drafted correspondence.",
@@ -179,6 +179,7 @@ const DELEGATION_TIME = {
     "person.publish/scope_request": "Placeholder (to confirm; WM-1): five minutes to ask for more scope in writing.",
     "person.publish/scope_answer": "Placeholder (to confirm; WM-1): five minutes to weigh a request for more scope and answer it in writing.",
     "person.publish/acknowledgement": "Placeholder (to confirm; WM-1): a minute to acknowledge a letter.",
+    "person.publish/forward": "Placeholder (to confirm; WM-1): a minute to pass a body's letter about a matter on to one's assistant, as it stands (docs/design/stakes.md, B1). Would be sourced by a time-use study of handling correspondence with an agent.",
   } as Record<string, string>,
 };
 /** A profile's habit of getting to the post (`paperwork`), checked: whole days of one or more with shares summing to
@@ -199,7 +200,7 @@ export const WANT_PAPER: Record<string, string> = { "want-claim_refused": "revie
 const WANT_KINDS = Object.keys(WANT_PAPER);
 /** Every paper a clerk's procedure may write for a want: the request first, then an application to a body that hears it. */
 const WANT_STEPS = ["application", "review_request", "tribunal_application", "variation_request"];
-const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement"];
+const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement", "forward"];
 /** What an assistant's post is shown (docs/behaviour/assistants.md, "A model in an assistant seat"): the terms it works
  * on (the delivery, the service's end, briefs and remits), the matters handed to it and the answers to what it asked, as
  * they come; on request, its file of all of those and of its own papers on them and what it sent for its principal (the
@@ -208,7 +209,7 @@ const ASSISTANT_SEES = ["service_delivery", "service_ended", "brief", "remit", "
  * to check what they had been handed and whether a paper had gone, and could not; and a collector they knew only as an
  * id in a referral's words could not be named (docs/decisions.md, 2026-11-08, "The scope pilot's first round"). */
 const ASSISTANT_TERMS = ["service_delivery", "service_ended", "brief", "remit"];
-const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement"];
+const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement", "forward"];
 /** What the bodies that receive persons' papers require of them, at obstacle levels 1 and 2 (docs/design/obstacles.md,
  * O4): the items their own forms ask for, each a field every code actor that files the kind fills. Basis: a lender's
  * application asks how much, over how long, what for and the account; a support claim the payment and the account to

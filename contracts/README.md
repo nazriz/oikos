@@ -963,3 +963,14 @@ unchanged to the byte.
   `hearing_at`, `by`, `due`, `closes`, where a whole number stands under the name.
 - A seat's view (`participants/src/llm/render.ts`): `by` and `draft_by` read as days; a referral's `why` and `due_on`
   are in its words and not set out again.
+
+
+## The client passes on (2026-11-14; docs/design/stakes.md, B1; docs/decisions.md, "B1: the client passes on every paper about a matter it handed over"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- A new delegation paper, `forward` (`papers::delegation::Forward`): from a principal to its assistant (addressed as its
+  other papers to it are), `basis` the body's paper; data `paper` (its id), `kind`, `by` (who wrote it), `for` (the
+  principal), `matter` (the referral, where the principal can tell), `text` and `data` (the body's paper's words and
+  data as it wrote them). It joins the assistant post's `matters` channel (as it comes) and its file.
+- The table of work gains `person.publish/forward` (60 seconds, a placeholder), where a town has providers.
+- `Report.needs.record` may name the paper that asks for a record (an evidence request passed on), where the record
+  asked for has no id of its own.

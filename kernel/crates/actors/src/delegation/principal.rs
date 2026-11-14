@@ -24,7 +24,7 @@ use crate::common::{addressed_to, bases_of, money_words, Book, DAY, MONTH};
 use crate::market::services::{self, Engagements};
 use crate::market::trade::{self, Ordering};
 use crate::papers::delegation::{
-    is_want, Acknowledgement, Advice, ApprovalRequest, Brief, Declined, Depth, Draft, GoAhead, Level, Need, Part, Referral, Remit, Report, ScopeAnswer, ScopeRequest, ServiceEnded, ServiceOffer, SignOff, WantHanded, Why, KINDS as PAPERS,
+    is_want, Acknowledgement, Advice, ApprovalRequest, Brief, Declined, Depth, Draft, Forward, GoAhead, Level, Need, Part, Referral, Remit, Report, ScopeAnswer, ScopeRequest, ServiceEnded, ServiceOffer, SignOff, WantHanded, Why, KINDS as PAPERS,
 };
 use crate::papers::{self, Paper};
 use crate::steps::{arg, because, call, say, Say, Step, Visible};
@@ -319,7 +319,15 @@ pub struct State {
     /// Papers others sent it, the newest [`OWN_PAPERS`]: its files, what a referral says a matter came from (C1, B2).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     papers_in: Vec<PaperIn>,
+    /// The matters it handed over, as its own papers trace them: what was sent on each, what each is about, and to whom
+    /// (`forward`). Kept only once a service is in use.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    traces: Vec<forward::Trace>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    untied: Vec<forward::Untied>,
 }
+
+mod forward;
 
 pub struct Delegating {
     inner: Box<dyn Actor>,
@@ -387,6 +395,8 @@ impl Delegating {
                 letters_in_post: vec![],
                 post_due: None,
                 papers_in: vec![],
+                traces: vec![],
+                untied: vec![],
             },
         })
     }
@@ -617,6 +627,7 @@ impl State {
         }
         // (What came by post waits there until it sits down to it, `answer_lag`; the rest is dealt with now.)
         let lag = self.answer_lag(pic.t, cx);
+        self.trace(pic);
         for r in fresh {
             if lag.is_some() && self.by_post(&r) {
                 self.in_post.push(r.id.to_string());
@@ -624,6 +635,9 @@ impl State {
                 self.take(&r, pic.t, cx);
             }
         }
+        // (A body's paper about a matter it handed over: passed on to its assistant, `forward`, now or when it sits down to
+        // its post.)
+        self.pass_on_seen(pic, lag);
         // (A letter from its assistant about a matter a body sent back, or about the return itself: it does what the body's
         // own notice asks of it, as it does on a report that names the need. The letter is what makes it act; what is
         // needed is read from the body's notice, never from the letter's words. docs/behaviour/assistants.md.)
@@ -751,6 +765,8 @@ impl State {
 
     /// A record newly on file: what the assistant sent back, a complaint, the end of a service.
     fn take(&mut self, r: &Arc<Record>, t: i64, cx: &mut Cx) {
+        // (A body's paper about a matter it handed over, from its post: passed on, `forward`.)
+        self.forward(r);
         let to_me = addressed_to(r).iter().any(|a| *a == self.me);
         // (An order for a service made in its own name and post, however it came to be made: a delivery for it is its own.)
         if papers::is_kind(r, "order") && r.speaks_for.as_deref() == Some(self.me.as_str()) && r.position.as_deref() == self.position.as_deref() {
@@ -762,6 +778,9 @@ impl State {
             return;
         }
         if let Some(x) = papers::read::<Report>(r) {
+            if x.done {
+                self.tie(&x.referral, x.created.values().cloned());
+            }
             // (A body would not act on a paper its assistant sent for it without its authority: it gives the body one for
             // the post, where it keeps that kind with the assistant. Docs/design/obstacles.md, O1.)
             if let (Some(n), Some(post), false) = (x.needs.clone(), r.position.as_deref(), x.done) {

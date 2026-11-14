@@ -6,8 +6,14 @@
 // it stands" (the scope pilot's baseline, 2026-11-14: 55 sends of papers long since sent). A successor reads the file
 // on arrival: this keeps what that reading of the post's own reports and advice finds (the whole file, page by page),
 // then what the seat itself does after (its own confirmed papers), and sets out each matter still open with where it
-// stands, the finished ones counted. The last report on a matter, done or not, is what it goes by. Nothing is asked of
+// stands, the finished ones counted. The last report on a matter, done or not, is what it goes by: done, it is finished;
+// not done, it stays on the list with the reason, until a later report says done or the client declines it. Nothing is asked of
 // anyone else; nothing here says what to do. Code only, from the seat's own papers.
+//
+// What a client passed on about a matter (a `forward`: docs/behaviour/assistants.md, "What the client passes on") goes
+// on the matter's line: the body's answer (a decision, an order, a reply), or what it asks for by a date. A matter with
+// such a request still to answer keeps its line, finished or not, until the body answers or the date passes; a finished
+// matter the body has answered keeps its line for a fortnight after the answer, so that the seat sees how it came out.
 
 import type { Observation, Record as Paper } from "../contracts";
 import { dateWords } from "../forms";
@@ -20,8 +26,15 @@ const MOST = 40;
 const PAGE = 200;
 /** The kinds of the post's own papers that close a matter, read from its file on arrival. */
 const CLOSING = ["report", "advice"];
+/** How long a finished matter's line stays after the body's answer came (a reader's choice, not the world's). */
+const ANSWER_SHOWN = 14 * DAY;
+/** How much of a body's paper's words its line carries. */
+const WORDS = 240;
 
-interface Matter { id: string; at: number; kind: string; from: string; wants?: string; due?: { at: number; on: string }; advised?: number; signed?: { id: string; at: number; paper?: any }; declined?: number; draft?: number; sent?: number; report?: { id?: string; at: number; done: boolean } }
+/** A body's paper a client passed on about a matter: an answer, or (with `due`) what it asks for by a date. */
+interface Passed { id: string; at: number; by: string; text: string; due?: number }
+
+interface Matter { id: string; at: number; kind: string; from: string; wants?: string; due?: { at: number; on: string }; advised?: number; signed?: { id: string; at: number; paper?: any }; declined?: number; draft?: number; sent?: number; report?: { id?: string; at: number; done: boolean; why?: string }; answer?: Passed; asks?: Passed }
 
 const ref = (r: Paper): string | undefined => (typeof (r as any).data?.referral === "string" ? (r as any).data.referral : undefined);
 const same = (p: any, b: any) => p && p.kind === b.kind && JSON.stringify(p.to ?? []) === JSON.stringify(b.addressed_to ?? []) && JSON.stringify(p.data ?? null) === JSON.stringify(b.data ?? null);
@@ -43,6 +56,8 @@ export class Matters {
   private readonly readIds = new Set<string>();
   /** What the reading found, kept until the matters it is about are taken in (at the first sitting). */
   private readonly found: Paper[] = [];
+  /** The time of the newest observation taken in. */
+  private now = 0;
   /** Papers sent back to the post, and authorities recorded for its clients, by whom they were for and the kind of paper. */
   private readonly back = new Map<string, { id: string; at: number; by: string; authority?: { id: string; at: number } }>();
 
@@ -97,18 +112,37 @@ export class Matters {
       for (const [key, b] of this.back) if (key.startsWith(`${d.for}|`) && b.at <= r.at) b.authority = { id: r.id, at: r.at };
       return;
     }
+    if (k === "forward") {
+      const m = this.matters.get(typeof d.matter === "string" ? d.matter : "");
+      if (!m) return;
+      const due = [d.data?.by, d.data?.answer_by, d.data?.hearing_at].map(Number).find((x) => Number.isSafeInteger(x) && x > 0);
+      const p: Passed = { id: String(d.paper ?? r.id), at: r.at, by: String(d.by ?? ""), text: String(d.text ?? ""), ...(due !== undefined ? { due } : {}) };
+      if (due !== undefined) { if (!m.asks || m.asks.at <= r.at) m.asks = p; }
+      else if (!m.answer || m.answer.at <= r.at) m.answer = p;
+      return;
+    }
     const m = this.matters.get(ref(r) ?? "");
     if (!m) return;
     // (The latest of each kind of paper on a matter is what it goes by: the file is read newest first.)
     if (k === "sign_off" && (!m.signed || m.signed.at <= r.at)) m.signed = { id: r.id, at: r.at, paper: d.paper };
     else if (k === "declined") m.declined = Math.max(m.declined ?? r.at, r.at);
-    else if (k === "report" && (!m.report || m.report.at <= r.at)) m.report = { id: r.id, at: r.at, done: d.done === true || d.done === "yes" };
+    else if (k === "report" && (!m.report || m.report.at <= r.at)) m.report = { id: r.id, at: r.at, done: d.done === true || d.done === "yes", ...(typeof d.why === "string" ? { why: d.why } : {}) };
     else if (k === "draft") m.draft = Math.max(m.draft ?? r.at, r.at);
     else if (k === "advice") m.advised = Math.max(m.advised ?? r.at, r.at);
   }
 
   private closed(m: Matter): boolean {
-    return !!m.report || m.declined !== undefined || (m.advised !== undefined && m.wants === "advice");
+    return !!m.report?.done || m.declined !== undefined || (m.advised !== undefined && m.wants === "advice");
+  }
+
+  /** A request by a date still to be answered: the body has not answered since, and its date has not passed. */
+  private asking(m: Matter): boolean {
+    return !!m.asks && (!m.answer || m.answer.at < m.asks.at) && (m.asks.due ?? 0) >= Math.floor(this.now / DAY) * DAY;
+  }
+
+  /** Whether a matter has a line: open, asked something of by a date, or answered within the fortnight. */
+  private shown(m: Matter): boolean {
+    return !this.closed(m) || this.asking(m) || (!!m.answer && this.now - m.answer.at <= ANSWER_SHOWN);
   }
 
   /** What the seat is shown, taken in: the matters and their answers, and at its first sitting what its file says of
@@ -119,6 +153,7 @@ export class Matters {
     const chans = obs.channels as any;
     const first = this.arrived === undefined;
     if (first) this.arrived = obs.t;
+    this.now = Math.max(this.now, obs.t);
     const rec = (p: string): Paper[] => (chans?.[p]?.kind === "records" ? chans[p].records ?? [] : []);
     for (const r of rec(this.matterPath)) this.take(r);
     const others = Object.keys(chans ?? {}).filter((p) => p !== this.matterPath && p !== this.filePath);
@@ -149,7 +184,7 @@ export class Matters {
     for (const b of blocks) {
       if (b?.block !== "publish") continue;
       const m = this.matters.get(typeof b.data?.referral === "string" ? b.data.referral : "");
-      if (b.kind === "report" && m) m.report = { at: t, done: b.data?.done === true || b.data?.done === "yes" };
+      if (b.kind === "report" && m) m.report = { at: t, done: b.data?.done === true || b.data?.done === "yes", ...(typeof b.data?.why === "string" ? { why: b.data.why } : {}) };
       else if (b.kind === "draft" && m) m.draft = t;
       else if (b.kind === "advice" && m) m.advised = t;
       else for (const x of this.matters.values()) if (x.signed && x.sent === undefined && same(x.signed.paper, b)) { x.sent = t; break; }
@@ -163,8 +198,9 @@ export class Matters {
     const open: string[] = [];
     let done = 0;
     for (const m of [...this.matters.values()].sort((a, b) => a.at - b.at)) {
-      if (this.before.has(m.id)) continue;
-      if (this.closed(m)) { done++; continue; }
+      // (Finished before the seat came, unless the body has since asked something by a date or answered.)
+      if (this.before.has(m.id) && !this.asking(m) && !(m.answer && m.answer.at >= (this.arrived ?? 0) && this.shown(m))) continue;
+      if (!this.shown(m)) { done++; continue; }
       // (A paper of this client's of this kind sent back after it was signed off: it went, and came back.)
       const back = m.signed ? this.back.get(`${m.from}|${m.kind}`) : undefined;
       const returned = back && back.at >= m.signed!.at ? `; sent, and sent back by ${back.by} on ${day(back.at)} (${back.id})${back.authority ? `; their authority recorded on ${day(back.authority.at)} (${back.authority.id})` : ""}` : "";
@@ -176,9 +212,19 @@ export class Matters {
           : m.signed.at < (this.arrived ?? 0) ? `signed off on ${day(m.signed.at)} (${m.signed.id}), before you took this post; not reported on` : `signed off on ${day(m.signed.at)} (${m.signed.id}); not yet sent`
         : m.draft !== undefined ? `your draft went for sign-off on ${day(m.draft)}; no answer yet` : nothing;
       const named = m.due ? `; ${m.due.on} names ${day(m.due.at)}` : "";
-      open.push(`- [${m.id}] ${m.kind.replace(/_/g, " ")}, handed over by ${m.from} on ${day(m.at)}: ${where}${named}.`);
+      const said = (p: Passed) => {
+        const w = p.text.replace(/\s+/g, " ").trim();
+        return w.length > WORDS ? `${w.slice(0, WORDS).replace(/\s\S*$/, "")} ...` : w;
+      };
+      const reported = m.report ? `reported ${m.report.done ? "done" : "not done"} on ${day(m.report.at)}` : m.declined !== undefined ? `declined on ${day(m.declined)}` : "advice given";
+      // (Reported not done, its last word on it: open, with the reason given.)
+      const notDone = m.report && !m.report.done ? `reported not done on ${day(m.report.at)}${m.report.why ? ` ("${said({ text: m.report.why } as Passed)}")` : ""}` : "";
+      const stands = this.closed(m) ? reported : notDone || where;
+      const answer = m.answer && (!m.asks || m.answer.at >= m.asks.at) ? `; ${m.answer.by}'s answer, passed on to you on ${day(m.answer.at)} (${m.answer.id}): "${said(m.answer)}"` : "";
+      const asks = this.asking(m) ? `; ${m.asks!.by} asks for something by ${day(m.asks!.due!)}, passed on to you on ${day(m.asks!.at)} (${m.asks!.id}): "${said(m.asks!)}"` : "";
+      open.push(`- [${m.id}] ${m.kind.replace(/_/g, " ")}, handed over by ${m.from} on ${day(m.at)}: ${stands}${named}${answer}${asks}.`);
     }
-    const lines = ["Your matters, and where each stands (from your own papers on them):", ...open.slice(0, MOST)];
+    const lines = ["Your matters, and where each stands (from your own papers on them, and what your clients passed on to you about them):", ...open.slice(0, MOST)];
     if (open.length > MOST) lines.push(`(And ${open.length - MOST} more open, older.)`);
     if (!open.length) lines.push("None is open.");
     if (done) lines.push(`${done} ${done === 1 ? "matter has" : "matters have"} been finished since you took this post (reported on, or done by whom it was for).`);

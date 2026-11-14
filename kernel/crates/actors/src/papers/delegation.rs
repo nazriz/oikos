@@ -30,6 +30,7 @@ pub const KINDS: &[&str] = &[
     ScopeAnswer::KIND,
     Acknowledgement::KIND,
     Handover::KIND,
+    Forward::KIND,
 ];
 
 /// What would clear an obstacle, as the law that made it names it (docs/design/obstacles.md section 4): an authority
@@ -630,6 +631,39 @@ pub struct Handover {
 }
 impl Paper for Handover {
     const KIND: &'static str = "handover";
+}
+
+/// A body's paper about a matter handed over, passed on by the principal to its assistant as it stands, as a client
+/// forwards an agency's letter to its agent (docs/behaviour/assistants.md, "What the client passes on"): the paper's
+/// id, kind, words and data as the body wrote them, who wrote it (`by`), whom it was to (`for`), and the matter it is
+/// about (`matter`: the referral, where the principal can tell). `basis` is the body's paper.
+///
+/// Written by: the principal's wrapper (`pass_on`). Read by: the `assistant` (a decision closes the matter; a paper that
+/// asks for something by a date is reported as a need), the seat's matters reader, the log's readers.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Forward {
+    pub paper: String,
+    pub kind: String,
+    pub by: String,
+    #[serde(rename = "for")]
+    pub for_: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matter: Option<String>,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub data: Value,
+}
+impl Paper for Forward {
+    const KIND: &'static str = "forward";
+}
+
+impl Forward {
+    /// The date the paper asks something by, where it names one (an evidence request's `by`, a notice's `answer_by` or the day of its hearing):
+    /// none, it asks for nothing by a date.
+    pub fn due(&self) -> Option<i64> {
+        ["by", "answer_by", "hearing_at"].iter().find_map(|k| crate::papers::lenient::whole(&self.data[*k]))
+    }
 }
 
 #[cfg(test)]

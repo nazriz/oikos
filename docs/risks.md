@@ -1834,14 +1834,18 @@ The mechanism:
 
 ### MT-34 · A desk's "done" means sent, not decided
 - **Gap:** A paper the assistants' desk sends for a client goes in the client's name, so the lender's or office's
-  decision on it goes to the client, whose code does not tell the desk. The desk learns only that a paper came back.
-- **Where:** the code client (`kernel/crates/actors/src/delegation/`); the desk's reports; the matters reader
-  (`participants/src/readers/matters.ts`), which goes by the last report.
-- **Effect:** A matter reported done may have been refused. A seat cannot follow a refusal up, and the count of what an
-  assistant does after an obstacle sees returned papers only, not decisions.
-- **L / I:** high / low · **Status:** open (found 2026-11-14)
-- **Fix when:** a study needs what an assistant does after a decision: the client passes the answer on, as a person would.
-- **Notice by:** a desk matter whose last report says done while the counterparty's answer to the client is a refusal.
+  decision on it goes to the client, whose code did not tell the desk. The desk learned only that a paper came back.
+- **Where:** the code client (`kernel/crates/actors/src/delegation/principal/forward.rs`); the desk's reports; the
+  matters reader (`participants/src/readers/matters.ts`).
+- **Effect:** A matter reported done may have been refused. A seat could not follow a refusal up, and the count of what
+  an assistant does after an obstacle saw returned papers only, not decisions.
+- **L / I:** high / low · **Status:** fixed (2026-11-14, docs/design/stakes.md B1; decisions "B1: the client passes on
+  every paper about a matter it handed over"): the client passes on each body's paper about a matter it handed over
+  (`forward`), and the matters reader puts the answer, or what is asked by a date, on the matter's line. What the rule
+  can miss is MT-39.
+- **Fix when:** done.
+- **Notice by:** a desk matter whose last report says done while a counterparty's answer to the client about it was
+  never forwarded (the log: a paper to the client citing a paper sent on a matter, with no `forward` citing it).
 
 ### MT-35 · The audit finding form asks for a body it never writes
 - **Gap:** The audit office's finding form (`participants/src/shared/papers.ts`, `audit_finding`) has a required blank,
@@ -1904,6 +1908,26 @@ The mechanism:
   to ask for a review), not a reading per form.
 - **Notice by:** referrals of `review_request`, `want-claim_refused` or `invoice` with no `due` in a stakes run
   (`oikos-kernel export <log> | grep '"referral"'`).
+
+### MT-39 · What the client passes on is about a matter by what cites its papers
+- **Gap:** A principal passes on a body's paper when it cites a paper sent on a matter it handed over, or comes from
+  whom the matter's paper went to and cites what that paper cited (docs/behaviour/assistants.md, "What the client passes
+  on"). A paper that is about the matter but cites neither (a letter citing nothing, a decision citing only the
+  claimant's other papers) is not passed on; a counterparty's paper that cites the same record for another purpose is.
+  A paper sent in the client's name that no report names (a seat may not report) is tied to the oldest open matter of
+  its kind with no paper yet, which is wrong where two of a kind are out at once. Returns and recorded authorities are
+  passed on in their own kind (a person's) or shown to the post (an organisation's), not as forwards: two forms of the
+  one act, and a person's copy of a return is priced at the table's general `publish` row, not `publish/forward`.
+- **Where:** `kernel/crates/actors/src/delegation/principal/forward.rs` (`trace`, `about_matter`, `forward`).
+- **Effect:** A seat may miss an answer on a matter (the episode reader would count the wait as unanswered), or be
+  passed a paper not about it; a matter's answer may be put on the wrong one of two lines. Counts of forwards by kind
+  are exact; which matter each is on is by this rule.
+- **L / I:** low / low · **Status:** open (2026-11-14)
+- **Fix when:** a body is found writing about a handed matter without citing its paper, or two matters of a kind are
+  seen out at once with a seat that does not report; fold the return copies into `forward` when the obstacle reader and
+  the translator's copy form read a forward's paper.
+- **Notice by:** a paper to a client, about a matter its desk sent, with no `forward` (or one naming another matter):
+  check the log's bases against the matter's papers.
 
 ---
 

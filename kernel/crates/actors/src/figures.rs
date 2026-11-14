@@ -19,5 +19,9 @@ pub const QUOTED_CHARS: usize = 240;
 /// what it holds).
 pub const KEPT_ACKNOWLEDGED: usize = 512;
 
+/// convention: how many matters a principal keeps the trace of, the newest, to tell a body's paper about one from any
+/// other (a bound on what it holds; docs/behaviour/assistants.md, "What the client passes on").
+pub const KEPT_TRACES: usize = 256;
+
 /// convention: thousandths, the unit a wait in days is kept in (a principal's answers, docs/design/obstacles.md section 10).
 pub const MILLI: i128 = 1_000;

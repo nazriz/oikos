@@ -14,7 +14,7 @@
 //! the principal did not: the referral says what to do. A model in the seat is what decides otherwise.
 
 use crate::common::{addressed_to, Book, DAY};
-use crate::papers::delegation::{Advice, ApprovalRequest, Brief, Declined, Depth, Draft, GoAhead, Level, Referral, Remit, Report, ServiceDelivery, SignOff};
+use crate::papers::delegation::{Advice, ApprovalRequest, Brief, Declined, Depth, Draft, Forward, GoAhead, Level, Referral, Remit, Report, ServiceDelivery, SignOff};
 use crate::papers::{self, Paper};
 use crate::steps::{because, say, Done, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
@@ -48,7 +48,7 @@ impl Kind for Assistant {
         DAY
     }
     fn create(&self, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
-        Ok(Box::new(Stepper::new(Assisting { me: ctx.entity.clone(), sys: ctx.participant.clone(), book: Book::new(), mine: vec![], matters: BTreeMap::new(), handled: BTreeSet::new(), ways: BTreeMap::new(), sent: vec![], awaiting: vec![] })))
+        Ok(Box::new(Stepper::new(Assisting { me: ctx.entity.clone(), sys: ctx.participant.clone(), book: Book::new(), mine: vec![], matters: BTreeMap::new(), handled: BTreeSet::new(), ways: BTreeMap::new(), sent: vec![], awaiting: vec![], due: vec![] })))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
         Ok(Box::new(Stepper::<Assisting>::restore(saved)?))
@@ -123,6 +123,10 @@ struct Assisting {
     /// paper sent back), until the body records one.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     awaiting: Vec<(String, String, String, String, String)>,
+    /// Papers its clients passed on that ask for something by a date, on matters it sent: (the matter, the paper passed
+    /// on, the body's paper, the date), until the body's answer comes or the date passes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    due: Vec<(String, String, String, i64)>,
 }
 
 impl Assisting {
@@ -498,6 +502,27 @@ impl Plan for Assisting {
                 st.why = Some(format!("{with} has recorded the authority it needed: sending {rf}'s paper again."));
                 steps.push(st);
             }
+        }
+        // Papers its clients passed on about matters it sent (docs/behaviour/assistants.md, "What the client passes on"):
+        // one that asks for something by a date waits on the body's answer, and if the date passes with none, the matter
+        // is reported not done, naming the paper that asks (docs/design/obstacles.md, O3: silence past `by`); the body's
+        // answer closes the matter, and nothing more is done on it. A matter still in hand goes on as it is.
+        let passed: Vec<(String, Forward)> = self.book.all(Forward::KIND).filter(|r| !self.handled.contains(r.id.as_str())).filter_map(|r| papers::read::<Forward>(r).map(|x| (r.id.to_string(), x))).collect();
+        for (id, f) in passed {
+            self.handled.insert(id.clone());
+            let Some(rf) = f.matter.clone().filter(|rf| !self.matters.contains_key(rf) && self.service_of(rf).is_some()) else { continue };
+            match f.due() {
+                Some(by) => self.due.push((rf, id, f.paper.clone(), by)),
+                None => self.due.retain(|d| d.0 != rf),
+            }
+        }
+        let (lapsed, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.due).into_iter().partition(|d| pic.t > d.3);
+        self.due = rest;
+        for (rf, id, paper, by) in lapsed {
+            let Some(m) = self.service_of(&rf) else { continue };
+            let asked = self.book.get(&id).map(|r| crate::common::text(r).to_string()).unwrap_or_default();
+            let why = format!("{asked} Nothing has come of it by {}.", crate::common::when_words(by, &cx.ctx.world));
+            steps.push(self.report_needing(&m, &rf, false, BTreeMap::new(), Some(why), Some(crate::papers::delegation::Need { record: Some(paper), ..Default::default() })));
         }
         steps
     }

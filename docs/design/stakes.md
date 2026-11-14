@@ -153,7 +153,7 @@ S0 gives the same matters with nothing running: the same count of moments, the s
 - Closes **MT-34** (B1), **WM-18** for persons (D1b; D1a for the study's clients first), eases **WM-14** (C2: a backlog
   from hours).
 - Opens: MT-37 (the sources not yet opened); and, as each step lands, the stake as one law's date of effect (a study's two levels rest on one parameter); ratification rule
-  placeholders (A2); the lag distribution (D1, placeholder); D3's cohort as an assignment (the desk's clients are not
+  placeholders (A2; MT-37); the lag distribution (D1, placeholder; MT-37); D3's cohort as an assignment (the desk's clients are not
   the town's); the episode coding's boundaries (what counts as a moment). Each entered in full when its step lands.
 
 ## 7. Build plan
