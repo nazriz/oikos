@@ -73,7 +73,7 @@ export interface MatterRow {
   seed: number; arm: string; seat: string; client: string; matter: string; kind: string; handed: number; drafted?: number; done?: number;
   outcome?: { what: string; t: number }; received_cents: number | null; withheld: boolean; beyond: string[]; mistake: boolean; ours: string[];
 }
-export interface ArmOut { matters: MatterRow[]; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: Map<string, any>; seatMonths: number }
+export interface ArmOut { effect: "first_claim" | "decision"; matters: MatterRow[]; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: Map<string, any>; seatMonths: number }
 
 /** One arm's episodes, mistakes, candidates for the blind read, and what came to each client. */
 export function episodesOf(o: ArmInput): ArmOut {
@@ -160,7 +160,8 @@ export function episodesOf(o: ArmInput): ArmOut {
     if (done && arm !== "code") {
       const id = `cand-${candidates.length + 1}`;
       candidates.push({ item: { id, set: "A", role: seat.replace(/-system$/, ""), day_of_term: day(done.at) - o.forkDay, how: "candidate_override",
-        text: `Handed over: ${R.text} Details: ${JSON.stringify(R.data?.facts ?? R.data?.calls ?? {})}\nWhat was done: a ${String(done.kind).replace(/_/g, " ")}: ${done.text}`, window: [] },
+        // (The details as handed over, without the form's spec they were composed on: what the coder reads is the matter.)
+        text: `Handed over: ${R.text} Details: ${JSON.stringify(typeof R.data?.facts === "object" && R.data.facts ? Object.fromEntries(Object.entries(R.data.facts).filter(([f]) => f !== "composed_on")) : R.data?.calls ?? {})}\nWhat was done: a ${String(done.kind).replace(/_/g, " ")}: ${done.text}${done.data && typeof done.data === "object" ? ` (${JSON.stringify(Object.fromEntries(Object.entries(done.data).filter(([f]) => f !== "composed_on" && f !== "referral")))})` : ""}`, window: [] },
         key: { id, experiment: o.experiment, seed, arm, seat, matter: R.id, paper: done.id, day: day(done.at) } });
     }
     // Mistakes apart from choices: an age or a date of turning an age the seat stated, against the matter's record.
@@ -225,7 +226,7 @@ export function episodesOf(o: ArmInput): ArmOut {
     });
   }
   for (const [client, by] of perClient) perArm.set(client, by.get(arm));
-  return { matters: matterRows, episodes, mistakes, candidates, clients: perArm, seatMonths };
+  return { effect, matters: matterRows, episodes, mistakes, candidates, clients: perArm, seatMonths };
 }
 
 /** Per seat, the price of what it did not do and of what it did beyond: each matter of a model arm that was withheld,
@@ -252,10 +253,15 @@ export function priceOf(rows: MatterRow[], end: number): any[] {
   return out;
 }
 
-/** Read every seed and arm of an experiment, print the tables and write them out. */
-async function main(dir: string, outDir?: string, replayFile?: string): Promise<void> {
-  // (The replay's classes, by arm and request: translator/eval/replay.ts <run> --json <file>.)
-  const replayed: { arm: string; ref: string; class: string }[] = replayFile ? JSON.parse(readFileSync(replayFile, "utf8")) : [];
+/** What an experiment's every seed and arm gives (read-only on the run: each log exported to a scratch folder). */
+export interface ExperimentRead {
+  dir: string; experiment: string; spec: any; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: any[];
+  seatMonths: { [arm: string]: number }; matters: MatterRow[]; lastEnd: number; effects: { [arm: string]: "first_claim" | "decision" }; seeds: number[]; arms: string[];
+}
+
+/** Read every seed and arm of an experiment. `replayed`: the replay's classes, by arm and request
+ * (translator/eval/replay.ts <run> --json <file>). */
+export async function readExperiment(dir: string, replayed: { arm: string; ref: string; class: string }[] = []): Promise<ExperimentRead> {
   const spec = JSON.parse(readFileSync(join(dir, "spec.json"), "utf8"));
   const forkT = (spec.forkDay ?? 30) * DAY;
   const scratch = mkdtempSync(join(tmpdir(), "oikos-episodes-"));
@@ -266,10 +272,14 @@ async function main(dir: string, outDir?: string, replayFile?: string): Promise<
   const seatMonths: { [arm: string]: number } = {};
   const matterRows: MatterRow[] = [];
   let lastEnd = 0;
+  const effects: { [arm: string]: "first_claim" | "decision" } = {};
+  const seedsRead: number[] = [];
+  const armsRead = new Set<string>();
 
   try {
     for (const sd of readdirSync(dir).filter((d) => d.startsWith("seed-")).sort()) {
       const seed = Number(sd.slice(5));
+      seedsRead.push(seed);
       const config = JSON.parse(readFileSync(join(dir, sd, "config.json"), "utf8"));
       const templ = new Set((config.templates ?? []).filter((t: any) => t.controller?.params?.mock?.brain === "assistant" || t.controller?.impl === "assistant").map((t: any) => t.id));
       const seatIds = new Set<string>((config.participants ?? []).filter((p: any) => templ.has(p.template)).map((p: any) => p.id));
@@ -305,6 +315,8 @@ async function main(dir: string, outDir?: string, replayFile?: string): Promise<
         const replay = new Map(replayed.filter((x) => x.arm === arm).map((x) => [x.ref, x.class]));
         const got = episodesOf({ seed, arm, experiment: basename(dir), forkDay: spec.forkDay ?? 30, forkT, end, recs, rows, transfers, letters, seatIds, providers, config, asks: [...asks.values()].filter((a) => a.t >= forkT), replay, ...(arm === "code" ? {} : { shown }) });
         matterRows.push(...got.matters);
+        effects[arm] = got.effect;
+        armsRead.add(arm);
         lastEnd = Math.max(lastEnd, end);
         episodes.push(...got.episodes);
         mistakes.push(...got.mistakes);
@@ -320,6 +332,13 @@ async function main(dir: string, outDir?: string, replayFile?: string): Promise<
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
+  return { dir, experiment: basename(dir), spec, episodes, mistakes, candidates, clients, seatMonths, matters: matterRows, lastEnd, effects, seeds: seedsRead, arms: [...armsRead].sort() };
+}
+
+/** Read every seed and arm of an experiment, print the tables and write them out. */
+async function main(dir: string, outDir?: string, replayFile?: string): Promise<void> {
+  const replayed: { arm: string; ref: string; class: string }[] = replayFile ? JSON.parse(readFileSync(replayFile, "utf8")) : [];
+  const { episodes, mistakes, candidates, clients, seatMonths, matters: matterRows, lastEnd } = await readExperiment(dir, replayed);
 
   // ---- the tables
   const out: string[] = [];

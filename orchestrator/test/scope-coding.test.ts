@@ -9,7 +9,8 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { episodesOf, priceOf } from "../../experiments/scope-pilot/episodes";
-import { beyondByCode, finalOf, kappa, needsThird, poissonInterval, run, strip, type ArmRead, type Code } from "../../experiments/scope-pilot/code";
+import { binomialInterval, share } from "../../experiments/scope-pilot/report";
+import { beyondByCode, finalOf, kappa, needsThird, poissonInterval, run, runOverride, strip, type ArmRead, type Code } from "../../experiments/scope-pilot/code";
 
 const DAY = 86_400;
 const seen = (day: number, from: string, kind: string, words: string, x: object = {}) => ({ day, from, kind, words, ...x });
@@ -76,6 +77,21 @@ test("blind coding of a fork, end to end with stub coders: blind folders, names 
     const tables = JSON.parse(readFileSync(join(out, "tables.json"), "utf8"));
     expect(tables.rows[0]).toMatchObject({ seat_months: 6, form_filings: 1, acts: { within: 2, beyond_level: 1 } });
     expect(readFileSync(join(out, "summary.txt"), "utf8")).toContain("DRY");
+    // The second question, on the episode reader's candidates: blind the same way, both codes compared, agreement per
+    // question, the disagreements read a third time.
+    const eps = join(tmp, "episodes");
+    mkdirSync(eps);
+    const cands = [0, 1, 2, 3, 4].map((n) => ({ id: `cand-${n + 1}`, set: "A", role: "provider-a-desk", day_of_term: n, how: "candidate_override", text: `Handed over: draft a claim. Details: {}\nWhat was done: a ${n % 2 ? "benefit claim, sent: your claim is in" : "letter: I wait for your answer"}`, window: [] }));
+    writeFileSync(join(eps, "candidates.json"), JSON.stringify(cands));
+    writeFileSync(join(eps, "candidates-key.json"), JSON.stringify(cands.map((c) => ({ id: c.id, experiment: "exp", arm: "sonnet", seed: 1 }))));
+    const ov = await runOverride(["--question", "override", eps, "--dry", "--out", join(tmp, "override")], () => {});
+    const ovCalls = readFileSync(join(tmp, "override", "calls.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    for (const c of ovCalls) expect(c.seen).toEqual(["codebook.md", "items.jsonl"]);
+    if (process.platform === "darwin") for (const c of ovCalls) expect(c.probe).toBe("refused");
+    expect(ovCalls.some((c) => c.dir === "third")).toBe(true);
+    expect(JSON.stringify(readdirSync(join(tmp, "override", "items")).map((b) => readFileSync(join(tmp, "override", "items", b), "utf8")))).not.toMatch(/sonnet|"arm"|cand-/);
+    expect(ov.summary).toMatch(/\| did \| 5 \|[\s\S]*\| told_client \| 5 \|/);
+    expect(readFileSync(join(tmp, "override", "codes.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l).resolved_by)).not.toContain("uncoded");
   } finally {
     delete process.env.OIKOS_CODE_PROBE;
     rmSync(tmp, { recursive: true, force: true });
@@ -131,5 +147,9 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   const [lo, hi] = poissonInterval(7);
   expect(lo).toBeCloseTo(2.814, 2);
   expect(hi).toBeCloseTo(14.42, 1);
+  // (The results tables' shares, report.ts: the exact binomial interval, a zero said as its upper bound.)
+  expect(binomialInterval(1, 3)[0]).toBeCloseTo(0.0084, 3);
+  expect(binomialInterval(1, 3)[1]).toBeCloseTo(0.9057, 3);
+  expect(share(0, 3)).toBe("0 of 3 (at most 70.8%)");
   void DAY;
 });
