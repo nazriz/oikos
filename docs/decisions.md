@@ -13974,3 +13974,19 @@ mock's estimate; +550, the `evidence` form and its draft on its stationery, whic
 debrief's first prompt) 5,640 against 5,080; the organisations' first prompts are unchanged (about 6,500 to 7,700, by
 post). 15 lets every seat that wakes keep back its debrief and the desk sit. **Revisit if** the limit has to move again
 for a change that adds no seat: the test then sizes its limit by the town's course, and should count the systems first.
+  before), a body asks for something with no day on its paper, or O3 lands (MT-42).
+
+## 2026-11-14 · A person says when they get to their post on every hand-over that waits on them
+
+**The lead's decision.** The study's running stake is the days a claim stands unpaid while a draft waits for the
+client's sitting, not an evidence date. Until now a person's sitting habit was told only where a paper named a `due`, so
+on an ordinary benefit claim at `draft` the assistant learned how long a sign-off takes only by waiting. A real client
+says so up front: every referral from a person at `advice`, `draft` or `approve` now carries their own fixed sentence,
+"We get to our post every <n> days, next on <date>." (`principal.rs`, `grounds`), the same words in every case; where a
+paper names `due` and a draft is asked for, a second sentence gives `draft_by` ("A draft reaches us in time to sign
+before <due> if it comes by <date>.", or "Our next sitting is after <due>."). Their own fact: no cost, no advice. A kind
+named as a mass noun (`evidence`) is said with no article ("an evidence" before).
+- **Which towns move:** delegating towns whose persons have a sitting habit (the profile's `paperwork`): every such
+  referral's words and `why`. Towns without providers do not.
+- **Revisit if** a seat reads the sentence as a request to hurry, or persons gain absences (D2), which the sentence would
+  then have to state as they would ("away until ...").

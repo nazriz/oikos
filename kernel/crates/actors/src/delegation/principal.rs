@@ -1633,20 +1633,25 @@ impl State {
                 }
             }
         }
-        // (Its own day for a draft, where a paper names `due`: `due` less its own time to read one; for a person who gets
-        // to their post at sittings of their own (`answer_lag`), the last of those that still leaves that time before
-        // `due`, said in fixed words: when it gets to its post, and by when a draft reaches it in time.)
+        // (A person who gets to their post at sittings of their own (`answer_lag`) says so on every hand-over that waits on
+        // them (advice, draft, approve): how often and when next, the same words in every case. Where a paper names `due`
+        // and it asks for a draft, its own day for the draft: the last of its sittings that still leaves its reading time
+        // before `due` (an organisation's: `due` less its reading time), said in a second fixed sentence.)
+        let read = self.p.seconds.sign_off;
+        let sits = self.sits.filter(|_| self.p.post.is_none() && self.p.paperwork.is_some());
+        if let (Some((every, phase, at)), Level::Advice | Level::Draft | Level::Approve) = (sits, level) {
+            let next = next_sitting((every, phase, at), t);
+            let often = if every == 1 { "every day".to_string() } else { format!("every {every} days") };
+            g.why.push(format!("We get to our post {often}, next on {}.", date(next)));
+        }
         if let (Some((due, _)), Level::Draft) = (&g.due, level) {
-            let read = self.p.seconds.sign_off;
-            match self.sits.filter(|_| self.p.post.is_none() && self.p.paperwork.is_some()) {
+            match sits {
                 None => g.draft_by = Some(due - read),
-                Some((every, phase, at)) => {
-                    let next = next_sitting((every, phase, at), t);
-                    let last = last_sitting((every, phase, at), t, *due, read);
-                    let often = if every == 1 { "every day".to_string() } else { format!("every {every} days") };
+                Some(x) => {
+                    let last = last_sitting(x, t, *due, read);
                     g.why.push(match last {
-                        Some(l) => format!("We get to our post {often}, next on {}; a draft reaches us in time to sign before {} if it comes by {}.", date(next), date(*due), date(l)),
-                        None => format!("We get to our post {often}, next on {}, after {}.", date(next), date(*due)),
+                        Some(l) => format!("A draft reaches us in time to sign before {} if it comes by {}.", date(*due), date(l)),
+                        None => format!("Our next sitting is after {}.", date(*due)),
                     });
                     g.draft_by = last;
                 }
@@ -2092,8 +2097,14 @@ fn told_words(g: &Grounds, date: &dyn Fn(i64) -> String) -> String {
     s
 }
 
+/// Kinds of paper whose names are mass nouns, said with no article ("evidence", never "an evidence").
+const MASS: &[&str] = &["evidence", "money", "goods"];
+
 fn a_kind(kind: &str) -> String {
     let k = kind.replace('_', " ");
+    if MASS.contains(&kind) {
+        return k;
+    }
     format!("{} {k}", if k.starts_with(['a', 'e', 'i', 'o', 'u']) { "an" } else { "a" })
 }
 

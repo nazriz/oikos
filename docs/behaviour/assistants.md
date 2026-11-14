@@ -134,13 +134,18 @@ at every depth (a finished act, what happened, a want) and at `advice`, for pers
   (`pay_in_days`) are not read: on an order they are its writer's promise to pay, on a bill its reader's, and the field
   does not say which. A rent increase's `from` is not read (it is the day the rent changes, not a day by which it asks
   anything).
+- **When a person gets to their post: on every hand-over that waits on them.** A person who gets to their post at
+  sittings of their own ("Getting to the post", `answer_lag`) says so on every referral at a level that waits on them
+  (`advice`, `draft`, `approve`; not `alone`), dated or not, in one fixed sentence: `We get to our post every <n> days,
+  next on <date>.` (`every day` where they sit daily). Their own habit, as a client tells an agent up front: the same
+  words in every case, no cost, no advice. An organisation says nothing of it (it deals with its post when its post's
+  code wakes).
 - **`draft_by`: its own day for a draft.** At `draft`, where `due` is set: for an organisation, `due` less its own time
-  to read a draft (its `seconds.sign_off`, 300 s by default, a placeholder: MT-32); for a person who gets to their post
-  at sittings of their own ("Getting to the post", `answer_lag`), the last of their sittings that still leaves that time
-  before `due`, said in fixed words: `We get to our post every <n> days, next on <date>; a draft reaches us in time to
-  sign before <due> if it comes by <draft_by>.`, or, where even the next sitting is too late, `We get to our post every
-  <n> days, next on <date>, after <due>.` (and no `draft_by`). Their own habit, as they would say it: no cost, no
-  advice. The code assistant copies it into its draft (`Draft.by`).
+  to read a draft (its `seconds.sign_off`, 300 s by default, a placeholder: MT-32); for a person who sits to their post,
+  the last of their sittings that still leaves that time before `due`, in a second fixed sentence: `A draft reaches us in
+  time to sign before <due> if it comes by <draft_by>.`, or, where even the next sitting is too late, `Our next sitting
+  is after <due>.` (and no `draft_by`). The code assistant copies it into its draft (`Draft.by`).
+- **Kinds named as mass nouns** (`evidence`) are said with no article in a referral's words (`MASS`).
 - **Its own position: fixed words by kind** (`TOLD`), the blanks filled from the matter's own paper, said only where every
   blank is there:
 
