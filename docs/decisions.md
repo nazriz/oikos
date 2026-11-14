@@ -13572,3 +13572,16 @@ before. Before, a client's code took a draft in at its next wake (news wakes it,
   fault since fixed). The first pilot's desk papers went in the provider's name and are still not read as anyone's act.
 - **Revisit if:** a body should look at who sent a paper as well as whose it is (an agent's own standing); a matter is
   withheld by some paper other than advice or a report.
+
+## 2026-11-14 · A letter whose subject names one paper is about that paper
+
+On rung 1's rerun (`runs/scope-obstacle-r1-L2-b`, Haiku 5.5) the desk wrote its client, on day 35, the letter the bank
+asked for: "Please write to Millbrook Savings Bank ... authorise provider-a-desk". It wrote it on its letter form with
+`about: "Loan application rec.23841: authority needed for Millbrook Savings Bank"`. A subject line in words was put at
+the letter's head with no reference (`re`), so the client's code, which acts on a letter about the matter (2026-11-14,
+MT-36), could not tell which matter it was about, and nothing moved: no authority, nothing recorded, nothing sent again.
+**Decision:** a subject line in words that names exactly one paper or letter by its id (`rec.N`, `msg.N`) is about that
+paper, as a letter headed "Re: rec.23841" is; the words still head the letter (participant 0.22.1). Two or more ids, or
+none, stay a subject line only, as before.
+- **Revisit if** a seat names a paper in its subject line that the letter is not about (the client would then act on the
+  wrong matter), or names the matter only in the letter's body.

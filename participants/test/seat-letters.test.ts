@@ -36,6 +36,7 @@ test("a letter whose about is not one id is sent, with what it is about at its h
     use("b", "write", { to: ["finance"], text: "Is this within the procedure?", as: "mayor", about: "[proc-payments]" }),
     use("c", "write", { to: ["[council-clerk]", "bank"], text: "When is the next ballot?", as: "mayor", about: "rec.1341, msg.775" }),
     use("d", "write", { to: ["bank"], text: "Thank you.", as: "mayor" }),
+    use("e", "write", { to: ["bank"], text: "Please write to the bank.", as: "mayor", about: "Loan application rec.23841: authority needed" }),
   ]]);
   // In words: the letter goes, the words head it, and it has no reference.
   expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "message", to: ["bank"], as: "mayor", text: "About: acc-city payments\n\nPlease stop the wage payments until a budget is adopted." });
@@ -44,11 +45,13 @@ test("a letter whose about is not one id is sent, with what it is about at its h
   // Two ids are not one: they head the letter. Whom it goes to is taken out of its brackets.
   expect(await p.step(sent(9 * HOUR), ctx)).toEqual({ type: "message", to: ["council-clerk", "bank"], as: "mayor", text: "About: rec.1341, msg.775\n\nWhen is the next ballot?" });
   expect(await p.step(sent(9 * HOUR), ctx)).toEqual({ type: "message", to: ["bank"], as: "mayor", text: "Thank you." });
+  // Words that name one paper by its id: they head the letter, and it is filed as about that paper.
+  expect(await p.step(sent(9 * HOUR), ctx)).toEqual({ type: "message", to: ["bank"], as: "mayor", text: "About: Loan application rec.23841: authority needed\n\nPlease write to the bank.", re: "rec.23841" });
   await p.step(sent(9 * HOUR), ctx);
   // It is told what became of what it is about, with the letter's result; and it is noted, to be counted.
   expect(resultsOf(calls[1]!).a).toContain('Done: your letter to bank (headed "About: acc-city payments": what it is about is not one id, so it heads the letter).');
   expect(resultsOf(calls[1]!).b).toContain("Done: your letter to finance.");
-  expect(notes.filter((n) => n.letter_about_in_words)).toEqual([{ letter_about_in_words: { about: "acc-city payments", to: ["bank"] } }, { letter_about_in_words: { about: "rec.1341, msg.775", to: ["council-clerk", "bank"] } }]);
+  expect(notes.filter((n) => n.letter_about_in_words)).toEqual([{ letter_about_in_words: { about: "acc-city payments", to: ["bank"] } }, { letter_about_in_words: { about: "rec.1341, msg.775", to: ["council-clerk", "bank"] } }, { letter_about_in_words: { about: "Loan application rec.23841: authority needed", to: ["bank"] } }]);
   // The tool says so in plain words.
   const write = tools(c).find((t) => t.name === "write")!;
   expect(write.description).toBe("Write to people or organisations, by id. The words go exactly as you write them. If the letter is about one thing that has an id (a paper, an account, a lot), give that id as about, and the letter is filed as about it. If what it is about is anything else (some words, or several things), say so in about all the same: it is put at the head of the letter as its subject line, and the letter is sent.");
