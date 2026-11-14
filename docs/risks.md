@@ -1812,6 +1812,8 @@ The mechanism:
   the result's sensitivity to it.
 - **Notice by:** a profile's `accept/<kind>` source still saying "PLACEHOLDER".
 
+### MT-34 · A model desk's "done" means sent, not decided: the lender's or office's answer goes to the client, whose code does not tell the desk (found 2026-11-14).
+
 ---
 
 ## Profiles and sources

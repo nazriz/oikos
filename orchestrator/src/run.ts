@@ -891,10 +891,6 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const perceiveCommand = (u: Unit): { cmd: object; looks?: LookRequest[] } => {
     const looks = u.looks;
     u.looks = undefined;
-    // (An assistant's seat reads its post's own file once, on arrival, as a successor does: a search, which leaves the
-    // file as the seat has never looked at it. readers/matters.ts.)
-    const read = u.llm?.matters?.toRead ? (u.llm.matters.read() as LookRequest[]) : [];
-    if (read.length) return { cmd: { command: "look", participant: u.participant, looks: [...(looks ?? []), ...read] }, ...(looks ? { looks } : {}) };
     return looks ? { cmd: { command: "look", participant: u.participant, looks }, looks } : { cmd: { command: "observe", participant: u.participant } };
   };
   /** A unit looks (its own looks first, if it asked), and gets its picture of the world: null if it no longer can.
@@ -907,7 +903,6 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const c = perceiveCommand(u);
       looks = c.looks;
       reply = await command(c.cmd);
-      if (reply === null && u.llm?.matters?.toRead) reply = await command({ command: "observe", participant: u.participant }); // (the file not read: as before)
       if (!looks && reply === null) return null;
       if (!looks) asked = { reply };
     }
@@ -916,8 +911,16 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { look_rejected: JSON.stringify(looks).slice(0, 4000) } } });
       u.notices.push({ t, text: "That couldn't be looked up." });
     }
-    if ((looks || u.llm?.matters?.toRead) && reply === null) reply = await command({ command: "observe", participant: u.participant });
+    if (looks && reply === null) reply = await command({ command: "observe", participant: u.participant });
     if (reply === null) return null; // it can no longer look (its capacity went away)
+    // (An assistant's seat reads its post's own file on arrival, as a successor does: page by page until it is read
+    // through, searches that leave the file as the seat has never looked at it. readers/matters.ts.)
+    for (let pages = 0; u.llm?.matters?.toRead && pages < 1000; pages++) {
+      const more = await command({ command: "look", participant: u.participant, looks: u.llm.matters.read() });
+      if (more === null) { u.llm.matters.giveUp(); break; }
+      u.llm.matters.absorbRead(more.observation);
+      reply = { ...reply, observation: joinRaw(reply.observation, more.observation) };
+    }
     const p00 = performance.now();
     const raw: Observation = { ...reply.observation, entity: u.entity };
     // Knowledge takes in the changes themselves; the controller reads the view's full picture.

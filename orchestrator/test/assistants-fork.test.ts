@@ -145,7 +145,18 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
     if (/\(kind: [a-z_]+; remit: rec\.[0-9]+/.test(desk)) expect(desk).toContain("## What the matters above come under: the remits and briefs they name");
     // Each matter with where it stands, from the post's own papers: what was finished before the seat took the post is
     // one line, not set out as work (2026-11-14: the baseline's seats sent 55 papers long since sent).
-    expect(desk).toMatch(/Your matters, and where each stands[^\n]*\n[\s\S]*?matters? (?:was|were) finished before you took this post; (?:it is|they are) in your file\./);
+    expect(desk).toMatch(/Your matters, and where each stands[^\n]*\n[\s\S]*?matters? (?:was|were) finished before you took this post; (?:it is|they are) in your file/);
+    // And none is shown open whose last report in the post's file, before the seat sat, says it is done (the first
+    // reading took the newest twenty only, and six matters long finished stood open: 2026-11-14).
+    const deskFirst = shown.find((e) => e.body.subject === "provider-a-desk-system")!;
+    const lastReport = new Map<string, { at: number; done: boolean }>();
+    for (const l of readFileSync(jsonl, "utf8").trim().split("\n")) {
+      const r = JSON.parse(l).body?.record;
+      if (r?.kind !== "report" || r.in_position !== "provider-a-desk" || r.at > deskFirst.t || typeof r.data?.referral !== "string") continue;
+      if ((lastReport.get(r.data.referral)?.at ?? -1) <= r.at) lastReport.set(r.data.referral, { at: r.at, done: r.data.done === true || r.data.done === "yes" });
+    }
+    const openShown = (flat(deskFirst.body.data.input).split("Your matters, and where each stands")[1] ?? "").split("\n\n")[0]!;
+    expect([...lastReport].filter(([rf, x]) => x.done && openShown.includes(`[${rf}]`)).map(([rf]) => rf)).toEqual([]);
     // Who it is, once, and its own drafts in one place headed as its own, with the way to answer each.
     expect(told).toContain("Who you are here: you hold the post ");
     // Whom it writes to: the post that hands it its work, never its whole organisation; a desk, its provider's sales and
