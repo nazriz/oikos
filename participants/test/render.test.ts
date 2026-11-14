@@ -22,6 +22,11 @@ test("the papers of delegation read in the office's words: a signed copy as the 
   expect(answer).not.toMatch(/held|reasons|why|5184000|5,184,000/);
   expect(answer).toContain(when(86_400 * 60));
   expect(factWords({ agreement: "rec.1", kind: "withholding_report", wants: "draft", does_itself: ["money"] })).not.toMatch(/does itself|money/);
+  // (A referral's days read as days; its why and the paper its day is on are in its words, not set out again: stakes C1.)
+  const dated = factWords({ agreement: "rec.1", kind: "benefit_claim", wants: "draft", due: 86_400 * 50, due_on: "rec.7", draft_by: 86_400 * 50 - 300, why: ["Until the claim is decided we are not paid pension."] });
+  expect(dated).toContain(when(86_400 * 50));
+  expect(dated).not.toMatch(/4320000|4319700|rec\.7|not paid/);
+  expect(factWords({ claim: "rec.3", need: "pay", what: "proof of pay", by: 86_400 * 40 })).toContain(when(86_400 * 40));
   // (A paper a body sent back carries the paper as it was, and says what it needs in its own words only; a body's notice
   // of what it requires keeps its items as data: docs/design/obstacles.md.)
   const back = factWords({ returned: "rec.90", need: { correction: ["purpose"] }, paper: { kind: "loan_application", text: "A loan, please.", to: ["bank"], data: { amount: 500000, purpose: "" }, basis: ["rec.90"] } });
