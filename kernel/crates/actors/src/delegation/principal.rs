@@ -81,6 +81,11 @@ pub struct Params {
     /// an organisation's: dealt with when it next wakes, as before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paperwork: Option<Paperwork>,
+    /// How many days it waits on a matter it handed over with no word from its assistant before it asks after it, and
+    /// again before it does it itself (`answers::left_open`; a want's is its `wants.answer_days`). Absent: 14 days,
+    /// a placeholder (MT-37).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub patience_days: Option<i64>,
 }
 
 /// How people get to their post (the profile's `paperwork`, placeholders until sourced): how many days apart a person
@@ -333,8 +338,24 @@ pub struct State {
     /// Questions from its assistant not answered yet (their ids): each answered in its own time (`answer_question`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     questions: Vec<String>,
+    /// Papers its assistant sent in its name, the newest few (`answers`); those it has reacted to; what it has borne of
+    /// such acts, by kind, in basis points of one; and the matters it has asked after (referral, when).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    in_name: Vec<answers::InName>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    reacted: BTreeSet<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    in_name_counts: BTreeMap<String, i64>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    chased: BTreeMap<String, i64>,
+    /// Bodies' papers citing a paper sent in its name, filed, waiting for it to sit down to its post (id, when).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    cited: Vec<(String, i64)>,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    cites_read: BTreeSet<String>,
 }
 
+mod answers;
 mod forward;
 mod question;
 
@@ -407,6 +428,12 @@ impl Delegating {
                 traces: vec![],
                 untied: vec![],
                 questions: vec![],
+                in_name: vec![],
+                reacted: BTreeSet::new(),
+                in_name_counts: BTreeMap::new(),
+                chased: BTreeMap::new(),
+                cited: vec![],
+                cites_read: BTreeSet::new(),
             },
         })
     }
@@ -607,6 +634,10 @@ impl State {
                 }
             }
         }
+        // (Papers its assistant sent in its name, once it has engaged a service: what a body's paper may cite, `answers`.)
+        if self.eng.live().next().is_some() {
+            self.note_in_name(pic);
+        }
         // (Papers others sent it, once it has engaged a service: its files, what a matter it hands over came from.)
         if self.eng.live().next().is_some() {
             for r in pic.all_records() {
@@ -637,6 +668,8 @@ impl State {
         }
         // (What came by post waits there until it sits down to it, `answer_lag`; the rest is dealt with now.)
         let lag = self.answer_lag(pic.t, cx);
+        // (A body's paper citing a paper sent in its name: filed, and read when it sits down to its post, `answers`.)
+        self.cited_seen(pic, lag, cx);
         self.trace(pic);
         for r in fresh {
             if lag.is_some() && self.by_post(&r) {
@@ -651,7 +684,8 @@ impl State {
         // (A letter from its assistant about a matter a body sent back, or about the return itself: it does what the body's
         // own notice asks of it, as it does on a report that names the need. The letter is what makes it act; what is
         // needed is read from the body's notice, never from the letter's words. docs/behaviour/assistants.md.)
-        let letters: Vec<(String, String)> = pic.inbox.iter().filter(|m| from.sent(m)).filter_map(|m| Some((m.re.as_ref()?.to_string(), m.from_position.as_ref()?.to_string()))).collect();
+        // (A letter with no reference is about its one unmet need with that assistant, if it has exactly one: `on_letter`.)
+        let letters: Vec<(String, String)> = pic.inbox.iter().filter(|m| from.sent(m)).filter_map(|m| Some((m.re.as_ref().map(|x| x.to_string()).unwrap_or_default(), m.from_position.as_ref()?.to_string()))).collect();
         if lag.is_some() {
             self.letters_in_post.extend(letters);
         } else {
@@ -750,6 +784,25 @@ impl State {
     /// holds on that matter, with what it asks of it still to meet, is met. A return on a matter: one citing the paper
     /// named, or, for a matter named, one that came after the matter was handed over.
     fn on_letter(&mut self, re: &str, post: &str) {
+        // (No reference: a person with one open problem with its assistant knows what the letter is about. Where it holds
+        // exactly one return from a body on a paper that assistant sent, asking of it what is still its own to meet, the
+        // letter is about that; with two or more, it cannot tell, and nothing follows (MT-36).)
+        if re.is_empty() {
+            let unmet: Vec<(String, Value)> = self
+                .book
+                .all(crate::common::intake::RETURNED)
+                .filter(|r| r.author.as_str() != self.me.as_str() && !self.passed_copy(r))
+                .map(|r| (r.id.to_string(), crate::common::data(r).to_value()))
+                .filter(|(_, d)| d["from"].as_str() == Some(post))
+                .filter(|(_, d)| serde_json::from_value::<Need>(d["need"].clone()).ok().and_then(|n| n.authority).is_some_and(|a| a.for_ == self.me && !self.lodged.contains(&format!("{}|{post}", a.with))))
+                .collect();
+            if let [(id, d)] = unmet.as_slice() {
+                if let Ok(n) = serde_json::from_value::<Need>(d["need"].clone()) {
+                    self.meet(&n, post, None, &id.clone());
+                }
+            }
+            return;
+        }
         let matter_at = self.book.get(re).filter(|q| papers::read::<Referral>(q).is_some() && q.speaks_for.as_deref() == Some(self.me.as_str())).map(|q| q.at);
         let returns: Vec<(String, Value)> = self
             .book
@@ -875,6 +928,10 @@ impl State {
             let agreement = m.agreement.clone();
             self.paper(GoAhead::KIND, &format!("Go ahead with {}.", x.referral), &agreement, &r.id, papers::data(&d), Then::Plain);
         } else if let Some(x) = papers::read::<Advice>(r) {
+            // (Advice on a matter it handed over to be drafted or done, in place of that: left open now, `answers`.)
+            if !self.advice_on.contains_key(&x.referral) {
+                self.in_place(&x.referral, Advice::KIND, &crate::common::data(r).to_value(), t, cx);
+            }
             let Some((program, kind, agreement)) = self.advice_on.remove(&x.referral) else { return };
             // (Advice in words alone, a model's, is not set beside its act by its code: nothing is counted.)
             if let Some(c) = x.calls.as_deref() {
@@ -1737,6 +1794,8 @@ impl State {
                 self.next_review = self.next_review.min(t + DAY);
             }
         }
+        // (Matters its assistant has left open past its clock: asked after, then done itself, `answers`.)
+        self.left_open(t, cx);
         if t >= self.next_review {
             self.next_review = t + self.p.review_days.max(1) * DAY;
             self.changed = false;

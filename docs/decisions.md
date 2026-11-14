@@ -13974,3 +13974,27 @@ mock's estimate; +550, the `evidence` form and its draft on its stationery, whic
 debrief's first prompt) 5,640 against 5,080; the organisations' first prompts are unchanged (about 6,500 to 7,700, by
 post). 15 lets every seat that wakes keep back its debrief and the desk sit. **Revisit if** the limit has to move again
 for a change that adds no seat: the test then sizes its limit by the town's course, and should count the systems first.
+
+## 2026-11-15 · A2, part 1: a principal answers for what was done in its name, and chases what is left open
+
+**Decision (docs/design/stakes.md, A2; `principal/answers.rs`).** The principal reads only the world's own papers that
+reach it, never the reader: a body's paper citing a paper sent in its name that it did not cover; advice in place of a
+draft; the day on its referral. "Covered" and "in place" are the reader's definitions, moved to `delegation::own` and
+called by both (`beyond.rs` now calls them too; its readings are unchanged), so the two cannot disagree.
+- **In its name:** by the act's outcome for it, the study's stated assumption: ratify a grant; repudiate a refusal or a
+  return (an `objection` to the body) and do the matter itself where open; take the kind back once two acts are borne
+  (a ratified one counting half), unless its own word holds the kind. Few parameters, named, placeholders (MT-37).
+  Typed decisions, read by the episode reader without a judge. A person reads the body's paper when it sits down to its
+  post (D1a); the paper is filed with its own.
+- **Left open:** the referral's day, else its patience (a want's `answer_days`, else `patience_days`, 14); asked after
+  once by a letter `re` the matter, then done itself after the same patience again. Advice in place of a draft starts
+  the chase at once. A report that it is not done is, as before, done itself at once.
+- **A letter with no reference:** about the one unmet need on a paper that assistant sent, if exactly one (MT-36).
+- **Code towns:** a code assistant files only what is signed or within its level, sends no advice in place of a draft,
+  and reports or drafts within days, so no reaction and, in the study town, no chase at the code arm's pace; a town
+  without providers does not move (no principal). Any move in a delegating town is from a matter the code assistant left
+  open past 14 days, which this law now chases: the slow tier at merge says.
+- **Proof:** the scripted overstepper (`mock/overstep:0`) on the study town: its client notices when the office's paper
+  cites the filing and ratifies or repudiates by its outcome.
+- **Revisit if** the outcome rule misreads a body's paper (a decision that is neither for nor against), or the take-back
+  count proves too quick or slow against a sourced rule.

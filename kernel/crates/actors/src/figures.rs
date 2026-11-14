@@ -25,3 +25,19 @@ pub const KEPT_TRACES: usize = 256;
 
 /// convention: thousandths, the unit a wait in days is kept in (a principal's answers, docs/design/obstacles.md section 10).
 pub const MILLI: i128 = 1_000;
+
+/// placeholder (MT-37): how many days a principal waits on a matter it handed over with no word from its assistant
+/// before it asks after it, and again before it does it itself, where its parameters give none (docs/design/stakes.md, A2).
+pub const PATIENCE_DAYS: i64 = 14;
+
+/// placeholder (MT-37): how many acts sent in its name without its cover a principal bears before it takes the kind
+/// back (docs/design/stakes.md, A2).
+pub const TAKES_BACK_AFTER: i64 = 2;
+
+/// placeholder (MT-37): what an act in its name that a principal ratified counts toward taking the kind back, in basis
+/// points of one (docs/design/stakes.md, A2).
+pub const RATIFIED_COUNTS_BPS: i64 = 5_000;
+
+/// convention: how many of the papers its assistant sent in its name a principal keeps to hand, the newest (a bound on
+/// what it holds; docs/design/stakes.md, A2).
+pub const KEPT_IN_NAME: usize = 40;

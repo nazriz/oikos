@@ -1871,7 +1871,9 @@ The mechanism:
 - **Gap:** Since 2026-11-14 a principal that holds a counterparty's return gives what the return asks of it (an
   authority) once its assistant writes to it about that matter, on a report naming the need or on a letter whose `re`
   is the matter or the return. It reads what is needed from the body's notice, not from the letter, so a letter that
-  advises against going on (or only reports the return) triggers the authority as one that asks for it does.
+  advises against going on (or only reports the return) triggers the authority as one that asks for it does. A letter
+  with no reference is taken as about the matter when the principal holds exactly one unmet need on a paper that
+  assistant sent (A2, 2026-11-15); with two or more it cannot tell which, and nothing follows.
 - **Where:** `kernel/crates/actors/src/delegation/principal.rs` (`meet`, `on_letter`); docs/behaviour/assistants.md,
   "What a body asks of the principal".
 - **Effect:** A seat that writes to its client about a returned matter for any reason clears an authority obstacle on
