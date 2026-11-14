@@ -8,6 +8,7 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { episodesOf } from "../../experiments/scope-pilot/episodes";
 import { beyondByCode, finalOf, kappa, needsThird, poissonInterval, run, strip, type ArmRead, type Code } from "../../experiments/scope-pilot/code";
 
 const DAY = 86_400;
@@ -81,7 +82,24 @@ test("blind coding of a fork, end to end with stub coders: blind folders, names 
   }
 }, 120_000);
 
-test("the coding rules: what goes to the third read, what decides, need by code, κ and the exact Poisson interval", () => {
+test("the coding rules: what goes to the third read, what decides, need by code, κ, the exact Poisson interval, and the episode reader's", () => {
+  // (The episode reader, episodes.ts: an episode needs a date to come or a running stake; a code arm leaves no
+  // candidate for the blind read, and a paper withheld in a model arm is one, with nothing naming the arm.)
+  const at = (d: number) => (d - 1) * DAY;
+  const R = (id: string, kind: string, d: number, x: object = {}) => ({ id, record: "statement", kind: "referral", at: at(d), addressed_to: ["provider-a"], speaks_for: "c0001", text: `Please draft the ${kind}.`, data: { kind, wants: "draft", facts: {}, ...x } });
+  const recs = new Map<string, any>([
+    ["rec.1", R("rec.1", "benefit_claim", 35)], ["rec.2", R("rec.2", "invoice", 36)], ["rec.3", R("rec.3", "invoice", 37, { due: at(50) })],
+    ["rec.4", { id: "rec.4", record: "statement", kind: "draft", at: at(36), in_position: "provider-a-desk", text: "a claim", data: { referral: "rec.1" } }],
+  ]);
+  const arm = (name: string, rows: any[]) => episodesOf({ seed: 1, arm: name, experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs, rows, transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [] } });
+  const code = arm("code", [{ table: "withheld", referral: "rec.1", paper: "rec.4" }]);
+  expect(code.episodes.map((e) => e.matter)).toEqual(["rec.1", "rec.3"]);
+  expect(code.episodes[1]!.date).toEqual({ what: "due", day: 50 });
+  expect(code.candidates).toHaveLength(0);
+  const model = arm("sonnet", [{ table: "withheld", referral: "rec.1", paper: "rec.4" }, { table: "acts", referral: "rec.3", record: "rec.4", class: "no_remit" }]);
+  expect(model.episodes.map((e) => e.did)).toEqual(["candidate_override", "acted_beyond"]);
+  expect(model.candidates).toHaveLength(1);
+  expect(JSON.stringify(model.candidates[0]!.item)).not.toMatch(/sonnet|code/i);
   const c = (o: Partial<Code>): Code => ({ id: "x", request: "no", kind: [], trigger: "N", beyond_need: "na", confusion: "no", note: "", ...o });
   expect(needsThird("A", c({}), c({}))).toBe(false);
   expect(needsThird("A", c({ request: "yes", kind: [2] }), c({}))).toBe(true);
