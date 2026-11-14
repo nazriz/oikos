@@ -1495,7 +1495,13 @@ impl Resolver<'_> {
         // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement
         // the rest of the world reads. It does not cite the form.
         if spec["writes"].is_object() {
-            let me = self.id(c, "for")?.unwrap_or_else(|| self.me.clone());
+            // (In the name of whom the form says, where it names a field for it: a client's paper is the client's. The
+            // TS resolver, the same. What is filed is as asked; only whose name it is in.)
+            let named = spec["writes"]["in_name_of"].as_str().and_then(|f| f.strip_prefix('=')).and_then(|f| data.get(f)).and_then(Json::as_str).filter(|x| !x.is_empty()).map(String::from);
+            let me = match self.id(c, "for")? {
+                Some(x) => x,
+                None => named.unwrap_or_else(|| self.me.clone()),
+            };
             let own = if own_words && Self::has(c, "text") { Self::str_(c, "text")? } else { None };
             let money = |a: &str| {
                 self.currency().map(|cur| calls::format_money(a, cur)).map_err(|s| match s {

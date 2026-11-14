@@ -120,6 +120,7 @@
             "basis": { "type": "string", "pattern": "^=[a-z_][a-z0-9_]{0,31}$" }
           }
         },
+        "in_name_of": { "type": "string", "pattern": "^=[a-z_][a-z0-9_]{0,31}$", "description": "The field naming whom the paper goes in the name of (a client's, filed for them by whoever works for them); absent: whoever files it." },
         "sends": {
           "description": "Whom every paper made on the form goes to whatever its fields say (those named in `to` by the form itself, not by a field), and why, in the form's own words: what whoever fills the form in is told of them, on the form and in a draft's preview. Each `to` lists them (in a module's declaration, \"@name\" for what is the office's own). It changes nothing a paper carries.",
           "type": "array",

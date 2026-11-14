@@ -937,7 +937,11 @@ class Resolver {
     // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement
     // the rest of the world reads. It does not cite the form.
     if (spec.writes) {
-      const me = this.id(c, "for") ?? this.me;
+      // (In the name of whom the form says, where it names a field for it: a client's paper is the client's. Rung 1's
+      // investigation, 2026-11-14: a desk's paper filed outright went in its provider's name, so no body asked for the
+      // client's authority and the reader did not see it. What is filed is as asked; only whose name it is in.)
+      const named = typeof spec.writes.in_name_of === "string" ? data[spec.writes.in_name_of.replace(/^=/, "")] : undefined;
+      const me = this.id(c, "for") ?? (typeof named === "string" && named ? named : this.me);
       const paper = this.written(() => forms.writePaper(spec as forms.FormData, data as forms.Filled, { self: me, now: this.k.t, money: (a) => this.sum(a), ...(ownWords && this.has(c, "text") ? { text: this.str(c, "text")! } : {}) }));
       // A claim the form records beside its paper (a permission granted with the decision): recorded first, as an
       // office that grants records what it grants and then says so.
