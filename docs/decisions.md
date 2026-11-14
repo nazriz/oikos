@@ -13744,3 +13744,38 @@ acting beyond or leaving a candidate is printed as a platform fault, never count
   buyer. Recorded as MT-41, not built here (it changes what every assistant's post is shown).
 - **Revisit if:** a seat means the request's act words as a blank's value, a quoted paper's words are meant whole in a
   blank the referral also gives, or a look into matters should set out the finished ones' papers as well.
+
+## 2026-11-14 · A short-staffed support office (stakes C2)
+
+**The law.** A study may state the hours of the town's share of the support agency's officers, in basis points of the
+profile's figure (`support.staff_hours_bps` in the town's spec; `supportStaffBps` in the study's, experiments/scope-
+pilot/build.ts). The generator scales the officers by it: the casework desk (`agency-casework`) keeps its minutes for
+each paper and its calendar and has fewer hours a working day, and the casework queues behind itself in them. Nothing
+delays a case but the hours; no dial. Absent or 10,000, the town is exactly as before (a generator test holds it), so
+only a town where a study sets a level moves, and the slow tier is not needed.
+- **Less than a day a lane:** the kernel's template `hours` give a lane any window of the day (`hours.seconds`, one second
+  to a day; `oikos_time::place_within` places work in it and carries the rest to the next working day). The generator
+  already used it: the study town's desk is 0.6 of an officer, 3.4 hours a working day on one lane.
+- **The screen** (the study town, obstacle level 2, seed 7, code arm, fork at day 30; scratch readers `support.ts`,
+  `demand.ts`). The desk's work: the town opens with about 35 to 40 hours of casework in hand (the opening caseload's
+  claims), then about an hour a week (0.1 to 3). Hours the desk worked each week, against what it has:
+
+  | staffing | desk a working day | behind (working every hour it has) until | after the fork, claim to evidence request | claim to decision |
+  |---|---|---|---|---|
+  | 10,000 | 3.4 h | day 17 | median 0.6 days, 90th percentile 1.5, longest 2.5 (180 days) | median 1.0, 7.7, 9.6 |
+  | 5,000 | 1.7 h | day 35 | 0.7, 1.5, 3.6 | 1.5, 7.9, 10.9 |
+  | 3,000 | 1.0 h | day 70 | 60 days: 7.5, 15.5, 21.0; 180 days: 1.8, 10.9, 21.0 | 60: 12.0, 21.5, 23.0; 180: 3.9, 20.0, 23.0 |
+  | 2,000 | 0.7 h | day 100 | 60 days: 27.5, 44.5, 48.9; 180 days: 1.5, 31.9, 48.9 | 60: 43.1, 49.9, 49.9; 180: 9.9, 37.5, 49.9 |
+
+  The queue is stable at every level down to 2,000: once the opening caseload is worked off, the town's own casework
+  (about an hour a week) is under the desk's hours, and the waits fall back to days. A short-staffed office here is a
+  slow office for weeks after the start, not one that falls behind for ever; below about 1,000 it would stay behind for
+  the whole of a 180-day fork. Reviews: answered the same day at every level, since a review goes at the case system's
+  second (WM-14, left (6); fixing it moves every town).
+- **The short-staffed setting: 3,000** (`SHORT_STAFFED_BPS`, a PLACEHOLDER: MT-32), chosen by hours of work, not by any
+  outcome of the study: the least level at which the desk is behind for weeks into a fork from day 30 (until about day
+  70) and catches up within the run. The design's 7,000 ("a short-staffed quarter") has the desk caught up within the
+  town's first month, so a fork from day 30 would see no wait at all; 2,000 is the stronger setting, behind until
+  about day 100.
+- **Revisit if** the officers' ratio is sourced (WM-14), a study forks later than day 30 (the opening backlog is over
+  sooner at every level), or reviews go to the desk (they would then queue too).

@@ -219,6 +219,23 @@ test("skills: off is the town as before; on, every kind of work and a person's p
   expect(() => generate({ ...spec, skills: { only: ["juggling"] } })).toThrow(/no skill of this town/);
 });
 
+// The support office's staffing (stakes C2; docs/behaviour/staffing.md, "The support agency's officers"): a stated level
+// gives the town's share of the agency's officers fewer hours, and nothing else; the queue is theirs to work through.
+test("support staffing: the profile's level is the town as before; a short-staffed level gives the casework desk fewer hours, and nothing else", () => {
+  const plain = JSON.stringify(generate(spec));
+  expect(JSON.stringify(generate({ ...spec, support: { staff_hours_bps: 10_000 } }))).toBe(plain);
+  const desk = (c: any) => c.templates.find((t: any) => t.id === "agency-casework");
+  const full = JSON.parse(plain), short = generate({ ...spec, support: { staff_hours_bps: 3_000 } }) as any;
+  // (Fewer hours a working day, the same minutes for each paper and the same calendar: a backlog from hours, never a dial.)
+  expect(desk(short).hours.seconds).toBeLessThan(desk(full).hours.seconds);
+  expect(desk(short).does).toEqual(desk(full).does);
+  expect(desk(short).hours.closed).toEqual(desk(full).hours.closed);
+  expect(short.orchestration.act_time.sources["template.agency-casework.lanes"]).toContain("Staffed at 3000 basis points");
+  const strip = (c: any) => ({ ...c, templates: c.templates.map((t: any) => (t.id === "agency-casework" ? { ...t, hours: { ...t.hours, seconds: 0 } } : t)), orchestration: { ...c.orchestration, act_time: { ...c.orchestration.act_time, sources: { ...c.orchestration.act_time.sources, "template.agency-casework.lanes": "", "template.agency-casework.hours": "" } } } });
+  expect(JSON.stringify(strip(short))).toBe(JSON.stringify(strip(full)));
+  expect(() => generate({ ...spec, support: { staff_hours_bps: 0 } })).toThrow(/staff_hours_bps/);
+});
+
 // The outside world's capability over time (docs/scenarios.md, "Capability"): each release a kind of system of its own,
 // released on its day, quicker and slipping less; the seller sells the newest out; the study's tag lists them all.
 test("capability: releases are kinds of system released on their days, sold newest first, and tagged for measurement only", () => {

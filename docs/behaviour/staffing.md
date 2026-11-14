@@ -97,6 +97,30 @@ seat shares their body, so what it does takes a person's time from the table of 
 The case system that held the post is not delivered in that town. Death from other causes still reaches the body (people abroad die);
 then the post falls vacant. The officer's age is drawn between 25 and 60 (a placeholder); nothing else of them is drawn.
 
+## The support agency's officers (stakes C2, 2026-11-14)
+
+The support office's casework (a decision on a claim, a request for the claimant's papers or an employer's confirmation)
+is done by a desk of the agency's officers (`outside-casework`, template `agency-casework`): each paper an officer's
+minutes (the person table's rows), in an officer's working day on the place's working days, the desk's hours a day the
+town's share of the agency's officers (the profile's officers per 1,000 claims in payment, times the town's claims at
+generation; WM-14) over its lanes. A share of one officer is a share of a day: the template's `hours` gives a lane any
+window from one second to a whole day (`hours.seconds`, `oikos_time::Hours`), and the kernel queues what does not fit on
+the next working day. So a desk can have less than a day a lane, and this one does: 0.6 of an officer in the study town,
+3.4 hours a working day.
+
+- **A stated level** (`support.staff_hours_bps` in the town's spec; the study's `supportStaffBps`): the officers' hours
+  in basis points of the profile's figure. 10,000 or absent is the profile's, and the town exactly as before. Less, and
+  the desk has fewer hours: the same minutes for each paper, the same calendar, and the casework queues behind itself in
+  those hours. Nothing delays a case but the hours of the officers who do it.
+- **The short-staffed setting** (`SHORT_STAFFED_BPS`, experiments/scope-pilot/build.ts): 3,000, a PLACEHOLDER (MT-32),
+  chosen by hours of work, not by any outcome of the study: the least level at which the desk, starting from the
+  town's opening caseload (about 35 to 40 hours of casework on the first day), works every hour it has for weeks into a
+  fork from day 30 and then catches up. The town's own casework after that is about an hour a week, which every level
+  down to 2,000 covers: the queue is stable, a slow office for weeks and then an ordinary one, not one that falls behind
+  for ever (docs/decisions.md, "A short-staffed support office").
+- **Not on the desk:** a review of a decision on a request to put it right goes at the case system's second (its step
+  has the answer to the requester in it, which is not casework): WM-14, left (6).
+
 ## What a seat sees
 
 A person in the office sees it as before (its papers, its roster, its books). What is new: it is told **its own body** (age, where it is,

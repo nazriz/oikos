@@ -378,6 +378,11 @@ export interface TownSpec {
    * lender, the support office) publish what they require (`OBSTACLE_ITEMS`), and their clerks send back a paper that
    * falls short, or wrongly one in order at the level's rate (`WRONG_RETURN_BPS`, placeholders). */
   obstacles?: 0 | 1 | 2;
+  /** The support office's staffing (stakes C2; docs/behaviour/staffing.md, "The support agency's officers"): the hours
+   * of the town's share of the agency's officers, in basis points of the profile's figure (`staff_hours_bps`; 10,000 or
+   * absent, the profile's own, and the town exactly as before). Fewer hours, and the casework queues behind itself in
+   * them: a backlog from hours, never a dial. A study states the level it sets, and why. */
+  support?: { staff_hours_bps?: number };
   /** What a person keeps of public goings-on (docs/behaviour/citizen.md, "What a person remembers of public goings-on";
    * risk SC-1): on unless set false (then everyone keeps every published paper for good, as before 2026-10-24); or the
    * bound's sizes in place of the generator's placeholders. */
@@ -3775,14 +3780,17 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const claims = Math.max(1, records.filter((r) => r.kind === "benefit_claim" && r.author === "genesis").length);
     // (The officers work the place's working week: an officer's day on each working day, none on its days of rest and
     // public holidays, the profile's calendar. A share of one officer is a share of a day.)
-    const officers = (per1000 * claims) / 1000;
+    // (A study's stated level of staffing scales the officers' hours, `support.staff_hours_bps`; absent, the profile's.)
+    const staffBps = spec.support?.staff_hours_bps ?? 10_000;
+    if (!(Number.isInteger(staffBps) && staffBps > 0 && staffBps <= 10_000)) throw new Error(`support.staff_hours_bps must be a whole number of basis points from 1 to 10,000 (it is ${staffBps})`);
+    const officers = staffBps === 10_000 ? (per1000 * claims) / 1000 : (per1000 * claims * staffBps) / 1000 / 10_000;
     const lanes = Math.max(1, Math.ceil(officers));
     const seconds = Math.min(DAY, Math.max(1, Math.round((WORKING_DAY * officers) / lanes)));
     const closed = officersCalendar("the support office's casework");
     const sources = { ...WORK_TIME.sources, ...V.work_time?.sources } as Record<string, string>;
     const rows = CASEWORK_KINDS.map((kind) => ({ kind, seconds: personTable[`publish/${kind}`] ?? personTable.publish!,
       source: sources[`person.publish/${kind}`] ?? sources.person ?? "Placeholder: no source was given." }));
-    return { id: "outside-casework", template: "agency-casework", lanes, officers, claims, hours: { from: V.round.work_start_hour * HOUR, seconds, closed }, rows };
+    return { id: "outside-casework", template: "agency-casework", lanes, officers, claims, staffBps, hours: { from: V.round.work_start_hour * HOUR, seconds, closed }, rows };
   })();
   if (casework) {
     templates.push({ id: casework.template, kind: "system", title: "An agency's casework desk: its officers' share of the town's claims", supplier: "outside",
@@ -4367,7 +4375,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         ...(casework ? {
           ...Object.fromEntries(casework.rows.map((r) => [`template.${casework.template}.publish/${r.kind}`, `An officer's time for it, the person table's row: ${r.source}`])),
           [`template.${casework.template}.hours`]: `An officer's working day (the profile's ordinary ${V.ordinary_hours_per_week} hours a week over ${WORK_DAYS} days, from ${V.round!.work_start_hour}:00: ${P.sources["ordinary_hours_per_week"] ?? P.sources["round"] ?? "the profile's figures"}) on each of the place's working days, times the town's share of officers over its lanes (${casework.officers.toFixed(3)} officers on ${casework.lanes}); closed on its days of rest and its public holidays (${casework.hours.closed.days.length} in the run's years): ${P.sources["calendar.weekend"] ?? "the profile's calendar.weekend"}; ${P.sources["calendar.holidays"] ?? "the profile's calendar.holidays"}.`,
-          [`template.${casework.template}.lanes`]: `The town's share of the support agency's officers: ${PS.support_officers_per_1000_claims} per 1,000 claims in payment, times the town's ${casework.claims} at generation (a national figure on a small town; at least one lane). ${P.sources["public_service.support_officers_per_1000_claims"] ?? "Placeholder: no source was given."}`,
+          [`template.${casework.template}.lanes`]: `The town's share of the support agency's officers: ${PS.support_officers_per_1000_claims} per 1,000 claims in payment, times the town's ${casework.claims} at generation (a national figure on a small town; at least one lane). ${P.sources["public_service.support_officers_per_1000_claims"] ?? "Placeholder: no source was given."}${casework.staffBps === 10_000 ? "" : ` Staffed at ${casework.staffBps} basis points of that, the study's stated level (support.staff_hours_bps; docs/behaviour/staffing.md, PLACEHOLDER: MT-32).`}`,
         } : {}),
         // (The tax collector's desk: the person table's rows, an officer's working day, one lane: PB-23.)
         ...(COLLECTS ? {

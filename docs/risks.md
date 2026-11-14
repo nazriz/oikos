@@ -353,7 +353,12 @@ The mechanism:
   placeholders); (3) the law's own waits (Universal Credit's assessment period) are not data yet; (4) fixed 2026-10-31 (decisions "Working calendars"): the desks' hours
   are closed on the place's days of rest and public holidays; (5) a generic `publish` row on a
   machine's template still covers a decision kind at the world's second if a module publishes one without naming the
-  desk: the backstop sees only rows that name a decision kind.
+  desk: the backstop sees only rows that name a decision kind. (6) found 2026-11-14 (stakes C2): a review of a decision
+  on a request to put it right (`decision_review` with its `remedy_answer`) goes at the case system's second, since the
+  step holds the answer, which is not a casework kind: reviews are answered the same day at every level of staffing.
+  Fixing it moves every town with a support office (the whole slow tier). (7) A study may set the officers' hours
+  below the profile's (`support.staff_hours_bps`, stakes C2; docs/behaviour/staffing.md): a short-staffed office is
+  then a backlog in the officers' hours, from the opening caseload, at a placeholder level (MT-32).
 
 ### WM-18 · A person's work in a post is not held to working hours
 - **Gap:** A system's lanes work inside its template's `hours`, but nothing seems to keep a person's acts in a post
@@ -1822,9 +1827,12 @@ The mechanism:
 - **Gap:** The friction factor's levels (docs/design/obstacles.md section 6) are set by figures no source gives yet:
   how often a body's clerk wrongly sends a paper in order back (200 and 800 basis points), how often a person does not
   find a paper asked for, the clerk's time to record an authority, and a strained office's staffing. Only the items a
-  body's form asks for rest on what a paper of the kind is.
-- **Where:** `worlds/generator/generate.ts` (`WRONG_RETURN_BPS`, `OBSTACLE_ITEMS`); the table of slips' `accept/<kind>`
-  rows and their sources.
+  body's form asks for rest on what a paper of the kind is. Since 2026-11-14 (stakes C2) the strained support office is
+  a stated level of its officers' hours (`support.staff_hours_bps`; the study's `SHORT_STAFFED_BPS`, 3,000 basis points of
+  the profile's, a placeholder chosen by hours of work: docs/decisions.md, "A short-staffed support office"); the waits
+  it makes come from the opening caseload and are sensitive to that level.
+- **Where:** `worlds/generator/generate.ts` (`WRONG_RETURN_BPS`, `OBSTACLE_ITEMS`, `support.staff_hours_bps`); the table
+  of slips' `accept/<kind>` rows and their sources; experiments/scope-pilot/build.ts (`SHORT_STAFFED_BPS`).
 - **Effect:** Obstacles met per seat-month, and so the manipulation check between levels 1 and 2, scale with a guessed
   rate. At the factory's assistant the whole of level 2's exposure is a placeholder.
 - **L / I:** high / medium · **Status:** open (labelled in the table of slips' sources)

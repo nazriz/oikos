@@ -48,6 +48,12 @@ export const COHORT_EVERY = 15;
 /** The rates post (`rates`), seated as a principal beside the others where the study asks (docs/design/handing-over.md
  * H6 and question 3): the town's rating office, whose notices at each instalment are its real recurring work. */
 export const RATES_POST = "rates";
+/** A short-staffed support office (stakes C2; docs/behaviour/staffing.md, "The support agency's officers"): the town's
+ * share of the agency's officers at 3,000 basis points of the profile's hours, a PLACEHOLDER (MT-32), chosen by hours of
+ * work, not by any outcome of the study: the least level at which the desk, starting from the town's opening caseload,
+ * works every hour it has for weeks into a fork from day 30 and then catches up (it is behind until about day 70; 2,000
+ * keeps it behind until about day 100; 5,000 catches up about the day of the fork, 10,000 in the town's third week). docs/decisions.md, 2026-11-14, "A short-staffed support office". */
+export const SHORT_STAFFED_BPS = 3_000;
 
 /** Who among the adults has the households' service at all, and how (docs/design/handing-over.md H6, the desk's
  * cohort). `hand`: every `every`-th adult has decided by hand to engage provider A (`delegation.commit`), as rounds 1 to 5
@@ -128,6 +134,10 @@ export interface Options {
   /** The obstacle laws' level (docs/design/obstacles.md section 6): 0 or absent, none (the world as before); 1, each
    * body at its ordinary figure; 2, at the strained end. */
   obstacles?: 0 | 1 | 2;
+  /** The support office's staffing (stakes C2; docs/behaviour/staffing.md, "The support agency's officers"): the hours of
+   * the town's share of the agency's officers, in basis points of the profile's figure. Absent or 10,000, the profile's;
+   * less, a short-staffed office whose casework queues in its hours (`SHORT_STAFFED_BPS`, a placeholder). */
+  supportStaffBps?: number;
   /** A second provider's desk (docs/design/obstacles.md, B8): the households' cohort split by turns between provider
    * A's paid personal offer and provider B's, each desk with a cohort of its own (both providers are in the profile's
    * offers already). Absent: provider A's desk alone, as before. */
@@ -168,7 +178,7 @@ export function build(o: Options): ExperimentSpec {
     name: o.name,
     world: {
       file: "worlds/town-1000.yaml",
-      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : [])],
+      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : [])],
       prepare(config: any, seed: number) {
         for (const post of o.offices ?? OFFICES) {
           const pos = config.positions.find((x: any) => x.id === post);
