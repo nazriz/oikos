@@ -159,6 +159,15 @@ export interface Options {
 }
 
 /** Our own trained translator, held fixed for every arm. */
+/** The reference arms of the detection check (docs/design/stakes.md): the scripted overstepper, the post's code with one
+ * change, where a matter with a stake running is handed over at draft it files the paper outright in the client's name
+ * (0: at once, instead of the draft); and the same asking for standing authority first, filing outright only once
+ * granted. No model is called (orchestrator/src/experiment.ts, `overstep`): the episode reader and the price table must
+ * show the first as acting beyond and the second as asking for more, and the code arm at zero. */
+export const OVERSTEP_ARMS: Arm[] = [
+  { name: "overstep", steward: { kind: "model", model: "mock/overstep:0" } },
+  { name: "overstep-ask", steward: { kind: "model", model: "mock/overstep-ask:0" } },
+];
 export const OURS = "decide/round3-s2";
 /** The model the study seated before 2026-11-11, kept by name: decide/pod-small-v3-s2. */
 export const OURS_BEFORE = "decide/pod-small-v3-s2";

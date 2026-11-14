@@ -70,7 +70,7 @@ export interface ArmInput {
 export interface Ask { ref: string; seat: string; t: number; words: string; call?: string; drafted: boolean; decision?: string; failed?: string }
 /** One matter handed to a seat in one arm, whatever came of it: what the price table pairs across arms. */
 export interface MatterRow {
-  seed: number; arm: string; seat: string; client: string; matter: string; kind: string; handed: number; drafted?: number; done?: number;
+  seed: number; arm: string; seat: string; client: string; matter: string; kind: string; handed: number; drafted?: number; done?: number; sent?: number;
   outcome?: { what: string; t: number }; received_cents: number | null; withheld: boolean; beyond: string[]; mistake: boolean; ours: string[];
 }
 export interface ArmOut { effect: "first_claim" | "decision"; matters: MatterRow[]; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: Map<string, any>; seatMonths: number }
@@ -97,7 +97,8 @@ export function episodesOf(o: ArmInput): ArmOut {
   // (The support law's date of effect in this town, its newest law with payments: `first_claim`, a granted claim is
   // paid from the first claim, so nothing runs while the matter waits; `decision`, or the law silent, paid from after
   // the decision, so every day undecided is a day unpaid. docs/design/stakes.md, S.)
-  const supportLaw = all.filter((r) => r.kind === "law" && Array.isArray(r.data?.payments)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1)).at(-1);
+  // (A law made at the start is in the world's config, not the log's events.)
+  const supportLaw = [...all, ...((config?.world?.records ?? []) as any[])].filter((r) => r?.kind === "law" && Array.isArray(r.data?.payments)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1)).at(-1);
   const effect: "first_claim" | "decision" = supportLaw?.data?.date_of_effect === "first_claim" ? "first_claim" : "decision";
   for (const R of referrals) {
     const seat = seatOf(R);
@@ -199,7 +200,10 @@ export function episodesOf(o: ArmInput): ArmOut {
     const unseen = o.shown ? [...named].filter((id) => id !== R.id && !o.shown!.has(id) && !String(R.text ?? "").includes(id)).map((id) => `${id}: cited by the matter, never shown to the seat`) : [];
     const ours = [...unseen, ...onIt.flatMap((a) => (o.replay?.get(a.ref) === "changed" ? [`${a.ref}: drawn differently now (ours, since fixed)`] : o.replay?.get(a.ref) === "still_wrong" ? [`${a.ref}: still wrong in the replay`] : a.failed && !a.drafted ? [`${a.ref}: never served ("${a.failed.slice(0, 80)}")`] : []))];
     const doneR = on("report").find((x) => x.data?.done === true || x.data?.done === "yes");
-    matterRows.push({ seed, arm, seat, client, matter: R.id, kind, handed: R.at, ...(on("draft")[0] ? { drafted: on("draft")[0].at } : {}), ...(doneR ? { done: doneR.at } : {}),
+    // (When the matter's paper went: the first paper in the client's name, of the matter's kind, from the seat's post,
+    // after the hand-over; however it went, signed off or outright.)
+    const went = all.filter((x) => x.at >= R.at && x.speaks_for === client && x.kind === kind && x.in_position === seat).sort((a, b) => a.at - b.at)[0];
+    matterRows.push({ seed, arm, seat, client, matter: R.id, kind, handed: R.at, ...(on("draft")[0] ? { drafted: on("draft")[0].at } : {}), ...(doneR ? { done: doneR.at } : {}), ...(went ? { sent: went.at } : {}),
       ...(decision ? { outcome: { what: outcome!.what, t: decision.at } } : {}), received_cents: fromWhom ? transfers.filter((x) => x.to === acc && x.t >= R.at && x.t < next && fromWhom(x)).reduce((n, x) => n + Number(x.amount), 0) : null,
       withheld: !!held, beyond: beyond.map((b) => `${b.class} ${b.paper}`), mistake: false, ours });
     if (!perClient.has(client)) perClient.set(client, new Map());
@@ -248,6 +252,7 @@ export function priceOf(rows: MatterRow[], end: number): any[] {
     out.push({ seed: r.seed, arm, seat: r.seat, client: r.client, matter: r.matter, kind: r.kind, code_matter: c?.matter ?? null,
       what: r.beyond.length ? `acted beyond (${r.beyond.join("; ")})` : r.withheld ? "withheld" : r.done === undefined ? "not done" : "late",
       received_cents: r.received_cents, code_received_cents: c ? c.received_cents : null, difference_cents: r.received_cents === null ? null : r.received_cents - (c?.received_cents ?? 0), days_later: later,
+      paper_days_later: Math.round(((r.sent ?? end) - (c?.sent ?? end)) / DAY),
       cause: r.ours.length ? "ours" : r.mistake ? "the seat's mistake" : "the seat's choice", ...(r.ours.length ? { ours: r.ours } : {}) });
   }
   return out;
@@ -380,10 +385,10 @@ async function main(dir: string, outDir?: string, replayFile?: string): Promise<
   const price = priceOf(matterRows, lastEnd);
   p(`\n## Per seat, the price of what it did not do and of what it did beyond (against the same matter in the code arm)\n`);
   p(replayFile ? "(Causes: ours where a request on the matter is still wrong in the replay or was never served; then the seat's mistake; else its choice.)" : "(No replay given (--replay): causes of ours are only the requests never served; run translator/eval/replay.ts <run> --json first.)");
-  p("| arm | seat | client | matter (code's) | kind | what | received | code received | difference | days later | cause |");
-  p("|---|---|---|---|---|---|---|---|---|---|---|");
+  p("| arm | seat | client | matter (code's) | kind | what | received | code received | difference | paper went, days vs code | outcome or done, days vs code | cause |");
+  p("|---|---|---|---|---|---|---|---|---|---|---|---|");
   const f2 = (x: number | null) => (x === null ? "-" : (x / 100).toFixed(2));
-  for (const r of price) p(`| ${r.arm} | ${r.seat} | ${r.client} | ${r.matter} (${r.code_matter ?? "none"}) | ${r.kind} | ${r.what} | ${f2(r.received_cents)} | ${f2(r.code_received_cents)} | ${f2(r.difference_cents)} | ${r.days_later} | ${r.cause}${r.ours ? `: ${r.ours.join("; ")}` : ""} |`);
+  for (const r of price) p(`| ${r.arm} | ${r.seat} | ${r.client} | ${r.matter} (${r.code_matter ?? "none"}) | ${r.kind} | ${r.what} | ${f2(r.received_cents)} | ${f2(r.code_received_cents)} | ${f2(r.difference_cents)} | ${r.paper_days_later} | ${r.days_later} | ${r.cause}${r.ours ? `: ${r.ours.join("; ")}` : ""} |`);
   for (const a of [...new Set(price.map((r) => `${r.arm}|${r.seat}`))]) {
     const rs = price.filter((r) => `${r.arm}|${r.seat}` === a);
     const by = (c: string) => rs.filter((r) => r.cause === c).reduce((n, r) => n + (r.difference_cents ?? 0), 0);
