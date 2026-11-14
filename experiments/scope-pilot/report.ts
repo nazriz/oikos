@@ -122,6 +122,21 @@ export async function report(dirs: string[]): Promise<string> {
       const sum = (k: "ratified" | "repudiated" | "taken_back" | "chased" | "did_itself") => ms.reduce((n, m) => n + (m.afterwards?.[k] ?? 0), 0);
       p(`| ${a} | ${ms.reduce((n, m) => n + m.beyond.length, 0)} | ${sum("ratified")} | ${sum("repudiated")} | ${sum("taken_back")} | ${sum("chased")} | ${sum("did_itself")} |`);
     }
+    // What was asked for, and how the client answered, with its own figures (A2 part 2).
+    p(``, `### Asked for more: what was asked against what the matter needed, and the client's answer with its own figures`, ``, `Runs read: ${runs(at)}.`, ``);
+    p(`| arm | client | matter | asked | the matter needed | level then | answer (why) | the client's stated wait on its answers | a day's delay costs it | its costs a month, now / asked |`, `|---|---|---|---|---|---|---|---|---|---|`);
+    let anyAsked = false;
+    for (const e of at.flatMap((r) => r.episodes.filter((x) => (x.asked_detail ?? []).length && r.effects[x.arm] === level))) for (const q of e.asked_detail!) {
+      anyAsked = true;
+      p(`| ${e.arm} | ${e.client} | ${e.matter} | ${[q.asked?.kind, q.asked?.level].filter(Boolean).join(" at ") || "-"} | ${[q.needed?.kind, q.needed?.wants].filter(Boolean).join(" at ") || "-"} | ${q.level_then ?? "-"} | ${q.granted === null ? "no answer" : q.granted ? "granted" : "declined"}${q.why ? ` (${q.why})` : ""} | ${q.wait_days !== undefined ? `${q.wait_days.toFixed(1)} days over ${q.waits} answers` : "-"} | ${q.late_cost_day_cents !== undefined ? money(q.late_cost_day_cents) : "-"} | ${q.cost_now_cents !== undefined ? `${money(q.cost_now_cents)} / ${money(q.cost_asked_cents)}` : "-"} |`);
+    }
+    if (!anyAsked) p(`| (none) | | | | | | | | | |`);
+    // Accumulation: levels held at the fork against at the end, by client and kind; each level granted, and the acts within it after.
+    p(``, `### Authority over the run: levels held at the fork and at the end, each level granted after the fork, and the acts within it afterwards`, ``, `Runs read: ${runs(at)}.`, ``);
+    p(`| arm | seed | client | kind | at the fork | at the end | granted after the fork (day: level) | acts within it afterwards |`, `|---|---|---|---|---|---|---|---|`);
+    const lv = at.flatMap((r) => r.levels.filter((l) => r.effects[l.arm] === level));
+    for (const l of lv) p(`| ${l.arm} | ${l.seed} | ${l.client} | ${l.kind} | ${l.at_fork ?? "-"} | ${l.at_end ?? "-"} | ${l.granted.map((g) => `${Math.floor(g.at / 86_400) + 1}: ${g.level}`).join("; ") || "-"} | ${l.granted.reduce((n, g) => n + g.acts_within_after, 0)} |`);
+    if (!lv.length) p(`| (none: no level changed after the fork) | | | | | | | |`);
     // 6. The stake a seat faced: the client's own wait on its episodes' drafts, and what that wait was worth at the rate.
     p(``, `### The stake: the clients' waits on the episodes' drafts (hours), and their worth at the rate the world's decision gives`, ``, `Runs read: ${runs(at)}.`, ``);
     p(`| arm | waits | median h | 90th h | longest h | over 1 day | over 3 days | over 6 days | worth at the rate, median | worth, all |`, `|---|---|---|---|---|---|---|---|---|---|`);

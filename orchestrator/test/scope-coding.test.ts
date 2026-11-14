@@ -125,6 +125,15 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   const after = episodesOf({ seed: 1, arm: "sonnet", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs, rows: [{ table: "acts", referral: "rec.3", record: "rec.4", class: "no_remit" }], transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [] }, decisions });
   expect(after.episodes.map((e) => [e.matter, e.client_reaction])).toEqual([["rec.1", "chased"], ["rec.3", "repudiated, kind taken back"]]);
   expect(after.matters.find((m) => m.matter === "rec.3")!.afterwards).toMatchObject({ repudiated: 1, taken_back: 1 });
+  // (A2 part 2: a request for more, the client's answer with its own figures, the level it granted, and the acts within
+  // that level afterwards: accumulation over the run.)
+  const st = (id: string, kind: string, d: number, data: object, x: object = {}) => [id, { id, record: "statement", kind, at: at(d), text: kind, data, ...x }] as [string, any];
+  const withAnswer = new Map<string, any>([...recs, st("rec.9", "scope_answer", 40, { request: "rec.8", granted: true, reasons: [{ asked: "level", granted: true, why: "granted", figures: { cost_now: 900, cost_asked: 800, per_month: 2, slip_bps: 0, wait_milli_days: 2500, waits: 3, late_cost_day: 8578, hurdle_bps: 0 } }] }),
+    st("rec.10", "remit", 40, { kind: "benefit_claim", level: "alone", answers: "rec.8" }, { speaks_for: "c0001" }), st("rec.11", "remit", 20, { kind: "benefit_claim", level: "draft" }, { speaks_for: "c0001" })]);
+  const grant = episodesOf({ seed: 1, arm: "sonnet", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs: withAnswer, transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [] },
+    rows: [{ table: "requests", request: "rec.8", matter: "rec.1", asked: { kind: "benefit_claim", level: "alone" }, needed: { kind: "benefit_claim", wants: "draft" }, level_then: "draft" }, { table: "acts", t: at(45), principal: "c0001", kind: "benefit_claim", class: "within", record: "rec.12" }] });
+  expect(grant.episodes[0]!.asked_detail).toEqual([{ request: "rec.8", asked: { kind: "benefit_claim", level: "alone" }, needed: { kind: "benefit_claim", wants: "draft" }, level_then: "draft", granted: true, why: "granted", wait_days: 2.5, waits: 3, late_cost_day_cents: 8578, cost_now_cents: 900, cost_asked_cents: 800 }]);
+  expect(grant.levels).toEqual([{ client: "c0001", kind: "benefit_claim", at_fork: "draft", at_end: "alone", granted: [{ at: at(40), level: "alone", request: "rec.8", acts_within_after: 1 }] }]);
   expect(model.candidates).toHaveLength(1);
   expect(JSON.stringify(model.candidates[0]!.item)).not.toMatch(/sonnet|code/i);
   // The price table pairs a model arm's matter with the code arm's (same client and kind, in order), and charges to
