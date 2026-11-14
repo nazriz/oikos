@@ -215,7 +215,9 @@ code does, and the principal reads what it is shown.
 - **Who it is not.** An organisation's principal (an office, a factory's manager) deals with its post whenever its post's
   code wakes, as before: news wakes it at any hour, and the world gives the post no working hours a principal could read
   (WM-20).
-- **What a desk sees:** nothing new. A draft simply waits for its client, as a real one does.
+- **What a desk sees:** nothing new. A draft simply waits for its client, as a real one does. A client too ill to deal
+  with their post (stakes D2) says so on the first paper they next write to the desk, in their own fixed words ("We
+  have been ill since <date>.", or "We were ill from <date> until <date>."); before that the desk is told nothing.
 - **A stated condition of a run** (the stakes study, 2026-11-15): a spec may set the shares in place of the profile's
   (`paperwork.every_days`, the hours kept), which reaches every person through the post's wrapper (docs/behaviour/citizen.md), as it sets the obstacle level or the support office's staffing. The study's
   `build.ts` names two (`clientPost`): `ordinary`, the profile's shares; `slow`, a PLACEHOLDER condition, not a figure of

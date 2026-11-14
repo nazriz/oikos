@@ -33,7 +33,8 @@ The build (docs/design/stakes.md section 7; first S, C1+B2, B1, D1a, A2, E by We
   towns only; persons only, an organisation's principal is WM-20).
 - [x] D1b. The same for every person's every paper, in their own time (every town moves; the smallest honest version:
   every person's post; the working-day charge and acts a person starts themselves stay on WM-18, the lead, 2026-11-14).
-- [ ] D2. A client away for days, lawfully.
+- [x] D2. A client away for days, lawfully (the smallest version: too ill for their post at home, the health model's
+  own conditions; a hospital as a place and trips out of town are WM-21).
 - [x] D3. Housing cases at the desk. Done 2026-11-14 (`Cohort.difficulty`; MT-40).
 - [x] E. The episode reader and per-client outcomes, the code arm as reference; mistakes apart from choices.
 - [ ] The episode rate measured on the code screen: at least 4 a desk seat-month at S1, or the cohort enlarged.

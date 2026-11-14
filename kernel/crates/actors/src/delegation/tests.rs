@@ -904,7 +904,7 @@ fn a_person_deals_with_what_comes_by_post_when_it_next_sits_down_to_it_and_not_b
     // principal's papers among it. Before 2026-11-14 a draft was signed off at the next wake.)
     let script: Vec<Value> = [40, 46].iter().map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
     let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 90 * DAY, "keep_until": 90 * DAY, "why": "a test's design", "hold": "freeze" });
-    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script, "paperwork": { "every_days": [[3, 10_000]], "from_hour": 19, "to_hour": 20 },
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script, "paperwork": { "every_days": [[3, 10_000]], "from_hour": 19, "to_hour": 20 }, "care": { "entity": "clinic", "waiting": "clinic/waiting", "seek_bps": 0, "severities": [], "off_work": ["serious"], "wait_days": 2 },
         "delegation": { "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "commit": commit } }));
     let inner = crate::stub::Script.create(&h.ctx).unwrap();
     h.actor = crate::post::wrap(&h.ctx, wrap(&h.ctx, inner).unwrap());
@@ -976,4 +976,31 @@ fn a_person_deals_with_what_comes_by_post_when_it_next_sits_down_to_it_and_not_b
     assert!(line.contains("Our hearing notice rec.hn from tribunal") && line.contains("naming answer by") && line.contains("to=[\"prov-a\"]"), "{line}");
     // (Shown with --nocapture: the proof of the desk's case, B3.)
     println!("B3-PROOF The desk's case: a client with a hearing notice and its day to answer by; the desk asks about the paper (rec.q, at {}h on day {}), the client answers at its next sitting (day {}, {}h):\n\n{line}\n", (came % DAY) / 3600, came / DAY, at / DAY, (at % DAY) / 3600);
+    assert!(!all(&h.sent).contains("We have been ill") && !all(&h.sent).contains("We were ill"), "well, it says nothing of illness");
+    // (Stakes D2: too ill to deal with its post. A condition that keeps it off work, from a day before the third draft
+    // comes until four sittings later: the draft waits through every sitting while it lasts and is read at the first
+    // after; and its first paper to its desk then says, in its own words, that it was ill. Its desk is told nothing before.)
+    let ill_from = signed_at[1] + 2 * DAY;
+    let ill_until = signed_at[1] + 12 * DAY + 3600;
+    h.body = json!({ "born_at": 0, "present": true, "alive": true, "conditions": [{ "id": "cond.1", "kind": "illness", "severity": "serious", "since": ill_from, "until": ill_until }] });
+    for t in (signed_at[1] + 3600..signed_at[1] + 3 * DAY).step_by(3600) {
+        h.wake(t, world(vec![]));
+    }
+    let referral = last_referral(&h);
+    let came = signed_at[1] + 3 * DAY - 7200;
+    h.wake(came, world(vec![statement("rec.d3", came, PROV, "draft", &[ME], json!({ "referral": referral, "calls": NOTICE }))]));
+    let mut t = came;
+    let (at, line) = loop {
+        t += 3600;
+        if t >= ill_until {
+            h.body = json!({ "born_at": 0, "present": true, "alive": true });
+        }
+        assert!(t < came + 20 * DAY, "signed off after the illness: {}", all(&h.sent));
+        let out = all(&h.wake(t, world(vec![])));
+        if let Some(line) = out.lines().find(|l| l.contains("kind=sign_off")) {
+            break (t, line.to_string());
+        }
+    };
+    assert!(at >= ill_until && at < ill_until + 3 * DAY + 3600, "read at the first sitting after it: {at} against {ill_until}");
+    assert!(line.contains("We were ill from") && !line.contains("advise"), "its own line, in fixed words: {line}");
 }

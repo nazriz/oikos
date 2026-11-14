@@ -1050,3 +1050,9 @@ nothing new, and its saved state is as before.
   is the wrapper's state (`me`, `p`, `sits`, `held`: papers held from a channel that shows what is new, by channel;
   `letters`). A principal's saved state loses `sits`, `in_post`, `letters_in_post` and `post_due`. A snapshot from
   before reads as before only where the profile gave no habit (compat relaxed in the rebuild).
+
+## Stakes D2: too ill to deal with one's post (2026-11-14; docs/decisions.md, "Too ill to deal with one's post"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- The post wrapper's saved state gains `off_work` (the citizen's `care.off_work`) and `ill` (the spans of such
+  conditions while anything waits). A principal's saved state gains `ill` (`since`, `until`, `told`). A client's first
+  paper to its assistant after such a spell carries one fixed sentence at the end of its text. No new paper or field.

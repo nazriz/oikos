@@ -6,6 +6,11 @@
 //!
 //! One wrapper, round every person's own code (and so round a principal's: a client deals with its assistant's papers
 //! as with any other post). A town whose profile gives no habit (`paperwork`) is as before, to the hash.
+//!
+//! **Too ill for it (stakes D2):** a person with a condition of a severity that keeps them off work (the health model's,
+//! `care.off_work`, at the profile's own rates) is too ill to deal with their post until it ends, as it keeps them from
+//! work: a sitting that falls while it lasts is skipped, and what waits is read at their first sitting after it. They
+//! are at home, ill; nobody is told (what they say of it to their assistant is their own: principal.rs, `away`).
 
 use crate::common::addressed_to;
 use crate::{Action, Actor, Ctx, Cx, Picture, DAY};
@@ -67,10 +72,26 @@ fn letter_for(me: &str, m: &Message) -> bool {
     m.from_entity.as_deref().unwrap_or(m.from.as_str()) != me
 }
 
+/// The time of the sitting at which what came at `at` is read: the first at or after it that does not fall in one of
+/// `ill` (each span `[since, until)` of a condition too serious to deal with post).
+pub fn sitting_for(sits: Sits, ill: &[(String, i64, i64)], at: i64) -> i64 {
+    let mut s = answer_lag(sits, at);
+    while let Some((_, _, until)) = ill.iter().find(|(_, since, until)| *since <= s && s < *until) {
+        s = answer_lag(sits, *until);
+    }
+    s
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct State {
     me: String,
     p: Paperwork,
+    /// The severities too serious to deal with post (the citizen's `care.off_work`), and the spans of such conditions
+    /// it has had while something waited (condition, since, until).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    off_work: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    ill: Vec<(String, i64, i64)>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     sits: Option<Sits>,
     /// Papers that came by a channel that shows only what is new, before the person sat down to them: by channel.
@@ -96,7 +117,10 @@ fn habit(ctx: &Ctx) -> Option<Paperwork> {
 /// The actor made for `ctx`, wrapped where it is a person's own code and the world gives a habit.
 pub fn wrap(ctx: &Ctx, inner: Box<dyn Actor>) -> Box<dyn Actor> {
     match habit(ctx) {
-        Some(p) => Box::new(Posted { inner, s: State { me: ctx.entity.clone(), p, sits: None, held: vec![], letters: vec![] } }),
+        Some(p) => {
+            let off_work = ctx.params.get("care").and_then(|c| c.to_value().get("off_work").and_then(|o| serde_json::from_value(o.clone()).ok())).unwrap_or_default();
+            Box::new(Posted { inner, s: State { me: ctx.entity.clone(), p, off_work, ill: vec![], sits: None, held: vec![], letters: vec![] } })
+        }
         None => inner,
     }
 }
@@ -125,7 +149,15 @@ impl Posted {
             return (None, None);
         }
         let sits = *self.s.sits.get_or_insert_with(|| draw(&self.s.p, &me, cx));
-        let read = |at: i64| answer_lag(sits, at) <= t;
+        // (Too ill for it: the spans of the conditions it has now, as its body shows them, kept while anything waits.)
+        if let Some(b) = pic.body.as_ref() {
+            for c in b.conditions.iter().filter(|c| self.s.off_work.contains(&c.severity)) {
+                self.s.ill.retain(|(id, _, _)| id.as_str() != c.id.as_str());
+                self.s.ill.push((c.id.to_string(), c.since, c.until));
+            }
+        }
+        let ill = self.s.ill.clone();
+        let read = |at: i64| sitting_for(sits, &ill, at) <= t;
         let mut shown = pic.clone();
         let mut shown_ids: BTreeSet<String> = BTreeSet::new();
         for (ch, seen) in shown.channels.iter_mut() {
@@ -161,7 +193,11 @@ impl Posted {
         let mut inbox: Vec<Message> = pic.inbox.iter().filter(|m| !letter_for(&me, m)).cloned().collect();
         inbox.append(&mut now);
         shown.inbox = inbox;
-        let due = self.s.held.iter().map(|(_, r)| r.at).chain(self.s.letters.iter().map(|m| m.t)).map(|at| answer_lag(sits, at)).min();
+        let due = self.s.held.iter().map(|(_, r)| r.at).chain(self.s.letters.iter().map(|m| m.t)).map(|at| sitting_for(sits, &ill, at)).min();
+        // (Nothing waiting: the spans are let go.)
+        if due.is_none() {
+            self.s.ill.clear();
+        }
         (Some(shown), due)
     }
 }

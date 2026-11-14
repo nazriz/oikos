@@ -55,6 +55,8 @@ pub struct Harness {
     pub decisions: Vec<Value>,
     /// The letters in its inbox at its next wake (the kernel's `Message`s, as JSON); empty after it.
     pub inbox: Value,
+    /// Its body as it is shown it (a person's `BodyView`, as JSON), where a test gives one.
+    pub body: Value,
 }
 
 impl Harness {
@@ -62,7 +64,7 @@ impl Harness {
         let ctx = ctx(entity, params);
         let actor = kind.create(&ctx).expect("the actor is made");
         let draws = Draws::new(&ctx.participant, "self");
-        Harness { kind, ctx, actor, draws, view: View::default(), seed: 11, n: 0, t: 0, sent: vec![], readings: json!({}), decisions: vec![], inbox: json!([]) }
+        Harness { kind, ctx, actor, draws, view: View::default(), seed: 11, n: 0, t: 0, sent: vec![], readings: json!({}), decisions: vec![], inbox: json!([]), body: Value::Null }
     }
 
     /// Replace the actor with its own saved self (every actor's memory saves).
@@ -74,7 +76,7 @@ impl Harness {
 
     fn observation(&self, t: i64, channels: Value, outcomes: Value) -> Observation {
         serde_json::from_value(json!({ "participant": self.ctx.participant, "t": t, "status": "active", "outcomes": outcomes,
-            "inbox": self.inbox, "drafts": [], "channels": channels, "readings": self.readings }))
+            "inbox": self.inbox, "drafts": [], "channels": channels, "readings": self.readings, "body": self.body }))
         .expect("an observation")
     }
 

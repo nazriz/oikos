@@ -310,6 +310,9 @@ pub struct State {
     /// second of the day. The wrapper round its code holds the post (crate::post); this is for what it says of it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     sits: Option<(i64, i64, i64)>,
+    /// Too ill to deal with its post, as a person (stakes D2): `away`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ill: Option<Ill>,
     /// Papers others sent it, the newest [`OWN_PAPERS`]: its files, what a referral says a matter came from (C1, B2).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     papers_in: Vec<PaperIn>,
@@ -346,6 +349,16 @@ mod question;
 pub struct Delegating {
     inner: Box<dyn Actor>,
     s: State,
+}
+
+/// A person too ill to deal with their post (stakes D2; `away`): since when, until when as their body shows it, and
+/// whether they have said so to their assistant.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct Ill {
+    since: i64,
+    until: i64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    told: bool,
 }
 
 /// What the principal's rule weighed a request at (`State::weigh`).
@@ -413,6 +426,7 @@ impl Delegating {
                 lodged: BTreeSet::new(),
                 passed: BTreeSet::new(),
                 sits: None,
+                ill: None,
                 papers_in: vec![],
                 traces: vec![],
                 untied: vec![],
@@ -437,6 +451,7 @@ impl Actor for Delegating {
     fn step(&mut self, pic: &Picture, cx: &mut Cx) -> Action {
         let s = &mut self.s;
         s.absorb(pic, cx);
+        s.away(pic, cx);
         // What the inner actor is shown: its own outcomes, never ours, and those of its acts the assistant has done.
         let hide = |o: &Outcome| s.own.contains_key(o.action.as_str()) || s.matters.get(o.action.as_str()).is_some_and(|m| m.referral.is_none() && o.status == OutcomeStatus::Applied);
         let filter = !s.synth.is_empty() || pic.outcomes.iter().any(hide);
@@ -494,7 +509,7 @@ impl Actor for Delegating {
                     };
                     lines.extend(step.lines.iter().cloned());
                     s.returned_matter = Some(m);
-                    return Action::Call { program: Program::Lines(lines), reasoning: step.why };
+                    return Action::Call { program: s.said_away(Program::Lines(lines), pic.t, cx), reasoning: step.why };
                 }
                 Action::Call { program, reasoning }
             }
@@ -503,7 +518,7 @@ impl Actor for Delegating {
                 match s.queue.first().cloned() {
                     Some(o) => {
                         s.queue.remove(0);
-                        let program = parse_program(&o.program).unwrap_or(Program::None(String::new()));
+                        let program = s.said_away(parse_program(&o.program).unwrap_or(Program::None(String::new())), pic.t, cx);
                         let reasoning = Some(o.why.clone());
                         s.returned_own = Some(o);
                         Action::Call { program, reasoning }
@@ -685,6 +700,55 @@ impl State {
         }
         let Some(pw) = cx.ctx.params.get("paperwork").and_then(|v| serde_json::from_value::<crate::post::Paperwork>(v.to_value()).ok()) else { return };
         self.sits = Some(crate::post::draw(&pw, &self.me, cx));
+    }
+
+    /// A person too ill to deal with their post (stakes D2): a condition of a severity that keeps them off work (the
+    /// citizen's `care.off_work`, the health model's own draws), as their body shows it. Their post waits until it ends
+    /// (crate::post); here, only whether they have it, and since when, for what they say of it to their assistant.
+    /// An organisation's principal has no body: never.
+    fn away(&mut self, pic: &Picture, cx: &Cx) {
+        if self.p.post.is_some() {
+            return;
+        }
+        let off: Vec<String> = cx.ctx.params.get("care").and_then(|c| c.to_value().get("off_work").and_then(|o| serde_json::from_value(o.clone()).ok())).unwrap_or_default();
+        let t = pic.t;
+        let now: Vec<(i64, i64)> = pic.body.as_ref().map(|b| b.conditions.iter().filter(|c| off.contains(&c.severity) && c.since <= t && t < c.until).map(|c| (c.since, c.until)).collect()).unwrap_or_default();
+        match (now.is_empty(), self.ill.as_mut()) {
+            (false, Some(i)) if t < i.until || !i.told => {
+                i.since = i.since.min(now.iter().map(|x| x.0).min().unwrap_or(i.since));
+                i.until = i.until.max(now.iter().map(|x| x.1).max().unwrap_or(i.until));
+            }
+            (false, _) => self.ill = Some(Ill { since: now.iter().map(|x| x.0).min().unwrap_or(t), until: now.iter().map(|x| x.1).max().unwrap_or(t), told: false }),
+            // (Over it and said so: let go, so that a later illness is said again.)
+            (true, Some(i)) if i.told && t >= i.until => self.ill = None,
+            _ => {}
+        }
+    }
+
+    /// Its own line about it, on the first paper it next writes to its assistant: its own fact, in fixed words, and
+    /// nothing else. The assistant is told nothing before that, as in life.
+    fn said_away(&mut self, program: Program, t: i64, cx: &Cx) -> Program {
+        let Some(i) = self.ill.as_ref().filter(|i| !i.told) else { return program };
+        let Program::Lines(mut lines) = program else { return program };
+        let assistant: Vec<String> = self.in_use().and_then(|e| e.agreement.clone()).map(|a| self.to_assistant(&a).0).unwrap_or_default();
+        let to_it = |l: &Line| l.call.fn_ == "statement" && l.call.get("to").is_some_and(|v| match v {
+            oikos_sight::calls::Value::Json(j) => j.as_array().is_some_and(|a| a.iter().any(|x| x.as_str().is_some_and(|x| assistant.iter().any(|y| y == x)))),
+            oikos_sight::calls::Value::Id(x) | oikos_sight::calls::Value::Text(x) => assistant.iter().any(|y| y == x),
+            _ => false,
+        });
+        let Some(l) = lines.iter_mut().find(|l| to_it(l)) else { return Program::Lines(lines) };
+        let date = |at: i64| crate::common::when_words(at, &cx.ctx.world);
+        let said = if t < i.until { format!("We have been ill since {}.", date(i.since)) } else { format!("We were ill from {} until {}.", date(i.since), date(i.until)) };
+        if let Some((_, oikos_sight::calls::Value::Text(words))) = l.call.args.iter_mut().find(|(k, _)| k == "text") {
+            words.push(' ');
+            words.push_str(&said);
+        } else {
+            return Program::Lines(lines);
+        }
+        if let Some(i) = self.ill.as_mut() {
+            i.told = true;
+        }
+        Program::Lines(lines)
     }
 
     /// What a body asked of it, met (docs/design/obstacles.md, `clears_by`), where its assistant has put the matter before

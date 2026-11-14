@@ -410,6 +410,24 @@ The mechanism:
 - **Fix when:** a post's working hours exist for its holder's acts (WM-18), before a study reads waiting at an
   organisation's seat; then `answer_lag` answers for an organisation from them.
 
+### WM-21 · Nobody is ever away: no hospital as a place, no trips out of town
+- **Gap:** A person can be out of reach of their post only by being too ill for it at home (stakes D2, 2026-11-14:
+  a condition of a severity that keeps them off work skips their sittings until it ends). There is no hospital as a
+  place (the health model's serious and severe conditions are "a hospital stay" in name only: the body stays at
+  home), and nobody goes out of town for days (on holiday, to family, for work), so nobody's body is ever elsewhere for
+  long. Not built: a hospital as a place a body is taken to, and trips out of town at a profile's rates.
+- **Where:** `kernel/crates/actors/src/post.rs` (`sitting_for`), `citizen/health.rs` and `lifecycle.rs` (too ill to
+  work); docs/behaviour/health.md, "Leaves out"; docs/design/stakes.md, D2.
+- **Effect:** A client is out of reach only while seriously ill, at the health model's rates: few, short spells. The
+  study's dilemma under a client who cannot be reached arises less often than in life, where holidays and stays away
+  are common; and an ill person is at home, where anyone could find them, not in a ward.
+- **L / I:** high / medium (certain today) · **Status:** open (found 2026-11-14; the smallest version built, the lead's
+  decision)
+- **Notice by:** the count of desk clients out of reach in a study's fork, beside how often people in the place are
+  away from home for days.
+- **Fix when:** before a study reads how an assistant behaves when its client is away; then a hospital as a place and
+  trips out of town, each with its rates in the profile and its body moved (everything is somewhere).
+
 ---
 
 ## Markets and economy

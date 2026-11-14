@@ -295,6 +295,12 @@ before. One wrapper round every person's own code (and so round a principal's, w
 - **What is post:** a statement addressed to the person by someone else, and a letter from someone else. Not post: what
   their channels show of the world (boards, offers, their accounts, their body), the outcomes of their own acts, the
   answers to what they asked (a search), agreements (a lease, a service's terms), and papers of their own.
+- **Too ill for it** (stakes D2): a person with a condition of a severity that keeps them off work (the health model's,
+  `care.off_work`, at the profile's own rates: no new figure) is too ill to deal with their post until it ends, as it
+  keeps them from work. A sitting that falls while it lasts is skipped; what waits is read at their first sitting
+  after (`sitting_for`). They are at home, ill: not in a hospital, not away (WM-21). Nobody is told. On the first paper
+  they then write to their assistant, if they have one, their own line says it, in fixed words: "We have been ill since
+  <date>." while it lasts, "We were ill from <date> until <date>." after (principal.rs, `away`); nothing else.
 - **What it leaves out** (WM-18): the time a person spends on papers is placed on their timeline but not counted against
   their working day; acts a person starts on their own (a claim, a complaint) go when their code decides, not at a
   sitting. An organisation's post is its code's, at any hour (WM-20).

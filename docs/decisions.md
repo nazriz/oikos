@@ -14248,3 +14248,22 @@ client's habit is what it was under D1a. `paperwork` moves from the principal's 
   (below, when landed).
 - **Revisit if** a source for the habit is opened (MT-37); a study reads the speed of acts persons start themselves, or
   of an office held by a person (WM-18); a town's base outcomes are seen to turn on the weekly tail (missed dates).
+
+## 2026-11-14 · Too ill to deal with one's post (stakes D2, the smallest version)
+
+**The law (the lead's decision, 2026-11-14).** A person with a condition of a severity that keeps them off work (the
+health model's own draws at the profile's own rates, `care.off_work`: serious and severe) is too ill to deal with their
+post until it ends, as it already keeps them from work. A sitting that falls while it lasts is skipped; what waits is
+read at the first sitting after (`post.rs`, `sitting_for`). They are at home, ill: it is not a hospital stay and not an
+absence from town, and nothing says it is. Nobody is told. On the first paper the person next writes to their assistant,
+their own line says it in fixed words, their own fact and nothing else: "We have been ill since <date>." while it lasts,
+"We were ill from <date> until <date>." after (`principal.rs`, `away` and `said_away`). No new figure.
+- **Not built (WM-21):** a hospital as a place a body is taken to, and trips out of town at a profile's rates.
+- **The screen** (the study town, level 2, seed 7, code arm; `ill.ts` in the session's scratch): over 60 days after
+  the fork, 4 of the 251 clients too ill for their post (4.0 to 7.2 days, all serious); over 180 days, 19 (median 8.6
+  days, 90th percentile 36, longest 46; 15 serious, 4 severe). None had a desk paper waiting on them when it began; one
+  wrote to the desk during it (a referral, with "We have been ill since year 1, day 128."). The desk's longest wait on a
+  client in month 5 of the 180 is 724 hours.
+- **Moves** every town where a person with the habit falls seriously ill while something waits in their post.
+- **Revisit if** a study needs clients away more often than illness makes them (WM-21), or the off-work severities
+  change in the health model.
