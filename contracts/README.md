@@ -939,3 +939,13 @@ Additions with defaults: every record on file reads as before, and a town withou
 - **G1, completed (2026-11-11):** a sign-off's signed copy (`SignOff.paper`) may carry `with`, the matter's payments in
   the call language; a form that sends a signed copy (`copies`) makes them in the same act, each citing the sign-off
   (both resolvers). The reader's `acts` rows gain `with_signed` for such a payment.
+
+## Stakes D1a: a client gets to its post in its own time (2026-11-14; docs/design/stakes.md; docs/decisions.md, "A client gets to its assistant's papers when it next gets to its post"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additions with defaults: a principal with no habit given, and every organisation's, is as before; a town without
+providers is unchanged to the byte.
+
+- A principal's parameters gain `paperwork` (`every_days`: `[days, bps]` pairs summing to 10,000; `from_hour`,
+  `to_hour`), from the profile's new `paperwork` (every profile; a labelled placeholder, MT-37). Its saved state gains
+  `sits` (its habit as drawn), `in_post`, `letters_in_post` and `post_due` (what waits in its post, and when it next
+  sits down to it).

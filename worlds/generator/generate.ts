@@ -181,6 +181,14 @@ const DELEGATION_TIME = {
     "person.publish/acknowledgement": "Placeholder (to confirm; WM-1): a minute to acknowledge a letter.",
   } as Record<string, string>,
 };
+/** A profile's habit of getting to the post (`paperwork`), checked: whole days of one or more with shares summing to
+ * 10,000, and a window of the day's hours. */
+function paperworkOf(p: { every_days: [number, number][]; from_hour: number; to_hour: number }) {
+  const sum = p.every_days.reduce((a, [, b]) => a + b, 0);
+  if (!p.every_days.length || sum !== 10_000 || p.every_days.some(([d, b]) => !Number.isInteger(d) || d < 1 || !Number.isInteger(b) || b < 0)) throw new Error(`profile: paperwork.every_days must be whole days of 1 or more with shares summing to 10,000 (they sum to ${sum})`);
+  if (!(Number.isInteger(p.from_hour) && Number.isInteger(p.to_hour) && 0 <= p.from_hour && p.from_hour < p.to_hour && p.to_hour <= 24)) throw new Error(`profile: paperwork's hours ${p.from_hour} to ${p.to_hour} are not a window of the day`);
+  return { every_days: p.every_days, from_hour: p.from_hour, to_hour: p.to_hour };
+}
 // (The composing share, COMPOSE_BPS, is in the registry: worlds/generator/registry.ts. Rows added only where a town has providers.)
 const ASSISTANT_PAPERS = ["advice", "draft", "approval_request", "report", "scope_request", "handover"];
 const ASSISTANT_PAPER_SECONDS = 5;
@@ -3336,7 +3344,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     kinds: Object.fromEntries([...new Set(PERSONS)].sort().map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost, compose_seconds: composeOf(k), ...lateCost(k) }])),
     seconds: { referral: DELEGATION_TIME.person["publish/referral"], sign_off: DELEGATION_TIME.person["publish/sign_off"], go_ahead: DELEGATION_TIME.person["publish/go_ahead"] },
     finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
-    horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints } } : {};
+    horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints,
+    // (When each gets to its post: the profile's habit, drawn once a person; stakes D1a.)
+    ...(V.paperwork ? { paperwork: paperworkOf(V.paperwork) } : {}) } } : {};
   if (PERSONS.length && AS) citizenChannels.push(K.from("providers", AS.providers.filter((p) => p.offers.some((o) => o.for === "persons")).map((p) => p.id), ["service_offer"], { title: "What providers of assistants sell" }));
   const citizenController = code("citizen.default", { ...personDelegation, outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
     complain_to: "city", complain_bps: V.services.complain_bps, complain_about_held: true,
