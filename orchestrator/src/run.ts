@@ -31,7 +31,7 @@ import { readForEnd } from "./run-end";
 import { namedFor, seatConfig } from "./seat-config";
 import { ReadingDesk, type DeskCounts } from "./reading";
 import { culture as cultureNs, reading as readingNs } from "@oikos/participants";
-import { DayBook, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, WORDS, type Words, inCurrency, inCalendar, modules as builtin, Randomness, Roster, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { DayBook, Matters, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, WORDS, type Words, inCurrency, inCalendar, modules as builtin, Randomness, Roster, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { lexiconReader, READING_TABLE, Tagger, READING_VERSION, type Reader, type ReadingTable } from "@oikos/participants/llm";
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reserveOrRefuse, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
@@ -244,7 +244,7 @@ interface Unit {
   entity: string;
   module: BehaviourModule;
   controller: Controller;
-  llm?: { controller: LlmController; config: any; drafts: { draft: Draft; hash: string; reasoning?: string }[]; drafted: number; roster?: Roster; tally?: Tally; dayBook?: DayBook };
+  llm?: { controller: LlmController; config: any; drafts: { draft: Draft; hash: string; reasoning?: string }[]; drafted: number; roster?: Roster; tally?: Tally; dayBook?: DayBook; matters?: Matters };
   ctx: ParticipantContext;
   /** How long it sleeps when it waits without saying until when, and when it first wakes: for the engine's schedule
    * (kernel/src/schedule.rs), which decides every wake from then on. */
@@ -538,7 +538,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // (Its reports, trays, office's file and staff, and the rest of its configuration: seat-config.ts, shared with the
     // experiment harness's model stewards.)
     const knowledge = new Knowledge(currency, cfg.names === true);
-    const { config, office, entity, standingIds, roster, tally, dayBook } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs: namedFor(knowledge, whoIs), ctxFor, twin, draftText, sorted: sortedKeys });
+    const { config, office, entity, standingIds, roster, tally, dayBook, matters } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs: namedFor(knowledge, whoIs), ctxFor, twin, draftText, sorted: sortedKeys });
     const controller = createLlmParticipant(config, io);
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };
     const ctx = ctxFor(p.id, office?.id ?? "self", entity, {});
@@ -581,7 +581,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const codeTwin = cfg.participants.find((x: any) => x.person && x.person === p.person && x.id !== p.id && !x.shares_body)?.id;
     return {
       key: p.id, participant: p.id, entity, module, controller: controller as unknown as Controller, ctx,
-      llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), ...(dayBook ? { dayBook } : {}) },
+      llm: { controller, config: p, drafts: [], drafted: 0, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), ...(dayBook ? { dayBook } : {}), ...(matters ? { matters } : {}) },
       ...(codeTwin && office ? { sort: `${codeTwin}|${office.id}` } : {}), ...(brain ? { hears: true, ...(codeTwin ? { body: codeTwin } : {}), ...(office ? { post: office.id } : {}) } : {}),
       cadence: ceilTo(brain?.cadence ?? cadence, tick), firstWake: wakeAt ?? (brain ? ceilTo(brainFirstWake.get(p.id) ?? mods[pp.mock.brain]!.firstWake?.(brain.ctx) ?? 0, tick) : 0), wokeFor: "start", since: 0,
       knowledge, view: new View(new Set(standingIds)), notices: [],
@@ -853,6 +853,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     if (d.call) try { by = performersOf(u.participant, calls.parseProgram(d.call)).by; } catch { /* (a call that does not read has no one named) */ }
     const r = await begin(u, { command: "act", participant: u.participant, ...(as ? { as } : {}), blocks: d.blocks, ...(by?.length ? { by } : {}),
       provenance: { via: "translator", proposal: d.proposal, draft: d.id, draft_hash: p.hash, translator: d.translator, call: d.call, resolver: d.resolver }, ...(p.reasoning ? { reasoning: p.reasoning } : {}) });
+    if (r !== null) u.llm?.matters?.own(d.blocks as any[], t);
     if (r === null) await notSent(u, "confirmed", `What you confirmed (${d.id}) could not be put into effect as it was drawn up, and nothing was done. You could ask for it again, in other words.`, { rejected_draft: d.id });
     // A standing work order of an office with nobody in post: on file, and said plainly with its result that nobody
     // follows it yet (a works manager set two for a crew of nobody and waited a month: 2026-10-09).
@@ -890,6 +891,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const perceiveCommand = (u: Unit): { cmd: object; looks?: LookRequest[] } => {
     const looks = u.looks;
     u.looks = undefined;
+    // (An assistant's seat reads its post's own file once, on arrival, as a successor does: a search, which leaves the
+    // file as the seat has never looked at it. readers/matters.ts.)
+    const read = u.llm?.matters?.toRead ? (u.llm.matters.read() as LookRequest[]) : [];
+    if (read.length) return { cmd: { command: "look", participant: u.participant, looks: [...(looks ?? []), ...read] }, ...(looks ? { looks } : {}) };
     return looks ? { cmd: { command: "look", participant: u.participant, looks }, looks } : { cmd: { command: "observe", participant: u.participant } };
   };
   /** A unit looks (its own looks first, if it asked), and gets its picture of the world: null if it no longer can.
@@ -902,6 +907,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const c = perceiveCommand(u);
       looks = c.looks;
       reply = await command(c.cmd);
+      if (reply === null && u.llm?.matters?.toRead) reply = await command({ command: "observe", participant: u.participant }); // (the file not read: as before)
       if (!looks && reply === null) return null;
       if (!looks) asked = { reply };
     }
@@ -910,7 +916,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { look_rejected: JSON.stringify(looks).slice(0, 4000) } } });
       u.notices.push({ t, text: "That couldn't be looked up." });
     }
-    if (looks && reply === null) reply = await command({ command: "observe", participant: u.participant });
+    if ((looks || u.llm?.matters?.toRead) && reply === null) reply = await command({ command: "observe", participant: u.participant });
     if (reply === null) return null; // it can no longer look (its capacity went away)
     const p00 = performance.now();
     const raw: Observation = { ...reply.observation, entity: u.entity };
@@ -918,7 +924,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // (What a seat knows is the engine's now (the resolver's source); a language-model seat's is kept here too, for its
     // drafts' previews and law warnings.)
     u.knowledge.absorb(raw);
-    const obs: Observation = { ...u.view.apply(raw), woke_for: u.wokeFor, since: u.since };
+    const obs: Observation = { ...u.view.apply(u.llm?.matters ? u.llm.matters.absorb(raw) : raw), woke_for: u.wokeFor, since: u.since };
     // (What the kernel sent, kept beside the picture for a mock seat's brain run detached on the Rust world: rust-world.ts.)
     if (u.llm) (obs as any)[RAW] = raw;
     // (A seat's roster of its own staff, and what a draft's preview may say of it: read from what it is shown.)

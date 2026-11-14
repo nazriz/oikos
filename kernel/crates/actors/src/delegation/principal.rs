@@ -1031,7 +1031,14 @@ impl State {
                     Why::Granted
                 } else if one.is_some() {
                     let money = |n: i128| money_words(n as i64, &cx.ctx.world);
-                    words.push(format!("By our own figures that matter {} would cost us about {}, against {} as it is, so we keep it as it is.", level.words(), money(c_want), money(c_now)));
+                    // (Where the two figures read the same, they are not set out: two equal sums, nought against nought, read as no reason. Wording
+                    // only, 2026-11-14.)
+                    let (w, n) = (money(c_want), money(c_now));
+                    words.push(if w == n {
+                        format!("By our own figures that matter {} would cost us no less than it does as it is, so we keep it as it is.", level.words())
+                    } else {
+                        format!("By our own figures that matter {} would cost us about {w}, against {n} as it is, so we keep it as it is.", level.words())
+                    });
                     Why::CostsMore
                 } else if wd.granted {
                     let back = if hands_over(level) { vec![] } else { self.take_back(&a, &k) };
@@ -1041,7 +1048,12 @@ impl State {
                     Why::Granted
                 } else {
                     let money = |n: i128| money_words(n as i64, &cx.ctx.world);
-                    words.push(format!("By our own figures {} {} would cost us about {} a month, against {} as they are now, so we keep them as they are.", plural(&named), level.words(), money(c_want), money(c_now)));
+                    let (w, n) = (money(c_want), money(c_now));
+                    words.push(if w == n {
+                        format!("By our own figures {} {} would cost us no less than they do as they are now, so we keep them as they are.", plural(&named), level.words())
+                    } else {
+                        format!("By our own figures {} {} would cost us about {w} a month, against {n} as they are now, so we keep them as they are.", plural(&named), level.words())
+                    });
                     Why::CostsMore
                 }
             };

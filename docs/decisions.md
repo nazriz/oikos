@@ -13421,3 +13421,24 @@ under $10 together at their own limits.
 - **Revisit if:** a request names a blank's value and the rule takes the wrong one (the rule wants the value right
   after the blank's name, and of its type); a seat means a paper written anew while citing its signed copy (it would
   draft again, on the draft form, which the rule leaves alone).
+
+## 2026-11-14 · An assistant's matters shown with what became of each; a refusal's figures that read the same
+
+- **What:** a seat in an assistant's post reads its post's own file once, on arrival, as a successor does (a look at
+  its own reports, which takes no working time, as any look at one's own papers; a search, so the file is still whole
+  to the seat's own first look), and keeps its own confirmed papers after (`participants/src/readers/matters.ts`, both
+  seat hosts). Each matter still open is set out with where it stands ("signed off on day 23 (rec.…); not yet sent",
+  "your draft went for sign-off on day 41; no answer yet", "no draft yet"; a client's paper of the matter's kind sent
+  back to the post after it was signed off, and an authority recorded for that client since, are said with it; a
+  sign-off made before the seat took the post with nothing seen of it since is said to be that, not "not yet sent");
+  those finished before it took the post (reported on, advised on where advice was asked, or declined and done by
+  whom it was for) leave its matters list, sign-offs with them, and are one line:
+  "N matters were finished before you took this post; they are in your file." The resolver still knows them.
+- **Why:** at the fork every matter its predecessor had finished looked open (the reports that closed them are in the
+  on-request file), and the baseline's seats sent 55 papers long since sent; the run counts what seats ask for.
+- **What moves:** only seated towns (a look made by a model seat; code towns make none). No channel, no kernel change.
+- **A refusal's wording:** where a principal's two figures print the same ("about $0.00, against $0.00"), they are not
+  set out: "would cost us no less than it does as it is, so we keep it as it is". A wording change only (the decision,
+  its `why`, parts and inputs are as before); a code town's scope answers change in that one case and nothing else.
+- **Revisit if:** a matter is closed by something other than a report or a decline (then the reader learns that paper);
+  a seat's own report is refused by the world (it is counted as made when confirmed).

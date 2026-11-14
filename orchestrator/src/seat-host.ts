@@ -12,7 +12,7 @@
 // when what it did will be done (read from the fork's log as the harness passes it on: `see`).
 
 import { appendFileSync } from "node:fs";
-import { calls, forms, inCalendar, inCurrency, modules, Randomness, View, type DayBook, type Observation, type ParticipantAction, type ParticipantContext, type Roster, type Tally } from "@oikos/participants";
+import { calls, forms, inCalendar, inCurrency, modules, Randomness, View, type DayBook, type Matters, type Observation, type ParticipantAction, type ParticipantContext, type Roster, type Tally } from "@oikos/participants";
 import {
   applyFraming, createLlmParticipant, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, reserveOrRefuse, seatsEndNeedMicroUsd, LLM_PARTICIPANT_VERSION, MOCK_VERSION, mockPolicies, MockAdapter, ModelCallFailed, ModelUnreachable,
   SpendingLimitReached, stepsOf, UsageLimitReached, type Budget, type DebriefInput, type FramingSpec, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price,
@@ -96,6 +96,9 @@ export class ModelSeat {
   private readonly roster?: Roster;
   private readonly tally?: Tally;
   private readonly dayBook: DayBook;
+  /** An assistant's matters, each with where it stands (readers/matters.ts); and whether its file has been read. */
+  private readonly matters?: Matters;
+  private fileRead = false;
   private readonly currency: any;
   private readonly calendar: any;
   private readonly confirm: "always" | "consequential" | "never";
@@ -138,6 +141,7 @@ export class ModelSeat {
     this.roster = made.roster;
     this.tally = made.tally;
     this.dayBook = made.dayBook;
+    this.matters = made.matters;
     this.view = new View(new Set(made.standingIds));
     this.onRequest = new Set(made.config.onRequest ?? []);
     this.ctx = ctxFor(o.seat, made.office?.id ?? "self", made.entity, {});
@@ -251,12 +255,17 @@ export class ModelSeat {
       // channels are handed over whole once it has some. Until 2026-11-08 it sat once with nothing, and was then shown
       // only what was new: a system delivered during a fork never saw its forms.)
       if (!Object.keys(raw.channels ?? {}).length) return { action: { type: "wait" } };
+      // (An assistant's seat reads its post's own file on arrival, as a successor does, before anything else: a look, which
+      // takes no time, as any look at its own papers; a search, which leaves the file as if never looked at. Its answer
+      // comes with the next wake, at once, and the hand-over is made then. readers/matters.ts, 2026-11-14.)
+      if (this.matters?.toRead && !this.fileRead) { this.fileRead = true; return { action: { type: "look", looks: this.matters.read() } }; }
       this.handedOver = true;
     }
     // (What a model seat was shown is recorded in full: training data, as in every pilot.)
     this.o.world.annotate({ annotation: "observation", subject: this.o.seat, data: { t: w.t, observation: { ...raw, channels: Object.entries(raw.channels ?? {}).map(([path, c]) => ({ path, ...(c as object) })) } } });
     for (let turn = 0; turn < TURNS_PER_WAKE; turn++) {
       this.knowledge.absorb(raw);
+      if (this.matters) raw = this.matters.absorb(raw);
       const obs: Observation = { ...this.view.apply(raw), woke_for: w.woke_for as Observation["woke_for"], since: w.since };
       (obs as any)[RAW] = turn === 0 ? sent : raw;
       this.tally?.absorb(obs);
@@ -373,6 +382,7 @@ export class ModelSeat {
     this.o.world.annotate({ annotation: "signoff", participant: this.o.seat, draft: d.id, draft_hash: p.hash, decision, ...(note ? { note } : {}) });
     this.arranged?.signed(d.id, decision);
     if (decision !== "accept") return undefined;
+    this.matters?.own(d.blocks as any[], this.t);
     if (this.o.brain && this.o.adapter.provider === "mock" && /form=scope_request\b/.test(d.proposal ?? "")) this.scripted++;
     let by: string[] | undefined;
     if (d.call) try { by = this.performers(calls.parseProgram(d.call)).by; } catch { /* (a call that does not read names no one) */ }
