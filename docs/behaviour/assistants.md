@@ -669,6 +669,23 @@ a claim for support: a day of the least payment), the principal counts how long 
 weighs a request for a higher level, or for one matter alone, with that wait at that cost. A matter granted alone gets a
 remit of its own (`Remit.only`); every other matter of the kind stays as it was.
 
+**The wait it can see (2026-11-14; docs/design/stakes.md, A2).** The wait is the client's own record of its matters of
+that kind with this assistant: from each hand-over to its own sign-off or go-ahead (since D1a, a person signs at their
+sittings, so a weekly sitter's matters wait days), averaged over the matters it has answered and those of the kind
+still waiting on it now (each has waited since its hand-over: its own records); a kind it has a matter of in hand is
+weighed as at least that many a month (a person's one claim in a year is still the claim before it). It is costed at its own
+figure for a day's delay, `late_cost_day`, which is nothing where the town's support law pays a granted claim from the
+first claim (`date_of_effect: first_claim`: the generator gives no figure), so there the wait moves nothing. A request
+to go ahead waits on the same answer as a draft, so a wait never makes `approve` the gain; `alone` escapes it, and is
+weighed like any level the service offers (the grants reader screens every level above the one held, `alone` with the
+rest). Against it, the slips it expects at the level asked (the offer's claim, moved by what it has seen) at its own
+cost of an error. A client that has waited long and lost by it says yes; one that has not, or whose delay costs it
+nothing, says no. Either answer says the wait in its words where there is one ("Our benefit claims have waited on our
+own answers about 6.5 days each, from handing them over (4 so far), and each day's wait costs us $57.85."), and types
+its figures on the answer (`reasons[].figures`: the two costs a month, matters a month, slips, the wait in thousandths
+of a day and how many, the day's cost, the hurdle) for the episode reader. Basis: docs/design/obstacles.md section 10
+(Aghion and Tirole 1997, formal and real authority). Risk MT-32 (the slip rates and the error cost are placeholders).
+
 ## Leaves out (for now)
 
 - A local provider (a firm of the town with premises): providers are the outside world's until a profile asks for one.

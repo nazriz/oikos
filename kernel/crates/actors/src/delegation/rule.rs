@@ -297,6 +297,11 @@ mod tests {
         assert!(cost_waiting(Level::Draft, &dear, 500, &w(), 0) < cost_waiting(Level::Alone, &dear, 500, &w(), 0), "no wait: the draft");
         assert!(cost_waiting(Level::Draft, &dear, 500, &w(), waited.wait_milli_days()) > cost_waiting(Level::Alone, &dear, 500, &w(), waited.wait_milli_days()), "two days' wait a matter: alone");
         assert_eq!(cost_waiting(Level::Draft, &k(10, 50_000), 500, &w(), 2_000), cost(Level::Draft, &k(10, 50_000), 500, &w()), "a delay nobody costs moves nothing");
+        // (A request to go ahead waits on the same answer as a draft: a wait never makes `approve` the gain, only `alone`,
+        // which escapes it. Stakes A2: the request a principal can sensibly grant is for `alone`.)
+        let gain = |l: Level, wait: i64| cost_waiting(Level::Draft, &dear, 500, &w(), wait) - cost_waiting(l, &dear, 500, &w(), wait);
+        assert_eq!(gain(Level::Approve, 2_000), gain(Level::Approve, 0), "approve: the wait costs the same either way");
+        assert!(gain(Level::Alone, 2_000) > gain(Level::Alone, 0), "alone: the longer the wait, the more it saves");
     }
 
     #[test]

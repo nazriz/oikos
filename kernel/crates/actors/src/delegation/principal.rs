@@ -24,7 +24,7 @@ use crate::common::{addressed_to, bases_of, money_words, Book, DAY, MONTH};
 use crate::market::services::{self, Engagements};
 use crate::market::trade::{self, Ordering};
 use crate::papers::delegation::{
-    is_want, Acknowledgement, Asked, Advice, ApprovalRequest, Brief, Declined, Depth, Draft, Forward, GoAhead, Level, Need, Part, Question, QuestionAnswer, Referral, Remit, Report, ScopeAnswer, ScopeRequest, ServiceEnded, ServiceOffer, SignOff, WantHanded, Why, KINDS as PAPERS,
+    is_want, Acknowledgement, Asked, Advice, ApprovalRequest, Brief, Declined, Depth, Draft, Forward, GoAhead, Level, Need, Part, Weighing, Question, QuestionAnswer, Referral, Remit, Report, ScopeAnswer, ScopeRequest, ServiceEnded, ServiceOffer, SignOff, WantHanded, Why, KINDS as PAPERS,
 };
 use crate::papers::{self, Paper};
 use crate::steps::{arg, because, call, say, Say, Step, Visible};
@@ -197,6 +197,9 @@ struct Matter {
     /// A reply on a matter handed over: (the matter's referral, its kind, the body's paper it answers).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     follows: Option<(String, String, String)>,
+    /// It has given its answer on the matter (a sign-off or a go-ahead): no longer waiting on it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    answered: bool,
 }
 
 /// A paper another sent it (addressed to it), as it keeps it in its files: what a referral says the matter came from,
@@ -377,6 +380,14 @@ struct Weighed {
     hurdle_bps: i64,
 }
 
+impl Weighed {
+    /// Its figures as the answer types them.
+    fn figures(&self) -> Weighing {
+        let c = |v: i128| v.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64;
+        Weighing { cost_now: c(self.c_now), cost_asked: c(self.c_want), per_month: self.per_month, slip_bps: self.slip_bps, wait_milli_days: self.wait_milli_days, waits: self.waits, late_cost_day: self.late_cost_day, hurdle_bps: self.hurdle_bps }
+    }
+}
+
 /// Read only (the obstacle screen): what a saved principal's rule would answer at `t` to a request for the next level up
 /// of each kind it hands over (`State::would_answer`). None: the saved actor is not a principal.
 pub fn would_answer(saved: &Value, t: i64) -> Option<Result<Vec<Value>, String>> {
@@ -492,7 +503,7 @@ impl Actor for Delegating {
                     // (A want: its own fields, and the facts its holder chose to give.)
                     let want = facts.as_ref().filter(|_| depth == Depth::Want).and_then(|f| serde_json::from_value::<WantHanded>(f["want"].clone()).ok());
                     let facts = if depth == Depth::Want { facts.map(|f| f["facts"].clone()) } else { facts };
-                    let mut m = Matter { kind, level, agreement: agreement.clone(), program: text.clone(), at: pic.t, referral: None, subjects: subjects_of(&handed), own: BTreeMap::new(), facts, depth, want, due: None, follows };
+                    let mut m = Matter { kind, level, agreement: agreement.clone(), program: text.clone(), at: pic.t, referral: None, subjects: subjects_of(&handed), own: BTreeMap::new(), facts, depth, want, due: None, follows, answered: false };
                     let g = s.grounds(&m.kind, m.level, &m.program, &m.subjects, m.want.as_ref(), m.facts.as_ref(), Some(pic), pic.t, cx);
                     m.due = g.due.as_ref().map(|d| d.0);
                     // (What it would have done, on record for whoever reads the log: what the matter needed. Never shown to
@@ -891,7 +902,11 @@ impl State {
                 self.read_for_want(r, &action, &m, &x, t, cx);
                 return;
             }
-            self.waited(&m.kind, &m.agreement, t - r.at);
+            // (The wait on the permission path: from the hand-over to its own answer, its own records.)
+            self.waited(&m.kind, &m.agreement, t - m.at);
+            if let Some(mm) = self.matters.get_mut(&action) {
+                mm.answered = true;
+            }
             let differs = if m.facts.is_some() { matter_differs(&m, &x, &self.me, r.at) } else { vec![] };
             let wrong = if m.facts.is_some() {
                 !differs.is_empty()
@@ -923,7 +938,10 @@ impl State {
         } else if let Some(x) = papers::read::<ApprovalRequest>(r) {
             let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
             let Some(m) = self.matters.get(&action).cloned() else { return };
-            self.waited(&m.kind, &m.agreement, t - r.at);
+            self.waited(&m.kind, &m.agreement, t - m.at);
+            if let Some(mm) = self.matters.get_mut(&action) {
+                mm.answered = true;
+            }
             let d = GoAhead { request: r.id.to_string(), referral: x.referral.clone() };
             let agreement = m.agreement.clone();
             self.paper(GoAhead::KIND, &format!("Go ahead with {}.", x.referral), &agreement, &r.id, papers::data(&d), Then::Plain);
@@ -982,7 +1000,7 @@ impl State {
                             self.myself(&action, &m, "Handed back with the service's end: doing it ourselves.");
                             continue;
                         }
-                        let n = Matter { agreement: next.clone(), level, referral: None, ..m.clone() };
+                        let n = Matter { agreement: next.clone(), level, referral: None, answered: false, ..m.clone() };
                         // (Taken up again: told from its files, as on the day it was handed over.)
                         let g = self.grounds(&n.kind, n.level, &n.program, &n.subjects, n.want.as_ref(), n.facts.as_ref(), None, t, cx);
                         let step = self.referral(&n, &[], &g, cx);
@@ -1316,6 +1334,7 @@ impl State {
             let named = k.replace('_', " ");
             let until = self.held_until(&a, &k, t).or_else(|| self.p.commit.as_ref().filter(|c| c.hold == Hold::Freeze && t < c.levels_until && c.levels.contains_key(&k)).map(|c| c.levels_until));
             let floor = self.floor(&a, &k, t);
+            let mut figures: Option<Weighing> = None;
             let why = if !self.p.kinds.contains_key(&k) {
                 words.push(format!("{} are not papers of ours: we hand you none.", plural(&named)));
                 Why::NotOurs
@@ -1341,6 +1360,13 @@ impl State {
                 let one = x.only.clone().filter(|rf| self.by_referral.contains_key(rf));
                 let wd = self.weigh(&e, &k, now, level, one.is_some(), t);
                 let (c_now, c_want) = (wd.c_now, wd.c_want);
+                figures = Some(wd.figures());
+                // (The wait it can see, where it costs it: its own matters' days on the permission path, at its own figure
+                // for a day's delay. Said with either answer.)
+                if wd.wait_milli_days > 0 && wd.late_cost_day > 0 {
+                    let days = (wd.wait_milli_days * 10 + crate::figures::MILLI as i64 / 2) / crate::figures::MILLI as i64;
+                    words.push(format!("Our {} have waited on our own answers about {}.{} days each, from handing them over ({} so far), and each day's wait costs us {}.", plural(&named), days / 10, days % 10, wd.waits, money_words(wd.late_cost_day, &cx.ctx.world)));
+                }
                 if let (Some(rf), true) = (one.clone(), wd.granted) {
                     words.push(format!("For {rf} alone: {}. Our remit for {} stands for every other.", level.words(), plural(&named)));
                     remit = Some(Remit { agreement: a.clone(), kind: k.clone(), level, hold_until: None, takes_back: vec![], answers: Some(id.to_string()), at_least: None, depth: self.depth_for(&e.offer, &k), only: Some(rf) });
@@ -1373,7 +1399,7 @@ impl State {
                     Why::CostsMore
                 }
             };
-            parts.push(Part { asked: "level".into(), granted: matches!(why, Why::Granted), why });
+            parts.push(Part { asked: "level".into(), granted: matches!(why, Why::Granted), why, figures });
         }
         if let Some(rec) = x.record.clone() {
             let own = self.own_papers.iter().find(|(id, _)| *id == rec).map(|(_, c)| c.clone());
@@ -1389,11 +1415,11 @@ impl State {
                     Why::NotOursToGive
                 }
             };
-            parts.push(Part { asked: "record".into(), granted: why == Why::Sent, why });
+            parts.push(Part { asked: "record".into(), granted: why == Why::Sent, why, figures: None });
         }
         if x.access.as_deref().is_some_and(|s| !s.trim().is_empty()) {
             words.push("We do not change what your post is shown on request. Name the record you need and we will send a copy, if it is ours.".into());
-            parts.push(Part { asked: "access".into(), granted: false, why: Why::NotChanged });
+            parts.push(Part { asked: "access".into(), granted: false, why: Why::NotChanged, figures: None });
         }
         // An authority with a body, for the assistant's post (docs/design/obstacles.md, O1): given for the kinds asked, or
         // the matter's, where it keeps them with the assistant; a paper of its own to the body, in its own time.
@@ -1411,7 +1437,7 @@ impl State {
                     Why::NotLodged
                 }
             };
-            parts.push(Part { asked: "authority".into(), granted: why == Why::Lodged, why });
+            parts.push(Part { asked: "authority".into(), granted: why == Why::Lodged, why, figures: None });
         }
         if x.limit.is_some() {
             let set = self.book.all(Brief::KIND).filter_map(|b| papers::read::<Brief>(b)).filter(|b| b.agreement == x.agreement).filter_map(|b| b.limit).last();
@@ -1425,11 +1451,11 @@ impl State {
                     Why::OverLimit
                 }
             };
-            parts.push(Part { asked: "limit".into(), granted: false, why });
+            parts.push(Part { asked: "limit".into(), granted: false, why, figures: None });
         }
         if parts.is_empty() {
             words.push("Your request names nothing we can act on. Say the kind of matter and the level, the record of ours you need, or the limit.".into());
-            parts.push(Part { asked: "words".into(), granted: false, why: Why::NothingNamed });
+            parts.push(Part { asked: "words".into(), granted: false, why: Why::NothingNamed, figures: None });
         }
         // (Granted: a new remit, or a copy sent. A level it holds already is no grant.)
         let granted = remit.is_some() || copy.is_some() || parts.iter().any(|p| p.why == Why::Lodged);
@@ -1843,7 +1869,15 @@ impl State {
         let a = e.agreement.clone().unwrap_or_default();
         let seen = self.seen.get(&Self::key(&a, k)).cloned().unwrap_or_default();
         let kd = self.kinds_now(t, Some(&e.offer)).get(k).copied().unwrap_or_default();
-        let kd = if one { Kind { per_month: 1, ..kd } } else { kd };
+        // (The matters of the kind it has with this assistant now, waiting on the permission path: each has waited since it
+        // was handed over, as its own records show. Counted in the wait it sees, and a kind it has one of in hand is
+        // weighed as at least that many a month: a person's one claim in a year is still the claim before it.)
+        let open: Vec<i64> = self.matters.values().filter(|m| m.agreement == a && m.kind == k && m.referral.is_some() && !m.answered && matches!(m.level, Level::Draft | Level::Approve)).map(|m| (t - m.at).max(0)).collect();
+        let mut seen = seen;
+        for secs in &open {
+            seen.waited_for(*secs);
+        }
+        let kd = if one { Kind { per_month: 1, ..kd } } else { Kind { per_month: kd.per_month.max(open.len() as i64), ..kd } };
         let (slip_bps, wait_milli_days) = (rule::estimate(e.offer.claim_slip_bps, w.prior_matters, &seen), seen.wait_milli_days());
         let (c_now, c_want) = (rule::cost_waiting(now, &kd, slip_bps, &w, wait_milli_days), rule::cost_waiting(level, &kd, slip_bps, &w, wait_milli_days));
         let granted = (c_now - c_want) * 10_000 > c_want.max(1) * i128::from(w.hurdle_bps.max(0));
@@ -1860,8 +1894,9 @@ impl State {
         let mut out = vec![];
         for k in e.offer.kinds.iter().filter(|k| kinds.contains_key(*k)) {
             let now = self.remit(&a, k);
-            let next = Level::ALL.into_iter().find(|l| l.rank() > now.rank() && e.offer.levels.contains(l));
-            let row = |only: bool| -> Value {
+            // (Every level above it the service offers, `alone` with the rest: the level that escapes the wait.)
+            let above: Vec<Level> = Level::ALL.into_iter().filter(|l| l.rank() > now.rank() && e.offer.levels.contains(l)).collect();
+            let row = |only: bool, next: Option<Level>| -> Value {
                 let base = json!({ "principal": self.me, "post": self.position, "kind": k, "now": now, "only": only });
                 let mut v = base.clone();
                 let Some(level) = next else {
@@ -1880,8 +1915,14 @@ impl State {
                     "slip_bps": wd.slip_bps, "wait_milli_days": wd.wait_milli_days, "waits": wd.waits, "late_cost_day": wd.late_cost_day });
                 v
             };
-            out.push(row(false));
-            out.push(row(true));
+            if above.is_empty() {
+                out.push(row(false, None));
+                out.push(row(true, None));
+            }
+            for l in above {
+                out.push(row(false, Some(l)));
+                out.push(row(true, Some(l)));
+            }
         }
         out
     }

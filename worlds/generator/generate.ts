@@ -3375,7 +3375,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // for any other kind, nothing is costed (no figure says what a day's delay of it costs).)
   const dayOf = (r: PaymentRule): number => { const a = r.amount as any; const per = typeof a.flat === "number" ? a.flat : typeof a.household === "number" ? a.household : typeof a.least === "number" ? a.least : 0; return r.every_days > 0 ? Math.floor(per / r.every_days) : 0; };
   const CLAIM_DAY = OB ? Math.min(...PAYMENTS.map(dayOf).filter((x) => x > 0), Number.MAX_SAFE_INTEGER) : 0;
-  const lateCost = (k: string) => (OB && k === "benefit_claim" && CLAIM_DAY < Number.MAX_SAFE_INTEGER ? { late_cost_day: CLAIM_DAY } : {});
+  // (Where the law pays a granted claim from the first claim, a day's wait costs the person nothing: no figure. Stakes A2, S.)
+  const lateCost = (k: string) => (OB && k === "benefit_claim" && CLAIM_DAY < Number.MAX_SAFE_INTEGER && spec.support_date_of_effect !== "first_claim" ? { late_cost_day: CLAIM_DAY } : {});
   const personDelegation = PERSONS.length && AS ? { delegation: { hour_value: Math.round((PS.wage_per_pay_period * 7 * HOUR) / ((PAY / DAY) * V.ordinary_hours_per_week * HOUR)),
     kinds: Object.fromEntries([...new Set(PERSONS)].sort().map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost, compose_seconds: composeOf(k), ...lateCost(k) }])),
     seconds: { referral: DELEGATION_TIME.person["publish/referral"], sign_off: DELEGATION_TIME.person["publish/sign_off"], go_ahead: DELEGATION_TIME.person["publish/go_ahead"] },

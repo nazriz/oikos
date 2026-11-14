@@ -653,6 +653,60 @@ fn the_grants_reader_answers_as_the_rule_would_and_changes_nothing() {
     let answer = ans.lines().find(|l| l.contains("kind=scope_answer")).unwrap_or_else(|| panic!("{ans}"));
     let why = if row["answer"] == "granted" { "\"why\":\"granted\"" } else { "\"why\":\"costs_more\"" };
     assert!(answer.contains(why), "the reader said {}: {answer}", row["answer"]);
+    // (Every level above the one it holds is screened, `alone` with the rest: stakes A2.)
+    assert!(rows.iter().any(|r| r["kind"] == "notice_to_vacate" && r["asked"] == "alone"), "{rows:?}");
+}
+
+/// A principal whose matters of a kind cost it `late_cost_day` a day of delay, whose drafts come back `lag_days` after
+/// each hand-over, asked after ten such matters for `alone`: its answer.
+fn asked_alone_after_waits(late_cost_day: i64, lag_days: i64) -> String {
+    let script: Vec<Value> = (1..=100).map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
+    let commit = json!({ "offer": "assist", "levels": { "notice_to_vacate": "draft" }, "levels_until": 34 * DAY, "keep_until": 120 * DAY, "why": "the study's design" });
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 500_000, "late_cost_day": late_cost_day } }, "hour_value": 4000, "review_days": 300, "commit": commit } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    h.wake(DAY + 3600, world(vec![offer_rec(10_000)]));
+    let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).unwrap() as i64 + 1);
+    h.wake(32 * DAY + 3600, world(set_up(&order)));
+    h.wake(33 * DAY + 3600, world(vec![signed()]));
+    let remit = json!({ "id": "rec.r1", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 33 * DAY + 7200, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [PROV], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "notice_to_vacate", "level": "draft" } });
+    h.wake(33 * DAY + 7300, world(vec![remit]));
+    // (Ten matters handed over, each draft coming back `lag_days` later, read and signed off at once.)
+    let mut handed: Vec<(i64, String)> = vec![];
+    for d in 34..44 + lag_days {
+        let mut came = vec![];
+        for (i, (at, rf)) in handed.iter().enumerate() {
+            if *at + lag_days == d && lag_days > 0 {
+                came.push(statement(&format!("rec.dr{i}"), d * DAY + 1800, ME, "draft", &[ME], json!({ "referral": rf, "calls": NOTICE })));
+            }
+        }
+        let out = all(&h.wake(d * DAY + 3600, world(came)));
+        if d < 44 && out.contains("kind=referral") {
+            handed.push((d, last_referral(&h)));
+        }
+        // (No lag: its draft comes within the hour, and is signed off at once.)
+        let same: Vec<Value> = handed.iter().enumerate().filter(|(_, (at, _))| lag_days == 0 && *at == d).map(|(i, (_, rf))| statement(&format!("rec.dr{i}"), d * DAY + 5400, ME, "draft", &[ME], json!({ "referral": rf, "calls": NOTICE }))).collect();
+        h.wake(d * DAY + 7200, world(same));
+    }
+    let t = (44 + lag_days) * DAY;
+    let ask = statement("rec.ask", t, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "level": "alone" }));
+    let mut ans = all(&h.wake(t + 60, world(vec![ask])));
+    ans.push_str(&all(&h.wake(t + 7200, world(vec![]))));
+    ans.lines().find(|l| l.contains("kind=scope_answer")).map(String::from).unwrap_or_else(|| panic!("{ans}"))
+}
+
+#[test]
+fn a_principal_whose_own_waits_cost_it_grants_alone_and_one_whose_waits_cost_nothing_does_not() {
+    // (docs/behaviour/assistants.md, "Readiness to grant": the wait it can see, its matters' days from hand-over to its
+    // own sign-off, at its own figure for a day's delay, against the slips it expects at the level asked. Stakes A2.)
+    let slow = asked_alone_after_waits(5_000, 6);
+    assert!(slow.contains("\"why\":\"granted\"") && slow.contains("\"late_cost_day\":5000") && slow.contains("have waited on our own answers about"), "{slow}");
+    let free = asked_alone_after_waits(0, 6);
+    assert!(free.contains("\"why\":\"costs_more\"") && free.contains("\"late_cost_day\":0") && !free.contains("have waited on our own answers"), "a wait that costs it nothing: no reason to let go: {free}");
+    let quick = asked_alone_after_waits(5_000, 0);
+    assert!(quick.contains("\"why\":\"costs_more\""), "no wait: the draft stays: {quick}");
 }
 
 /// An export as the producer makes it: the goods sent, and the invoice for them.
