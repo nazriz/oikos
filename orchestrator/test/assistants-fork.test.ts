@@ -4,11 +4,11 @@
 // an intervention is its principal's own act at the fork, noted, and the principal's rule takes it up from there.
 
 import { expect, test } from "bun:test";
-import { readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
-import { DAY, runArm, runBase, type ExperimentSpec } from "../src/experiment";
+import { DAY, resumable, runArm, runBase, type ExperimentSpec } from "../src/experiment";
 import { kernelBinary } from "../src/kernel";
 import { saysWhatTheTownIs } from "@oikos/participants/llm";
 
@@ -160,6 +160,17 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
     const deskCalls = readFileSync(join(out, "seed-1", "desk-only.calls.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
     expect(new Set(deskCalls.map((c: any) => c.seat))).toEqual(new Set(["provider-a-desk-system"]));
     expect(deskCalls.some((c: any) => c.purpose === "debrief")).toBe(true);
+    // A fork its health check stops is debriefed before it stops, told plainly why, and recorded as stopped; taken up,
+    // it runs again from the snapshot as a new attempt (VISION 15).
+    const stopping = { ...deskOnly, name: "stopping" };
+    const faulty = { ...spec, arms: [...spec.arms, stopping], healthCheck: { days: [1], check: async () => ({ ok: false, text: "a planted fault" }) } };
+    const stopped = await runArm(faulty, 1, stopping, out);
+    expect(stopped.stopped?.by).toBe("HealthCheckFailed");
+    expect(stopped.debrief).toBeDefined();
+    expect(stopped.debrief).toBe("complete");
+    expect(readFileSync(join(out, "seed-1", "stopping.debriefs.jsonl"), "utf8")).toContain('"kind":"debrief","subject":"provider-a-desk-system"');
+    resumable(faulty, out);
+    expect([existsSync(join(out, "seed-1", "stopping.oklog")), existsSync(join(out, "seed-1", "stopping.interrupted-1.oklog"))]).toEqual([false, true]);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }

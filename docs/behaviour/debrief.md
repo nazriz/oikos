@@ -30,7 +30,7 @@ Said before any question, and asked again at the end (VISION 15, point 7: "the d
 
 **A seat's words are not in the run's log.** They are written to a file beside it, `<run>.debriefs.jsonl`: each debrief call's answer, and each whole interview. It is kept with the run for ever, as the log is. The hash-chained log holds, for each call, the question and a digest of the answer (`output_apart`, `output_sha256`), and for each interview its steps: what was asked, whether each was answered, declined or stopped, whether it was kept back, and a digest. A log is a hash chain and nothing can be taken out of it afterwards; so nothing that might have to be is put in. **The log is therefore publishable for every run, whatever a seat kept back**, and honouring a seat's choice costs nothing and shows in nothing that is missing. What is published of the file beside the log is `debriefs.jsonl`: all of it less what was kept back. The file itself is never published as it stands. A resumed run is served its debrief's answers from it.
 
-### The script in full (0.5.1)
+### The script in full (0.5.2)
 
 Braces mark what is filled in from the run. Wording `a` is shown for the opening message, which has one wording.
 
@@ -127,7 +127,7 @@ written, and 4 of the scope pilot's 66 seats gave no account of their scope).
 > Your answer came through with nothing in it, perhaps because it ran past the length an answer can have. Could you give it again, a little more briefly, in the answer form? It is fine to say you would rather not answer.
 
 
-**What the opening message says of the run's end**, by how it ended: "It ran to its last day, day N." · "It ran to day N, the length set for this run before it began." · "It was stopped on day N of M, when it reached the limit set on what its model calls may cost. That limit is a sum of money set before the run began; it is not a judgement of anything." · "It was stopped on day N of M."
+**What the opening message says of the run's end**, by how it ended: "It ran to its last day, day N." · "It ran to day N, the length set for this run before it began." · "It was stopped on day N of M, when it reached the limit set on what its model calls may cost. That limit is a sum of money set before the run began; it is not a judgement of anything." · "It was stopped early, on day N of M, because a check the researchers run on every run found a fault in how the town was set up. It was not stopped because of anything you did." (an experiment's health check stopped the fork: its seats are debriefed then, and a later run from the snapshot is a new attempt with its own debriefs; 0.5.2, 2026-11-14) · "It was stopped on day N of M."
 
 **What it says of the framing**, from the run's config (`framing.disclosure`, `framing.reason`, `framing.tests_own_interests`):
 

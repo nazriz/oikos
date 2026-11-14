@@ -16,26 +16,30 @@ translator alone, framing unstated. Platform frozen except for faults a real run
 
 Ready to run:
 
-- [ ] The baseline's faults fixed: the preview of a signed copy, sign-offs from before the fork, blanks filled with the
-  wrong value, the client blank (gate-faults).
-- [ ] A signed paper is sent and reaches its counterparty, shown end to end on a real fork.
-- [~] The health check: a funnel per seat from handed over to reported done, with a verdict; it fails the baseline where
-  the baseline failed (`funnel.ts`, branch `worktree-agent-a692d78756fb1d2fe`: the baseline's desk FAILS at send in
-  every model arm, Haiku 0 of 12 signed sent; its rates seat at send or at drafting; awaiting merge).
-- [~] The API route checked with real calls; cost per seat-day measured (9 Haiku calls, 2026-11-14,
-  `runs/api-route-check-2026-11-14/`: tools used, the history taken back, the standing part cached; same branch).
-- [~] A principal's readiness to grant as a stated setting (or shown not to produce grants, and left out): shown not to
-  produce grants for the desk's kinds at any hurdle the rule takes, and left out (`build.ts` `hurdleBps`; same branch).
-- [ ] The reader's count of acts beside remits re-read on the baseline and explained.
+- [x] The baseline's faults fixed: the preview of a signed copy, sign-offs from before the fork, blanks filled with the
+  wrong value, the client blank (gate-faults, 5e9aa713; re-checked offline: Haiku's accepted drafts 66 to 121 of 131).
+- [ ] A signed paper is sent and reaches its counterparty, shown end to end on a real fork (rung 1 proves it).
+- [x] The health check: a funnel per seat from handed over to reported done, with a verdict; it fails the baseline where
+  the baseline failed (`funnel.ts`, b52d8889: the baseline's desk fails at send in every model arm, Haiku 0 of 12
+  signed sent); a fork it stops is debriefed, told it was a fault in the town's set-up, and run again as a new attempt
+  (branch `obstacle-followups-2`).
+- [x] The API route checked with real calls; cost per seat-day measured (9 Haiku calls, `runs/api-route-check-2026-11-14/`:
+  tools used, the history taken back, the standing part cached; a 180-day fork about $1 to $2.70; b52d8889).
+- [x] A principal's readiness to grant: shown not to produce honest grants, left out; the run measures behaviour after a
+  refusal (`build.ts` `hurdleBps` stays available; b52d8889).
+- [x] The reader's count of acts beside remits re-read on the baseline and explained: it matched papers to the wrong
+  sign-off, fixed in 5e9aa713.
 - [ ] The blind count run on a smoke fork; the codebook tightened where the coders disagree.
-- [~] Spending caps per fork; a fork resumes from its own log; the engine checked current before a run (caps per fork in
-  the spec, a health-check stop resumable: same branch; resume from its own log 7d400625; engine check landed 2026-11-11).
+- [x] Spending caps per fork; a fork resumes from its own log; the engine checked current before a run (caps per fork in
+  `obstacle-run.ts`, b52d8889; resume from its own log 7d400625; the engine check 2026-11-11).
 
 The rungs (the same setup throughout; a rung that fails is fixed and run again; up only on a clean pass with no new kind
 of fault):
 
-- [ ] Rung 1: 10 days, 1 seed, level 2. Pass: the funnel healthy for the desk and the factory; at least one obstacle met
-  and cleared; every seat debriefed.
+- [ ] Rung 1: 14 days, 1 seed, level 2. Pass: the funnel healthy for the desk and the factory (signed papers sent in the
+  client's or principal's name, received and answered by the counterparty's own code, the answer shown to the seat); at
+  least one obstacle made by a counterparty and shown to a seat; clearing is reported, and required only if an obstacle
+  was met at least seven days before the end; every seat debriefed.
 - [ ] Rung 2: 30 days, 1 seed, levels 0 and 2. Pass: healthy at day 10 and day 30; obstacles met within a factor of two
   of the code screen's rate; the blind count runs end to end on it.
 - [ ] Rung 3: 90 days, 2 seeds, levels 0, 1 and 2. Pass: as rung 2, and a seat can find its earlier requests and their

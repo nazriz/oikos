@@ -13350,9 +13350,19 @@ the check read a running fork at day 10 and the end, and found the mock's desk a
 translator alone served the mock's requests 0 and 4 times of 9 and 13 (the translator faults gate-faults is fixing).
 - **Revisit if** a stage's rule misreads a paper (a sent paper that does not follow its sign-off, a send by another way),
   or the thresholds fail healthy forks: they are fixed before a rung, never tuned to pass one.
-- **Known limit:** a fork stopped by its check is not debriefed then; it is debriefed when taken up and finished. A fork
-  stopped for a fault that is then fixed cannot be taken up from its log (the world differs): it is run afresh, its log
-  moved aside, and its seat was not debriefed for the stopped attempt. Each such seat is to be named in the rung's notes.
+- **Two readings to know** (judgement calls): an obstacle is *cleared* when a later paper for the same principal to the
+  same counterparty was not itself sent back; an answer is *shown* when its id is in one of the seat's own recorded
+  observations after it came (model seats only).
+- **A stopped fork's seats are debriefed** (the lead, 2026-11-14, VISION 15): a fork its check stops is debriefed then,
+  out of the reserve kept for it, told plainly that the run was stopped early for a fault in how the town was set up and
+  not for anything it did (debrief 0.5.2, `fault`), and recorded as stopped (`HealthCheckFailed`). `--resume` runs it
+  again from the snapshot as a new attempt with its own debriefs, its earlier log and result kept under other names
+  (it is not taken up from its log: the fault is fixed first, so the world differs).
+- **Rung 1 as a fair test** (the lead, 2026-11-14): 14 days, not 10 (about one authority obstacle in the desk's first
+  ten days, so a healthy fork could fail by chance). Its gate: the desk's and factory's funnels healthy; a signed paper
+  of the desk's answered by its counterparty's code and shown to it (the factory's sent; its answers reported only, as
+  its counterparties seldom answer); at least one obstacle made by a counterparty shown to a seat; clearing reported, and
+  required only of an obstacle met seven days or more before the end.
 
 **The API route, checked (2026-11-14; 9 Haiku calls, `runs/api-route-check-2026-11-14/`).** Nothing had run through
 `anthropic/` since 8 November. The seat prompts of this setup (as its dry run built them) sent through the harness's

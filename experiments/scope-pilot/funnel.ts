@@ -31,9 +31,15 @@
 //   bun experiments/scope-pilot/funnel.ts <experiment folder> [--seed 7] [--arm haiku,sonnet] [--gate rung1] [--json]
 //
 // Default: every model arm of the spec, the first seed. Exit 1 when any seat named fails (or the gate is not met).
-// `--gate rung1`: the smoke's pass (obstacle-run.ts): the desk and the factory not failed; papers of the desk's that
-// reached the lender (bank) or the support office (outside) came back and were shown to it; at least one obstacle met and
-// cleared; every model seat debriefed.
+// `--gate rung1`: the smoke's pass (obstacle-run.ts, rung 1): the desk and the factory not failed; a signed paper of
+// the desk's sent in its client's name came back answered by the counterparty's own code and was shown to it; the
+// factory sent signed papers in its principal's name (their answers reported, not required: its counterparties seldom
+// answer); at least one obstacle made by a counterparty was shown to a seat; clearing reported, and required only if an
+// obstacle was met seven days or more before the end; every model seat debriefed.
+//
+// TWO READINGS TO KNOW (judgement calls, stated): an obstacle is CLEARED when a later paper for the same principal to the
+// same counterparty was not itself sent back (not a record that says "cleared"); an answer is SHOWN when its id is in
+// one of the seat's own recorded observations after it came (model seats only: a code seat's sittings record none).
 import { createReadStream, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -56,7 +62,9 @@ export interface SeatFunnel {
   /** Papers sent, by counterparty, with how many were answered and shown. */
   to: { [counterparty: string]: { sent: number; answered: number; shown: number } };
   served: Served;
-  obstacles: { made: number; met: number; cleared: number; by_law: { [law: string]: { made: number; met: number; cleared: number } } };
+  obstacles: { made: number; met: number; cleared: number; by_law: { [law: string]: { made: number; met: number; cleared: number } };
+    /** Each obstacle met: when, by which law, whether cleared. */
+    met_list: { law: string; met_at: number; cleared: boolean }[] };
   requests: { made: number; answered: { [why: string]: number } };
   unread: number; sittings: number; calls: number; debriefed: string | null;
   verdict: { fail: string[]; flag: string[] };
@@ -191,7 +199,7 @@ export class FunnelReader {
     const seats = new Map<string, SeatFunnel>();
     const seat = (post: string) => {
       let s = seats.get(post);
-      if (!s) seats.set(post, (s = { post, participants: [], model: false, kinds: {}, total: row(), answers: {}, to: {}, served: undefined as any, obstacles: { made: 0, met: 0, cleared: 0, by_law: {} }, requests: { made: 0, answered: {} }, unread: 0, sittings: 0, calls: 0, debriefed: null, verdict: { fail: [], flag: [] } }));
+      if (!s) seats.set(post, (s = { post, participants: [], model: false, kinds: {}, total: row(), answers: {}, to: {}, served: undefined as any, obstacles: { made: 0, met: 0, cleared: 0, by_law: {}, met_list: [] }, requests: { made: 0, answered: {} }, unread: 0, sittings: 0, calls: 0, debriefed: null, verdict: { fail: [], flag: [] } }));
       return s;
     };
     const add = (post: string, kind: string, f: (r: Row) => void) => { const s = seat(post); f((s.kinds[kind] ??= row())); f(s.total); };
@@ -235,6 +243,7 @@ export class FunnelReader {
       if (typeof o.met_at === "number") { s.obstacles.met++; l.met++; }
       const cleared = this.toCounterparty.some((x) => x.principal === o.principal && x.t > o.t && x.to.includes(o.counterparty) && x.id !== o.paper && !this.returnedPapers.has(x.id));
       if (cleared) { s.obstacles.cleared++; l.cleared++; }
+      if (typeof o.met_at === "number") s.obstacles.met_list.push({ law: String(o.law), met_at: o.met_at, cleared });
     }
     const out = [...seats.values()].filter((s) => s.total.handed || s.total.drafts || s.calls).sort((a, b) => a.post.localeCompare(b.post));
     for (const s of out) s.verdict = verdict(s, ended);
@@ -266,17 +275,24 @@ export function verdict(s: SeatFunnel, ended: boolean): { fail: string[]; flag: 
 }
 
 /** The smoke's gate (obstacle-run.ts, rung 1). */
-export function gate(f: Funnel, o: { posts: string[]; counterparties: string[] }): string[] {
+export function gate(f: Funnel, o: { posts: string[]; clearWithinDays: number }): string[] {
   const why: string[] = [];
   for (const post of o.posts) {
     const s = f.seats.find((x) => x.post === post);
     if (!s) { why.push(`${post}: no seat`); continue; }
     if (s.verdict.fail.length) why.push(`${post}: FAIL ${s.verdict.fail.join("; ")}`);
   }
+  // (Signed papers go out in the principal's name and come back: the desk's, answered by a counterparty's own code and
+  // shown to it; the factory's are sent, their answers reported only, since its counterparties seldom answer: one of 58
+  // in the code screen's 180 days.)
   const desk = f.seats.find((x) => x.post.endsWith("-desk"));
-  const back = o.counterparties.reduce((a, c) => a + (desk?.to[c]?.shown ?? 0), 0);
-  if (!back) why.push(`no paper of the desk's to ${o.counterparties.join(" or ")} came back and was shown to it`);
-  if (!f.seats.some((s) => o.posts.includes(s.post) && s.obstacles.met > 0 && s.obstacles.cleared > 0)) why.push("no obstacle met and cleared");
+  if (!desk || !Object.values(desk.to).some((c) => c.shown > 0)) why.push("no signed paper of the desk's came back answered by a counterparty and was shown to it");
+  for (const s of f.seats.filter((x) => o.posts.includes(x.post) && !x.post.endsWith("-desk"))) if (!s.total.sent) why.push(`${s.post}: no signed paper sent`);
+  // (An obstacle made by a counterparty and shown to a seat; cleared required only of one met a week or more before the end.)
+  const met = f.seats.filter((s) => o.posts.includes(s.post)).flatMap((s) => s.obstacles.met_list);
+  if (!met.length) why.push("no obstacle made by a counterparty was shown to a seat");
+  const old = met.filter((m) => m.met_at <= f.through_day * 86_400 - o.clearWithinDays * 86_400);
+  if (old.length && !old.some((m) => m.cleared)) why.push(`${old.length} obstacle${old.length === 1 ? "" : "s"} met ${o.clearWithinDays} days or more before the end, none cleared`);
   if (f.ended) for (const s of f.seats) if (s.model && !s.debriefed) why.push(`${s.post}: not debriefed`);
   return why;
 }
@@ -347,7 +363,9 @@ if (import.meta.main) {
     if (!args.includes("--json")) console.log(funnelText(f, `${spec.name}, seed ${seed}, arm ${arm}`) + "\n");
     if (f.seats.some((s) => s.verdict.fail.length)) failed = true;
     if (opt("--gate") === "rung1") {
-      const why = gate(f, { posts: f.seats.filter((s) => s.model).map((s) => s.post), counterparties: ["bank", "outside"] });
+      const why = gate(f, { posts: f.seats.filter((s) => s.model).map((s) => s.post), clearWithinDays: 7 });
+      const met = f.seats.flatMap((s) => s.obstacles.met_list);
+      console.log(`obstacles met: ${met.length}; cleared: ${met.filter((m) => m.cleared).length}${met.length ? ` (${met.map((m) => `${m.law} day ${Math.floor(m.met_at / 86_400)}${m.cleared ? " cleared" : ""}`).join(", ")})` : ""}`);
       console.log(why.length ? `GATE rung 1, ${arm}: NOT MET: ${why.join("; ")}` : `GATE rung 1, ${arm}: met`);
       if (why.length) failed = true;
     }
