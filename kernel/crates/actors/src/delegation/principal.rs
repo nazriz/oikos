@@ -24,7 +24,7 @@ use crate::common::{addressed_to, bases_of, money_words, Book, DAY, MONTH};
 use crate::market::services::{self, Engagements};
 use crate::market::trade::{self, Ordering};
 use crate::papers::delegation::{
-    is_want, Acknowledgement, Advice, ApprovalRequest, Brief, Declined, Depth, Draft, GoAhead, Level, Part, Referral, Remit, Report, ScopeAnswer, ScopeRequest, ServiceEnded, ServiceOffer, SignOff, WantHanded, Why, KINDS as PAPERS,
+    is_want, Acknowledgement, Advice, ApprovalRequest, Brief, Declined, Depth, Draft, GoAhead, Level, Need, Part, Referral, Remit, Report, ScopeAnswer, ScopeRequest, ServiceEnded, ServiceOffer, SignOff, WantHanded, Why, KINDS as PAPERS,
 };
 use crate::papers::{self, Paper};
 use crate::steps::{arg, because, call, say, Say, Step, Visible};
@@ -461,6 +461,13 @@ struct Assistant {
 }
 
 impl Assistant {
+    /// Whether a letter is from its assistant: written in its assistant's post, or by a provider whose service it engaged.
+    fn sent(&self, m: &oikos_sight::Message) -> bool {
+        match &self.post {
+            Some(post) => m.from_position.as_deref() == Some(post.as_str()),
+            None => m.from_entity.as_deref().is_some_and(|s| s != self.me && self.providers.iter().any(|p| p == s)),
+        }
+    }
     fn of(s: &State) -> Assistant {
         Assistant { me: s.me.clone(), post: s.p.post.clone(), providers: s.eng.live().map(|e| e.offer.provider.clone()).collect() }
     }
@@ -527,6 +534,63 @@ impl State {
         for r in fresh {
             self.take(&r, pic.t, cx);
         }
+        // (A letter from its assistant about a matter a body sent back, or about the return itself: it does what the body's
+        // own notice asks of it, as it does on a report that names the need. The letter is what makes it act; what is
+        // needed is read from the body's notice, never from the letter's words. docs/behaviour/assistants.md.)
+        let letters: Vec<(String, String)> = pic.inbox.iter().filter(|m| from.sent(m)).filter_map(|m| Some((m.re.as_ref()?.to_string(), m.from_position.as_ref()?.to_string()))).collect();
+        for (re, post) in letters {
+            self.on_letter(&re, &post);
+        }
+    }
+
+    /// What a body asked of it, met (docs/design/obstacles.md, `clears_by`), where its assistant has put the matter before
+    /// it (a report naming the need, or a letter about the matter): one law over every need that is its own to meet. An
+    /// authority with that body for its assistant's post is its to give, for kinds it keeps with the assistant. A
+    /// correction is the sender's (the paper goes again with the item); a record to find (O3) would be its own, and no
+    /// law asks for one yet. `referral`: the matter, where the paper names it (a report); else the kinds' remits decide.
+    fn meet(&mut self, need: &Need, post: &str, referral: Option<&str>, basis: &str) {
+        let Some(a) = need.authority.as_ref().filter(|a| a.for_ == self.me) else { return };
+        let kinds = match referral {
+            Some(rf) => {
+                let Some(q) = self.book.get(rf).and_then(|q| papers::read::<Referral>(q)).filter(|q| hands_over(self.remit(&q.agreement, &q.kind))) else { return };
+                if a.kinds.is_empty() { vec![q.kind.clone()] } else { a.kinds.clone() }
+            }
+            None => {
+                let Some(agreement) = self.in_use().and_then(|e| e.agreement.clone()) else { return };
+                if a.kinds.is_empty() || !a.kinds.iter().any(|k| hands_over(self.remit(&agreement, k))) {
+                    return;
+                }
+                a.kinds.clone()
+            }
+        };
+        self.lodge(&a.with, post, &kinds, basis);
+    }
+
+    /// A letter from its assistant whose `re` is a matter of its, a return it holds, or the paper returned: each return it
+    /// holds on that matter, with what it asks of it still to meet, is met. A return on a matter: one citing the paper
+    /// named, or, for a matter named, one that came after the matter was handed over.
+    fn on_letter(&mut self, re: &str, post: &str) {
+        let matter_at = self.book.get(re).filter(|q| papers::read::<Referral>(q).is_some() && q.speaks_for.as_deref() == Some(self.me.as_str())).map(|q| q.at);
+        let returns: Vec<(String, Value)> = self
+            .book
+            .all(crate::common::intake::RETURNED)
+            .filter(|r| r.author.as_str() != self.me.as_str() && !self.passed_copy(r))
+            .filter(|r| {
+                let d = crate::common::data(r).to_value();
+                r.id.as_str() == re || d["returned"].as_str() == Some(re) || matter_at.is_some_and(|at| r.at >= at)
+            })
+            .map(|r| (r.id.to_string(), crate::common::data(r).to_value()["need"].clone()))
+            .collect();
+        for (id, need) in returns {
+            if let Ok(n) = serde_json::from_value::<Need>(need) {
+                self.meet(&n, post, matter_at.map(|_| re), &id);
+            }
+        }
+    }
+
+    /// Whether a return on file is its own copy passed on to its desk (`pass_on`), not the body's.
+    fn passed_copy(&self, r: &Record) -> bool {
+        r.speaks_for.as_deref() == Some(self.me.as_str())
     }
 
     /// A record newly on file: what the assistant sent back, a complaint, the end of a service.
@@ -544,12 +608,8 @@ impl State {
         if let Some(x) = papers::read::<Report>(r) {
             // (A body would not act on a paper its assistant sent for it without its authority: it gives the body one for
             // the post, where it keeps that kind with the assistant. Docs/design/obstacles.md, O1.)
-            if let (Some(a), Some(post), false) = (x.needs.as_ref().and_then(|n| n.authority.clone()), r.position.as_deref(), x.done) {
-                let referral = self.book.get(&x.referral).and_then(|q| papers::read::<Referral>(q));
-                if let Some(q) = referral.filter(|q| a.for_ == self.me && hands_over(self.remit(&q.agreement, &q.kind))) {
-                    let kinds = if a.kinds.is_empty() { vec![q.kind.clone()] } else { a.kinds.clone() };
-                    self.lodge(&a.with, post, &kinds, &r.id);
-                }
+            if let (Some(n), Some(post), false) = (x.needs.clone(), r.position.as_deref(), x.done) {
+                self.meet(&n, post, Some(&x.referral), &r.id);
             }
             let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
             let Some(m) = self.matters.get(&action).cloned() else { return };
