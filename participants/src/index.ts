@@ -26,6 +26,7 @@ export { tabledLines, votedWords, yearInDays } from "./shared/government";
 export { Roster, type RosterNow } from "./readers/roster";
 export { Tally, type BallotCount } from "./readers/tally";
 export { DayBook, LISTED_DAYS } from "./readers/daybook";
+export { Matters } from "./readers/matters";
 export { KIND as DECISION_KIND, type DecisionLaw, type Need as DecisionNeed } from "./shared/decisions";
 export { particularsOf } from "./shared/frictions";
 export { diaryText } from "./readers/diary";

@@ -408,6 +408,9 @@ fn a_level_decided_by_hand_as_a_floor_is_kept_at_least_and_its_rule_may_raise_it
     assert!(one.contains("\"why\":\"below_floor\"") && one.contains("We have agreed to keep notice to vacates with you at least to draft for sign-off until year 1, day 121."), "{one}");
     let two = ans.lines().find(|l| l.contains("kind=scope_answer") && l.contains("rec.ask2")).unwrap_or_else(|| panic!("{ans}"));
     assert!(two.contains("\"why\":\"costs_more\""), "{two}");
+    // (A refusal reads as a reason: two figures that read the same are not set out as "about $0.00, against $0.00".)
+    let figures = two.split("would cost us about ").nth(1).map(|x| (x.split(' ').next().unwrap_or("").to_string(), x.split("against ").nth(1).and_then(|y| y.split(' ').next()).unwrap_or("").to_string()));
+    assert!(figures.as_ref().is_none_or(|(a, b)| a != b) && (figures.is_some() || two.contains("would cost us no less than")), "{two}");
 }
 
 #[test]

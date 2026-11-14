@@ -119,7 +119,9 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
     // request in the call language.)
     const told = shown.flatMap((e) => [e.body.data.system ?? "", flat(e.body.data.input)]).join("\n").split("\n").filter((l) => !l.includes("(mock) ")).join("\n");
     expect(told).toContain("Its blanks:");
-    expect(told).toContain("what is to be done: ");
+    // (A matter handed over as the act is set out as what is to be done, where any is shown open: since 2026-11-14 one
+    // its predecessor finished is counted, not set out.)
+    if (/\] referral from [^\n]*What to do is as written/.test(told)) expect(told).toContain("what is to be done: ");
     expect(told).toMatch(/\$[0-9]/);
     for (const [what, never] of [["the store's notation", /\{"|":\{|":"/], ["the call language", /\b(?:statement|money|form|message|goods|work|agreement)\(|\bcalls: |data=/],
       ["a sum in its smallest unit", /\b(?:amount|fee(?: month)?|price|paid|withheld|cost|balance|rent|wage|setup|exit): -?[0-9]/i], ["the platform's words", /\b(?:translators?|kernel|resolver|channels?|blocks?)\b/i],
@@ -141,6 +143,9 @@ test("model seats in two kinds of assistant: each is a seat, each sees its forms
     expect(desk).not.toMatch(/## The town's laws and charter[^\n]*\(\d+ new\)/);
     expect(desk).not.toMatch(/## The service you work under: its delivery, briefs and remits \(\d+ new\)/);
     if (/\(kind: [a-z_]+; remit: rec\.[0-9]+/.test(desk)) expect(desk).toContain("## What the matters above come under: the remits and briefs they name");
+    // Each matter with where it stands, from the post's own papers: what was finished before the seat took the post is
+    // one line, not set out as work (2026-11-14: the baseline's seats sent 55 papers long since sent).
+    expect(desk).toMatch(/Your matters, and where each stands[^\n]*\n[\s\S]*?matters? (?:was|were) finished before you took this post; (?:it is|they are) in your file\./);
     // Who it is, once, and its own drafts in one place headed as its own, with the way to answer each.
     expect(told).toContain("Who you are here: you hold the post ");
     // Whom it writes to: the post that hands it its work, never its whole organisation; a desk, its provider's sales and

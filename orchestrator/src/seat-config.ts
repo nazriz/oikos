@@ -4,7 +4,7 @@
 // One place, so that a seat is the same seat whichever host runs it: the run's (run.ts, `llmUnit`) and the experiment
 // harness's (seat-host.ts, a model steward in a fork).
 
-import { DayBook, diaryText, Roster, Tally, type BehaviourModule, type ParticipantContext } from "@oikos/participants";
+import { DayBook, diaryText, Matters, Roster, Tally, type BehaviourModule, type ParticipantContext } from "@oikos/participants";
 import type { LlmParticipantConfig } from "@oikos/participants/llm";
 
 /** A position as a host knows it (the config's, and as position_created / appointed change it). */
@@ -38,6 +38,7 @@ export interface SeatConfig {
   roster?: Roster;
   tally?: Tally;
   dayBook: DayBook;
+  matters?: Matters;
 }
 
 /** Who someone is, as a seat's reports name them, with each organisation's or person's name it is told learnt as it is
@@ -103,12 +104,17 @@ export function seatConfig(x: SeatConfigInput): SeatConfig {
   const officeModule = office ? mods[office.role_module?.code ?? ""] : undefined;
   const dayBook = new DayBook({ entity, authors: [p.id, ...ownAuthors], name: (id: string) => whoIs(id)?.name,
     ...(office && officeModule?.books ? { books: officeModule.books(ctxFor(p.id, office.id, entity, x.sorted(office.role_module?.params ?? {}) as any)) } : {}) });
-  const config: LlmParticipantConfig = { dayBook: { text: (at: number, since?: number) => dayBook.text(at, office?.title ?? entityName ?? "The office", since) }, ...(pp.mock?.debrief ? { mockDebrief: pp.mock.debrief } : {}), trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster || tally || (office && Object.keys(times).length) ? { staff: { text: setOut } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText: x.draftText,
+  // An assistant's post (its matters handed to it, and its own file, read on request): each matter with where it stands,
+  // from one reading of the file at its first sitting and its own papers after (readers/matters.ts).
+  const mattersAt = chans.find((c) => c.ch.id === "matters" && c.ch.kind === "records" && !c.ch.on_request)?.path;
+  const fileAt = chans.find((c) => c.ch.id === "file" && c.ch.kind === "records" && c.ch.on_request)?.path;
+  const matters = mattersAt && fileAt ? new Matters(mattersAt, fileAt) : undefined;
+  const config: LlmParticipantConfig = { ...(matters ? { matters: { text: () => matters.text() } } : {}), dayBook: { text: (at: number, since?: number) => dayBook.text(at, office?.title ?? entityName ?? "The office", since) }, ...(pp.mock?.debrief ? { mockDebrief: pp.mock.debrief } : {}), trays, ownAuthors, ...(pp.wake_on_papers === false ? { wakeOnPapers: false } : {}), ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(roster || tally || (office && Object.keys(times).length) ? { staff: { text: setOut } } : {}), whoIs, participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText: x.draftText,
     ...(pp.sessions && !twin ? { sessions: pp.sessions } : {}), ...(twin ? { exactBack: true } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
     // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
     ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, ks]) => chans.filter((c) => c.path === id || c.path.endsWith(`/${id}`)).map((c) => [c.path, ks] as [string, string[]]))) } : {}),
     ...(pp.prompt_max ? { promptMax: pp.prompt_max } : {}),
     // (Papers it keeps and is not shown as a list, set out with the matters that name them: a desk's clients' remits.)
     ...(Array.isArray(pp.with_matters) ? { withMatters: (pp.with_matters as string[]).flatMap((s) => chans.filter((c) => c.path === s || c.path.endsWith(`/${s}`)).map((c) => c.path)) } : {}) } as LlmParticipantConfig;
-  return { config, ...(office ? { office } : {}), entity, ...(entityName ? { entityName } : {}), standingIds, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), dayBook };
+  return { config, ...(office ? { office } : {}), entity, ...(entityName ? { entityName } : {}), standingIds, ...(roster ? { roster } : {}), ...(tally ? { tally } : {}), dayBook, ...(matters ? { matters } : {}) };
 }

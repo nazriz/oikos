@@ -74,6 +74,9 @@ export interface LlmParticipantConfig {
   /** The office's own file: what it has sent, filed and paid, what has come into its account, and what stands open on its
    * books (behaviour/daybook.ts), from its own papers and accounts, in a bounded space. Set out at every sitting. */
   dayBook?: { text(t: number, since?: number): string };
+  /** An assistant's matters, each with where it stands, from its own papers on them (readers/matters.ts). Set out at
+   * every sitting. */
+  matters?: { text(): string };
   /** How hard its model reasons, where its way in takes an effort (docs/real-models.md, "Effort"): the seat's own
    * setting, sent with each of its calls. Not given: the adapter's (the model's default, or what was named with it). */
   effort?: string;
@@ -1508,6 +1511,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           const staffPart = staffNow && staffNow !== staffShown ? `\n\n${staffNow}` : "";
           const foldSaid = await foldNotes(obs.t);
           const filePart = c.dayBook ? await made("office_file", FILE_NOT_BROUGHT, () => c.dayBook!.text(obs.t, lastOpened)) : "";
+          const mattersPart = c.matters ? await made("matters", FILE_NOT_BROUGHT, () => c.matters!.text()) : "";
           // What came of its own requests and letters since its last sitting opened (its own: it saw each as it went).
           const actsPart = inWorld(actsText(lastOpened));
           openingAt = obs.t;
@@ -1517,7 +1521,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           const waitingSaid = stillWaiting.length ? [inWorld(`Not yet answered: ${stillWaiting.length === 1 ? "something you asked for is" : `${stillWaiting.length} things you asked for are`} still waiting for your yes or no since ${when(Math.min(...stillWaiting.map((d) => draftsWaiting.get(d.id)!)))}: ${stillWaiting.map((d) => `${d.id} (${draftGist(d)})`).join("; ")}. Nothing in ${stillWaiting.length === 1 ? "it" : "them"} is done until you say yes. ${stillWaiting.length === 1 ? "It is" : "They are"} set out under "${WAITING_HEAD.slice(3)}", with how to answer.`)] : [];
           const told = [...waitingSaid, ...(answerOwed ? [TRUE_ANSWER] : []), ...foldSaid, ...notBrought, ...unsaid];
           if (answerOwed) answering = answerOwed;
-          sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n${notebookRoom(notes.length)}` : "(empty)"}\n\n${told.length ? `${told.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}${staffPart}${filePart ? `\n\n${filePart}` : ""}${actsPart ? `\n\n${actsPart}` : ""}` }];
+          sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n${notebookRoom(notes.length)}` : "(empty)"}\n\n${told.length ? `${told.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}${staffPart}${mattersPart ? `\n\n${mattersPart}` : ""}${filePart ? `\n\n${filePart}` : ""}${actsPart ? `\n\n${actsPart}` : ""}` }];
         }
 
         let res: Awaited<ReturnType<typeof callModel>>;
