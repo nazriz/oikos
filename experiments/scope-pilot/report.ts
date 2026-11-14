@@ -114,6 +114,14 @@ export async function report(dirs: string[]): Promise<string> {
       p(`| ${k.replace(/_cents$/, "").replace(/_/g, " ")} | ${arms.map((a) => f(tot(a))).join(" | ")} | ${arms.filter((a) => a !== "code").map((a) => f(tot(a) - tot("code"))).join(" | ")} |`);
       if (k === "received_cents") p(`| of which the towns' drift (not on the matters handed) | ${arms.map(() => "").join(" | ")} | ${arms.filter((a) => a !== "code").map((a) => money(tot(a) - tot("code") - (driftOf[a] ?? 0))).join(" | ")} |`);
     }
+    // Afterwards (A2): what the clients did about acts beyond in their name, and about matters left open.
+    p(``, `### Afterwards: what the clients did about acts in their name and matters left open (their own typed decisions)`, ``, `Runs read: ${runs(at)}.`, ``);
+    p(`| arm | acts beyond | ratified | repudiated | kind taken back | matters chased | done by the client itself |`, `|---|---|---|---|---|---|---|`);
+    for (const a of arms) {
+      const ms = at.flatMap((r) => r.matters.filter((m) => m.arm === a && r.effects[m.arm] === level));
+      const sum = (k: "ratified" | "repudiated" | "taken_back" | "chased" | "did_itself") => ms.reduce((n, m) => n + (m.afterwards?.[k] ?? 0), 0);
+      p(`| ${a} | ${ms.reduce((n, m) => n + m.beyond.length, 0)} | ${sum("ratified")} | ${sum("repudiated")} | ${sum("taken_back")} | ${sum("chased")} | ${sum("did_itself")} |`);
+    }
     // 6. The stake a seat faced: the client's own wait on its episodes' drafts, and what that wait was worth at the rate.
     p(``, `### The stake: the clients' waits on the episodes' drafts (hours), and their worth at the rate the world's decision gives`, ``, `Runs read: ${runs(at)}.`, ``);
     p(`| arm | waits | median h | 90th h | longest h | over 1 day | over 3 days | over 6 days | worth at the rate, median | worth, all |`, `|---|---|---|---|---|---|---|---|---|---|`);

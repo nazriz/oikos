@@ -72,6 +72,10 @@ export interface ArmInput {
   asks?: Ask[];
   /** The replay's class of each request by its reference (translator/eval/replay.ts --json): "still_wrong", "changed". */
   replay?: Map<string, string>;
+  /** The principals' typed decisions on what their assistants did (A2: kernel/crates/actors/src/delegation/principal/
+   * answers.rs): an act in their name not covered, ratified or repudiated (with the kind taken back once it has borne
+   * enough), and a matter left open, chased by a letter and then done by the client itself. */
+  decisions?: { t: number; data: any }[];
   /** Every record id a model seat of the arm was shown (its observations, as the log keeps them): what a matter citing
    * one it never saw could not be worked from. Absent: not read (a code arm). */
   shown?: Set<string>;
@@ -84,6 +88,8 @@ export interface MatterRow {
   signoff_seconds?: number; per_day_cents?: number;
   /** Papers of the matter a body sent back to the seat for want of the client's authority. */
   returned_authority?: number;
+  /** The client's typed decisions on the matter (A2): on its acts in its name, and on it left open. */
+  afterwards?: { ratified: number; repudiated: number; taken_back: number; chased: number; did_itself: number };
   outcome?: { what: string; t: number }; received_cents: number | null; withheld: boolean; beyond: string[]; mistake: boolean; ours: string[];
 }
 export interface ArmOut { effect: "first_claim" | "decision"; matters: MatterRow[]; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: Map<string, any>; seatMonths: number }
@@ -157,7 +163,13 @@ export function episodesOf(o: ArmInput): ArmOut {
     const told = letters.some((l) => l.t >= R.at && l.t <= closed + 7 * DAY && l.to.some((to) => to.startsWith(client))) || on("report").length > 0 || on("advice").length > 0;
     const outcome = decision ? { what: decision.kind === "benefit_decision" ? (decision.data?.granted ? "granted" : "refused") : decision.data?.approved ? "loan approved" : "loan declined", day: day(decision.at) } : undefined;
     // (A2: the client's typed answer to an act in its name, where the world records one.)
-    const reaction = all.find((x) => ["ratification", "repudiation", "taken_back", "done_myself"].includes(x.kind) && x.speaks_for === client && ref(x) === R.id)?.kind;
+    // (A2: what the client did about the matter, from its own typed decisions: about an act on it in its name (ratified,
+    // repudiated, the kind then taken back), or about it left open (chased, then done itself).)
+    const actIds = new Set(myActs.map((a: any) => String(a.record)));
+    const onActs = (o.decisions ?? []).filter((d) => d.data?.choice === "in_my_name" && actIds.has(String(d.data?.act)));
+    const onOpen = (o.decisions ?? []).filter((d) => d.data?.choice === "left_open" && d.data?.referral === R.id);
+    const reactions = [...onActs.map((d) => `${d.data.reaction === "ratify" ? "ratified" : "repudiated"}${d.data.taken_back ? ", kind taken back" : ""}`), ...onOpen.map((d) => (d.data.step === "asked" ? "chased" : "did it itself"))];
+    const reaction = reactions.length ? reactions.join("; ") : undefined;
     // (One episode a matter, from its hand-over: a matter of a kind whose waiting can cost the client, or one with a date
     // to come, handed over to draft, approve or advise, so that its next step needs the client. At both stake levels:
     // only its stake differs. The waits on the client are its path.)
@@ -229,7 +241,8 @@ export function episodesOf(o: ArmInput): ArmOut {
     matterRows.push({ seed, arm, seat, client, matter: R.id, kind, handed: R.at, ...(on("draft")[0] ? { drafted: on("draft")[0].at } : {}), ...(doneR ? { done: doneR.at } : {}), ...(went ? { sent: went.at } : {}),
       ...(waits.some((w) => w.wait === "sign_off" && w.to !== undefined) ? { signoff_seconds: waits.filter((w) => w.wait === "sign_off" && w.to !== undefined).reduce((n, w) => n + (w.to! - w.from), 0) } : {}), ...(perDay ? { per_day_cents: perDay } : {}),
       ...(decision ? { outcome: { what: outcome!.what, t: decision.at } } : {}), received_cents: fromWhom ? transfers.filter((x) => x.to === acc && x.t >= R.at && x.t < next && fromWhom(x)).reduce((n, x) => n + Number(x.amount), 0) : null,
-      withheld: !!held, beyond: beyond.map((b) => `${b.class} ${b.paper}`), mistake: false, ours, returned_authority: returnedAuthority });
+      withheld: !!held, beyond: beyond.map((b) => `${b.class} ${b.paper}`), mistake: false, ours, returned_authority: returnedAuthority,
+      afterwards: { ratified: onActs.filter((d) => d.data.reaction === "ratify").length, repudiated: onActs.filter((d) => d.data.reaction === "repudiate").length, taken_back: onActs.filter((d) => d.data.taken_back).length, chased: onOpen.filter((d) => d.data.step === "asked").length, did_itself: onOpen.filter((d) => d.data.step === "did_itself").length } });
     if (!perClient.has(client)) perClient.set(client, new Map());
   }
   for (const m of mistakes) { const r = matterRows.find((x) => x.matter === m.matter); if (r) r.mistake = true; }
@@ -346,6 +359,7 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
         const letters: { t: number; from: string; to: string[] }[] = [];
         const asks = new Map<string, Ask>();
         const shown = new Set<string>();
+        const decisions: { t: number; data: any }[] = [];
         const ask = (ref: string, t: number) => asks.get(ref) ?? (asks.set(ref, { ref, seat: ref.split(".").slice(1, -1).join("."), t, words: "", drafted: false }), asks.get(ref)!);
         let end = forkT;
         for await (const e of lines(file)) {
@@ -358,10 +372,11 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
           else if (b.annotation === "observation" && Array.isArray(b.data?.observation?.channels)) { for (const ch of b.data.observation.channels) for (const r of ch?.records ?? []) if (typeof r?.id === "string") shown.add(r.id); }
           else if (b.annotation === "draft" && typeof b.draft?.id === "string") Object.assign(ask(b.draft.id, e.t), { drafted: true, call: b.draft.call });
           else if (b.annotation === "signoff" && typeof b.draft === "string") ask(b.draft, e.t).decision = b.decision;
+          else if (b.annotation === "decision" && b.data?.domain === "delegation" && (b.data.choice === "in_my_name" || b.data.choice === "left_open")) decisions.push({ t: e.t, data: b.data });
           else if (b.annotation === "translation_failure" && typeof b.data?.draft === "string") Object.assign(ask(b.data.draft, e.t), { failed: String(b.data.reason ?? ""), ...(b.data.call ? { call: b.data.call } : {}) });
         }
         const replay = new Map(replayed.filter((x) => x.arm === arm).map((x) => [x.ref, x.class]));
-        const got = episodesOf({ seed, arm, experiment: basename(dir), forkDay: spec.forkDay ?? 30, forkT, end, recs, rows, transfers, letters, seatIds, providers, config, asks: [...asks.values()].filter((a) => a.t >= forkT), replay, ...(arm === "code" ? {} : { shown }) });
+        const got = episodesOf({ seed, arm, experiment: basename(dir), forkDay: spec.forkDay ?? 30, forkT, end, recs, rows, transfers, letters, seatIds, providers, config, asks: [...asks.values()].filter((a) => a.t >= forkT), replay, decisions: decisions.filter((d) => d.t >= forkT), ...(arm === "code" ? {} : { shown }) });
         matterRows.push(...got.matters);
         effects[arm] = got.effect;
         armsRead.add(arm);

@@ -120,6 +120,11 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   expect(firstClaim.episodes.map((e) => [e.matter, e.stake])).toEqual([["rec.1", "none"], ["rec.3", "none"]]);
   const model = arm("sonnet", [{ table: "withheld", referral: "rec.1", paper: "rec.4" }, { table: "acts", referral: "rec.3", record: "rec.4", class: "no_remit" }]);
   expect(model.episodes.map((e) => e.did)).toEqual(["candidate_override", "acted_beyond"]);
+  // (A2: what the client did afterwards, from its own typed decisions: on an act in its name, and on a matter left open.)
+  const decisions = [{ t: at(40), data: { domain: "delegation", choice: "in_my_name", reaction: "repudiate", act: "rec.4", taken_back: true } }, { t: at(45), data: { domain: "delegation", choice: "left_open", step: "asked", referral: "rec.1" } }];
+  const after = episodesOf({ seed: 1, arm: "sonnet", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs, rows: [{ table: "acts", referral: "rec.3", record: "rec.4", class: "no_remit" }], transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [] }, decisions });
+  expect(after.episodes.map((e) => [e.matter, e.client_reaction])).toEqual([["rec.1", "chased"], ["rec.3", "repudiated, kind taken back"]]);
+  expect(after.matters.find((m) => m.matter === "rec.3")!.afterwards).toMatchObject({ repudiated: 1, taken_back: 1 });
   expect(model.candidates).toHaveLength(1);
   expect(JSON.stringify(model.candidates[0]!.item)).not.toMatch(/sonnet|code/i);
   // The price table pairs a model arm's matter with the code arm's (same client and kind, in order), and charges to
