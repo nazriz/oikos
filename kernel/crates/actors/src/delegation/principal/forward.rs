@@ -237,9 +237,21 @@ impl State {
             if crate::papers::delegation::dates_named(&d).is_empty() {
                 continue;
             }
-            let Some(Some(rf)) = self.about_matter(r) else { continue };
-            let Some(t) = self.traces.iter().find(|t| t.referral == rf) else { continue };
-            return Some((rf, t.kind.clone(), id));
+            match self.about_matter(r) {
+                Some(Some(rf)) => {
+                    let Some(t) = self.traces.iter().find(|t| t.referral == rf) else { continue };
+                    return Some((rf, t.kind.clone(), id));
+                }
+                // (It cites a paper its assistant sent in its name that no report has tied to a matter yet (its report
+                // comes after it is sent): the matter is the newest it handed over of that paper's kind, as it was then.)
+                Some(None) => {
+                    let bases: Vec<String> = bases_of(r).iter().map(|b| b.to_string()).collect();
+                    let Some(u) = self.untied.iter().find(|u| bases.contains(&u.0)) else { continue };
+                    let Some(t) = self.traces.iter().rev().find(|t| t.kind == u.1 && t.at <= u.4) else { continue };
+                    return Some((t.referral.clone(), t.kind.clone(), id));
+                }
+                None => continue,
+            }
         }
         None
     }
