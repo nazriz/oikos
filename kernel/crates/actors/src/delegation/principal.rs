@@ -217,7 +217,7 @@ struct Grounds {
 pub(super) const TOLD: &[(&str, &str)] = &[("benefit_claim", "Until the claim is decided we are not paid {payment}.")];
 
 /// How much of a paper's words a referral quotes.
-const QUOTED: usize = 240;
+const QUOTED: usize = crate::figures::QUOTED_CHARS;
 
 /// How many of its own papers it keeps to hand, to send a copy of.
 const OWN_PAPERS: usize = crate::figures::KEPT_OWN_PAPERS;

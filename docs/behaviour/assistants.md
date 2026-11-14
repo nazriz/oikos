@@ -125,7 +125,7 @@ at every depth (a finished act, what happened, a want) and at `advice`, for pers
 - **The papers it came from.** The records the matter's act cites (`basis`, `on`, `settles`), the paper a want is
   against, and the records a want's holder gives. Each one another sent it (addressed to it) or that it can see (a
   published posting) is told in one fixed sentence: `It comes from <sender>'s <kind> <id> of <date>: "<its words>"`, its
-  words quoted to 240 characters, cut at a word. Its own papers are not told: what it wrote is its own act.
+  words quoted to 240 characters (`figures::QUOTED_CHARS`, a placeholder), cut at a word. Its own papers are not told: what it wrote is its own act.
 - **`due`: the day a paper names.** The nearest day still to come that one of those papers names in a detail read by one
   law for every kind (`papers::delegation::DATE_FIELDS`): `answer_by`, `hearing_at`, `by`, `due`, `closes`, wherever a
   whole number stands under the name (an evidence request's `by`, a hearing's `answer_by`, a notice to vacate's `by`, a
