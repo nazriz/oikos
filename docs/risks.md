@@ -1962,9 +1962,12 @@ The mechanism:
 - **Effect:** Invoices not drafted read as caution where the seat could not check what it was to rest on (rung 1's
   third run, 2026-11-14: two invoices held as blocked, four letters to a manager whose code reads none); the factory's
   income in a model arm falls for a reason of ours.
-- **L / I:** high / medium · **Status:** open (2026-11-14)
-- **Fix when:** before the next rung's factory is read as a finding: give an assistant's post the boards its matters
-  cite and places by id in its look-up, checked against the code arm's hash.
+- **L / I:** high / medium · **Status:** partly fixed (2026-11-14): every assistant's post keeps an on-request board of
+  the published kinds a matter may cite, and its seat looks up each cited paper it does not hold by its id and is shown
+  it with the matter; it sees its own organisation's premises on request (decisions, "An assistant sees what its
+  matters cite"). Still open: a cited published kind not in the board, and another organisation's places.
+- **Fix when:** a seat says a paper its matter cites is not to be found, of a kind not in `CITED_KINDS`: add the kind
+  with its reason.
 - **Notice by:** a seat's letter or note saying a paper its referral cites is not on its file, or a place id is not
   entered.
 

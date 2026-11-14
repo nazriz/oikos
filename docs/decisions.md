@@ -13798,3 +13798,22 @@ without providers keep their hashes).
   window.
 - **Revisit if** the source gives a window for keeping the start date (then the lapse keeps it only inside it), or a
   seat is seen not to find the published rule.
+
+## 2026-11-14 · An assistant sees what its matters cite, and its own organisation's premises (MT-41)
+
+The factory's assistant was handed invoices that cite the buyer's standing offer, and the works the goods left from,
+and could read neither: the offer is published but on no board its post keeps, and its look-up of who's who answers
+for people and organisations, not buildings. It held both invoices as blocked (rung 1's third run), and every model
+arm's factory received $0.3M to $1.1M less than the code arm's (the episode reader). **Decision**, a law for every
+assistant's post, not for this form: (1) it keeps an on-request board of the published kinds a matter may cite (a
+buyer's offer, a price list, a job advertised, homes and premises to let, property for sale), and its seat looks up
+each paper a matter handed to it cites, that it does not hold, by its id, once, before it sits; what is found is set
+out with the matter (`Matters.lookups`, seat-host). That is "it was published" reached by "one named thing": the
+principal named it in the hand-over; the board is never shown, and a search of it takes what any search takes (no
+time: only a visit does). A buyer's offer is declared published, with its reason, in towns with assistants only
+(`PUBLISHED_OFFERS`). (2) It sees its organisation's own premises on request, as its principal's post does (the way
+`here`, one organisation's only), so its own buildings are found by their ids. Towns without assistant posts do not
+move; assistant towns' hashes move because a post's channels are part of the hashed state, not because any code
+participant acts otherwise (the code arm checked equal on records, transfers and measures).
+- **Revisit if** a matter cites a published paper of a kind not in the board (add the kind with its reason), a seat
+  is shown a cited paper it could not have been named, or the look-ups crowd its first sitting (16 at most a sitting).

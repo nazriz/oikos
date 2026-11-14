@@ -240,12 +240,21 @@ const obstacleChannels = (level: number) => (level > 0 ? [K.published("requireme
 
 // (Each keeps to its post, `own_post`: what a principal hands its assistant is addressed to the assistant's post as
 // well as to the organisation, and an organisation with two assistants' posts shows each only its own: risk MT-31.)
-const assistantChannels = (also: string[] = []) => [
+/** The published kinds a matter handed to an assistant may cite (boards, each in `knowing.published`): looked up by the
+ * seat one by its id, as its principal named it in the hand-over (participants/src/readers/matters.ts). MT-41. */
+const CITED_KINDS = ["buying_offer", "price_list", "job_posting", "rental_listing", "premises_listing", "property_for_sale"];
+/** Its organisation's own premises, as its principal's post sees them, looked at on request: an office sees its own
+ * premises (the way `here`), and so finds its own buildings by their ids (MT-41: the factory's works). */
+const ownPremises = (principal: any) => (Array.isArray(principal?.channels) ? principal.channels : []).filter((c: any) => c?.kind === "sites" && c.way === "here" && c.area?.premises)
+  .map((c: any) => ({ ...c, id: `own-${c.id}`, title: "Your organisation's own premises: what stands there, and who is there, looked at on request (look)", on_request: true }));
+const assistantChannels = (also: string[] = [], principal?: any) => [
   K.mine("terms", { statement_kinds: ASSISTANT_TERMS, own_post: true }, { title: "The service you work under: its delivery, briefs and remits" }),
   K.mine("matters", { statement_kinds: ASSISTANT_MATTERS, own_post: true }, { title: "Matters handed to you, and the answers to what you asked" }),
   K.mine("file", { statement_kinds: [...new Set([...ASSISTANT_SEES, ...ASSISTANT_PAPERS, ...also])], own_post: true }, { title: "Your file: the matters handed to you, your papers on them and what you sent, looked up on request (look, with what to find)", on_request: true }),
   K.board("laws", ["law", "charter", "payment_details"], { title: "The town's laws and charter, and where what they charge is paid, published: looked up on request (look, with what to find), for the law a matter rests on" }),
   K.lookUp("who", { title: WHO }),
+  K.board("cited", CITED_KINDS, { title: "What is published that the matters handed to you cite (a buyer's offer, a price list, a job advertised): looked up by its id" }),
+  ...ownPremises(principal),
 ];
 
 /** What a person keeps of public goings-on (the citizen's `public_memory`; docs/behaviour/citizen.md): the kinds of
@@ -3585,7 +3594,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const post = `${pos.id}-assistant`;
       // (The account it pays from and its keeper: the organisation's own, so its post may be shown it. Before 2026-11-10 a
       // seat could not name the bank to ask it to pay from it: "You don't know who keeps account acc-factory-1".)
-      positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: [...assistantChannels(kinds), ...obstacleChannels(OB), { id: "account", kind: "accounts" }] });
+      positions.push({ id: post, entity: pos.entity, title: "Assistant", channels: [...assistantChannels(kinds, pos), ...obstacleChannels(OB), { id: "account", kind: "accounts" }] });
       assistantPosts.push({ post, entity: pos.entity, code: m.code, kinds });
       // (Its own form for each kind it may hand over, with its own details: what its matters are read back on and
       // composed on. docs/design/broad-seats.md, G2.)

@@ -99,6 +99,8 @@ export class ModelSeat {
   /** An assistant's matters, each with where it stands (readers/matters.ts); and whether its file has been read. */
   private readonly matters?: Matters;
   private fileRead = false;
+  /** (What it was shown while it looked up the papers its matters cite: joined with the answer, and shown together.) */
+  private held?: Observation;
   private readonly currency: any;
   private readonly calendar: any;
   private readonly confirm: "always" | "consequential" | "never";
@@ -264,6 +266,15 @@ export class ModelSeat {
         if (this.matters.toRead) return { action: { type: "look", looks: this.matters.read() } };
       }
       this.handedOver = true;
+    }
+    // (An assistant's seat looks up the published papers a matter handed to it cites, that it does not hold, one by its id
+    // each, before it sits: its principal named them in the hand-over. A search of a board, which takes what any search
+    // takes; its answer comes with the next wake, at once, and what it was shown meanwhile is shown with it. MT-41.)
+    if (this.matters) {
+      if (this.held) { raw = { ...joinRaw(this.held, raw), entity: this.entity } as Observation; this.held = undefined; }
+      const shown = new Set(Object.values(raw.channels ?? {}).flatMap((c: any) => (c?.kind === "records" ? (c.records ?? []).map((r: any) => r.id) : [])));
+      const looks = this.matters.lookups(raw, (id) => this.knowledge.records.has(id) || shown.has(id));
+      if (looks.length) { this.held = raw; return { action: { type: "look", looks } }; }
     }
     // (What a model seat was shown is recorded in full: training data, as in every pilot.)
     this.o.world.annotate({ annotation: "observation", subject: this.o.seat, data: { t: w.t, observation: { ...raw, channels: Object.entries(raw.channels ?? {}).map(([path, c]) => ({ path, ...(c as object) })) } } });
