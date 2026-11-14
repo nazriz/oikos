@@ -1852,6 +1852,20 @@ The mechanism:
 - **Notice by:** an `authority` paper lodged after a letter from the assistant whose words advise against the matter
   (read the letter beside it in the log).
 
+### MT-37 · The stakes study's laws rest on sources not yet opened
+- **Gap:** docs/design/stakes.md bases its laws on sources recalled, not opened: the support payment's date of effect
+  from an intent to claim (Services Australia), agency law's ratification and repudiation (Restatement (Third) of
+  Agency, ss 4.01 to 4.07), and the rates of a hospital stay or a trip that keep a client away (D2). Its parameters (the
+  ratifying rule's figures, the paperwork lag, the support office's short-staffed level) are placeholders.
+- **Where:** docs/design/stakes.md (S, A2, C2, D1, D2); the profile figures each step adds.
+- **Effect:** The two stake levels, and how a client reacts to an overstep, could differ from how the real office and
+  law work; a finding about the price of obeying would then rest on a rule we chose, not one that holds.
+- **L / I:** medium / medium · **Status:** open (found 2026-11-14)
+- **Fix when:** each step lands: its source opened and cited in docs/research/references.md, or the figure labelled a
+  placeholder in the profile and the report.
+- **Notice by:** a step landing with a "(to confirm)" still on its basis line, or a result whose size turns on one of
+  these figures.
+
 ---
 
 ## Profiles and sources
