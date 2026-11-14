@@ -14052,3 +14052,28 @@ called by both (`beyond.rs` now calls them too; its readings are unchanged), so 
   cites the filing and ratifies or repudiates by its outcome.
 - **Revisit if** the outcome rule misreads a body's paper (a decision that is neither for nor against), or the take-back
   count proves too quick or slow against a sourced rule.
+
+
+## 2026-11-14 · A2: a request for more authority weighed with the wait the client can see
+
+**What was wrong (verified).** The client's rule already costed a wait on its own answers at `draft` and `approve`
+(`rule.rs`, `cost_waiting`), but three things kept it from ever counting: the wait was measured from a draft's arrival to
+the sign-off (minutes for a code client, until D1a); the grants reader screened only the next level up (`approve`, which
+waits on the same answer and so never gains), never `alone`; and a day's delay was costed even where the law pays from the
+first claim. So the desk's clients declined every request, whatever they had been through.
+**The law (stakes A2, part 2).** The wait is the client's own record: from each hand-over to its own sign-off or
+go-ahead, per kind and assistant (`principal.rs`, the `waited` calls). It is costed at the kind's `late_cost_day`, which
+the generator leaves out where the support law's date of effect is `first_claim`. Every level the service offers is
+weighed, `alone` included (`would_answer` screens each). The answer says the wait in its words and types its figures
+(`Part.figures`). Basis: docs/design/obstacles.md section 10 (Aghion and Tirole 1997).
+- **What moves:** delegating towns at obstacle levels (where a day's delay is costed); their clients' answers to
+  requests, and the grants reader's rows. Towns without providers do not move.
+- **The bar to say yes is low, and that is the study's stated assumption about clients.** At the study's figures a
+  single benefit claim that has waited about a fifth of a day on the client's own answer, at a day's least payment
+  (A$57.76), already costs more than the slips the client expects at `alone` (the offer's 1% at the profile's cost of an
+  error, a placeholder: MT-32). So one claim of a client who sits down to its post weekly suffices for it to grant
+  `alone` (the proof: 8 of 8 such requests granted at `decision`, 0 of 7 at `first_claim`). What would change it: a
+  sourced cost of an error made at `alone` (what a wrong claim filed without the client's reading costs them), or a
+  sourced slip rate for the service, in place of the placeholders.
+- **Revisit if** clients grant `alone` after waits that a real client would not count as losses (a claim decided in
+  time regardless), or the wait should include the body's own time (it does not: only the client's own path).

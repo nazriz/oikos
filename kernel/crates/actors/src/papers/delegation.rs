@@ -589,6 +589,25 @@ pub struct Part {
     pub asked: String,
     pub granted: bool,
     pub why: Why,
+    /// For a level weighed: the figures the principal's rule weighed it on (its own; read by the episode reader, never
+    /// shown to a seat as codes: its words say the same).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub figures: Option<Weighing>,
+}
+
+/// What a principal's rule weighed a level on (docs/behaviour/assistants.md, "Readiness to grant"): the two costs a month
+/// (cents), the matters a month, the slips it expects (bps), how long matters of the kind have waited on its own
+/// answers on the permission path (thousandths of a day, and how many), what a day of delay costs it, and its hurdle.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Weighing {
+    pub cost_now: i64,
+    pub cost_asked: i64,
+    pub per_month: i64,
+    pub slip_bps: i64,
+    pub wait_milli_days: i64,
+    pub waits: i64,
+    pub late_cost_day: i64,
+    pub hurdle_bps: i64,
 }
 
 /// The principal's answer to a request for more scope: each part asked and what it made of it (a remit it grants is a

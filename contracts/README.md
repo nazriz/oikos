@@ -1019,3 +1019,12 @@ nothing new, and its saved state is as before.
 - A principal's parameters gain `patience_days` (absent: 14).
 - Its saved state gains `in_name`, `reacted`, `in_name_counts`, `chased`, `cited`, `cites_read` (each absent when empty).
 - `delegation::own` (`same_paper`, `class`, `in_place`): the reader's definitions, shared with the principal.
+
+## The wait a client can see (2026-11-14; docs/design/stakes.md, A2 part 2; docs/decisions.md, "A2: a request for more authority weighed with the wait the client can see"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- `ScopeAnswer.reasons[]` (`Part`) gains `figures` (`Weighing`) for a level weighed: `cost_now`, `cost_asked` (cents a
+  month), `per_month`, `slip_bps`, `wait_milli_days`, `waits`, `late_cost_day`, `hurdle_bps`. Absent elsewhere.
+- The grants reader (`oikos-kernel grants`, `would_answer`) gives a row for every level above the one held that the
+  service offers (`alone` among them), where it gave the next one only.
+- The generator gives a person's `benefit_claim` no `late_cost_day` where the town's support law pays from the first
+  claim (`support_date_of_effect: first_claim`).
