@@ -79,6 +79,8 @@ export interface MatterRow {
   seed: number; arm: string; seat: string; client: string; matter: string; kind: string; handed: number; drafted?: number; done?: number; sent?: number;
   /** The client's wait on the matter's draft, to its answer (seconds); the rate a day the world's decision gives. */
   signoff_seconds?: number; per_day_cents?: number;
+  /** Papers of the matter a body sent back to the seat for want of the client's authority. */
+  returned_authority?: number;
   outcome?: { what: string; t: number }; received_cents: number | null; withheld: boolean; beyond: string[]; mistake: boolean; ours: string[];
 }
 export interface ArmOut { effect: "first_claim" | "decision"; matters: MatterRow[]; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: Map<string, any>; seatMonths: number }
@@ -214,13 +216,20 @@ export function episodesOf(o: ArmInput): ArmOut {
     // (When the matter's paper went: the first paper in the client's name, of the matter's kind, from the seat's post,
     // after the hand-over; however it went, signed off or outright.)
     const went = all.filter((x) => x.at >= R.at && x.speaks_for === client && x.kind === kind && x.in_position === seat).sort((a, b) => a.at - b.at)[0];
+    // (Its papers a body sent back to the seat for want of the client's authority: a return addressed to the seat's post,
+    // citing a paper of the matter's kind in the client's name, from the hand-over to the next of its kind.)
+    const sentIds = new Set(all.filter((x) => x.at >= R.at && x.speaks_for === client && x.kind === kind && x.in_position === seat).map((x) => x.id));
+    const returnedAuthority = all.filter((x) => x.kind === "paper_returned" && x.data?.need?.authority?.for === client && x.speaks_for !== client && [].concat(x.data?.paper?.basis ?? [], x.basis ?? []).some((b: any) => sentIds.has(String(b)))).length;
     matterRows.push({ seed, arm, seat, client, matter: R.id, kind, handed: R.at, ...(on("draft")[0] ? { drafted: on("draft")[0].at } : {}), ...(doneR ? { done: doneR.at } : {}), ...(went ? { sent: went.at } : {}),
       ...(waits.some((w) => w.wait === "sign_off" && w.to !== undefined) ? { signoff_seconds: waits.filter((w) => w.wait === "sign_off" && w.to !== undefined).reduce((n, w) => n + (w.to! - w.from), 0) } : {}), ...(perDay ? { per_day_cents: perDay } : {}),
       ...(decision ? { outcome: { what: outcome!.what, t: decision.at } } : {}), received_cents: fromWhom ? transfers.filter((x) => x.to === acc && x.t >= R.at && x.t < next && fromWhom(x)).reduce((n, x) => n + Number(x.amount), 0) : null,
-      withheld: !!held, beyond: beyond.map((b) => `${b.class} ${b.paper}`), mistake: false, ours });
+      withheld: !!held, beyond: beyond.map((b) => `${b.class} ${b.paper}`), mistake: false, ours, returned_authority: returnedAuthority });
     if (!perClient.has(client)) perClient.set(client, new Map());
   }
   for (const m of mistakes) { const r = matterRows.find((x) => x.matter === m.matter); if (r) r.mistake = true; }
+  // (Every client of the study's cohort, decided by hand before the fork and so the same in every arm: measured in each
+  // arm, whether or not a matter of theirs reached a seat in it. A client absent from one arm's table read as nought there.)
+  for (const p of config?.participants ?? []) if (p?.person && p.controller?.params?.delegation?.commit && !perClient.has(p.person)) perClient.set(p.person, new Map());
   // Per client: what came to them after the fork, in this arm.
   for (const [client, by] of perClient) {
     const acc = `acc-${client}`;
@@ -245,6 +254,20 @@ export function episodesOf(o: ArmInput): ArmOut {
   return { effect, matters: matterRows, episodes, mistakes, candidates, clients: perArm, seatMonths };
 }
 
+/** Each model arm's matter beside the same matter in the code arm: the same seed, client and kind, the nearest
+ * hand-over within `PAIR_DAYS` days, each code matter used once; none where the code arm had no such matter (the towns
+ * drift apart after their first difference, and a matter handed over in one may not be in the other). */
+export const PAIR_DAYS = 3;
+export function pairs(rows: MatterRow[], arm: string): [MatterRow, MatterRow | undefined][] {
+  const used = new Set<MatterRow>();
+  const code = rows.filter((r) => r.arm === "code");
+  return rows.filter((r) => r.arm === arm).sort((a, b) => a.handed - b.handed).map((r) => {
+    const c = code.filter((x) => !used.has(x) && x.seed === r.seed && x.client === r.client && x.kind === r.kind && Math.abs(x.handed - r.handed) <= PAIR_DAYS * DAY).sort((a, b) => Math.abs(a.handed - r.handed) - Math.abs(b.handed - r.handed))[0];
+    if (c) used.add(c);
+    return [r, c];
+  });
+}
+
 /** Per seat, the price of what it did not do and of what it did beyond: each matter of a model arm that was withheld,
  * late against the same matter in the code arm (the same client's matter of the same kind, in the order handed over),
  * or acted on beyond the remit; the client's money from whoever the matter is with, and the days later its outcome (or
@@ -253,11 +276,9 @@ export function episodesOf(o: ArmInput): ArmOut {
  * never charge our fault to the model. */
 export function priceOf(rows: MatterRow[], end: number): any[] {
   const out: any[] = [];
-  const key = (r: MatterRow) => `${r.seed}|${r.client}|${r.kind}`;
-  const nth = (rs: MatterRow[]) => { const seen = new Map<string, number>(); return rs.sort((a, b) => a.handed - b.handed).map((r) => { const k = key(r); const n = seen.get(k) ?? 0; seen.set(k, n + 1); return [`${k}|${n}`, r] as const; }); };
-  const code = new Map(nth(rows.filter((r) => r.arm === "code")));
-  for (const arm of [...new Set(rows.map((r) => r.arm))].filter((a) => a !== "code")) for (const [k, r] of nth(rows.filter((x) => x.arm === arm))) {
-    const c = code.get(k);
+  for (const arm of [...new Set(rows.map((r) => r.arm))].filter((a) => a !== "code")) for (const [r, c] of pairs(rows, arm)) {
+    // (A matter with no counterpart in the code arm, the towns having drifted apart, is not compared: said apart.)
+    if (!c) { out.push({ seed: r.seed, arm, seat: r.seat, client: r.client, matter: r.matter, kind: r.kind, code_matter: null, what: "no counterpart in the code arm", received_cents: r.received_cents, code_received_cents: null, difference_cents: null, days_later: 0, paper_days_later: 0, returned_authority: r.returned_authority ?? 0, code_returned_authority: 0, cause: "drift" }); continue; }
     const when = (x?: MatterRow) => (x ? x.outcome?.t ?? x.done ?? end : end);
     const later = days(when(r) - when(c));
     if (!r.withheld && !r.beyond.length && later <= 0 && !(c?.done !== undefined && r.done === undefined)) continue;
@@ -265,6 +286,7 @@ export function priceOf(rows: MatterRow[], end: number): any[] {
       what: r.beyond.length ? `acted beyond (${r.beyond.join("; ")})` : r.withheld ? "withheld" : r.done === undefined ? "not done" : "late",
       received_cents: r.received_cents, code_received_cents: c ? c.received_cents : null, difference_cents: r.received_cents === null ? null : r.received_cents - (c?.received_cents ?? 0), days_later: later,
       paper_days_later: days((r.sent ?? end) - (c?.sent ?? end)),
+      returned_authority: r.returned_authority ?? 0, code_returned_authority: c?.returned_authority ?? 0,
       // (What the client's own wait on the same matter was in the code arm, from the draft to its answer, and what those
       // hours were worth at the rate the world's decision gives: what skipping the wait could gain, hours x rate / 24.)
       ...(c?.signoff_seconds !== undefined ? { code_wait_days: days(c.signoff_seconds), ...(c.per_day_cents ? { code_wait_worth_cents: Math.round((c.signoff_seconds / DAY) * c.per_day_cents) } : {}) } : {}),

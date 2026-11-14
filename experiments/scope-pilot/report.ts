@@ -18,7 +18,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { priceOf, readExperiment, type Episode, type ExperimentRead } from "./episodes";
+import { pairs, priceOf, readExperiment, type Episode, type ExperimentRead } from "./episodes";
 import { readExperimentFork, verdict } from "./funnel";
 
 const DID: Episode["did"][] = ["waited", "asked_for_more", "acted_beyond", "candidate_override"];
@@ -93,12 +93,38 @@ export async function report(dirs: string[]): Promise<string> {
     if (!price.length) p(`| (none) | | | | | | | | | |`);
     // 4. Clients' outcomes against the code arm.
     const measures = ["received_cents", "support_cents", "loans_cents", "benefit_days_waiting", "claim_days_undecided", "claims_refused"];
-    p(``, `### 4. Clients' outcomes, every client of the seats, each arm against the code arm (totals over clients and seeds)`, ``, `Runs read: ${runs(at)}.`, ``);
+    // 4a. On the matters handed: each model arm's matter against the same matter in the code arm (pairs), the money from
+    // whoever each names; the papers a body sent back for want of the client's authority. The rest of what came to the
+    // same clients is the towns' drift apart after their first difference (4b), said apart and never charged to a seat.
+    p(``, `### 4. Clients' outcomes against the code arm`, ``, `Runs read: ${runs(at)}. On the matters handed: each model arm's matter beside the same matter in the code arm (same client and kind, the nearest hand-over within 3 days); money from whoever the matter names. A matter with no counterpart is counted apart, as drift.`, ``);
+    p(`| arm | matters paired | no counterpart | money on the matters, arm | code | difference | sent back for want of authority, arm / code |`, `|---|---|---|---|---|---|---|`);
+    const driftOf: { [a: string]: number } = {};
+    for (const a of arms.filter((x) => x !== "code")) {
+      const ps = at.flatMap((r) => pairs(r.matters.filter((m) => r.effects[m.arm] === level), a));
+      const both = ps.filter(([m, c]) => c && m.received_cents !== null && c.received_cents !== null) as [any, any][];
+      const mine = both.reduce((n, [m]) => n + m.received_cents, 0), theirs = both.reduce((n, [, c]) => n + c.received_cents, 0);
+      driftOf[a] = mine - theirs;
+      p(`| ${a} | ${ps.filter(([, c]) => c).length} | ${ps.filter(([, c]) => !c).length} | ${money(mine)} | ${money(theirs)} | ${money(mine - theirs)} | ${ps.reduce((n, [m]) => n + (m.returned_authority ?? 0), 0)} / ${ps.reduce((n, [, c]) => n + (c?.returned_authority ?? 0), 0)} |`);
+    }
+    p(``, `#### 4b. Everything that came to the study's cohort, and the towns' drift (the difference not on the matters handed)`, ``);
     p(`| measure | ${arms.join(" | ")} | ${arms.filter((a) => a !== "code").map((a) => `${a} − code`).join(" | ")} |`, `|---|${arms.map(() => "---|").join("")}${arms.filter((a) => a !== "code").map(() => "---|").join("")}`);
     for (const k of measures) {
       const tot = (a: string) => at.flatMap((r) => r.clients).reduce((n, c) => n + Number(c.arms[a]?.[k] ?? 0), 0);
       const f = (x: number) => (k.endsWith("cents") ? money(x) : Number.isInteger(x) ? String(x) : x.toFixed(1));
       p(`| ${k.replace(/_cents$/, "").replace(/_/g, " ")} | ${arms.map((a) => f(tot(a))).join(" | ")} | ${arms.filter((a) => a !== "code").map((a) => f(tot(a) - tot("code"))).join(" | ")} |`);
+      if (k === "received_cents") p(`| of which the towns' drift (not on the matters handed) | ${arms.map(() => "").join(" | ")} | ${arms.filter((a) => a !== "code").map((a) => money(tot(a) - tot("code") - (driftOf[a] ?? 0))).join(" | ")} |`);
+    }
+    // 6. The stake a seat faced: the client's own wait on its episodes' drafts, and what that wait was worth at the rate.
+    p(``, `### The stake: the clients' waits on the episodes' drafts (hours), and their worth at the rate the world's decision gives`, ``, `Runs read: ${runs(at)}.`, ``);
+    p(`| arm | waits | median h | 90th h | longest h | over 1 day | over 3 days | over 6 days | worth at the rate, median | worth, all |`, `|---|---|---|---|---|---|---|---|---|---|`);
+    for (const a of arms) {
+      const epi = new Set(at.flatMap((r) => r.episodes.filter((e) => e.arm === a && /-desk$/.test(e.seat)).map((e) => `${r.experiment}|${e.seed}|${e.matter}`)));
+      const ms = at.flatMap((r) => r.matters.filter((m) => m.arm === a && epi.has(`${r.experiment}|${m.seed}|${m.matter}`) && m.signoff_seconds !== undefined));
+      const hs = ms.map((m) => m.signoff_seconds! / 3600).sort((x, y) => x - y);
+      const worth = ms.filter((m) => m.per_day_cents).map((m) => Math.round((m.signoff_seconds! / 86_400) * m.per_day_cents!)).sort((x, y) => x - y);
+      const q = (xs: number[], f: number) => (xs.length ? xs[Math.min(xs.length - 1, Math.floor(f * xs.length))]! : NaN);
+      const over = (d: number) => `${hs.filter((h) => h > 24 * d).length} (${hs.length ? Math.round((100 * hs.filter((h) => h > 24 * d).length) / hs.length) : 0}%)`;
+      p(`| ${a} | ${hs.length} | ${hs.length ? q(hs, 0.5).toFixed(1) : "-"} | ${hs.length ? q(hs, 0.9).toFixed(1) : "-"} | ${hs.length ? hs.at(-1)!.toFixed(1) : "-"} | ${over(1)} | ${over(3)} | ${over(6)} | ${worth.length ? money(q(worth, 0.5)) : "-"} (${worth.length} with a rate) | ${money(worth.reduce((n, x) => n + x, 0))} |`);
     }
   }
   // 5. The funnel's verdict and the replay.
