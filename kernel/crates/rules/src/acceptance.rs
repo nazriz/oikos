@@ -81,6 +81,7 @@ mod tests {
             items: [("loan_application".to_string(), vec![Item { field: "account".into(), says: "the account to pay it into".into() }, Item { field: "purpose".into(), says: "what it is for".into() }])].into(),
             authority: vec!["loan_application".into()],
             basis: None,
+            also: vec![],
         }
     }
 
