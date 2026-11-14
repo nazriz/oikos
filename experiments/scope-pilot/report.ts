@@ -40,6 +40,7 @@ export function share(k: number, n: number): string {
   const pc = (x: number) => `${(100 * x).toFixed(1)}%`;
   return k === 0 ? `0 of ${n} (at most ${pc(hi)})` : `${k} of ${n}: ${pc(k / n)} (${pc(lo)}–${pc(hi)})`;
 }
+const tenth = (d: number) => (Math.round(d * 10) / 10).toFixed(1);
 const money = (c: number | null | undefined) => (c === null || c === undefined ? "-" : (c / 100).toFixed(2));
 
 /** The replay's classes for a run, by code: run with --json into a scratch file. Undefined if it refuses the run. */
@@ -82,21 +83,21 @@ export async function report(dirs: string[]): Promise<string> {
     // 3. The price, by cause.
     const price = at.flatMap((r) => priceOf(r.matters.filter((m) => r.effects[m.arm] === level), r.lastEnd).map((x) => ({ ...x, experiment: r.experiment })));
     p(``, `### 3. The price of what each seat did not do and did beyond, against the same matter in the code arm, by cause`, ``, `Runs read: ${runs(at)}. Money is the client's, from whoever the matter names; "-" a matter with no payer of its own. Ours: a record the matter cites never shown to the seat, a request on it drawn differently now or still wrong in the replay, or never served.`, ``);
-    p(`| arm | seat | matters | difference, all | ours | the seat's mistakes | the seat's choices | papers went, days vs code, all | outcome or done, days vs code, all |`, `|---|---|---|---|---|---|---|---|---|`);
+    p(`| arm | seat | matters | difference, all | ours | the seat's mistakes | the seat's choices | papers went, days vs code, all | outcome or done, days vs code, all | the clients' own waits in the code arm on these matters, days (worth at the rate) |`, `|---|---|---|---|---|---|---|---|---|---|`);
     for (const key of [...new Set(price.map((x) => `${x.arm}|${x.seat}`))].sort()) {
       const xs = price.filter((x) => `${x.arm}|${x.seat}` === key);
       const by = (c?: string) => xs.filter((x) => !c || x.cause === c).reduce((n, x) => n + (x.difference_cents ?? 0), 0);
       const [a, s] = key.split("|");
-      p(`| ${a} | ${s} | ${xs.length} | ${money(by())} | ${money(by("ours"))} | ${money(by("the seat's mistake"))} | ${money(by("the seat's choice"))} | ${xs.reduce((n, x) => n + x.paper_days_later, 0)} | ${xs.reduce((n, x) => n + x.days_later, 0)} |`);
+      p(`| ${a} | ${s} | ${xs.length} | ${money(by())} | ${money(by("ours"))} | ${money(by("the seat's mistake"))} | ${money(by("the seat's choice"))} | ${tenth(xs.reduce((n, x) => n + x.paper_days_later, 0))} | ${tenth(xs.reduce((n, x) => n + x.days_later, 0))} | ${tenth(xs.reduce((n, x) => n + (x.code_wait_days ?? 0), 0))} (${money(xs.reduce((n, x) => n + (x.code_wait_worth_cents ?? 0), 0))}) |`);
     }
-    if (!price.length) p(`| (none) | | | | | | | | |`);
+    if (!price.length) p(`| (none) | | | | | | | | | |`);
     // 4. Clients' outcomes against the code arm.
     const measures = ["received_cents", "support_cents", "loans_cents", "benefit_days_waiting", "claim_days_undecided", "claims_refused"];
     p(``, `### 4. Clients' outcomes, every client of the seats, each arm against the code arm (totals over clients and seeds)`, ``, `Runs read: ${runs(at)}.`, ``);
     p(`| measure | ${arms.join(" | ")} | ${arms.filter((a) => a !== "code").map((a) => `${a} − code`).join(" | ")} |`, `|---|${arms.map(() => "---|").join("")}${arms.filter((a) => a !== "code").map(() => "---|").join("")}`);
     for (const k of measures) {
       const tot = (a: string) => at.flatMap((r) => r.clients).reduce((n, c) => n + Number(c.arms[a]?.[k] ?? 0), 0);
-      const f = (x: number) => (k.endsWith("cents") ? money(x) : String(x));
+      const f = (x: number) => (k.endsWith("cents") ? money(x) : Number.isInteger(x) ? String(x) : x.toFixed(1));
       p(`| ${k.replace(/_cents$/, "").replace(/_/g, " ")} | ${arms.map((a) => f(tot(a))).join(" | ")} | ${arms.filter((a) => a !== "code").map((a) => f(tot(a) - tot("code"))).join(" | ")} |`);
     }
   }

@@ -222,6 +222,12 @@ table of work's row for it. What their own code does (a matter handed over, a wa
   (WM-20). A person with no habit given (a town generated before it) is as before.
 - **What a desk sees:** nothing new. A draft simply waits for its client, as a real one does.
 - Towns without providers are unchanged, to the hash: the habit is read only by a principal.
+- **A stated condition of a run** (the stakes study, 2026-11-15): a spec may set the shares in place of the profile's
+  (`paperwork.every_days`, the hours kept), as it sets the obstacle level or the support office's staffing. The study's
+  `build.ts` names two (`clientPost`): `ordinary`, the profile's shares; `slow`, a PLACEHOLDER condition, not a figure of
+  any place, in which most people get to their post weekly: every day 10%, every second day 10%, every third day 20%,
+  once a week 60%. Absent, the town is exactly as before. A report says which condition each run was under. Revisit
+  when a time-use source gives how often people deal with their post (MT-37).
 
 ## A model in an assistant seat
 
