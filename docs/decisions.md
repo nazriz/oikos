@@ -14410,3 +14410,20 @@ Landed together on main at bcd7a1af; the whole slow tier run on the batch. What 
   regression check is unchanged (134, all explained).
 - **Revisit if** the study wants a draft for sign-off for someone who handed nothing to go out too: the draft forms
   require a matter, so today such a draft is asked back and only the outright paper can be written.
+
+## 2026-11-15 · What the desk reads, made plain: habits as of today, reports before the seat, authorities, forwards, instants
+
+From the first-sitting read of 2026-11-15 (seat side only; no code participant changes; towns without assistant seats
+do not move).
+- **The client's habit, as of today** (`readers/matters.ts`): each open matter restates the client's own stated habit
+  ("We get to our post every 7 days, next on ...", read from their referral) with their next sitting as of the day it is
+  read; the referral keeps what it said.
+- **A report from before the seat held the post** is marked so ("reported not done on ..., before you took this post"),
+  as sign-offs were.
+- **An authority asked for:** a matter a body sent back for want of the client's authority says whether that body's
+  recording of it has reached the post, or plainly that none has; a recording is that body's only (before, any body's
+  recording for the client matched).
+- **A forward** names its sender `from` (the body's paper's `by`, where it is a day, keeps the name) and leaves out the
+  body's details its words already say: it set out the words three times (`render.ts`, `forwardShown`).
+- **Instants under date-like names** (`_at`, `_on`) are read as dates by one rule (`decided_on` read "896,764").
+- **Revisit if** a client's stated habit changes (D2, away), when the matters reader should read the newest statement.

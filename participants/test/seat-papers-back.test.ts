@@ -163,3 +163,21 @@ test("an assistant's matter that cites a published paper it does not hold: looke
   // (A search of that board the seat makes itself is its own look, set out as one.)
   expect(Object.keys(m.absorb({ t: 32 * DAY, channels: { "a/cited": { kind: "records", search: true, records: [offer] } } } as any).channels)).toEqual(["a/cited"]);
 });
+
+test("an open matter says the client's habit and next sitting as of today, a report from before the seat as such, and whether the body's recording of their authority has reached it", () => {
+  // (The first-sitting read of 2026-11-15: a referral's "next on" was weeks stale; reports by the code desk read as the
+  // seat's own; matters sent back for want of authority said nothing of whether it was ever recorded.)
+  const m = new Matters("a/matters", "a/file");
+  const ref = (id: string, at: number, kind: string) => ({ id, record: "statement", kind: "referral", at, author: "x", speaks_for: "c1", text: `For you to draft for sign-off: a ${kind}. We get to our post every 7 days, next on year 1, day 14.`, data: { kind, wants: "draft" } }) as any;
+  const report = { id: "rec.20", record: "statement", kind: "report", at: 20 * DAY, author: "desk", text: "Not done.", data: { referral: "rec.1", done: false, why: "We cannot act on it for c1." } } as any;
+  const back = (id: string, at: number, by: string, kind: string) => ({ id, record: "statement", kind: "paper_returned", at, author: by, data: { for: "c1", by, need: { authority: { for: "c1", with: by } }, paper: { kind } } }) as any;
+  const recorded = { id: "rec.31", record: "statement", kind: "authority_recorded", at: 22 * DAY, author: "bank", data: { for: "c1", by: "bank" } } as any;
+  m.absorbRead({ t: 30 * DAY, channels: { "a/file": { kind: "records", search: true, records: [report] } } } as any);
+  m.absorb({ t: 30 * DAY, channels: { "a/matters": { kind: "records", records: [ref("rec.1", 8 * DAY, "benefit_claim"), ref("rec.2", 9 * DAY, "loan_application")] }, "a/back": { kind: "records", records: [back("rec.30", 18 * DAY, "outside", "benefit_claim"), back("rec.32", 19 * DAY, "bank", "loan_application"), recorded] } } } as any);
+  const t = m.text();
+  // (Sittings every seven days from day index 13: as of day index 30, the next is day index 34, "year 1, day 35".)
+  expect(t).toContain("c1 gets to their post every 7 days, next on year 1, day 35");
+  expect(t).toContain("reported not done on year 1, day 21, before you took this post");
+  expect(t).toContain("no recording of their authority with outside has reached you");
+  expect(t).toContain("their authority with bank recorded on year 1, day 23 (rec.31)");
+});
