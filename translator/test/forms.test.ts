@@ -137,6 +137,13 @@ test("a form's blanks the request settles in so many words are set by code: the 
     .toBe("form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=rec.5, to=desk)");
   expect(ruled('form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=e-factory-1-works, to=desk)', "Draft for sign-off a job application for c0100, posting rec.9."))
     .toBe("form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=rec.5, to=desk)");
+  // (The study counts it, 2026-11-15.) A paper for someone who handed the seat no matter (c0200) is drawn in their name:
+  // outright, as asked; as a draft, with no matter, which the form asks back for. Never moved onto c0100's matter, nor
+  // made for c0100, whether the model wrote the client or left it empty.
+  const other = "account=acc-c0200, employer=factory-7, form=job_application, posting=rec.9, to=desk";
+  expect(ruled(`form(${other}, client=c0200)`, "Send a job application in c0200's name to factory-7, posting rec.9, into acc-c0200.")).toBe(`form(account=acc-c0200, client=c0200, employer=factory-7, form=job_application, posting=rec.9, to=desk)`);
+  expect(ruled(`form(${other}, client=c0200)`, "Draft for sign-off a job application in c0200's name to factory-7, posting rec.9, into acc-c0200.")).toBe("form(account=acc-c0200, client=c0200, employer=factory-7, form=draft_job_application, posting=rec.9, to=desk)");
+  expect(ruled(`form(${other})`, "Draft for sign-off a job application in c0200's name to factory-7, posting rec.9, into acc-c0200.")).toBe("form(account=acc-c0200, employer=factory-7, form=draft_job_application, posting=rec.9, to=desk)");
   // An optional blank the request says there is none of is left empty.
   expect(ruled('form(connection="energy", form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)', "A supply request on lot-1; no connection.")).toBe("form(form=supply_request, law=law-rates, lots=lot-1, owner=c0057, to=desk)");
   // (Rung 1's third run.) A words blank holding only the id of the matter, or of a record the paper cites, is left

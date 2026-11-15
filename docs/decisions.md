@@ -14396,3 +14396,17 @@ Landed together on main at bcd7a1af; the whole slow tier run on the batch. What 
 - **Revisit if** a correction the check lists turns out to change what a seat would have confirmed (a code-set client
   a principal's code does not read), or the extract outgrows the gate's budget (then sample, or move it to the slow
   tier); or if seats start naming a client other than the matter's on purpose.
+
+## 2026-11-15 · A paper for someone who handed the seat nothing is drawn in their name
+
+- **Why:** the study counts it (the reader's `not_handed` and `no_remit`): a seat that writes a paper for a person with
+  no matter of theirs at its post must get that paper drawn for that person, never moved to another client.
+- **Read:** with the client written, it was: outright, drawn as asked; as a draft for sign-off, drawn on the draft form
+  with no matter, which the form (its referral is required) asks back for. With the client left empty by the model, a
+  draft was silently moved onto the one open matter of its kind, another person's, and the client rule then made the
+  paper that person's.
+- **Decision:** on a form with a client blank left empty, the matter of its kind is taken only if the request names
+  that matter's client. Rules table: three cases for c0200, who handed nothing (translator/test/forms.test.ts). The
+  regression check is unchanged (134, all explained).
+- **Revisit if** the study wants a draft for sign-off for someone who handed nothing to go out too: the draft forms
+  require a matter, so today such a draft is asked back and only the outright paper can be written.
