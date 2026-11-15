@@ -14508,3 +14508,21 @@ do not move).
   translator's next training round, and the seat's retry is the remedy.
 - **Revisit if** a later run brings targets (confirmed redrafts) for the act-word blanks: the act-words rule is kept in
   this entry's words to be scored again then.
+## 2026-11-15 · Rung 1 "c": a paper sent again is its own matter's, not an open want's; a request is answered under its matter's service
+
+**Read** (`runs/scope-stakes-r1-decision-slow-c`, on 6fa2a604). (1) The code arm's one "acted beyond" was the reader's: on
+day 41.9 the code desk sent c0485's pension claim again (rec.33659, citing the client's passed-on copy rec.21865 of the
+support office's return), the authority having been recorded (rec.33658); the matter was rec.14377, handed at draft and
+signed off before the fork. The client had handed over a want meanwhile (rec.28993, a refused claim, day 36.5), and the
+reader gave any paper sent for a principal with a want open to that want, so the claim read "beyond the level" under the
+want. (2) The Haiku desk's four requests for a client's authority (rec.24132 to rec.24135, day 30.5) were never answered:
+each named the matter in the request's agreement blank (`agreement: rec.14377`, the referral), and the client answers
+only a request under a service of its own, so it set each aside without a word. Their clients did sit (c0485 gave the
+authority on day 34.9, from the desk's earlier report), so slow clients were not the cause.
+**Decision.** (1) The reader: a paper that cites one sorted against another of the principal's matters (a return, or
+the client's copy of it) is that matter's, before any open want's (beyond.rs); re-read, the code arm has no act beyond.
+(2) The principal: a request names its service by the agreement, or by the matter it names (`matter`, `only`, or a
+referral of its own in the agreement's place); it is answered under that matter's service, and a matter's kind is read
+from its referral on file whether or not it is still open.
+- **Revisit if** a desk's paper cites papers of two matters (then the first found is its matter), or a request names
+  nothing of the client's at all (it is still set aside, unanswered: say so if a run shows it).

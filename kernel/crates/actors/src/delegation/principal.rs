@@ -777,6 +777,23 @@ impl State {
     /// A letter from its assistant whose `re` is a matter of its, a return it holds, or the paper returned: each return it
     /// holds on that matter, with what it asks of it still to meet, is met. A return on a matter: one citing the paper
     /// named, or, for a matter named, one that came after the matter was handed over.
+    /// The service a request for more is under, as the client knows it: the agreement it names, where that is a service of
+    /// its own; else that of the matter it names (its `matter`, `only`, or a referral of its own put where the agreement
+    /// goes: the stakes run's rung 1 "c", 2026-11-15, where four requests named the matter there and went unanswered).
+    fn service_of_request(&self, x: &ScopeRequest) -> Option<String> {
+        if self.eng.by_agreement(&x.agreement).is_some() {
+            return Some(x.agreement.clone());
+        }
+        [x.matter.as_deref(), x.only.as_deref(), Some(x.agreement.as_str())]
+            .into_iter()
+            .flatten()
+            .filter_map(|m| self.book.get(m))
+            .filter(|q| q.speaks_for.as_deref() == Some(self.me.as_str()))
+            .filter_map(|q| papers::read::<Referral>(q))
+            .map(|q| q.agreement)
+            .find(|a| self.eng.by_agreement(a).is_some())
+    }
+
     /// An authority its assistant asks for at a body, on its request form: given from the body's own notice on its file
     /// (a return asking its authority for this post), for a matter of its own with this assistant (open or not) or a kind
     /// it hands over; `meet` decides and lodges, as for a report or a letter. The kinds given, where one was; none where no
@@ -976,7 +993,7 @@ impl State {
                 self.questions.push(id);
             }
         } else if let Some(x) = papers::read::<ScopeRequest>(r) {
-            if self.eng.by_agreement(&x.agreement).is_some() {
+            if self.service_of_request(&x).is_some() {
                 // (Answered in its own time, part by part, by its rule: `answer`. Before 2026-11-10 a request only brought
                 // its review forward, and nothing it asked for was read: the scope pilot.)
                 let id = r.id.to_string();
@@ -1342,7 +1359,11 @@ impl State {
     /// grants cites it too. Its words are the office's own.
     fn answer(&mut self, id: &str, pic: &Picture, cx: &mut Cx) {
         let Some(r) = self.book.get(id).cloned() else { return };
-        let Some(x) = papers::read::<ScopeRequest>(&r) else { return };
+        let Some(mut x) = papers::read::<ScopeRequest>(&r) else { return };
+        // (The service it is under, as the client knows it: the agreement named, or the one of the matter it names.)
+        if let Some(a) = self.service_of_request(&x) {
+            x.agreement = a;
+        }
         let t = pic.t;
         let date = |at: i64| crate::common::when_words(at, &cx.ctx.world);
         let mut parts: Vec<Part> = vec![];
@@ -1353,7 +1374,10 @@ impl State {
         let mut inputs: Vec<String> = vec![id.to_string()];
         let e = self.eng.by_agreement(&x.agreement).cloned();
         // A kind at a level (the kind of the matter it names, where it names a level alone).
-        let kind = x.kind.clone().or_else(|| x.matter.as_ref().and_then(|m| self.by_referral.get(m)).and_then(|a| self.matters.get(a)).map(|m| m.kind.clone()));
+        // (Of any matter of its own with this assistant, open or not: its referral on file says the kind.)
+        let kind = x.kind.clone().or_else(|| x.matter.as_ref().and_then(|m| self.by_referral.get(m)).and_then(|a| self.matters.get(a)).map(|m| m.kind.clone())).or_else(|| {
+            x.matter.as_ref().and_then(|m| self.book.get(m)).filter(|q| q.speaks_for.as_deref() == Some(self.me.as_str())).and_then(|q| papers::read::<Referral>(q)).map(|q| q.kind)
+        });
         if let (Some(level), Some(k)) = (x.level, kind.clone()) {
             let a = x.agreement.clone();
             let now = self.remit(&a, &k);

@@ -499,6 +499,12 @@ fn an_authority_asked_for_on_the_request_form_is_given_from_the_bodys_notice_for
     let given = out.lines().find(|l| l.contains("kind=authority")).unwrap_or_else(|| panic!("an authority from the body's notice: {out}"));
     assert!(given.contains("to=[\"court\"]") && given.contains("\"posts\":[\"ll-assistant\"]") && given.contains("basis=rec.ret"), "{given}");
     assert!(out.lines().any(|l| l.contains("kind=scope_answer") && l.contains("\"why\":\"lodged\"")), "{out}");
+    // (A request that puts the matter where the service's agreement goes is answered all the same, under the matter's
+    // service: the stakes run's rung 1 "c", where four such requests went unanswered.)
+    let mut odd = ask("rec.ask3", "court");
+    odd["data"]["agreement"] = json!(referral.clone());
+    let out = all(&h.wake(38 * DAY + 3600, world(vec![odd])));
+    assert!(out.lines().any(|l| l.contains("kind=scope_answer") && l.contains("rec.ask3")), "answered: {out}");
 }
 
 #[test]
