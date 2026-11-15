@@ -284,6 +284,10 @@ export interface RuleTrace { rule: string; what: string }
 
 type Standing = "code" | "named" | "fill" | "correct" | "redraw";
 /** Every rule, by name, with its standing in the order above. */
+/** Rules switched off, by name: for scoring each rule's worth on the scored set (translator/eval/score.ts), never in a run. */
+export const SWITCHED_OFF = new Set<string>();
+export const RULE_NAMES = (): string[] => Object.keys(RULES);
+export const STANDING_OF = (name: string): string => RULES[name] ?? "?";
 const RULES: { [name: string]: Standing } = {
   // redraws onto another form
   question: "redraw", sendSigned: "redraw", signedCopySent: "redraw", draftForm: "redraw",
@@ -327,6 +331,7 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
    * (then that form is drawn, its blanks its own), and the model's own form is not one the request names. */
   const mayRedraw = (rule: string, act: boolean, target: string | undefined): boolean => {
     if (RULES[rule] !== "redraw") throw new Error(`${rule} is no redraw`);
+    if (SWITCHED_OFF.has(rule)) return false;
     return act && !namedForms.length && !modelFormNamed(target);
   };
 
@@ -385,7 +390,7 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
   if (!("lines" in p) && namedForm) {
     const field = typeof namedForm.data?.copies === "string" ? namedForm.data.copies.replace(/^=/, "") : undefined;
     const c = field ? copyOf(named, k, field) : [];
-    if (field && c.length === 1) {
+    if (field && c.length === 1 && !SWITCHED_OFF.has("formById")) {
       note("formById", `drawn as ${namedForm.data.form} of ${c[0]}`);
       return { lines: [{ call: { fn: "form", args: { form: { id: namedForm.data.form }, to: { id: whoseForm(namedForm)! }, [field]: { id: c[0]! } } } as calls.Call }] };
     }
@@ -401,6 +406,7 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     /** The one place a blank is changed, by the order above. */
     const edit = (rule: string, field: string, v: calls.Value | undefined): void => {
       const s = RULES[rule];
+      if (SWITCHED_OFF.has(rule)) return;
       if (!s || s === "redraw") throw new Error(`no blank rule ${rule}`);
       const had = args[field];
       if (JSON.stringify(had) === JSON.stringify(v)) { if (s === "named") locked.add(field); return; }
@@ -423,7 +429,7 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     const draft0 = !sender && !namedForm && f && f.data?.writes?.kind !== "draft" ? k.forms.find((x) => x.data?.form === `draft_${f!.data.form}` && whoseForm(x) === whoseForm(f!)) : undefined;
     const draftOf = draft0 && mayRedraw("draftForm", DRAFT_FOR_SIGN_OFF.test(request.slice(0, 80)), draft0.data.form) ? draft0 : undefined;
     // (The form the request names outright.)
-    const byId = namedForm && namedForm.id !== f?.id ? namedForm : undefined;
+    const byId = namedForm && namedForm.id !== f?.id && !SWITCHED_OFF.has("formById") ? namedForm : undefined;
     const to = sender ?? byId ?? draftOf;
     if (to) {
       note(to === sender ? "signedCopySent" : to === byId ? "formById" : "draftForm", `form: ${argText(args.form)} -> ${to.data.form}`);
@@ -573,7 +579,7 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
   // (A letter beside a form the request names by its id, in the form's own words: the form said again as a letter
   // nobody asked for. Rung 1, 2026-11-15: a question to the client drawn with a letter to the bank in its words.)
   const formWords = new Set(lines.filter((l) => l.call.fn === "form").flatMap((l) => Object.values(l.call.args).flatMap((v) => (v && "text" in v ? [(v as { text: string }).text.trim().replace(/[.\s]+$/, "")] : []))));
-  const kept = namedForms.length === 1 ? lines.filter((l) => !(l.call.fn === "message" && formWords.has((argText(l.call.args.text) ?? "").trim().replace(/[.\s]+$/, "")))) : lines;
+  const kept = namedForms.length === 1 && !SWITCHED_OFF.has("letterAgain") ? lines.filter((l) => !(l.call.fn === "message" && formWords.has((argText(l.call.args.text) ?? "").trim().replace(/[.\s]+$/, "")))) : lines;
   if (kept.length !== lines.length) note("letterAgain", `${lines.length - kept.length} letter(s) in a named form's words dropped`);
   return { lines: kept };
 }

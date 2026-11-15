@@ -3,3 +3,6 @@ target/
 /runs/
 .DS_Store
 .claude/
+
+# translator/eval/score.ts: a rules version written out to be scored (removed after)
+translator/src/.score-rules-*.ts
