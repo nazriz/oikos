@@ -292,7 +292,7 @@ const RULES: { [name: string]: Standing } = {
   // redraws onto another form
   question: "redraw", sendSigned: "redraw", signedCopySent: "redraw", draftForm: "redraw",
   // the seat names outright
-  formById: "named", namedChoice: "named", entityWith: "named", namedValue: "named", namedWords: "named", leftEmpty: "named",
+  formById: "named", namedChoice: "named", entityWith: "named", namedValue: "named", leftEmpty: "named",
   // fills what is empty
   matterNamed: "fill", referralOfKind: "fill", recordNamed: "fill",
   // corrects what is plainly contradicted
@@ -471,14 +471,9 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       const copied = v && "id" in v && field === copyField0 ? copyOf([v.id], k, field) : [];
       if (v && copied.length === 1) edit("namedValue", field, { id: copied[0]! });
       else if (v && fits(t.type, v, isRecord)) edit("namedValue", field, t.type === "text" && "id" in v ? { text: v.id } : v);
-      else if (!v && t.type === "text") {
-        // (A words blank the request gives as "<blank>: words;" unquoted, of which the translator wrote only the start:
-        // the request's words. Rung 1 rerun: "need: proof of who you are and of the details of your claim, as asked"
-        // written "proof of who you are".)
-        const m = new RegExp(`(?:^|[;,.(]\\s*)${spoken(field)}\\s*:\\s*([^;"“”]{3,240}?)\\s*(?:;|\\.\\s|\\.$|$)`, "i").exec(request);
-        const said = m?.[1]?.trim(), had = args[field] && "text" in args[field]! ? (args[field] as { text: string }).text.trim() : undefined;
-        if (said && had && said !== had && said.toLowerCase().startsWith(had.toLowerCase())) edit("namedWords", field, { text: said });
-      }
+      // (No rule takes a words blank's unquoted "<blank>: words" from the request: `namedWords`, added after the rung 1
+      // rerun, was the one rule with a net loss on the scored set, and misfired in run c ('claim): which paper is your
+      // ...'), 2026-11-15.)
       if (!v && !t.required && args[field] !== undefined && leftEmpty(request, field)) edit("leftEmpty", field, undefined);
     }
 
