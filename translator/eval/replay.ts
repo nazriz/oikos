@@ -11,136 +11,127 @@
 // drawn or previewed differently, each listed with the seat's reason, for a reader to check. Then every request still
 // wrong (drawn the same, and declined or asked back), with a one-line class. No model is called.
 //
-//   bun translator/eval/replay.ts <run folder>
+//   bun translator/eval/replay.ts <run folder> [--json <file>]
+//
+// The regression check (docs/handover.md; translator/src/rules.ts, its order of precedence): every request a seat
+// confirmed as drawn, in every model arm of the runs named, drawn and previewed by the rules now; each one drawn or
+// shown differently is listed with the rules that touched it, and it exits 1 if any is not in the explained file
+// (translator/test/regress-explained.json, each entry pointing at its docs/decisions.md entry). With `--extract` it
+// also writes the compact extract the gate's check reads (translator/test/regress.test.ts): the requests and what each
+// seat was shown, each record once, gzipped. A `.json.gz` extract may be named in place of a run.
+//
+//   bun translator/eval/replay.ts --regress <run folders or extract...> [--extract <file.json.gz>] [--explained <file>]
 //
 // It refuses a run whose seat-days hold the pilot cases (translator/eval/pilot-cases.ts): those stay out of all of it.
 
-import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve as pathResolve } from "node:path";
-import { calls } from "@oikos/participants";
-import { kernelBinary } from "../../orchestrator/src/kernel";
-import { Knowledge } from "../src/knowledge";
-import { Preview } from "../src/preview";
-import { resolve } from "../src/resolver";
-import { formRules, misread, recordTest, ruled } from "../src/rules";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { PILOT_CASES } from "./pilot-cases";
+import { canon, changesBetween, compact, expand, explainedKeys, keyOf, readArm, regressions, replayOne, withKnowledge, type ArmLog, type CompactArm, type Difference, type Explained, explainedOf } from "./requests";
 
+const argv = process.argv.slice(2);
+const flag = (name: string) => { const i = argv.indexOf(name); return i >= 0 ? argv.splice(i, 2)[1] : undefined; };
 // (`--json <file>`: each request's class, by arm and reference, for the episode reader's price table: "still_wrong",
 // "changed" or "right" (accepted and drawn the same).)
-const argv = process.argv.slice(2);
-const jsonAt = argv.indexOf("--json");
-const jsonOut = jsonAt >= 0 ? argv.splice(jsonAt, 2)[1] : undefined;
-const folder = argv[0];
-if (!folder) {
-  console.error("usage: bun translator/eval/replay.ts <run folder> [--json <file>]");
+const jsonOut = flag("--json");
+const extractOut = flag("--extract");
+const explainAs = flag("--explain");
+const explainedAt = flag("--explained") ?? join(import.meta.dir, "..", "test", "regress-explained.json");
+const regress = argv[0] === "--regress" ? (argv.shift(), true) : false;
+if (!argv.length) {
+  console.error("usage: bun translator/eval/replay.ts <run folder> [--json <file>]\n       bun translator/eval/replay.ts --regress <run folders or extract...> [--extract <file.json.gz>] [--explained <file>]");
   process.exit(2);
 }
-const run = realpathSync(pathResolve(folder));
 // (The pilot cases' runs, by their folder as the cases name it: refused, folder and any folder inside one.)
 const held = [...new Set(PILOT_CASES.map((c) => c.from.run.replace(/\/+$/, "")))];
-if (held.some((h) => run.endsWith(`/${h}`) || run.includes(`/${h}/`))) {
-  console.error(`${run} holds the pilot cases' seat-days (translator/eval/pilot-cases.ts): they stay out of all of it.`);
-  process.exit(3);
+function runOf(folder: string): { run: string; logs: string[] } {
+  const run = realpathSync(pathResolve(folder));
+  if (held.some((h) => run.endsWith(`/${h}`) || run.includes(`/${h}/`))) {
+    console.error(`${run} holds the pilot cases' seat-days (translator/eval/pilot-cases.ts): they stay out of all of it.`);
+    process.exit(3);
+  }
+  const seeds = readdirSync(run).filter((d) => d.startsWith("seed-")).map((d) => join(run, d));
+  const logs = (seeds.length ? seeds : [run]).flatMap((d) => readdirSync(d).filter((f) => f.endsWith(".oklog") && f !== "base.oklog" && f !== "code.oklog").map((f) => join(d, f)));
+  if (!logs.length) { console.error(`no model arm's log in ${run}`); process.exit(2); }
+  return { run, logs };
 }
 
-const seeds = readdirSync(run).filter((d) => d.startsWith("seed-")).map((d) => join(run, d));
-const logs = (seeds.length ? seeds : [run]).flatMap((d) => readdirSync(d).filter((f) => f.endsWith(".oklog") && f !== "base.oklog" && f !== "code.oklog").map((f) => join(d, f)));
-if (!logs.length) {
-  console.error(`no model arm's log in ${run}`);
-  process.exit(2);
+/** Every model arm of these runs, read from their logs, or from an extract (a `.json.gz` named in place of a run). */
+async function arms(folders: string[]): Promise<ArmLog[]> {
+  const out: ArmLog[] = [];
+  const scratch = mkdtempSync(join(tmpdir(), "oikos-replay-"));
+  try {
+    for (const folder of folders) {
+      if (folder.endsWith(".json.gz")) { out.push(...(JSON.parse(gunzipSync(await Bun.file(folder).bytes()).toString()) as CompactArm[]).map(expand)); continue; }
+      const { run, logs } = runOf(folder);
+      for (const log of logs) out.push(await readArm(log, run.split("/").pop()!, scratch));
+    }
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+  return out;
 }
 
-interface Req {
-  ref: string; seq: number; seat: string; request: string; raw?: string; stage?: string;
-  call?: string; summary?: string; decision?: "accept" | "reject"; note?: string; failure?: string; failedCall?: string;
+if (regress) {
+  const all = await arms(argv);
+  if (extractOut) {
+    const bytes = gzipSync(JSON.stringify(all.map(compact)), { level: 9 });
+    await Bun.write(extractOut, bytes);
+    console.log(`extract: ${extractOut}, ${(bytes.length / 1e6).toFixed(2)} MB, ${all.reduce((n, a) => n + a.requests.length, 0)} requests in ${all.length} arms`);
+  }
+  const explained = await explainedKeys(explainedAt);
+  let confirmed = 0;
+  const open: Difference[] = [], known: Difference[] = [];
+  for (const a of all) {
+    const r = regressions(a);
+    confirmed += r.confirmed;
+    for (const d of r.differences) (explained.has(keyOf(d)) ? known : open).push(d);
+  }
+  console.log(`Regression check: ${confirmed} requests the seats confirmed as drawn, in ${all.length} arms; drawn or shown differently now: ${open.length + known.length} (${known.length} explained in docs/decisions.md).`);
+  for (const d of [...open, ...known]) console.log(describe(d, explained.has(keyOf(d))));
+  // (`--explain "<decisions.md heading>"`: every difference not yet explained written into the explained file as a
+  // correction under that entry; only once the entry says why each is right. A regression is fixed, never explained.)
+  if (explainAs && open.length) {
+    const was: Explained[] = (await Bun.file(explainedAt).exists()) ? await Bun.file(explainedAt).json() : [];
+    const add: Explained[] = open.map((d) => explainedOf(d, explainAs));
+    await Bun.write(explainedAt, `[\n${[...was, ...add].map((x) => JSON.stringify(x)).join(",\n")}\n]\n`);
+    console.log(`\n${add.length} written to ${explainedAt} as explained by "${explainAs}".`);
+    process.exit(0);
+  }
+  process.exit(open.length ? 1 : 0);
 }
-const DRAFT_ID = /^draft\.(.+)\.(\d+)$/;
-const scratch = mkdtempSync(join(tmpdir(), "oikos-replay-"));
+
+const { run } = runOf(argv[0]!);
 const totals = new Map<string, { offered: number; accepted: number; first: number; firstAccepted: number; low: number; high: number; firstLow: number; firstHigh: number }>();
 const wrong: string[] = [];
 const classes: { arm: string; ref: string; class: "still_wrong" | "changed" | "right" }[] = [];
 const changed: string[] = [];
-
-try {
-  for (const log of logs) {
-    const out = join(scratch, "log.jsonl");
-    const ex = Bun.spawnSync([kernelBinary(), "export", log, "--out", out]);
-    if (ex.exitCode !== 0) throw new Error(`export failed for ${log}: ${ex.stderr.toString().slice(0, 300)}`);
-    const config = JSON.parse(readFileSync(join(log, "..", "config.json"), "utf8"));
-    const currency = config.world?.currencies?.[0];
-    const reqs = new Map<string, Req>();
-    const obs: { seat: string; seq: number; o: any }[] = [];
-    const model = new Map<string, string>();
-    const stream = Bun.file(out).stream().pipeThrough(new TextDecoderStream());
-    let rest = "";
-    for await (const chunk of stream) {
-      const lines = (rest + chunk).split("\n");
-      rest = lines.pop()!;
-      for (const l of lines) {
-        if (!l.includes('"annotation"') || l.includes('"annotation":"decision"') || l.includes('"annotation":"outcome"')) continue;
-        const e = JSON.parse(l);
-        const b = e.body ?? {};
-        const at = (ref: string) => reqs.get(ref) ?? (reqs.set(ref, { ref, seq: e.seq, seat: DRAFT_ID.exec(ref)?.[1] ?? "?", request: "" }), reqs.get(ref)!);
-        if (b.annotation === "usage" && b.purpose === "participant" && typeof b.subject === "string" && !model.has(b.subject)) model.set(b.subject, `${b.provider}/${b.model}`);
-        else if (b.annotation === "observation" && typeof b.subject === "string") obs.push({ seat: b.subject, seq: e.seq, o: b.data.observation });
-        else if (b.annotation === "transcript" && b.data?.purpose === "translator" && typeof b.data.ref === "string") {
-          const r = at(b.data.ref);
-          if (!r.request) {
-            r.seq = e.seq;
-            r.request = String(b.data.input ?? "").split("\n\nForms this person knows of:")[0]!.replace(/^Request: /, "");
-            r.raw = (b.data.output ?? []).find((o: any) => o.type === "tool_use")?.input?.program;
-          }
-        } else if (b.annotation === "note" && b.data?.translation_route?.draft) at(b.data.translation_route.draft).stage = b.data.translation_route.stage;
-        else if (b.annotation === "draft" && b.draft?.id) Object.assign(at(b.draft.id), { call: b.draft.call, summary: b.draft.summary });
-        else if (b.annotation === "signoff" && b.draft) Object.assign(at(b.draft), { decision: b.decision, note: b.note });
-        else if (b.annotation === "translation_failure" && b.data?.draft && !b.data.drawn_up_again) Object.assign(at(b.data.draft), { failure: b.data.reason, failedCall: b.data.call });
-      }
+for (const a of await arms([argv[0]!])) {
+  const arm = a.arm;
+  for (const [r, k] of withKnowledge(a)) {
+    const who = `${arm}: ${a.model[r.seat] ?? r.seat}`;
+    const t = totals.get(who) ?? { offered: 0, accepted: 0, first: 0, firstAccepted: 0, low: 0, high: 0, firstLow: 0, firstHigh: 0 };
+    totals.set(who, t);
+    const { now, preview } = replayOne(r, k);
+    const logged = r.call ?? r.failedCall ?? "";
+    // (Accepted and drawn the same: accepted now, whatever the preview's wording. Not accepted: the same only where both
+    // the call and what the seat would be shown are.)
+    const same = canon(now) === canon(logged) && (r.decision === "accept" || r.summary === undefined || preview === r.summary);
+    const first = (r.stage ?? "first") === "first";
+    if (r.call) t.offered++;
+    if (first) t.first++;
+    if (r.decision === "accept") { t.accepted++; if (first) t.firstAccepted++; }
+    if (r.decision === "accept" && same) { t.low++; if (first) t.firstLow++; t.high++; if (first) t.firstHigh++; classes.push({ arm, ref: r.ref, class: "right" }); continue; }
+    classes.push({ arm, ref: r.ref, class: same ? "still_wrong" : "changed" });
+    if (!same) {
+      t.high++; if (first) t.firstHigh++;
+      changed.push(`${who} ${r.ref}${first ? "" : " (restated)"}: ${r.decision === "accept" ? "accepted" : r.decision === "reject" ? `declined ("${cut(r.note ?? "", 110)}")` : `asked back ("${cut(r.failure ?? "", 110)}")`}\n    logged: ${cut(logged, 160)}\n    now:    ${cut(now, 160)}${newLines(r.summary ?? "", preview).map((x) => `\n    shown:  ${cut(x, 220)}`).join("")}`);
+      continue;
     }
-    const arm = log.split("/").pop()!.replace(/\.oklog$/, "");
-    for (const r of [...reqs.values()].filter((x) => x.request && x.raw).sort((a, b) => a.seq - b.seq)) {
-      const who = `${arm}: ${model.get(r.seat) ?? r.seat}`;
-      const t = totals.get(who) ?? { offered: 0, accepted: 0, first: 0, firstAccepted: 0, low: 0, high: 0, firstLow: 0, firstHigh: 0 };
-      totals.set(who, t);
-      // The seat's knowledge as it stood when it asked: everything it was shown before.
-      const k = new Knowledge(currency);
-      for (const x of obs) if (x.seat === r.seat && x.seq < r.seq) k.absorb(x.o);
-      let now = r.raw!, preview = "";
-      try {
-        const p = calls.parseProgram(r.raw!);
-        const fr = formRules(p, r.request, k);
-        const wrong = misread(fr, r.request, k);
-        const ru = ruled(fr, r.request, recordTest(k));
-        // (A reading code tells is wrong goes back to the translator with why: a fresh model call, not replayed here.)
-        if (wrong) [now, preview] = [`(the translator asked again: ${wrong})`, ""];
-        else if (ru.ok) {
-          now = calls.programText(ru.program);
-          const as = [...k.held][0];
-          const res = resolve(ru.program, k, () => undefined, as, { written: true });
-          preview = res.ok ? new Preview(k, k.actingFor(as), () => undefined, as).of(res.blocks, givenOf(ru.program)) : `asked: ${res.questions.join(" ")}`;
-        } else preview = `asked: ${ru.ask}`;
-      } catch (e) { preview = `could not be replayed: ${String((e as Error).message).slice(0, 120)}`; }
-      const logged = r.call ?? r.failedCall ?? "";
-      // (Accepted and drawn the same: accepted now, whatever the preview's wording. Not accepted: the same only where both
-      // the call and what the seat would be shown are.)
-      const same = canon(now) === canon(logged) && (r.decision === "accept" || r.summary === undefined || preview === r.summary);
-      const first = (r.stage ?? "first") === "first";
-      if (r.call) t.offered++;
-      if (first) t.first++;
-      if (r.decision === "accept") { t.accepted++; if (first) t.firstAccepted++; }
-      const counts = (x: boolean) => { if (x) { t.high++; if (first) t.firstHigh++; } };
-      if (r.decision === "accept" && same) { t.low++; if (first) t.firstLow++; t.high++; if (first) t.firstHigh++; classes.push({ arm, ref: r.ref, class: "right" }); continue; }
-      classes.push({ arm, ref: r.ref, class: same ? "still_wrong" : "changed" });
-      if (!same) {
-        counts(true);
-        changed.push(`${who} ${r.ref}${first ? "" : " (restated)"}: ${r.decision === "accept" ? "accepted" : r.decision === "reject" ? `declined ("${cut(r.note ?? "", 110)}")` : `asked back ("${cut(r.failure ?? "", 110)}")`}\n    logged: ${cut(logged, 160)}\n    now:    ${cut(now, 160)}${newLines(r.summary ?? "", preview).map((x) => `\n    shown:  ${cut(x, 220)}`).join("")}`);
-        continue;
-      }
-      wrong.push(`${who} ${r.ref}: ${r.decision === "reject" ? `declined, drawn the same now: "${cut(r.note ?? "", 140)}"` : r.failure ? `asked back, the same now: "${cut(r.failure, 140)}"` : "drafted, not answered"}  [${cut(r.request, 100)}]`);
-    }
+    wrong.push(`${who} ${r.ref}: ${r.decision === "reject" ? `declined, drawn the same now: "${cut(r.note ?? "", 140)}"` : r.failure ? `asked back, the same now: "${cut(r.failure, 140)}"` : "drafted, not answered"}  [${cut(r.request, 100)}]`);
   }
-} finally {
-  rmSync(scratch, { recursive: true, force: true });
 }
 
 if (jsonOut) await Bun.write(jsonOut, JSON.stringify(classes, null, 1));
@@ -154,22 +145,15 @@ for (const c of changed) console.log(`- ${c}`);
 console.log(`\nStill wrong (${wrong.length}): drawn and shown the same now, and declined or asked back:`);
 for (const w of wrong) console.log(`- ${w}`);
 
+function describe(d: Difference, explained: boolean): string {
+  return `\n- ${explained ? "(explained) " : ""}${d.run} ${d.arm} ${d.ref}, by ${d.rules.join(", ") || "(no rule: the preview or the resolver)"}\n    asked:  ${cut(d.request, 220)}\n    logged: ${cut(d.logged, 220)}\n    now:    ${cut(d.now, 220)}\n    change: ${cut(changesBetween(d.logged, d.now), 300)}${newLines(d.shownThen, d.shownNow).map((x) => `\n    shown:  ${cut(x, 220)}`).join("")}`;
+}
 /** The lines of what the seat would be shown now that it was not shown then (the first three). */
 function newLines(was: string, now: string): string[] {
   const old = new Set(was.split("\n").map((x) => x.trim()));
   return now.split("\n").map((x) => x.trim()).filter((x) => x && !old.has(x)).slice(0, 3);
 }
-function canon(s: string): string {
-  try { return calls.programText(calls.parseProgram(s)); } catch { return s; }
-}
 function cut(s: string, n: number): string {
   const one = s.replace(/\s+/g, " ").trim();
   return one.length <= n ? one : `${one.slice(0, n - 1)}…`;
-}
-/** The blanks a call's form lines filled, as written (translator/src/index.ts, `givenOf`). */
-function givenOf(p: calls.Program): { [field: string]: unknown } | undefined {
-  if (!("lines" in p)) return undefined;
-  const o: { [field: string]: unknown } = {};
-  for (const l of p.lines) if (l.call.fn === "form") for (const [k, v] of Object.entries(l.call.args)) if (!["form", "to", "for"].includes(k)) o[k] = "text" in v ? v.text : "id" in v ? v.id : undefined;
-  return Object.keys(o).length ? o : undefined;
 }

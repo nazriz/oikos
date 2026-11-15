@@ -14249,3 +14249,60 @@ the client's own id (a translator rule, another worker's).
   request names one matter handed over is that one. Replayed, the four are scope requests with the body and matter.
 - **Revisit if** a seat asks a question whose words name another form ("ask the client whether a scope request is
   wanted"): the drawing then decides, and a model that drew the named form would be kept.
+
+## 2026-11-15 · The regression check over every real request, and the order of precedence among the form rules
+
+- **Why:** three rules added after one run, keyed on its phrasing, broke twelve of the next run's sixteen faults. Rules
+  were being checked only against the run they were written for.
+- **The check** (`bun translator/eval/replay.ts --regress <runs or extract>`; in the gate as
+  `translator/test/regress.test.ts`): every request a model seat confirmed as drawn, in every real run we hold, is
+  drawn again by the rules now on the seat's knowledge as it stood, and must do the same (resolved to the same acts)
+  and be shown the same (previewed by the code now, so a change in the preview's own wording is not counted). Each
+  difference is listed with the rules that touched it; any not explained here fails. It reads a compact extract kept
+  on the run server (`~/oikos/runs/regress/requests.json.gz`, 1.5 MB: 1,152 requests in 9 arms of
+  scope-first-pilot, scope-obstacle-r1-L2, -b, -c, scope-stakes-r1-decision-slow, -b; 658 confirmed), not the logs; it
+  takes about a second. The extract stays out of git with the runs; where it is absent (a hosted runner) the test says
+  so and checks nothing. The explained file (`translator/test/regress-explained.json`) holds the request, a digest of
+  the call drawn now, the blanks and the rules, none of the run's words.
+- **Today, main with r1b-fixes: 238 differences.** 170 were regressions already on main: `law` taken out of 170 rates
+  notices and withholding returns of the first pilot ("law law-rates": the 2026-11-14 rule that clears a record blank
+  holding no record took a law's id, which the seat cites but was never shown on a channel of records), 42 of them
+  also with their `lots` cut to the first lot ("lots: lot-a005, lot-b006", a named value read as one id). Both fixed:
+  a record blank is cleared only where it holds a minted record (a matter, a copy) or an id the seat knows as no record;
+  a list blank named with several ids keeps the model's list. The other 68, and 66 more the law difference had hidden,
+  are corrections, explained here (134 in the explained file):
+  - the first pilot's local model: a referral written as a law, a sign-off, a word or a person ("referral=law-rates",
+    "sign-off", "report", "c0736") cleared, and the one matter of the kind taken where there is one (else asked back for
+    it); 25 drafts for sign-off drawn and confirmed as the outright paper (17 job applications, 8 rates notices) drawn as
+    their draft forms; and whom the work is for set to who handed over the matter (9);
+  - the first pilot's Sonnet, Sol and Haiku: whom a report or request is for set to the entity that handed the matter
+    over, not its post ("finance", "rates", "factory-1-manager" to city or factory-1: 7); a connection's id where its
+    whole sentence was written (2); a signed delivery note written anew as a statement, now sent as signed (1);
+  - the stakes run's rung 1: the authority asked with the bank, not the client (2), and a review request's `about` kept
+    as the refusal it cites (1); its rerun: the four asks for a body's authority as scope requests, not questions (4).
+- **What it would not have caught:** the three misfires of the rerun. Their phrasing ("(send-signed ask-34)", a question
+  naming its own form) appeared in no earlier confirmed request; with main's rules before r1b-fixes, the check finds
+  the same differences on the earlier runs as after. It guards what has worked; a new phrasing still needs its run.
+- **The order of precedence**, at the head of `formRules`, enforced in one place (`edit` for blanks, `mayRedraw` for
+  forms), every rule named with its standing: 0, code sets whose form it is (`to`) and whom the work is for (`client`);
+  1, what the seat names outright wins (a form by id or as a form, a blank by its name and value) and no later rule
+  changes it; 2, the model's draw where not contradicted; 3, a phrasing rule only fills what is empty or corrects what
+  is plainly contradicted; 4, a redraw onto another form only where the request's first words name that act, it names
+  no form outright, and the model's own form is not one it names (by id, as a form, or by its several-word name in
+  words; not the paper a draft form drafts or a copying form sends).
+- **Rules that broke the order before today:** the signed copy sent as it stands (`signedCopySent`) redrew with no check
+  of the request's first words; the draft form (`draftForm`) took "draft for sign-off" anywhere in the request; the send
+  as signed (`sendSigned`) did not ask whether the model's own form was named; `client` overrode a client the seat named
+  (now explicitly code's, step 0); the clearing of a record blank (`notARecord`) and the named value of a list
+  (`namedValue`) changed what the seat named outright; the paper's-words, record's-words and hand-over's-words
+  corrections could clear or rewrite a blank the seat named. The question rule broke it on main and was brought in line
+  by r1b-fixes. All now go through `edit` and `mayRedraw`.
+- **Decision:** no change to the rules lands without the check at zero or each difference explained in an entry here
+  (docs/handover.md; the head of translator/src/rules.ts). After each real run the extract is rebuilt with it added.
+- **Also, the episode reader** (experiments/scope-pilot/episodes.ts): a request is on a matter only if made after its
+  hand-over. The factory's invoice handed over on day 44, 0.2 days before the end, was priced "ours" (-293,692.00)
+  for two day-37 requests on the invoice before it, which shares its standing offer; it is the run's end: the code arm
+  invoiced and was paid within hours of the hand-over, and the model seat had no sitting left.
+- **Revisit if** a correction the check lists turns out to change what a seat would have confirmed (a code-set client
+  a principal's code does not read), or the extract outgrows the gate's budget (then sample, or move it to the slow
+  tier); or if seats start naming a client other than the matter's on purpose.

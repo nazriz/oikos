@@ -56,6 +56,17 @@ machine, 2026-11-10); for a narrow change, the gate alone (2 to 4 minutes). CI r
   framing: `docs/real-models.md`. A real-model pilot needs Naz's go-ahead (the API credit).
 - **After a rung, and before rerunning one, run** `bun translator/eval/replay.ts <run folder>`: each seat model's
   requests through the translator's rules as they are now (read-only on the run; no model called).
+- **No change to the translator's rules (`translator/src/rules.ts`) lands without the regression check at zero, or
+  each difference explained in `docs/decisions.md`.** The check: every request a model seat confirmed as drawn, in
+  every real run we hold, must still be drawn and shown the same. It is in the gate (`translator/test/regress.test.ts`,
+  about a second of work) and reads a compact extract on the run server, `~/oikos/runs/regress/requests.json.gz`
+  (1.5 MB: the requests and what each seat was shown, each record once; never in git, like the runs). By hand:
+  `bun translator/eval/replay.ts --regress ~/oikos/runs/regress/requests.json.gz` lists each difference with the rules
+  that made it and exits 1 on any not explained. A true correction is written up in `docs/decisions.md`, then recorded
+  with `--explain "<the entry's heading>"` (translator/test/regress-explained.json); a regression is fixed, never
+  explained. After each real run, rebuild the extract with it added: `bun translator/eval/replay.ts --regress
+  <every real run folder> --extract ~/oikos/runs/regress/requests.json.gz` (the held-out pilot cases' runs are
+  refused). The rules' order of precedence is at the head of `formRules`; a new rule takes its standing there.
 - **The stakes run** (`experiments/scope-pilot/stakes-run.ts`; its header has every rung's cells, the dry run and the
   reading after): a rung, detached, from the run server's checkout (R and its cells; rung 1 shown):
   `cd ~/oikos && R=1 CELLS="decision:slow" && nohup zsh -c "source ~/.zshenv; unset ANTHROPIC_API_KEY; for C in $CELLS; do S=\${C%%:*}; P=\${C##*:}; OIKOS_RUNG=$R OIKOS_STAKE=\$S OIKOS_PACE=\$P OIKOS_TRANSLATOR_MODELS=\$HOME/oikos/runs/translator-model bun orchestrator/src/cli.ts experiment run experiments/scope-pilot/stakes-run.ts --out \$HOME/oikos/runs/scope-stakes-r$R-\$S-\$P || exit 1; OIKOS_SCRIPTED=1 OIKOS_RUNG=$R OIKOS_STAKE=\$S OIKOS_PACE=\$P OIKOS_TRANSLATOR_MODELS=\$HOME/oikos/runs/translator-model bun orchestrator/src/cli.ts experiment run experiments/scope-pilot/stakes-run.ts --out \$HOME/oikos/runs/scope-stakes-r$R-\$S-\$P-scripted || exit 1; done" > $HOME/oikos/runs/scope-stakes-r$R.out 2>&1 & caffeinate -i -w $! &`.
