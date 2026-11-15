@@ -513,7 +513,11 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     if (fields.referral && args.referral === undefined && k.referralKind && !handed.length) {
       const paperKind = String(f.data?.writes?.data?.paper?.kind ?? f.data?.writes?.kind ?? "");
       const by = argText(args.client);
-      const open = [...k.referralKind].filter(([id, kind]) => kind === paperKind && !k.answeredReferrals?.has(id) && (by === undefined || k.referrals.get(id) === by)).map(([id]) => id);
+      // (On a form with a client blank left empty, only a matter of someone the request names: a paper for a person who
+      // handed this post nothing is drawn in their name, with no matter, and never moved onto another client's matter,
+      // which the client rule below would then make it for. The study counts such papers: not handed, or no remit.)
+      const whose = (id: string) => (by !== undefined ? k.referrals.get(id) === by : !fields.client || named.includes(k.referrals.get(id) ?? ""));
+      const open = [...k.referralKind].filter(([id, kind]) => kind === paperKind && !k.answeredReferrals?.has(id) && whose(id)).map(([id]) => id);
       // (Of several, the one whose hand-over names a record the request names: a delivery note's order.)
       const byFacts = open.filter((id) => Object.values(k.referralGives?.get(id) ?? {}).some((v) => /^rec\.[0-9]+$/.test(v) && named.includes(v)));
       const one = open.length === 1 ? open[0] : byFacts.length === 1 ? byFacts[0] : undefined;
