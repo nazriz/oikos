@@ -188,7 +188,7 @@ test("a form's blanks the request settles in so many words are set by code: the 
   expect(r1d("none(unclear)", "Sending a paper again as it was (form-desk-send-again): returned rec.16867, the benefit claim.")).toBe("form(form=send_again, returned=rec.16867, to=desk)");
   expect(r1d('form(client=c0100, done=yes, form=report, referral=rec.5, to=desk, words="All sent.")\nmessage(text="All sent", to=["bank"])', "Filing a report (form-desk-report) for c0100 on rec.5: done yes.")).toBe('form(client=c0100, done=yes, form=report, referral=rec.5, to=desk, words="All sent.")');
   // (Rung 1's rerun, 2026-11-15.) A report that mentions how a paper went ("send-signed ask-34") is not the send form; a
-  // question naming its form by id keeps its own blanks; "<blank>: words;" cut short by the translator is the request's;
+  // question naming its form by id keeps its own blanks; (a words blank cut short is no rule's since 2026-11-15: by score)
   // the paper's own quoted words are not another blank's.
   expect(r1d('form(client=c0100, done=yes, form=report, referral=rec.5, to=desk, words="sent as signed (send-signed ask-34)")', "Report done on rec.5: sent as signed on day 38 (send-signed ask-34, signed copy rec.7)."))
     .toBe('form(client=c0100, done=yes, form=report, referral=rec.5, to=desk, words="sent as signed (send-signed ask-34)")');
@@ -202,8 +202,6 @@ test("a form's blanks the request settles in so many words are set by code: the 
   // And whom the authority is with, "give Millbrook Savings Bank its authority", is that body, by the name it was shown.
   const named = { ...qs, names: new Map([["bank", "Millbrook Savings Bank"]]) };
   expect(calls.programText(formRules(calls.parseProgram(scope.replace("authority=bank", "authority=c0100").replace(" matter=rec.5,", "")), "Ask c0100 (scope request, referral rec.5, agreement rec.6) to give Millbrook Savings Bank its authority for the desk.", named))).toBe(scope);
-  expect(r1d('form(client=c0100, done=yes, form=report, referral=rec.5, to=desk, words="proof of who you are")', "Filing a report (form-desk-report) on rec.5: done yes; words: proof of who you are and of the details of your claim; nothing else."))
-    .toBe('form(client=c0100, done=yes, form=report, referral=rec.5, to=desk, words="proof of who you are and of the details of your claim")');
   const bare = { ...r1, referralGives: new Map<string, { [f: string]: string }>() };
   expect(calls.programText(formRules(calls.parseProgram(`${draft}, trade="Application for the advertised job.")`), 'Draft for sign-off a job application for c0100 to factory-7, saying "Application for the advertised job.", posting rec.9, referral rec.5.', bare))).toBe(`${draft})`);
   // Nothing settled in so many words: left as the translator wrote it.

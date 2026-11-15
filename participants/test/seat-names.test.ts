@@ -86,6 +86,10 @@ test("a seat is told once who it is and whom it writes to; its own drafts stand 
   expect(calls[0]!.system).not.toContain("Name (id)");
   const shown = calls[0]!.messages[0]!.content as string;
   expect(shown.indexOf("## Waiting for your yes or no: what you asked for, set out")).toBeLessThan(shown.indexOf("## Letters"));
+  // (Run c of the stakes run's rung 1, 2026-11-15: "a draft for sign-off ... is never confirmed" was read as its own
+  // drafts.) What waits says a draft it asked for is confirmed like any other, and only another's paper is not.
+  expect(shown).toContain("a draft you asked to be drawn up for a client's sign-off too, which goes to the client only once you confirm it");
+  expect(shown).not.toMatch(/draft for sign-off[^.]*never confirmed/);
   // The rest of the answer is told what became of it: a paper is not a draft; an account is not someone to write to.
   await p.step({ ...obs, inbox: [], outcomes: [], channels: {} } as any, ctx);
   const told = JSON.stringify(calls.at(-1)!.messages.at(-1)!.content);

@@ -14475,3 +14475,36 @@ do not move).
 - **Revisit if** a matched pair (b) turns out to ask two different things (the act and matter test is loose where a
   seat restates more than it was asked), or the set's targets for words blanks keep most later pairs out of reach (then
   score them apart from words, as the table's fifth row does).
+
+## 2026-11-15 · The line that flipped run c; `namedWords` removed by score; run c's model draws left to training
+
+- **The line:** what is waiting for a seat's yes or no ended "Only these are answered with Confirm or Decline, by their
+  references (ask- and a number): a paper someone sent you (rec. and a number), a draft for sign-off or a form is never
+  confirmed" (`WAITING_SAYS`, participants/src/llm/render.ts, since 2026-11-10). It meant a draft someone else sent; a
+  Haiku desk read it as its own drafts, wrote "a draft for sign-off or a form is never confirmed" into its standing rules
+  on its first day, and left eleven of its drafts unanswered (run c of the stakes run's rung 1). **Decision:** it now
+  says what is answered so ("each ... by its reference (ask- and a number), whatever it is: a draft you asked to be
+  drawn up for a client's sign-off too, which goes to the client only once you confirm it"), and apart, that a paper
+  someone else sent (rec. and a number) is answered with a paper or a letter of the seat's own. The ask-back for a
+  confirm of a paper not the seat's, which listed "a draft for sign-off" among the papers never confirmed, now says "a
+  paper someone else sent you (a sign-off, a remit, a referral)". LLM_PARTICIPANT_VERSION 0.22.2; the backstop
+  (participants/test/seat-names.test.ts) holds that the waiting text says a draft the seat asked for is confirmed like
+  any other and that no "draft for sign-off ... never confirmed" stands in what it is shown.
+- **Other sentences that can be read two ways** (listed, not changed): the `do` tool's "not for reading or asking: ... to
+  ask someone something, write to them", against the question form (asking a client is done with do on that form; a
+  letter to a principal is only acknowledged); the standing "Only what you asked for, set out and waiting for your yes
+  or no, is confirmed or declined", which does not say a draft for sign-off is among it; the sittings' "sooner, at the
+  next sitting, if someone writes to you (a letter: a paper filed with your office, a vote or a notice does not bring
+  you back sooner ...)", where the colon reads as if a paper filed were a letter.
+- **`namedWords` removed** (the one net loss on the scored set): 707 to 708 drawn to target of 764; apart from words
+  blanks 719 to 722; of the 90 later-request targets, 33 to 34 (45 to 48 apart from words). Nothing lost; the
+  regression check unchanged (674 confirmed, 134 explained). Baseline now 708.
+- **Run c's model draws** (a scope request's `words` drawn "level", `trade` "Draft for sign-off", evidence `need`
+  "Draft", a question drawn as a benefit change): two rules under the written order were tried and scored. A words
+  blank holding only the request's act or a level's word left empty (`correct`): 708 to 707 exact, 722 to 726 apart
+  from words: it loses run c's par.3.1, an invoice the seat confirmed with memo "Draft for sign-off". A form named in
+  words as a form ("(form: question to client, ...)") as named outright: no change (the question it would draw still
+  lacks its blanks, and is asked back). Neither raises the score with nothing lost, so neither lands: these are for the
+  translator's next training round, and the seat's retry is the remedy.
+- **Revisit if** a later run brings targets (confirmed redrafts) for the act-word blanks: the act-words rule is kept in
+  this entry's words to be scored again then.

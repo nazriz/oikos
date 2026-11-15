@@ -938,7 +938,11 @@ export interface RenderOptions {
 
 /** The heading of the one place a seat's own drafts stand, waiting for its yes or no, and the line under it. */
 export const WAITING_HEAD = "## Waiting for your yes or no: what you asked for, set out";
-export const WAITING_SAYS = "Each is something you asked for, set out so that you can check it before anything happens. Nothing in it is done until you say yes. Only these are answered with Confirm or Decline, by their references (ask- and a number): a paper someone sent you (rec. and a number), a draft for sign-off or a form is never confirmed.";
+// (Until 2026-11-15 it ended "...: a paper someone sent you (rec. and a number), a draft for sign-off or a form is never
+// confirmed", meaning a draft someone else sent; a Haiku desk took it as its own drafts, wrote "a draft for sign-off is
+// never confirmed" into its standing rules on its first day, and left eleven of its drafts unanswered: the stakes run's
+// rung 1, run c.)
+export const WAITING_SAYS = "Each is something you asked for, set out so that you can check it before anything happens; nothing in it is done until you say yes. Each is answered with Confirm or Decline, by its reference (ask- and a number), whatever it is: a draft you asked to be drawn up for a client's sign-off too, which goes to the client only once you confirm it. A paper someone else sent you (rec. and a number) is not answered this way: you answer it with a paper or a letter of your own.";
 /** How the platform's own preview is named to a seat: "ask-3", never "draft." (a draft for sign-off is the world's paper)
  * and never "rec." (a paper's). The preview is kept as `draft.<participant>.<n>`; a seat's "ask-<n>" is read back to it. */
 export const askRef = (s: string): string => s.replace(/(?<![\w.-])draft\.(?:par\.[0-9]+|[a-z][a-z0-9_-]*)\.(w?[0-9]+)(?![\w-])/g, (_, n: string) => `ask-${n}`);
