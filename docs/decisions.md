@@ -14427,3 +14427,51 @@ do not move).
   body's details its words already say: it set out the words three times (`render.ts`, `forwardShown`).
 - **Instants under date-like names** (`_at`, `_on`) are read as dates by one rule (`decided_on` read "896,764").
 - **Revisit if** a client's stated habit changes (D2, away), when the matters reader should read the newest statement.
+
+## 2026-11-15 · A scored set from every real request; rule versions chosen by score
+
+- **Why:** three runs in a row (stakes rung 1: a, b, c) the rules layer got worse after it was "fixed" by reading the
+  run before. Hand-reading and adding or reordering rules was not converging.
+- **The set** (`translator/eval/score.ts --build`; `~/oikos/runs/regress/scored-set.json.gz`, out of git with the
+  runs): from the regress extract, now with run c (1,193 requests in 10 arms), every request with a target where one
+  can be had honestly: (a) the call the seat confirmed (540), or its correction explained on this date (134); (b) for a
+  request declined or asked back, the call the same seat confirmed next for the same act in its first words (draft,
+  send, send again, ask, report, scope request) naming the same matter (a record the confirmed call's referral,
+  matter, sign-off, return, claim or order holds, written in the earlier request) (90). 399 declined or asked back
+  have no target (268 with a later confirmed request of the act that names another matter, the rest none of that act);
+  requests no seat answered are not in it.
+- **Scored** (drawn to target on the model's first draw: the ruled call does what the target does):
+
+  | | bcd7a1af (run a) | 6ccb81cb (run b) | main (run c) | raw (code-set only) |
+  |---|---|---|---|---|
+  | all, 764 | 519 | 536 | 707 | 513 |
+  | target confirmed, 540 | 425 | 434 | 540 | 499 |
+  | target corrected, 134 | 64 | 70 | 134 | 5 |
+  | target later, 90 | 30 | 32 | 33 | 9 |
+  | later, apart from words blanks | 46 | 44 | 45 | 22 |
+  | stakes runs a, b, c, 140 | 101 | 118 | 120 | 81 |
+
+  Main's 100% on the first two rows is by construction (the regression check holds it there); the independent row is
+  "later". Run a's rules lose 115 confirmed requests main draws right (most the first pilot's rates notices: a law's
+  id cleared, the regression found earlier today), and gain one: draft.provider-a-desk-system.60 of the first pilot,
+  where main's `namedWords` writes "retail, referral rec.53494" for "retail".
+- **Each rule switched off** (`--each-rule`): `namedWords` is the only one with a net loss (switched off: 708, and 48
+  of the later targets apart from words, against 45). `signedCopySent`, `namedChoice`, `recordNamed`,
+  `referralIsOrder` and `letterAgain` draw nothing to target that the others would not; the rest each gain (draftForm
+  37, client 39, sendSigned 21, referralOfKind 15, namedValue 13, office 11, formById 10, ...), counting their own
+  corrections; on the targets they did not set themselves, client 23, sendSigned 20, draftForm 12, office 11,
+  formById 10, namedValue 11.
+- **Decision:** the set and its score decide; a rule lands only if it raises the score on the whole set and misses
+  nothing the baseline hits (`translator/test/score.test.ts`; `translator/test/score-baseline.json`, the 707 keys main
+  hits); the set grows with every run, and a run's new phrasings enter it before any rule is written for them.
+- **What run c's faults were:** the model's, not the rules: `words="level"` on four scope requests, `trade="Draft for
+  sign-off"` on four job applications, `need="Draft"`, a benefit change drawn for a question: all in the translator's
+  own first draw, the same under every rules version. One rule misfire: `namedWords` extended a question's `name` to
+  'claim): which paper is your ...' and two evidence `need`s with words around them. The desk drafted nothing because
+  it never confirmed its own drafts: it took the platform's line "Only these are answered with Confirm or Decline ...:
+  a paper someone sent you (rec. and a number), a draft for sign-off or a form is never confirmed"
+  (participants/src/llm/render.ts, WAITING_SAYS, since 2026-11-10) to mean its own drafts, and wrote it into its
+  standing rules on day 31.
+- **Revisit if** a matched pair (b) turns out to ask two different things (the act and matter test is loose where a
+  seat restates more than it was asked), or the set's targets for words blanks keep most later pairs out of reach (then
+  score them apart from words, as the table's fifth row does).
