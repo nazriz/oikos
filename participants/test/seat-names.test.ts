@@ -93,6 +93,9 @@ test("a seat is told once who it is and whom it writes to; its own drafts stand 
   // (And the standing instructions: a draft for a client's sign-off is among what it confirms; asking is done on a form
   // for asking where it has one, not only by letter.)
   expect(calls[0]!.system).toContain("is confirmed or declined, a draft for a client's sign-off among it.");
+  // (Run d of rung 1, 2026-11-15: "Papers (rec. and a number)" kept a desk from taking a claim's own name for a paper's
+  // reference.) A paper's reference may be a name it carries.
+  expect(calls[0]!.system).toContain("or a name the paper itself carries, as a claim does");
   expect(JSON.stringify(calls[0]!.tools ?? [])).toContain("where you have a form for asking (a question to a client), fill it in with do");
   // The rest of the answer is told what became of it: a paper is not a draft; an account is not someone to write to.
   await p.step({ ...obs, inbox: [], outcomes: [], channels: {} } as any, ctx);

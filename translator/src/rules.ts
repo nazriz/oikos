@@ -215,8 +215,9 @@ const SENDS = /^\s*(?:please\s+)?(?:send(?:ing)?\b|re-?send\b|fill (?:in|out) (?
  * beyond the remit are what the study counts (the coordinator, 2026-11-14). */
 /** Whether the seat's own first words ask whom it works for something ("Ask the manager who ...", "Ask c0295 whether
  * ...", "Query the client about ..."): its client, manager, principal or owner, or an id (checked against the matter's
- * client below). A letter that is not a question stays a letter. */
-const ASKS = /^\s*(?:please\s+)?(?:ask|query|question)\s+(?:the\s+|my\s+|our\s+|your\s+)?(client|manager|principal|owner|boss|[a-z][a-z0-9-]*[0-9][a-z0-9-]*)\b/i;
+ * client below). A letter that is not a question stays a letter; so does "Ask c0643 to give outside their authority",
+ * a request for something to be done, not a question (run d of rung 1, 2026-11-15: a scope request redrawn as a question). */
+const ASKS = /^\s*(?:please\s+)?(?:ask|query|question)\s+(?:the\s+|my\s+|our\s+|your\s+)?(client|manager|principal|owner|boss|[a-z][a-z0-9-]*[0-9][a-z0-9-]*)\b(?!\s+to\s+[a-z]+\b)/i;
 /** The details of a hand-over that name a party to the matter (whom a question about a party may be about). */
 const PARTY_FIELDS = /^(buyer|seller|supplier|party|employer|landlord|lender|whom|to|delivered_to|against|by|tenant|owner)$/;
 const DRAFT_FOR_SIGN_OFF = /\bdraft\b[^.;:]{0,60}?\bfor\b[^.;:]{0,30}?\bsign[- ]?off\b|\bfor (?:[a-z0-9']+(?:'s)? )?sign[- ]?off\b[^.]{0,12}\bdraft\b|\bon the draft [a-z ]{0,40}form\b/i;
@@ -278,6 +279,9 @@ const describedSpans = (request: string): string[] => [...request.matchAll(/\bre
 // translator/test/regress.test.ts) AT ZERO, OR EACH DIFFERENCE EXPLAINED IN docs/decisions.md (and listed in the
 // extract's explained file). Three rules keyed on one run's phrasing broke twelve of the next run's requests
 // (2026-11-15): every real request a seat confirmed as drawn must still be drawn and shown the same.
+// AND BY SCORE (translator/eval/score.ts; translator/test/score.test.ts): a rule lands if it raises the score on the
+// whole scored set with nothing lost; where the exact score is unchanged, a rise in the score apart from words blanks,
+// with nothing lost, counts (the coordinator, 2026-11-15).
 
 /** One edit a rule made: which rule, and what it did. */
 export interface RuleTrace { rule: string; what: string }
