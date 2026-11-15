@@ -14249,3 +14249,94 @@ the client's own id (a translator rule, another worker's).
   request names one matter handed over is that one. Replayed, the four are scope requests with the body and matter.
 - **Revisit if** a seat asks a question whose words name another form ("ask the client whether a scope request is
   wanted"): the drawing then decides, and a model that drew the named form would be kept.
+
+## 2026-11-14 · Every person gets to their post at their own sitting (stakes D1b)
+
+**The law.** D1a's law, for every person and every paper sent them: what others send a person (a statement addressed
+to them by someone else; a letter from someone else) waits in their post until they next sit down to it, by the
+profile's habit drawn once a person, and their code is shown it then, in the order it came (`kernel/crates/actors/
+src/post.rs`: `draw`, `answer_lag`, `by_post`, and the wrapper `Posted`, round every person's own code at the one
+place actors are made, `offices/books.rs` `create`/`restore`). What they do about it is their own act then, at the
+table of work's row. **D1a is now its consequence:** the principal no longer holds its own papers (its `answer_lag`,
+`in_post` and the rest are gone from principal.rs, which differs from before D1a by one comment); the wrapper outside it
+shows it its desk's papers at the sitting, as any person's post. The draw is the same (`paperwork-<person>`), so a
+client's habit is what it was under D1a. `paperwork` moves from the principal's parameters to every person's code's.
+- **How it holds:** a channel that shows only what is new hands a paper once, so the wrapper keeps it (saved) until the
+  sitting and puts it back in the same channel then; a channel kept whole shows it again, and it is held back until
+  then; a search's answers (what they asked a keeper) are never held. It wakes the person at the sitting if nothing
+  wakes them before.
+- **The smallest honest version (the lead, 2026-11-14).** Left out, and named on WM-18: a person's paper time is still
+  not counted against their working day (charging it would make the kernel refuse job work after a person's own
+  paperwork, a new behaviour for every town needing its own checkpoint); acts a person starts on their own (a claim, a
+  complaint) go when their code decides; agreements (a lease, a service's terms) are not post.
+- **The early check the lead asked for:** non-clients still meet dated requests. The study town, level 2, seed 7, base
+  and a 60-day code fork, "before" with every habit removed: evidence requests answered by their date, 65 of 65 before
+  and 64 of 65 after for non-clients (one late), 36 of 36 and 37 of 37 for clients. No hearing notice reached a person in
+  that town in 90 days. The desk's waits on its client grow beyond D1a's, the weekly sitters now showing: month 1 mean
+  31 hours (median 9.9, 90th percentile 110, longest 147), month 2 mean 16 (90th percentile 56, longest 75).
+- **Every town moves** (every profile gives the habit). The pins are re-taken at the final rebase, each with its reason
+  (below, when landed).
+- **Revisit if** a source for the habit is opened (MT-37); a study reads the speed of acts persons start themselves, or
+  of an office held by a person (WM-18); a town's base outcomes are seen to turn on the weekly tail (missed dates).
+
+## 2026-11-14 · Too ill to deal with one's post (stakes D2, the smallest version)
+
+**The law (the lead's decision, 2026-11-14).** A person with a condition of a severity that keeps them off work (the
+health model's own draws at the profile's own rates, `care.off_work`: serious and severe) is too ill to deal with their
+post until it ends, as it already keeps them from work. A sitting that falls while it lasts is skipped; what waits is
+read at the first sitting after (`post.rs`, `sitting_for`). They are at home, ill: it is not a hospital stay and not an
+absence from town, and nothing says it is. Nobody is told. On the first paper the person next writes to their assistant,
+their own line says it in fixed words, their own fact and nothing else: "We have been ill since <date>." while it lasts,
+"We were ill from <date> until <date>." after (`principal.rs`, `away` and `said_away`). No new figure.
+- **Not built (WM-21):** a hospital as a place a body is taken to, and trips out of town at a profile's rates.
+- **The screen** (the study town, level 2, seed 7, code arm; `ill.ts` in the session's scratch): over 60 days after
+  the fork, 4 of the 251 clients too ill for their post (4.0 to 7.2 days, all serious); over 180 days, 19 (median 8.6
+  days, 90th percentile 36, longest 46; 15 serious, 4 severe). None had a desk paper waiting on them when it began; one
+  wrote to the desk during it (a referral, with "We have been ill since year 1, day 128."). The desk's longest wait on a
+  client in month 5 of the 180 is 724 hours.
+- **Moves** every town where a person with the habit falls seriously ill while something waits in their post.
+- **Revisit if** a study needs clients away more often than illness makes them (WM-21), or the off-work severities
+  change in the health model.
+
+## 2026-11-14 · A review's answer is the officers' casework, as its decision is
+
+**The law.** The support office's casework is every paper its published decision law has an officer write about a case:
+the decision, what it asks for, a decision looked at again, and now the answer to a request to put one right
+(`remedy_answer`), as the tax collector's casework already had it (`CASEWORK_KINDS`, generate.ts). The office's own rule
+is unchanged (`Casework::assign`: a step all of whose papers are casework goes to the desk); its step for a review holds
+the review, the answer and a new decision, so until now the answer kept the whole review at the case system's second
+(WM-14 (6), found with stakes C2). An answer takes the person table's row for a paper. Every town with a support office
+moves (the every-town batch, with D1b and D2).
+- **Measured** (the study town, level 2, seed 7, code arm, with D1b, D2 and C2's level; review request to the office's
+  review, the answer going with it): at 10,000, 60 days median 0.5 days, 90th percentile 0.9, longest 0.9 (8 reviews),
+  180 days 0.5, 0.9, 0.9 (13); at 3,000, 60 days 1.5, 2.9, 5.2 (10), 180 days 1.0, 2.9, 5.2 (19). Before, 0.0 at every
+  level. Claims on the same runs: at 10,000 claim to decision median 5.9 days over 60 (5.5 over 180), longer than C2's
+  1.0 because the claimant now reads the office's request for papers at a sitting (D1b); at 3,000, 12.9 over 60 and 7.5
+  over 180.
+- **Revisit if** a review in a backlog is seen to wait less than the claims around it (the desk's lane takes work in the
+  order it is ordered; the reviews measured mostly came after the opening backlog).
+
+## 2026-11-15 · The every-town batch re-pinned (stakes D1b, D2 and the review's answer)
+
+Landed together on main at bcd7a1af; the whole slow tier run on the batch. What moved and why, each pin with its reason:
+- **A fault the slow tier found, fixed in the batch:** papers a person is shown at a sitting were made before their last
+  plan, so the mind's plan (records made since it last planned) never read them; in unions.test.ts two of 74 members
+  voted in a strike ballot. The wake at a sitting is news, and the mind is given what life took in since its last plan
+  (`Mind::taken_in`; mind/plan.rs reads those made before it too). A record first seen late for any other reason is now
+  read by the plan too, in every town.
+- **culture-dial.test.ts (the canary), config hashes and Rust states, three profiles:** every person's code is given the
+  habit (`paperwork`) and reads its post at its sittings, skipped while too ill (D1b, D2), and a review's answer is the
+  officers' casework. Old values in the test's comment.
+- **scripts/fixtures/representation-results.json, six towns' state hashes and logs:** the same reasons, re-taken by
+  `bun scripts/same-results.ts --pin` on the batch.
+- **twin-draws-year.test.ts, the mayor's twin's floor 0.37 to 0.32** (33.6% and 33.9% measured): a paper the mayor's seat
+  files at another hour is read at another sitting, days apart for weekly readers, so what they decide falls on other
+  days. The other seat's twin is still 100%.
+- **justice.test.ts:** every application heard by the run's end has its order, and at least nine in ten are heard by
+  then (53 of 54): a tenant reads a rent increase at a sitting and applies then, so the last hearing can fall after day
+  250. The finding, the law and the 21 days are held as before.
+- **building.test.ts:** `already_present` joins the races: a household's word of a new home read at a sitting finds the
+  person already home by their round.
+- **office-work.test.ts** (D1b, earlier): the last report read either way, carried out or not and why.
+- **Revisit if** a test's measure turns on post read at once again (a seat that must answer the same day), or the habit
+  is sourced (MT-37).

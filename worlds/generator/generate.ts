@@ -3400,11 +3400,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     kinds: Object.fromEntries([...new Set(PERSONS)].sort().map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost, compose_seconds: composeOf(k), ...lateCost(k) }])),
     seconds: { referral: DELEGATION_TIME.person["publish/referral"], sign_off: DELEGATION_TIME.person["publish/sign_off"], go_ahead: DELEGATION_TIME.person["publish/go_ahead"] },
     finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
-    horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints, ...lateMatters,
-    // (When each gets to its post: the profile's habit, drawn once a person; stakes D1a.)
-    ...(V.paperwork ? { paperwork: paperworkOf(spec.paperwork ? { ...V.paperwork, every_days: spec.paperwork.every_days } : V.paperwork) } : {}) } } : {};
+    horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints, ...lateMatters } } : {};
   if (PERSONS.length && AS) citizenChannels.push(K.from("providers", AS.providers.filter((p) => p.offers.some((o) => o.for === "persons")).map((p) => p.id), ["service_offer"], { title: "What providers of assistants sell" }));
-  const citizenController = code("citizen.default", { ...personDelegation, outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
+  const citizenController = code("citizen.default", { ...personDelegation,
+    // (When each person gets to their post: the profile's habit, drawn once a person; stakes D1a and D1b, kernel post.rs.)
+    ...(V.paperwork ? { paperwork: paperworkOf(spec.paperwork ? { ...V.paperwork, every_days: spec.paperwork.every_days } : V.paperwork) } : {}), outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
     complain_to: "city", complain_bps: V.services.complain_bps, complain_about_held: true,
     // (What holds people in a job they have, where the profile says: read by those who take initiative.)
     ...(spec.living && V.job_move ? { job_move: V.job_move } : {}),
@@ -3829,7 +3829,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // town's share of the agency's officers (the place's officers per 1,000 claims in payment, times the town's claims at
   // generation: a national figure on a small town). The office's case system (`agency-system`) keeps its seconds for what
   // a computer does (payments, notices) and names the desk (`by`) on every act that is only casework.
-  const CASEWORK_KINDS = ["benefit_decision", DECISION_KIND.evidence_request, DECISION_KIND.confirmation_request, DECISION_KIND.review];
+  // (Its casework is every paper the published decision law has an officer write about a case: the decision, what it asks
+  // for, a decision looked at again, and the answer to a request to put one right, as the tax collector's casework has it.
+  // Until 2026-11-14 the answer was left out, so a review, whose step holds it, went at the case system's second: WM-14 (6).)
+  const CASEWORK_KINDS = ["benefit_decision", DECISION_KIND.evidence_request, DECISION_KIND.confirmation_request, DECISION_KIND.review, DECISION_KIND.answer];
   const casework = (() => {
     if (!PAYMENTS.length) return undefined;
     const per1000 = PS.support_officers_per_1000_claims;

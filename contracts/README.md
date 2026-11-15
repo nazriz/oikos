@@ -1042,3 +1042,17 @@ nothing new, and its saved state is as before.
 - A principal's `delegation` parameters gain `late_matters` (`kind -> matter`): a kind whose `late_cost_day` is for one
   matter of it only (the matter word its paper's data names). The generator sets `review_request -> claim_refused`, and
   gives `late_cost_day` to `review_request` and `want-claim_refused` beside `benefit_claim`, where a day's delay is costed.
+
+## Stakes D1b: every person's post in their own time (2026-11-14; docs/decisions.md, "Every person gets to their post at their own sitting"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- `paperwork` moves from a principal's parameters (`delegation.paperwork`, gone) to every person's own code's
+  parameters (citizen.default's `paperwork`), the same shape. A person's code saved with it is `{inner, post}`: `post`
+  is the wrapper's state (`me`, `p`, `sits`, `held`: papers held from a channel that shows what is new, by channel;
+  `letters`). A principal's saved state loses `sits`, `in_post`, `letters_in_post` and `post_due`. A snapshot from
+  before reads as before only where the profile gave no habit (compat relaxed in the rebuild).
+
+## Stakes D2: too ill to deal with one's post (2026-11-14; docs/decisions.md, "Too ill to deal with one's post"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- The post wrapper's saved state gains `off_work` (the citizen's `care.off_work`) and `ill` (the spans of such
+  conditions while anything waits). A principal's saved state gains `ill` (`since`, `until`, `told`). A client's first
+  paper to its assistant after such a spell carries one fixed sentence at the end of its text. No new paper or field.

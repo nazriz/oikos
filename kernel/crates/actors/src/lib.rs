@@ -30,6 +30,7 @@ pub mod market;
 pub mod mind;
 pub mod offices;
 pub mod papers;
+pub mod post;
 pub mod registry;
 pub mod steps;
 pub mod stub;

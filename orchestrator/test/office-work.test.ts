@@ -86,7 +86,10 @@ test("a crew taken on by offers of the pay alone, made on the office's advertise
   expect(shown.some((x) => /Your standing work orders:\n- rec\.\d+, collect every 7 days: carried out by nobody: there is nobody in post\./.test(x))).toBe(true);
   const last = shown.filter((x) => x.includes("Staff of your office")).at(-1)!;
   expect(last).toMatch(/In post \(\d\): c\d+, since year 1, day \d+, under rec\.\d+, last at work year 1, day \d+ \((collect|maintain)\)/);
-  expect(last).toMatch(/Your standing work orders, as your staff reported on year 1, day \d+ \(rec\.\d+\):\n- rec\.\d+, collect every 7 days: carried out: \d+ calls at addresses, \d+ loads/);
+  // (Each order as the crew last reported it, carried out or not and why: since every person reads their post at a sitting
+  // of their own, 2026-11-14, stakes D1b, the last report before the run's end is day 17's, when the day's upkeep took the
+  // crew out before the week's collection was set out. That the round was collected is held above, on the reports.)
+  expect(last).toMatch(/Your standing work orders, as your staff reported on year 1, day \d+ \(rec\.\d+\):\n- rec\.\d+, collect every 7 days: (carried out: \d+ calls at addresses, \d+ loads|not carried out: [^\n]+)/);
   expect(shown.some((x) => x.includes("Reports from the staff on the work under the standing work orders") && x.includes("Report of the works crew, year 1, day"))).toBe(true);
 }, 600_000);
 

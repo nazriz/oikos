@@ -118,8 +118,8 @@ the next working day. So a desk can have less than a day a lane, and this one do
   fork from day 30 and then catches up. The town's own casework after that is about an hour a week, which every level
   down to 2,000 covers: the queue is stable, a slow office for weeks and then an ordinary one, not one that falls behind
   for ever (docs/decisions.md, "A short-staffed support office").
-- **Not on the desk:** a review of a decision on a request to put it right goes at the case system's second (its step
-  has the answer to the requester in it, which is not casework): WM-14, left (6).
+- **Reviews are on the desk too** (2026-11-14): a review of a decision on a request to put it right, with its answer
+  to the requester, is casework (until then the answer kept it at the case system's second: WM-14 (6), fixed).
 
 ## What a seat sees
 

@@ -599,6 +599,7 @@ impl Person {
     pub fn mind_plan(&mut self, w: &mut Week) -> mind::Planned {
         let life = self.life(w.pic, w.t, w.acc.as_ref().map(|a| a.balance));
         let mut m = std::mem::replace(&mut self.mind, Box::new(mind::Plain::default()));
+        m.taken_in(&self.absorbed.fresh);
         let planned = m.plan(w.cx, w.pic, &self.book, &life, &super::recourse::Ways { person: self, pic: w.pic, contacts: life.contacts as usize });
         self.mind = m;
         planned

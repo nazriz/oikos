@@ -609,6 +609,9 @@ pub trait Mind: Outlook + Send {
     /// met, wants due and their ways, gatherings, founding and groups, civic acts, talk, thanks). `ways` is life's
     /// openings for each want.
     fn plan(&mut self, cx: &mut Cx, pic: &Picture, book: &Book, life: &Life, ways: &dyn Openings) -> Planned;
+    /// The records life took in since its last plan (by id), whatever day they were made: papers read late, at a
+    /// sitting (crate::post), are new to the plan though made before it. Given just before `plan`.
+    fn taken_in(&mut self, _ids: &[String]) {}
     /// What the person says when someone asks how they are or what they know (citizen.ts `newsOfMine`), from the
     /// news life gives (its job, its shop, its home) and what the mind remembers.
     fn say_how(&mut self, cx: &mut Cx, asker: &str, life: &Life) -> String;

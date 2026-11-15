@@ -273,6 +273,41 @@ Three changes on the person's side of the firm and landlord fixes (docs/decision
 
 The rates the person's values shift (`sway`) move symmetrically about the town's mean, so the town's rates stay as calibrated while people differ.
 
+## Getting to the post (stakes D1a and D1b, 2026-11-14; `kernel/crates/actors/src/post.rs`)
+
+A person reads what others send them when they next sit down to their post, not as it comes. A paper addressed to them
+by someone else (a decision, a request for evidence, a notice, a bill, a hearing's notice, their assistant's draft) and a
+letter from someone else wait in their post; at their next sitting their code is shown all of it, in the order it came,
+and what they do about it is their own act then, placed on their timeline at the table of work's row as ever. Nothing
+holds the paper but the person not having sat down to it yet; they are woken at their sitting if nothing wakes them
+before. One wrapper round every person's own code (and so round a principal's, which reads its assistant's papers so).
+
+- **The habit** (`paperwork` in the profile, on every person's code): how many days apart a person sits down to their
+  post, with the share of persons of each, and the hours of the day they do it in. Each person's is drawn once from the
+  world's seeded draws (`cx.chance("paperwork-<person>")`, as a landlord's day for its rent book is): how many days
+  apart, which day of those, and a minute in the window.
+- **The distribution, a PLACEHOLDER** (to be sourced: MT-37; every profile the same): every day 60%, every second day
+  15%, every third day 10%, once a week 15%; in a three-hour window starting two hours after the profile's working day
+  ends (19:00 to 22:00 where work ends at 17:00), their free hours outside work. It would be sourced by a time-use
+  survey's household management (mail and paperwork: how often, at what time of day; the American Time Use Survey's
+  household and personal mail and messages, to confirm: MT-37). The shape is the stakes design's (most daily, a tail
+  every few days up to about a week); no figure is from a place.
+- **What is post:** a statement addressed to the person by someone else, and a letter from someone else. Not post: what
+  their channels show of the world (boards, offers, their accounts, their body), the outcomes of their own acts, the
+  answers to what they asked (a search), agreements (a lease, a service's terms), and papers of their own.
+- **Too ill for it** (stakes D2): a person with a condition of a severity that keeps them off work (the health model's,
+  `care.off_work`, at the profile's own rates: no new figure) is too ill to deal with their post until it ends, as it
+  keeps them from work. A sitting that falls while it lasts is skipped; what waits is read at their first sitting
+  after (`sitting_for`). They are at home, ill: not in a hospital, not away (WM-21). Nobody is told. On the first paper
+  they then write to their assistant, if they have one, their own line says it, in fixed words: "We have been ill since
+  <date>." while it lasts, "We were ill from <date> until <date>." after (principal.rs, `away`); nothing else.
+- **What it leaves out** (WM-18): the time a person spends on papers is placed on their timeline but not counted against
+  their working day; acts a person starts on their own (a claim, a complaint) go when their code decides, not at a
+  sitting. An organisation's post is its code's, at any hour (WM-20).
+- **What it changes:** every town whose profile gives the habit (all of them since 2026-11-14). A dated request (an
+  evidence request's 14 days) is still met nearly always: in the study town over 90 days, all 101 before and 101 of
+  102 after (one late, a non-client; docs/decisions.md). A town without the habit in its profile is as before.
+
 ## Attention: what a citizen looks at (D43)
 
 A citizen doesn't receive the housing or job market. It looks when it needs to, the way a person reads the listings when hunting:

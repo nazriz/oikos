@@ -337,12 +337,13 @@ fn staff_books(kind: &dyn Kind, ctx: &Ctx) -> Option<(String, Box<dyn OfficeBook
 /// The actor of `kind` for `ctx`: its own, with its staff's clerk where it keeps books and runs as staff, and as a
 /// principal where the world gives it `delegation` (docs/design/delegation.md: none does unless the town has providers).
 pub fn create(kind: &dyn Kind, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
-    crate::delegation::wrap(ctx, create_kept(kind, ctx)?)
+    // (A person's own code, and its principal's, reads its post when it sits down to it: crate::post.)
+    Ok(crate::post::wrap(ctx, crate::delegation::wrap(ctx, create_kept(kind, ctx)?)?))
 }
 
 /// The same, taken up again as `save` left it.
 pub fn restore(kind: &dyn Kind, ctx: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
-    crate::delegation::rewrap(ctx, &saved, |inner| restore_kept(kind, ctx, inner))
+    crate::post::rewrap(ctx, &saved, |saved| crate::delegation::rewrap(ctx, &saved, |inner| restore_kept(kind, ctx, inner)))
 }
 
 fn create_kept(kind: &dyn Kind, ctx: &Ctx) -> Result<Box<dyn Actor>, String> {
