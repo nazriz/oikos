@@ -14614,3 +14614,9 @@ from its referral on file whether or not it is still open.
   code towns do not.
 - **Revisit if** seats' answers to `waiting` show the question itself leads them (all answer in the same words), or the
   situation sentences turn out to be read as a request.
+
+## 2026-11-15 · The client's-situation setting wired into the stakes spec; the factory asked the debrief's `waiting`
+
+- **Decision:** `OIKOS_SITUATION=on` (default off) in experiments/scope-pilot/stakes-run.ts turns on build.ts `clientSituation`; the experiment's name then carries "-situation" so its folder is apart. The debrief's `waiting` is asked of every model seat with a matters reader (the factory's assistant too), not only those whose papers are kept with their matters: rung 2b's factory seat was not asked.
+- **Read** (mock fork, decision x slow, setting on): the balance sentence appears on every hand-over; no "Coming in" or "Our rent" sentence appeared anywhere in the town. A client paid a support payment from the start (in payment from day 1, with no decision record on its file) is told of it in no sentence, and a long hand-over's line is cut in the desk's list before the situation sentence (the seat must look at the matter to read it).
+- **Revisit if** the owner turns the setting on for a run: the two gaps above first.
