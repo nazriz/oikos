@@ -14218,3 +14218,34 @@ c0736's returns from the bank are on file too, and are met once the request's au
 the client's own id (a translator rule, another worker's).
 - **Revisit if** a body asks for an authority other than by a return (a published requirement read before sending), so
   that a client should give one before any paper comes back.
+
+## 2026-11-15 · What the stakes run's rung 1 rerun showed in the translator, and two rules that misfired
+
+- **Read** (runs/scope-stakes-r1-decision-slow-b, on main b98ddb0d): 16 requests still wrong in the replay, up from 8.
+  Ten were ours, and seven of those were rules of ours misfiring: a form named by its hyphenated name was taken from a
+  mention of what was done ("sent as signed on day 38 (send-signed ask-34)"), so five reports were drawn as sends and
+  declined as duplicates; the question rule drew over a request that named its own form and blanks, putting the first
+  paper named in `paper` and the whole request in `words` (three declines). Three more: a job application's `trade`
+  written with the paper's own quoted words; evidence `need` cut short of "need: … ;" as the request gave it; two
+  delivery notes' `referral` written as their orders. Five were the model's (a unit price written as a count or as the
+  whole amount; an invoice left unclear; a review's `seeks` written as its particulars), one the seat's own choice
+  (declining a resend whose amount its client had since changed).
+- **Decision:** a form is named by its own name only where the request calls it a form ("form send-signed", "the
+  send-signed form"); the question rule stands aside where the request names its form by id; a words blank given as
+  "<blank>: words;" that the translator cut short takes the request's words; the paper's quoted words ("saying …") are
+  no other blank's (unless the hand-over gives that blank's words); a referral blank holding a record the request names
+  as something else ("order rec.N") is no matter, and the matter of its kind whose hand-over names that record is
+  taken. The replay after: still wrong 4 (the model's 3 and the seat's 1).
+- **Revisit if** a request calls a form by its name in other words ("on send-signed"), or a matter's hand-over names
+  more than one record the request names.
+- **And a third misfire, found reading the episode:** the desk's four asks for a body's authority on day 31, "Ask c0352
+  (scope request, referral rec.10730, agreement rec.1362) to give Outside its authority for provider-a-desk, ...",
+  were drawn by the model as scope requests and turned by the question rule into questions holding the request's
+  words; the seat confirmed them, so no scope request went and the reader saw none (the clients had given their
+  authority before the fork, from the bodies' own notices, so nothing was lost in this run). **Decision:** the question
+  rule also stands aside where what was drawn is another of the seat's forms that the request names in words ("scope
+  request"); an entity blank given as "give <whom> its <blank>" is whom, by id or the name the seat was shown ("give
+  Millbrook Savings Bank its authority": bank, not the client); a request for scope's `matter` left empty where the
+  request names one matter handed over is that one. Replayed, the four are scope requests with the body and matter.
+- **Revisit if** a seat asks a question whose words name another form ("ask the client whether a scope request is
+  wanted"): the drawing then decides, and a model that drew the named form would be kept.
