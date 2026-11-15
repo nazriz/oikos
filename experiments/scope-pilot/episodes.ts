@@ -284,7 +284,10 @@ export function episodesOf(o: ArmInput): ArmOut {
     // a delivery note is for, the posting a job application answers. Ours: drawn differently by the rules now (a fault
     // of ours since fixed), still wrong in the replay (ours, or the seat's misreading: not told apart), or never served.)
     const named = new Set([R.id, ...JSON.stringify(R.data?.facts ?? {}).match(/rec\.[0-9]+/g) ?? [], ...(String(R.data?.calls ?? "").match(/rec\.[0-9]+/g) ?? [])].filter((x) => x !== R.data?.agreement && x !== R.data?.remit));
-    const onIt = (o.asks ?? []).filter((a) => [...named].some((id) => new RegExp(`\\b${id.replace(".", "\\.")}\\b`).test(`${a.words} ${a.call ?? ""}`)));
+    // (Only a request made once the matter was handed over: one before it was on another matter that shares a record with
+    // it, an invoice under the same standing offer. The stakes run's rung 1 rerun, 2026-11-15: the factory's invoice handed
+    // over on day 44 was priced "ours" for two day-37 requests on the invoice before it.)
+    const onIt = (o.asks ?? []).filter((a) => a.t >= R.at && [...named].some((id) => new RegExp(`\\b${id.replace(".", "\\.")}\\b`).test(`${a.words} ${a.call ?? ""}`)));
     const unseen = o.shown ? [...named].filter((id) => id !== R.id && !o.shown!.has(id) && !String(R.text ?? "").includes(id)).map((id) => `${id}: cited by the matter, never shown to the seat`) : [];
     const ours = [...unseen, ...onIt.flatMap((a) => (o.replay?.get(a.ref) === "changed" ? [`${a.ref}: drawn differently now (ours, since fixed)`] : o.replay?.get(a.ref) === "still_wrong" ? [`${a.ref}: still wrong in the replay`] : a.failed && !a.drafted ? [`${a.ref}: never served ("${a.failed.slice(0, 80)}")`] : []))];
     const doneR = on("report").find((x) => x.data?.done === true || x.data?.done === "yes");
