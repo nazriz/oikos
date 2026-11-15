@@ -798,6 +798,27 @@ impl State {
     /// A letter from its assistant whose `re` is a matter of its, a return it holds, or the paper returned: each return it
     /// holds on that matter, with what it asks of it still to meet, is met. A return on a matter: one citing the paper
     /// named, or, for a matter named, one that came after the matter was handed over.
+    /// An authority its assistant asks for at a body, on its request form: given from the body's own notice on its file
+    /// (a return asking its authority for this post), for a matter of its own with this assistant (open or not) or a kind
+    /// it hands over; `meet` decides and lodges, as for a report or a letter. The kinds given, where one was; none where no
+    /// notice from that body asks it.
+    fn authority_on_notice(&mut self, with: &str, matter: Option<&str>, kind: Option<&str>, post: &str) -> Option<Vec<String>> {
+        let at = matter.and_then(|m| self.book.get(m)).filter(|q| papers::read::<Referral>(q).is_some() && q.speaks_for.as_deref() == Some(self.me.as_str())).map(|q| q.at);
+        let notices: Vec<(String, Need)> = self
+            .book
+            .all(crate::common::intake::RETURNED)
+            .filter(|r| r.author.as_str() != self.me.as_str() && !self.passed_copy(r) && r.speaks_for.as_deref().unwrap_or(r.author.as_str()) == with)
+            .filter_map(|r| serde_json::from_value::<Need>(crate::common::data(r).to_value()["need"].clone()).ok().map(|n| (r.id.to_string(), n, r.at)))
+            .filter(|(_, n, rat)| n.authority.as_ref().is_some_and(|a| a.for_ == self.me && a.with == with && (at.is_some_and(|m| *rat >= m) || kind.is_some_and(|k| a.kinds.iter().any(|x| x == k)))))
+            .map(|(id, n, _)| (id, n))
+            .collect();
+        let (id, need) = notices.last()?.clone();
+        let key = format!("{with}|{post}");
+        let before = self.lodged.contains(&key);
+        self.meet(&need, post, at.and(matter), &id);
+        (before || self.lodged.contains(&key)).then(|| need.authority.map(|a| a.kinds).unwrap_or_default())
+    }
+
     fn on_letter(&mut self, re: &str, post: &str) {
         // (No reference: a person with one open problem with its assistant knows what the letter is about. Where it holds
         // exactly one return from a body on a paper that assistant sent, asking of it what is still its own to meet, the
@@ -1449,17 +1470,22 @@ impl State {
         }
         // An authority with a body, for the assistant's post (docs/design/obstacles.md, O1): given for the kinds asked, or
         // the matter's, where it keeps them with the assistant; a paper of its own to the body, in its own time.
+        // (One path with a report naming the need and a letter about the matter, `meet`: it gives what the body's own
+        // notice on its file asks, for a matter of its own with this assistant, open or not, or a kind it hands it; a
+        // request is not what is needed, the body's notice is. Before 2026-11-15 it looked the matter up among its open
+        // matters only, and refused clients whose matter had been sent and sent back: the stakes run's first rung.)
         if let Some(with) = x.authority.clone().filter(|w| !w.trim().is_empty()) {
-            let kinds: Vec<String> = kind.clone().into_iter().filter(|k| hands_over(self.remit(&x.agreement, k))).collect();
+            let with = with.trim().to_string();
             let post = r.position.as_deref().map(String::from);
-            let why = match post.filter(|_| !kinds.is_empty()) {
-                Some(post) => {
-                    self.lodge(&with, &post, &kinds, id);
+            let matter = x.matter.clone().or_else(|| x.only.clone());
+            let given = post.as_deref().and_then(|p| self.authority_on_notice(&with, matter.as_deref(), kind.as_deref(), p));
+            let why = match given {
+                Some(kinds) => {
                     words.push(format!("We are giving {with} our authority for you in {}.", kinds.iter().map(|k| plural(&k.replace('_', " "))).collect::<Vec<_>>().join(" and ")));
                     Why::Lodged
                 }
                 None => {
-                    words.push(format!("We give {with} no authority for you: name a kind of matter we hand you, or the matter it is for."));
+                    words.push(format!("We hold no notice from {with} asking for our authority for you on a matter we hand you, so we give it none."));
                     Why::NotLodged
                 }
             };
