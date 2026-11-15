@@ -14508,3 +14508,4 @@ do not move).
   translator's next training round, and the seat's retry is the remedy.
 - **Revisit if** a later run brings targets (confirmed redrafts) for the act-word blanks: the act-words rule is kept in
   this entry's words to be scored again then.
+- **Follow-up, the same day:** the three sentences listed above are reworded as proposed (participant 0.22.3): the `do` tool points to a form for asking where the seat has one; the standing line says a draft for a client's sign-off is among what is confirmed or declined; the sittings' line reads "(a letter; a paper filed with your office, a vote or a notice does not bring you back sooner ...)". The guard (participants/test/seat-names.test.ts) holds the first two.

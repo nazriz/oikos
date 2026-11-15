@@ -37,11 +37,11 @@ test("going to see a place is offered where a seat would look for it: in what to
   const seat = (extra: Partial<LlmParticipantConfig>) => tools({ participant: "x", entity: "city", framing: { disclosure: "simulation", reason: "" }, standing: [], titles: new Map([["mayor/town", "Go and see (takes time: say where)"]]), cadenceDays: 7, draftText: () => "", ...extra });
   const there = seat({ kinds: new Map([["mayor/town", "sites"], ["mayor/files", "records"]]), ways: new Map([["mayor/town", { way: "visit" }]]), onRequest: ["mayor/town", "mayor/files"] });
   const d = (ts: ReturnType<typeof tools>, name: string) => ts.find((t) => t.name === name)!.description;
-  expect(d(there, "do")).toEndWith("and to ask someone something, write to them. To find out how a place stands, send someone to go and see it: that is a look too.");
+  expect(d(there, "do")).toEndWith("and to ask someone something, write to them; where you have a form for asking (a question to a client), fill it in with do. To find out how a place stands, send someone to go and see it: that is a look too.");
   expect(d(there, "look")).toStartWith("Look into one of your reports yourself, or send someone to go and see a place, when you choose.");
   expect(d(there, "look")).toContain('Places you are not at: "Go and see (takes time: say where)" (mayor/town). Nobody is shown them: name where to send someone (a building by its id, or a piece of ground by its cell, such as cell.3.4; a lot\'s cells are on its plan), up to 16 at a time.');
   // An office with nowhere to send anyone is told nothing of it.
   const desk = seat({ kinds: new Map([["mayor/files", "records"]]), onRequest: ["mayor/files"] });
-  expect(d(desk, "do")).toEndWith("and to ask someone something, write to them.");
+  expect(d(desk, "do")).toEndWith("and to ask someone something, write to them; where you have a form for asking (a question to a client), fill it in with do.");
   expect(d(desk, "look")).toStartWith("Look into one of your reports yourself, when you choose.");
 });
