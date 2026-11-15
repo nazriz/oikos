@@ -307,7 +307,8 @@ function callWords(c: Call): string {
 function forwardShown(d: any): unknown {
   const words = String(d?.text ?? "");
   const inner = d?.data && typeof d.data === "object" && !Array.isArray(d.data) ? Object.fromEntries(Object.entries(d.data).filter(([, v]) => !(typeof v === "string" && v.length > 12 && words.includes(v)))) : {};
-  return { from: d?.by, kind: d?.kind, paper: d?.paper, ...(d?.matter ? { matter: d.matter } : {}), ...Object.fromEntries(Object.entries(inner).filter(([k]) => !["from", "kind", "paper", "matter"].includes(k))) };
+  const { from: _f, kind: _k, paper: _p, matter: _m, ...rest } = inner as { [k: string]: unknown };
+  return { from: d?.by, kind: d?.kind, paper: d?.paper, ...(d?.matter ? { matter: d.matter } : {}), ...rest };
 }
 
 const dataWords = (r: { kind: string; data?: unknown }, fields?: FieldKinds) => (r.kind === "form" ? "" : r.data === null || r.data === undefined || typeof r.data !== "object" ? ""
