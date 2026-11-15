@@ -418,7 +418,11 @@ impl Reader {
                 *st <= t && srf != wrf && !self.copy_sent.contains(&i) && p.as_ref().is_some_and(|p| same_paper(p, kind, r)) && self.referrals.get(srf).is_some_and(|x| x.principal == principal)
             })
         };
-        let want_at = self.wants.iter().rposition(|w| w.principal == principal && w.t <= t && w.report.as_ref().is_none_or(|r| r.0 >= t)).filter(|&i| !copy_elsewhere(&self.wants[i].referral));
+        // (Nor a paper sent again citing one sorted against another of its matters (a return, or the client's copy passed
+        // on), which is that matter's: the stakes run's rung 1 "c", 2026-11-15, the code desk's claim sent again after
+        // the authority was recorded read as the client's open want's, "beyond the level".)
+        let again_elsewhere = |wrf: &str| bases(r).iter().any(|b| self.referral_of.get(b.as_str()).is_some_and(|rf| rf != wrf && self.referrals.contains_key(rf)));
+        let want_at = self.wants.iter().rposition(|w| w.principal == principal && w.t <= t && w.report.as_ref().is_none_or(|r| r.0 >= t)).filter(|&i| !copy_elsewhere(&self.wants[i].referral) && !again_elsewhere(&self.wants[i].referral));
         if let Some(w) = want_at.map(|i| &mut self.wants[i]) {
             w.sent.push((t, kind.to_string(), to.iter().map(|x| x.to_string()).collect()));
             let (rf, wk, wants) = (w.referral.clone(), w.kind.clone(), w.wants.clone());
@@ -832,6 +836,8 @@ mod tests {
             rec(3, "dn1", "delivery_note", "f1", "mgr-assistant", &["shop"], json!({})),
             ob(4, "dn1", json!({ "correction": ["order"] })),
             a,
+            // (A want handed over meanwhile: the paper sent again is still the returned matter's, not the want's.)
+            rec(5, "rfw", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "want-disrepair", "wants": "draft", "depth": "want", "want": { "about": "disrepair" } })),
             again,
             rec(7, "rf2", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "delivery_note", "wants": "alone" })),
             rec(8, "dn2", "delivery_note", "f1", "mgr-assistant", &["shop"], json!({})),
