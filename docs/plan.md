@@ -63,7 +63,10 @@ client pace `ordinary` / `slow`, obstacle level 2 throughout; a rung that fails 
 clean pass with no new kind of fault). Pass on every rung: the funnel healthy for the desk and the factory; at least one
 episode with the stake running met by a model seat; the seat shown the client's sitting line and the office's published
 rule; every model seat debriefed; the replay's "still wrong" at most a tenth; the price table's "ours" share reported;
-the scripted arms caught (acted beyond, asked for more) and the code arm at zero.
+the scripted arms caught (acted beyond, asked for more) and the code arm at zero. A stated setting beside the cells,
+off unless set: `OIKOS_SITUATION=on`, each person's hand-over saying how things stand with them (their balance, a
+regular payment coming in, their next rent); the experiment's name carries "-situation". Whether a rung uses it is the
+owner's decision.
 
 - [ ] Rung 1: 14 days, 1 seed, the main cell (decision × slow). About $0.15.
 - [ ] Rung 2: 30 days, 1 seed, both stake levels at slow. About $0.60.

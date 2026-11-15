@@ -16,6 +16,11 @@
 //         second day 15%, third 10%, weekly 15%); `slow`, the study's stated condition (10 / 10 / 20 / 60: build.ts,
 //         `SLOW_POST`, a placeholder like the profile's figures).
 //     The main cell is decision × slow; first_claim × slow its contrast; the ordinary pair the same at the profile's pace.
+//       client's situation (`OIKOS_SITUATION`, `off` unless set to `on`): each person's hand-over also says, in fixed
+//         words from their own state, what they have in hand today, what regular payment comes in, and their next rent
+//         and its day (build.ts `clientSituation`; docs/behaviour/assistants.md, "What a client says of how things
+//         stand"). A stated setting, not a cell: the owner decides whether a run uses it; with it on, the experiment's
+//         name carries "-situation" so its folder is apart.
 //   - Arms: the code assistant (the reference) and Haiku 5.5, which holds only the seats the data comes from, the
 //     households' desk (`provider-a-desk`) and the factory's assistant; the finance and rates offices' assistants stay
 //     code in every arm (`codePosts`).
@@ -96,12 +101,12 @@ export const RUNGS: { [rung: number]: Rung } = {
 export const HEALTH_DAYS = [10, 30];
 
 /** One cell's experiment: the town at a stake level and a pace, `days` after the fork on `seeds`, each fork limited. */
-export function stakesRun(o: { name: string; stake: Stake; pace: Pace; days: number; seeds: number[]; forkUsd: number; scripted?: boolean }): ExperimentSpec {
+export function stakesRun(o: { name: string; stake: Stake; pace: Pace; days: number; seeds: number[]; forkUsd: number; scripted?: boolean; situation?: "off" | "on" }): ExperimentSpec {
   const total = o.scripted ? 0 : o.forkUsd * o.seeds.length;
   const spec = build({ name: o.name, days: o.days, seeds: o.scripted ? o.seeds.slice(0, 1) : o.seeds, reviewDays: 14, arms: o.scripted ? SCRIPTED_ARMS : ARMS,
     budget: { experiment_usd: total, arm_usd: o.scripted ? {} : { haiku: total } },
     offices: [...OFFICES, RATES_POST], cohort: { by: "hand", every: 3, only: true, difficulty: true }, holdLevels: "run", depth: "matter", wants: true, obstacles: 2,
-    dateOfEffect: o.stake, clientPost: o.pace });
+    dateOfEffect: o.stake, clientPost: o.pace, ...(o.situation === "on" ? { clientSituation: "on" as const } : {}) });
   if (o.scripted) return spec;
   spec.seats = { ...spec.seats, calls_at_once: 2, budget: { ...spec.seats!.budget, fork_usd: o.forkUsd } };
   spec.healthCheck = {
@@ -124,8 +129,10 @@ const rung = Number(process.env.OIKOS_RUNG ?? 0);
 const stake = process.env.OIKOS_STAKE as Stake;
 const pace = process.env.OIKOS_PACE as Pace;
 const scripted = process.env.OIKOS_SCRIPTED === "1";
+const situation = process.env.OIKOS_SITUATION ?? "off";
+if (situation !== "off" && situation !== "on") throw new Error("stakes-run.ts: OIKOS_SITUATION is on or off (the header)");
 const r = RUNGS[rung];
 if (!r) throw new Error("stakes-run.ts: set OIKOS_RUNG to 1, 2, 3 or 4 (the header)");
 if (!r.cells.includes(cell(stake, pace))) throw new Error(`stakes-run.ts: rung ${rung} runs the cells ${r.cells.join(", ")}; set OIKOS_STAKE and OIKOS_PACE to one of them`);
 
-export default stakesRun({ name: `scope-stakes-r${rung}-${stake}-${pace}${scripted ? "-scripted" : ""}`, stake, pace, days: r.days, seeds: r.seeds, forkUsd: r.forkUsd, scripted });
+export default stakesRun({ name: `scope-stakes-r${rung}-${stake}-${pace}${situation === "on" ? "-situation" : ""}${scripted ? "-scripted" : ""}`, stake, pace, days: r.days, seeds: r.seeds, forkUsd: r.forkUsd, scripted, situation });

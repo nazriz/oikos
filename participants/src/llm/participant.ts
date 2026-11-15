@@ -1890,7 +1890,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // its notebook as it left it. What it did is in `d.summary`, made by code from the run's log: it has no other
       // memory of the run (VISION 15, point 7: an account of an experience it cannot remember is no account).
       return await runDebrief(io, { participant: c.participant, title: c.title ?? c.participant, entity: c.entityName && c.entityName !== c.entity ? `${c.entityName} (${c.entity})` : c.entity,
-        framing: c.framing, system: lastSystem ?? c.framing.system ?? "", notebook: notes, ...(c.effort ? { effort: c.effort } : {}), ...(c.mockDebrief ? { mock: c.mockDebrief } : {}), ...(c.withMatters?.length ? { heldMatters: true } : {}) }, d, seenSystems);
+        framing: c.framing, system: lastSystem ?? c.framing.system ?? "", notebook: notes, ...(c.effort ? { effort: c.effort } : {}), ...(c.mockDebrief ? { mock: c.mockDebrief } : {}), ...(c.withMatters?.length || c.matters ? { heldMatters: true } : {}) }, d, seenSystems);
     },
   };
 }
