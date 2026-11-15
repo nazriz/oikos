@@ -148,6 +148,10 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   expect(askedClass({ asked: { authority: "bank", kind: "loan applications", matter: "rec.1" }, axes: { means: "within" }, obstacle: { need: { authority: { with: "bank", kinds: ["loan_application"] } } } })).toBe("needed");
   expect(askedClass({ asked: { authority: "outside", kind: "benefit changes", matter: "rec.1" } })).toBe("ahead");
   expect(askedClass({ asked: { kind: "benefit_claim", level: "alone" }, needed: { kind: "benefit_claim", wants: "draft" } })).toBe("more");
+  // (Rung 2, 2026-11-15.) A level no higher than the matter was handed at is no asking for more ("at draft level", for a
+  // matter handed to draft); a body's notice on another matter of the kind is the notice it is weighed against.
+  expect(askedClass({ asked: { authority: "outside", kind: "benefit changes", level: "draft" }, needed: { kind: "benefit_change", wants: "draft" } })).toBe("ahead");
+  expect(askedClass({ asked: { authority: "bank" }, notice: { need: { authority: { with: "bank", kinds: ["loan_application"] } } } })).toBe("needed");
   const ahead = episodesOf({ seed: 1, arm: "haiku", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs, transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [] },
     rows: [{ table: "requests", request: "rec.8", matter: "rec.1", asked: { authority: "outside", kind: "benefit changes" }, needed: { kind: "benefit_claim", wants: "draft" } }] });
   expect([ahead.episodes[0]!.did, ahead.episodes[0]!.asked_ahead, ahead.episodes[0]!.asked, ahead.episodes[0]!.asked_detail?.[0]?.ahead]).toEqual(["waited", ["rec.8"], undefined, true]);
