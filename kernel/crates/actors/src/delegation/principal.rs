@@ -68,6 +68,10 @@ pub struct Params {
     /// The papers that say a matter went wrong, when they come back citing it (a complaint, a request to put it right).
     #[serde(default)]
     pub complaints: Vec<String>,
+    /// It says how things stand with it on each hand-over (the generator's `assistant_situation`): what it has in hand
+    /// today, what regular payment comes in, its next rent and its day. Off: the hand-over as before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub situation: bool,
     /// A delegation it has already decided on, by hand (`Commit`): absent, its rule decides everything.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub commit: Option<Commit>,
@@ -1758,6 +1762,57 @@ impl State {
     /// nearest day still to come that one of them names ([`crate::papers::delegation::DATE_FIELDS`]) is the matter's
     /// `due`. Its own position, in its kind's fixed words ([`TOLD`]), the blanks from the matter's own paper. Its own
     /// papers name no `due`: their days are terms it sets for others.
+    /// How things stand with it, as it would tell whoever helps it (`situation`), each in a fixed sentence from its own
+    /// papers and account: what it has in hand today; each payment that comes to it on a standing basis (an agreement or
+    /// a decision that pays it every so often); its rent and the day it next falls due, where it is a tenant.
+    fn situation(&self, pic: &Picture, t: i64, cx: &Cx) -> Vec<String> {
+        let w = &cx.ctx.world;
+        let money = |c: i64| crate::common::money_words(c, w);
+        let date = |at: i64| crate::common::when_words(at, w);
+        let every = |s: i64| if s % DAY == 0 && s / DAY == 1 { "every day".to_string() } else if s % DAY == 0 { format!("every {} days", s / DAY) } else { format!("every {} hours", s / 3600) };
+        let mut out = Vec::new();
+        let mine = format!("acc-{}", self.me);
+        let own = if self.p.account.is_empty() { mine.clone() } else { self.p.account.clone() };
+        if let Some(a) = pic.accounts().find(|a| a.account.as_str() == own) {
+            out.push(format!("In our account ({}) today: {}.", own, money(i64::try_from(a.balance).unwrap_or(i64::MAX))));
+        }
+        let mut seen = BTreeSet::new();
+        for r in pic.all_records() {
+            if !seen.insert(r.id.to_string()) {
+                continue;
+            }
+            // (An agreement under which another party pays it every so often: a wage, say.)
+            if let RecordBody::Agreement { terms } = &r.body {
+                for c in terms.commitments.iter().filter(|c| c.who != self.me) {
+                    let (Some(o), Some(e)) = (crate::papers::agreements::outcome_of(&c.does), c.every) else { continue };
+                    if let Some(m) = o.money.filter(|m| m.to == own) {
+                        out.push(format!("Coming in: {} {} from {} ({}).", money(m.amount), every(e), c.who, r.id));
+                    }
+                }
+                // (A lease of which it is the tenant: its rent and the day it next falls due.)
+                let l = crate::papers::agreements::lease_terms(r, &self.me);
+                if l.rent > 0 && l.space.is_some() {
+                    if let Some(e) = l.every.filter(|e| *e > 0) {
+                        let from = r.at.max(0);
+                        let next = from + ((t - from).max(0) / e + 1) * e;
+                        out.push(format!("Our rent: {} {}, next due on {} ({}).", money(l.rent), every(e), date(next), r.id));
+                    }
+                }
+            }
+            // (A decision that pays it a support payment every so often.)
+            if crate::common::is_kind(r, "benefit_decision") {
+                use crate::common::Fields;
+                let d = crate::common::data(r);
+                if d.flag("granted") && d.s("claim").is_some_and(|c| c.contains(self.me.as_str())) {
+                    if let (Some(a), Some(e)) = (d.i("amount"), d.i("every")) {
+                        out.push(format!("Coming in: {} {}, our {} ({}).", money(a), every(e), d.s("payment").unwrap_or("payment").replace('_', " "), r.id));
+                    }
+                }
+            }
+        }
+        out
+    }
+
     fn grounds(&self, kind: &str, level: Level, program: &str, subjects: &[String], want: Option<&WantHanded>, facts: Option<&Value>, pic: Option<&Picture>, t: i64, cx: &Cx) -> Grounds {
         let mut cited: Vec<String> = subjects.to_vec();
         cited.extend(want.and_then(|w| w.against.as_ref()).map(|a| a.record.clone()));
@@ -1790,6 +1845,14 @@ impl State {
                 if g.due.as_ref().is_none_or(|(x, _)| d < *x) {
                     g.due = Some((d, p.id.clone()));
                 }
+            }
+        }
+        // (Where it is set (`situation`), how things stand with it, in fixed words from its own state and nothing reckoned:
+        // its balance today, a regular payment coming in, its next rent and its day. A person tells whoever helps them;
+        // no adjective, no sum of ours, no advice.)
+        if self.p.situation {
+            if let Some(pic) = pic {
+                g.why.extend(self.situation(pic, t, cx));
             }
         }
         // (A person who gets to their post at sittings of their own (`habit`) says so on every hand-over that waits on

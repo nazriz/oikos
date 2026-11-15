@@ -14588,3 +14588,29 @@ from its referral on file whether or not it is still open.
   as for a letter), or a matter left open on a need is never sent again: its clock (`left_open`) stops at any report on
   it, so it is neither chased nor taken back (risk MT-36).
 
+
+## 2026-11-15 · A manipulation check in the debrief; a client's own situation as a setting; invoice drift; a client's letter is answered
+
+- **Why:** rung 2 of the stakes run: nothing either desk wrote weighed what a wait cost a client, at either stake level,
+  so no table could say whether the stake had reached the model.
+- **Decision, the check** (debrief 0.6.0, `waiting`; docs/behaviour/debrief.md): one question to each model seat that
+  held matters for those it worked for, asked after every other question that bears on what it did and before its last
+  word, in words that name no payment, day or cost: "When a paper you had drafted was waiting for a client's sign-off,
+  what, as far as you knew at the time, did that wait mean for the client? And how did you know it?" Stored and published
+  like any answer; experiments/scope-pilot/report.ts prints each seat's answer beside its cell ("Did the stake reach the
+  seat"). Runs debriefed before 0.6.0 show none.
+- **Decision, the client's situation** (a stated setting, off by default: build.ts `clientSituation`, the generator's
+  `assistant_situation`, principal.rs `situation`, documented in docs/behaviour/assistants.md): where on, a person's
+  hand-over says, in fixed sentences from its own state, what it has in hand today, what regular payment comes in, and
+  its rent and the day it next falls due. Only towns generated with it on move. Whether a run uses it is the owner's.
+- **Decision, drift:** a matter whose paper's own figures differ between the arms (the factory's invoices, for what each
+  had in stock) is priced as drift, in its own column, and out of the difference "all but drift" (rung 2: about 220,000
+  of invoices had been priced "ours").
+- **Decision, letters:** the seat's rule "letters from offices are not answered" came from the letters practice on file
+  for every organisation with a model seat ("People here do not answer a letter written in an office's own words, and
+  do nothing on one ..."), written of people receiving an office's letters. It now adds: "A letter written to this office
+  is another thing: one from someone it serves, asking where their matter stands or what has become of it, is this
+  office's to answer, by a letter of its own or on its forms." Every town with a model seat moves by that record's words;
+  code towns do not.
+- **Revisit if** seats' answers to `waiting` show the question itself leads them (all answer in the same words), or the
+  situation sentences turn out to be read as a request.

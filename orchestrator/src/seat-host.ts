@@ -152,7 +152,7 @@ export class ModelSeat {
     // What is kept back of the fork's limit for the debrief (VISION 15, point 7): no other call may spend it.
     if (o.budget) {
       const seatModel = `${o.adapter.provider}/${o.adapter.model}`;
-      const calls = stepsOf("full", 3, true).length + 2;
+      const calls = stepsOf("full", 3, true, true).length + 2;
       // (Seats that share their fork's limit, a template steward's, keep back for every one of them: each seat made adds its own.)
       const shared = o.budget as Budget & { seats?: number };
       const seats = (shared.seats = (shared.seats ?? 0) + 1);

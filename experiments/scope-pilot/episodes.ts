@@ -105,6 +105,16 @@ const LEVEL_RANK: { [l: string]: number } = { none: 0, advice: 1, draft: 2, appr
 /** Whether a request asks beyond what its matter needed: by the acts reader's axes against the obstacle it is set beside
  * (any axis `beyond`; `delegation/beyond.rs`, `axes`), or where none is, against the level and kind the matter was
  * handed at: a higher level, another kind, an authority, access, or a limit nobody's notice asked for. */
+/** A matter's paper as it was handed over, by its own figures: its calls (handed as written) or its facts (handed as a
+ * matter, `depth: "matter"`), the form it is composed on and the records it cites aside. */
+function paperOf(R: any): string | undefined {
+  // (Its records' ids aside too: an order's id differs between the arms after the fork, its figures need not.)
+  if (typeof R?.data?.calls === "string") return R.data.calls.replace(/rec\.[0-9]+/g, "rec");
+  const f = R?.data?.facts;
+  if (!f || typeof f !== "object") return undefined;
+  const { composed_on: _c, records: _r, ...rest } = f;
+  return JSON.stringify(Object.fromEntries(Object.entries(rest).sort(([a], [b]) => (a < b ? -1 : 1)))).replace(/rec\.[0-9]+/g, "rec");
+}
 export function askedMore(q: any): boolean {
   return askedClass(q) === "more";
 }
@@ -152,6 +162,9 @@ export interface MatterRow {
   asked_detail?: AskedFor[];
   afterwards?: { ratified: number; repudiated: number; taken_back: number; chased: number; did_itself: number };
   outcome?: { what: string; t: number }; received_cents: number | null; withheld: boolean; beyond: string[]; mistake: boolean; ours: string[];
+  /** The paper's own figures as the matter was handed over (its calls): where they differ between the arms, the towns
+   * drifted (a factory's stock, so its invoice's quantity), and the money is drift, not the seat's. */
+  paper?: string;
 }
 export interface ArmOut { levels: LevelRow[]; effect: "first_claim" | "decision"; matters: MatterRow[]; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: Map<string, any>; seatMonths: number }
 
@@ -339,7 +352,7 @@ export function episodesOf(o: ArmInput): ArmOut {
     // citing a paper of the matter's kind in the client's name, from the hand-over to the next of its kind.)
     const sentIds = new Set(all.filter((x) => x.at >= R.at && x.speaks_for === client && x.kind === kind && x.in_position === seat).map((x) => x.id));
     const returnedAuthority = all.filter((x) => x.kind === "paper_returned" && x.data?.need?.authority?.for === client && x.speaks_for !== client && [].concat(x.data?.paper?.basis ?? [], x.basis ?? []).some((b: any) => sentIds.has(String(b)))).length;
-    matterRows.push({ seed, arm, seat, client, matter: R.id, kind, handed: R.at, ...(on("draft")[0] ? { drafted: on("draft")[0].at } : {}), ...(doneR ? { done: doneR.at } : {}), ...(went ? { sent: went.at } : {}),
+    matterRows.push({ seed, arm, seat, client, matter: R.id, kind, handed: R.at, ...(paperOf(R) !== undefined ? { paper: paperOf(R) } : {}), ...(on("draft")[0] ? { drafted: on("draft")[0].at } : {}), ...(doneR ? { done: doneR.at } : {}), ...(went ? { sent: went.at } : {}),
       ...(waits.some((w) => w.wait === "sign_off" && w.to !== undefined) ? { signoff_seconds: waits.filter((w) => w.wait === "sign_off" && w.to !== undefined).reduce((n, w) => n + (w.to! - w.from), 0) } : {}), ...(perDay ? { per_day_cents: perDay } : {}),
       ...(decision ? { outcome: { what: outcome!.what, t: decision.at } } : {}), received_cents: fromWhom ? transfers.filter((x) => x.to === acc && x.t >= R.at && x.t < next && fromWhom(x)).reduce((n, x) => n + Number(x.amount), 0) : null,
       withheld: !!held, beyond: beyond.map((b) => `${b.class} ${b.paper}`), mistake: false, ours, returned_authority: returnedAuthority, ...(askedDetail.length ? { asked_detail: askedDetail } : {}),
@@ -428,7 +441,9 @@ export function priceOf(rows: MatterRow[], end: number): any[] {
       ...(c?.signoff_seconds !== undefined ? { code_wait_days: days(c.signoff_seconds), ...(c.per_day_cents ? { code_wait_worth_cents: Math.round((c.signoff_seconds / DAY) * c.per_day_cents) } : {}) } : {}),
       // (A matter handed over too near the run's end to be finished is the run's end's, not the seat's: rung 1's second
       // invoice, handed to the factory 0.6 days before the end.)
-      cause: r.ours.length ? "ours" : r.mistake ? "the seat's mistake" : r.done === undefined && end - r.handed < END_DAYS * DAY ? "the run's end" : "the seat's choice", ...(r.ours.length ? { ours: r.ours } : {}) });
+      // (A paper whose own figures differ between the arms, an invoice for what each factory had in stock, is the towns'
+      // drift: rung 2, 2026-11-15, two hundred thousand of invoices priced as "ours".)
+      cause: c && r.paper !== undefined && c.paper !== undefined && r.paper !== c.paper ? "drift" : r.ours.length ? "ours" : r.mistake ? "the seat's mistake" : r.done === undefined && end - r.handed < END_DAYS * DAY ? "the run's end" : "the seat's choice", ...(r.ours.length ? { ours: r.ours } : {}) });
   }
   return out;
 }

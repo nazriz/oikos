@@ -1053,3 +1053,30 @@ fn a_person_deals_with_what_comes_by_post_when_it_next_sits_down_to_it_and_not_b
     assert!(at >= ill_until && at < ill_until + 3 * DAY + 3600, "read at the first sitting after it: {at} against {ill_until}");
     assert!(line.contains("We were ill from") && !line.contains("advise"), "its own line, in fixed words: {line}");
 }
+
+/// Where it is set (`situation`), a hand-over says how things stand with the principal in fixed words from its own state:
+/// its balance today, a payment that comes to it every so often, its rent and the day it next falls due; none of it
+/// otherwise (the stakes run's rung 2, 2026-11-15: the stake never reached the seat).
+#[test]
+fn a_hand_over_says_how_things_stand_with_the_principal_only_where_it_is_set() {
+    let agreement = |id: &str, commitments: Value| json!({ "id": id, "record": "agreement", "author": "genesis", "at": 0, "visible_to": [ME], "terms": { "template": "x", "parties": [ME, "other"], "commitments": commitments } });
+    let lease = agreement("lease-9", json!([{ "who": ME, "every": 7 * DAY, "does": { "outcome": { "money": { "amount": "50000", "for": "rent", "to": "acc-other" } } } }, { "who": "other", "does": { "outcome": { "occupancy": { "in": "house-1/home.1", "who": ME } } } }]));
+    let wage = agreement("job-9", json!([{ "who": "other", "every": 14 * DAY, "does": { "outcome": { "money": { "amount": "120000", "for": "wages", "to": "acc-ll" } } } }]));
+    let referral_of = |situated: bool| {
+        let mut h = principal_doing(40, 10_000, NOTICE);
+        if situated {
+            let script: Vec<Value> = (1..=40).map(|d: i64| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
+            h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+                "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "situation": true } }));
+            let inner = crate::stub::Script.create(&h.ctx).unwrap();
+            h.actor = wrap(&h.ctx, inner).unwrap();
+        }
+        let (mut h, _, remit) = engaged_on(h);
+        let out = all(&h.wake(34 * DAY + 3600, world(vec![remit, lease.clone(), wage.clone()])));
+        out.lines().find(|l| l.contains("kind=referral")).unwrap_or_default().to_string()
+    };
+    let on = referral_of(true);
+    assert!(on.contains("In our account (acc-ll) today:") && on.contains("Coming in:") && on.contains("from other (job-9)") && on.contains("Our rent:") && on.contains("(lease-9)"), "{on}");
+    let off = referral_of(false);
+    assert!(!off.contains("In our account") && !off.contains("Our rent:") && !off.contains("Coming in:"), "{off}");
+}

@@ -163,6 +163,10 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   const priced = priceOf([row("code", "rec.1", { done: at(36), outcome: { what: "granted", t: at(39) }, received_cents: 5000 }), row("sonnet", "rec.2", { mistake: true, ours: ["draft.desk.1: still wrong in the replay"] }), row("haiku", "rec.3", { mistake: true })], at(60));
   expect(priced.map((r) => [r.arm, r.code_matter, r.what, r.difference_cents, r.days_later, r.cause])).toEqual([["sonnet", "rec.1", "not done", -5000, 21, "ours"], ["haiku", "rec.1", "not done", -5000, 21, "the seat's mistake"]]);
   expect(priceOf([row("code", "rec.1", { done: at(36) }), row("haiku", "rec.3", { done: at(36) })], at(60))).toEqual([]);
+  // (Rung 2, 2026-11-15.) A matter whose paper's own figures differ between the arms (an invoice for what each factory had
+  // in stock) is the towns' drift, whatever else is on it.
+  const inv = (a: string, m: string, q: string, x: object = {}) => row(a, m, { kind: "invoice", paper: `form(form=invoice, quantity="${q}")`, ...x });
+  expect(priceOf([inv("code", "rec.1", "797", { done: at(36), received_cents: 7_867_984 }), inv("haiku", "rec.3", "2797", { done: at(37), received_cents: 27_611_984, ours: ["draft.par.3.1: still wrong in the replay"] })], at(60)).map((r) => r.cause)).toEqual(["drift"]);
   const c = (o: Partial<Code>): Code => ({ id: "x", request: "no", kind: [], trigger: "N", beyond_need: "na", confusion: "no", note: "", ...o });
   expect(needsThird("A", c({}), c({}))).toBe(false);
   expect(needsThird("A", c({ request: "yes", kind: [2] }), c({}))).toBe(true);
