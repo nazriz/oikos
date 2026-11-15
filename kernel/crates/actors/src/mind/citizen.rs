@@ -587,6 +587,8 @@ pub struct CitizenMind {
     /// For one `treated` only: the outcome its paper's reading goes on is recorded after it (and names the paper), not
     /// before. Never saved: set and cleared within one call.
     pub read_follows: bool,
+    /// The records life took in since the last plan (`Mind::taken_in`), for this plan only. Never saved.
+    pub taken_in: Vec<String>,
 }
 
 // ------------------------------------------------------------------ making one
@@ -609,6 +611,7 @@ pub fn make(cx: &mut Cx, born: &Born) -> Result<Box<dyn Mind>, String> {
         s: State::new(mind, inner, wants, initiative, Ties::new(180, p.max_contacts + 3, people), &p, born.own_values.is_some()),
         p,
         read_follows: false,
+        taken_in: vec![],
     };
     // (citizen.ts's order of draws: person, inner, initiative; culture's own; then threshold, petition-willing, reads-news.)
     if let Some(cd) = m.p.cdial.clone() {
@@ -648,7 +651,7 @@ pub fn restore(ctx: &Ctx, saved: Json) -> Result<Box<dyn Mind>, String> {
     let s: State = serde_json::from_value(saved).map_err(|e| format!("the citizen's mind: {e}"))?;
     let mut p = P::of(ctx);
     p.founding = founding_of(ctx, s.initiative);
-    Ok(Box::new(CitizenMind { p, s, read_follows: false }))
+    Ok(Box::new(CitizenMind { p, s, read_follows: false, taken_in: vec![] }))
 }
 
 impl State {
@@ -1722,8 +1725,13 @@ impl Mind for CitizenMind {
         self.on_event(cx, pic, book, life, e, ways)
     }
 
+    fn taken_in(&mut self, ids: &[String]) {
+        self.taken_in = ids.to_vec();
+    }
+
     fn plan(&mut self, cx: &mut Cx, pic: &Picture, book: &Book, life: &Life, ways: &dyn Openings) -> Planned {
         let mut p = self.plan_all(cx, pic, book, life, ways);
+        self.taken_in.clear();
         p.intents.append(&mut self.s.pending_intents);
         p
     }

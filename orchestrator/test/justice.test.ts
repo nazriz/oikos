@@ -44,7 +44,12 @@ test("unlawful rent increases are taken to the tribunal, found invalid, and with
   expect(kind("hearing_notice").filter((n) => n.data.kind === "rent_increase").length).toBe(applications.length);
   // (The tribunal's orders on these notices; it also hears possession now, which is orchestrator/test/possession.test.ts.)
   const orders = kind("tribunal_order").filter((o) => o.data.kind === "rent_increase");
-  expect(orders.length).toBe(applications.length);
+  // (Every application heard by the run's end has its order. Since 2026-11-15 (stakes D1b) a tenant reads the notice at a
+  // sitting of their own and applies then, so the last hearing can fall after the run's 250 days.)
+  const heardBy = (a: any) => kind("hearing_notice").find((n) => n.data.application === a.id)?.data;
+  const heard = applications.filter((a) => (heardBy(a)?.hearing_at ?? heardBy(a)?.answer_by ?? 0) < 250 * DAY);
+  expect(heard.length).toBeGreaterThan(applications.length * 0.9);
+  expect(orders.length).toBe(heard.length);
   for (const o of orders) {
     expect(o.data.finding).toBe("invalid");
     expect(o.data.laws).toContain("law-rent-cap");

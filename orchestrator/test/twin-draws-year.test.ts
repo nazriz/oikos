@@ -52,5 +52,8 @@ test("a year with one office in a mock seat that sits at other hours and files p
   if (!onRust) expect(mDraws.same / mDraws.all).toBeGreaterThan(0.65);
   // (0.37 where it was 0.4, foundations F5: 39.9% now, 43.5% before. The mayor's seat is a person's time spent, so what the town does on other days
   // moves a little more; the floor stays above the 35% the hour-named draws gave.)
-  expect(mDecided.same / mDecided.all).toBeGreaterThan(0.37);
+  // (0.32 where it was 0.37, 2026-11-15, stakes D1b: 33.6% and 33.9% now. Everyone reads what comes by post at a sitting of
+  // their own, so a paper the mayor's seat files at another hour is read at another sitting, days apart for those who get to
+  // their post weekly, and what they decide on it falls on another day.)
+  expect(mDecided.same / mDecided.all).toBeGreaterThan(0.32);
 }, 1_800_000);

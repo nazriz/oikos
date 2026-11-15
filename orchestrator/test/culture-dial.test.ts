@@ -112,7 +112,13 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
   // alone; with 0.77.0 written in, each is the hash it was. 6123ac0b..., e310a127..., fd53b87f... until then.)
   // (Re-taken on 2026-11-08 at the scope pilot's world faults, the config hashes only: the generator's version (0.79.0) in
   // the description alone, the towns having no assistants. 42ca7058..., 50c1e33a..., 4c849e00... until then.)
-  ? { "au-vic-2026": "efde801fb99443f6", "gb-eng-2026": "d8370e0f52315a86", "ke-nakuru-2026": "a023b11de4141c6f" }
+  // (Re-taken on 2026-11-15 at stakes D1b, D2 and the review's answer, config hashes and Rust states both: every person's
+  // code is given the profile's habit of getting to their post (`paperwork`), and what others send them waits for their
+  // sitting (kernel post.rs), skipped while they are too ill for it, and is new to their plan then; the support office's answer to a request to put a
+  // decision right is the officers' casework, so a review takes an officer's time. efde801f..., d8370e0f..., a023b11d...
+  // for the configs and 1895f02c..., 402f7523..., 3a1ff10c... for the states, until then. docs/decisions.md, "Every
+  // person gets to their post at their own sitting", "The every-town batch re-pinned".)
+  ? { "au-vic-2026": "b0eff76377970af2", "gb-eng-2026": "eb7d8f28d05af36c", "ke-nakuru-2026": "2c41f0468729e087" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -189,9 +195,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // main's d8300873..., e9564040..., 7bf5ae46..., until then.)
 // (Re-taken on 2026-11-07 at WM-15, as the configs above; 2ee01f8c..., 7abe89a6..., 4be8a863... until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "1895f02c0fa9fc1c99621394b4b32edeba7309a1f93ff20424243cd8a1f6b20f",
-  "gb-eng-2026": "402f7523b185099564ea106cd303bc2862a8f4f6f767cacd3ed8c3bff5df9639",
-  "ke-nakuru-2026": "3a1ff10ca4df6eb93265bf430be66e695b15b9cf94dc01c353b1106f5aaa37a7",
+  "au-vic-2026": "f50ff194129e76869f497b5499f1689018f6af3a1d39885c7c45bb1a83139aed",
+  "gb-eng-2026": "ab26f6bd7910e0b11e7071687a9f9cd94022ae6a26dc0672c8b82388c14c6956",
+  "ke-nakuru-2026": "a326bfa392f90ad0b0ee9c5b63dbb91e65dd496839e0d1e0546fc9bf1cb0dbc9",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

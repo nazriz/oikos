@@ -93,7 +93,13 @@ impl CitizenMind {
         let t = cx.t;
         let mut out = Planned::default();
         self.refresh_teachings(book);
-        let fresh: Vec<_> = book.records_since(self.s.last_planned_from).cloned().collect();
+        let mut fresh: Vec<_> = book.records_since(self.s.last_planned_from).cloned().collect();
+        // (And what was taken in since, though made before the last plan: post read late, at a sitting, crate::post.)
+        for id in std::mem::take(&mut self.taken_in) {
+            if let Some(r) = book.get(&id).filter(|r| r.at < self.s.last_planned_from) {
+                fresh.push(r.clone());
+            }
+        }
         let first_plan = !self.s.planned_once;
         // Culture: someone made in the run holds the picture lightly; a newcomer with no parents here is of a group
         // drawn from the profile's shares (citizen.ts 1733-1740).

@@ -14285,3 +14285,28 @@ moves (the every-town batch, with D1b and D2).
   over 180.
 - **Revisit if** a review in a backlog is seen to wait less than the claims around it (the desk's lane takes work in the
   order it is ordered; the reviews measured mostly came after the opening backlog).
+
+## 2026-11-15 · The every-town batch re-pinned (stakes D1b, D2 and the review's answer)
+
+Landed together on main at bcd7a1af; the whole slow tier run on the batch. What moved and why, each pin with its reason:
+- **A fault the slow tier found, fixed in the batch:** papers a person is shown at a sitting were made before their last
+  plan, so the mind's plan (records made since it last planned) never read them; in unions.test.ts two of 74 members
+  voted in a strike ballot. The wake at a sitting is news, and the mind is given what life took in since its last plan
+  (`Mind::taken_in`; mind/plan.rs reads those made before it too). A record first seen late for any other reason is now
+  read by the plan too, in every town.
+- **culture-dial.test.ts (the canary), config hashes and Rust states, three profiles:** every person's code is given the
+  habit (`paperwork`) and reads its post at its sittings, skipped while too ill (D1b, D2), and a review's answer is the
+  officers' casework. Old values in the test's comment.
+- **scripts/fixtures/representation-results.json, six towns' state hashes and logs:** the same reasons, re-taken by
+  `bun scripts/same-results.ts --pin` on the batch.
+- **twin-draws-year.test.ts, the mayor's twin's floor 0.37 to 0.32** (33.6% and 33.9% measured): a paper the mayor's seat
+  files at another hour is read at another sitting, days apart for weekly readers, so what they decide falls on other
+  days. The other seat's twin is still 100%.
+- **justice.test.ts:** every application heard by the run's end has its order, and at least nine in ten are heard by
+  then (53 of 54): a tenant reads a rent increase at a sitting and applies then, so the last hearing can fall after day
+  250. The finding, the law and the 21 days are held as before.
+- **building.test.ts:** `already_present` joins the races: a household's word of a new home read at a sitting finds the
+  person already home by their round.
+- **office-work.test.ts** (D1b, earlier): the last report read either way, carried out or not and why.
+- **Revisit if** a test's measure turns on post read at once again (a seat that must answer the same day), or the habit
+  is sourced (MT-37).

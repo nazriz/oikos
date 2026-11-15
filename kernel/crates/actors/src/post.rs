@@ -179,6 +179,7 @@ impl Posted {
         // (What it held and has now sat down to, back in the channel it came by, in the order it came.)
         let (now, still): (Vec<_>, Vec<_>) = std::mem::take(&mut self.s.held).into_iter().partition(|(_, r)| read(r.at));
         self.s.held = still;
+        let mut released = false;
         for (ch, r) in now {
             if shown_ids.contains(r.id.as_str()) {
                 continue;
@@ -186,13 +187,21 @@ impl Posted {
             let entry = shown.channels.entry(ch.as_str().into()).or_insert_with(|| Seen::Records { records: vec![], search: false });
             if let Seen::Records { records, .. } = entry {
                 records.push(Arc::new(r));
+                released = true;
             }
         }
-        let (mut now, still): (Vec<Message>, Vec<Message>) = std::mem::take(&mut self.s.letters).into_iter().chain(std::mem::take(&mut shown.inbox).into_iter().filter(|m| letter_for(&me, m))).partition(|m| read(m.t));
-        self.s.letters = still;
+        let (mut back, kept): (Vec<Message>, Vec<Message>) = std::mem::take(&mut self.s.letters).into_iter().partition(|m| read(m.t));
+        released |= !back.is_empty();
+        let (mut now, still): (Vec<Message>, Vec<Message>) = std::mem::take(&mut shown.inbox).into_iter().filter(|m| letter_for(&me, m)).partition(|m| read(m.t));
+        self.s.letters = kept.into_iter().chain(still).collect();
         let mut inbox: Vec<Message> = pic.inbox.iter().filter(|m| !letter_for(&me, m)).cloned().collect();
+        inbox.append(&mut back);
         inbox.append(&mut now);
         shown.inbox = inbox;
+        // (Its post sat down to is news to it, as a letter coming is: its code reads what came, whatever woke it.)
+        if released {
+            shown.woke_for = "news".into();
+        }
         let due = self.s.held.iter().map(|(_, r)| r.at).chain(self.s.letters.iter().map(|m| m.t)).map(|at| sitting_for(sits, &ill, at)).min();
         // (Nothing waiting: the spans are let go.)
         if due.is_none() {
