@@ -14526,3 +14526,4 @@ referral of its own in the agreement's place); it is answered under that matter'
 from its referral on file whether or not it is still open.
 - **Revisit if** a desk's paper cites papers of two matters (then the first found is its matter), or a request names
   nothing of the client's at all (it is still set aside, unanswered: say so if a run shows it).
+- **Follow-up, the same day:** the three sentences listed above are reworded as proposed (participant 0.22.3): the `do` tool points to a form for asking where the seat has one; the standing line says a draft for a client's sign-off is among what is confirmed or declined; the sittings' line reads "(a letter; a paper filed with your office, a vote or a notice does not bring you back sooner ...)". The guard (participants/test/seat-names.test.ts) holds the first two.

@@ -90,6 +90,10 @@ test("a seat is told once who it is and whom it writes to; its own drafts stand 
   // drafts.) What waits says a draft it asked for is confirmed like any other, and only another's paper is not.
   expect(shown).toContain("a draft you asked to be drawn up for a client's sign-off too, which goes to the client only once you confirm it");
   expect(shown).not.toMatch(/draft for sign-off[^.]*never confirmed/);
+  // (And the standing instructions: a draft for a client's sign-off is among what it confirms; asking is done on a form
+  // for asking where it has one, not only by letter.)
+  expect(calls[0]!.system).toContain("is confirmed or declined, a draft for a client's sign-off among it.");
+  expect(JSON.stringify(calls[0]!.tools ?? [])).toContain("where you have a form for asking (a question to a client), fill it in with do");
   // The rest of the answer is told what became of it: a paper is not a draft; an account is not someone to write to.
   await p.step({ ...obs, inbox: [], outcomes: [], channels: {} } as any, ctx);
   const told = JSON.stringify(calls.at(-1)!.messages.at(-1)!.content);
