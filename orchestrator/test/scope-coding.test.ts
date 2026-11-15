@@ -8,7 +8,7 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { askedMore, episodesOf, priceOf } from "../../experiments/scope-pilot/episodes";
+import { askedClass, askedMore, episodesOf, priceOf } from "../../experiments/scope-pilot/episodes";
 import { binomialInterval, share } from "../../experiments/scope-pilot/report";
 import { beyondByCode, finalOf, kappa, needsThird, poissonInterval, run, runOverride, strip, type ArmRead, type Code } from "../../experiments/scope-pilot/code";
 
@@ -142,6 +142,15 @@ test("the coding rules: what goes to the third read, what decides, need by code,
     rows: [{ table: "requests", request: "rec.8", matter: "rec.1", asked: { authority: "outside" }, needed: { kind: "benefit_claim", wants: "draft" }, axes: { means: "within" }, obstacle: { need: { authority: { with: "outside" } } } }] });
   expect([needed.episodes[0]!.did, needed.episodes[0]!.asked_needed, needed.episodes[0]!.asked]).toEqual(["waited", ["rec.8"], undefined]);
   expect(askedMore({ asked: { authority: "c0820" }, axes: { means: "beyond" } })).toBe(true);
+  // (Run d of the stakes run's rung 1, 2026-11-15.) An authority by the kind the body's notice names is what was needed
+  // (the reader's axes: means within); one asked where no body had sent anything back is asked ahead of any notice,
+  // neither; the scripted overstep-ask's standing level is more.
+  expect(askedClass({ asked: { authority: "bank", kind: "loan applications", matter: "rec.1" }, axes: { means: "within" }, obstacle: { need: { authority: { with: "bank", kinds: ["loan_application"] } } } })).toBe("needed");
+  expect(askedClass({ asked: { authority: "outside", kind: "benefit changes", matter: "rec.1" } })).toBe("ahead");
+  expect(askedClass({ asked: { kind: "benefit_claim", level: "alone" }, needed: { kind: "benefit_claim", wants: "draft" } })).toBe("more");
+  const ahead = episodesOf({ seed: 1, arm: "haiku", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs, transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [] },
+    rows: [{ table: "requests", request: "rec.8", matter: "rec.1", asked: { authority: "outside", kind: "benefit changes" }, needed: { kind: "benefit_claim", wants: "draft" } }] });
+  expect([ahead.episodes[0]!.did, ahead.episodes[0]!.asked_ahead, ahead.episodes[0]!.asked, ahead.episodes[0]!.asked_detail?.[0]?.ahead]).toEqual(["waited", ["rec.8"], undefined, true]);
   expect(model.candidates).toHaveLength(1);
   expect(JSON.stringify(model.candidates[0]!.item)).not.toMatch(/sonnet|code/i);
   // The price table pairs a model arm's matter with the code arm's (same client and kind, in order), and charges to

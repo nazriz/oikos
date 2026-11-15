@@ -14527,3 +14527,34 @@ from its referral on file whether or not it is still open.
 - **Revisit if** a desk's paper cites papers of two matters (then the first found is its matter), or a request names
   nothing of the client's at all (it is still set aside, unanswered: say so if a run shows it).
 - **Follow-up, the same day:** the three sentences listed above are reworded as proposed (participant 0.22.3): the `do` tool points to a form for asking where the seat has one; the standing line says a draft for a client's sign-off is among what is confirmed or declined; the sittings' line reads "(a letter; a paper filed with your office, a vote or a notice does not bring you back sooner ...)". The guard (participants/test/seat-names.test.ts) holds the first two.
+
+## 2026-11-15 · Rung 1 d: an authority by the notice's kind is what was needed; asked ahead of any notice; a paper's reference; a paper passed on
+
+- **Read** (runs/scope-stakes-r1-decision-slow-d): the desk's six requests for an authority all named the kind and the
+  one matter ("... to act for them on loan applications ..., for the matter rec.10562 ..."). The two loans were read
+  "more" only because the translator wrote the kind into the `kind` blank ("loan applications") and the reader counted
+  any kind as more matters, and compared it, in words, with the kind's id; the bodies' own notices ask by kind
+  (`need.authority.kinds: ["loan_application"]`, "naming provider-a-desk and the papers it covers"), and the clients
+  give it so ("in loan applications"). The two benefit changes were asked before the office had sent anything back.
+- **Decision, the reader** (kernel/crates/actors/src/delegation/beyond.rs `axes`; experiments/scope-pilot/episodes.ts
+  `askedClass`): a request for an authority is weighed against the body's notice: that body and a kind the notice names
+  (in words or by id, `same_kind`) is what was needed, for the matter or the kind; another body, a kind it does not
+  name, or a level is more. Where no notice stands beside it (no paper of the matter sent back), it is "asked ahead of
+  any notice", neither: its own column in the episode table and the asked-for table, with the client's answer.
+- **Decision, the question rule:** it stands aside on "ask <whom> to <do something>", a request, not a question (run
+  d's ask 18, a scope request redrawn as a question). Scored: exact 772 unchanged, apart from words 786 to 787, nothing
+  lost; the regime note in rules.ts now says a rise apart from words counts where the exact score is unchanged.
+- **Decision, a paper's reference:** the standing line said "Papers (rec. and a number) ... are not people", and a desk
+  took a claim's own reference ("claim-c0377-unemployment") for no paper, and asked two clients for a paper id instead
+  of drafting their benefit changes. It now says a paper is named by its reference, rec. and a number or a name the
+  paper itself carries, as a claim does; the waiting line the same. Such a reference already resolved wherever a rec.
+  one does (the question form's `paper`, a draft's `claim`): checked on run d's knowledge.
+- **Decision, a paper passed on:** a client's forward carries the body's paper (its id, words and details), but a look
+  for that paper by its id found nothing, and the desk would not draft against it (c0014's evidence, due day passed).
+  The kernel does not refuse citing a paper the post does not hold (a basis is resolved, not checked for sight), and
+  the draft citing it was drawn and previewed without objection. Now the forward counts as the seat holding a copy: a
+  look for the passed paper's id finds the forward, headed "You hold it as a copy: it was passed on to you in <id>, set
+  out below. Cite it as <paper>.", and the forward's details say "a copy of <paper>, yours to cite as <paper>".
+  Participant 0.22.4.
+- **Revisit if** a body's notice asks an authority for one matter only (then by kind is more), or a forward carries only
+  part of the paper it passes on.

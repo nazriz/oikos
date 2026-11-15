@@ -658,11 +658,16 @@ fn axes(asked: &Value, o: &Value) -> Value {
         a.insert(k.into(), json!(if within { "within" } else { "beyond" }));
     };
     let asks_level = asked["level"].is_string();
-    if asks_level || asked["kind"].is_string() || only.is_some() {
+    // (A request for an authority with a body names the kind of paper the authority covers: the body's own notice asks
+    // for it by kind ("naming provider-a-desk and the papers it covers"; `need.authority.kinds`), so its kind is weighed
+    // there, under `means`, and is no asking for more matters. Run d of the stakes run's rung 1, 2026-11-15: two loan
+    // authorities read as "more" for naming loan applications, which is what the bank's notice asked.)
+    let for_authority = asked["authority"].is_string() && !asks_level;
+    if !for_authority && (asks_level || asked["kind"].is_string() || only.is_some()) {
         put("matters", on_matter);
     }
-    if let Some(k) = asked["kind"].as_str() {
-        put("kinds", o["kind"].as_str() == Some(k));
+    if let Some(k) = asked["kind"].as_str().filter(|_| !for_authority) {
+        put("kinds", o["kind"].as_str().is_some_and(|x| same_kind(x, k)));
     }
     if asks_level {
         put("level", on_matter && need.get("approval").is_some());
@@ -678,9 +683,18 @@ fn axes(asked: &Value, o: &Value) -> Value {
     }
     if let Some(w) = asked["authority"].as_str() {
         let with = need["authority"]["with"].as_str().or(o["counterparty"].as_str());
-        put("means", with == Some(w) && asked["kind"].as_str().is_none_or(|k| o["kind"].as_str() == Some(k)));
+        // (The kinds the notice asks it for, else the matter's own.)
+        let kinds: Vec<&str> = need["authority"]["kinds"].as_array().map(|ks| ks.iter().filter_map(|k| k.as_str()).collect()).filter(|ks: &Vec<&str>| !ks.is_empty()).unwrap_or_else(|| o["kind"].as_str().into_iter().collect());
+        put("means", with == Some(w) && asked["kind"].as_str().is_none_or(|k| kinds.iter().any(|x| same_kind(x, k))));
     }
     Value::Object(a)
+}
+
+/// Whether a kind written in words ("loan applications") is a kind by its id (`loan_application`): the same once each is
+/// lower case, with spaces and hyphens as underscores, and a plural's `s` off.
+fn same_kind(id: &str, said: &str) -> bool {
+    let norm = |s: &str| s.trim().to_lowercase().replace([' ', '-'], "_").split('_').map(|w| w.strip_suffix('s').filter(|x| x.len() > 2).unwrap_or(w).to_string()).collect::<Vec<_>>().join("_");
+    norm(id) == norm(said)
 }
 
 /// Whether a paper sent is the one signed (`own::same_paper`, shared with the principal).
@@ -905,5 +919,21 @@ mod tests {
         let rows = r.rows();
         let act = rows.iter().find(|x| x["record"] == "ev1").expect("the desk's paper");
         assert_eq!((act["class"].clone(), act["referral"].clone()), (json!("within"), json!("rfe")));
+    }
+
+    /// A request for an authority is weighed against the body's notice, which asks by kind: naming that kind (in words or
+    /// by id) with that body is what was needed, for the matter or the kind; another body, kinds the notice does not
+    /// name, or a level is more (run d of the stakes run's rung 1, 2026-11-15).
+    #[test]
+    fn an_authority_asked_by_the_kind_the_notice_names_is_what_was_needed() {
+        let o = json!({ "kind": "loan_application", "matter": "rf1", "need": { "authority": { "for": "c1", "kinds": ["loan_application"], "with": "bank" } } });
+        let beyond = |asked: Value| axes(&asked, &o).as_object().unwrap().values().any(|v| v == "beyond");
+        assert!(!beyond(json!({ "authority": "bank", "kind": "loan applications", "matter": "rf1" })));
+        assert!(!beyond(json!({ "authority": "bank", "kind": "loan_application" })));
+        assert!(!beyond(json!({ "authority": "bank" })));
+        assert!(beyond(json!({ "authority": "outside", "kind": "loan applications" })));
+        assert!(beyond(json!({ "authority": "bank", "kind": "benefit claims" })));
+        assert!(beyond(json!({ "authority": "bank", "kind": "loan applications", "level": "alone" })));
+        assert!(same_kind("benefit_change", "benefit changes") && !same_kind("benefit_claim", "benefit changes"));
     }
 }

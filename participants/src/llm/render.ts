@@ -308,7 +308,7 @@ function forwardShown(d: any): unknown {
   const words = String(d?.text ?? "");
   const inner = d?.data && typeof d.data === "object" && !Array.isArray(d.data) ? Object.fromEntries(Object.entries(d.data).filter(([, v]) => !(typeof v === "string" && v.length > 12 && words.includes(v)))) : {};
   const { from: _f, kind: _k, paper: _p, matter: _m, ...rest } = inner as { [k: string]: unknown };
-  return { from: d?.by, kind: d?.kind, paper: d?.paper, ...(d?.matter ? { matter: d.matter } : {}), ...rest };
+  return { from: d?.by, kind: d?.kind, paper: d?.paper, ...(typeof d?.paper === "string" ? { held: `a copy of ${d.paper}, yours to cite as ${d.paper}` } : {}), ...(d?.matter ? { matter: d.matter } : {}), ...rest };
 }
 
 const dataWords = (r: { kind: string; data?: unknown }, fields?: FieldKinds) => (r.kind === "form" ? "" : r.data === null || r.data === undefined || typeof r.data !== "object" ? ""
@@ -651,6 +651,8 @@ const SET_OUT = "Someone has set out. What they find comes with the report after
 export interface Looked {
   named?: string[]; measure?: string; limit?: number; /** Someone was sent to the places named: what they find comes later. */ sent?: true;
   paper?: string; fromEntry?: number; about?: string; words?: string; kinds?: string[]; kindSaid?: string;
+  /** The paper asked for reached the seat only passed on, inside this paper of its own (a client's forward): shown as it. */
+  via?: string;
   /** What was asked for, in words (what to find, about what, since when), as the answer says back what was searched. */
   said?: string;
   /** How many papers at most were asked of whoever keeps them (more than `limit` where the list is narrowed here). */
@@ -793,6 +795,10 @@ function lookedPapers(head: string, id: string, records: Record[], asked: Looked
   const a = asked ?? {};
   if (a.paper !== undefined) {
     const r = records.find((x) => x.id === a.paper && (!folder || ofKind(x, folder)));
+    // (A paper passed on to the seat, held as the copy in the paper that passed it on: run d of rung 1, 2026-11-15, a
+    // desk looked four times for an office's request it held only in its client's forward, and let the due day pass.)
+    const copy = !r && a.via ? records.find((x) => x.id === a.via) : undefined;
+    if (copy) return [`## ${head}: the paper ${a.paper}`, `You hold it as a copy: it was passed on to you in ${a.via}, set out below. Cite it as ${a.paper}.`, ...paperInFull(copy, { ...a, paper: copy.id }, readings)];
     return [`## ${head}: the paper ${a.paper}`, ...(r ? paperInFull(r, a, readings) : ["There is no paper with that id there."])];
   }
   const limit = a.limit ?? 20;
@@ -942,7 +948,7 @@ export const WAITING_HEAD = "## Waiting for your yes or no: what you asked for, 
 // confirmed", meaning a draft someone else sent; a Haiku desk took it as its own drafts, wrote "a draft for sign-off is
 // never confirmed" into its standing rules on its first day, and left eleven of its drafts unanswered: the stakes run's
 // rung 1, run c.)
-export const WAITING_SAYS = "Each is something you asked for, set out so that you can check it before anything happens; nothing in it is done until you say yes. Each is answered with Confirm or Decline, by its reference (ask- and a number), whatever it is: a draft you asked to be drawn up for a client's sign-off too, which goes to the client only once you confirm it. A paper someone else sent you (rec. and a number) is not answered this way: you answer it with a paper or a letter of your own.";
+export const WAITING_SAYS = "Each is something you asked for, set out so that you can check it before anything happens; nothing in it is done until you say yes. Each is answered with Confirm or Decline, by its reference (ask- and a number), whatever it is: a draft you asked to be drawn up for a client's sign-off too, which goes to the client only once you confirm it. A paper someone else sent you (by its reference: rec. and a number, or a name it carries) is not answered this way: you answer it with a paper or a letter of your own.";
 /** How the platform's own preview is named to a seat: "ask-3", never "draft." (a draft for sign-off is the world's paper)
  * and never "rec." (a paper's). The preview is kept as `draft.<participant>.<n>`; a seat's "ask-<n>" is read back to it. */
 export const askRef = (s: string): string => s.replace(/(?<![\w.-])draft\.(?:par\.[0-9]+|[a-z][a-z0-9_-]*)\.(w?[0-9]+)(?![\w-])/g, (_, n: string) => `ask-${n}`);

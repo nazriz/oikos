@@ -113,6 +113,20 @@ test("a paper is read in full when it is asked for by its id; a register or a ma
   expect(r.f).toContain("## The office's files: the paper rec.1\nThere is no paper with that id there.");
 });
 
+test("a paper passed on to the seat is a copy it holds: a look for it by its id finds the paper that passed it on, and says to cite it so", async () => {
+  // (Run d of the stakes run's rung 1, 2026-11-15: an office's request reached the desk only in its client's forward; the
+  // desk looked for it by its id four times, found nothing, would not draft against it, and the due day passed.)
+  const fwd = { id: "rec.299", record: "statement", kind: "forward", author: "c0014-self", speaks_for: "c0014", at: 37 * DAY, visible_to: ["c0014", "city"], text: "Passed on to you: outside's request.",
+    data: { paper: "rec.239", by: "outside", kind: "evidence_request", text: "Send proof of who you are.", matter: "rec.66" } };
+  const { p, calls } = harness([[use("a", "look", { report: "finance/files", paper: "rec.239" })]]);
+  // (The look asks for the forward, the paper it holds the copy in.)
+  expect(await p.step(found(37 * DAY, "finance/files", [fwd], false), ctx)).toMatchObject({ type: "look", looks: [{ channel: "finance/files", query: { where: [{ field: "id", op: "=", value: "rec.299" }] } }] });
+  await p.step(found(38 * DAY, "finance/files", [fwd]), ctx);
+  const r = resultsOf(calls.at(-1)!);
+  expect(r.a).toContain("## The office's files: the paper rec.239\nYou hold it as a copy: it was passed on to you in rec.299, set out below. Cite it as rec.239.");
+  expect(r.a).toContain("a copy of rec.239, yours to cite as rec.239");
+});
+
 test("a kind is said in plain words; a kind that finds nothing is answered with the kinds the folder holds", async () => {
   // An agreement for something is asked for as an agreement, and told from the list; a claim to something by what it is to.
   expect(kindWhere("employment agreement")).toEqual({ where: [{ field: "record", op: "=", value: "agreement" }], here: true });
