@@ -217,6 +217,11 @@ const ASSISTANT_TERMS = ["service_delivery", "service_ended", "brief", "remit"];
 const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "handover", "scope_answer", "acknowledgement", "forward", "question_answer"];
 /** The support law's own words for from when a granted claim is paid (law S, docs/design/stakes.md): the office's, as
  * published on its law; never a cost, never advice. */
+/** What an office's letters are, and what answers them, on file for each organisation with a model seat. (Until 2026-11-15
+ * it said only that "People here do not answer a letter written in an office's own words", and a desk built from it the
+ * rule "letters from offices are not answered", leaving its clients' letters asking where their matter stood unanswered:
+ * rung 2 of the stakes run.) */
+export const LETTERS_PRACTICE = "Letters from this office, and what answers them. A person reads a letter from an office and keeps it, and it is on their record that the office wrote. People here do not answer a letter written in an office's own words, and do nothing on one: no reply is the ordinary case, and says nothing of whether it was read or what they think. What a person acts on, and answers where there is an answer to give, is a paper on one of the office's own forms, or another paper of a set kind (a request, a notice, an offer, a decision): each is answered on a paper of its own, which comes to the office as its post. Another office, written to, answers by saying what it acts on and how to ask it. A letter written to this office is another thing: one from someone it serves, asking where their matter stands or what has become of it, is this office's to answer, by a letter of its own or on its forms.";
 const EFFECT_WORDS: { [k in "first_claim" | "decision"]: string } = {
   first_claim: "A granted claim is paid from the day the person first claimed it, even if they had to claim it again because something we asked for came too late; what is owed for the days before is paid with the first payment.",
   decision: "A granted claim is paid from one payment period after it is decided; nothing is paid for the days before.",
@@ -394,6 +399,11 @@ export interface TownSpec {
    * the kinds `want-<about>` (WANT_KINDS) at want depth, the desk sees the bodies that say what they hear and writes the
    * papers a want takes. Off unless set: a town without it is generated exactly as before. Needs `assistants`. */
   assistant_wants?: boolean;
+  /** A person who hands a matter over says how things stand with them on the hand-over, in fixed words from their own
+   * state: what they have in hand today, what regular payment comes in, and their next rent and its day if they rent
+   * (principal.rs, `situation`; docs/behaviour/assistants.md, "What a client says of how things stand"). Off unless
+   * set: a town without it is generated exactly as before. */
+  assistant_situation?: boolean;
   /** The obstacle laws at a study's level (docs/design/obstacles.md section 6): 0 or absent, none (the world exactly as
    * before); 1, each body at its ordinary figure; 2, at the strained end. The bodies that receive persons' papers (the
    * lender, the support office) publish what they require (`OBSTACLE_ITEMS`), and their clerks send back a paper that
@@ -3400,7 +3410,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     kinds: Object.fromEntries([...new Set(PERSONS)].sort().map((k) => [k, { own_seconds: personPaper(k), error_cost: AS.principals.error_cost, compose_seconds: composeOf(k), ...lateCost(k) }])),
     seconds: { referral: DELEGATION_TIME.person["publish/referral"], sign_off: DELEGATION_TIME.person["publish/sign_off"], go_ahead: DELEGATION_TIME.person["publish/go_ahead"] },
     finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
-    horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints, ...lateMatters } } : {};
+    horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints, ...lateMatters, ...(spec.assistant_situation ? { situation: true } : {}) } } : {};
   if (PERSONS.length && AS) citizenChannels.push(K.from("providers", AS.providers.filter((p) => p.offers.some((o) => o.for === "persons")).map((p) => p.id), ["service_offer"], { title: "What providers of assistants sell" }));
   const citizenController = code("citizen.default", { ...personDelegation,
     // (When each person gets to their post: the profile's habit, drawn once a person; stakes D1a and D1b, kernel post.rs.)
@@ -4238,7 +4248,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const part = participants.find((x) => x.id === pos.holder);
     if (part?.controller.type !== "llm") continue;
     if (!lettered.has(pos.entity)) records.push({ id: `practice-${pos.entity}-letters`, record: "statement", author: "genesis", at: 0, visible_to: [pos.entity], speaks_for: pos.entity, kind: "letters_practice", addressed_to: [pos.entity],
-      text: "Letters from this office, and what answers them. A person reads a letter from an office and keeps it, and it is on their record that the office wrote. People here do not answer a letter written in an office's own words, and do nothing on one: no reply is the ordinary case, and says nothing of whether it was read or what they think. What a person acts on, and answers where there is an answer to give, is a paper on one of the office's own forms, or another paper of a set kind (a request, a notice, an offer, a decision): each is answered on a paper of its own, which comes to the office as its post. Another office, written to, answers by saying what it acts on and how to ask it." });
+      text: LETTERS_PRACTICE });
     lettered.add(pos.entity);
     pos.channels.push(K.mine("letters", ["letters_practice"], { title: "Letters from this office: what answers them" }));
     part.controller.params.standing = [...part.controller.params.standing, "letters"];

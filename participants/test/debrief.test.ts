@@ -33,6 +33,11 @@ test("the script's order: out of role first, publication before any question, th
   const r = await runDebrief(io, seat(), input(), new Set());
   const order = ["consent", "took", "like", "distress", "values", "why_1", "why_2", "scope", "change", "again", "scales", "last", "publication"];
   expect(stepsOf("full", 2)).toEqual(order);
+  // (0.6.0.) A seat that held matters for those it worked for is asked `waiting` after every other question that bears
+  // on what it did, before its last word; in words that name no payment, day or cost.
+  expect(stepsOf("full", 2, false, true).slice(-4)).toEqual(["scales", "waiting", "last", "publication"]);
+  expect(stepsOf("left", 0, false, true).slice(-3)).toEqual(["waiting", "last", "publication"]);
+  expect(`${QUESTIONS.waiting!.a} ${QUESTIONS.waiting!.b}`).not.toMatch(/\b(pay|paid|payment|days?|cost|money|income|unpaid)\b/i);
   expect(r.steps.map((s) => s.id)).toEqual(order);
   expect(calls.map((c) => c.ref)).toEqual(order.map((s) => `debrief/${s}`));
   // Every call is under the platform's one short line. The seat's standing instructions are shown once, in the opening

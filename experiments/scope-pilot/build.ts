@@ -142,6 +142,10 @@ export interface Options {
    * "Getting to the post"): `ordinary`, the profile's shares; `slow`, most of them weekly (`SLOW_POST`). Absent: the
    * profile's, and the town exactly as before. */
   clientPost?: "ordinary" | "slow";
+  /** "on": a client says how things stand with them on each hand-over, in fixed words from their own state (their
+   * balance today, a regular payment coming in, their next rent and its day): the generator's `assistant_situation`.
+   * Off, or absent: the hand-over as before, and the town exactly as before. */
+  clientSituation?: "off" | "on";
   /** A second provider's desk (docs/design/obstacles.md, B8): the households' cohort split by turns between provider
    * A's paid personal offer and provider B's, each desk with a cohort of its own (both providers are in the profile's
    * offers already). Absent: provider A's desk alone, as before. */
@@ -199,7 +203,7 @@ export function build(o: Options): ExperimentSpec {
     name: o.name,
     world: {
       file: "worlds/town-1000.yaml",
-      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : []), ...(o.dateOfEffect ? [`support_date_of_effect=${o.dateOfEffect}`] : []), ...(o.clientPost === "slow" ? [`paperwork=${JSON.stringify({ every_days: SLOW_POST })}`] : [])],
+      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : []), ...(o.dateOfEffect ? [`support_date_of_effect=${o.dateOfEffect}`] : []), ...(o.clientPost === "slow" ? [`paperwork=${JSON.stringify({ every_days: SLOW_POST })}`] : []), ...(o.clientSituation === "on" ? ["assistant_situation=true"] : [])],
       prepare(config: any, seed: number) {
         for (const post of o.offices ?? OFFICES) {
           const pos = config.positions.find((x: any) => x.id === post);

@@ -690,7 +690,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const mixModels = o.composerAdapters ? (composerCfg?.mix ?? []).map((m) => m.model).filter((m) => io.prices![m]) : [];
     const accountModel = mixModels.sort((a, b) => io.prices![b]!.input + io.prices![b]!.output - io.prices![a]!.input - io.prices![a]!.output)[0];
     const accountPrice = accountModel ? io.prices![accountModel] : undefined;
-    const calls = stepsOf("full", 3, true).length + 2;
+    const calls = stepsOf("full", 3, true, true).length + 2;
     const n = accountPrice ? accountsN : 0;
     const costs = endCosts();
     const need = endNeedMicroUsd(costs, { seats, seatModel, ...(io.prices![seatModel] ? { seatPrice: io.prices![seatModel] } : {}), seatReckoned: reckonedEndMicroUsd({ seats: 1, seatPrice: io.prices![seatModel], calls, promptChars: DEBRIEF_PROMPT_CHARS, answerTokens: Math.round(DEBRIEF_ANSWER_TOKENS / 2) }),

@@ -323,7 +323,7 @@ test("a run's own log gives the same summary afterwards as the seat was shown; a
   expect(lim.debriefs).toEqual({ "mayor-system": "complete", "finance-system": "complete" });
   const ll = lines(lim.logPath);
   const kept = ll.find((e) => e.body?.data?.kept_back_for_the_end).body.data.kept_back_for_the_end;
-  expect(kept).toMatchObject({ of_limit_microusd: 3_000_000, seats_to_debrief: 2, calls_a_debrief: 17, accounts: 0 }); // (what is kept back follows the script: 16 calls under 0.4, 17 since 0.5.0 asks one question more)
+  expect(kept).toMatchObject({ of_limit_microusd: 3_000_000, seats_to_debrief: 2, calls_a_debrief: 18, accounts: 0 }); // (what is kept back follows the script: 16 calls under 0.4, 17 since 0.5.0 asks one question more, 18 since 0.6.0 asks a seat with matters what a wait for sign-off meant)
   // (An unmeasured model: sized by the floor, over half of this limit, and all of it kept back: 2026-11-10.)
   expect(kept).toMatchObject({ a_seat_by: "floor", margin_percent: 125 });
   expect(kept.microusd).toBe(kept.needed_microusd);

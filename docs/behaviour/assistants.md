@@ -166,6 +166,24 @@ at every depth (a finished act, what happened, a want) and at `advice`, for pers
   (`render.ts`; `why` and `due_on` are in the words and not set out again), and the open matters' list says
   `<id> names <date>` beside each (`readers/matters.ts`).
 
+### What a client says of how things stand (`situation`; a stated setting, off by default; 2026-11-15)
+
+Rung 2 of the stakes run showed that no seat ever weighed what a wait cost its client: the hand-over said only "Until
+the claim is decided we are not paid pension." A person in that position tells whoever is helping them how things stand.
+With the generator's `assistant_situation` (experiments/scope-pilot/build.ts: `clientSituation: "on"`), every person's
+hand-over adds to its `why`, in fixed sentences from its own state and nothing reckoned by us (principal.rs,
+`situation`; B2: their own facts only):
+
+- "In our account (<account>) today: <its balance>."
+- for each agreement under which another party pays it every so often, and each granted decision that pays it a support
+  payment: "Coming in: <amount> every <N> days from <payer> (<paper>)." or "Coming in: <amount> every <N> days, our
+  <payment> (<decision>)."
+- where it is a tenant: "Our rent: <amount> every <N> days, next due on <date> (<lease>)."
+
+No adjective, no sum or day-rate of ours, no advice, nothing about the assistant. Off (the default), the hand-over is as
+before and the town exactly as before; only a town generated with the setting on moves. Whether a run uses it is decided
+by the owner (docs/design/stakes.md).
+
 ## The assistant (`assistant`)
 
 The code that plays a provider's system when no model holds it (`kernel/crates/actors/src/delegation/assistant.rs`). It

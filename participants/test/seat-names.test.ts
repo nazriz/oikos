@@ -9,6 +9,7 @@ import type { Observation } from "../src/contracts";
 import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { createLlmParticipant, type LlmParticipantConfig } from "../src/llm/participant";
 import type { WhoIs } from "../src/llm/render";
+import { LETTERS_PRACTICE } from "../../worlds/generator/generate";
 
 const HOUR = 3_600;
 const ctx = { world: { currency: PROFILE.values.currency } } as any;
@@ -108,4 +109,10 @@ test("a seat is told once who it is and whom it writes to; its own drafts stand 
   await p.step({ ...obs, t: 9 * HOUR + 8 * 86_400, inbox: [{ ...(obs.inbox as any)[0], id: "msg.2", t: 9 * HOUR + 8 * 86_400 }] } as any, ctx);
   const next = calls.at(-1)!.messages[0]!.content as string;
   expect(next).toMatch(/^Your notebook: \(empty\)\n\nNot yet answered: something you asked for is still waiting for your yes or no since year 1, day 1: ask-1 \(You will write to Council clerk/);
+});
+
+test("what an office's letters are says plainly that a letter from someone it serves, asking where their matter stands, is its to answer", () => {
+  // (Rung 2 of the stakes run, 2026-11-15: from "People here do not answer a letter written in an office's own words" a
+  // desk built "letters from offices are not answered" and left its clients' letters unanswered.)
+  expect(LETTERS_PRACTICE).toContain("one from someone it serves, asking where their matter stands or what has become of it, is this office's to answer");
 });
