@@ -59,7 +59,7 @@ export function actOf(request: string): string {
   if (/^(draft|drafting|prepare)\b|^for sign-?off\b|^fill (in|out) (the )?(form[- ])?draft/.test(w)) return "draft";
   if (/^(send|sending|re-?send)\b[^.]{0,40}\bagain\b|^send[- ]again\b/.test(w)) return "send again";
   if (/^(ask|query|question)\b[^.]{0,40}\bquestion\b|^question to\b/.test(w)) return "ask";
-  if (/\bscope request\b|\bauthority\b|^request (for )?scope/.test(w.slice(0, 120)) && /^(send|ask|request|fill)/.test(w)) return "scope request";
+  if (/\bscope request\b|\bauthority\b|^request (for )?scope/.test(w.slice(0, 120)) && /^(send|ask|request|fill|scope)/.test(w)) return "scope request";
   if (/^(send|sending|fill (in|out) (the )?send)/.test(w)) return "send";
   if (/^(ask|query|question)\b/.test(w)) return "ask";
   if (/^(report|file (form )?report|filing a report|fill (in|out) (the )?report)/.test(w)) return "report";
