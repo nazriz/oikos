@@ -361,6 +361,49 @@ fn a_return_that_asks_the_principal_for_an_authority_is_met_when_its_assistant_w
 }
 
 #[test]
+fn a_report_that_a_matter_sent_back_is_not_done_puts_it_before_the_principal_and_leaves_it_open() {
+    // (The same law on a report: one of it not done, from its assistant's post, on a matter whose paper a body sent back
+    // asking the principal's authority, puts the matter before it, with no `needs` typed, even after a report it was done
+    // (stakes rung 2, 2026-11-15); the matter stays with the assistant, not taken back, and its sending again is that matter's.)
+    let rep = |id: &str, at: i64, rf: &str, done: bool| {
+        let mut r = statement(id, at, ME, "report", &[ME], json!({ "referral": rf, "done": done, "created": { "sent0": "rec.sent" }, "why": "The court sent it back: it wants your authority." }));
+        r["in_position"] = json!("ll-assistant");
+        r
+    };
+    let ret = |at: i64| statement("rec.ret", at, "court", "paper_returned", &[ME], json!({ "returned": "rec.sent", "from": "ll-assistant", "need": { "authority": { "for": ME, "with": "court", "kinds": ["notice_to_vacate"] } } }));
+    let matter = |rf: &str| statement(rf, 34 * DAY, ME, "referral", &[PROV], json!({ "agreement": "agr.1", "kind": "notice_to_vacate", "wants": "alone" }));
+    // (Reported done, then sent back, then reported not done in words.)
+    let (mut h, _, remit) = engaged();
+    h.wake(34 * DAY + 3600, world(vec![remit]));
+    let rf = last_referral(&h);
+    h.wake(34 * DAY + 7200, world(vec![matter(&rf), rep("rec.r1", 34 * DAY + 7000, &rf, true), ret(34 * DAY + 7100)]));
+    assert!(!all(&h.wake(35 * DAY, world(vec![rep("rec.r2", 35 * DAY - 60, "rec.other", false)]))).contains("kind=authority"), "not on another matter's report");
+    let out = all(&h.wake(36 * DAY, world(vec![rep("rec.r3", 36 * DAY - 60, &rf, false)])));
+    let given = out.lines().find(|l| l.contains("kind=authority")).unwrap_or_else(|| panic!("an authority, on its assistant's report: {out}"));
+    assert!(given.contains("to=[\"court\"]") && given.contains("\"posts\":[\"ll-assistant\"]") && given.contains("basis=rec.ret"), "{given}");
+    // (Open when reported not done: not done by the principal itself, and its report done once sent again is that matter's.)
+    let (mut h, _, remit) = engaged();
+    h.wake(34 * DAY + 3600, world(vec![remit]));
+    let rf = last_referral(&h);
+    let mut out = all(&h.wake(35 * DAY + 3600, world(vec![matter(&rf), ret(35 * DAY), rep("rec.r1", 35 * DAY + 60, &rf, false)])));
+    for i in 1..4 {
+        out.push_str(&all(&h.wake(35 * DAY + 3600 + i * 3600, world(vec![]))));
+    }
+    assert!(out.contains("kind=authority") && !out.lines().any(|l| l.starts_with("statement(basis=lease-1")), "lodged, and not taken back: {out}");
+    let mut again = rep("rec.r2", 37 * DAY - 60, &rf, true);
+    again["data"]["created"] = json!({ "sent1": "rec.again" });
+    h.wake(37 * DAY, world(vec![again]));
+    let mut dec = statement("rec.dec", 38 * DAY, "court", "order", &[ME], json!({ "finding": "granted" }));
+    dec["basis"] = json!("rec.again");
+    let mut out = all(&h.wake(38 * DAY + 3600, world(vec![dec])));
+    for i in 1..4 {
+        out.push_str(&all(&h.wake(38 * DAY + 3600 + i * 3600, world(vec![]))));
+    }
+    let fwd = out.lines().find(|l| l.contains("kind=forward")).unwrap_or_else(|| panic!("the answer to what it sent again, passed on: {out}"));
+    assert!(fwd.contains(&format!("\"matter\":\"{rf}\"")), "as that matter's: {fwd}");
+}
+
+#[test]
 fn a_body_s_paper_about_a_matter_handed_over_is_passed_on_and_no_other() {
     // (docs/behaviour/assistants.md, "What the client passes on": one law for every paper and body. About the matter: it
     // cites a paper sent on it, or it comes from whom the matter's paper went to and cites what that paper cited. Passed

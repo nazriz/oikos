@@ -687,7 +687,7 @@ impl State {
         // (A letter with no reference is about its one unmet need with that assistant, if it has exactly one: `on_letter`.)
         let letters: Vec<(String, String)> = pic.inbox.iter().filter(|m| from.sent(m)).filter_map(|m| Some((m.re.as_ref().map(|x| x.to_string()).unwrap_or_default(), m.from_position.as_ref()?.to_string()))).collect();
         for (re, post) in letters {
-            self.on_letter(&re, &post);
+            let _ = self.on_letter(&re, &post);
         }
     }
 
@@ -815,7 +815,9 @@ impl State {
         (before || self.lodged.contains(&key)).then(|| need.authority.map(|a| a.kinds).unwrap_or_default())
     }
 
-    fn on_letter(&mut self, re: &str, post: &str) {
+    /// Whether, on a matter named, it holds a return asking of it what is its own to meet: what a report of it not done
+    /// puts before it (`take`).
+    fn on_letter(&mut self, re: &str, post: &str) -> bool {
         // (No reference: a person with one open problem with its assistant knows what the letter is about. Where it holds
         // exactly one return from a body on a paper that assistant sent, asking of it what is still its own to meet, the
         // letter is about that; with two or more, it cannot tell, and nothing follows (MT-36).)
@@ -833,7 +835,7 @@ impl State {
                     self.meet(&n, post, None, &id.clone());
                 }
             }
-            return;
+            return false;
         }
         let matter_at = self.book.get(re).filter(|q| papers::read::<Referral>(q).is_some() && q.speaks_for.as_deref() == Some(self.me.as_str())).map(|q| q.at);
         let returns: Vec<(String, Value)> = self
@@ -846,11 +848,14 @@ impl State {
             })
             .map(|r| (r.id.to_string(), crate::common::data(r).to_value()["need"].clone()))
             .collect();
+        let mut mine = false;
         for (id, need) in returns {
             if let Ok(n) = serde_json::from_value::<Need>(need) {
+                mine |= n.authority.as_ref().is_some_and(|a| a.for_ == self.me);
                 self.meet(&n, post, matter_at.map(|_| re), &id);
             }
         }
+        mine
     }
 
     /// Whether a return on file is its own copy passed on to its desk (`pass_on`), not the body's.
@@ -881,7 +886,23 @@ impl State {
             if let (Some(n), Some(post), false) = (x.needs.clone(), r.position.as_deref(), x.done) {
                 self.meet(&n, post, Some(&x.referral), &r.id);
             }
+            // (A report of it not done, from its assistant's post, on a matter whose paper a body sent back asking of it
+            // what is its own to meet, is its assistant putting the matter before it, typed `needs` or not, as a letter
+            // about the matter is: it meets the return's need, read from the return. Nor is the matter closed against
+            // that need: it stays with the assistant, to send again once the need is met, and what it sends then is that
+            // matter's. The stakes run's rung 2, 2026-11-15: a desk's plain not-done report on a loan sent back for want
+            // of the client's authority, after a report it was done, never led the client to lodge one.)
+            let before_it = match (r.position.as_deref(), x.done) {
+                (Some(post), false) if self.p.post.as_deref().is_none_or(|p| p == post) => {
+                    let post = post.to_string();
+                    self.on_letter(&x.referral, &post)
+                }
+                _ => false,
+            };
             let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
+            if before_it {
+                return;
+            }
             let Some(m) = self.matters.get(&action).cloned() else { return };
             let k = Self::key(&m.agreement, &m.kind);
             if x.done {

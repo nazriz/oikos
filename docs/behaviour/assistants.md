@@ -571,6 +571,10 @@ law; no body asks for one yet. The same for a person and for an organisation (wh
 Basis: a person whose bank has told them to write to authorise their assistant, and whose assistant then writes to
 them about that matter, does it; they do not wait for the news on a particular form (the first rung, 2026-11-14:
 `runs/scope-obstacle-r1-L2`, where Haiku wrote the client exactly that letter and nothing moved). Risk MT-36.
+A report that the matter is not done, from its assistant's post, is the assistant writing to it about that matter, with
+a `needs` named or only words: it meets a need the body's return on that matter asks of it, read from the return, as on
+a letter. And a matter reported not done for that reason is not closed against the need: it is not taken back, it stays
+with the assistant, and a paper sent again once the need is met is that matter's (2026-11-15, the second rung).
 
 **A principal answers for its assistant (2026-11-15; docs/design/stakes.md, A2; `principal/answers.rs`).** It reads
 only the world's papers that reach it, never the reader; what counts as covered, and as in place of a draft, is the

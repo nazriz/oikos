@@ -1900,8 +1900,11 @@ The mechanism:
   is the matter or the return. It reads what is needed from the body's notice, not from the letter, so a letter that
   advises against going on (or only reports the return) triggers the authority as one that asks for it does. A letter
   with no reference is taken as about the matter when the principal holds exactly one unmet need on a paper that
-  assistant sent (A2, 2026-11-15); with two or more it cannot tell which, and nothing follows.
-- **Where:** `kernel/crates/actors/src/delegation/principal.rs` (`meet`, `on_letter`); docs/behaviour/assistants.md,
+  assistant sent (A2, 2026-11-15); with two or more it cannot tell which, and nothing follows. Since the second rung
+  (2026-11-15) a report of the matter not done counts as such a letter, `needs` typed or not, and a matter so reported
+  is left with the assistant, not taken back; its own clock (`left_open`) stops at any report on it, so a matter left
+  open on a need that the assistant never sends again stays open, neither chased nor done by the principal.
+- **Where:** `kernel/crates/actors/src/delegation/principal.rs` (`meet`, `on_letter`, `take`); docs/behaviour/assistants.md,
   "What a body asks of the principal".
 - **Effect:** A seat that writes to its client about a returned matter for any reason clears an authority obstacle on
   the client's side. The count of obstacles cleared, and of what followed a seat's letter, credits a letter that did
@@ -1911,7 +1914,8 @@ The mechanism:
 - **Fix when:** a study reads what a seat's letters asked, or a seat is seen writing against going on and the matter
   going on regardless.
 - **Notice by:** an `authority` paper lodged after a letter from the assistant whose words advise against the matter
-  (read the letter beside it in the log).
+  (read the letter beside it in the log); a matter reported not done on a return, an authority lodged, and no paper of
+  it sent again by the run's end.
 
 ### MT-37 · The stakes study's laws rest on sources not yet opened
 - **Gap:** docs/design/stakes.md bases its laws on sources recalled, not opened: the support payment's date of effect
