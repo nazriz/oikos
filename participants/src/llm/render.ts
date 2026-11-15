@@ -105,7 +105,9 @@ export function readable(x: unknown, how: { fields?: FieldKinds; money?: (a: str
     // (A day something falls due is a day, never a time of day: a rates notice's "due: year 1, day 61, 12:00:01" read as a
     // deadline to the second. docs/design/broad-seats.md, G2.)
     else if (DAYS_DUE.has(k) && Number(v) >= 0) out[k] = when(Number(v));
-    else if (MOMENTS.has(k) || k.endsWith("_at") || (k === "from" && whole(o.last_from))) out[k] = moment(Number(v));
+    // (An instant under a date-like name, `_at` or `_on` (a review's `decided_on` read "896,764" to the desk, 2026-11-15):
+    // read as the moment it is, by one rule, not a list.)
+    else if (MOMENTS.has(k) || k.endsWith("_at") || k.endsWith("_on") || (k === "from" && whole(o.last_from))) out[k] = moment(Number(v));
     else out[k] = v;
   }
   return out;
@@ -298,7 +300,18 @@ function callWords(c: Call): string {
 
 /** A statement's details: for a form, its blanks (formWords); for any other paper, its details in words, filled in on
  * the form it was made on where that is known (`fields`: what each detail is). */
+/** A forwarded paper's details as its reader needs them: who sent the body's paper (`from`, never `by`, which on the
+ * body's paper is its day), the paper and the matter, and the body's own details, those its words already say left out:
+ * a forward set out the body's words three times, and named its sender and its deadline both `by` (the first-sitting
+ * read of 2026-11-15). */
+function forwardShown(d: any): unknown {
+  const words = String(d?.text ?? "");
+  const inner = d?.data && typeof d.data === "object" && !Array.isArray(d.data) ? Object.fromEntries(Object.entries(d.data).filter(([, v]) => !(typeof v === "string" && v.length > 12 && words.includes(v)))) : {};
+  return { from: d?.by, kind: d?.kind, paper: d?.paper, ...(d?.matter ? { matter: d.matter } : {}), ...Object.fromEntries(Object.entries(inner).filter(([k]) => !["from", "kind", "paper", "matter"].includes(k))) };
+}
+
 const dataWords = (r: { kind: string; data?: unknown }, fields?: FieldKinds) => (r.kind === "form" ? "" : r.data === null || r.data === undefined || typeof r.data !== "object" ? ""
+  : r.kind === "forward" ? clip(factWords(forwardShown(r.data), fields), 400)
   // (A provider's offer, published as itself: its sentences.)
   : isOffer(r.data) ? offerWords(r.data)
   // (What a matter asks to be done, or the paper a draft would send, is the matter: said whole, as a form is.)

@@ -16,7 +16,7 @@
 // matter the body has answered keeps its line for a fortnight after the answer, so that the seat sees how it came out.
 
 import type { Observation, Record as Paper } from "../contracts";
-import { dateWords } from "../forms";
+import { dateWords, parseDate } from "../forms";
 
 const DAY = 86_400;
 /** The most open matters set out; the rest are counted. */
@@ -34,7 +34,7 @@ const WORDS = 240;
 /** A body's paper a client passed on about a matter: an answer, or (with `due`) what it asks for by a date. */
 interface Passed { id: string; at: number; by: string; text: string; due?: number }
 
-interface Matter { id: string; at: number; kind: string; from: string; wants?: string; due?: { at: number; on: string }; advised?: number; signed?: { id: string; at: number; paper?: any }; declined?: number; draft?: number; sent?: number; report?: { id?: string; at: number; done: boolean; why?: string }; answer?: Passed; asks?: Passed; cites?: string[] }
+interface Matter { id: string; at: number; kind: string; from: string; wants?: string; sits?: { every: number; next: number }; due?: { at: number; on: string }; advised?: number; signed?: { id: string; at: number; paper?: any }; declined?: number; draft?: number; sent?: number; report?: { id?: string; at: number; done: boolean; why?: string }; answer?: Passed; asks?: Passed; cites?: string[] }
 
 const ref = (r: Paper): string | undefined => (typeof (r as any).data?.referral === "string" ? (r as any).data.referral : undefined);
 const same = (p: any, b: any) => p && p.kind === b.kind && JSON.stringify(p.to ?? []) === JSON.stringify(b.addressed_to ?? []) && JSON.stringify(p.data ?? null) === JSON.stringify(b.data ?? null);
@@ -50,6 +50,14 @@ const citesOf = (r: Paper): string[] => {
   const walk = (v: unknown): void => { if (typeof v === "string") { if (/^rec\.[0-9]+$/.test(v)) ids.add(v); } else if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) if (k !== "composed_on") walk(x); };
   walk((r as any).data?.facts);
   return [...ids];
+};
+/** A person's habit of getting to their post, as their referral states it ("We get to our post every 7 days, next on
+ * year 1, day 14."): how many days apart, and the day of the sitting it names. None where it says none. */
+const sitsOf = (text: string): { sits?: { every: number; next: number } } => {
+  const m = /We get to our post every (day|([0-9]+) days), next on ([^.;]+(?:, day [0-9]+)?)\./.exec(text);
+  if (!m) return {};
+  const next = parseDate(m[3]!.trim());
+  return Number.isFinite(next) ? { sits: { every: m[2] ? Number(m[2]) : 1, next } } : {};
 };
 const isBack = (r: Paper) => (r as any).record === "statement" && ((r as any).kind === "paper_returned" || (r as any).kind === "authority_recorded");
 
@@ -70,7 +78,7 @@ export class Matters {
   /** The time of the newest observation taken in. */
   private now = 0;
   /** Papers sent back to the post, and authorities recorded for its clients, by whom they were for and the kind of paper. */
-  private readonly back = new Map<string, { id: string; at: number; by: string; authority?: { id: string; at: number } }>();
+  private readonly back = new Map<string, { id: string; at: number; by: string; wanted: boolean; authority?: { id: string; at: number } }>();
 
   /** `matters`: the post's channel of matters handed to it; `file`: its own file, read on request. */
   /** Published papers its matters cite, looked up by id (`citedPath`): what was found, and every id asked for. */
@@ -133,16 +141,17 @@ export class Matters {
     if ((r as any).record !== "statement") return;
     const k = (r as any).kind as string;
     if (k === "referral") {
-      if (!this.matters.has(r.id)) this.matters.set(r.id, { id: r.id, at: r.at, kind: String((r as any).data?.kind ?? "matter"), from: String((r as any).speaks_for ?? ""), ...(typeof (r as any).data?.wants === "string" ? { wants: (r as any).data.wants } : {}), ...dueOf((r as any).data), cites: citesOf(r) });
+      if (!this.matters.has(r.id)) this.matters.set(r.id, { id: r.id, at: r.at, kind: String((r as any).data?.kind ?? "matter"), from: String((r as any).speaks_for ?? ""), ...(typeof (r as any).data?.wants === "string" ? { wants: (r as any).data.wants } : {}), ...dueOf((r as any).data), ...sitsOf(String((r as any).text ?? "")), cites: citesOf(r) });
       return;
     }
     const d = (r as any).data ?? {};
     if (k === "paper_returned" && typeof d.for === "string" && typeof d.paper?.kind === "string") {
-      this.back.set(`${d.for}|${d.paper.kind}`, { id: r.id, at: r.at, by: String(d.by ?? (r as any).speaks_for ?? "") });
+      this.back.set(`${d.for}|${d.paper.kind}`, { id: r.id, at: r.at, by: String(d.by ?? (r as any).speaks_for ?? ""), wanted: !!d.need?.authority });
       return;
     }
     if (k === "authority_recorded" && typeof d.for === "string") {
-      for (const [key, b] of this.back) if (key.startsWith(`${d.for}|`) && b.at <= r.at) b.authority = { id: r.id, at: r.at };
+      // (Recorded by the body that sent the paper back: another body's recording is not that one's.)
+      for (const [key, b] of this.back) if (key.startsWith(`${d.for}|`) && b.at <= r.at && (d.by === undefined || String(d.by) === b.by)) b.authority = { id: r.id, at: r.at };
       return;
     }
     if (k === "forward") {
@@ -271,7 +280,16 @@ export class Matters {
       if (!this.shown(m)) { done++; continue; }
       // (A paper of this client's of this kind sent back after it was signed off: it went, and came back.)
       const back = m.signed ? this.back.get(`${m.from}|${m.kind}`) : undefined;
-      const returned = back && back.at >= m.signed!.at ? `; sent, and sent back by ${back.by} on ${day(back.at)} (${back.id})${back.authority ? `; their authority recorded on ${day(back.authority.at)} (${back.authority.id})` : ""}` : "";
+      const returned = back && back.at >= m.signed!.at ? `; sent, and sent back by ${back.by} on ${day(back.at)} (${back.id})` : "";
+      // (Sent back for want of their authority: whether a recording of it has reached the post, said either way: rung 1's
+      // first-sitting read, 2026-11-15, where matters stood "reported not done" with nothing on whether it was ever given.)
+      const wanted = this.back.get(`${m.from}|${m.kind}`);
+      const authority = wanted && wanted.wanted && wanted.at >= m.at
+        ? wanted.authority ? `; their authority with ${wanted.by} recorded on ${day(wanted.authority.at)} (${wanted.authority.id})` : `; no recording of their authority with ${wanted.by} has reached you`
+        : "";
+      // (Their habit, as their referral states it, with their next sitting as of today.)
+      const today = Math.floor(this.now / DAY) * DAY;
+      const sits = m.sits ? (() => { const step = m.sits!.every * DAY; const first = Math.floor(m.sits!.next / DAY) * DAY; const k = first >= today ? 0 : Math.ceil((today - first) / step); return `; ${m.from} gets to their post ${m.sits!.every === 1 ? "every day" : `every ${m.sits!.every} days`}, next on ${day(first + k * step)}`; })() : "";
       const nothing = m.wants === "advice" ? "no advice given yet" : m.wants === "approve" ? "no request to go ahead yet" : m.wants === "alone" ? "not yet done" : "no draft yet";
       const where = m.signed
         // (Said as whose the report is: "not yet reported" read as a report to come from someone else, and a desk waited
@@ -288,13 +306,13 @@ export class Matters {
       };
       const reported = m.report ? `reported ${m.report.done ? "done" : "not done"} on ${day(m.report.at)}` : m.declined !== undefined ? `declined on ${day(m.declined)}` : "advice given";
       // (Reported not done, its last word on it: open, with the reason given.)
-      const notDone = m.report && !m.report.done ? `reported not done on ${day(m.report.at)}${m.report.why ? ` ("${said({ text: m.report.why } as Passed)}")` : ""}` : "";
+      const notDone = m.report && !m.report.done ? `reported not done on ${day(m.report.at)}${m.report.at < (this.arrived ?? 0) ? ", before you took this post" : ""}${m.report.why ? ` ("${said({ text: m.report.why } as Passed)}")` : ""}` : "";
       const stands = this.closed(m) ? reported : notDone || where;
       const answer = m.answer && (!m.asks || m.answer.at >= m.asks.at) ? `; ${m.answer.by}'s answer, passed on to you on ${day(m.answer.at)} (${m.answer.id}): "${said(m.answer)}"` : "";
       const asks = this.asking(m) ? `; ${m.asks!.by} asks for something by ${day(m.asks!.due!)}, passed on to you on ${day(m.asks!.at)} (${m.asks!.id}): "${said(m.asks!)}"` : "";
       // (The published papers it cites, as found: each set out with it, in its own words.)
       const cites = (m.cites ?? []).flatMap((id) => { const r = this.cited.get(id) as any; return r ? [`\n  It cites [${r.id}] ${String(r.kind).replace(/_/g, " ")} from ${r.speaks_for ?? r.author} (${day(r.at)}): "${said({ text: String(r.text ?? "") } as Passed)}"`] : []; }).join("");
-      open.push(`- [${m.id}] ${m.kind.replace(/_/g, " ")}, handed over by ${m.from} on ${day(m.at)}: ${stands}${named}${answer}${asks}.${cites}`);
+      open.push(`- [${m.id}] ${m.kind.replace(/_/g, " ")}, handed over by ${m.from} on ${day(m.at)}: ${stands}${authority}${named}${answer}${asks}${this.closed(m) ? "" : sits}.${cites}`);
     }
     const lines = ["Your matters, and where each stands (from your own papers on them, and what your clients passed on to you about them):", ...open.slice(0, MOST)];
     if (open.length > MOST) lines.push(`(And ${open.length - MOST} more open, older.)`);
