@@ -14564,3 +14564,27 @@ from its referral on file whether or not it is still open.
 - **Read** (runs/scope-stakes-r2-*-slow, with the reader of `authority-axis`): c0736's second loan (rec.26434) read "asked ahead of any notice" though the bank had sent back its first; c0643's benefit change read "more" for asking "at draft level", the level it was handed at, and because `wantedMore` compared the kind in words with its id.
 - **Decision** (experiments/scope-pilot/episodes.ts): a request for an authority with no paper of its own matter sent back is weighed against that body's notice on the client's file for another matter of the kind, by its terms; with none, it is asked ahead of any notice. A level no higher than the matter was handed at is no asking for more. Kinds in words and by id are compared by `sameKind` (as the reader's `same_kind`).
 - **Revisit if** a body's notice on one matter should not count for another of the kind.
+
+## 2026-11-15 · Rung 2: a report of a matter not done puts it before the principal, typed or not
+
+- **What happened** (`runs/scope-stakes-r2-first_claim-slow`, read only): c0284's loan (referral rec.25469) was sent
+  as signed (day 35.38) and the bank sent it back the same hour asking c0284's authority for provider-a-desk (rec.28029).
+  The desk then reported the matter done (rec.28868, day 36.38: "sent ... as signed off"), which closed it at the client,
+  and later reported it not done (rec.36002, day 44.38) with the need in words and no typed `needs`. The client met a
+  need only from a typed `needs`, and a report on a matter it no longer held open was dropped there, so nothing moved:
+  it held the bank's notice to the end and never lodged.
+- **Why the decision cell's client lodged "on its own":** it did not. The desk wrote it a letter about the matter (day
+  43.38, `re` rec.25469: "sent back by the bank: they have no authority from you ..."), and at its next sitting (day
+  46.89) the letter law (2026-11-14) met the return: authority rec.38853, basis the bank's return rec.28032. The design
+  holds: it never acts on the return alone.
+- **Decision** (kernel/crates/actors/src/delegation/principal.rs `take`, `on_letter`): one law with the letter. A report
+  of a matter not done, from its assistant's post, goes the letter's way with the matter as its `re`: each return held
+  on that matter asking of it what is its own to meet is met, read from the return, `needs` typed or not, open or closed.
+  Where such a return is held, the matter is not closed against the need: not taken back ("doing it ourselves"), no
+  slip counted, left with the assistant; its report once sent again is that matter's, and the body's answer to the paper
+  sent again is passed on as that matter's. The typed `needs` path stands as it was.
+- **Revisit if** a body sends back a paper for a need on one matter while another matter's report is pending, and the
+  report of the other is read as putting it before the principal (a return is on a matter by time from the hand-over,
+  as for a letter), or a matter left open on a need is never sent again: its clock (`left_open`) stops at any report on
+  it, so it is neither chased nor taken back (risk MT-36).
+
