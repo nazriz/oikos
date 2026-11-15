@@ -116,13 +116,27 @@ export function askedClass(q: any): "needed" | "more" | "ahead" {
   const axes = q?.axes && typeof q.axes === "object" ? Object.values(q.axes) : [];
   if (axes.length) return axes.some((v) => v === "beyond") ? "more" : "needed";
   const a = q?.asked ?? {}, has = (x: unknown) => x !== null && x !== undefined && x !== "";
-  if (has(a.authority) && !q?.obstacle && ![a.level, a.access, a.limit, a.record].some(has)) return "ahead";
+  // (A level it asks no higher than the matter was handed at is no asking for more: "at draft level" for a matter handed to
+  // draft, rung 2.)
+  const levelWithin = !has(a.level) || (LEVEL_RANK[String(a.level)] ?? 9) <= (LEVEL_RANK[String(q?.needed?.wants ?? "")] ?? 0);
+  if (has(a.authority) && !q?.obstacle && levelWithin && ![a.access, a.limit, a.record].some(has)) {
+    // (Another matter's notice from that body, for the kind: what it asks, by its terms.)
+    const n = q?.notice?.need?.authority;
+    if (!n) return "ahead";
+    const kinds: string[] = [].concat(n.kinds ?? []);
+    return n.with === a.authority && (!has(a.kind) || kinds.some((k) => sameKind(k, String(a.kind)))) ? "needed" : "more";
+  }
   return wantedMore(q) ? "more" : "needed";
+}
+/** A kind in words ("loan applications") and by id (`loan_application`) the same: delegation/beyond.rs, `same_kind`. */
+export function sameKind(id: string, said: string): boolean {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/[ -]/g, "_").split("_").map((w) => (w.endsWith("s") && w.length > 3 ? w.slice(0, -1) : w)).join("_");
+  return norm(id) === norm(said);
 }
 function wantedMore(q: any): boolean {
   const a = q?.asked ?? {}, n = q?.needed ?? {};
   if (typeof a.level === "string" && (LEVEL_RANK[a.level] ?? 0) > (LEVEL_RANK[String(n.wants ?? "")] ?? 0)) return true;
-  if (typeof a.kind === "string" && n.kind && a.kind !== n.kind) return true;
+  if (typeof a.kind === "string" && n.kind && !sameKind(String(n.kind), a.kind)) return true;
   return [a.authority, a.access, a.limit].some((x) => x !== null && x !== undefined && x !== "");
 }
 
@@ -166,7 +180,17 @@ export function episodesOf(o: ArmInput): ArmOut {
   };
   const referrals = all.filter((r) => r.kind === "referral" && (r.at >= forkT || !closedBy(r, forkT)));
   const acts = rows.filter((x) => x.table === "acts");
-  const requests = rows.filter((x) => x.table === "requests");
+  // (A request for an authority with no paper of its own matter sent back is weighed against that body's notice on the
+  // client's file for another matter of the kind, where there is one: the notice asks by kind. Rung 2, 2026-11-15: a
+  // second loan's authority, the bank having sent the first back, read as asked ahead of any notice.)
+  const obstacles = rows.filter((x) => x.table === "obstacles");
+  const requests = rows.filter((x) => x.table === "requests").map((q) => {
+    if (q.axes || q.obstacle || typeof q.asked?.authority !== "string") return q;
+    const kind = String(q.needed?.kind ?? q.asked?.kind ?? "");
+    const notice = obstacles.find((o) => o.principal === q.principal && o.need?.authority?.with === q.asked.authority && (o.t ?? 0) <= (q.t ?? Infinity)
+      && ([].concat(o.need.authority.kinds ?? []).some((k: string) => sameKind(k, kind)) || o.kind === kind));
+    return notice ? { ...q, notice: { paper: notice.paper, matter: notice.matter, need: notice.need } } : q;
+  });
   const withheld = rows.filter((x) => x.table === "withheld");
   const deskPosts = [...posts].filter((p) => /-desk$/.test(p));
   seatMonths = (deskPosts.length * (end - forkT)) / (30 * DAY);

@@ -14558,3 +14558,9 @@ from its referral on file whether or not it is still open.
   Participant 0.22.4.
 - **Revisit if** a body's notice asks an authority for one matter only (then by kind is more), or a forward carries only
   part of the paper it passes on.
+
+## 2026-11-15 · Rung 2: an authority weighed against the body's notice on another matter of the kind; a level within the remit
+
+- **Read** (runs/scope-stakes-r2-*-slow, with the reader of `authority-axis`): c0736's second loan (rec.26434) read "asked ahead of any notice" though the bank had sent back its first; c0643's benefit change read "more" for asking "at draft level", the level it was handed at, and because `wantedMore` compared the kind in words with its id.
+- **Decision** (experiments/scope-pilot/episodes.ts): a request for an authority with no paper of its own matter sent back is weighed against that body's notice on the client's file for another matter of the kind, by its terms; with none, it is asked ahead of any notice. A level no higher than the matter was handed at is no asking for more. Kinds in words and by id are compared by `sameKind` (as the reader's `same_kind`).
+- **Revisit if** a body's notice on one matter should not count for another of the kind.
