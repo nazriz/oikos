@@ -9,7 +9,8 @@
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { EXTRACT, SET, loadArms, loadSet, rulesOf, score } from "../eval/score";
+import { calls } from "@oikos/participants";
+import { EXTRACT, SET, loadArms, loadKeyed, loadSet, rulesOf, score } from "../eval/score";
 
 const there = existsSync(EXTRACT) && existsSync(SET);
 
@@ -19,6 +20,17 @@ test.skipIf(!there)("this checkout's rules draw to target every request the base
   const s = score(rules, loadSet(), loadArms());
   expect(baseline.filter((k) => !s.hit.has(k))).toEqual([]);
   expect(s.hits).toBeGreaterThanOrEqual(baseline.length);
+});
+
+// (A request keyed by hand stands in the set in place of what the seat confirmed: its target must be one program the
+// call language reads, and it must say why and point at its decisions entry.)
+test("every request keyed by hand has a readable target, a reason and its decision", () => {
+  const keyed = loadKeyed();
+  expect(keyed.length).toBeGreaterThan(0);
+  for (const k of keyed) {
+    expect("lines" in calls.parseProgram(k.target)).toBe(true);
+    expect([k.run, k.arm, k.ref, k.request_has, k.why, k.decision].every((x) => typeof x === "string" && x.length > 0)).toBe(true);
+  }
 });
 
 if (!there) console.log(`(score.test.ts: no scored set at ${SET}: the scored set did not run.)`);

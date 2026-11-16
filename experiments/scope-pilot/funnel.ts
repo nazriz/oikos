@@ -24,7 +24,14 @@
 //   - 5 or more answers came back and none was shown to it (a model seat);
 //   - 10 or more requests to the translator and no draft offered;
 //   - 5 or more sittings and no call (a model seat);
-//   - the fork has ended and a model seat was not debriefed.
+//   - the fork has ended and a model seat was not debriefed;
+//   - replies UNFINISHED: of a model seat's own calls (its sittings and its notebook), 2 or more, and over one in 20, came
+//     back cut off at their room even when made again with more room, or (a log from before 2026-11-16, when nothing was
+//     made again) came back with nothing in them; the same of its debrief's calls. A sitting so cut off ends unfinished
+//     (participant.ts), and an answer so cut off is incomplete, so a fork with many is not read as the model's choices.
+//     (The GLM 5.3 probe of 2026-11-16: 10 of 61 seat calls came back empty at the 8,000-token room, and this check said
+//     "unread answers 0"; 8 of its 34 debrief calls ran out at 2,400.) Replies cut off once and answered when made again
+//     are FLAGGED over one in 10: the room is too small for the model, and each costs a call more.
 // A stage that keeps under half of what entered it (4 or more entering) is FLAGGED, not failed: some papers are never
 // answered (a delivery note, a rates notice), and a matter may still be open.
 //
@@ -70,8 +77,16 @@ export interface SeatFunnel {
     met_list: { law: string; met_at: number; cleared: boolean }[] };
   requests: { made: number; answered: { [why: string]: number } };
   unread: number; sittings: number; calls: number; debriefed: string | null;
+  /** The seat's own calls (sittings and notebook) and its debrief's: how many, how many came back cut off at their room
+   * (each then made again, where there was room), and how many were left unfinished (cut off when made again too, or,
+   * in a log from before 2026-11-16, empty). */
+  replies: Replies; debrief_replies: Replies;
   verdict: { fail: string[]; flag: string[] };
 }
+export interface Replies { calls: number; cut_off: number; unfinished: number }
+const replies = (): Replies => ({ calls: 0, cut_off: 0, unfinished: 0 });
+/** A debrief answer's room before 2026-11-16, when the usage record did not say it (participants' DEBRIEF_ANSWER_TOKENS). */
+const OLD_DEBRIEF_ROOM = 2_400;
 export interface Funnel { fork_day: number; through_day: number; ended: boolean; seats: SeatFunnel[] }
 
 const asList = (x: unknown): string[] => (Array.isArray(x) ? x.map(String) : x ? [String(x)] : []);
@@ -96,6 +111,7 @@ export class FunnelReader {
   private readonly sittings = new Map<string, Set<number>>();
   private readonly calls = new Map<string, number>();
   private readonly debriefs = new Map<string, string>();
+  private readonly replies = new Map<string, { own: Replies; debrief: Replies; last?: { purpose: string; cut: boolean; again: boolean; legacy: boolean } }>();
   private readonly toCounterparty: { principal: string; to: string[]; t: number; id: string; kind: string }[] = [];
   /** Authorities a principal gave (id -> principal), and those a counterparty recorded (principal, counterparty, when). */
   private readonly authorities = new Map<string, string>();
@@ -145,7 +161,10 @@ export class FunnelReader {
       this.served.see(e);
       const who = String(b.subject ?? "");
       if (b.annotation === "usage" && b.purpose === "participant") { this.calls.set(who, (this.calls.get(who) ?? 0) + 1); this.model.add(who); }
-      else if (b.annotation === "debrief") this.debriefs.set(who, debriefWords(b.data ?? {}));
+      if (b.annotation === "usage" && (b.purpose === "participant" || b.purpose === "notebook" || b.purpose === "debrief")) this.seeReply(who, b);
+      if (b.annotation === "transcript" && (b.data?.purpose === "participant" || b.data?.purpose === "notebook")) this.seeTranscript(who, b.data);
+      if (b.annotation === "usage" || b.annotation === "transcript") return;
+      if (b.annotation === "debrief") this.debriefs.set(who, debriefWords(b.data ?? {}));
       else if (b.annotation === "note" && b.data?.unread_answer) this.unread.set(who, (this.unread.get(who) ?? 0) + 1);
       else if (b.annotation === "observation" && this.seatOf.has(who)) {
         (this.sittings.get(who) ?? this.sittings.set(who, new Set()).get(who)!).add(t);
@@ -203,12 +222,41 @@ export class FunnelReader {
     }
   }
 
+  private repliesOf(who: string) {
+    let r = this.replies.get(who);
+    if (!r) this.replies.set(who, (r = { own: replies(), debrief: replies() }));
+    return r;
+  }
+  /** A call's usage record: counted, and whether it was cut off at its room (said, from 2026-11-16; before, only a
+   * debrief's can be told, by its fixed room). */
+  private seeReply(who: string, b: any): void {
+    const r = this.repliesOf(who);
+    const legacy = b.max_tokens === undefined;
+    const cut = b.cut_off === true || (legacy && b.purpose === "debrief" && (b.output_tokens ?? 0) >= OLD_DEBRIEF_ROOM);
+    const into = b.purpose === "debrief" ? r.debrief : r.own;
+    into.calls++;
+    // (Made again after a cut: the cut is counted once, as unfinished only where the call made again was cut too. A log
+    // from before anything was made again: every cut is unfinished.)
+    if (cut && !b.again && !legacy) into.cut_off++;
+    if (cut && (b.again || legacy)) into.unfinished++;
+    r.last = { purpose: String(b.purpose), cut, again: b.again === true, legacy };
+  }
+  /** A seat's call's transcript, after its usage record: one that came back with nothing in it, in a log from before
+   * 2026-11-16 (nothing said why it stopped), is counted unfinished. */
+  private seeTranscript(who: string, d: any): void {
+    const r = this.repliesOf(who);
+    const last = r.last;
+    r.last = undefined;
+    if (!last || !last.legacy || last.cut) return;
+    if (Array.isArray(d.output) && !d.output.some((c: any) => c?.type === "tool_use" || (c?.type === "text" && String(c.text ?? "").trim()))) r.own.unfinished++;
+  }
+
   /** The funnel so far, with the obstacles as `oikos-kernel delegation` reads them (its rows, JSON) and whether the fork ended. */
   result(obstacleRows: any[], ended: boolean): Funnel {
     const seats = new Map<string, SeatFunnel>();
     const seat = (post: string) => {
       let s = seats.get(post);
-      if (!s) seats.set(post, (s = { post, participants: [], model: false, kinds: {}, total: row(), answers: {}, to: {}, served: undefined as any, obstacles: { made: 0, met: 0, cleared: 0, loosely: 0, by_law: {}, met_list: [] }, requests: { made: 0, answered: {} }, unread: 0, sittings: 0, calls: 0, debriefed: null, verdict: { fail: [], flag: [] } }));
+      if (!s) seats.set(post, (s = { post, participants: [], model: false, kinds: {}, total: row(), answers: {}, to: {}, served: undefined as any, obstacles: { made: 0, met: 0, cleared: 0, loosely: 0, by_law: {}, met_list: [] }, requests: { made: 0, answered: {} }, unread: 0, sittings: 0, calls: 0, debriefed: null, replies: replies(), debrief_replies: replies(), verdict: { fail: [], flag: [] } }));
       return s;
     };
     const add = (post: string, kind: string, f: (r: Row) => void) => { const s = seat(post); f((s.kinds[kind] ??= row())); f(s.total); };
@@ -240,6 +288,8 @@ export class FunnelReader {
       s.sittings += this.sittings.get(participant)?.size ?? 0;
       s.calls += this.calls.get(participant) ?? 0;
       if (this.debriefs.has(participant)) s.debriefed = this.debriefs.get(participant)!;
+      const r = this.replies.get(participant);
+      if (r) for (const [into, from] of [[s.replies, r.own], [s.debrief_replies, r.debrief]] as const) for (const k of ["calls", "cut_off", "unfinished"] as const) into[k] += from[k];
     }
     const servedBy = this.served.bySeat();
     for (const s of seats.values()) s.served = s.participants.map((p) => servedBy[p]).filter((x): x is Served => !!x).reduce((a: Served, x) => { for (const k of Object.keys(a) as (keyof Served)[]) a[k] += x[k]; return a; }, { requests: 0, served_first_time: 0, asked_back: 0, served_after_restatement: 0, never_served: 0, not_sent: 0, drafts_unsure: 0, drafts_offered: 0, drafts_confirmed: 0, drafts_declined: 0, drafts_unanswered: 0 } as Served);
@@ -283,6 +333,11 @@ export function verdict(s: SeatFunnel, ended: boolean): { fail: string[]; flag: 
   if (s.served.requests >= 10 && s.served.drafts_offered === 0) fail.push("at the translator: no draft offered");
   if (s.model && s.sittings >= 5 && s.calls === 0) fail.push("no call at any sitting");
   if (ended && s.model && !s.debriefed) fail.push("not debriefed");
+  for (const [what, r] of [["replies", s.replies], ["debrief replies", s.debrief_replies]] as const) {
+    if (!r) continue;
+    if (r.unfinished >= 2 && r.unfinished * 20 > r.calls) fail.push(`${what} unfinished: ${r.unfinished} of ${r.calls} cut off at their room`);
+    if (r.cut_off >= 2 && r.cut_off * 10 > r.calls) flag.push(`${what} cut off: ${r.cut_off} of ${r.calls} (made again with more room)`);
+  }
   const pairs: [string, number, number][] = [["drafted of handed", t.handed, t.drafted], ["signed of drafts", t.drafts, t.signed], ["sent of signed", t.signed, t.sent], ["answered of sent", t.sent, t.answered], ...(s.model ? [["shown of answered", t.answered, t.shown] as [string, number, number]] : []), ["done of handed", t.handed, t.done]];
   for (const [what, a, b] of pairs) if (a >= 4 && b < a / 2) flag.push(`${what}: ${b} of ${a}`);
   if (s.served.requests >= 4 && s.served.served_first_time < s.served.requests / 2) flag.push(`served first time: ${s.served.served_first_time} of ${s.served.requests}`);
@@ -331,7 +386,7 @@ export function funnelText(f: Funnel, label: string): string {
     const head = `${short(s.post)}: ${t.handed} handed${t.carried ? ` (${t.carried} from before the fork)` : ""}, ${t.drafted} drafted (${t.drafts} drafts), ${t.signed} signed (${t.declined} declined), ${t.sent} sent, ${t.answered} answered, ${s.model ? `${t.shown} shown, ` : ""}${t.done} reported done`;
     lines.push(`${head}: ${s.verdict.fail.length ? `FAIL ${s.verdict.fail.join("; ")}` : "ok"}${s.verdict.flag.length ? ` [flagged: ${s.verdict.flag.join("; ")}]` : ""}`);
     lines.push(`  ${s.model ? "model" : "code"} seat ${s.participants.join(", ")} in ${s.post}: ${s.sittings} sittings, ${s.calls} calls; translator: ${s.served.requests} requests, ${s.served.served_first_time} served first time, ${s.served.served_after_restatement} after a restatement, ${s.served.never_served} never, ${s.served.not_sent} not sent; drafts confirmed ${s.served.drafts_confirmed}, declined ${s.served.drafts_declined}`);
-    lines.push(`  obstacles: ${s.obstacles.made} made, ${s.obstacles.met} met, ${s.obstacles.cleared} cleared (loosely ${s.obstacles.loosely})${Object.keys(s.obstacles.by_law).length ? ` (${Object.entries(s.obstacles.by_law).map(([k, v]) => `${k} ${v.made}/${v.met}/${v.cleared}`).join(", ")})` : ""}; requests for more ${s.requests.made}${s.requests.made ? ` (${Object.entries(s.requests.answered).map(([k, v]) => `${k} ${v}`).join(", ")})` : ""}; reported not done ${t.not_done}; unread answers ${s.unread}; debriefed: ${s.debriefed ?? (s.model ? "no" : "-")}`);
+    lines.push(`  obstacles: ${s.obstacles.made} made, ${s.obstacles.met} met, ${s.obstacles.cleared} cleared (loosely ${s.obstacles.loosely})${Object.keys(s.obstacles.by_law).length ? ` (${Object.entries(s.obstacles.by_law).map(([k, v]) => `${k} ${v.made}/${v.met}/${v.cleared}`).join(", ")})` : ""}; requests for more ${s.requests.made}${s.requests.made ? ` (${Object.entries(s.requests.answered).map(([k, v]) => `${k} ${v}`).join(", ")})` : ""}; reported not done ${t.not_done}; unread answers ${s.unread}; replies cut off ${s.replies.cut_off}, unfinished ${s.replies.unfinished} of ${s.replies.calls}; debrief replies cut off ${s.debrief_replies.cut_off}, unfinished ${s.debrief_replies.unfinished} of ${s.debrief_replies.calls}; debriefed: ${s.debriefed ?? (s.model ? "no" : "-")}`);
     if (Object.keys(s.to).length) lines.push(`  sent to: ${Object.entries(s.to).sort((a, b) => b[1].sent - a[1].sent).map(([c, v]) => `${c} ${v.sent} (answered ${v.answered}${s.model ? `, shown ${v.shown}` : ""})`).join(", ")}`);
     for (const [k, r] of Object.entries(s.kinds).sort((a, b) => b[1].handed - a[1].handed)) lines.push(`    ${k}: ${STAGES.map((st) => (st === "shown" && !s.model ? "-" : r[st])).join(" → ")}${r.declined ? ` (declined ${r.declined})` : ""}`);
   }

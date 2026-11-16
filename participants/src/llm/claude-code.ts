@@ -31,7 +31,7 @@
 import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ContentBlock, LlmAdapter, LlmRequest, LlmResponse } from "./adapter";
+import { stopOf, type ContentBlock, type LlmAdapter, type LlmRequest, type LlmResponse } from "./adapter";
 import { readAnswerObject, readAnswerText, unreadAnswer } from "./answer";
 import { promptTooLong, UsageLimitReached } from "./call";
 import { answerSchema, runBounded, transcript } from "./codex";
@@ -211,7 +211,9 @@ export class ClaudeCodeAdapter implements LlmAdapter {
       const usage = { input_tokens: u.input_tokens ?? 0, output_tokens: u.output_tokens ?? 0, cache_read_tokens: u.cache_read_input_tokens ?? 0, cache_write_tokens: u.cache_creation_input_tokens ?? 0, ...(typeof result.total_cost_usd === "number" ? { reported_cost_microusd: Math.ceil(result.total_cost_usd * 1e6) } : {}), ...(typeof result.num_turns === "number" ? { turns: result.num_turns } : {}) };
       const log = this.o.log ?? process.env.OIKOS_CLAUDE_CODE_LOG;
       if (log) appendFileSync(log, JSON.stringify({ subject: req.subject, purpose: req.purpose, model: this.model, ...((req.effort ?? this.effort) ? { effort: req.effort ?? this.effort } : {}), input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cache_read_tokens: usage.cache_read_tokens, cache_write_tokens: usage.cache_write_tokens, turns: result.num_turns, reported_usd: result.total_cost_usd, by_model: result.modelUsage, ms: result.duration_ms }) + "\n");
-      return { content, usage, raw };
+      // (Why the last turn stopped, where the CLI's result says: `stop_reason`.)
+      const stop = stopOf(result.stop_reason);
+      return { content, usage, raw, ...(stop ? { stop } : {}) };
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

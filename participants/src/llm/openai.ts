@@ -3,7 +3,7 @@
 // /v1/chat/completions). The adapter interface is Anthropic-shaped; this maps
 // it: tool uses become `tool_calls`, tool results become `tool` messages.
 
-import type { ContentBlock, LlmAdapter, LlmMessage, LlmRequest, LlmResponse } from "./adapter";
+import { stopOf, type ContentBlock, type LlmAdapter, type LlmMessage, type LlmRequest, type LlmResponse } from "./adapter";
 import { post, type HttpOptions } from "./anthropic";
 
 export interface OpenAIOptions extends Omit<HttpOptions, "apiKey"> {
@@ -13,6 +13,11 @@ export interface OpenAIOptions extends Omit<HttpOptions, "apiKey"> {
   baseUrl?: string;
   /** OpenAI's newer models take max_completion_tokens; most local servers take max_tokens. Default: by provider. */
   tokenField?: "max_tokens" | "max_completion_tokens";
+  /** The way in takes a bound on the model's reasoning as OpenRouter's `reasoning: { max_tokens }`
+   * (https://openrouter.ai/docs/use-cases/reasoning-tokens, read 2026-11-16): sent where the request carries one. */
+  reasoningBound?: boolean;
+  /** Fields the host takes beside the standard ones (OpenRouter's `usage: { include: true }`, which reports a call's cost). */
+  extraBody?: Record<string, unknown>;
 }
 
 /** Our messages, in the chat-completions shape. */
@@ -50,6 +55,8 @@ export class OpenAICompatibleAdapter implements LlmAdapter {
       messages: toChat(req.system, req.messages),
       ...(req.tools?.length ? { tools: req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.input_schema } })) } : {}),
       ...(this.o.temperatureMilli !== undefined ? { temperature: this.o.temperatureMilli / 1000 } : {}),
+      ...(this.o.extraBody ?? {}),
+      ...(this.o.reasoningBound && req.reasoningTokens ? { reasoning: { max_tokens: req.reasoningTokens } } : {}),
     };
     const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl ?? "https://api.openai.com/v1"}/chat/completions`,
       this.o.apiKey ? { authorization: `Bearer ${this.o.apiKey}` } : {}, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
@@ -66,13 +73,19 @@ export class OpenAICompatibleAdapter implements LlmAdapter {
       content.push({ type: "tool_use", id: c.id, name: c.function?.name ?? "", input });
     }
     const cached = r.usage?.prompt_tokens_details?.cached_tokens;
+    const reasoning = r.usage?.completion_tokens_details?.reasoning_tokens;
+    const stop = stopOf(r.choices?.[0]?.finish_reason);
+    const cost = r.usage?.cost;
     return {
       content,
       usage: {
         input_tokens: (r.usage?.prompt_tokens ?? 0) - (cached ?? 0),
         output_tokens: r.usage?.completion_tokens ?? 0,
         ...(cached !== undefined ? { cache_read_tokens: cached } : {}),
+        ...(typeof reasoning === "number" ? { reasoning_tokens: reasoning } : {}),
+        ...(typeof cost === "number" ? { reported_cost_microusd: Math.ceil(cost * 1e6) } : {}),
       },
+      ...(stop ? { stop } : {}),
     };
   }
 }

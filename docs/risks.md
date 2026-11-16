@@ -2216,6 +2216,60 @@ The mechanism:
 - **Fix when:** before a study seats both: trace the engagement per post.
 - **Notice by:** an assigned principal with no `engage` decision and no order.
 
+### MT-55 · A citizen claims again a payment it is already paid
+- **Gap:** c0479, paid a pension from a grant made on review (rec.14984, day 16), had its desk file two more pension
+  claims (days 20 and 29) in the stakes probe. The cause is not traced; perhaps a grant made on review never enters the
+  citizen's list of payments.
+- **Where:** `kernel/crates/actors/src/citizen/money.rs` (how a grant updates `benefits`), the delegation route of claims.
+- **Effect:** extra claims and decisions, and evidence requests that become episodes, for clients who need nothing.
+  Since 2026-11-16 a second grant no longer loses a payment and a refusal no longer ends one (support.rs), so money is
+  no longer moved by it.
+- **L / I:** medium / low · **Status:** open (2026-11-16, stakes probe)
+- **Fix when:** an episode count is read for the evidence or benefit-claim kinds, or the next support-office change.
+- **Notice by:** a `benefit_claim` in a client's name while a `benefit_decision` granting the same payment stands.
+
+### MT-56 · "Claim days undecided" counts only claims that were sent
+- **Gap:** the per-client measure sums the days from each claim in the client's name to its decision. A seat that sends
+  no claim scores 0, which reads as better than an arm that sent claims and waited.
+- **Where:** `experiments/scope-pilot/episodes.ts` (`claim_days_undecided`), the report's table 4b.
+- **Effect:** an arm that held back every claim (the DeepSeek probe: 0 against the code arm's 9.1) looks faster.
+  "Benefit days waiting", which runs from the hand-over, is the measure to read beside it.
+- **L / I:** high / medium · **Status:** open (2026-11-16)
+- **Fix when:** the results page reports benefit timing, which should then run from the hand-over, not the claim.
+- **Notice by:** an arm with claims undecided 0 and benefit days waiting above the reference.
+
+### MT-57 · A reasoning model's room rests on a guessed allowance and a bound its host may not keep
+- **Gap:** a model that reasons in its output is given its price entry's `reasoning_tokens` on top of the answer's room,
+  sent as OpenRouter's `reasoning.max_tokens` (decisions, "A reply cut off at its room"). The 16,000 for GLM 5.3 and
+  DeepSeek V4.1 Flash is a guess (the probes show only that 8,000 was too little), and OpenRouter's page says support for
+  the bound varies by model and provider: where it is not kept, the model may reason through the whole room again. A
+  reply still cut off after its one retry ends the sitting unfinished; one cut off with something in it is acted on as
+  far as it goes.
+- **Where:** `orchestrator/prices.json` (the two entries), `participants/src/llm/call.ts` (`callModel`), openai.ts and
+  openai-compat.ts (the bound sent); the debrief's reserve (`seatsEndNeedMicroUsd`) does not count the allowance, so a
+  reasoning model's debrief may run past what was kept back (counted as the platform's overrun, never the seat's).
+- **Effect:** sittings that end unfinished are days a seat did nothing by our doing; matters open across them are priced
+  "ours" (episodes.ts), but the seat's later choices are made with less done than it meant. A retry doubles a call's cost.
+- **L / I:** medium / high · **Status:** open (2026-11-16)
+- **Fix when:** the first run with the allowance has recorded `reasoning_tokens`: set each model's allowance from them;
+  pin a provider that keeps the bound before a counted run.
+- **Notice by:** the funnel's "replies cut off" flag or "replies unfinished" fail; usage records with `reasoning_tokens`
+  near `max_tokens`.
+
+### MT-58 · Evidence that cites the client's forward, not the office's request, is not matched
+- **Gap:** the support office matches papers for a claim to its ask by the request they cite (`support_law::answers`).
+  The `request` blank of the desk's evidence form takes any record, and a forward (the client's copy passed on, which the
+  office never holds) is not turned into the office's paper in it; the resolver does that only for `referral` and
+  `matter` blanks. Such evidence falls back to the paper's own `need`, which a seat writes in words, and the claim lapses.
+- **Where:** `kernel/crates/resolver/src/resolve.rs` (the passed-on mapping), `support_law::answers`.
+- **Effect:** a model desk that cites the forward loses its client's claim for papers sent on time, which a reader would
+  see as the desk's failure. Not seen in rung 1 (GLM, DeepSeek and Haiku cited the office's paper).
+- **L / I:** low / high · **Status:** open (2026-11-16)
+- **Fix when:** the replay or the episodes show evidence citing a forward: map a record blank naming a forward to the
+  body's paper in it, measured on the scored set.
+- **Notice by:** a `benefit_decision` refused for "papers ... did not come" where the desk's evidence came in time;
+  evidence whose `request` is a forward.
+
 ---
 
 ## Profiles and sources

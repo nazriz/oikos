@@ -62,12 +62,13 @@ for (const [name, how, by, stop] of [
     const r = await runWorld({ config: r0.config, runId: r0.runId, outDir: d, until: 8 * DAY, adapter: serving.wrap(live), resumedFrom: { log: "town.seed1.stopped-1.jsonl", serving } });
     expect(r.stopped).toBeUndefined();
     expect(serving.diverged).toBeUndefined();
-    // (The debrief, and nothing else: its questions, each a call. This stand-in answers in plain words, so each
-    // answer is kept as given.)
-    expect(live.calls).toBe(stepsOf("full", 0).length);
+    // (The debrief, and nothing else: its questions, each a call, and the one follow-up to each very short answer to
+    // what it was like, what it would change and whether it would again. This stand-in answers in plain words, read as
+    // its answers since 0.7.1.)
+    expect(live.calls).toBe(stepsOf("full", 0).length + 3);
     const again = notes(r.logPath);
     expect(again.filter((a) => a.annotation === "debrief").map((a) => a.subject)).toEqual(["mayor-system"]);
-    expect(again.find((a) => a.annotation === "debrief")!.data.steps[1]).toMatchObject({ id: "took", status: "unread" });
+    expect(again.find((a) => a.annotation === "debrief")!.data.steps[1]).toMatchObject({ id: "took", status: "answered" });
     expect(readFileSync(r.logPath.replace(/\.jsonl$/, ".debriefs.jsonl"), "utf8")).toContain("It went well enough.");
     expect(r.stateHash).toBe(s.stateHash);
     // The pilot report: whole, with the debrief given.

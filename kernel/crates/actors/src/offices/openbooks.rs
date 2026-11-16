@@ -898,7 +898,11 @@ fn support(base: &Base, me: &str, w: &WorldInfo) -> Vec<OpenHeading> {
         .iter()
         .flat_map(|k| book.open(k))
         .filter(|r| addressed(r, me) && d(r).s("claim").is_some())
-        .map(|r| format!("{}|{}", js(d(r).get("claim")), js(d(r).get("need"))))
+        // (Matched to the ask it answers as the office matches it: by the request it cites, where that is on file.)
+        .map(|r| match crate::boundary::support_law::answers(book, r, me) {
+            Some((c, n)) => format!("{c}|{n}"),
+            None => format!("{}|{}", js(d(r).get("claim")), js(d(r).get("need"))),
+        })
         .collect();
     let mut asked: Vec<&R> = ["evidence_request", "confirmation_request"]
         .iter()

@@ -16,7 +16,7 @@ function obs(t: number, letter?: string): Observation {
   return { t, channels: {}, outcomes: [], inbox: letter ? [{ from: "clerk", t, text: letter }] : [], drafts: [], positions: [{ position: "mayor", entity: "city", title: "Mayor" }] } as unknown as Observation;
 }
 
-function harness(answers: (ContentBlock[] | "fail")[], extra: Partial<LlmParticipantConfig> = {}) {
+function harness(answers: (ContentBlock[] | "fail" | "cut")[], extra: Partial<LlmParticipantConfig> = {}) {
   const calls: LlmRequest[] = [];
   const notes: any[] = [];
   let n = 0;
@@ -24,6 +24,8 @@ function harness(answers: (ContentBlock[] | "fail")[], extra: Partial<LlmPartici
     calls.push(JSON.parse(JSON.stringify(req)));
     const a = answers[n++];
     if (a === "fail") throw new Error("no answer within 180 s");
+    // (A reply cut off at its room with nothing in it: a reasoning model's thinking used all of it.)
+    if (a === "cut") return { content: [], usage: { input_tokens: 1, output_tokens: req.maxTokens }, stop: { reason: "max_tokens", raw: "length" } } as any;
     return { content: a ?? [{ type: "tool_use", id: `end-${n}`, name: "done_for_now", input: {} }], usage: { input_tokens: 1, output_tokens: 1 } } as any;
   } };
   const io = { adapter, annotate: async (a: any) => void (a.annotation === "note" && notes.push(a.data)), now: () => 0 } as any;
@@ -194,6 +196,27 @@ test("a seat whose model call fails misses that sitting and sits again at its ne
   await plain.p.step(obs(DAY + 5 * HOUR), ctx);
   expect(shown(plain.calls[1]!)).toContain("You missed your sitting on year 1, day 1");
   expect(shown(plain.calls[1]!)).toContain("a letter");
+});
+
+test("a reply cut off at its room with nothing in it is made again once with twice the room; cut off again, the sitting ends unfinished, and the seat is told so in the world's words, not as a sitting that chose to do nothing", async () => {
+  // (The GLM 5.3 and DeepSeek V4.1 Flash probes of 2026-11-16: a sixth of their seat calls came back empty at the room, and
+  // each sitting simply ended, nothing said.)
+  const sessions = { start: 9 * HOUR, end: 17 * HOUR, days: 5 };
+  const { p, calls, notes } = harness(["cut", "cut", "cut", [use("a", "write", { to: ["clerk"], text: "Thanks.", as: "mayor" })]], { sessions, maxTokens: 1_000 });
+  let e: ModelCallFailed | undefined;
+  try { await p.step(obs(9 * HOUR, "a letter at nine"), ctx); } catch (x) { e = x as ModelCallFailed; }
+  expect(e).toBeInstanceOf(ModelCallFailed);
+  expect(e!.cutOff).toBe(true);
+  expect(e!.backAt).toBe(DAY + 9 * HOUR);
+  expect(calls.map((c) => c.maxTokens)).toEqual([1_000, 2_000]);
+  expect(notes.find((n) => n.sitting_missed)!.sitting_missed).toMatchObject({ day: 0, midway: false, why: "cut_off" });
+  // The next day's: cut off once, answered when made again, and told first thing that the last sitting ended unfinished.
+  expect(await p.step(obs(DAY + 9 * HOUR, "a letter the next morning"), ctx)).toMatchObject({ type: "message", text: "Thanks." });
+  expect(calls.length).toBe(4);
+  const next = shown(calls[2]!);
+  expect(next).toContain("Your sitting on year 1, day 1 ended unfinished");
+  for (const l of ["a letter at nine", "a letter the next morning"]) expect(next).toContain(l);
+  expect(next).not.toMatch(/\bmodel|\btokens?\b|\broom\b|platform|cut off/i);
 });
 
 test("more kept for a sitting than can be set out: whole reports are left out from the front, counted, and recorded", async () => {

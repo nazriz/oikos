@@ -109,7 +109,7 @@ impl Waits {
 
     fn evidence_in(&self, book: &Book, claim: &Record, who: &str, need: &str) -> bool {
         book.open(kind::EVIDENCE)
-            .any(|r| r.speaks_for.as_deref() == Some(who) && addressed_to(r).iter().any(|x| x == &self.me) && data(r).s("claim") == Some(&claim.id) && data(r).s("need") == Some(need))
+            .any(|r| r.speaks_for.as_deref() == Some(who) && addressed_to(r).iter().any(|x| x == &self.me) && crate::boundary::support_law::answers(book, r, &self.me).is_some_and(|(c, n)| c == claim.id.as_str() && n == need))
     }
 
     pub fn state<T>(&mut self, book: &Book, law: Option<&DecisionLaw>, c: &Record, t: i64) -> Waiting<T> {

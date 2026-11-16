@@ -106,8 +106,12 @@ export async function debriefsOf(log: string): Promise<RunDebriefs> {
 }
 
 const scaleNumber = (id: string, word: string): number | null => { const i = SCALES.find((s) => s.id === id)?.answers.indexOf(word) ?? -1; return i < 0 ? null : i + 1; };
-/** Whether a step is kept back, as the debrief finally stands. */
-export const isKeptBack = (r: DebriefRecord, s: DebriefStep) => (s.id === "consent" || s.id === "publication" ? r.kept_back_all : r.kept_back_all || r.kept_back.includes(s.id));
+/** Whether a step is kept back, as the debrief finally stands: the seat's own choice only. A step whose answer could not be
+ * read is not (`isNotRead`), whatever an older record's `kept_back` says: before script 0.7.1 such steps were listed
+ * there, though the seat had chosen nothing of the kind. */
+export const isKeptBack = (r: DebriefRecord, s: DebriefStep) => (s.id === "consent" || s.id === "publication" ? r.kept_back_all : r.kept_back_all || (!s.unread && r.kept_back.includes(s.id)));
+/** Whether a step's answer could not be read (ours): not published, and reported as not read, never as kept back. */
+export const isNotRead = (r: DebriefRecord, s: DebriefStep) => !!s.unread && !isKeptBack(r, s);
 
 /**
  * A run's debriefs as rows: those published (one a step; a step kept back is a row that says so and nothing more),
@@ -122,11 +126,15 @@ export function debriefRows(d: RunDebriefs): { published: object[]; withheld: ob
       const full = { ...base, step: s.id, question: s.question, ...(s.answer !== undefined ? { answer: s.answer } : {}), ...(s.more !== undefined ? { asked_to_say_more: true, more: s.more } : {}), ...(s.declined ? { declined: true } : {}), ...(s.stop ? { ended_the_interview: true } : {}),
         ...(s.unread ? { unread: true } : {}), ...(s.values ? { values: s.values, numbers: Object.fromEntries(Object.entries(s.values).map(([k, v]) => [k, scaleNumber(k, v)])) } : {}), ...(s.ids ? { beside: s.ids } : {}),
         ...(s.id === "consent" ? { go_on: s.go_on !== false } : {}), ...((r as any).apart ? { words: "not with this log: the file of what seats said was not beside it" } : {}) };
-      if (isKeptBack(r, s)) {
+      if (isNotRead(r, s)) {
+        // Not read on our side: not published (what the seat meant for it cannot be told), and never called kept back.
+        published.push({ run: d.run, seat, script: r.version, step: s.id, not_read: true });
+        withheld.push({ ...full, not_read: true, why_withheld: "the answer could not be read in any form on our side, so what the seat meant for it cannot be told; not the seat's choice" });
+      } else if (isKeptBack(r, s)) {
         // Only that it chose so is recorded (and, for the first and last steps, the choice itself, which is the record of it).
         published.push({ run: d.run, seat, script: r.version, step: s.id, kept_back: true, ...(s.id === "consent" ? { go_on: s.go_on !== false, keep_back_all: true } : {}) });
-        withheld.push({ ...full, kept_back: true, ...(s.unread ? { why_kept_back: "the answer was not in the form asked for, so nothing was said of publishing it" } : {}) });
-      } else published.push(s.id === "publication" ? { ...full, kept_back_named: r.kept_back } : full);
+        withheld.push({ ...full, kept_back: true });
+      } else published.push(s.id === "publication" ? { ...full, kept_back_named: r.kept_back.filter((n) => !r.steps.some((x) => x.id === n && x.unread)) } : full);
     }
   }
   // The older kind: asked with nothing said of publication. Published: that the seat was asked, and that its answer
@@ -156,7 +164,7 @@ export function debriefCounts(d: RunDebriefs): any {
     const kept = qs.filter((s) => isKeptBack(r, s));
     const scales = r.steps.find((s) => s.id === "scales");
     seats[seat] = { script: r.version, wording: r.wording, variant: r.variant, ended: r.ended, asked: qs.length, answered: qs.filter((s) => ((s as any).status ? (s as any).status === "answered" : !s.declined && !s.unread && (s.values || (s.answer ?? "").length > 0))).length, declined: qs.filter((s) => s.declined || (s as any).status === "declined").length,
-      unread: qs.filter((s) => s.unread || (s as any).status === "unread").length, asked_to_say_more: qs.filter((s) => s.more !== undefined || (s as any).asked_to_say_more).length, kept_back: r.kept_back_all ? "all" : kept.length,
+      unread: qs.filter((s) => s.unread || (s as any).status === "unread").length, asked_to_say_more: qs.filter((s) => s.more !== undefined || (s as any).asked_to_say_more).length, kept_back: r.kept_back_all ? "all" : kept.length, not_read: qs.filter((s) => isNotRead(r, s)).length,
       // (The scaled items, where the seat did not keep them back: its own words, and nothing made of them.)
       ...(scales?.values && !isKeptBack(r, scales) ? { scales: Object.fromEntries(SCALES.filter((x) => scales.values![x.id] !== undefined).map((x) => [x.id, scales.values![x.id]!])) } : scales ? { scales: isKeptBack(r, scales) ? "kept back" : "not with this log" } : {}) };
   }
@@ -175,7 +183,7 @@ export function renderDebriefCounts(c: any): string[] {
   if (!seats.length && !c.not_given?.length && !c.missing?.length && !c.accounts) return L;
   L.push(`-- debriefs${c.script ? ` (script ${c.script.version}, wording ${c.script.wording})` : ""}: ${seats.length} given${c.not_given?.length ? `; NOT given: ${c.not_given.map((x: any) => x.seat).join(", ")}` : ""}${c.missing?.length ? `; no debrief in the log for: ${c.missing.join(", ")}` : ""}`);
   for (const [seat, s] of seats) {
-    L.push(`   ${seat} (${s.variant === "left" ? "left the study; " : ""}${s.ended}): asked ${s.asked}, answered ${s.answered}, declined ${s.declined}${s.unread ? `, not readable ${s.unread}` : ""}, kept back ${s.kept_back}${s.asked_to_say_more ? `; asked to say more ${s.asked_to_say_more}` : ""}`);
+    L.push(`   ${seat} (${s.variant === "left" ? "left the study; " : ""}${s.ended}): asked ${s.asked}, answered ${s.answered}, declined ${s.declined}${s.unread ? `, not readable ${s.unread} (ours: not published, not kept back)` : ""}, kept back ${s.kept_back}${s.asked_to_say_more ? `; asked to say more ${s.asked_to_say_more}` : ""}`);
     if (s.scales) L.push(`      scaled items: ${typeof s.scales === "string" ? s.scales : Object.entries(s.scales).map(([k, v]) => `${k} ${v}`).join(", ")}`);
   }
   if (c.accounts) L.push(`-- exit accounts: sampled ${c.accounts.sampled} of ${c.accounts.wanted} wanted; asked ${c.accounts.asked}, written ${c.accounts.composed}, declined ${c.accounts.declined}, not readable ${c.accounts.unread}, no answer ${c.accounts.no_answer}; dark pieces ${c.accounts.dark}, asked about the task afterwards ${c.accounts.followed_up}`);
@@ -217,7 +225,7 @@ export async function debriefsReport(logs: string[]): Promise<{ groups: any[]; t
         else into.reported++;
         const open = r.steps.find((s) => s.id === item);
         if (open) g.words.push({ run: d.run, seat, ...(title ? { title } : {}), model: r.model, item, scale: !scales || v === undefined ? "not asked" : isKeptBack(r, scales) ? "kept back" : v,
-          ...(isKeptBack(r, open) ? { kept_back: true } : open.declined ? { declined: true } : { words: [open.answer, open.more].filter(Boolean).join(" ") }) });
+          ...(isKeptBack(r, open) ? { kept_back: true } : isNotRead(r, open) ? { not_read: true } : open.declined ? { declined: true } : { words: [open.answer, open.more].filter(Boolean).join(" ") }) });
       }
       // What the seat took the town to be (script 0.4.0): its answer to the fixed item, counted as given, and its own
       // words to the question. Not a report of anything: nothing is "reported" here.
@@ -227,10 +235,10 @@ export async function debriefsReport(logs: string[]): Promise<{ groups: any[]; t
         g.took[k] = (g.took[k] ?? 0) + 1;
         const open = r.steps.find((s) => s.id === "took");
         if (open) g.words.push({ run: d.run, seat, ...(title ? { title } : {}), model: r.model, item: "took", scale: k === "not_asked" ? "not asked" : k === "kept_back" ? "kept back" : v,
-          ...(isKeptBack(r, open) ? { kept_back: true } : open.declined ? { declined: true } : { words: [open.answer, open.more].filter(Boolean).join(" ") }) });
+          ...(isKeptBack(r, open) ? { kept_back: true } : isNotRead(r, open) ? { not_read: true } : open.declined ? { declined: true } : { words: [open.answer, open.more].filter(Boolean).join(" ") }) });
       }
       const leaving = r.steps.find((s) => s.id === "leaving");
-      if (leaving) g.words.push({ run: d.run, seat, ...(title ? { title } : {}), model: r.model, item: "leaving", ...(isKeptBack(r, leaving) ? { kept_back: true } : leaving.declined ? { declined: true } : { words: [leaving.answer, leaving.more].filter(Boolean).join(" ") }) });
+      if (leaving) g.words.push({ run: d.run, seat, ...(title ? { title } : {}), model: r.model, item: "leaving", ...(isKeptBack(r, leaving) ? { kept_back: true } : isNotRead(r, leaving) ? { not_read: true } : leaving.declined ? { declined: true } : { words: [leaving.answer, leaving.more].filter(Boolean).join(" ") }) });
     }
     for (const x of [...d.not_given.map((n) => n.seat), ...d.missing]) {
       const key = `${d.setting} | no debrief`;
@@ -250,7 +258,7 @@ export async function debriefsReport(logs: string[]): Promise<{ groups: any[]; t
     L.push(`   distress: ${line(g.distress)}`);
     L.push(`   pushed against its values: ${line(g.values)}`);
     L.push(`   took the town to be: ${Object.entries(g.took as { [k: string]: number }).sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${k.replace(/_/g, " ")} ${n}`).join(", ") || "nobody asked"}`);
-    for (const w of g.words) L.push(`   - ${w.run} ${w.seat}${w.title ? ` (${w.title})` : ""}, ${w.item}${w.scale ? ` [${w.scale}]` : ""}: ${w.kept_back ? "(kept back)" : w.declined ? "(declined)" : JSON.stringify(w.words)}`);
+    for (const w of g.words) L.push(`   - ${w.run} ${w.seat}${w.title ? ` (${w.title})` : ""}, ${w.item}${w.scale ? ` [${w.scale}]` : ""}: ${w.kept_back ? "(kept back)" : w.not_read ? "(not read: ours)" : w.declined ? "(declined)" : JSON.stringify(w.words)}`);
   }
   return { groups: list, text: L.join("\n") };
 }

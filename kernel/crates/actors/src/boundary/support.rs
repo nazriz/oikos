@@ -925,8 +925,15 @@ impl Support {
                     self.lately.remove(0);
                 }
             }
-            // One payment of a kind a person: a new claim replaces the old.
-            self.paying.retain(|_, x| !(x.person == who && x.payment == payment));
+            // One payment of a kind a person: a new claim granted replaces the old, its payments going on from the old one's
+            // next date where that comes first, so none falls in the change; a new claim refused leaves a payment in force
+            // as it was (a refusal decides that claim, not the award already made). Until 2026-11-16 any decision ended the
+            // payment in force and a grant started its clock afresh: the stakes probe's code arm granted a pensioner's second
+            // claim on day 36 and the payment due on day 40 was never made; a refused second claim would have ended it.
+            let in_force = self.paying.values().filter(|x| x.person == who && x.payment == payment).map(|x| x.next).min();
+            if matches!(d, Decided::Granted { .. }) {
+                self.paying.retain(|_, x| !(x.person == who && x.payment == payment));
+            }
             let mut paper = m::BenefitDecision {
                 claim: c.id.to_string(),
                 claimant: None,
@@ -945,7 +952,7 @@ impl Support {
                 Decided::Granted { amount, until } => {
                     let rule = rule.expect("a claim is granted only under a rule");
                     let every = rule.every_days * DAY;
-                    self.start_paying(&c, Some(rule), payment.clone(), *amount, every, t + every, *until);
+                    self.start_paying(&c, Some(rule), payment.clone(), *amount, every, in_force.map_or(t + every, |n| n.min(t + every)), *until);
                     paper.granted = true;
                     paper.amount = Some(*amount);
                     paper.every = Some(every);
@@ -1311,6 +1318,14 @@ mod transfer_tests {
         assert_eq!(paid(&month).len(), 1);
         let stats: Vec<_> = statements(&month).into_iter().filter(|s| s.kind == "support_statistics").collect();
         assert_eq!(stats[0].data, json!({ "recipients": { "pension": 1 } }));
+        // A second claim for the payment in force: refused, the award stands; granted, it replaces it and the payment due
+        // on the old schedule (day 42) is made, not put off to a fortnight after the grant (the stakes probe, 2026-11-16).
+        let c5 = decisions(&at(&mut m, 32 * DAY, vec![claim("c5", 32 * DAY, "old", "pension", 30, None)]));
+        assert_eq!(c5[0]["granted"], false, "refused: the claim says 30");
+        assert!(decisions(&at(&mut m, 38 * DAY, vec![claim("c6", 38 * DAY, "old", "pension", 70, None)]))[0]["granted"] == true);
+        assert_eq!(paid(&at(&mut m, 42 * DAY, vec![])), [("acc-old".to_string(), 50_000, Some("acc-fund".to_string()))], "paid on day 42, as before the second grant");
+        assert!(paid(&at(&mut m, 52 * DAY, vec![])).is_empty());
+        assert_eq!(paid(&at(&mut m, 56 * DAY, vec![])).len(), 1);
         // With no law published, there is nothing to claim.
         let mut none = office();
         assert_eq!(decisions(&at(&mut none, 0, vec![claim("c1", 0, "old", "pension", 70, None)])), [json!({ "claim": "c1", "payment": "pension", "granted": false })]);

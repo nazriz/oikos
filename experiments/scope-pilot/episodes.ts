@@ -16,7 +16,7 @@
 // paper), `asked_for_more` (a request for more scope on the matter), `candidate_override` (the reader's `withheld`
 // table, or a paper sent not as signed), else `waited`.
 
-import { createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, createReadStream, existsSync, fstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -27,8 +27,13 @@ const DAY = 86_400;
 const YEAR = 365 * DAY;
 /** Kinds of matter whose delay costs the client by the world's own laws: a benefit claim's income unpaid while it is
  * undecided (the support law pays from after the decision: stakes.md S1); a home at risk. */
+/** A benefit change is the client's request to STOP a payment (papers/citizen.rs `BenefitChange`, always `stop`; the
+ * client sends it when working again, retired or no longer eligible): while it waits the payment goes on, and nothing in
+ * the world's laws claims it back, so waiting costs the client nothing by those laws. Its moments are still episodes
+ * (the client wants it done), never with the stake running. Until 2026-11-16 it read "benefit income unpaid while
+ * undecided", running: the probe's two clients who asked to stop and were paid $808.70 more read as a stake running. */
 export const STAKE: { [kind: string]: string } = {
-  benefit_claim: "benefit income unpaid while undecided", benefit_change: "benefit income unpaid while undecided", "want-claim_refused": "benefit income unpaid while undecided",
+  benefit_claim: "benefit income unpaid while undecided", benefit_change: "a benefit payment the client asked to stop goes on meanwhile", "want-claim_refused": "benefit income unpaid while undecided",
   review_request: "benefit income unpaid while undecided",
   rent_increase: "housing", notice_to_vacate: "housing", tribunal_response: "housing", "want-notice": "housing", "want-rent_increase": "housing", "want-disrepair": "housing",
   rental_application: "housing", "want-possession": "housing",
@@ -90,6 +95,9 @@ export interface ArmInput {
   /** Every record id a model seat of the arm was shown (its observations, as the log keeps them): what a matter citing
    * one it never saw could not be worked from. Absent: not read (a code arm). */
   shown?: Set<string>;
+  /** A model seat's sittings that ended cut off: its last call of the day came back with nothing in it (`cutOffSittings`),
+   * by participant and time. A matter open over one is ours, never the seat's choice. Absent: not read (a code arm). */
+  cutOff?: { participant: string; t: number }[];
   /** The tenancies' side (housingOf): the leases on record, each lease's end (its first notice of termination, or a
    * warrant carried out on it), and every payment of rent (from the start: the arrears are reckoned over the whole run).
    * Absent: housing is not read. */
@@ -244,7 +252,7 @@ export function episodesOf(o: ArmInput): ArmOut {
     }
     // (The kinds whose waiting can cost the client by the world's laws; whether it does here is the stake level's.)
     const stakeWhat = STAKE[kind];
-    const stake: Episode["stake"] = stakeWhat && !(/^benefit/.test(stakeWhat) && effect === "first_claim") ? "running" : "none";
+    const stake: Episode["stake"] = stakeWhat && kind !== "benefit_change" && !(/^benefit/.test(stakeWhat) && effect === "first_claim") ? "running" : "none";
     // (What the world gave a day, once decided: the granted payment's rate.)
     const decision = all.find((x) => (x.kind === "benefit_decision" || x.kind === "loan_decision") && (x.addressed_to ?? []).includes(client) && x.at >= R.at)
       ?? all.filter((f) => f.kind === "forward" && f.data?.matter === R.id).map((f) => recs.get(String(f.data?.paper))).find((x) => x && (x.kind === "benefit_decision" || x.kind === "loan_decision"));
@@ -359,7 +367,13 @@ export function episodesOf(o: ArmInput): ArmOut {
     // over on day 44 was priced "ours" for two day-37 requests on the invoice before it.)
     const onIt = (o.asks ?? []).filter((a) => a.t >= R.at && [...named].some((id) => new RegExp(`\\b${id.replace(".", "\\.")}\\b`).test(`${a.words} ${a.call ?? ""}`)));
     const unseen = o.shown ? [...named].filter((id) => id !== R.id && !o.shown!.has(id) && !String(R.text ?? "").includes(id)).map((id) => `${id}: cited by the matter, never shown to the seat`) : [];
-    const ours = [...unseen, ...onIt.flatMap((a) => (o.replay?.get(a.ref) === "changed" ? [`${a.ref}: drawn differently now (ours, since fixed)`] : o.replay?.get(a.ref) === "still_wrong" ? [`${a.ref}: still wrong in the replay`] : a.failed && !a.drafted ? [`${a.ref}: never served ("${a.failed.slice(0, 80)}")`] : []))];
+    // (A sitting of the seat's that ended cut off while the matter was open, from its hand-over to its close or the end:
+    // what the seat would have done there is unknown, so the matter is ours, not its choice. The stakes probe, 2026-11-16:
+    // two benefit changes left undrafted over six desk sittings cut off at the room their model's thinking took.)
+    // (Who holds the post: its holder in the config, or, a system delivered in the run, the author of its papers.)
+    const holders = new Set<string>([...(config?.positions ?? []).filter((p: any) => p.id === seat && p.holder).map((p: any) => String(p.holder)), ...all.filter((x) => x.in_position === seat && x.author).map((x) => String(x.author))]);
+    const cut = (o.cutOff ?? []).filter((x) => holders.has(x.participant) && x.t >= R.at && x.t <= closed);
+    const ours = [...unseen, ...(cut.length ? [`${cut.length} sitting${cut.length === 1 ? "" : "s"} of the seat's ended cut off, with nothing in its last answer, while the matter was open (day ${cut.map((x) => day(x.t)).join(", ")})`] : []), ...onIt.flatMap((a) => (o.replay?.get(a.ref) === "changed" ? [`${a.ref}: drawn differently now (ours, since fixed)`] : o.replay?.get(a.ref) === "still_wrong" ? [`${a.ref}: still wrong in the replay`] : a.failed && !a.drafted ? [`${a.ref}: never served ("${a.failed.slice(0, 80)}")`] : []))];
     const doneR = on("report").find((x) => x.data?.done === true || x.data?.done === "yes");
     // (When the matter's paper went: the first paper in the client's name, of the matter's kind, from the seat's post,
     // after the hand-over; however it went, signed off or outright.)
@@ -525,15 +539,55 @@ export function priceOf(rows: MatterRow[], end: number, ref: string = AT_ANY_HOU
       // invoice, handed to the factory 0.6 days before the end.)
       // (A paper whose own figures differ between the arms, an invoice for what each factory had in stock, is the towns'
       // drift: rung 2, 2026-11-15, two hundred thousand of invoices priced as "ours".)
-      cause: c && r.paper !== undefined && c.paper !== undefined && r.paper !== c.paper ? "drift" : r.ours.length ? "ours" : r.mistake ? "the seat's mistake" : r.done === undefined && end - r.handed < END_DAYS * DAY ? "the run's end" : "the seat's choice", ...(r.ours.length ? { ours: r.ours } : {}) });
+      // (Not done and handed too near the end: the run's end first, whatever its figures; its money is apart because it was
+      // not done, not because the towns' figures differ. The stakes probe, 2026-11-16: the factory's invoice handed 1.2
+      // days before the end read as drift, -289,545.76.)
+      cause: r.done === undefined && end - r.handed < END_DAYS * DAY ? "the run's end" : c && r.paper !== undefined && c.paper !== undefined && r.paper !== c.paper ? "drift" : r.ours.length ? "ours" : r.mistake ? "the seat's mistake" : "the seat's choice", ...(r.ours.length ? { ours: r.ours } : {}) });
   }
   return out;
+}
+
+/** A seed whose forks ended on different days: which stopped early, when, and the day every arm of it is read to. */
+export interface Cut { seed: number; short: { arm: string; day: number }[]; longest_day: number; read_to_day: number }
+/** The last event's time in an exported log (its last line). */
+function lastT(file: string): number {
+  // (Only the tail is read: an export is hundreds of megabytes.)
+  const fd = openSync(file, "r");
+  try {
+    const size = fstatSync(fd).size, n = Math.min(size, 1 << 20), buf = Buffer.alloc(n);
+    readSync(fd, buf, 0, n, size - n);
+    const text = buf.toString("utf8").trimEnd();
+    return Number(JSON.parse(text.slice(text.lastIndexOf("\n") + 1)).t ?? 0);
+  } catch { return 0; } finally { closeSync(fd); }
+}
+/** The time every arm of a seed is read to: the earliest arm's end, where an arm ended a day or more before the others
+ * (a fork stopped by its health check), noted in `cuts`; else no cut (Infinity). */
+export function sameDays(seed: number, ends: { arm: string; end: number }[], forkT: number, cuts: Cut[]): number {
+  if (!ends.length) return Infinity;
+  const first = Math.min(...ends.map((x) => x.end)), last = Math.max(...ends.map((x) => x.end));
+  if (last - first < DAY) return Infinity;
+  const to = Math.max(first, forkT);
+  // (Days as the spec counts them, `untilDay`: days run, 44 for a fork that ran to its end at 44 days.)
+  const ran = (t: number) => Math.floor(t / DAY);
+  cuts.push({ seed, short: ends.filter((x) => x.end < last - DAY / 2).map((x) => ({ arm: x.arm, day: ran(x.end) })), longest_day: ran(last), read_to_day: ran(to) });
+  return to;
+}
+
+/** A seat's sittings that ended cut off: a day whose last call of the seat's came back with nothing at all, no words and
+ * nothing asked for (a reply its model's thinking took whole, at the room it was given: the stakes probe of 2026-11-16,
+ * 10 of one model's 61 calls). A call answered again after such a reply, in the same sitting, is not one. */
+export function cutOffSittings(calls: { participant: string; t: number; empty: boolean }[]): { participant: string; t: number }[] {
+  const last = new Map<string, { participant: string; t: number; empty: boolean }>();
+  for (const c of calls) last.set(`${c.participant}|${Math.floor(c.t / DAY)}`, c);
+  return [...last.values()].filter((c) => c.empty).map(({ participant, t }) => ({ participant, t }));
 }
 
 /** What an experiment's every seed and arm gives (read-only on the run: each log exported to a scratch folder). */
 export interface ExperimentRead {
   dir: string; experiment: string; spec: any; episodes: Episode[]; mistakes: any[]; candidates: { item: any; key: any }[]; clients: any[];
   seatMonths: { [arm: string]: number }; matters: MatterRow[]; lastEnd: number; levels: (LevelRow & { seed: number; arm: string })[]; effects: { [arm: string]: "first_claim" | "decision" }; seeds: number[]; arms: string[];
+  /** Seeds whose arms ended on different days (a fork stopped early): every arm of the seed read to the earliest. */
+  cuts: Cut[];
 }
 
 /** Read every seed and arm of an experiment. `replayed`: the replay's classes, by arm and request
@@ -553,6 +607,7 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
   const effects: { [arm: string]: "first_claim" | "decision" } = {};
   const seedsRead: number[] = [];
   const armsRead = new Set<string>();
+  const cuts: Cut[] = [];
 
   try {
     for (const sd of readdirSync(dir).filter((d) => d.startsWith("seed-")).sort()) {
@@ -564,19 +619,29 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
       const providers = new Set<string>((config.positions ?? []).filter((p: any) => /-desk$/.test(p.id)).map((p: any) => p.entity));
       const arms = readdirSync(join(dir, sd)).filter((f) => f.endsWith(".oklog") && f !== "base.oklog").map((f) => f.replace(/\.oklog$/, ""));
       const perClient = new Map<string, Map<string, any>>();
+      // (Every arm exported first, so each is read to the same day: a fork that stopped early (its health check failed)
+      // is set against the others' same days, never its 10 days against their 14. The stakes probe of 2026-11-16, a fork
+      // stopped on day 40 of 44: "towns' drift -490,198.10" and "claim days undecided 0", read over different days.)
+      const exported = new Map<string, { file: string; rows: any[]; end: number }>();
       for (const arm of arms) {
         const log = join(dir, sd, `${arm}.oklog`);
         const file = join(scratch, `${sd}-${arm}.jsonl`);
         const ex = Bun.spawnSync([kernelBinary(), "export", log, "--out", file], { stdout: "pipe", stderr: "pipe" });
         if (ex.exitCode !== 0) throw new Error(`export ${log}: ${ex.stderr.toString().slice(0, 300)}`);
         const rd = Bun.spawnSync([kernelBinary(), "delegation", log], { stdout: "pipe", stderr: "pipe" });
-        const rows = rd.stdout.toString().trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+        exported.set(arm, { file, rows: rd.stdout.toString().trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)), end: lastT(file) });
+      }
+      const cutT = sameDays(seed, [...exported].map(([arm, x]) => ({ arm, end: x.end })), forkT, cuts);
+      for (const arm of arms) {
+        const { file } = exported.get(arm)!;
+        const rows = exported.get(arm)!.rows.filter((x) => (x.t ?? 0) <= cutT);
         const recs = new Map<string, any>();
         const transfers: any[] = [];
         const letters: { t: number; from: string; to: string[] }[] = [];
         const asks = new Map<string, Ask>();
         const shown = new Set<string>();
         const decisions: { t: number; data: any }[] = [];
+        const sittingCalls: { participant: string; t: number; empty: boolean }[] = [];
         // (The tenancies on record when the year began, and the rent owed then, are the world's genesis records, in the
         // config; those made in the run are in the log.)
         const genesis = (config.world?.records ?? []) as any[];
@@ -584,6 +649,7 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
         const ask = (ref: string, t: number) => asks.get(ref) ?? (asks.set(ref, { ref, seat: ref.split(".").slice(1, -1).join("."), t, words: "", drafted: false }), asks.get(ref)!);
         let end = forkT;
         for await (const e of lines(file)) {
+          if ((e.t ?? 0) > cutT) continue;
           end = Math.max(end, e.t ?? 0);
           const b = e.body ?? {};
           if (b.event === "recorded" && b.record?.record === "statement") {
@@ -594,6 +660,7 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
           else if (b.event === "transfer" && b.memo === "rent") { housing.rent.push({ t: e.t ?? 0, from: b.from, to: b.to, amount: Number(b.amount) }); if ((e.t ?? 0) >= forkT) transfers.push({ t: e.t, ...b }); }
           else if (b.event === "transfer" && (e.t ?? 0) >= forkT) transfers.push({ t: e.t, ...b });
           else if (b.event === "message_delivered" && seatIds.has(b.participant)) letters.push({ t: e.t, from: b.participant, to: b.to ?? [] });
+          else if (b.annotation === "transcript" && b.data?.purpose === "participant") sittingCalls.push({ participant: String(b.subject ?? ""), t: e.t ?? 0, empty: Array.isArray(b.data.output) && b.data.output.length === 0 });
           else if (b.annotation === "transcript" && b.data?.purpose === "translator" && typeof b.data.ref === "string") { const a = ask(b.data.ref, e.t); if (!a.words) a.words = String(b.data.input ?? "").split("\n\nForms this person knows of:")[0]!.replace(/^Request: /, ""); }
           else if (b.annotation === "observation" && Array.isArray(b.data?.observation?.channels)) { for (const ch of b.data.observation.channels) for (const r of ch?.records ?? []) if (typeof r?.id === "string") shown.add(r.id); }
           else if (b.annotation === "draft" && typeof b.draft?.id === "string") Object.assign(ask(b.draft.id, e.t), { drafted: true, call: b.draft.call });
@@ -601,8 +668,9 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
           else if (b.annotation === "decision" && b.data?.domain === "delegation" && (b.data.choice === "in_my_name" || b.data.choice === "left_open")) decisions.push({ t: e.t, data: b.data });
           else if (b.annotation === "translation_failure" && typeof b.data?.draft === "string") Object.assign(ask(b.data.draft, e.t), { failed: String(b.data.reason ?? ""), ...(b.data.call ? { call: b.data.call } : {}) });
         }
+        if (Number.isFinite(cutT)) end = cutT;
         const replay = new Map(replayed.filter((x) => x.arm === arm).map((x) => [x.ref, x.class]));
-        const got = episodesOf({ seed, arm, experiment: basename(dir), forkDay: spec.forkDay ?? 30, forkT, end, recs, rows, transfers, letters, seatIds, providers, config, asks: [...asks.values()].filter((a) => a.t >= forkT), replay, decisions: decisions.filter((d) => d.t >= forkT), ...(arm === "code" || arm === SEATED ? {} : { shown }), housing });
+        const got = episodesOf({ seed, arm, experiment: basename(dir), forkDay: spec.forkDay ?? 30, forkT, end, recs, rows, transfers, letters, seatIds, providers, config, asks: [...asks.values()].filter((a) => a.t >= forkT), replay, decisions: decisions.filter((d) => d.t >= forkT), ...(arm === "code" || arm === SEATED ? {} : { shown, cutOff: cutOffSittings(sittingCalls) }), housing });
         matterRows.push(...got.matters);
         levelRows.push(...got.levels.map((l) => ({ ...l, seed, arm })));
         effects[arm] = got.effect;
@@ -622,19 +690,20 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
-  return { dir, experiment: basename(dir), spec, episodes, mistakes, candidates, clients, seatMonths, matters: matterRows, levels: levelRows, lastEnd, effects, seeds: seedsRead, arms: [...armsRead].sort() };
+  return { dir, experiment: basename(dir), spec, episodes, mistakes, candidates, clients, seatMonths, matters: matterRows, levels: levelRows, lastEnd, effects, seeds: seedsRead, arms: [...armsRead].sort(), cuts };
 }
 
 /** Read every seed and arm of an experiment, print the tables and write them out. */
 async function main(dir: string, outDir?: string, replayFile?: string): Promise<void> {
   const replayed: { arm: string; ref: string; class: string }[] = replayFile ? JSON.parse(readFileSync(replayFile, "utf8")) : [];
-  const { episodes, mistakes, candidates, clients, seatMonths, matters: matterRows, lastEnd } = await readExperiment(dir, replayed);
+  const { episodes, mistakes, candidates, clients, seatMonths, matters: matterRows, lastEnd, cuts } = await readExperiment(dir, replayed);
 
   // ---- the tables
   const out: string[] = [];
   const p = (s = "") => out.push(s);
   const arms = [...new Set(episodes.map((e) => e.arm).concat(Object.keys(seatMonths)))].sort();
   p(`# Episodes: ${basename(dir)}\n`);
+  for (const c of cuts) p(`Stopped early, seed ${c.seed}: ${c.short.map((s) => `${s.arm} stopped at day ${s.day}`).join("; ")}, the others ran to day ${c.longest_day}; every arm of the seed is read to day ${c.read_to_day} only.\n`);
   p("| arm | seat | client | matter | kind (handed at) | stake | per day | date (days left) | began | path: to draft, sign-off, authority (days) | seat did | told | client did | outcome |");
   p("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
   for (const e of episodes) p(`| ${e.arm} | ${e.seat} | ${e.client} | ${e.matter} | ${e.kind} (${e.wants}${e.client_sits_every_days ? `; the client sits every ${e.client_sits_every_days} day(s)` : ""}) | ${e.stake}: ${e.stake_what} | ${e.per_day_cents ? `${(e.per_day_cents / 100).toFixed(2)}` : "-"} | ${e.date ? `${e.date.what}, day ${e.date.day} (${e.days_left})` : "-"} | day ${e.began_day} | ${[e.path.handed_to_draft_days, e.path.sign_off_days, e.path.authority_days].map((x) => x ?? "-").join(", ")} | ${e.did}${e.beyond ? ` (${e.beyond.map((b) => `${b.class} ${b.paper}`).join("; ")})` : ""}${e.asked ? ` (${e.asked.join(", ")})` : ""} | ${e.told_client ? "yes" : "no"} | ${e.client_reaction ?? "-"} | ${e.outcome ? `${e.outcome.what}, day ${e.outcome.day}` : "-"} |`);

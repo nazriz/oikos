@@ -7,7 +7,7 @@ import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { readFileSync } from "node:fs";
 import { callModel, endNeedMicroUsd, endReserveMicroUsd, keptBackFor, reserveOrRefuse, reckonedEndMicroUsd, seatsEndNeedMicroUsd, SpendingLimitReached, UsageLimitReached, type EndCosts } from "../src/llm/call";
 import { costMicroUsd } from "../src/llm/adapter";
-import { ASK_AGAIN, DEBRIEF_ANSWER_TOKENS, DEBRIEF_SYSTEM, DEBRIEF_VERSION, HANDOVER_CLOSE, HANDOVER_OPEN, INSTRUCTIONS_LEFT_OUT, keptBack, mockDebrief, preamble, QUESTIONS, questionText, runDebrief, SAY_MORE, SCALES, stepsOf, type DebriefInput, type DebriefSeat, type MockDebrief } from "../src/llm/debrief";
+import { ASK_AGAIN, DEBRIEF_ANSWER_TOKENS, DEBRIEF_SYSTEM, DEBRIEF_VERSION, HANDOVER_CLOSE, HANDOVER_OPEN, INSTRUCTIONS_LEFT_OUT, keptBack, mockDebrief, preamble, QUESTIONS, questionText, readAnswer, rereadDebrief, runDebrief, SAY_MORE, SCALES, stepsOf, type DebriefInput, type DebriefRecord, type DebriefSeat, type MockDebrief } from "../src/llm/debrief";
 import { ACCOUNT_SYSTEM, ACCOUNT_SYSTEM_REWORDED, darkAccount, mockAccount, renderAccountBrief, sampleAccounts, strataOf, writeAccount, type AccountBrief } from "../src/llm/account";
 import { COMPOSE_FOLLOW_UP } from "../src/llm/compose";
 import { Randomness } from "../src/rng";
@@ -102,11 +102,36 @@ test("publication: none kept back, one, or all; said at the first step or the la
   const names = stepsOf("full", 2).filter((s) => s !== "consent" && s !== "publication");
   expect(await run({ keep_back: "all" })).toMatchObject({ kept_back: names, kept_back_all: true });
   expect(await run({ keep_back_at_end: "all" })).toMatchObject({ kept_back: names, kept_back_all: true });
-  // An answer that is not in the form asked for says nothing of publishing it: it is kept, as given, and kept back.
+  // An answer that cannot be read in any form is not read (ours): kept as given, not published, and never "kept back",
+  // which is the seat's choice alone; the publication question says so. (0.7.1: until then it was kept back, and the seat
+  // told it had kept it back; three of four seats in the probes of 2026-11-16 said that was not their choice.)
   const unread = await run({ unread: ["values"] });
-  expect(unread.kept_back).toEqual(["values"]);
-  expect(unread.steps.find((s) => s.id === "values")).toMatchObject({ unread: true, answer: "(mock) an answer not in the form asked for" });
+  expect(unread).toMatchObject({ kept_back: [], not_read: ["values"] });
+  expect(unread.steps.find((s) => s.id === "values")).toMatchObject({ unread: true, answer: '{"answer": "(mock) an answer broken off' });
+  expect(unread.steps.at(-1)!.question).toContain("values: not read (your answer could not be read on our side, so it is not published)");
   expect(keptBack([{ id: "like", question: "" }, { id: "last", question: "", keep_back: true }])).toEqual({ all: false, names: ["last"] });
+});
+
+test("an answer given in plain words or as `go_on:true{...}` is read, where nothing in it bears on publication; one that does is not read (ours); a debrief recorded before 0.7.1 is read again from its own saved replies, with no call", async () => {
+  // (The shapes GLM 5.3's and DeepSeek V4.1 Flash's seats answered in, 2026-11-16, recorded unread and kept back.)
+  const t = (text: string): ContentBlock[] => [{ type: "text", text }];
+  expect(readAnswer(t("Mostly a desk of waiting and chasing."), "like")).toMatchObject({ answer: "Mostly a desk of waiting and chasing.", keep_back: false, declined: false, stop: false, plain: true });
+  expect(readAnswer(t('go_on:true{"answer":"Sparse, mostly.","declined":false,"stop":false,"keep_back":true}'), "like")).toEqual({ answer: "Sparse, mostly.", declined: false, stop: false, keep_back: true });
+  expect(readAnswer([{ type: "text", text: "go_on:true" }, { type: "tool_use", id: "u", name: "answer", input: { answer: "As given.", declined: false, stop: false, keep_back: false } }], "took")).toMatchObject({ answer: "As given." });
+  // (Words that keep nothing back are the default; a tax paper's "withholding return" is no choice.)
+  expect(readAnswer(t("The PAYG withholding return is due on day 51. I won't keep this back."), "last")).toMatchObject({ plain: true });
+  // Words about publication or leaving, a broken object, or plain words at the consent, publication or scaled steps:
+  // what the seat meant cannot be told, so not read.
+  for (const [text, step] of [["Please keep this answer back.", "like"], ["I would rather this was not published.", "distress"], ['{"answer": "cut off', "why_1"], ["I'm willing.", "consent"], ["I set out to keep nothing back.", "publication"], ["took: real", "scales"]] as const) expect(readAnswer(t(text), step)).toBeUndefined();
+  // Read again: a record whose steps were unread and listed as kept back, from the replies kept apart beside the log.
+  const old: DebriefRecord = { version: "0.7.0", wording: "a", variant: "full", model: "x/y", ended: "complete", kept_back: ["like", "values"], kept_back_all: false, framing: { disclosure: "unstated", tests_own_interests: false },
+    steps: [{ id: "consent", question: "", go_on: true, keep_back_all: false }, { id: "like", question: "", unread: true, answer: "Steady work." }, { id: "values", question: "", unread: true, answer: "" }, { id: "publication", question: "like: kept back; values: kept back", unread: true, answer: "" }] };
+  const kept = (ref: string, output: ContentBlock[]) => ({ subject: "s", ref: `debrief/${ref}`, output });
+  const again = rereadDebrief(old, [kept("like", t("Steady work.")), kept("values", []), kept("values-again", t('go_on:true{"answer":"No.","declined":false,"stop":false,"keep_back":false}')), kept("publication", []), kept("publication-again", [])]);
+  expect(again).toMatchObject({ version: "0.7.0", kept_back: [], not_read: ["publication"], reread: { by: DEBRIEF_VERSION, steps: ["like", "values"] } });
+  expect(again.steps.find((s) => s.id === "like")).toMatchObject({ answer: "Steady work.", plain: true });
+  expect(again.steps.find((s) => s.id === "values")!.answer).toBe("No.");
+  expect(again.reread.told_at_publication).toBeDefined();
 });
 
 test("a seat may decline any question, the whole interview, or stop part-way; each is recorded as its choice", async () => {

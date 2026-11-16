@@ -172,14 +172,15 @@ export class CodexCliAdapter implements LlmAdapter {
         if (n >= attempts || tooLong) throw new Error(`codex exec failed after ${n} attempt${n === 1 ? "" : "s"} (${tooLong ? `the prompt is too long: ${why.slice(0, 300)}` : why})`);
         await Bun.sleep(1000 * 2 ** (n - 1));
       }
-      let usage = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0 };
+      let usage: { input_tokens: number; output_tokens: number; cache_read_tokens: number; reasoning_tokens?: number } = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0 };
       for (const line of r.stdout.split("\n")) {
         if (!line.trim()) continue;
         try {
           const e = JSON.parse(line);
           if (e.type === "turn.completed" && e.usage) {
             const cached = e.usage.cached_input_tokens ?? 0;
-            usage = { input_tokens: (e.usage.input_tokens ?? 0) - cached, output_tokens: (e.usage.output_tokens ?? 0) + (e.usage.reasoning_output_tokens ?? 0), cache_read_tokens: cached };
+            usage = { input_tokens: (e.usage.input_tokens ?? 0) - cached, output_tokens: (e.usage.output_tokens ?? 0) + (e.usage.reasoning_output_tokens ?? 0), cache_read_tokens: cached, ...(typeof e.usage.reasoning_output_tokens === "number" ? { reasoning_tokens: e.usage.reasoning_output_tokens } : {}) };
+            // (The CLI says nothing of why a reply stopped: no stop reason is recorded for it.)
           }
         } catch {
           // not an event line

@@ -24,7 +24,7 @@
 // Errors: the account's credit or quota spent stops the run (CreditExhausted: nothing is bought); a rate limit that
 // outlasts the retries stops it as a usage limit does (UsageLimitReached), to be resumed (`oikos resume <log>`).
 
-import { requestText, type ContentBlock, type LlmAdapter, type LlmRequest, type LlmResponse } from "./adapter";
+import { requestText, stopOf, type ContentBlock, type LlmAdapter, type LlmRequest, type LlmResponse } from "./adapter";
 import { post, type HttpOptions } from "./anthropic";
 import { readAnswerText } from "./answer";
 import { CreditExhausted, UsageLimitReached } from "./call";
@@ -111,7 +111,7 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
   private async ask(req: LlmRequest): Promise<LlmResponse> {
     const mode = this.o.answer ?? "text";
     if (mode === "tools") {
-      const inner = new OpenAICompatibleAdapter("openai-compat", this.hostModel, { ...this.o, tokenField: "max_tokens" });
+      const inner = new OpenAICompatibleAdapter("openai-compat", this.hostModel, { ...this.o, tokenField: "max_tokens", ...(this.host === "openrouter" ? { reasoningBound: true, extraBody: { usage: { include: true } } } : {}) });
       return inner.complete(req);
     }
     const names = (req.tools ?? []).map((t) => t.name);
@@ -128,11 +128,11 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
         max_tokens: req.maxTokens,
         messages: [{ role: "system", content: `${req.system}\n\n${noteGuide(req.tools)}` }, ...chat],
         ...(this.o.temperatureMilli !== undefined ? { temperature: this.o.temperatureMilli / 1000 } : {}),
-        ...(this.host === "openrouter" ? { usage: { include: true } } : {}),
+        ...(this.host === "openrouter" ? { usage: { include: true }, ...(req.reasoningTokens ? { reasoning: { max_tokens: req.reasoningTokens } } : {}) } : {}),
       };
       const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl}/chat/completions`, auth, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
       const said: string = typeof r.choices?.[0]?.message?.content === "string" ? withoutThinking(r.choices[0].message.content) : "";
-      return { content: readNote(said, req.tools, nextId), usage: usageOf(r), said };
+      return { content: readNote(said, req.tools, nextId), usage: usageOf(r), said, ...stopIn(r) };
     }
     const shape = req.answer ? req.answer.schema : answerSchema(names);
     // (Codex's prompt, with its first line, which is about a command-line tool, replaced, and the shape written out.)
@@ -147,7 +147,7 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
       ...(mode === "json" ? { response_format: { type: "json_object" } } : {}),
       ...(this.o.temperatureMilli !== undefined ? { temperature: this.o.temperatureMilli / 1000 } : {}),
       // (OpenRouter reports what a call cost when asked; other hosts ignore the field.)
-      ...(this.host === "openrouter" ? { usage: { include: true } } : {}),
+      ...(this.host === "openrouter" ? { usage: { include: true }, ...(req.reasoningTokens ? { reasoning: { max_tokens: req.reasoningTokens } } : {}) } : {}),
     };
     const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl}/chat/completions`, auth, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
     const said: string = typeof r.choices?.[0]?.message?.content === "string" ? withoutThinking(r.choices[0].message.content) : "";
@@ -171,18 +171,23 @@ export class OpenAICompatHostedAdapter implements LlmAdapter {
       }
       content = words ? [{ type: "text", text: words }] : [];
     } else content = readAnswerText(said, names, nextId);
-    return { content, usage: usageOf(r) };
+    return { content, usage: usageOf(r), ...stopIn(r) };
   }
 }
+
+/** Why the reply stopped, where the host says. */
+const stopIn = (r: any) => { const stop = stopOf(r.choices?.[0]?.finish_reason); return stop ? { stop } : {}; };
 
 /** Tokens as the chat-completions API reports them (cached prompt tokens apart), and the cost where the host reports it. */
 export function usageOf(r: any): LlmResponse["usage"] {
   const cached = r.usage?.prompt_tokens_details?.cached_tokens;
   const cost = r.usage?.cost;
+  const reasoning = r.usage?.completion_tokens_details?.reasoning_tokens;
   return {
     input_tokens: (r.usage?.prompt_tokens ?? 0) - (cached ?? 0),
     output_tokens: r.usage?.completion_tokens ?? 0,
     ...(cached !== undefined ? { cache_read_tokens: cached } : {}),
+    ...(typeof reasoning === "number" ? { reasoning_tokens: reasoning } : {}),
     ...(typeof cost === "number" ? { reported_cost_microusd: Math.ceil(cost * 1e6) } : {}),
   };
 }

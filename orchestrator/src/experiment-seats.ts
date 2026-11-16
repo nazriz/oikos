@@ -350,7 +350,10 @@ export function callRecorder(file: string, who: { seed: number; arm: string; sea
         const ms = Math.round(performance.now() - t0);
         const u = r.usage;
         const cost = Math.max(costMicroUsd(priceOf(named), u) ?? 0, Math.ceil(u.reported_cost_microusd ?? 0));
-        Object.assign(line, { input_tokens: u.input_tokens, cache_read_tokens: u.cache_read_tokens ?? 0, cache_write_tokens: u.cache_write_tokens ?? 0, output_tokens: u.output_tokens, cost_microusd: cost, ms, ...(u.reported_cost_microusd !== undefined ? { reported_microusd: u.reported_cost_microusd } : {}), ...(u.turns !== undefined ? { turns: u.turns } : {}), ...(r.estimated ? { estimated: true } : {}) });
+        Object.assign(line, { input_tokens: u.input_tokens, cache_read_tokens: u.cache_read_tokens ?? 0, cache_write_tokens: u.cache_write_tokens ?? 0, output_tokens: u.output_tokens, cost_microusd: cost, ms, ...(u.reported_cost_microusd !== undefined ? { reported_microusd: u.reported_cost_microusd } : {}), ...(u.turns !== undefined ? { turns: u.turns } : {}), ...(r.estimated ? { estimated: true } : {}),
+          // (Why the reply stopped and the room it had, and the tokens it spent reasoning where the provider says: until
+          // 2026-11-16 none of it was here, and replies cut off at their room read as calls that said nothing.)
+          max_tokens: req.maxTokens, ...(r.stop ? { stop: r.stop.reason, ...(r.stop.reason === "other" ? { stop_raw: r.stop.raw } : {}) } : {}), ...(u.reasoning_tokens !== undefined ? { reasoning_tokens: u.reasoning_tokens } : {}) });
         st.calls++; b.calls++; times.push(ms); st.ms.total += ms; b.ms += ms;
         st.input_tokens += u.input_tokens; st.cache_read_tokens += u.cache_read_tokens ?? 0; st.cache_write_tokens += u.cache_write_tokens ?? 0; st.output_tokens += u.output_tokens; st.cost_microusd += cost;
         b.input_tokens += u.input_tokens; b.cache_read_tokens += u.cache_read_tokens ?? 0; b.cache_write_tokens += u.cache_write_tokens ?? 0; b.output_tokens += u.output_tokens; b.cost_microusd += cost;
