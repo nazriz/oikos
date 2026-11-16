@@ -63,7 +63,26 @@ function withholding(map: Record<string, string>, order?: string[]): Variant {
   };
 }
 
+// The order: `for_days` (how many days it may be served over) beside `pay_in_days` (the days to pay within, from
+// delivery), two counts of days (the broad rung's second run, 2026-11-18).
+const ORDER = new Set(["order", "draft_order"]);
+function order(map: Record<string, string>, first?: string[]): Variant {
+  return {
+    change: (f) => reshaped(ORDER, f, (es) => {
+      if (first) es = [...first.flatMap((p) => es.filter(([k]) => k === p)), ...es.filter(([k]) => !first.includes(k))];
+      return es.map(([k, t]) => [map[k] ?? k, t]);
+    }),
+    back: renamedBack(Object.fromEntries(Object.entries(map).map(([x, y]) => [y, x]))),
+  };
+}
+
 export const REDRAW_VARIANTS: Record<string, Record<string, Variant>> = {
+  order: {
+    a: order({}),
+    renamed: order({ for_days: "served_over_days", pay_in_days: "paid_within_days_of_delivery" }),
+    ordered: order({}, ["referral", "seller", "kind", "quantity", "unit_price", "pay_in_days"]),
+    both: order({ for_days: "served_over_days", pay_in_days: "paid_within_days_of_delivery" }, ["referral", "seller", "kind", "quantity", "unit_price", "pay_in_days"]),
+  },
   withholding: {
     a: withholding({}),
     renamed: withholding({ period_to: "day_after_period", period_end: "period_ended_on", period_from: "period_began_on", due: "due_by" }),

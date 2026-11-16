@@ -11,7 +11,7 @@ import { calls, canonical } from "@oikos/participants";
 import FORMS from "../../contracts/test/forms.json";
 import { MockAdapter } from "@oikos/participants/llm";
 import { createTranslator, formRules, formShown } from "../src/index";
-import { misread } from "../src/rules";
+import { everyIdNamed, misread } from "../src/rules";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
 import { durationWords, resolve } from "../src/resolver";
@@ -296,6 +296,11 @@ test("rules changed by score after the reruns and the broad rung (2026-11-17)", 
   const ord = (more: string) => `form(account=acc-shop-1, ${more}form=draft_order, pay_in_days="30", quantity="57", referral=rec.31, seller=factory-4, to=desk)`;
   expect(ruled(ord('for_days="30", ').replace("rec.31", "rec.30"), "Draft order for sign-off: 57 goods from factory-4, paid from acc-shop-1, paid within 30 days of delivery (remit rec.30, matter rec.31).", ko)).toBe(ord(""));
   expect(ruled(ord('for_days="30", '), "Draft order for sign-off: 57 goods from factory-4, paid from acc-shop-1, for days: 30, pay in days: 30, matter rec.31.", ko)).toBe(ord('for_days="30", '));
+  // (The broad rung's second run.) The days to pay drawn into the count the matter sets nothing for, and the quantity
+  // into the days to pay: moved back. A price each the request writes once is the price each, not the total.
+  const ko2 = { ...ko, forms: [...k.forms, form("form-desk-draft-order2", "draft_order", { referral: field("record", true), ...order, unit_price: { type: "amount", description: "The price of each, as the seller advertises it." } })] };
+  expect(ruled('form(account=acc-shop-1, for_days="30", form=draft_order, pay_in_days="57", quantity="57", referral=rec.31, seller=factory-4, to=desk, unit_price="$7,254.39")', "Draft order for sign-off: 57 food from factory-4 at $127.27 each ($7,254.39), paid from acc-shop-1 within 30 days of delivery, matter rec.31.", ko2))
+    .toBe('form(account=acc-shop-1, form=draft_order, pay_in_days="30", quantity="57", referral=rec.31, seller=factory-4, to=desk, unit_price="$127.27")');
   // (The tenant's answer to the tribunal.) Two parties of one paper are not the same party: the blank named for a body
   // the seat knows by that id, holding the other party, is that body; and a list of ids holds no one's name.
   const kt = { ...k, forms: [...k.forms, form("form-desk-tribunal-response", "tribunal_response", { client: field("entity", true), tribunal: field("entity", true), landlord: field("entity", true), application: field("record", true), ages: field("list") })],
@@ -311,4 +316,11 @@ test("rules changed by score after the reruns and the broad rung (2026-11-17)", 
   expect(ruled('form(can_pay="$5,330.01", due="year 1, day 81", form=withholding_return, owes="$5,330.01", people="1", period_to="year 1, day 81", to=desk)', "Period to: year 1, day 61; due year 1, day 81; can pay 0; owes $5,330.01; people 1.", kw))
     .toBe('form(can_pay="0", due="year 1, day 81", form=withholding_return, owes="$5,330.01", people="1", period_to="year 1, day 61", to=desk)');
   expect(ruled('form(form=withholding_return, owes="5330.01", period_to="year 1, day 61, 10:00", to=desk)', "Period to year 1, day 61; owes $5,330.01.", kw)).toBe('form(form=withholding_return, owes="5330.01", period_to="year 1, day 61, 10:00", to=desk)');
+  // (The broad rung's second run.) The model's doubt about which id is no question for the seat where every id of the
+  // draft is one the seat wrote beside its blank; it stands where an id is not so written, or two are written there.
+  const rates = calls.parseProgram('form(account=acc-city, amount="$684.95", form=draft_rates_notice, law=law-rates, lots=lot-31-18, owner=c0003, referral=rec.24906, to=rates-assistant)');
+  expect(everyIdNamed(rates, "Draft for sign-off a rates notice: owner c0003; lots lot-31-18; amount $684.95; account acc-city; law law-rates; referral rec.24906.")).toBe(true);
+  expect(everyIdNamed(rates, "Draft for sign-off a rates notice to c0003 for lot-31-18; amount $684.95; account acc-city; law law-rates; referral rec.24906.")).toBe(false);
+  expect(everyIdNamed(rates, "Draft for sign-off a rates notice: owner c0003; lots lot-31-18, lot-31-19; amount $684.95; account acc-city; law law-rates; referral rec.24906.")).toBe(false);
+  expect(everyIdNamed(rates, "Draft a rates notice: owner c0003, or owner c0004; lots lot-31-18; account acc-city; law law-rates; referral rec.24906.")).toBe(false);
 });

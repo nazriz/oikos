@@ -23,16 +23,12 @@
           "required": true,
           "type": "entity"
         },
-        "for_days": {
-          "description": "How many days the order may be served over.",
-          "type": "count"
-        },
         "kind": {
           "description": "What is ordered.",
           "required": true,
           "type": "text"
         },
-        "pay_in_days": {
+        "paid_within_days_of_delivery": {
           "description": "Where it is bought on the seller's terms of trade: the days it is paid within, from delivery.",
           "type": "count"
         },
@@ -50,6 +46,10 @@
           "required": true,
           "type": "entity"
         },
+        "served_over_days": {
+          "description": "How many days the order may be served over.",
+          "type": "count"
+        },
         "unit_price": {
           "description": "The price of each, as the seller advertises it.",
           "required": true,
@@ -63,9 +63,9 @@
           "account": "=account",
           "at": "=at",
           "deliver_to": "=deliver_to",
-          "for_days": "=for_days",
+          "for_days": "=served_over_days",
           "kind": "=kind",
-          "pay_in_days": "=pay_in_days",
+          "pay_in_days": "=paid_within_days_of_delivery",
           "quantity": "=quantity",
           "retry_of": "=retry_of",
           "unit_price": "#unit_price"

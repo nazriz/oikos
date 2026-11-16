@@ -15298,3 +15298,46 @@ The whole-town rung 1 run b on Haiku (`runs/scope-broad-r1-b`, health check pass
 - **What was wrong:** a seat's ninth and later requests in one answer were set aside with a line ("only the first 8 things you ask in one answer are taken up") it could miss: at rung 3 three drafts waited 14 to 17 days and one notice was missed in the town run. The 8 (`maxActions`, participant.ts) was a holdover from before acts cost their performer's time (the action budget, `max_actions_per_wake`, was removed for that in the time crate); nothing now needs it: each act takes its own time, in turn.
 - **Decision:** with no limit set for a run (`max_actions` in a seat's params), every action an answer asks for is taken up, in order, in the same sitting; the system prompt no longer names a number. A run may still set a limit, and then those past it are said, as before. Guard: participants/test/llm-answers.test.ts (ten in one answer, all taken up, none dropped).
 - **Revisit if** a model writes runaway lists of requests (dozens in one answer), which would then be a finding to read, not a limit to set silently.
+## 2026-11-18 · Orders: the days to pay and the days to serve over, told apart
+
+- **The measure:** the 24-seat town run `scope-broad-r2` (Haiku, made at 3997f0f0) added:
+  `~/oikos/runs/regress/requests-2026-11-18.json.gz` (5,085 requests in 33 arms, 3,757 confirmed; main's rules: 151
+  differences, all explained before) and `scored-set-2026-11-18.json.gz`. Main on it: 3,868 of 4,398 (87.9%). Three more
+  orders keyed (their confirmed or next-confirmed draw held `for_days` that neither the request nor the matter gives),
+  with the seven of 2026-11-17.
+- **The form, redrawn** (`translator/eval/redraw.ts`, set `order`; 69 real orders, 58 with a target), with the rules
+  below: as it is, `for_days` invented on 51, days to pay right 43 of 51, right 44; blanks renamed
+  (`served_over_days`, `paid_within_days_of_delivery`) 0 invented, right 41; the days to pay placed after the price 50
+  invented, right 46; both 0 invented, days to pay right 57 of 60, right 51 (eight gained, one lost: par.15.4, whose
+  seat wrote "for days 30" and confirmed it). **Landed** (participants/src/shared/papers.ts `ORDER`, and the port
+  kernel/crates/rules/forms/papers.json): both blanks renamed for what they count, the days to pay right after the
+  price. What a paper carries is unchanged (`for_days`, `pay_in_days` in its data: no reader moves); a matter's facts,
+  read back on the form, now name the blanks by their new names. Every world's forms catalogue changes, so pinned config
+  hashes move; the manifests' own older copies of the order form (`participants/manifests/*.json`, without the days to
+  pay) are not touched. The regression check and the score cannot see it (they replay the logged draws on the logged
+  forms).
+- **Rules** (translator/src/rules.ts), each scored, nothing main hit lost:
+
+  | change | right first time | differences |
+  |---|---|---|
+  | main, with the three keys | 3,868 | 151 (explained before) |
+  | `countMoved`: the figure the model put in a count the matter sets nothing for goes to the count it does set out, where that one holds nothing, another blank's figure or no whole number | 3,871 | none |
+  | `priceEach`: an amount whose description is "the price of each", holding another figure the request writes, where the request writes one "<figure> each": that figure, as written | 3,878 | 1, below |
+
+  Explained: stakes r2 "-b" par.3.35, an export invoice confirmed with the total ($271,381.28) as the price each. With
+  the set rebuilt: 3,879. `priceEach` lost 25 on 2026-11-17 for two faults now gone: the figure compared with its
+  separators, and the invoice's total blank, whose description also says "each" ("how many, at the price of each").
+- **Scored and not landed:** "Draft a/an …" in the first words as a draft for sign-off: five confirmed outright papers
+  of the first pilot lost (a seat that writes "Draft a rates notice" can mean the paper itself). Two blanks of different
+  types holding each other's values swapped back (`at`, `deliver_to`): nothing gained. An optional record blank holding
+  the paper's own referral left empty (`retry_of`): one gained, two lost.
+- **The readers' questions, answered:** "$2.72 could not be read as a number" (and "30 days") is the resolver refusing a
+  price in the days-to-pay count: a consequence of the swap, now moved back where the matter says which count it is.
+  "It isn't clear which one you mean" on correct rates notices is our model's own unsureness about an id, under its
+  cut-off (`unsure: which`), offered with the draft (translator/src/arrangement.ts, `alone`), on 171 requests of the run;
+  on the rates notices every id it wrote is one the request writes verbatim. Proposed, not done: where every id of the
+  draw is written in the request by the blank's name, the "which" notice is not said (a change to what the seat is
+  told, which the score cannot measure). A draft first drawn as the outright paper: of 33 such first draws in the run,
+  the rules now redraw 30 onto the draft form; three are left, each "Draft a supply request …" or "Draft an order …"
+  with no "for sign-off", which the rules do not read as a draft (above: seats at other posts mean the paper itself).
+- **Revisit if** a matter sets out a count the paper's other count should take, or seats start writing the new names.
