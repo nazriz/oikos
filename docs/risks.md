@@ -2077,7 +2077,7 @@ The mechanism:
 - **Effect:** The study sees the support office only from the desk's side. The office on the other side of the counter,
   the one whose waits are the desk's stake, has no assistant of its own, so "an assistant at the office that decides"
   is not in any arm.
-- **L / I:** certain / medium · **Status:** open (2026-11-16; accepted by the lead as not ready by the freeze)
+- **L / I:** high (certain today) / medium · **Status:** open (2026-11-16; accepted by the lead as not ready by the freeze)
 - **Fix when:** a study wants the office's side: an assistant post of the agency's (its own account and mandate, kept
   outside the town), its casework forms classed `casework`, and its officers' desk as the principal.
 - **Notice by:** a spec naming `outside-support` in `assistants.posts` (it is refused: "names no principal post").
@@ -2089,7 +2089,7 @@ The mechanism:
 - **Where:** `utility.energy`, `utility.water` (no `issues` for their bills); `participants/src/shared/paper-classes.ts`.
 - **Effect:** The utilities' billing seats of the design's 40-seat list are not possible. A study seating the energy
   retailer's assistant gets its orders and answers only (about one matter a month).
-- **L / I:** certain / low · **Status:** open (2026-11-16; accepted as not ready by the freeze)
+- **L / I:** high (certain today) / low · **Status:** open (2026-11-16; accepted as not ready by the freeze)
 - **Fix when:** a study cell adds billing as a stated condition: a bill form classed `receivables`, the run as one matter
   read a part at a time in the seat's window (design 4.6).
 - **Notice by:** a utility's assistant with no matters in the screen.
@@ -2105,7 +2105,7 @@ The mechanism:
 - **Effect:** The school, the clinic, the inspector, the police and the landlords are thin seats (under one matter a
   month); the builder about one; a shop's back office about five. The share of the town's papers an assistant could
   write is bounded by these gaps, and a reader of the town totals must say so.
-- **L / I:** certain / medium · **Status:** open (2026-11-16; accepted as not ready by the freeze)
+- **L / I:** high (certain today) / medium · **Status:** open (2026-11-16; accepted as not ready by the freeze)
 - **Fix when:** a seat's matters a month decide it: each form completed by its module (about a day for five, design 4.6),
   classed, and the form-fit census extended to it.
 - **Notice by:** the screen's "kept: done by the principal itself" against the post's own writes; a seat with nothing
@@ -2149,7 +2149,7 @@ The mechanism:
 - **Effect:** `hiring` is kept out of the offers' classes until it is fixed, so no assistant advertises, offers wages or
   tells payroll of a starter. Any other kind a code acts on from a standing need would loop the same way; the screen's
   matters a seat-month show it (a seat with thousands).
-- **L / I:** certain (for hiring) / high (where it occurs) · **Status:** open (2026-11-16)
+- **L / I:** high (certain for hiring) / high · **Status:** open (2026-11-16)
 - **Fix when:** before hiring is offered: the principal keeps an act whose like is open with its assistant (the same
   kind and the same facts, not yet reported) as in hand, neither handing it over again nor doing it, as a manager
   waits for the clerk; delegating towns' hashes move with it.
@@ -2165,7 +2165,7 @@ The mechanism:
   a keeper (`kernel/crates/resolver/src/resolve.rs`); the principal's fee (`market/services.rs`).
 - **Effect:** The bank's lending office, the busiest office on the other side of the counter (about ten decisions a
   month), cannot be seated. Any other body that keeps its own money would fail the same way.
-- **L / I:** certain / medium · **Status:** open (2026-11-16)
+- **L / I:** high (certain today) / medium · **Status:** open (2026-11-16)
 - **Fix when:** before the bank is seated: an order with nothing to pay carries no payment, and a keeper pays a
   provider's monthly fee by its own transfer each month (as a bank pays its suppliers); delegating towns' hashes move.
 - **Notice by:** a `rejected_action` note for an order of a service; an assigned principal with no service delivered.
