@@ -1394,7 +1394,9 @@ impl RecordFilter {
         // draft to its office is not on another assistant's file because both work for the town. The whole-town rung 1:
         // the inspector's, the finance office's and the planning office's assistants were shown the rates assistant's
         // drafts, addressed to the town and so to no post of it. 2026-11-16.)
-        if rec.position.as_deref().is_some_and(|p| post_of(p).as_deref() == Some(me)) {
+        // (Only a paper to the organisation itself: one another post sends out to someone else (the provider's sales post's
+        // service delivery to a client) is the organisation's dealings, shown as ever.)
+        if rec.position.as_deref().is_some_and(|p| post_of(p).as_deref() == Some(me)) && !to.is_empty() && to.iter().all(|x| x.as_str() == me) {
             return false;
         }
         ours.is_empty()
