@@ -340,12 +340,12 @@ const RULES: { [name: string]: Standing } = {
   // redraws onto another form
   question: "redraw", sendAgain: "redraw", sendSigned: "redraw", signedCopySent: "redraw", draftForm: "redraw",
   // the seat names outright
-  formById: "named", namedChoice: "named", namedDate: "named", namedFigure: "named", entityWith: "named", namedValue: "named", leftEmpty: "named",
+  formById: "named", namedChoice: "named", namedDate: "named", namedFigure: "named", priceEach: "correct", entityWith: "named", namedValue: "named", leftEmpty: "named",
   // fills what is empty
   matterNamed: "fill", referralOfKind: "fill", recordNamed: "fill",
   // corrects what is plainly contradicted
   office: "code", client: "code",
-  authorityGiven: "correct", notARecord: "correct", referralIsOrder: "correct", referralNotHanded: "correct", figureOnce: "correct", partyNamed: "correct", nameInList: "correct", copyNotHeld: "correct",
+  authorityGiven: "correct", notARecord: "correct", referralIsOrder: "correct", referralNotHanded: "correct", figureOnce: "correct", countMoved: "correct", partyNamed: "correct", nameInList: "correct", copyNotHeld: "correct",
   recordInWords: "correct", recordsOwnWords: "correct", papersOwnWords: "correct", handOverWords: "correct",
   letterAgain: "correct",
 };
@@ -566,6 +566,14 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       // (An amount or a count the request names with its figure, "can pay 0", "people 1": that figure; one the model
       // wrote as the same figure stands as written. The stakes run's rung 3: the tenant's answer drawn with `can_pay` as
       // the whole sum owed on 63 tries, 60 of them where the request said "can pay 0".)
+      // (An amount for the price of each, by its own description, holding another figure the request writes, where the
+      // request writes exactly one "<figure> each": that figure, as written. Tried on 2026-11-17 without the written form
+      // kept and lost 25; again on 2026-11-18, the broad rung's second run: six orders with the total as the price each.)
+      if (t.type === "amount" && /^the price of each\b/i.test((t as { description?: string }).description ?? "") && !locked.has(field) && !namedFigure(request, field)) {
+        const each = [...new Set([...request.matchAll(/((?:[^\sA-Za-z0-9,.;:()"'])?[0-9](?:[0-9.,]*[0-9])?)\s+each\b/g)].map((m) => m[1]!))];
+        const had = argText(args[field]);
+        if (each.length === 1 && had !== undefined && figure(had) !== figure(each[0]!) && request.includes(had.replace(/^["']|["']$/g, ""))) edit("priceEach", field, { text: each[0]! });
+      }
       if ((t.type === "amount" || t.type === "count") && !locked.has(field)) {
         const fig = namedFigure(request, field);
         const had = argText(args[field]);
@@ -651,6 +659,19 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     // 30 beside `pay_in_days` 30; the matter gives the days to pay and no days to serve over, and the principal declined
     // the draft for it and placed the order itself.)
     const facts = k.referralFacts?.get(argText(args.referral) ?? "");
+    // (And the figure the model put in a count the matter sets out nothing for goes to the count it does set out, where
+    // that one holds nothing, another blank's figure, or no whole number: the broad rung's second run, 2026-11-18, "paid
+    // ... within 30 days of delivery" drawn as `for_days` 30 with `pay_in_days` the quantity, or the price.)
+    if (facts) for (const [field, t] of Object.entries(fields)) {
+      const v = argText(args[field]);
+      if (t.type !== "count" || t.required || v === undefined || facts.has(field) || locked.has(field) || new RegExp(`\\b${spoken(field)}\\b`, "i").test(request)) continue;
+      const g = Object.keys(fields).find((x) => {
+        if (x === field || !facts.has(x) || fields[x]!.type !== "count" || fields[x]!.required || locked.has(x)) return false;
+        const w = argText(args[x]);
+        return w === undefined || !/^[0-9][0-9,]*$/.test(w.trim()) || Object.keys(fields).some((y) => y !== x && y !== field && argText(args[y]) === w);
+      });
+      if (g && /^[0-9]+$/.test(v.trim())) { edit("countMoved", g, { text: v }); edit("countMoved", field, undefined); }
+    }
     if (facts) for (const [field, t] of Object.entries(fields)) {
       const v = argText(args[field]);
       // (Counts only: on a delivery note `unit_price` beside `price_each` is one sum the form asks for twice, and seats
