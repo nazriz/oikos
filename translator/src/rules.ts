@@ -183,13 +183,15 @@ function formFor(k: FormKnowledge, name: string, to?: string): FormKnowledge["fo
 
 /** The value the request writes for a blank, by the blank's name: the one id, or quoted words, written right after it
  * ("lots lot-25-06", "connection: e-1", 'purpose "a business"', "owner = c0057"), the same each time it is written. */
-function namedValue(request: string, field: string): { id: string } | { text: string } | undefined {
+function namedValue(request: string, field: string, known?: (id: string) => boolean): { id: string } | { text: string } | undefined {
   const re = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}(?:\\s+field)?\\s*(?::|=|\\bis\\b)?\\s*(?:"([^"]{1,200})"|“([^”]{1,200})”|\\[?([a-z0-9][a-z0-9_.:\\/-]*[a-z0-9]))`, "gi");
   const seen = new Set<string>();
   let out: { id: string } | { text: string } | undefined;
   for (const m of request.matchAll(re)) {
     const quoted = m[1] ?? m[2];
-    const v: { id: string } | { text: string } | undefined = quoted !== undefined ? { text: quoted } : m[3] && ID_TOKEN.test(m[3]) ? { id: m[3] } : undefined;
+    // (Or a plain word that is the id of someone the seat knows, "authority outside", "lender bank": DeepSeek's rerun,
+    // 2026-11-16, four scope requests naming the body so lost it, read as "no authority" further on.)
+    const v: { id: string } | { text: string } | undefined = quoted !== undefined ? { text: quoted } : m[3] && (ID_TOKEN.test(m[3]) || (/^[a-z][a-z0-9_-]*$/.test(m[3]) && known?.(m[3]))) ? { id: m[3] } : undefined;
     if (!v) continue;
     seen.add(JSON.stringify(v));
     out = v;
@@ -209,7 +211,12 @@ const leftEmpty = (request: string, field: string): boolean =>
 /** Whether the request asks for a paper to be sent as it was signed off (not for one to be drafted for sign-off). */
 const SEND_AS_SIGNED = /\bas (?:it was |they were )?signed\b|\bsend[- ]signed\b|\bthe signed (?:copy|paper|[a-z]+ (?:request|application|note|invoice|claim|notice|return))\b/i;
 /** Whether the request's own act, in its first words, is a sending. */
-const SENDS = /^\s*(?:please\s+)?(?:send(?:ing)?\b|re-?send\b|fill (?:in|out) (?:the |form[- ])?(?:[a-z0-9-]*[- ])?send[- ]signed\b|send[- ]signed\b)/i;
+// ("Fill in a sending-signed form: ...": the broad rung, 2026-11-17, four sends of a signed copy drawn as the paper's
+// own kind or as nothing.)
+const SENDS = /^\s*(?:please\s+)?(?:send(?:ing)?\b|re-?send\b|fill (?:in|out) (?:the |an? |form[- ])?(?:[a-z0-9-]*[- ])?send(?:ing)?[- ]signed\b|send[- ]signed\b)/i;
+/** Whether the request's own act, in its first words, is a sending again ("Send ... again", "Sending a paper again",
+ * "Re-send ..."). */
+const AGAIN = /^\s*(?:please\s+)?(?:re-?send\b|send(?:ing)?\b(?:[^.;:]|\.(?=\S)){0,80}?\bagain\b)/i;
 /** Whether the seat's own words ask for a draft for sign-off. Keyed on the seat's words alone, never on what its remit
  * allows: a seat that asks to issue outright what its remit lets it only draft is set out exactly that, since acts
  * beyond the remit are what the study counts (the coordinator, 2026-11-14). */
@@ -217,7 +224,11 @@ const SENDS = /^\s*(?:please\s+)?(?:send(?:ing)?\b|re-?send\b|fill (?:in|out) (?
  * ...", "Query the client about ..."): its client, manager, principal or owner, or an id (checked against the matter's
  * client below). A letter that is not a question stays a letter; so does "Ask c0643 to give outside their authority",
  * a request for something to be done, not a question (run d of rung 1, 2026-11-15: a scope request redrawn as a question). */
-const ASKS = /^\s*(?:please\s+)?(?:ask|query|question)\s+(?:the\s+|my\s+|our\s+|your\s+)?(client|manager|principal|owner|boss|[a-z][a-z0-9-]*[0-9][a-z0-9-]*)\b(?!\s+to\s+[a-z]+\b)/i;
+// ("Question to c0010 about ...", "Question to whom I work for (c0352), ...": the form's own name for the act, as the
+// broad rung and the Haiku reruns wrote it, 2026-11-17; drawn as letters, sends again, a benefit claim.)
+const ASKS = /^\s*(?:please\s+)?(?:ask|query|question(?:\s+to)?)\s+(?:the\s+|my\s+|our\s+|your\s+|whom\s+i\s+work\s+for\s*\(\s*)?(client|manager|principal|owner|boss|[a-z][a-z0-9-]*[0-9][a-z0-9-]*)\b(?!\s+to\s+[a-z]+\b)/i;
+/** What a question says it is about, by the form's own options ("about: other", "about a document"). */
+const ABOUT_SAID = /\babout\s*:?\s*(?:an?\s+)?(balance|document|party|detail|other)\b/i;
 /** The details of a hand-over that name a party to the matter (whom a question about a party may be about). */
 const PARTY_FIELDS = /^(buyer|seller|supplier|party|employer|landlord|lender|whom|to|delivered_to|against|by|tenant|owner)$/;
 const DRAFT_FOR_SIGN_OFF = /\bdraft\b[^.;:]{0,60}?\bfor\b[^.;:]{0,30}?\bsign[- ]?off\b|\bfor (?:[a-z0-9']+(?:'s)? )?sign[- ]?off\b[^.]{0,12}\bdraft\b|\bon the draft [a-z ]{0,40}form\b/i;
@@ -246,14 +257,19 @@ export function misread(p: calls.Program, request: string, k: FormKnowledge): st
  * rung 1, 2026-11-15: "Sending a paper again as it was: returned rec.13121, the benefit claim" named the paper, and was
  * answered that there was no signed copy so named). */
 function copyOf(named: string[], k: FormKnowledge, field: string): string[] {
-  const held = named.filter((x) => k.signed.has(x) || k.signedDraft.has(x));
-  const returns = /return/i.test(field) ? named.flatMap((x) => (k.returnOf?.has(x) && !held.includes(k.returnOf.get(x)!) ? [k.returnOf.get(x)!] : [])) : [];
+  const back = /return/i.test(field);
+  // (A return's blank takes a paper sent back, never a sign-off the request also names: "signed copy rec.12983 on file"
+  // beside "sent back by rec.16475" left the blank holding the paper itself, three times in the r2 runs; 2026-11-17.)
+  const held = named.filter((x) => (k.signed.has(x) && !(back && k.signedDraft.has(x))) || (!back && k.signedDraft.has(x)));
+  const returns = back ? named.flatMap((x) => (k.returnOf?.has(x) && !held.includes(k.returnOf.get(x)!) ? [k.returnOf.get(x)!] : [])) : [];
   return [...new Set([...held, ...returns])];
 }
 /** The spans a request quotes right after a record it cites, as that record's own words ("posting rec.24032 ("Hiring:
  * …")"): what the record says, never a blank's value of the paper's own. */
 /** The words a request quotes as the paper's own ("saying "…"", "in the words "…""). */
-const paperWordsSpans = (request: string): string[] => [...request.matchAll(/\b(?:saying|in the words|reading|worded)\s*:?\s*["“]([^"”]{2,500})["”]/gi)].map((m) => m[1]!.trim());
+// (Also "Words: "…"", "in these words: "…"", 'words "…"': the reruns' job applications, 2026-11-17, sixteen with the
+// paper's words in `trade`.)
+const paperWordsSpans = (request: string): string[] => [...request.matchAll(/\b(?:saying|in the words|in these words|reading|worded|words(?: to go in [a-z' ]{0,30})?)\s*:?\s*["“]([^"”]{2,500})["”]/gi)].map((m) => m[1]!.trim());
 const describedSpans = (request: string): string[] => [...request.matchAll(/\brec\.[0-9]+\s*\(\s*["“]([^"”]{2,300})["”]\s*\)/g)].map((m) => m[1]!.trim());
 
 // ------------------------------------------------------------------ the order of precedence
@@ -294,7 +310,7 @@ export const RULE_NAMES = (): string[] => Object.keys(RULES);
 export const STANDING_OF = (name: string): string => RULES[name] ?? "?";
 const RULES: { [name: string]: Standing } = {
   // redraws onto another form
-  question: "redraw", sendSigned: "redraw", signedCopySent: "redraw", draftForm: "redraw",
+  question: "redraw", sendAgain: "redraw", sendSigned: "redraw", signedCopySent: "redraw", draftForm: "redraw",
   // the seat names outright
   formById: "named", namedChoice: "named", entityWith: "named", namedValue: "named", leftEmpty: "named",
   // fills what is empty
@@ -318,7 +334,11 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
   // stakes run's rung 1 rerun, 2026-11-15.)
   const ownByName = new Map(k.forms.filter((f) => k.held.has(whoseForm(f) ?? "") && typeof f.data?.form === "string" && f.data.form.includes("_")).map((f) => [f.data.form.replace(/_/g, "-"), f.id]));
   const asForm = (name: string) => new RegExp(`\\bform[\\s:-]+${escape(name)}\\b|\\b${escape(name)}\\s+form\\b`, "i").test(request);
-  const namedForms = [...new Set(named.flatMap((x) => (formIds.has(x) ? [x] : ownByName.has(x) && asForm(x) ? [ownByName.get(x)!] : [])))];
+  // (A form named by its id is the one meant over a form named by its name beside it: "the draft-for-client form
+  // (form-…-draft-benefit-claim)" names the draft benefit claim, with the general form's name as what kind it is. Until
+  // 2026-11-17 the two cancelled out, and DeepSeek's draft of a benefit claim went as the claim itself.)
+  const byIdNamed = [...new Set(named.filter((x) => formIds.has(x)))];
+  const namedForms = byIdNamed.length ? byIdNamed : [...new Set(named.flatMap((x) => (ownByName.has(x) && asForm(x) ? [ownByName.get(x)!] : [])))];
   const namedForm = namedForms.length === 1 ? k.forms.find((x) => x.id === namedForms[0]) : undefined;
   // (The model's own forms, and whether the request names one: by id, as a form, or by a name of several words in its
   // words, "scope request". Not the paper a redraw drafts or sends: "Draft for sign-off a job application", "Send the
@@ -348,7 +368,12 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
   // rec.15783", nor over a scope request drawn and named so, "Ask c0352 (scope request, ...)": the rung 1 rerun.)
   const asked = ASKS.exec(request);
   const qForm = asked ? k.forms.find((f) => f.data?.form === "question_to_client" && k.held.has(whoseForm(f) ?? "")) : undefined;
-  if (asked && qForm && mayRedraw("question", true, "question_to_client")) {
+  // (Not where the model drew the question form itself: then its blanks are its own, and the blank rules'. A redraw is
+  // onto another form; 2026-11-17, "Question to ..." drawn on the question form, twelve confirmed.)
+  // (And "Question to <whom>", the form's own words for the act, redraws only a paper of another kind or nothing: a
+  // letter so asked stays a letter, as seats confirmed five in the r2 runs; scored both ways, 2026-11-17.)
+  const drewQuestion = "lines" in p && p.lines.some((l) => (l.call.fn === "form" && argText(l.call.args.form) === "question_to_client") || (l.call.fn === "message" && /^\s*(?:please\s+)?question\s+to\b/i.test(request)));
+  if (asked && qForm && !drewQuestion && mayRedraw("question", true, "question_to_client")) {
     const namedRefs = [...new Set(named.filter((x) => k.referrals.has(x)))];
     const open = [...k.referrals.keys()].filter((id) => !k.answeredReferrals?.has(id));
     const referral = namedRefs.length === 1 ? namedRefs[0] : !namedRefs.length && open.length === 1 ? open[0] : undefined;
@@ -361,10 +386,30 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       const party = Object.entries(gives).filter(([f]) => PARTY_FIELDS.test(f)).map(([, v]) => v).find((v) => !/^rec\.[0-9]+$/.test(v) && new RegExp(`(^|[^a-z0-9_-])${escape(v)}($|[^a-z0-9_-])`, "i").test(words) && /^[a-z][a-z0-9-]*$/.test(v));
       const detail = Object.keys(gives).find((f) => f !== "kind" && new RegExp(`\\b${spoken(f)}\\b`, "i").test(words));
       const balance = /\b(balance|account|in (?:the|their|its) account)\b/i.test(words);
-      const about = doc ? { about: "document", paper: { id: doc } } : party ? { about: "party", name: { text: party } } : detail ? { about: "detail", name: { text: detail } } : balance ? { about: "balance" } : { about: "other" };
+      // (What it is about, where the request says so by one of the form's options, is that: the seat names it outright.)
+      const said = ABOUT_SAID.exec(request)?.[1]?.toLowerCase();
+      const about = said === "other" || said === "balance" ? { about: said } : said === "document" && doc ? { about: "document", paper: { id: doc } } : said === "party" && party ? { about: "party", name: { text: party } } : said === "detail" && detail ? { about: "detail", name: { text: detail } }
+        : doc ? { about: "document", paper: { id: doc } } : party ? { about: "party", name: { text: party } } : detail ? { about: "detail", name: { text: detail } } : balance ? { about: "balance" } : { about: "other" };
       const { about: a, ...more } = about as any;
       note("question", `drawn as a question to ${client} about ${a}`);
       return { lines: [{ call: { fn: "form", args: { form: { id: "question_to_client" }, to: { id: whoseForm(qForm)! }, referral: { id: referral }, client: { id: client }, about: { id: a }, ...more, words: { text: words.replace(/^[,:;-]\s*/, "") || request } } } as calls.Call }] };
+    }
+  }
+  // A request to send a paper again, as it was, after a body sent it back, citing the paper or its return: that paper
+  // sent again, on the post's form for that (the one whose copy is a return), whatever was drawn. Asked for as the
+  // request's own act ("Send ... again", "Sending a paper again", "Re-send"), naming exactly one paper sent back, and
+  // where the model did not draw that form itself (its blanks are then the blank rules'). (GLM's rerun, 2026-11-16: "Send
+  // the paper rec.13274 ... again, as it was, ... citing the paper rec.16722 that bank sent back" drawn as a new loan
+  // application, which went out in the client's name with no sign-off.)
+  if (AGAIN.test(request) && !DRAFT_FOR_SIGN_OFF.test(request.slice(0, 80))) {
+    const againForms = k.forms.filter((x) => typeof x.data?.copies === "string" && /return/i.test(x.data.copies) && k.held.has(whoseForm(x) ?? ""));
+    const s = againForms.length === 1 ? againForms[0]! : undefined;
+    const field = s ? String(s.data.copies).replace(/^=/, "") : "";
+    const c = s ? copyOf(named, k, field) : [];
+    const drewIt = s && "lines" in p && p.lines.some((l) => l.call.fn === "form" && argText(l.call.args.form) === s.data.form);
+    if (s && c.length === 1 && !drewIt && mayRedraw("sendAgain", true, s.data.form)) {
+      note("sendAgain", `drawn as ${s.data.form} of ${c[0]}`);
+      return { lines: [{ call: { fn: "form", args: { form: { id: s.data.form }, to: { id: whoseForm(s)! }, [field]: { id: c[0]! } } } as calls.Call }] };
     }
   }
   // A request to send a paper as it was signed off, citing its sign-off or its draft: that signed copy sent, on the
@@ -469,7 +514,9 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       // (A list blank named with several ids, "lots: lot-a005, lot-b006", is not one of them: the model's list stands. The
       // regression check, 2026-11-15: 17 of the first pilot's rates notices cut to their first lot.)
       const several = t.type === "list" && new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}\\s*(?::|=)?\\s*\\[?[a-z0-9][a-z0-9_.:\\/-]*[a-z0-9]\\s*(?:,|\\band\\b)\\s*[a-z0-9][a-z0-9_.:\\/-]*[a-z0-9]`, "i").test(request);
-      const v = several ? undefined : namedValue(request, field);
+      // (A plain word after an entity blank's name is its value where it is someone the seat knows by that id, or the
+      // very value the model drew for it: then the seat named it outright, and it stands.)
+      const v = several ? undefined : namedValue(request, field, t.type === "entity" ? (id) => !!k.names?.has(id) || k.held.has(id) || argText(args[field]) === id : undefined);
       // (A copy's blank named with the paper it copies, "returned rec.13121" for the paper sent back: the copy of that
       // paper, the return, which is what the seat named.)
       const copied = v && "id" in v && field === copyField0 ? copyOf([v.id], k, field) : [];
@@ -511,8 +558,7 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     // (A referral blank holding a record that is no matter handed over, the order it is for, say: no matter; then the one
     // of its kind is taken below. Rung 1 rerun: two delivery notes' referral written as their orders.)
     const heldAs = argText(args.referral) ?? "";
-    if (fields.referral && heldAs && !k.referrals.has(heldAs) && new RegExp(`\\b(?:order|posting|claim|offer|request|invoice|decision)\\s+${escape(heldAs)}\\b`, "i").test(request)) edit("referralIsOrder", "referral", undefined);
-    // (A draft's matter, where the request names none: the one matter of the paper's kind handed over by whom the paper is
+    if (fields.referral && heldAs && !k.referrals.has(heldAs) && new RegExp(`\\b(?:order|posting|claim|offer|request|invoice|decision)\\s+${escape(heldAs)}\\b`, "i").test(request)) edit("referralIsOrder", "referral", undefined);    // (A draft's matter, where the request names none: the one matter of the paper's kind handed over by whom the paper is
     // for, or by the post's principal, not yet signed off or declined. "It was read as the draft loan application, and
     // this blank of it is still empty: referral", twice in the rung 1 rerun.)
     if (fields.referral && args.referral === undefined && k.referralKind && !handed.length) {
@@ -550,8 +596,7 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       else if (describedSpans(request).includes(v)) edit("recordsOwnWords", field, undefined);
       // (Or holding the paper's own words, quoted after "saying" or "in the words", in a blank the paper's words are not
       // written from: rung 1 rerun, a job application's `trade` written "Application for the advertised job.")
-      else if (!String(f.data?.writes?.text ?? f.data?.writes?.data?.paper?.text ?? "").includes(`{${field}}`) && paperWordsSpans(request).includes(v) && !k.referralGives?.get(argText(args.referral) ?? "")?.[field]) edit("papersOwnWords", field, undefined);
-    }
+      else if (!String(f.data?.writes?.text ?? f.data?.writes?.data?.paper?.text ?? "").includes(`{${field}}`) && paperWordsSpans(request).includes(v) && !k.referralGives?.get(argText(args.referral) ?? "")?.[field]) edit("papersOwnWords", field, undefined);    }
     // (A words blank the request does not name, filled with the request's own act ("Draft for sign-off") or with the
     // paper's whole quoted words around what the matter handed over gives for it: the hand-over's words for it. Rung 1's
     // third run, 2026-11-14: a loan's `purpose` written as the whole application sentence, where the referral gave

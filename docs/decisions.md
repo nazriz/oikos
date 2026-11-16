@@ -15051,3 +15051,65 @@ The merge's slow tier refused `claim-told` on three tests. Two were faults the t
 - **A charge whose notice never came** (`citizen/absorb.rs`, `letters`; `citizen/money.rs`, `told`, `Money.told_by_letter`). Checked every kind of claim `recorded_against` pays, and who tells of each: rates, by the notice written in the same act (the rates office, or its system), or by its assistant's notice later; rates interest, by the claim it is made on, and by the letter the rates office writes with it ("Rates of ... are overdue; interest ... has been added", citing the rates); a fine, by the demolition order in the same act. The one way a charge could go unpaid for ever: rates whose notice an assistant or a seat never sends. Rates overdue a month draw interest, and the office writes to the owner about them then; that letter is a letter (a message), not a record, so `told` did not count it. Now a letter from a charge's holder about the charge (its `re`) tells as a notice would, so such rates are paid from the first overdue letter, a month after their due day. A fine with no order, or rates with neither notice nor interest (an office with no penalty interest that never sends the notice), are never told: the owner does not know of them, which is the world's, and the office's own books show them unpaid.
 - **A seat's notebook named its preview by the platform's id** (`participants/src/llm/participant.ts`; assistants-fork). A reason given with a confirm or decline is written in the seat's notebook as "Day 61, why I confirmed draft.provider-a-desk-system.1": the ref as the call gave it, which the mock gives as the preview's own id. The notebook is shown back to the seat. It is now named as the seat was shown it (`askRef`: "ask-1"). The town's new course only brought a desk confirmation with a reason inside the test's window; the leak was there before. seat-welfare's test had pinned the leaked form and now pins "ask-1".
 - **entry's founder chose the business on a draw** (`orchestrator/test/entry.test.ts`, set-up only). The founder the test gives the savings to valued none of what draws a person to start a business (`wk_enterprise`), so founding scored below life as it was each month and came only on a draw: day 101 before, day 228 on this branch, too late for the shop to serve by day 240. The test is of what follows a founding (the title passes, the shop hires and trades), so its founder is now one who values doing things of their own, new things and getting on (`own_values`), and founds at the first weighing after the premises are listed.
+
+## 2026-11-17 · The translator by score: the reruns in the scored set, and seven rule changes
+
+- **Why:** readers of the reruns and the broad rung saw the translator draw papers of the wrong kind (a resend as a new
+  loan application that went out unsigned; a draft of a benefit claim as the claim; questions to a client as resends and
+  claims). The standing rule holds: nothing lands unless the scored set's score holds or rises and the regression check
+  is at zero, or each difference is explained here.
+- **The measure.** The extract rebuilt with every real-model run since the last build: the stakes reruns (situation,
+  situation-b, GLM 5.3 b and c, DeepSeek V4.1 Flash b, c and d, gpt-6-luna, qwen2.5-14b) and the broad rung (Haiku, nine
+  seats), beside the runs it held: 2,424 requests in 25 arms, 1,600 confirmed; main's rules on it: 134 differences, all
+  explained already. Kept beside the old, dated: `~/oikos/runs/regress/requests-2026-11-17.json.gz` and
+  `scored-set-2026-11-17.json.gz` (the gate's `requests.json.gz` and `scored-set.json.gz` are left as they were: put the
+  dated ones in their place when this lands; main's rules pass the gate's two checks on them too, unchanged). The set:
+  1,854 requests with a target, main's rules 1,632 right first time (88.0%; the last build, 1,154 of 1,280, 90.2%).
+- **A fault in the set, fixed first** (`translator/eval/score.ts`, `actOf`): "Fill in a sending-signed form …" and
+  "Fill in a report form …" were both the act "fill" (the article "a" and "sending-signed" were not read), so the broad
+  rung's four sends of a signed copy took a later report as their target. Now 1,865 with a target (eleven more of the
+  broad rung's questions to a client find their later confirmed question); main 1,632 (87.5%). The baseline below.
+- **The changes**, each scored on the whole set, against main's hits (none lost), regression check over the new extract:
+
+  | change (translator/src/rules.ts) | right first time | apart from words blanks | differences |
+  |---|---|---|---|
+  | main, on the set | 1,632 | 1,684 | 134 (explained before) |
+  | a return's blank takes a paper sent back, never a sign-off also named (`copyOf`) | 1,634 | 1,686 | none new |
+  | `sendAgain`: "Send … again, as it was", one paper sent back named, drawn as another paper or nothing: the send again | 1,641 | 1,693 | 1, below |
+  | a form named by id wins over one named by its name beside it (`namedForms`) | 1,642 | 1,694 | none new |
+  | "Question to <whom>" is the question form's act (`ASKS`), the seat's "about: other" kept; a letter so asked stays a letter | 1,642 | 1,708 | none new |
+  | "Fill in a sending-signed form" is a send (`SENDS`) | 1,646 | 1,712 | none new |
+  | a blank named with a plain word, the very value the model drew ("authority outside"), stands (`namedValue`) | 1,650 | 1,716 | 4, below |
+  | the paper's own words after "Words:", "in these words:" are not a blank the paper is not written from (`paperWordsSpans`) | 1,657 | 1,716 | 3, below |
+
+  The eight differences, explained (regress-explained.json, under this heading): GLM-b draft.provider-a-desk-system.7, the
+  resend that went out as a new, unsigned loan application, now the send again of rec.16722 (keyed on 2026-11-16);
+  DeepSeek-c .2 to .5, the four scope requests whose `authority` was dropped by `leftEmpty` reading "it has no
+  authority from you" as "leave authority empty", now with the body the seat named (keyed on 2026-11-16); the broad
+  rung's .37, .42 and .43, job applications confirmed with `trade` holding the paper's own words "Application for the
+  advertised job.", now without (the reading `papersOwnWords` has held since the rung 1 rerun; the same words were
+  declined in that blank in ten other requests, which this draws right). With the set rebuilt on these, 1,660 of 1,865
+  (89.0%); baseline 1,660.
+- **Scored and not landed:** a referral blank holding a law ("referral=law-rates", the broad rung's rates seat) cleared:
+  no change (its requests have no target; the seat declined them for owners who had paid). A price-each blank holding
+  another figure set to the request's one "<figure> each": 1,650 to 1,625, 25 lost (the same figure written two ways).
+  "no <blank> from/for …" not read as leave-empty: no change. A words blank holding only "Draft for sign-off" left
+  empty where the paper is not written from it: four gained, five lost (seats confirmed that `trade` elsewhere). The
+  question change redrawing letters too: 1,630 exact (twelve, then five, confirmed letters lost).
+- **Patterns, answered from the design.** (a) The tenant's answer to the tribunal: the translator is shown a form's
+  blanks by name and type only (`formShownTo`, translator/src/index.ts), never their descriptions, so "a blank must say
+  what it holds in the world's words" can only be done by its name; `ages (list)` is the one free list and took the
+  tribunal's name, `tribunal (entity)` took the landlord. The asks have no target (none confirmed), so no change to the
+  form can be scored; it is for the model's next round (the form in training, and descriptions shown or names that say
+  whose: risk TR-9). (e) A referral named only in the seat's reason: the translator's input is the request, the forms the
+  seat knows of and, on its retry, what the resolver said (P3); the reason is the seat's own account, kept for the
+  record and its debrief, and is never an instruction. It stays out: a matter is filled from the seat's own file (the
+  one open matter of the kind, `referralOfKind`), or asked back. (g) The total in the price each, the quantity in the
+  days to pay: the model's draw; the rule tried lost 25. (h) As (c) of the table above (by id).
+- **Left:** of 205 misses, 71 are the model drawing nothing (`none(unclear)`: qwen's delivery notes, Haiku's
+  questions and delivery notes, reports); about 45 are a words blank written otherwise than the seat later confirmed;
+  the rest a draft for sign-off drawn as the send of a signed paper (ten, sent back to the translator by `misread`),
+  `trade` "Draft for sign-off" (eight, both ways confirmed), letters for questions (thirteen, kept on purpose), and
+  single cases. None moves by a rule with nothing lost; they are the next training round's.
+- **Revisit if** a run brings targets for the rejected rules' cases (the referral holding a law, the price each), or a
+  seat confirms a send again drawn by `sendAgain` that it did not mean.

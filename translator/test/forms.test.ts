@@ -223,3 +223,58 @@ test("a draft the rules drew is not offered with what the model was unsure of (t
   expect(r.ok && r.draft.call).toBe("form(form=send_signed, sign_off=rec.81, to=registry)");
   expect((r as any).answered?.unsure).toBeUndefined();
 });
+
+// (2026-11-17, "The translator by score": each rule change scored on the scored set, nothing it hit lost, the regression
+// check at zero. Each line guards one change.)
+test("rules changed by score after the reruns and the broad rung (2026-11-17)", () => {
+  const field = (type: string, required = false) => ({ type, ...(required ? { required: true } : {}) });
+  const form = (id: string, name: string, fields: object, more: object = {}) => ({ id, data: { form: name, office: "desk", fields, ...more } });
+  const k = {
+    forms: [form("form-desk-send-signed", "send_signed", { sign_off: field("record", true) }, { copies: "=sign_off" }),
+      form("form-desk-send-again", "send_again", { returned: field("record", true) }, { copies: "=returned" })],
+    records: new Set(["rec.5", "rec.6", "rec.7", "rec.20", "rec.21"]), signed: new Map<string, any>([["rec.7", { kind: "benefit_claim" }], ["rec.21", { kind: "benefit_claim" }]]),
+    signedDraft: new Map([["rec.7", "rec.6"]]), returnOf: new Map([["rec.20", "rec.21"]]),
+    referrals: new Map([["rec.5", "c0100"]]), referralKind: new Map([["rec.5", "benefit_claim"]]), answeredReferrals: new Set<string>(), held: new Set(["desk"]),
+  };
+  const ruled = (program: string, request: string, kk: any = k) => calls.programText(formRules(calls.parseProgram(program), request, kk));
+  // A return's blank takes the paper sent back, never a sign-off the request also names (r2 "-b", three sends again).
+  expect(ruled("form(form=send_again, returned=rec.20, to=desk)", "Sending a paper again as it was: benefit claim rec.20, sent back by rec.21; signed copy rec.7 on file. Matter rec.5."))
+    .toBe("form(form=send_again, returned=rec.21, to=desk)");
+  // A send again, as it was, naming the paper sent back, drawn as that paper written anew (GLM's rerun: it went out with
+  // no sign-off) or as nothing: the paper sent again. Not a draft for sign-off, nor a send naming no paper sent back.
+  const loan = 'form(account=acc-c0100, amount="$4,500.00", client=c0100, form=loan_application, lender=bank, months="12", purpose="living costs")';
+  expect(ruled(loan, "Send the paper rec.20 (the loan application of c0100 to bank) again, as it was, citing the paper rec.21 that bank sent back.")).toBe("form(form=send_again, returned=rec.21, to=desk)");
+  expect(ruled("none(unclear)", "Send again rec.21 (loan application to bank for c0100), now that bank has recorded authority rec.6")).toBe("form(form=send_again, returned=rec.21, to=desk)");
+  expect(ruled(loan, "Send the loan application of c0100 to bank again, for $4,500.00.")).toBe(loan);
+  // A form named by its id beside another named by its name ("the draft-for-client form (form-…-draft-benefit-claim)"):
+  // the one named by id (DeepSeek's rerun: the draft of a benefit claim went to the office as the claim itself).
+  const claim = { client: field("entity", true), office: field("entity", true), payment: { type: "choice", required: true, options: ["pension", "unemployment"] } };
+  const kd = { ...k, forms: [...k.forms, form("form-desk-draft-for-client", "draft_for_client", { client: field("entity", true), referral: field("record", true), words: field("text", true) }),
+    form("form-desk-benefit-claim", "benefit_claim", claim, { writes: { kind: "benefit_claim" } }), form("form-desk-draft-benefit-claim", "draft_benefit_claim", { referral: field("record", true), ...claim }, { writes: { kind: "draft", data: { paper: { kind: "benefit_claim" } } } })] };
+  expect(ruled("form(client=c0100, form=benefit_claim, office=outside, payment=pension)", "Fill in the draft-for-client form (form-desk-draft-benefit-claim) for client c0100: draw up a benefit claim to outside for sign-off, payment pension; referral rec.5.", kd))
+    .toBe("form(client=c0100, form=draft_benefit_claim, office=outside, payment=pension, referral=rec.5, to=desk)");
+  // "Question to <whom>", the form's own words for the act, drawn as a paper of another kind (Haiku's rerun: a send
+  // again of a paper with no authority yet): the question form, about what the request says it is about. A letter so
+  // asked stays a letter.
+  const kq = { ...k, forms: [...k.forms, form("form-desk-question", "question_to_client", { referral: field("record", true), client: field("entity", true), about: { type: "choice", required: true, options: ["balance", "document", "party", "detail", "other"] }, paper: field("record"), name: field("text"), words: field("text", true) })] };
+  expect(ruled("form(form=send_again, returned=rec.20, to=desk)", "Question to c0100 (about: other) on matter rec.5: bank returned rec.20 for lack of your authority. Please write to bank.", kq))
+    .toBe('form(about=other, client=c0100, form=question_to_client, referral=rec.5, to=desk, words="(about: other) on matter rec.5: bank returned rec.20 for lack of your authority. Please write to bank.")');
+  const letter = 'message(re=rec.5, text="please write to bank", to=c0100)';
+  expect(ruled(letter, "Question to c0100 about rec.5: please write to bank.", kq)).toBe(letter);
+  // "Fill in a sending-signed form", citing the sign-off: that signed copy sent (the broad rung: drawn as the paper's own
+  // kind, or as nothing).
+  expect(ruled("none(unclear)", "Fill in a sending-signed form: sign-off rec.7 (the signed copy of draft rec.6, benefit claim for c0100), to be sent as it was signed."))
+    .toBe("form(form=send_signed, sign_off=rec.7, to=desk)");
+  // A blank named with a plain word, the very value the model drew ("authority outside"), stands: "it has no authority
+  // from you" further on is no request to leave it empty (DeepSeek's rerun: four scope requests went with no body named).
+  const ks = { ...k, forms: [...k.forms, form("form-desk-scope-request", "scope_request", { agreement: field("record", true), client: field("entity", true), authority: field("entity"), matter: field("record"), words: field("text", true) })] };
+  const scope = 'form(agreement=rec.6, authority=outside, client=c0100, form=scope_request, matter=rec.5, to=desk, words="Please give outside your authority.")';
+  expect(ruled(scope, 'Fill in the scope-request form (form-desk-scope-request): client c0100; agreement rec.6; authority outside; matter rec.5; words "Please give outside your authority." outside returned the claim: it has no authority from you.', ks)).toBe(scope);
+  // The paper's own words, quoted after "Words:" or "in these words:", are not a words blank the paper is not written
+  // from (the reruns: sixteen job applications with them in `trade`).
+  const job = { client: field("entity", true), employer: field("entity", true), posting: field("record", true), account: field("account", true), trade: field("text") };
+  const kj = { ...k, forms: [...k.forms, form("form-desk-draft-job-application", "draft_job_application", { referral: field("record", true), ...job }, { writes: { kind: "draft", text: "Draft for sign-off.", data: { paper: { kind: "job_application", text: "Application for the advertised job." } } } })] };
+  const drawn = "form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=rec.5, to=desk";
+  expect(ruled(`${drawn}, trade="Application for the advertised job.")`, 'Draft for sign-off, job application in c0100\'s name to factory-7, posting rec.9, into acc-c0100. Words: "Application for the advertised job." Referral rec.5.', kj)).toBe(`${drawn})`);
+  expect(ruled(`${drawn}, trade="Application for the advertised job.")`, 'Draft for sign-off, in c0100\'s name: a job application to factory-7, in these words: "Application for the advertised job.", posting rec.9, referral rec.5.', kj)).toBe(`${drawn})`);
+});

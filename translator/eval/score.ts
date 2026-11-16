@@ -64,9 +64,11 @@ export function loadSet(file = SET): ScoredSet {
 /** The act a request asks for, in its first words. */
 export function actOf(request: string): string {
   const w = request.trim().toLowerCase().replace(/^please\s+/, "");
-  // (A form named in the first words, by id or name, "Fill in form-…-draft-rates-notice", "Using the send-signed form":
-  // its act.)
-  const f = /^(?:fill (?:in|out)|use|using|on|with)?\s*(?:the\s+)?(?:form[- :]+)?(?:[a-z0-9]+-)*?(draft|send-signed|send-again|question|report|scope-request|advice)\b/.exec(w.slice(0, 120).replace(/_/g, "-"));
+  // (A form named in the first words, by id or name, "Fill in form-…-draft-rates-notice", "Using the send-signed form",
+  // "Fill in a sending-signed form", "Fill in the office's draft-for-client form": its act. Until 2026-11-17 "a" and
+  // "sending-signed" were not read, so every "Fill in a … form" was the act "fill", and scope-broad-r1's four sends of a
+  // signed copy were paired with a later report as their target.)
+  const f = /^(?:fill (?:in|out)|use|using|on|with)?\s*(?:the\s+|an?\s+|the [a-z-]+'s\s+)?(?:form[- :]+)?(?:[a-z0-9]+-)*?(draft|send-signed|send-again|question|report|scope-request|advice)\b/.exec(w.slice(0, 120).replace(/_/g, "-").replace(/\bsending[- ]signed\b/g, "send-signed").replace(/\bsending[- ]again\b/g, "send-again"));
   if (f && /^(fill|use|using|on|with|form|the)/.test(w)) return ({ draft: "draft", "send-signed": "send", "send-again": "send again", question: "ask", report: "report", "scope-request": "scope request", advice: "advice" } as { [k: string]: string })[f[1]!]!;
   if (/^(draft|drafting|prepare)\b|^for sign-?off\b|^fill (in|out) (the )?(form[- ])?draft/.test(w)) return "draft";
   if (/^(send|sending|re-?send)\b[^.]{0,40}\bagain\b|^send[- ]again\b/.test(w)) return "send again";
