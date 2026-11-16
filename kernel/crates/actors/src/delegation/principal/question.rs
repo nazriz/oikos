@@ -11,6 +11,11 @@ use super::*;
 
 /// The words of an answer that cannot say (fixed).
 const CANNOT: &str = "We cannot say.";
+/// What follows every answer that cannot say: what the form answers, and which form carries what it does not, in the
+/// world's terms (2026-11-17, the stakes rung 3: desks asked their clients on this form, ten times over, to write to the
+/// bank naming the desk, were answered "cannot say" or "account is acc-...", and no authority was ever given; the request
+/// form's authority blank is the way a client gives it).
+pub const WHERE_ELSE: &str = "On this form we answer what our account stands at, a paper we hold (by its id), who someone the matter names is, or a detail of the matter. To have us give a body our authority for you, ask on the request form (scope_request), naming the body in its authority blank. Whether to send something is not a question: draft it for our sign-off.";
 
 impl State {
     /// Its answer to a question from its assistant, as its own paper to it.
@@ -48,7 +53,13 @@ impl State {
                     );
                     (true, json!({ "paper": p.id, "kind": p.kind, "from": p.from, "at": p.at, "dates": p.dates.iter().map(|(k, d)| json!({ "named": k, "at": d })).collect::<Vec<_>>() }), said)
                 }
-                None => (false, Value::Null, format!("We hold no paper {}.", q.paper.as_deref().unwrap_or("of that name"))),
+                // (One of our own papers to you on the matter (a sign-off, a remit): ours, on your file as we sent it, and
+                // said so, never "we hold no paper". The stakes rung 3: desks asked about their clients' own sign-offs,
+                // ahead of any word from the bank, and were told the client held no such paper.)
+                None => match q.paper.as_deref().and_then(|p| self.book.get(p)).filter(|r| r.speaks_for.as_deref() == Some(self.me.as_str())) {
+                    Some(r) => (false, Value::Null, format!("{} is our own {} to you, on your file as we sent it. We hold nothing about it from anyone else.", r.id, crate::common::kind(&r).unwrap_or("paper").replace('_', " "))),
+                    None => (false, Value::Null, format!("We hold no paper {}.", q.paper.as_deref().unwrap_or("of that name"))),
+                },
             },
             (Some(x), Asked::Party) => match q.name.as_deref().filter(|n| !n.is_empty()) {
                 Some(who) => self.party(x, who, pic, &date),
@@ -63,6 +74,7 @@ impl State {
             (Some(x), Asked::Other) if !x.why.is_empty() => (false, Value::Null, format!("{CANNOT} What we told you of this matter when we handed it over: {}", x.why.join(" "))),
             (Some(_), Asked::Other) => (false, Value::Null, CANNOT.to_string()),
         };
+        let words = if known { words } else { format!("{words} {WHERE_ELSE}") };
         let a = QuestionAnswer { question: id.to_string(), referral: q.referral.clone(), about: q.about, known, answer };
         self.paper(QuestionAnswer::KIND, &words, &agreement, id, papers::data(&a), Then::Plain);
     }

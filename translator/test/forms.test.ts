@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import Ajv2020 from "ajv/dist/2020";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { calls, canonical } from "@oikos/participants";
+import { calls, canonical, clientDraftOf, clientPapers, forms } from "@oikos/participants";
 import FORMS from "../../contracts/test/forms.json";
 import { MockAdapter } from "@oikos/participants/llm";
 import { createTranslator, formRules, formShown } from "../src/index";
@@ -323,4 +323,51 @@ test("rules changed by score after the reruns and the broad rung (2026-11-17)", 
   expect(everyIdNamed(rates, "Draft for sign-off a rates notice to c0003 for lot-31-18; amount $684.95; account acc-city; law law-rates; referral rec.24906.")).toBe(false);
   expect(everyIdNamed(rates, "Draft for sign-off a rates notice: owner c0003; lots lot-31-18, lot-31-19; amount $684.95; account acc-city; law law-rates; referral rec.24906.")).toBe(false);
   expect(everyIdNamed(rates, "Draft a rates notice: owner c0003, or owner c0004; lots lot-31-18; account acc-city; law law-rates; referral rec.24906.")).toBe(false);
+});
+
+test("a client's paper on the desk's form for it is the client's own, read back and written again: every detail, in the same units (2026-11-17)", () => {
+  // (As the citizen's own code writes each: citizen/housing.rs `hunt` and `answer_tribunal`, recourse.rs `Complaint`.
+  // The stakes rung 3: rental applications went on the words-only form without their listing or household, and a
+  // tenant's answer on its form went with no offer, no words and its interval in seconds.)
+  const own: { form: string; paper: any }[] = [
+    { form: "rental_application", paper: { kind: "rental_application", text: "Application for apts-3/dwelling.2, for a household of 3.", addressed_to: ["landlord-2"], visible_to: ["c0149", "landlord-2"], basis: "rec.40",
+      data: { listing: "rec.40", account: "acc-c0149", members: ["c0149", "c0150", "c0151"], household: { people: 3, bedrooms_needed: 2 } } } },
+    { form: "complaint", paper: { kind: "complaint", text: "Our waste at apts-3 hasn't been collected for about 18 days.", addressed_to: ["city"], visible_to: ["c0149", "city"], data: { structure: "apts-3", about: "waste", days: 18 } } },
+    { form: "tribunal_response", paper: { kind: "tribunal_response", text: "Answer to application rec.9: we say $5,330.01 is owed today; we can pay nothing toward it beyond the rent now; I live here alone (aged 63); we have nowhere else to go.",
+      addressed_to: ["tribunal", "landlord-10"], visible_to: ["c0427", "tribunal", "landlord-10"], basis: "rec.9",
+      data: { application: "rec.9", owes: 533001, offer: 0, every_days: 30, out_of_work_since: 1_728_000, people: 1, children: 0, ages: [63], lived_days: 200, go_to: "nowhere" } } },
+  ];
+  for (const { form, paper } of own) {
+    const spec = clientPapers([]).find((x) => x.form === form) as any;
+    const self = paper.visible_to[0];
+    const read = forms.fieldsFor(spec, paper, { self, now: 0, money: (x) => x });
+    expect(read, form).toBeDefined();
+    const again = forms.writePaper(spec, { ...read!.fields, client: self }, { self, now: 0, money: (x) => x, ...(read!.text ? { text: read!.text } : {}) });
+    expect(again, form).toMatchObject({ kind: paper.kind, text: paper.text, data: paper.data, addressed_to: paper.addressed_to });
+    // (Its draft carries the paper as it would go, its words written from the fields: never a template's "{application}".)
+    const draft = forms.writePaper(clientDraftOf(spec) as any, { ...read!.fields, client: self, referral: "rec.1" }, { self: "provider-a-desk", now: 0, money: (x) => x });
+    expect(String((draft.data as any).paper.text), form).not.toContain("{");
+  }
+  // (The translator worker's redraw of the real asks on these forms, 2026-11-17.)
+  const answer = clientPapers([]).find((x) => x.form === "tribunal_response") as any;
+  const base = { client: "c0427", tribunal: "tribunal", landlord: "landlord-10", application: "rec.9" };
+  const write = (more: object) => forms.writePaper(answer, { ...base, ...more } as any, { self: "c0427", now: 0, money: (x) => x });
+  // The words already opening with what the paper's words open with: said once, never twice.
+  expect(write({ words: "Answer to application rec.9: we have nowhere else to go." }).text).toBe("Answer to application rec.9: we have nowhere else to go.");
+  expect(write({ words: "we have nowhere else to go." }).text).toBe("Answer to application rec.9: we have nowhere else to go.");
+  // Ages: two written together are the two; a word or a name is asked back in plain words.
+  expect((write({ ages: ["30, 3"] }).data as any).ages).toEqual([30, 3]);
+  expect((write({ ages: ["30 and 3", "7"] }).data as any).ages).toEqual([30, 3, 7]);
+  for (const bad of ["one", "Ann"]) expect(() => write({ ages: [bad] })).toThrow(`The ages are whole numbers, written in figures, each on its own: "${bad}" is not one.`);
+  // Counts written as words, one to twenty, read as numbers; the home is a dwelling, by the form's own type.
+  expect([calls.parseCount("four"), calls.parseCount("two"), calls.parseCount("twenty")]).toEqual([4, 2, 20]);
+  expect((clientPapers([]).find((x) => x.form === "rental_application") as any).fields.home.type).toBe("space");
+  // The tenant's words come from the hand-over unless the request quotes words for them: never "pay", never the
+  // request's own act. A draw that quotes them keeps them.
+  const draftAnswer = { id: "form-desk-draft-tribunal-response", data: { ...clientDraftOf(answer), office: "desk" } };
+  const kw = { forms: [draftAnswer], records: new Set(["rec.5", "rec.9"]), signed: new Map(), signedDraft: new Map(), returnOf: new Map(), referrals: new Map([["rec.5", "c0427"]]), referralKind: new Map([["rec.5", "tribunal_response"]]),
+    answeredReferrals: new Set<string>(), held: new Set(["desk"]), handedWords: new Map([["rec.5", "Answer to application rec.9: we say $5,330.01 is owed today; we have nowhere else to go."]]) };
+  const drawn = (words: string, request: string) => calls.programText(formRules(calls.parseProgram(`form(application=rec.9, client=c0427, form=draft_tribunal_response, landlord=landlord-10, referral=rec.5, to=desk, tribunal=tribunal, words="${words}")`), request, kw as any));
+  for (const w of ["pay", "Draft for sign-off"]) expect(drawn(w, "Draft for sign-off the tenant's answer for c0427, referral rec.5, can pay 0.")).toContain('words="we say $5,330.01 is owed today; we have nowhere else to go."');
+  expect(drawn("we cannot pay", 'Draft the answer for c0427, referral rec.5, in the words "we cannot pay".')).toContain('words="we cannot pay"');
 });

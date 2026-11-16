@@ -181,6 +181,11 @@ impl Assisting {
             Ok(Program::Lines(l)) => l,
             _ => return self.report(m, referral, false, BTreeMap::new(), Some("what was asked could not be read".into())),
         };
+        // (Nothing to send, a draft signed with nothing in it: not done, and said so, never reported done with nothing
+        // gone. The stakes rung 3's diligent reference: a delivery note signed blank, reported done, never sent.)
+        if lines.is_empty() {
+            return self.report(m, referral, false, BTreeMap::new(), Some("the draft signed had nothing in it to send".into()));
+        }
         if m.client != self.me {
             // (A paper of a person's, written by the desk in their name: it speaks for them, and they see it.)
             for l in &mut lines {

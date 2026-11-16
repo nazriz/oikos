@@ -10,7 +10,7 @@
 //     the form of whoever reads the paper. A program that composes it is asked back.
 // Code seats write calls straight to the resolver (P14) and are not ruled: they write `basis`, `for` and `data` as the
 // contract has them (participants/src/calls.ts `CODE_ARGS`).
-import { calls } from "@oikos/participants";
+import { calls, forms } from "@oikos/participants";
 
 /** The functions whose record cites a basis (contracts/calls.md), and so take the rule's. */
 const CITES = new Set(["money", "structure", "claim", "agreement", "statement"]);
@@ -156,6 +156,7 @@ export interface FormKnowledge {
   readonly referralKind?: ReadonlyMap<string, string>;
   readonly answeredReferrals?: ReadonlySet<string>;
   readonly referralGives?: ReadonlyMap<string, { readonly [field: string]: string }>;
+  readonly handedWords?: ReadonlyMap<string, string>;
   readonly referralFacts?: ReadonlyMap<string, ReadonlySet<string>>;
   readonly returnOf?: ReadonlyMap<string, string>;
   readonly held: ReadonlySet<string>;
@@ -746,6 +747,21 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       const act = /^(?:a\s+)?draft(?:ed)?\s+for\s+(?:(?:the\s+)?client'?s?\s+)?sign[- ]?off$/i.test(v);
       const quotedWhole = v.length > g.length && v.toLowerCase().includes(g.toLowerCase()) && quotedSpans(request).some((q) => q.trim() === v);
       if (act || quotedWhole) edit("handOverWords", field, { text: g });
+    }
+    // (A blank of the paper's own words the matter handed over gives in its paper's words (a tenant's answer: "we say
+    // 5,330.01 is owed today; …"): those words, unless the request quotes words for it. The translator worker's redraw
+    // of 110 real asks, 2026-11-17: the blank held the quoted words in 40, "pay" (from "can pay 0") in 32, the request's
+    // own act in 11, and nothing in 7. A paper never goes with "pay" or "Draft for sign-off" as someone's words.)
+    const handOver = k.handedWords?.get(argText(args.referral) ?? "");
+    const template = String(f.data?.writes?.data?.paper?.text ?? f.data?.writes?.text ?? "");
+    if (handOver && template) for (const [field, said] of forms.wordsFromText(template.replace(/^Draft for sign-off\.\s*/, ""), handOver, f.data as forms.FormData)) {
+      const t = fields[field];
+      const v = args[field] && "text" in args[field]! ? (args[field] as { text: string }).text.trim() : undefined;
+      // (Only a blank of words alone: one a paper's details are written from too (a review request's `matter`) is a
+      // name, which the paper's words only show.)
+      const inData = JSON.stringify(f.data?.writes?.data ?? {}).includes(`"=${field}"`);
+      if (t?.type !== "text" || inData || v === said.trim() || (v && quotedSpans(request).some((q) => q.trim() === v))) continue;
+      edit("handOverWords", field, { text: said });
     }
     // Whom the work is for: whoever handed over the matter it is on.
     if (fields.client) {

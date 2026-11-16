@@ -312,6 +312,12 @@ test("the funnel counts a paper sent again after the fork, on a matter handed an
   expect(read([{ table: "acts", record: "rec.6", referral: "rec.1", post: "provider-a-desk" }])).toMatchObject({ handed: 1, carried: 1, signed: 1, sent: 1, answered: 1, done: 1 });
   // (Without the acts reader's rows, as before: never sent, and the matter not among the handed at all.)
   expect(read([])?.sent ?? 0).toBe(0);
+  // (A seat appointed to an assistant's post during the run, its principal having engaged the provider after the fork:
+  // listed, with the day. The stakes rung 3: landlord-10's seat, par.14, sat 19 times and was in no reader.)
+  const late = new FunnelReader(config, {}, 30);
+  late.see({ kind: "event", t: 63.6 * DAY, body: { event: "appointed", holder: "par.14", position: "landlord-10-office-assistant" } });
+  late.see({ kind: "annotation", t: 64 * DAY, body: { annotation: "usage", purpose: "participant", subject: "par.14" } });
+  expect(late.result([], false).seats.find((s) => s.post === "landlord-10-office-assistant")).toMatchObject({ participants: ["par.14"], model: true, engaged_day: 63.6, calls: 1 });
 });
 
 test("a seat in a town of one stake level is never shown the other level's words: the law's text, a client's hand-over, every line", async () => {

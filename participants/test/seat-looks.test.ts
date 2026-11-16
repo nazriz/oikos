@@ -101,6 +101,13 @@ test("a look into an assistant's matters says which of what it found is on a mat
   expect(said).toContain("rec.1 (reported on in rec.4 on year 1, day 29, before you took this post)");
   expect(said).not.toContain("rec.5");
   expect(m.finishedIn(m.absorb(chans([handed[2]], true)))).toBe("");
+  // (A matter its predecessor drafted before the seat took the post: read from the file on arrival, shown drafted,
+  // never "no draft yet". The stakes rung 3: three matters drafted on day 30 were drafted again and signed twice.)
+  const n = new Matters("mine/matters", "mine/file");
+  n.absorbRead({ t: 31 * DAY, channels: { "mine/file": { kind: "records", search: true, records: [st("rec.6", "draft", 30 * DAY, { referral: "rec.5", calls: "statement(kind=invoice)" })] } } } as any);
+  n.absorb(chans([handed[2]]));
+  expect(n.text()).toMatch(/\[rec\.5\] invoice[^\n]*draft/);
+  expect(n.text()).not.toContain("no draft yet");
 });
 
 test("an account the seat's own participant does not hold is set out by whose it is, never as its own", () => {

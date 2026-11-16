@@ -1039,6 +1039,13 @@ impl Person {
             data["lease"] = json!({ "landlord": h.landlord, "agreement": h.agreement, "space": h.space, "rent": h.rent });
             records.push(h.agreement.clone());
         }
+        // (A want about the home's papers where we hold none of them, neither the lease nor what the landlord sent: one of
+        // the household told of the leaseholder's notice. The papers and the lease are the leaseholder's, and only they can
+        // ask the landlord; we have nothing to hand over, and do not. The stakes rung 3: c0352's "notice" want went with
+        // "records: none", and its assistant asked twice and reported it not done.)
+        if matches!(about, "rent_increase" | "notice") && records.is_empty() {
+            return;
+        }
         if let Some(g) = self.recourse.grievances.get(&key) {
             let m = matter_of(g);
             data["matter"] = json!({ "matter": m.matter, "party": m.party, "about": m.about, "amount": m.amount, "structure": m.structure, "seeks": m.seeks });
@@ -1397,7 +1404,10 @@ impl Openings for Ways<'_> {
         }
         // Our assistant, where a remit of ours has its provider's desk see to wants of this kind (docs/design/
         // handing-over.md section 2.3): handed over again only once the other side has had its time to answer.
-        if let Some(provider) = p.handing(&want.about) {
+        // (Not a want about the home's papers where none is ours: the lease and what the landlord sent are the
+        // leaseholder's, and only they can ask; `hand_over`.)
+        let ours = !matches!(want.about.as_str(), "rent_increase" | "notice") || want.against.is_some() || p.s.home.as_ref().is_some_and(|h| !h.owned);
+        if let Some(provider) = p.handing(&want.about).filter(|_| ours) {
             let key = gkey(&want.about, want.whom.as_deref().unwrap_or(""), want.against.as_ref().map(|a| a.0.as_str()));
             let answer_days = p.answer_days();
             if r.handed.get(&key).is_none_or(|at| t - at >= answer_days * DAY) {
@@ -2047,6 +2057,28 @@ mod tests {
         assert_eq!((g.asked, g.answer.as_deref(), g.handed), (Some(14 * DAY), Some("refused"), true));
         assert!(said(&p).iter().any(|x| x["domain"] == "way" && x["option"] == "assistant" && x["kind"] == "refused"), "{:?}", said(&p));
         assert!(!said(&p).iter().any(|x| x["domain"] == "way" && x["option"] == "ask"), "we did not ask: our assistant did");
+    }
+
+    /// (2026-11-17) A want about the home's papers where none is ours (one of the household told of the leaseholder's
+    /// notice) is not handed over: the lease and the notice are the leaseholder's, and only they can ask. The stakes rung
+    /// 3: c0352's went with "records: none", and its assistant asked twice and reported it not done.
+    #[test]
+    fn a_want_about_a_notice_none_of_whose_papers_are_ours_is_not_handed_over() {
+        let c = ctx(json!({}), true);
+        let mut p = person(&c, 0);
+        let service = vec![
+            rec(json!({ "id": "agr.9", "record": "agreement", "author": "prov-a-sales", "at": DAY, "visible_to": ["prov-a", ME], "terms": { "template": "service", "parties": ["prov-a", ME], "commitments": [] } })),
+            rec(json!({ "id": "agr.9-a", "record": "signature", "author": "prov-a-sales", "at": DAY, "visible_to": ["prov-a", ME], "agreement": "agr.9", "as": "prov-a" })),
+            rec(json!({ "id": "agr.9-b", "record": "signature", "author": "c1-self", "at": DAY, "visible_to": ["prov-a", ME], "agreement": "agr.9", "as": ME })),
+            rec(json!({ "id": "rem.1", "record": "statement", "author": "c1-self", "speaks_for": ME, "at": 2 * DAY, "visible_to": [ME, "prov-a"], "addressed_to": ["prov-a"], "kind": "remit", "text": "From now",
+                "data": { "agreement": "agr.9", "kind": "want-notice", "level": "draft", "depth": "want" } })),
+        ];
+        let pc = pic(12 * DAY, service);
+        p.book.absorb(&pc);
+        let wnt = want("notice", "landlord-1", None, &["occupancy"]);
+        assert!(ways(&p, &pc, &wnt).iter().all(|o| o.kind != "assistant"), "none of its papers ours: not handed over");
+        tenant(&mut p);
+        assert!(ways(&p, &pc, &wnt).iter().any(|o| o.kind == "assistant"), "our own lease: handed over");
     }
 
     /// (2026-11-16) A want handed over cites the papers that started it, ours: what whom it is against sent us citing the

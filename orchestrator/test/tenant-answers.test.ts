@@ -12,7 +12,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
-import { planLawWords, possessionOrderFor, planLaw, modules } from "@oikos/participants";
+import { clientPapers, forms, planLawWords, possessionOrderFor, planLaw, modules } from "@oikos/participants";
 import { runWorld } from "../src/run";
 import { giveToAnother } from "./lib/offices";
 
@@ -121,6 +121,18 @@ test("each kind of answer, through the code member: what a tenant tells is typed
     for (const k of Object.keys(a.data)) expect(["application", "owes", "offer", "every_days", "disputes_sum", "disputes_notice", "out_of_work_since", "pay_short", "claim", "claim_on", "ill", "people", "children", "ages", "lived_days", "go_to", "left", "left_at"]).toContain(k);
     expect(JSON.stringify(a.data)).not.toMatch(/trust|agency|bps|affinity/);
     expect(a.visible_to).toEqual(expect.arrayContaining(["tribunal"]));
+    // The desk's form for a client's answer says all of it, in the same units: read back from the tenant's own paper
+    // and written again, the same paper, its words and every detail (2026-11-17, the stakes rung 3: c0427's answer on
+    // the form went with no offer, no words and `every` in seconds, and an order followed that the tenant's own did not).
+    if (a.data.left) continue;
+    const spec = clientPapers([]).find((x) => x.form === "tribunal_response")! as any;
+    const paper = { kind: a.kind, text: a.text, addressed_to: a.addressed_to, visible_to: a.visible_to, basis: a.basis, data: a.data, speaks_for: a.speaks_for };
+    const read = forms.fieldsFor(spec, paper as any, { self: a.speaks_for, now: a.at, money: (x) => x });
+    expect(read, JSON.stringify(a)).toBeDefined();
+    const again = forms.writePaper(spec, { ...read!.fields, client: a.speaks_for, tribunal: "tribunal" }, { self: a.speaks_for, now: a.at, money: (x) => x, ...(read!.text ? { text: read!.text } : {}) });
+    expect(again.data).toEqual(a.data);
+    expect(again.text).toBe(a.text);
+    expect(read!.fields.words, a.text).toBe(a.text.slice(a.text.indexOf(": ") + 2));
   }
   expect(o.get("nothing")!.order.data.finding).toBe("possession");
   // One in work who offers: the sum a plan answer gives; a plan where it clears what is owed within the law's longest.
