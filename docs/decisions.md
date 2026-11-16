@@ -14779,3 +14779,16 @@ from its referral on file whether or not it is still open.
 - **Not done here (risks MT-45 to MT-49):** the support office and the other outside offices have no assistant post; utilities' bills have no form; price lists, interviews, hours notices, certificates, consultations, inspections and two returns have no form; our translator has never seen the new seats' forms; the classes are our reading, to confirm.
 - **Revisit if** a seat is handed papers no business assistant would write, or none of what it would; a product's published feature list puts a kind in another class; or a study wants the till or a billing run as a stated condition (then a class the offer names, never a list).
 - **Added the same day, from the first 10-seat code screen:** (1) `hiring` is kept out of the offers' classes (MT-51: an employer re-advertises at every wake, and each was handed over again: 5,020 postings from the builder in three days); (2) where offers are by class, a principal post that is shown no account of its own is shown the one it pays its fee from (the planning and works offices could not name the keeper of the town's account to pay); (3) the bank's lending office is not seated (MT-52: it keeps its own account and cannot pay a provider's fee from it); `broad.ts` seats the inspector in its place.
+## 2026-11-16: two hosted open-weight models priced for the stakes probe (OpenRouter)
+
+- **What:** `orchestrator/prices.json` gains `openai-compat/openrouter/z-ai/glm-5.3` and
+  `openai-compat/openrouter/deepseek/deepseek-v4.1-flash`, each at the figure OpenRouter's model list gives, asked with
+  the API's function calling (`answer: tools`; each answered a plain function call on 2026-11-16).
+- **Why these:** the contrast beside Haiku 5.5 wants capable models from other makers that can do the job (the local
+  qwen2.5:14b could not). Both are open-weight, both cheap enough for a 14-day probe under the rung's $1 limit, on the
+  owner's $10 of OpenRouter credit (2026-11-16).
+- **Known limit:** OpenRouter picks the provider for each call, and providers serve these models at different prices
+  and precisions (4-bit to 8-bit), so two calls in one run may not meet the same weights. Fine for a probe that asks
+  whether another model behaves differently at all; a run counted in the study pins one provider first.
+- **Revisit if** a probe's behaviour looks like the provider's doing (replies that fail to parse in bursts), or one of
+  these goes into the counted runs: pin the provider (a `provider` field on the request) and say which.
