@@ -203,7 +203,7 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // them, read at their post's sitting, not on seeing the town's rate-book entry the moment it is made; au-vic's first
 // instalment falls in its 60 days, the others' 30 days hold none. 0d99861e... until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "0d99861e8b3f0910134e09e4d77ad9454ddc4e0a24cb1ac7e696d38892d77c0d",
+  "au-vic-2026": "206e99704bbcaf61ed9ba5adea580cd3c52ca6124219ed7aa7fed4a145460d62",
   "gb-eng-2026": "1ef061096609457937fdf27f71b3a0af6d2d3d52336416521fcd70c35ad0ca60",
   "ke-nakuru-2026": "cbf6fa013880d2a617f8a3554e09e7638036ee2e38aa9597b7da5ed31133dbb6",
 };
