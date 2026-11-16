@@ -2306,11 +2306,12 @@ The mechanism:
   counterparty to.
 - **Effect:** At a delegating rates post the town's owners pay rates nobody has billed them for, and some get a notice
   after paying; a seat that drafts every notice it is handed sends demands for money already paid.
-- **L / I:** high (certain at a delegating rates post) / medium · **Status:** open (2026-11-16; the lead asked for the
-  answer, not a fix yet)
-- **Fix when:** before a counted run seats the rates post: the claim is recorded with the notice it goes with (the
-  office's clerk enters it when the notice goes out), or an owner pays rates on the notice it holds, never on a claim
-  alone; the code arm unchanged.
+- **L / I:** high (certain at a delegating rates post) / medium · **Status:** fixed (decisions 2026-11-16, A charge is acted on once its holder has told us of it; the lead's decision:
+  a person acts on a claim made against them from the paper that tells them of it; `citizen/money.rs`, `told`;
+  docs/behaviour/citizen.md, "A charge is paid once we are told of it"). Left: firms read only the debt claims their
+  workers record against them, to strike the wages those replace, never to pay a claim on sight; no other payer reads
+  claims against it.
+- **Fix when:** (fixed) a payer who acts on a claim from anything but a paper telling them of it would reopen it.
 - **Notice by:** a rates payment before the owner's notice; a notice addressed to an owner whose claim is settled.
 
 ### MT-61 · A body that returns a paper sent for a client writes to the client, not to the post that sent it

@@ -290,6 +290,9 @@ pub struct Money {
     // ---- borrowing and bills
     pub borrowing: Borrower,
     pub bills_paid: BTreeSet<String>,
+    /// Charges against us that a letter from their holder told us of, naming the charge (`told`).
+    #[serde(default)]
+    pub told_by_letter: BTreeSet<String>,
     /// Bills paid lately (when, how much), for what bills come to a month.
     pub bills: Vec<(i64, i64)>,
     pub bill_seen: BTreeSet<String>,
@@ -355,6 +358,7 @@ impl Money {
             spells: BTreeMap::new(),
             borrowing: Borrower::default(),
             bills_paid: BTreeSet::new(),
+            told_by_letter: BTreeSet::new(),
             bills: vec![],
             bill_seen: BTreeSet::new(),
             billed: BTreeMap::new(),
@@ -390,6 +394,7 @@ impl Default for Money {
             spells: BTreeMap::new(),
             borrowing: Borrower::default(),
             bills_paid: BTreeSet::new(),
+            told_by_letter: BTreeSet::new(),
             bills: vec![],
             bill_seen: BTreeSet::new(),
             billed: BTreeMap::new(),
@@ -868,7 +873,7 @@ impl Person {
 
     // ------------------------------------------------------------------ what is recorded against us (3842-3878)
 
-    /// What's recorded against us to pay (rates on a home we own, a fine): paid when we can, keeping a month's
+    /// What's recorded against us to pay (rates on a home we own, a fine), once a paper has told us of it: paid when we can, keeping a month's
     /// essentials; our bills for a service, paid when they come, if we can; and, short of next month's housing and
     /// essentials with income coming in, a loan from our bank to tide us over.
     pub fn recorded_against(&mut self, w: &mut Week) {
@@ -882,6 +887,12 @@ impl Person {
                 RecordBody::Claim { position: oikos_contracts::blocks::Position::Right, counterparty: Some(cp), about, .. } if *cp == me => {
                     let k = about.s("kind")?;
                     if !["rates", "rates_interest", "fine"].contains(&k) || self.money.bills_paid.contains(c.id.as_str()) {
+                        return None;
+                    }
+                    // (Only a charge it has been told of: the claim is its holder's record, and reaches us by the paper
+                    // that tells us of it. The whole-town rung 1: an owner paid the rates its town had just entered in
+                    // its rate book, sixteen minutes after, two days before any notice. MT-60.)
+                    if !told(&self.book, &self.money.told_by_letter, c, &me, 0) {
                         return None;
                     }
                     Some((c.id.to_string(), about.i("amount").unwrap_or(0), about.s("account").map(String::from), k.to_string(), about.s("for").map_or_else(|| c.id.to_string(), String::from)))
@@ -1474,6 +1485,37 @@ impl Person {
     }
 }
 
+/// Whether a claim made against `me` has reached it by a paper that tells of it (the lead's decision of 2026-11-16, on
+/// MT-60): a charge in its holder's ledger is the holder's record, and is ours to act on only once the holder has told us.
+/// Told: a paper addressed to us in the same act as the claim (the notice the claim was entered with, an order the fine
+/// came with), or a paper addressed to us from its holder that names its sum (and its due day, where it has one: a
+/// rates notice sent apart from the claim by the office's assistant), or a letter naming it; and a claim made on a claim
+/// we were told of (interest on overdue rates) is told as that one was. In the code arm claim and paper are one act, so
+/// nothing there moves; where the paper goes later (an assistant's), the claim waits for it.
+pub fn told(book: &crate::common::Book, letters: &BTreeSet<String>, c: &Record, me: &str, depth: u8) -> bool {
+    let RecordBody::Claim { holder, about, .. } = &c.body else { return false };
+    // (Or a letter from its holder about it: the overdue letter that comes with interest, where no notice did.)
+    if letters.contains(c.id.as_str()) {
+        return true;
+    }
+    let amount = about.i("amount");
+    let due_day = about.i("due").map(|d| d.div_euclid(DAY));
+    let to_me = |r: &Record| addressed_to(r).iter().any(|a| *a == me);
+    let from_holder = |r: &Record| r.speaks_for.as_deref() == Some(holder.as_str()) || r.author == c.author;
+    let names = |r: &Record| {
+        let d = data(r).to_value();
+        let sum = d.get("amount").and_then(|x| x.as_i64().or_else(|| x.as_str().and_then(|s| s.parse().ok())));
+        let due = d.get("due").and_then(Value::as_i64).map(|x| x.div_euclid(DAY));
+        amount.is_some() && sum == amount && (due_day.is_none() || due == due_day)
+    };
+    let cites = |r: &Record| crate::common::bases_of(r).iter().any(|b| b.as_str() == c.id.as_str()) || data(r).to_value().to_string().contains(&format!("\"{}\"", c.id));
+    if book.records().any(|r| matches!(r.body, RecordBody::Statement { .. }) && to_me(r) && r.at >= c.at && ((r.at == c.at && r.author == c.author) || (from_holder(r) && (names(r) || cites(r))))) {
+        return true;
+    }
+    // (Made on a claim we were told of: interest on overdue rates, written to us with it.)
+    depth < 3 && crate::common::bases_of(c).iter().any(|b| book.get(b).is_some_and(|x| matches!(x.body, RecordBody::Claim { .. }) && told(book, letters, x, me, depth + 1)))
+}
+
 #[cfg(test)]
 mod tests {
     //! participants/test/payments.test.ts (a claimant's half), and the person's side of spending, shopping, bills
@@ -1838,14 +1880,42 @@ mod tests {
         let pays = calls(&s, "money");
         assert_eq!(pays.len(), 1);
         assert_eq!((arg_of(pays[0], "to"), arg_of(pays[0], "settles")), ("acc-x".to_string(), "rec.0".to_string()));
+        // (A charge nobody has told us of is not ours to act on: the fine is the town's record until it writes to us.
+        // MT-60, the lead's decision of 2026-11-16.)
         let s = run(&mut p, &c, 8 * DAY, 40, 100_000, &[], |p, w| {
             p.ordered_to_pay(w);
             p.recorded_against(w);
         });
+        assert!(calls(&s, "money").is_empty(), "not told of the fine: nothing paid; the order once only");
+        // (Told by the paper it came with, in the same act: paid.)
+        let with_it = rec(json!({ "id": "rec.3", "record": "statement", "author": "p.town", "speaks_for": "town", "at": 0, "visible_to": "public", "kind": "fine_notice", "text": "Fined.", "addressed_to": ["c1"], "data": {} }));
+        let s = run(&mut p, &c, 9 * DAY, 40, 100_000, &[with_it], |p, w| {
+            p.ordered_to_pay(w);
+            p.recorded_against(w);
+        });
         let pays = calls(&s, "money");
-        assert_eq!(pays.len(), 1, "the order is paid once");
+        assert_eq!(pays.len(), 1, "the fine, once told");
         assert_eq!(arg_of(pays[0], "settles"), "rec.2");
         assert_eq!(s[0].why.as_deref(), Some("Paying the fine recorded against us (littering)."));
+        // (Rates entered when the notices were handed over, and the notice sent days later by another hand: paid only
+        // once the notice, naming its sum and due day, has come.)
+        let rates = rec(json!({ "id": "rec.5", "record": "claim", "author": "p.rates", "speaks_for": "town", "at": 10 * DAY, "visible_to": "public", "position": "right", "holder": "town", "counterparty": "c1", "about": { "kind": "rates", "amount": 5_000, "account": "acc-town", "due": 40 * DAY + 1_794 } }));
+        let s = run(&mut p, &c, 11 * DAY, 40, 100_000, &[rates], |p, w| p.recorded_against(w));
+        assert!(calls(&s, "money").is_empty(), "the rates entered, no notice yet: nothing paid");
+        let notice = rec(json!({ "id": "rec.6", "record": "statement", "author": "par.4", "speaks_for": "town", "at": 12 * DAY, "visible_to": "public", "kind": "rates_notice", "text": "Rates notice.", "addressed_to": ["c1"], "data": { "amount": 5_000, "due": 40 * DAY, "account": "acc-town" } }));
+        let s = run(&mut p, &c, 13 * DAY, 40, 100_000, &[notice], |p, w| p.recorded_against(w));
+        let pays = calls(&s, "money");
+        assert_eq!((pays.len(), pays.first().map(|x| arg_of(x, "settles"))), (1, Some("rec.5".to_string())), "the notice came: paid");
+        // (Rates whose notice never came: unpaid until the holder writes about them, as with the overdue letter that
+        // comes with interest; then paid.)
+        let unnoticed = rec(json!({ "id": "rec.7", "record": "claim", "author": "p.rates", "speaks_for": "town", "at": 50 * DAY, "visible_to": "public", "position": "right", "holder": "town", "counterparty": "c1", "about": { "kind": "rates", "amount": 6_000, "account": "acc-town", "due": 80 * DAY } }));
+        assert!(calls(&run(&mut p, &c, 51 * DAY, 40, 100_000, &[unnoticed], |p, w| p.recorded_against(w)), "money").is_empty(), "no notice: nothing paid");
+        let mut letter = pic(110 * DAY, 40, 100_000, vec![]);
+        letter.inbox = vec![serde_json::from_value(json!({ "id": "m.1", "t": 110 * DAY, "from": "p.rates", "as": "rates", "from_entity": "town", "to": ["c1"], "text": "Rates of $60.00 are overdue; interest of $0.50 has been added.", "re": "rec.7" })).unwrap()];
+        let mut d = Draws::new("p.c1", "self");
+        p.absorb(&letter, &mut Cx::new(110 * DAY, &c, &mut d, 7, vec![]));
+        let pays = calls(&run(&mut p, &c, 111 * DAY, 40, 100_000, &[], |p, w| p.recorded_against(w)), "money").iter().map(|x| arg_of(x, "settles")).collect::<Vec<_>>();
+        assert_eq!(pays, vec!["rec.7".to_string()], "told by its holder's letter about it: paid");
     }
 
     #[test]

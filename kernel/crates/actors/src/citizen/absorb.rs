@@ -549,7 +549,7 @@ impl Person {
             }
             let amount = crate::common::cents(tx.amount);
             // A home's price paid us for one we're selling, or the principal of the loan for one we're buying, is the home's.
-            if self.home_money_in(&tx.from, amount, tx.settles.as_deref()) {
+            if self.home_money_in(tx.t, &tx.from, amount, tx.settles.as_deref()) {
                 continue;
             }
             self.s.inflows.push((tx.t, amount));
@@ -635,6 +635,18 @@ impl Person {
         self.s.household_record = rec.as_ref().map(|r| r.0.clone());
         self.s.household = rec.map(|r| r.1);
         for m in &pic.inbox {
+            // A letter from the holder of a charge against us, about it, tells us of it as its notice would (the
+            // overdue letter with interest, where no notice came: MT-60): the charge is then paid as one we were told of.
+            if let Some(re) = m.re.as_ref() {
+                let holder = self.book.get(re).and_then(|c| match &c.body {
+                    RecordBody::Claim { holder, counterparty: Some(cp), .. } if *cp == me => Some(holder.to_string()),
+                    _ => None,
+                });
+                let from = m.from_entity.as_ref().map(|x| x.to_string()).or_else(|| m.from_position.as_ref().and_then(|p| self.book.position(p).map(|x| x.entity.clone())));
+                if holder.is_some() && holder == from {
+                    self.money.told_by_letter.insert(re.to_string());
+                }
+            }
             // The bank couldn't make a payment of our rent (or our share of it): we still owe it.
             let home = self.s.home.as_ref();
             let share_order = self.s.share.as_ref().and_then(|s| s.1.clone());

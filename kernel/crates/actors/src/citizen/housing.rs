@@ -72,6 +72,10 @@ pub struct Selling {
     pub received: i64,
     pub sold: bool,
     pub loan: Option<String>,
+    /// Money in while it is listed that no purchase we have read explains (when, from what account, how much): the
+    /// buyer's price may reach our account before their purchase reaches us, and is the home's once it does.
+    #[serde(default)]
+    pub unexplained: Vec<(i64, String, i64)>,
 }
 
 /// A home we are buying.
@@ -516,7 +520,7 @@ impl Person {
     }
     /// Money in that is the home's, not income (absorb asks of each payment to us, citizen.ts 1347-1362): a buyer's
     /// price for a home we're selling, or a mortgage's principal for one we're buying. True: counted here.
-    pub fn home_money_in(&mut self, from: &str, amount: i64, settles: Option<&str>) -> bool {
+    pub fn home_money_in(&mut self, at: i64, from: &str, amount: i64, settles: Option<&str>) -> bool {
         self.listing_seen();
         let me = self.me.clone();
         if let Some(s) = self.housing.selling.as_mut().filter(|s| !s.listings.is_empty()) {
@@ -532,6 +536,11 @@ impl Person {
                     s.received += amount;
                 }
                 return true;
+            }
+            // (Not known yet as the price: kept, to be counted as the home's if a purchase from this account reaches
+            // us. Until then it is taken as any money in is.)
+            if s.buyer.is_none() {
+                s.unexplained.push((at, from.to_string(), amount));
             }
         }
         let _ = me;
@@ -2062,6 +2071,17 @@ impl Person {
                     if let Some(b) = buys.first() {
                         s.buyer = b.speaks_for.map(|x| x.to_string());
                         s.buyer_account = data(b).s("account").map(String::from);
+                        // The price, if it came before the purchase did: the home's, not income (2026-11-17: a seller
+                        // whose buyer's purchase reached it a day after the money spent the price and never passed the
+                        // title).
+                        for (at, from, amount) in std::mem::take(&mut s.unexplained) {
+                            if s.buyer_account.as_deref() == Some(from.as_str()) {
+                                s.received += amount;
+                                if let Some(i) = self.s.inflows.iter().position(|x| *x == (at, amount)) {
+                                    self.s.inflows.remove(i);
+                                }
+                            }
+                        }
                     }
                 }
                 if let (Some(buyer), true) = (s.buyer.clone(), s.received >= s.price) {

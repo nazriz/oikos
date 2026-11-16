@@ -71,7 +71,10 @@ holder's transfer.
 | **Selling** | Paid in full: the title transferred to the buyer, the listing withdrawn, a sale announced. With a mortgage: the bank's payout figure (what's left, at the loan's rate) paid, settling the loan, and its repayments stopped. Then, if leaving, they go (on a later wake, with what's left). | — |
 
 Neither a home's price nor a mortgage's principal counts as the household's income (it would have been spent at the
-shops: a seller once ordered $89,000 of goods with the price of their house).
+shops: a seller once ordered $89,000 of goods with the price of their house). The price can reach the seller's account
+before the buyer's purchase reaches the seller, who reads papers at their post's sitting and sees money at once: money in
+while the home is listed is kept with the account it came from, and once a purchase is read, what came from its account
+is the price (2026-11-17: a seller who read the purchase a day after the money spent the price and kept the title).
 
 ## The bank (bank.lending 0.2.0)
 
