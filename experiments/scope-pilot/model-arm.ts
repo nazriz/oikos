@@ -6,8 +6,11 @@
 //     a working day a seat), 24 calls a sitting at most (seat-host.ts TURNS_PER_WAKE) and 900 s a call (models.ts).
 //   - openai-compat/<host>/<model>: a hosted open-weight API, a paid key, so seated with `allow_paid_api` (choosing it
 //     here is the owner's go-ahead) and under the run's dollar limits at its price entry's figures; the entry's `answer`
-//     says how it is asked (text unless it says otherwise), and its room is 8,000 tokens (docs/real-models.md, a
-//     32,768-token window beside the pilot's longest prompts). An entry missing or marked to_confirm is refused.
+//     says how it is asked (text unless it says otherwise), and its room for the answer is 8,000 tokens (docs/real-models.md,
+//     a 32,768-token window beside the pilot's longest prompts); a model that reasons in its output is given its entry's
+//     `reasoning_tokens` on top of that, at every call (participants/src/llm/call.ts: 2026-11-16, when GLM 5.3's and
+//     DeepSeek V4.1 Flash's reasoning ate the whole 8,000 in a sixth of their calls). An entry missing or marked
+//     to_confirm is refused.
 //   - codex/<model>: the owner's ChatGPT subscription, flat rate (nothing reckoned a call); room as Haiku's. Not on equal
 //     terms (the Codex CLI puts its own instructions under ours).
 //   - anthropic/<model>, claude-code/<model>: room as Haiku's, priced at the API's rates.
@@ -18,7 +21,8 @@ import { priceTable } from "../../orchestrator/src/models";
 export const DEFAULT_MODEL = "anthropic/claude-haiku-5-5";
 /** Room for a call's output, thinking included (the API's and the subscriptions' seats). */
 const ROOM = { max_tokens: 16_000 };
-/** A local model's room for a note (first-pilot.ts); a hosted one's within a 32,768-token window. */
+/** A local model's room for a note (first-pilot.ts); a hosted one's for its answer within a 32,768-token window (its
+ * reasoning, where its entry gives room for it, on top: call.ts). */
 const LOCAL_ROOM = 2_000;
 const HOSTED_ROOM = 8_000;
 

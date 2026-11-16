@@ -2196,6 +2196,31 @@
             "cost_microusd": {
               "description": "Cost of this call in millionths of a US dollar, from the price table recorded in the orchestrator annotation.",
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "max_tokens": {
+              "description": "The room the call was given for its output, reasoning included (2026-11-16).",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "stop": {
+              "description": "Why the reply stopped, where the provider says: max_tokens means it reached its room, and what it was writing is cut off.",
+              "enum": ["end", "tool_use", "max_tokens", "filtered", "other"]
+            },
+            "stop_raw": {
+              "description": "The provider's own word for a stop of kind other.",
+              "type": "string",
+              "maxLength": 64
+            },
+            "reasoning_tokens": {
+              "description": "Of output_tokens, those spent reasoning, where the provider says.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "cut_off": {
+              "description": "The reply reached its room (stop max_tokens).",
+              "const": true
+            },
+            "again": {
+              "description": "The call made once more, with twice the room, after a reply cut off at its room.",
+              "const": true
             }
           }
         },

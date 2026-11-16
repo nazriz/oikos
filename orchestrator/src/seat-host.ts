@@ -302,7 +302,9 @@ export class ModelSeat {
         if (!(e instanceof ModelCallFailed)) throw e;
         // A call that failed after its adapter's retries: the seat waits this wake (D59); call after call failing, the
         // model is out of reach and the fork stops.
-        this.o.world.annotate({ annotation: "note", subject: this.o.seat, data: { participant_error: { unit: this.o.seat, error: `${e.name}: ${e.message}`.slice(0, 2000), in_a_row: ++this.failures } } });
+        // (A reply cut off at its room was answered: the model is in reach, so it is not counted towards the failures in
+        // a row that stop the fork. The funnel counts cut-offs, and fails a seat with too many: funnel.ts.)
+        this.o.world.annotate({ annotation: "note", subject: this.o.seat, data: { participant_error: { unit: this.o.seat, error: `${e.name}: ${e.message}`.slice(0, 2000), in_a_row: e.cutOff ? this.failures : ++this.failures, ...(e.cutOff ? { cut_off: true } : {}) } } });
         if (this.failures >= MAX_FAILURES_IN_A_ROW) throw new ModelUnreachable(`the model can't be reached (${this.failures} calls in a row failed; the last: ${e.message.slice(0, 300)})`);
         return { action: e.backAt !== undefined && e.backAt > w.t ? { type: "wait", until: e.backAt } : { type: "wait" } };
       }

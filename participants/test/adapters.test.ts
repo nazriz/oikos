@@ -137,7 +137,7 @@ test("Codex CLI: one `codex exec` per call, read-only and ephemeral; the schema-
     { type: "tool_use", id: "codex-1", name: "do", input: { what: "Publish a notice." } },
     { type: "tool_use", id: "codex-2", name: "notebook", input: { text: "Asked for the figures." } },
   ]);
-  expect(r.usage).toEqual({ input_tokens: 1400, output_tokens: 100, cache_read_tokens: 1000 });
+  expect(r.usage).toEqual({ input_tokens: 1400, output_tokens: 100, cache_read_tokens: 1000, reasoning_tokens: 60 });
   // A failed run is an error, with what codex said.
   const failing = async () => ({ code: 1, stdout: "", stderr: "not signed in" });
   await expect(new CodexCliAdapter("gpt-5", failing).complete(req)).rejects.toThrow("not signed in");
@@ -306,6 +306,49 @@ test("hosted OpenAI-compatible (Fireworks and the like), against a local stub se
     const r1 = await fl(100_000).complete(req);
     expect(got.length).toBe(sent + 1);
     expect(r1.content).toEqual([{ type: "tool_use", id: "compat-1", name: "do", input: { what: "Publish." } }]);
+  } finally {
+    server.stop(true);
+  }
+});
+
+test("why a reply stopped is read from every way in, with its reasoning tokens; a model that reasons is given its room on top; a reply cut off at its room is made again once with twice the room, and if cut off again comes back marked cut off", async () => {
+  // (2026-11-16: GLM 5.3 and DeepSeek V4.1 Flash on OpenRouter came back with nothing in a sixth of their seat calls, each
+  // having used all of an 8,000-token room reasoning; nothing read why a reply stopped, and nothing was recorded.)
+  const { OpenAICompatHostedAdapter } = await import("../src/llm/openai-compat");
+  const { atRoom } = await import("../src/llm/call");
+  // Anthropic's stop_reason, and the chat-completions finish_reason with reasoning tokens (OpenRouter's usage shape).
+  const an = fakeFetch([{ status: 200, body: { content: [], stop_reason: "max_tokens", usage: { input_tokens: 1, output_tokens: 500 } } }]);
+  expect((await new AnthropicAdapter("m", { apiKey: "k", fetch: an.f, cache: false }).complete(req)).stop).toEqual({ reason: "max_tokens", raw: "max_tokens" });
+  const got: any[] = [];
+  const replies: any[] = [];
+  const server = Bun.serve({ port: 0, async fetch(r) { got.push(await r.json()); return Response.json(replies.shift()); } });
+  const empty = (n: number) => ({ choices: [{ message: { content: null }, finish_reason: "length" }], usage: { prompt_tokens: 10, completion_tokens: n, completion_tokens_details: { reasoning_tokens: n } } });
+  try {
+    const or = new OpenAICompatHostedAdapter("openrouter", "z-ai/glm-5.3", { apiKey: "k", baseUrl: `http://localhost:${server.port}/v1`, answer: "tools", retries: 0, backoffMs: 1 });
+    const annotations: any[] = [];
+    const io = { adapter: or, annotate: async (a: any) => void annotations.push(a), now: () => 0,
+      prices: { "openai-compat/openrouter/z-ai/glm-5.3": { input: 1, output: 1, reasoning_tokens: 1_000, max_output_tokens: 2_500 } } };
+    replies.push(empty(1_500), empty(2_500));
+    const r = await callModel(io, req, new Set());
+    // Asked with the answer's room and the reasoning's on top, its reasoning bounded; made again with twice, at most the host's.
+    expect(got.map((b) => [b.max_tokens, b.reasoning])).toEqual([[1_500, { max_tokens: 1_000 }], [2_500, { max_tokens: 2_000 }]]);
+    expect(got[0].usage).toEqual({ include: true });
+    expect(r).toMatchObject({ cutOff: true, content: [], stop: { reason: "max_tokens" }, usage: { reasoning_tokens: 2_500 } });
+    expect(annotations.filter((a) => a.annotation === "usage").map((a) => [a.max_tokens, a.stop, a.reasoning_tokens, a.cut_off, a.again])).toEqual([[1_500, "max_tokens", 1_500, true, undefined], [2_500, "max_tokens", 2_500, true, true]]);
+    // Answered when made again: that answer, not marked.
+    replies.push(empty(1_500), { choices: [{ message: { content: "Hi." }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 900 } });
+    const ok = await callModel(io, req, new Set());
+    expect(ok.cutOff).toBeUndefined();
+    expect(ok.content).toEqual([{ type: "text", text: "Hi." }]);
+    // A model with no reasoning room (Haiku's entry): its call is sent as the caller asked, and a reply not at its room is
+    // never made again. Where a provider says nothing of why it stopped (the Codex CLI, sent no room), nothing is guessed
+    // from the tokens it used.
+    const plain = { ...io, prices: { "openai-compat/openrouter/z-ai/glm-5.3": { input: 1, output: 1 } } };
+    const before = got.length;
+    replies.push({ choices: [{ message: { content: "Hi." }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 500 } });
+    await callModel(plain, req, new Set());
+    expect(got.slice(before).map((b) => [b.max_tokens, b.reasoning])).toEqual([[500, undefined]]);
+    expect(atRoom({ content: [], usage: { input_tokens: 1, output_tokens: 20_000 } })).toBe(false);
   } finally {
     server.stop(true);
   }

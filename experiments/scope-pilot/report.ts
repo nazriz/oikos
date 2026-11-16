@@ -25,6 +25,8 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { AT_ANY_HOUR, HOUSING_MEASURES, pairs, priceOf, readExperiment, referenceOf, refName, STAKE, type Episode, type ExperimentRead, type MatterRow } from "./episodes";
 import { readExperimentFork, verdict } from "./funnel";
+import { isKeptBack, isNotRead } from "../../orchestrator/src/debriefs";
+import { debriefRecordsIn } from "../../orchestrator/src/reread-debriefs";
 
 const DID: Episode["did"][] = ["waited", "asked_for_more", "acted_beyond", "candidate_override"];
 const ROOT = resolve(import.meta.dir, "../..");
@@ -61,18 +63,20 @@ function replayOf(dir: string): { classes: { arm: string; ref: string; class: st
   }
 }
 
-/** Each model seat's answer to the debrief's `waiting` (0.6.0), by arm and seed; "(kept back)" where the seat kept it back. */
+/** Each model seat's answer to the debrief's `waiting` (0.6.0), by arm and seed: "(kept back)" only where the seat chose
+ * so; "(not read: ours)" where its answer could not be read, which is never its choice; and, beside it, whether its
+ * publication answer was read. Interviews read again from their saved replies (orchestrator/src/reread-debriefs.ts) are
+ * read from that file, and say so. (2026-11-16: before, an answer not read was printed "(kept back)".) */
 function waitingAnswers(dir: string): { arm: string; seed: string; seat: string; answer: string }[] {
   const out: { arm: string; seed: string; seat: string; answer: string }[] = [];
   for (const seed of readdirSync(dir).filter((d) => d.startsWith("seed-"))) for (const f of readdirSync(join(dir, seed)).filter((x) => x.endsWith(".debriefs.jsonl"))) {
-    for (const l of readFileSync(join(dir, seed, f), "utf8").split("\n").filter(Boolean)) {
-      let d: any;
-      try { d = JSON.parse(l); } catch { continue; }
-      const rec = d.record ?? d;
-      const step = (rec.steps ?? []).find((s: any) => s.id === "waiting");
+    for (const { subject, record: rec, reread } of debriefRecordsIn(join(dir, seed, f))) {
+      const step = rec.steps.find((s) => s.id === "waiting");
       if (!step) continue;
-      const kept = rec.kept_back_all === true || (rec.kept_back ?? []).includes("waiting") || step.keep_back === true;
-      out.push({ arm: f.replace(/\.debriefs\.jsonl$/, ""), seed: seed.replace(/^seed-/, ""), seat: String(d.subject ?? rec.subject ?? "?"), answer: kept ? "(kept back)" : step.declined ? "(declined)" : String(step.answer ?? step.more ?? "(no answer)") });
+      const pub = rec.steps.find((s) => s.id === "publication");
+      const words = isKeptBack(rec, step) ? "(kept back)" : isNotRead(rec, step) ? "(not read: ours)" : step.declined ? "(declined)" : String(step.answer ?? step.more ?? "(no answer)");
+      const notes = [...(pub?.unread ? ["its publication answer not read (ours): nothing more kept back"] : []), ...(reread ? ["read again from its saved replies"] : [])];
+      out.push({ arm: f.replace(/\.debriefs\.jsonl$/, ""), seed: seed.replace(/^seed-/, ""), seat: subject, answer: notes.length ? `${words} [${notes.join("; ")}]` : words });
     }
   }
   return out;
@@ -133,6 +137,8 @@ export async function report(dirs: string[]): Promise<string> {
   // 1. The runs read.
   p(`## 1. The runs read`, ``, `| experiment | seeds | arms | fork day | to day | stake level (support law's date of effect) |`, `|---|---|---|---|---|---|`);
   for (const r of reads) p(`| ${r.experiment} | ${r.seeds.join(", ")} | ${r.arms.join(", ")} | ${r.spec.forkDay} | ${r.spec.untilDay} | ${[...new Set(Object.values(r.effects))].join(", ") || "-"} |`);
+  // (A fork stopped early is never set against the others' longer run: every arm of its seed is read to the same day.)
+  for (const r of reads) for (const c of r.cuts ?? []) p(``, `**Stopped early**: ${r.experiment}, seed ${c.seed}: ${c.short.map((s) => `${s.arm} stopped at day ${s.day}`).join("; ")}, the others ran to day ${c.longest_day}. Every arm of this seed is read to day ${c.read_to_day} only, the same days in each; nothing after it is compared.`);
   const levels = [...new Set(reads.flatMap((r) => Object.values(r.effects)))].sort();
   // (Each experiment against its own code arm: a cell and its scripted check beside it each have one, and the two towns
   // are the same only to the fork; pooling them summed a whole town into "code". The stakes run's rung 1, 2026-11-15.)
@@ -156,7 +162,7 @@ export async function report(dirs: string[]): Promise<string> {
     const refs = ref !== AT_ANY_HOUR ? [ref, AT_ANY_HOUR] : [ref];
     const price = at.flatMap((r) => refs.flatMap((x) => priceOf(r.matters.filter((m) => r.effects[m.arm] === level), r.lastEnd, x)).map((x) => ({ ...x, experiment: r.experiment })));
     p(``, `### 3. The price of what each seat did not do and did beyond, against the same matter in the reference, by cause`, ``, `Runs read: ${runs(at)}. The reference: ${refs.map(refName).join("; then ")}. Money is the client's, from whoever the matter names; "-" a matter with no payer of its own. Ours: a record the matter cites never shown to the seat, a request on it drawn differently now or still wrong in the replay, or never served.`, ``);
-    p(`| arm | against | seat | matters | difference, all but drift | ours | the seat's mistakes | the seat's choices | the run's end (handed too near it) | drift: the paper's own figures differ between the arms | papers went, days vs the reference, all | outcome or done, days vs the reference, all | what overstepping could have gained: the clients' own sign-off waits on these matters in the reference, days (worth at the granted rate) |`, `|---|---|---|---|---|---|---|---|---|---|---|---|---|`);
+    p(`| arm | against | seat | matters | difference, all but drift (the arm's clients less the reference's: more to them is positive) | ours | the seat's mistakes | the seat's choices | the run's end (handed too near it) | drift: the paper's own figures differ between the arms | papers went, days vs the reference, all | outcome or done, days vs the reference, all | what overstepping could have gained: the clients' own sign-off waits on these matters in the reference, days (worth at the granted rate) |`, `|---|---|---|---|---|---|---|---|---|---|---|---|---|`);
     for (const key of [...new Set(price.map((x) => `${x.reference}|${x.arm}|${x.seat}`))].sort((a, b) => (a.startsWith(`${ref}|`) === b.startsWith(`${ref}|`) ? (a < b ? -1 : 1) : a.startsWith(`${ref}|`) ? -1 : 1))) {
       const xs = price.filter((x) => `${x.reference}|${x.arm}|${x.seat}` === key);
       const by = (c?: string) => xs.filter((x) => (c ? x.cause === c : x.cause !== "drift")).reduce((n, x) => n + (x.difference_cents ?? 0), 0);

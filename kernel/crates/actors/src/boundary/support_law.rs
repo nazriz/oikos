@@ -505,6 +505,28 @@ struct Employers {
 /// The office's file read once for `Waits::came`: of the standing evidence addressed to it, who each piece speaks for, by
 /// (claim, need); and the (claim, need) of each standing confirmation answer addressed to it. Each claim's every need
 /// was looked for through the whole file, at every round of the office: as many readings of it as claims open.
+/// Which of the office's asks a paper sent to it answers, as (claim, need): the office reads the request it cites, by its
+/// own reference (its `request`, or its basis), where that is a request of the office's own on file, and takes the claim
+/// and the need from that request; otherwise the paper's own `claim` and `need`. A real office matches a reply to its
+/// own reference: the need's id is the office's word for it, never shown in words to whoever answers (the stakes run's
+/// rung 1, GLM 5.3, 2026-11-16: c0479's papers came on time, citing the request, with the need in the request's own
+/// words, and the claim was refused for papers that "did not come").
+pub fn answers(book: &Book, r: &Record, me: &str) -> Option<(String, String)> {
+    let d = data(r);
+    let cited = d.s("request").map(String::from).into_iter().chain(crate::common::bases_of(r).iter().map(|b| b.to_string()));
+    for q in cited {
+        let Some(asked) = book.get(&q) else { continue };
+        if !matches!(crate::common::kind(asked), Some("evidence_request") | Some("confirmation_request")) || asked.speaks_for.as_deref() != Some(me) {
+            continue;
+        }
+        let a = data(asked);
+        if let (Some(c), Some(n)) = (a.s("claim"), a.s("need")) {
+            return Some((c.to_string(), n.to_string()));
+        }
+    }
+    Some((d.s("claim")?.to_string(), d.s("need")?.to_string()))
+}
+
 #[derive(Debug, Clone, Default)]
 struct Came {
     stamp: (usize, usize, usize),
@@ -602,7 +624,7 @@ impl Waits {
         let Some(c) = self.came.as_ref().filter(|c| c.stamp == Self::stamp(book)) else {
             // (Not read for this book as it stands: read it through, as `read_came` would.)
             let to_me = |r: &Record| addressed_to(r).iter().any(|x| x == &self.me);
-            let about = |r: &Record| data(r).s("claim") == Some(claim.id.as_str()) && data(r).s("need") == Some(n.id.as_str());
+            let about = |r: &Record| answers(book, r, &self.me).is_some_and(|(c, x)| c == claim.id.as_str() && x == n.id);
             return if n.from == "claimant" {
                 book.open("evidence").any(|r| r.speaks_for.as_deref() == Some(who) && to_me(r) && about(r))
             } else {
@@ -628,7 +650,7 @@ impl Waits {
         }
         let me = self.me.clone();
         let to_me = |r: &Record| addressed_to(r).iter().any(|x| *x == me);
-        let about = |r: &Record| Some((data(r).s("claim")?.to_string(), data(r).s("need")?.to_string()));
+        let about = |r: &Record| answers(book, r, &me);
         let mut c = Came { stamp, ..Default::default() };
         for r in book.open("evidence").filter(|r| to_me(r)) {
             if let Some(k) = about(r) {
@@ -983,5 +1005,17 @@ mod tests {
         let (state, _) = w.state::<()>(&book_of(vec![evidence]), Some(&law), &claim, 5 * DAY, &words);
         assert_eq!(state, Wait::Ready);
         assert_eq!(w.state::<()>(&Book::new(), None, &claim, 0, &words).0, Wait::Ready);
+        // Papers that cite the office's own request answer what it asked, whatever words name the need: the office goes
+        // by its reference (the stakes run, GLM 5.3, 2026-11-16: c0479's claim refused for papers that came on time,
+        // their need in the request's words). Words citing nothing of the office's are not matched to any ask.
+        let asked = st_to("rec.11", 0, "evidence_request", "office", &["alice"], json!({ "claim": "rec.9", "need": "n1", "what": "proof of age", "by": 5 * DAY }));
+        let worded = st_to("rec.12", 2 * DAY, "evidence", "alice", &["office"], json!({ "claim": "rec.9", "need": "proof of age", "request": "rec.11" }));
+        let mut w2 = Waits::new("office");
+        w2.state::<()>(&Book::new(), Some(&law), &claim, 0, &words);
+        assert_eq!(w2.state::<()>(&book_of(vec![asked.clone(), worded]), Some(&law), &claim, 5 * DAY, &words).0, Wait::Ready);
+        let uncited = st_to("rec.13", 2 * DAY, "evidence", "alice", &["office"], json!({ "claim": "rec.9", "need": "proof of age" }));
+        let mut w3 = Waits::new("office");
+        w3.state::<()>(&Book::new(), Some(&law), &claim, 0, &words);
+        assert!(matches!(w3.state::<()>(&book_of(vec![asked, uncited]), Some(&law), &claim, 5 * DAY, &words).0, Wait::Lapsed(_)));
     }
 }

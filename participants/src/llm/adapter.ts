@@ -46,6 +46,10 @@ export interface LlmRequest {
    * may meet either gives both (a tool of the same name taking the same object). */
   answer?: { name: string; schema: object };
   maxTokens: number;
+  /** Of `maxTokens`, the most the model may spend reasoning before it answers, where its way in takes a bound
+   * (OpenRouter's `reasoning.max_tokens`); set by callModel from the model's entry (`reasoning_tokens`), never by a
+   * caller. An adapter whose way in takes none leaves it. */
+  reasoningTokens?: number;
   /** How hard the model is to reason for this call, where whoever makes it has a say (a seat's setting): the word its
    * way in takes ("low", "medium", "high"). An adapter that takes an effort uses this one before its own; one that
    * takes none leaves it. Recorded with the call's transcript. */
@@ -64,6 +68,26 @@ export interface Usage {
   reported_cost_microusd?: number;
   /** How many model turns the provider took inside the one call, where it says (Claude Code's `num_turns`). */
   turns?: number;
+  /** Of `output_tokens`, those the model spent reasoning, where the provider says (chat completions'
+   * `completion_tokens_details.reasoning_tokens`, the Codex CLI's `reasoning_output_tokens`). */
+  reasoning_tokens?: number;
+}
+
+/** Why a reply stopped, as the provider said it, in one vocabulary: `end` (the model finished), `tool_use` (it finished
+ * on a call of a tool), `max_tokens` (it reached the room it was given: whatever it was writing is cut off there),
+ * `filtered` (the provider withheld it), `other` (anything else; `raw` says what). */
+export type StopReason = "end" | "tool_use" | "max_tokens" | "filtered" | "other";
+export interface Stop { reason: StopReason; raw: string }
+
+/** A chat-completions `finish_reason` (OpenAI, OpenRouter, Fireworks, Together, Featherless, ollama, vLLM), or an
+ * Anthropic `stop_reason`, as a Stop; undefined where there is none. */
+export function stopOf(raw: unknown): Stop | undefined {
+  if (typeof raw !== "string" || !raw) return undefined;
+  const reason: StopReason = raw === "stop" || raw === "end_turn" || raw === "stop_sequence" ? "end"
+    : raw === "tool_calls" || raw === "function_call" || raw === "tool_use" ? "tool_use"
+    : raw === "length" || raw === "max_tokens" || raw === "max_output_tokens" ? "max_tokens"
+    : raw === "content_filter" || raw === "refusal" ? "filtered" : "other";
+  return { reason, raw };
 }
 
 export interface LlmResponse {
@@ -71,6 +95,11 @@ export interface LlmResponse {
   usage: Usage;
   /** True when token counts are estimates (the mock), not a provider's report. */
   estimated?: boolean;
+  /** Why the reply stopped, where the provider says (`stopOf`). */
+  stop?: Stop;
+  /** Set by callModel: the reply was cut off at the room it was given, after the one call made again with more room
+   * (`cut_off` in the record). What it holds may be nothing, or less than the model meant. */
+  cutOff?: boolean;
   /** The model's words as it wrote them, where an adapter read them into uses (a plain note: note.ts): kept in the
    * transcript, since the words are the data (P2). */
   said?: string;
@@ -127,6 +156,13 @@ export interface Price {
   output: number;
   cache_read?: number;
   cache_write?: number;
+  /** A model that reasons in its output before it answers: the room it is given for that, added to every call's own
+   * room for the answer (callModel), and sent as the bound on its reasoning where its way in takes one. With its source
+   * in the entry's `room_source`. Absent: a call's room is the caller's, unchanged. */
+  reasoning_tokens?: number;
+  /** The most output the host gives one call (OpenRouter's `top_provider.max_completion_tokens`): a call made again
+   * with more room is never given more than this. */
+  max_output_tokens?: number;
 }
 
 export const PRICES: Record<string, Price> = {

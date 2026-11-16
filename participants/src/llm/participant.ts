@@ -18,7 +18,7 @@ import { inCurrency } from "../money";
 import { inCalendar } from "../calendar";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { CounterWatch } from "./counter";
-import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
+import { callModel, cutOffBare, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
 import { namedRefs } from "../readers/matters";
 import { runDebrief, type DebriefInput, type DebriefRecord, type MockDebrief } from "./debrief";
 import { asksWhatItIs, TRUE_ANSWER, wayOut, wayOutAsked } from "./framing";
@@ -1564,10 +1564,16 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             if (fit.left) await note({ prompt_trimmed: { ...fit.left, characters: fit.characters, limit: promptMax } });
             sentCharacters = fit.characters;
             fitted = fit.messages;
-            return callModel(io, {
+            const r = await callModel(io, {
               purpose: "participant", subject: c.participant, system: fit.system, messages: fit.messages, tools: toolset, maxTokens: c.maxTokens ?? 4000, ...(c.effort ? { effort: c.effort } : {}),
               context: { observation: obs, notes, participant: c.participant, ...(missed.length ? { missed } : {}) },
             }, seenSystems);
+            // A reply cut off at its room with nothing in it, even with more room (callModel): not a turn that chose to
+            // do nothing. The sitting ends unfinished, as one whose call failed does (below), and the seat is told so at
+            // its next sitting, in the world's words. (2026-11-16: 10 of GLM 5.3's 61 seat calls came back so, and the
+            // sitting simply ended, nothing said.)
+            if (cutOffBare(r)) throw Object.assign(new ModelCallFailed(`${c.participant}: the reply reached the room it was given, and again with twice the room, with nothing in it: the sitting ended unfinished`), { cutOff: true });
+            return r;
           };
           // An answer is read exactly or not at all: one that could not be is not guessed at. The seat is told plainly what
           // could not be read, once, in the same exchange; if the second can't be read either, nothing is done.
@@ -1647,7 +1653,13 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             }
             if (turn === 1) missed.push(obs);
             const tooLong = promptTooLong(e.message);
-            const told = midway
+            // (A sitting cut off is not one missed: the seat was at its desk and did not finish. It is told so, in the
+            // world's words; nothing about rooms or tokens.)
+            const told = e.cutOff
+              ? midway
+                ? `Your sitting on ${when(obs.t)} ended unfinished: what you were working out after your last answer there was never finished, so nothing more was done that day, and nothing of it was written down or noted. How what you had asked for before went is set out below, with what has come in since.`
+                : `Your sitting on ${when(obs.t)} ended unfinished: you read what had come in, but never finished working out what to do, so nothing was done that day and nothing was noted. What had come in for it is set out below, with what has come in since.`
+              : midway
               ? `Your sitting on ${when(obs.t)} was cut short: you were away from your desk after your last answer there, and nothing more was done that day. How what you had asked for went is set out below, with what has come in since.`
               : `You missed your sitting on ${when(obs.t)}: you were not at your desk, and nothing was read or done that day. What had come in for it is set out below, with what has come in since.`;
             if (!tooLong && !unsaid.includes(told)) unsaid.push(told);
@@ -1659,7 +1671,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             if (S) sittingDay = Math.floor(obs.t / DAYS); // (that day's sitting is the one missed)
             backAt = 0;
             e.backAt = S ? nextSitting(obs.t + 1) : obs.t + DAYS;
-            await note({ sitting_missed: { day: Math.floor(obs.t / DAYS), midway, back_at: e.backAt, why: tooLong ? "prompt_too_long" : "model_call_failed", error: String(e.message).slice(0, 300) } });
+            await note({ sitting_missed: { day: Math.floor(obs.t / DAYS), midway, back_at: e.backAt, why: tooLong ? "prompt_too_long" : e.cutOff ? "cut_off" : "model_call_failed", error: String(e.message).slice(0, 300) } });
             throw e;
           }
           // No answer because the run is stopping (a limit): nothing it was to be shown is dropped. What was kept for it
@@ -1691,6 +1703,12 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         carried = [];
         missed = [];
         unsaid = unreadTwice ? [`When you were last here, ${unreadTwice}.`] : [];
+        // (A reply cut off at its room with something in it: what came before the break is taken as written, and the
+        // seat is told, in the world's words, that the rest never reached anyone.)
+        if (res.cutOff) {
+          unsaid.push(`When you were last here, on ${when(obs.t)}, one of your answers broke off before you had finished it: what came before the break was taken as written, and nothing after it reached anyone.`);
+          await note({ answer_cut_off: { day: Math.floor(obs.t / DAYS), uses: res.content.filter((b) => b.type === "tool_use").length } });
+        }
         quietKept = { carried: 0, unsaid: 0 };
         extra = [];
         results.clear();

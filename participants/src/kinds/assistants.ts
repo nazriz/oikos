@@ -122,11 +122,14 @@ export function clientPapers(payments: string[]): Issued[] {
       fields: { client, office: f("entity", "The office that pays it.", req), claim: f("record", "The client's claim to stop.", req) },
       writes: { in_name_of: "=client", kind: "benefit_change", text: "Please stop paying my claim {claim}.", basis: "=claim", to: ["=office"], visible: ["=client", "=office"], data: { claim: "=claim", stop: true } } },
     // (The reply to an office's request for papers on a claim: a matter handed over stays handed over, so the desk that
-    // made the claim answers what the office asks next. The fields are those the office reads: `Evidence`.)
+    // made the claim answers what the office asks next. The fields are those the office reads: `Evidence`. The office
+    // matches the papers to its ask by the request they cite (support_law.rs `answers`), so `need` is the sender's own
+    // words, never an id it was not shown: until 2026-11-16 it was required and matched as the office's id for the need
+    // ("papers"), which no seat is shown, and papers filled in the words shown were refused as never come.)
     { form: "evidence", title: "Papers for a claim, sent as the office asked, in a client's name",
       does: "Sends the office that asked for them the papers for a client's claim, in the client's name, answering its request. The office reads which claim and which of its requests it answers, and decides the claim on what it then has.",
       fields: { client, office: f("entity", "The office that asked.", req), request: f("record", "The office's request.", req), claim: f("record", "The client's claim.", req),
-        need: f("text", "What the office asked for, as its request names it.", req), last_employer: f("entity", "The client's last employer, where the office asks for one.") },
+        need: f("text", "What is sent, in a few words, if you wish: the office goes by the request it answers."), last_employer: f("entity", "The client's last employer, where the office asks for one.") },
       writes: { in_name_of: "=client", kind: "evidence", text: "For my claim {claim}: the papers asked for.", basis: "=request", to: ["=office"], visible: ["=client", "=office"], data: { claim: "=claim", need: "=need", request: "=request", last_employer: "=last_employer" } } },
   ];
 }

@@ -97,8 +97,10 @@ test("the debrief shows the seat its own standing instructions, once, with its n
   expect(first.messages[0]!.content).toContain(`=== YOUR STANDING INSTRUCTIONS, AS THEY WERE ===\n${sitting.system.trim()}\n=== END OF YOUR STANDING INSTRUCTIONS ===`);
   expect(first.messages[0]!.content).toContain("WHAT THE RECORD SHOWS OF WHAT YOU DID\nYou keep only your notebook from one sitting to the next, so this is set out for you. It was made by code from the run's record. The platform records what was done and does not judge how things turned out, so nothing here says how any of it went; what followed in the town is in the run's published data. It is your own acts only: your notebook may also mention what other offices did.\n1 letter of yours was delivered.");
   expect(first.messages[0]!.content).toContain("YOUR NOTEBOOK, AS YOU LEFT IT\nDay 8: waiting on the bank.");
-  // (This harness answers a debrief in plain words, not in the form asked for: every answer is kept as given, and kept back.)
-  expect(r.steps.every((s) => s.unread)).toBe(true);
+  // (This harness answers a debrief in plain words: read as the answer to each open question (0.7.1), never at the
+  // consent, scaled or publication steps, which are not read (ours) and never kept back.)
+  expect(r.steps.filter((s) => s.unread).map((s) => s.id)).toEqual(["consent", "scales", "publication"]);
+  expect(r.kept_back).toEqual([]);
   expect(debriefs[0]).toEqual(r);
 });
 

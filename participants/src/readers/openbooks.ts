@@ -280,8 +280,15 @@ export function supportBooks(ctx: ParticipantContext): OfficeBooks {
         .map((r): OpenItem => ({ id: r.data!.claim as string, since: r.at, ...(r.data?.amount !== undefined ? { amount: cents(r.data.amount) } : {}),
           line: `${r.data!.claim}: ${r.data?.claimant}'s claim for ${r.data?.payment} support, put before the office-holder ${dateWords(r.at)} (${r.id}): ${r.data?.fails}; not decided` }));
       // What a claim waits for (foundations F8): the papers and confirmations the office has asked for, not yet come, with the day each is due by.
-      const came = new Set(["evidence", "confirmation_answer"].flatMap((k) => book.open(k)).filter((r) => (r.addressed_to ?? []).includes(me) && typeof r.data?.claim === "string").map((r) => `${r.data!.claim}|${r.data!.need}`));
-      const waiting = ["evidence_request", "confirmation_request"].flatMap((k) => book.open(k)).filter((r) => r.speaks_for === me && typeof r.data?.claim === "string" && !decided.has(r.data.claim) && !came.has(`${r.data.claim}|${r.data.need}`))
+      // (A paper is matched to the ask it answers by the request it cites, where that is the office's own: support_law.rs `answers`.)
+      const asks = ["evidence_request", "confirmation_request"].flatMap((k) => book.open(k)).filter((r) => r.speaks_for === me);
+      const askById = new Map(asks.map((r) => [r.id, r]));
+      const answers = (r: StatementRecord) => {
+        const q = [r.data?.request, ...basesOf(r)].map((x) => askById.get(String(x))).find((x) => typeof x?.data?.claim === "string" && typeof x?.data?.need === "string");
+        return q ? `${q.data!.claim}|${q.data!.need}` : `${r.data!.claim}|${r.data!.need}`;
+      };
+      const came = new Set(["evidence", "confirmation_answer"].flatMap((k) => book.open(k)).filter((r) => (r.addressed_to ?? []).includes(me) && typeof r.data?.claim === "string").map(answers));
+      const waiting = asks.filter((r) => typeof r.data?.claim === "string" && !decided.has(r.data.claim) && !came.has(`${r.data.claim}|${r.data.need}`))
         .sort((a, b) => Number(a.data?.by ?? 0) - Number(b.data?.by ?? 0) || (a.id < b.id ? -1 : 1))
         .map((r): OpenItem => ({ id: r.id, since: r.at, ...(Number.isFinite(Number(r.data?.by)) ? { due: Number(r.data!.by) } : {}),
           line: `${r.data!.claim}: ${r.kind === "evidence_request" ? "the claimant" : String(r.addressed_to?.[0] ?? "the last employer")} was asked ${dateWords(r.at)} for ${r.data?.what} (${r.id}), due by ${Number.isFinite(Number(r.data?.by)) ? dateWords(Number(r.data!.by)) : "no day given"}; not yet answered` }));

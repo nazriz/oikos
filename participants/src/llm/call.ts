@@ -142,7 +142,24 @@ export class ModelCallFailed extends Error {
   /** When the seat the call was for sits again (its participant's own reckoning: the next working day's sitting): the
    * run has it woken then. Without it a seat would wait out its whole usual rhythm, days, with nobody in it. */
   backAt?: number;
+  /** The call was answered, but the reply reached the room it was given, twice, with nothing in it that could be taken
+   * (callModel, `cutOffBare`): the sitting ended unfinished, which the seat is told in those words. */
+  cutOff?: boolean;
 }
+
+/** Whether a reply stopped at the room it was given: only where the provider says so. (Never guessed from the tokens
+ * used: the Codex CLI and Claude Code are sent no room and count every turn's tokens, so a long answer of theirs would
+ * read as cut off. Every way in that is sent a room says why its reply stopped: anthropic, openai, openai-compat, ollama.) */
+export function atRoom(res: LlmResponse): boolean {
+  return !res.estimated && res.stop?.reason === "max_tokens";
+}
+
+/** A reply with nothing in it that could be taken: no use of a tool, and no words. */
+export const bare = (res: LlmResponse): boolean => !res.content.some((b) => b.type === "tool_use" || (b.type === "text" && b.text.trim()));
+
+/** A reply cut off at its room with nothing in it, after the one call made again with more room: what the caller is
+ * left with. Where a caller's turn rests on the reply (a seat's sitting), it is not a turn that chose to do nothing. */
+export const cutOffBare = (res: LlmResponse): boolean => !!res.cutOff && bare(res);
 
 /** Whether a failed call's words say the prompt was more than the model takes. Such a call is never made again
  * unchanged: an adapter does not try it again, and whoever made it sends less next time. */
@@ -166,11 +183,37 @@ export interface LlmIO {
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
+/**
+ * One model call, recorded. Two things about room (2026-11-16; docs/decisions.md, "A reply cut off at its room"):
+ *  - A model that reasons in its output (its entry's `reasoning_tokens`) is given that room on top of the caller's room
+ *    for the answer, and the bound is sent where its way in takes one. Before, a reasoning model's thinking ate the
+ *    whole of an 8,000-token room in 10 of GLM 5.3's 61 seat calls and 11 of DeepSeek V4.1 Flash's, which came back
+ *    with nothing, and the sitting simply ended.
+ *  - A reply that stops at its room (`atRoom`) is cut off: whatever the model was writing is unfinished. The call is
+ *    made once more with twice the room (at most the host's `max_output_tokens`), a call of its own, recorded and
+ *    counted against the limit as any other. If that one is cut off too, it comes back marked `cutOff`, with what it
+ *    holds; the caller decides what an unfinished reply means for it (a seat's sitting: participant.ts).
+ * Every call's usage record says why it stopped (`stop`), the room it had (`max_tokens`), its reasoning tokens where the
+ * provider says, and `cut_off` / `again` where it was cut off or was the call made again.
+ */
 export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<string>): Promise<LlmResponse> {
-  const { adapter } = io;
-  const key = `${adapter.provider}/${adapter.model}`;
+  const key = `${io.adapter.provider}/${io.adapter.model}`;
   const price = (io.prices ?? PRICES)[key];
   if (!price) throw new Error(`no price recorded for ${key}: add it to the price table before using this model`);
+  const reasoning = typeof price.reasoning_tokens === "number" && price.reasoning_tokens > 0 ? price.reasoning_tokens : 0;
+  const first: LlmRequest = reasoning ? { ...req, maxTokens: req.maxTokens + reasoning, reasoningTokens: reasoning } : req;
+  const res = await callOnce(io, first, seenSystems, price, {});
+  if (!atRoom(res)) return res;
+  const most = typeof price.max_output_tokens === "number" ? price.max_output_tokens : Infinity;
+  const room = Math.min(first.maxTokens * 2, most);
+  if (room <= first.maxTokens) return { ...res, cutOff: true };
+  const again = await callOnce(io, { ...first, maxTokens: room, ...(reasoning ? { reasoningTokens: Math.min(reasoning * 2, room - req.maxTokens) } : {}) }, seenSystems, price, { again: true });
+  return atRoom(again) ? { ...again, cutOff: true } : again;
+}
+
+async function callOnce(io: LlmIO, req: LlmRequest, seenSystems: Set<string>, price: Price, how: { again?: boolean }): Promise<LlmResponse> {
+  const { adapter } = io;
+  const key = `${adapter.provider}/${adapter.model}`;
   let worst = 0;
   if (io.budget) {
     // The worst case for this call: the prompt (estimated generously: characters / 3) and every output token allowed.
@@ -226,6 +269,11 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
     ...(res.usage.cache_read_tokens !== undefined ? { cache_read_tokens: res.usage.cache_read_tokens } : {}),
     ...(res.usage.cache_write_tokens !== undefined ? { cache_write_tokens: res.usage.cache_write_tokens } : {}),
     cost_microusd: cost,
+    // (Why it stopped, the room it had, and its reasoning, where the provider says: a reply cut off at its room is
+    // never read as one that chose to say nothing.)
+    max_tokens: req.maxTokens, ...(res.stop ? { stop: res.stop.reason, ...(res.stop.reason === "other" ? { stop_raw: res.stop.raw } : {}) } : {}),
+    ...(res.usage.reasoning_tokens !== undefined ? { reasoning_tokens: res.usage.reasoning_tokens } : {}),
+    ...(atRoom(res) ? { cut_off: true } : {}), ...(how.again ? { again: true } : {}),
   });
   // A debrief's answer is kept apart from the log, where the run has somewhere to keep it: the log gets its digest.
   let apart: string | undefined;

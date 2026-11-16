@@ -8,8 +8,9 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { askedClass, askedMore, episodesOf, housingOf, priceOf } from "../../experiments/scope-pilot/episodes";
+import { askedClass, askedMore, cutOffSittings, episodesOf, housingOf, priceOf, sameDays } from "../../experiments/scope-pilot/episodes";
 import { binomialInterval, peopleTable, share } from "../../experiments/scope-pilot/report";
+import { FunnelReader } from "../../experiments/scope-pilot/funnel";
 import { seatHealth } from "../../experiments/scope-pilot/broad-report";
 import { beyondByCode, finalOf, kappa, needsThird, poissonInterval, run, runOverride, strip, type ArmRead, type Code } from "../../experiments/scope-pilot/code";
 
@@ -133,7 +134,7 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   // the check fails naming it; a model seat that never sat is flagged, not failed; at the end one not debriefed fails.)
   const total = { handed: 0, drafted: 0, drafts: 0, signed: 0, sent: 0, answered: 0, shown: 0, done: 0, declined: 0, not_done: 0, carried: 0 };
   const served = { requests: 0, served_first_time: 0, asked_back: 0, served_after_restatement: 0, never_served: 0, not_sent: 0, drafts_unsure: 0, drafts_offered: 0, drafts_confirmed: 0, drafts_declined: 0, drafts_unanswered: 0 };
-  const seat = (post: string, p: string, sittings: number, debriefed: any) => ({ post, participants: [p], model: true, kinds: {}, total, answers: {}, to: {}, served, obstacles: { made: 0, met: 0, cleared: 0, loosely: 0, by_law: {}, met_list: [] }, requests: { made: 0, answered: {} }, unread: 0, sittings, calls: 0, debriefed, verdict: { fail: [], flag: [] } });
+  const seat = (post: string, p: string, sittings: number, debriefed: any) => ({ post, participants: [p], model: true, kinds: {}, total, answers: {}, to: {}, served, obstacles: { made: 0, met: 0, cleared: 0, loosely: 0, by_law: {}, met_list: [] }, requests: { made: 0, answered: {} }, unread: 0, sittings, calls: 0, debriefed, replies: { calls: 0, cut_off: 0, unfinished: 0 }, debrief_replies: { calls: 0, cut_off: 0, unfinished: 0 }, verdict: { fail: [], flag: [] } });
   const fn = { fork_day: 30, through_day: 40, ended: false, seats: [seat("a-assistant", "par.1", 0, null)] } as any;
   const map = { "par.1": { capacity: "a-assistant" }, "par.2": { capacity: "b-assistant" } };
   const day10 = seatHealth(fn, map, false, "t");
@@ -189,6 +190,21 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   // in stock) is the towns' drift, whatever else is on it.
   const inv = (a: string, m: string, q: string, x: object = {}) => row(a, m, { kind: "invoice", paper: `form(form=invoice, quantity="${q}")`, ...x });
   expect(priceOf([inv("code", "rec.1", "797", { done: at(36), received_cents: 7_867_984 }), inv("haiku", "rec.3", "2797", { done: at(37), received_cents: 27_611_984, ours: ["draft.par.3.1: still wrong in the replay"] })], at(60)).map((r) => r.cause)).toEqual(["drift"]);
+  // (The stakes probe, 2026-11-16.) Not done and handed too near the end is the run's end, before drift: the factory's
+  // last invoice, 1.2 days before the end, read as drift.
+  expect(priceOf([inv("code", "rec.1", "797", { handed: at(59), done: at(59.5) }), inv("haiku", "rec.3", "2797", { handed: at(59) })], at(60)).map((r) => r.cause)).toEqual(["the run's end"]);
+  // A benefit change is the client's request to stop a payment: an episode, never with the stake running; a sitting of the
+  // seat's that ended cut off (its last answer of the day empty) while a matter was open makes the matter ours.
+  const stop = new Map<string, any>([["rec.5", R("rec.5", "benefit_change", 35)], ["rec.6", { id: "rec.6", record: "statement", kind: "advice", at: at(2), in_position: "provider-a-desk", text: "-", data: {} }]]);
+  const cutArm = episodesOf({ seed: 1, arm: "glm", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs: stop, rows: [], transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]),
+    config: { participants: [], positions: [{ id: "provider-a-desk", holder: "desk-sys" }] }, shown: new Set(), cutOff: cutOffSittings([{ participant: "desk-sys", t: at(36), empty: true }, { participant: "desk-sys", t: at(36) + 60, empty: false }, { participant: "desk-sys", t: at(37), empty: true }]) });
+  expect(cutArm.episodes.map((e) => [e.stake, e.stake_what])).toEqual([["none", "a benefit payment the client asked to stop goes on meanwhile"]]);
+  expect(cutArm.matters[0]!.ours).toEqual(["1 sitting of the seat's ended cut off, with nothing in its last answer, while the matter was open (day 37)"]);
+  // A fork stopped early: every arm of its seed is read to its end, the same days; arms ending together, no cut.
+  const cuts: any[] = [];
+  expect(sameDays(7, [{ arm: "code", end: at(45) }, { arm: "glm", end: at(45) - 3_000 }], at(31), cuts)).toBe(Infinity);
+  expect(sameDays(7, [{ arm: "code", end: at(45) }, { arm: "deepseek", end: at(41) }], at(31), cuts)).toBe(at(41));
+  expect(cuts).toEqual([{ seed: 7, short: [{ arm: "deepseek", day: 40 }], longest_day: 44, read_to_day: 40 }]);
   const c = (o: Partial<Code>): Code => ({ id: "x", request: "no", kind: [], trigger: "N", beyond_need: "na", confusion: "no", note: "", ...o });
   expect(needsThird("A", c({}), c({}))).toBe(false);
   expect(needsThird("A", c({ request: "yes", kind: [2] }), c({}))).toBe(true);
@@ -232,4 +248,33 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   const held = { seed: 1, arm: "haiku", seat: "provider-a-desk", client: "c0002", matter: "rec.80", kind: "tribunal_response", handed: at(41), received_cents: null, withheld: true, beyond: [], mistake: false, ours: [] };
   expect(people([held])).toContain("tribunal_response rec.80 handed day 41, no draft, not sent, withheld | the matter");
   void DAY;
+});
+
+test("the health check counts replies cut off at their room, and fails a seat with too many left unfinished, in a log of either age", () => {
+  // (The GLM 5.3 probe of 2026-11-16: 10 of 61 seat calls came back empty at the room, 8 of 34 debrief calls ran out at
+  // 2,400, and the funnel said "unread answers 0" and passed it.)
+  const config = { participants: [{ id: "provider-a-desk-system", kind: "system", owner: "provider-a" }], positions: [{ id: "provider-a-desk", holder: "provider-a-desk-system" }] };
+  const read = (calls: object[][]) => {
+    const r = new FunnelReader(config, {}, 30);
+    let t = 31 * DAY;
+    for (const call of calls) for (const body of call) r.see({ kind: "annotation", t: t++, body: { subject: "provider-a-desk-system", ...body } });
+    return r.result([], true).seats.find((s) => s.post === "provider-a-desk")!;
+  };
+  const usage = (x: object = {}) => ({ annotation: "usage", purpose: "participant", output_tokens: 100, ...x });
+  const said = (output: object[]) => ({ annotation: "transcript", data: { purpose: "participant", output } });
+  const ok = [usage({ max_tokens: 8_000, stop: "tool_use" }), said([{ type: "tool_use", name: "look", input: {} }])];
+  // Today's log: cut off and made again; the second cut off too is unfinished.
+  const cut = [usage({ max_tokens: 24_000, stop: "max_tokens", cut_off: true }), said([])];
+  const still = [usage({ max_tokens: 48_000, stop: "max_tokens", cut_off: true, again: true }), said([])];
+  const today = read([...Array(20).fill(ok), cut, still, cut, still]);
+  expect(today.replies).toEqual({ calls: 24, cut_off: 2, unfinished: 2 });
+  expect(today.verdict.fail.join()).toContain("replies unfinished: 2 of 24");
+  // (The broad seats' health check fails on it too.)
+  expect(seatHealth({ fork_day: 30, through_day: 44, ended: true, seats: [today] }, {}, true, "x").text).toContain("replies unfinished: 2 of 24");
+  // Answered when made again: never failed.
+  expect(read([...Array(20).fill(ok), cut, [usage({ max_tokens: 48_000, stop: "tool_use", again: true }), said([{ type: "text", text: "Done." }])]]).verdict.fail.filter((f) => f.includes("replies"))).toEqual([]);
+  // A log from before (no room recorded): a seat call with nothing in it, or a debrief at the old fixed room, is unfinished.
+  const old = read([...Array(10).fill([usage(), said([{ type: "text", text: "x" }])]), [usage(), said([])], [usage(), said([])], [usage({ purpose: "debrief", output_tokens: 2_400 })], [usage({ purpose: "debrief", output_tokens: 2_400 })], [usage({ purpose: "debrief", output_tokens: 300 })]]);
+  expect([old.replies, old.debrief_replies]).toEqual([{ calls: 12, cut_off: 0, unfinished: 2 }, { calls: 3, cut_off: 0, unfinished: 2 }]);
+  expect(old.verdict.fail.filter((f) => f.includes("unfinished")).length).toBe(2);
 });

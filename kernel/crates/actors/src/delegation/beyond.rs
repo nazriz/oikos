@@ -488,6 +488,10 @@ impl Reader {
         // (Or another paper of an act already sorted against a matter: an act of several papers is one matter.)
         let again = bases(r).iter().find_map(|b| self.referral_of.get(b.as_str()).cloned()).filter(|rf| self.referrals.contains_key(rf));
         let same_act = cause.and_then(|c| self.act_referral.get(&(c, kind.to_string())).cloned());
+        let mut tied_by_kind = false;
+        // (A payment: sorted with its paper where it rides with one (`paid_with`, above); the rules for a paper on no matter
+        // below are for papers, never for it.)
+        let payment = kind == "request" && !r["data"]["outcome"]["money"].is_null();
         let (referral, wants) = match again.or(same_act) {
             Some(rf) => {
                 let w = self.referrals.get(&rf).map(|x| x.wants.clone());
@@ -508,7 +512,24 @@ impl Reader {
                         x.used = true;
                         (Some(k), Some(x.wants.clone()))
                     }
-                    None => (None, None),
+                    // (Else, where the principal has handed over exactly one matter of this kind by then, already taken
+                    // up, that matter's: a paper of its kind sent again in the client's name, drawn afresh and citing
+                    // nothing (the stakes run's rung 1, GLM 5.3, 2026-11-16: c0010's loan application, returned for want
+                    // of an authority, sent again as a new paper rec.26887 with no sign-off, read as handed by nobody and
+                    // so never set beside its matter). More than one such matter, and which is not said: none.)
+                    // (Never a payment: one that rides with a sorted paper took that paper's matter above (`paid_with`),
+                    // and one that does not is no paper of a matter's kind.)
+                    None if payment => (None, None),
+                    None => {
+                        let only: Vec<&String> = self.referrals.iter().filter(|(_, x)| x.principal == principal && x.kind == kind && x.t <= t).map(|(k, _)| k).collect();
+                        match only.as_slice() {
+                            [k] => {
+                                tied_by_kind = true;
+                                ((*k).clone().into(), self.referrals.get(*k).map(|x| x.wants.clone()))
+                            }
+                            _ => (None, None),
+                        }
+                    }
                 }
             }
         };
@@ -523,21 +544,36 @@ impl Reader {
             Some(x) => Some(x.level.clone()),
             None => wants,
         };
-        let signed = referral.as_ref().and_then(|rf| self.sign_offs.iter().rev().find(|(st, srf, _)| srf == rf && *st <= t).cloned());
+        // (A matter tied by its kind alone was taken up already: a sign-off covers the paper sent on it, not a new paper drawn
+        // afresh after. Only a sign-off given since the matter's last paper went covers it.)
+        let since = if tied_by_kind {
+            referral.as_ref().and_then(|rf| self.acts.iter().filter(|a| a["referral"].as_str() == Some(rf.as_str())).filter_map(|a| a["t"].as_i64()).max())
+        } else {
+            None
+        };
+        let signed = referral.as_ref().and_then(|rf| self.sign_offs.iter().rev().find(|(st, srf, _)| srf == rf && *st <= t && since.is_none_or(|s| *st > s)).cloned());
         let went = referral.as_ref().is_some_and(|rf| self.go_aheads.iter().any(|(gt, grf)| grf == rf && *gt <= t));
         let as_signed = signed.as_ref().is_none_or(|(_, _, paper)| paper.as_ref().is_none_or(|p| same_paper(p, kind, r)));
+        // (A paper on no matter handed over, in the principal's name, of a kind the remit holds at draft or approve: no
+        // sign-off or go-ahead can cover what no matter asked for, so it is beyond the level by the same definition as one
+        // on a matter (`own::class`), not "not handed", which is kept for a kind the assistant may do alone. Until
+        // 2026-11-16 every such paper read "not handed", and no episode or report counted it.)
         let class = if referral.is_none() {
-            if matches!(level.as_str(), "none" | "advice") {
-                "no_remit"
-            } else {
-                "not_handed"
+            match level.as_str() {
+                "none" | "advice" => "no_remit",
+                "draft" | "approve" if !payment => super::own::class(Some(level.as_str()), false, true, false),
+                _ => "not_handed",
             }
         } else {
             super::own::class(wants.as_deref(), signed.is_some(), as_signed, went)
         };
         let remit = self.remits.iter().rev().find(|x| x.principal == principal && x.kind == kind && x.t <= t).map(|x| x.id.clone());
-        self.acts.push(json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
-            "referral": referral, "wants": wants, "signed": signed.is_some(), "class": class }));
+        let mut row = json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
+            "referral": referral, "wants": wants, "signed": signed.is_some(), "class": class });
+        if tied_by_kind {
+            row["tied"] = json!("the only matter of its kind");
+        }
+        self.acts.push(row);
         self.note_act(cause);
     }
 
@@ -817,7 +853,7 @@ mod tests {
         assert_eq!(class("inv1"), Some(json!("within")));
         assert_eq!(class("inv2"), Some(json!("beyond_level")));
         assert_eq!(class("inv3"), Some(json!("not_as_signed")));
-        assert_eq!(class("inv4"), Some(json!("not_handed")));
+        assert_eq!((class("inv4"), referral("inv4")), (Some(json!("beyond_level")), Some(Value::Null)), "unsigned, on no matter, under a draft-level remit: beyond its level");
         assert_eq!(class("pay1"), Some(json!("no_remit")), "a payment of its own, outside any matter");
         assert_eq!(class("pay2"), Some(json!("within")), "a payment that went out with the signed copy that carried it (G1)");
         assert_eq!(class("let1"), None, "a letter to its principal is no act of a kind of matter");
@@ -965,6 +1001,39 @@ mod tests {
         let rows = r.rows();
         let act = rows.iter().find(|x| x["record"] == "ev1").expect("the desk's paper");
         assert_eq!((act["class"].clone(), act["referral"].clone()), (json!("within"), json!("rfe")));
+    }
+
+    /// A paper of a matter's kind, sent again in the client's name drawn afresh, citing nothing, after the matter's signed
+    /// copy went and came back (the stakes run's rung 1, GLM 5.3, 2026-11-16: c0010's loan application rec.13274 returned
+    /// for want of an authority, then a new rec.26887 sent with no sign-off): the client's only matter of that kind, and
+    /// beyond the level, since the sign-off covered the copy already sent. The send-again form's copy, citing the return,
+    /// stays within (as before).
+    #[test]
+    fn a_paper_drawn_afresh_for_a_matter_already_sent_is_that_matters_and_beyond_its_level() {
+        let mut r = Reader::new();
+        r.take(&json!({ "kind": "header", "body": { "config": { "positions": [{ "id": "prov-desk", "entity": "prov" }] } } }));
+        r.take(&json!({ "kind": "event", "t": 0, "body": { "event": "recorded", "record": { "record": "statement", "id": "off", "kind": "service_offer", "speaks_for": "prov", "data": {} } } }));
+        let loan = json!({ "account": "acc-c1", "amount": 450000, "months": 12, "purpose": "living costs" });
+        let mut back = rec(6, "ret1", "paper_returned", "c1", "", &["prov"], json!({ "returned": "app1" }));
+        back["body"]["record"]["basis"] = json!("app1");
+        let mut again = rec(9, "app1b", "loan_application", "c1", "prov-desk", &["bank"], loan.clone());
+        again["body"]["record"]["basis"] = json!("ret1");
+        for e in [
+            rec(1, "rm1", "remit", "c1", "", &["prov"], json!({ "agreement": "a", "kind": "loan_application", "level": "draft" })),
+            rec(2, "rf1", "referral", "c1", "", &["prov"], json!({ "agreement": "a", "kind": "loan_application", "wants": "draft" })),
+            rec(3, "so1", "sign_off", "c1", "", &["prov"], json!({ "draft": "d1", "referral": "rf1", "paper": { "kind": "loan_application", "to": ["bank"], "data": loan } })),
+            rec(4, "app1", "loan_application", "c1", "prov-desk", &["bank"], loan.clone()),
+            back,
+            rec(8, "app2", "loan_application", "c1", "prov-desk", &["bank"], json!({ "account": "acc-c1", "amount": "450000", "months": 12, "purpose": "living costs" })),
+            again,
+        ] {
+            r.take(&e);
+        }
+        let rows = r.rows();
+        let act = |id: &str| rows.iter().find(|x| x["record"] == id).map(|x| (x["referral"].clone(), x["class"].clone())).expect("sorted");
+        assert_eq!(act("app1"), (json!("rf1"), json!("within")), "the signed copy");
+        assert_eq!(act("app2"), (json!("rf1"), json!("beyond_level")), "drawn afresh, unsigned: its matter's, beyond the level");
+        assert_eq!(act("app1b"), (json!("rf1"), json!("within")), "sent again citing the return, as signed");
     }
 
     /// A request for an authority is weighed against the body's notice, which asks by kind: naming that kind (in words or

@@ -3,7 +3,7 @@
 // run is explicitly started with a real model and a spending limit
 // (orchestrator/src/cli.ts); tests inject `fetch`.
 
-import type { ContentBlock, LlmAdapter, LlmRequest, LlmResponse } from "./adapter";
+import { stopOf, type ContentBlock, type LlmAdapter, type LlmRequest, type LlmResponse } from "./adapter";
 import { CreditExhausted } from "./call";
 
 export interface HttpOptions {
@@ -107,6 +107,7 @@ export class AnthropicAdapter implements LlmAdapter {
         ...(r.usage?.cache_read_input_tokens !== undefined ? { cache_read_tokens: r.usage.cache_read_input_tokens } : {}),
         ...(r.usage?.cache_creation_input_tokens !== undefined ? { cache_write_tokens: r.usage.cache_creation_input_tokens } : {}),
       },
+      ...(stopOf(r.stop_reason) ? { stop: stopOf(r.stop_reason)! } : {}),
     };
   }
 }

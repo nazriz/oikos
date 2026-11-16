@@ -11,7 +11,11 @@
 //       same seat, the same act in its first words (draft, send, send again, ask, report, scope request), naming the
 //       same matter (a record the confirmed call's referral, matter, sign-off, return or claim blank holds, named in
 //       the earlier request's words), the first confirmed after it on that matter: the confirmed call's target;
-//   (c) nothing else has one. Requests no seat answered are not in it.
+//   (c) a request keyed by hand (translator/eval/keyed-targets.json, each with its reason and its decisions entry):
+//       its key, before (a) and (b), and whatever the seat did with it. For a request the seat confirmed as drawn
+//       wrongly, whose confirmed call would otherwise be its target, and that no rule draws right (the rules change
+//       only by score: a keyed request is a miss until one does).
+//   (d) nothing else has one. Requests no seat answered are not in it.
 //
 //   bun translator/eval/score.ts --build [--extract <file>]       the set, from the regress extract (run content: kept
 //                                                                  beside it under runs/regress, out of git)
@@ -36,8 +40,16 @@ export const REGRESS_DIR = join(process.env.OIKOS_RUNS ?? join(homedir(), "oikos
 export const EXTRACT = join(REGRESS_DIR, "requests.json.gz");
 export const SET = join(REGRESS_DIR, "scored-set.json.gz");
 const EXPLAINED = join(import.meta.dir, "..", "test", "regress-explained.json");
+export const KEYED = join(import.meta.dir, "keyed-targets.json");
 
-export interface Item { run: string; arm: string; ref: string; seat: string; target: string; how: "confirmed" | "corrected" | "later"; from?: string }
+/** A request keyed by hand: its run, arm and reference, words its request holds (checked: a key never lands on another request), its
+ * right reading, why, and the decisions entry that says so. */
+export interface Keyed { run: string; arm: string; ref: string; request_has: string; target: string; why: string; decision: string }
+export function loadKeyed(file = KEYED): Keyed[] {
+  return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as Keyed[]) : [];
+}
+
+export interface Item { run: string; arm: string; ref: string; seat: string; target: string; how: "confirmed" | "corrected" | "later" | "keyed"; from?: string }
 export interface ScoredSet { built: string; items: Item[]; unmatched: { run: string; arm: string; ref: string; why: string }[] }
 
 export const itemKey = (x: { run: string; arm: string; ref: string }) => `${x.run}|${x.arm}|${x.ref}`;
@@ -81,6 +93,7 @@ function matterOf(call: string): string[] {
 /** The set, built from the extract: (a) and (b) above. */
 export async function build(arms: ArmLog[]): Promise<ScoredSet> {
   const explained = await explainedKeys(EXPLAINED);
+  const keyed = new Map(loadKeyed().map((x) => [itemKey(x), x]));
   const items: Item[] = [];
   const unmatched: ScoredSet["unmatched"] = [];
   for (const a of arms) {
@@ -94,6 +107,12 @@ export async function build(arms: ArmLog[]): Promise<ScoredSet> {
     }
     const confirmed = a.requests.filter((r) => target.has(r.ref));
     for (const r of a.requests) {
+      const key = keyed.get(itemKey({ run: a.run, arm: a.arm, ref: r.ref }));
+      if (key) {
+        if (!r.request.includes(key.request_has)) throw new Error(`keyed target ${itemKey(key)}: the request there does not hold "${key.request_has}"`);
+        items.push({ run: a.run, arm: a.arm, ref: r.ref, seat: r.seat, target: canon(key.target), how: "keyed" });
+        continue;
+      }
       if (target.has(r.ref)) { items.push(target.get(r.ref)!); continue; }
       if (r.decision !== "reject" && !r.failure) continue;
       const act = actOf(r.request);
@@ -191,7 +210,7 @@ if (import.meta.main) {
     const set = await build(loadArms(extract));
     writeFileSync(SET, gzipSync(JSON.stringify(set), { level: 9 }));
     const how = (h: string) => set.items.filter((x) => x.how === h).length;
-    console.log(`scored set: ${SET}\n  ${set.items.length} requests with a target: ${how("confirmed")} confirmed, ${how("corrected")} corrected (explained), ${how("later")} from a later confirmed request\n  ${set.unmatched.length} declined or asked back with no target:`);
+    console.log(`scored set: ${SET}\n  ${set.items.length} requests with a target: ${how("confirmed")} confirmed, ${how("corrected")} corrected (explained), ${how("later")} from a later confirmed request, ${how("keyed")} keyed by hand\n  ${set.unmatched.length} declined or asked back with no target:`);
     for (const [why, n] of Object.entries(set.unmatched.reduce((o, u) => ({ ...o, [u.why]: (o[u.why] ?? 0) + 1 }), {} as { [w: string]: number }))) console.log(`    ${n}: ${why}`);
     process.exit(0);
   }
