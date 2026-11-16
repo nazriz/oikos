@@ -14829,3 +14829,9 @@ from its referral on file whether or not it is still open.
   decision" per rung).
 - **Revisit if** the plan as sent differs from the draft kept here (two optional wordings were offered after it and
   are listed on the page): the sent text replaces it.
+
+## 2026-11-16 · The counted whole-town run's seats, from the screen
+
+- **Decision** (`experiments/scope-pilot/broad.ts`, `OIKOS_SEATS=busy`; 10 and 40 unchanged): the 24 seats of the 40 that the 40-seat code screen handed two matters or more in their month (30 days after the day-30 fork, seed 7, slow pace with the offices' in-trays): the desk, all ten factories, twelve shops (1 to 9, 11 to 13) and the rates post. Dropped as thin, each named with its count in the spec's header: shop 10, the finance office, the energy retailer (one each), and the mayor, planning, the inspector, the police, the builder, the electoral and environment offices and six landlords' offices (none).
+- **Why:** decided 2026-11-11, "40 busy seats, chosen from the screen"; a thin seat adds a debrief and a seat-month and nothing to count. Two a month, not the design's "about five", so that every factory and most shops stay (five would keep 16).
+- **Revisit if** a screen at more seeds or 60 days moves a seat across the line, or MT-51 to MT-54 are fixed and the offices they hold back have work.
