@@ -253,6 +253,8 @@ export class Knowledge {
         const by = r.kind === "sign_off" ? r.speaks_for : r.data.for;
         this.signed.set(r.id, typeof by === "string" ? { ...r.data.paper, signed_by: by } : r.data.paper);
       }
+      // (A sign-off of a draft of several papers: each, sent together, in the name of whoever signed it off.)
+      if (r.kind === "sign_off" && Array.isArray(r.data?.papers) && r.data.papers.length) this.signed.set(r.id, { papers: r.data.papers, ...(typeof r.speaks_for === "string" ? { signed_by: r.speaks_for } : {}) });
       // Job advertisements, and the applications that answer them: an offer of employment made on one is on its terms.
       if (r.kind === "job_posting") this.jobs.set(r.id, { advertisement: r.id, ...(typeof r.data?.space === "string" && r.data.space ? { space: r.data.space } : {}) });
       if (r.kind === "job_application" && typeof r.data?.posting === "string") this.applications.set(r.id, r.data.posting);

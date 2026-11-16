@@ -213,7 +213,9 @@ export function fitPrompt(system: string, messages: LlmMessage[], max: number, l
       for (const m of ms) {
         const cands: { get: () => string; set: (s: string) => void }[] = typeof m.content === "string" ? [{ get: () => m.content as string, set: (s) => void (m.content = s) }]
           : m.content.flatMap((c) => (c.type === "text" ? [{ get: () => c.text, set: (s: string) => void (c.text = s) }] : c.type === "tool_result" && (newestToo || !fresh.has(c)) ? [{ get: () => c.content, set: (s: string) => void (c.content = s) }] : []));
-        for (const c of cands) if (!best || c.get().length > best.get().length) best = c;
+        // (Never what it is asked to say yes or no to: what is waiting is never cut in the middle; `supersede` and
+        // WAITING_CHARS keep it whole and within bounds.)
+        for (const c of cands) if (!c.get().includes(WAITING_HEAD) && (!best || c.get().length > best.get().length)) best = c;
       }
       if (!best || best.get().length <= cutNote.length + 200) break;
       const was = best.get();
@@ -234,6 +236,54 @@ export function fitPrompt(system: string, messages: LlmMessage[], max: number, l
     left.cut = true;
   }
   return { system: sys, messages: ms, characters: size(sys, ms), left };
+}
+
+/** What stands where an older setting-out of something set out again further on was (`supersede`). */
+export const SET_OUT_AGAIN = (head: string) => `(${head.replace(/^## /, "")}: set out again further on, as it stands now.)`;
+
+/**
+ * Each part of a sitting that sets out how something stands now (what is waiting for its yes or no; its own address
+ * book of those it has looked up) is set out whole once: where it is set out again later in the sitting, the older one
+ * is a line saying so. Every result of a turn sets out what is waiting, as it then stands, so that a seat that drew up
+ * eight things in one turn was shown the list eight times, growing, and again at every turn after (2026-11-17, the
+ * town rung's rates seat: 167,000 characters by its sixth turn, the oldest of its own look-ups left out and the rest
+ * cut, the list it was confirming among them). What it is shown last is the list as it stands; nothing is lost.
+ */
+export function supersede(messages: LlmMessage[]): LlmMessage[] {
+  const keyOf = (part: string): string | undefined => {
+    const head = part.split("\n", 1)[0]!;
+    if (!head.startsWith("## ")) return undefined;
+    if (head === WAITING_HEAD) return head;
+    const second = part.split("\n", 3)[1] ?? "";
+    return second === "Those you have looked up so far:" || second === "You have looked nobody up yet." ? head : undefined;
+  };
+  type Slot = { get: () => string; set: (s: string) => void };
+  const ms = messages.map((m) => ({ ...m, content: typeof m.content === "string" ? m.content : m.content.map((c) => ({ ...c })) })) as LlmMessage[];
+  const slots: Slot[] = ms.flatMap((m): Slot[] => (typeof m.content === "string" ? [{ get: () => m.content as string, set: (s) => void (m.content = s) }]
+    : m.content.flatMap((c): Slot[] => (c.type === "text" ? [{ get: () => c.text, set: (s) => void (c.text = s) }] : c.type === "tool_result" ? [{ get: () => c.content, set: (s) => void (c.content = s) }] : []))));
+  const split = (s: string) => s.split("\n\n## ").map((x, n) => (n ? `## ${x}` : x));
+  // (Nothing set out twice: the conversation as it was, the same objects, as fitting leaves one within its ceiling.)
+  const counts = new Map<string, number>();
+  for (const sl of slots) for (const p of split(sl.get())) { const k = keyOf(p); if (k) counts.set(k, (counts.get(k) ?? 0) + 1); }
+  if (![...counts.values()].some((n) => n > 1)) return messages;
+  const last = new Map<string, [number, number]>();
+  slots.forEach((sl, i) => split(sl.get()).forEach((p, j) => { const k = keyOf(p); if (k) last.set(k, [i, j]); }));
+  slots.forEach((sl, i) => {
+    const parts = split(sl.get());
+    let changed = false;
+    const out = parts.map((p, j) => {
+      const k = keyOf(p);
+      if (!k) return p;
+      const [li, lj] = last.get(k)!;
+      if (li === i && lj === j) return p;
+      changed = true;
+      // (The list is one paragraph; what follows it in the same result, a line said of the use, stays.)
+      const more = p.indexOf("\n\n");
+      return `${SET_OUT_AGAIN(k)}${more >= 0 ? p.slice(more) : ""}`;
+    });
+    if (changed) sl.set(out.join("\n\n"));
+  });
+  return ms;
 }
 
 /** Whether a conversation already tells the seat that not all of it could be set out (NOT_BROUGHT). */
@@ -565,6 +615,8 @@ export function notebookAges(was: string, ages: number[], now: string, t: number
   before.forEach((l, i) => { const a = left.get(l) ?? []; a.push(ages[i] ?? t); left.set(l, a); });
   return entries(now).map((l) => left.get(l)?.shift() ?? t);
 }
+/** A reply cut off at its room (callModel's `cutOff`), as a fold's asking returns it. */
+const CUT_OFF = Symbol("cut off");
 /** The least a fold is worth asking for, in characters of older notes. */
 export const FOLD_LEAST = 600;
 /** Which lines are older entries to fold: those not touched since the oldest times, taken by the time they stand from
@@ -948,13 +1000,18 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     const words = Math.max(10, Math.round(plan.limit / 60) * 10);
     const asked = `at most ${plan.limit.toLocaleString("en")} characters (about ${words} words)`;
     const content = `Your notebook is nearly full: ${notes.length.toLocaleString("en")} of the ${NOTEBOOK_MAX.toLocaleString("en")} characters it holds are used. These are your older notes, the ones you have not touched since you wrote them (written up to day ${day}); your newer notes stay just as they are:\n\n${older}\n\nWrite a summary of these older notes in your own words, keeping what you will still need from them, in ${asked}. What you write replaces the older notes above, under the heading "${header}"; give only the summary.`;
-    // One asking, and one more if the summary came back longer than asked (each a counted call of its own).
-    const ask = async (messages: LlmMessage[]): Promise<string | undefined> => {
+    // One asking, and one more if the summary came back longer than asked (each a counted call of its own). Its room is
+    // a seat's turn's: the length is asked for in words, not enforced by the room. (Until 2026-11-17 the room was the
+    // asked characters halved, in tokens, and 256 more: 760 for 1,007 characters. Haiku's first reply spent it all and
+    // wrote nothing; its second, with twice the room, was cut off mid-word, and that was folded in.)
+    const ask = async (messages: LlmMessage[]): Promise<string | undefined | typeof CUT_OFF> => {
       try {
         const res = await callModel(io, {
-          purpose: "notebook", subject: c.participant, ref: "notebook", system: c.framing.system ?? "", maxTokens: Math.min(c.maxTokens ?? 4000, Math.ceil(plan.limit / 2) + 256), ...(c.effort ? { effort: c.effort } : {}),
+          purpose: "notebook", subject: c.participant, ref: "notebook", system: c.framing.system ?? "", maxTokens: c.maxTokens ?? 4000, ...(c.effort ? { effort: c.effort } : {}),
           messages, context: { participant: c.participant, notes, older, limit: plan.limit, day },
         }, seenSystems);
+        // (A reply cut off at its room is not the summary it was writing: nothing cut off is its finished word.)
+        if (res.cutOff) return CUT_OFF;
         return res.content.filter((b) => b.type === "text").map((b: any) => b.text).join("\n").trim();
       } catch (e) {
         if (!(e instanceof ModelCallFailed)) throw e;
@@ -963,6 +1020,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     };
     const first = await ask([{ role: "user", content }]);
     if (first === undefined) return fail("no answer came");
+    if (first === CUT_OFF) return fail("the summary was cut off at the room it was given, and again with twice the room");
     if (!first) return fail("the answer was empty or could not be read");
     let reply = first;
     /** What of the summary was left out, where it had to be cut (said to the seat, and kept in the note). */
@@ -974,7 +1032,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // the seat is told what was left out. Nothing is dropped without its being said.)
       const second = await ask([{ role: "user", content }, { role: "assistant", content: first },
         { role: "user", content: `That summary is ${first.length.toLocaleString("en")} characters, and it has to be ${asked} to fit. Write it again, shorter, keeping what you will still need; give only the summary.` }]);
-      const again = second ? second : undefined;
+      const again = second && second !== CUT_OFF ? second : undefined;
       const best = again !== undefined && again.length < first.length ? again : first;
       if (best.length <= plan.limit) reply = best;
       else {
@@ -1573,6 +1631,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           // first), with a line saying so where it stood, and noted.
           const ask = async (given: LlmMessage[]) => {
             const sys = systemPrompt(c, standingText, { posts: whoPosts, parties: whoParties, ...(whoPaper ? { paper: whoPaper } : {}), ...(whoPrincipals.size ? { principals: [...whoPrincipals] } : {}), ...(whoSupplier ? { supplier: whoSupplier } : {}) });
+            // (What is set out again later in the sitting stands once, where it is newest: `supersede`.)
+            given = supersede(given);
             let fit = fitPrompt(sys, given, promptMax, lookIds);
             // Something left out: it is told so plainly, once a sitting, with the newest of what it is shown (room is
             // made for the line). No silent gaps.

@@ -847,7 +847,8 @@ without providers of assistants is unchanged to the byte.
   any act is (law 10): its own row and the carried kind's `compose/<kind>` row; a world whose table has no such row
   refuses it as unpriced. The kernel reads nothing else of it, and knows nothing of what the paper is for.
 - **The papers of delegation** (typed in `kernel/crates/actors/src/papers/delegation.rs`): `SignOff.paper` (the signed
-  copy), `Referral.does_itself` (the kinds of the same act its principal does), `Remit.answers` (the request it grants),
+  copy; `SignOff.papers`, 2026-11-17, each paper of a draft written as calls of several, the matter's payments with the
+  first, all sent on one `send_signed`), `Referral.does_itself` (the kinds of the same act its principal does), `Remit.answers` (the request it grants),
   `ScopeRequest.record` and `.matter`, and two new papers, `scope_answer` (the request, granted or not, `reasons` for the
   record, a copy as `paper`, `look_again_at`) and `acknowledgement` (`of`: the letter acknowledged).
 - **Papers published:** `payment_details` (a collector's account for what a law charges), in towns with providers.

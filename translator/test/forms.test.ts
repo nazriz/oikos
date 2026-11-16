@@ -98,6 +98,13 @@ test("a signed copy sent is previewed as that copy, under its sign-off, and not 
   k.absorb({ ...FORMS.observation, channels: { mine: { kind: "records", records: [{ id: "rec.90", record: "statement", kind: blk.kind, text: blk.text, addressed_to: blk.addressed_to, data: blk.data, ...(blk.basis ? { basis: blk.basis } : {}), visible_to: blk.visible_to, at: 3 * 86_400 + 600, author: "x", speaks_for: "city", in_position: "registry" }] } } } as any);
   const twice = new Preview(k, "city", undefined, "registry").of(sent.blocks);
   expect(twice).toContain("It has gone already: this same paper was sent as rec.90 on year 1, day 4, and this sends it a second time.");
+  // (2026-11-17) A sign-off of a draft of several papers: sent all together on it, each as it stands and said so.
+  const papers = [{ kind: "rates_notice", text: "Rates notice: 10.00.", to: ["c1"], visible: ["city", "c1"], data: { amount: 1000 } }, { kind: "rates_notice", text: "Rates notice: 20.00.", to: ["c2"], visible: ["city", "c2"], data: { amount: 2000 } }];
+  k.absorb({ ...FORMS.observation, channels: { mine: { kind: "records", records: [{ id: "rec.95", record: "statement", kind: "sign_off", text: "Signed.", addressed_to: ["city"], data: { draft: "rec.94", referral: "rec.93", papers }, visible_to: ["city"], at: 4 * 86_400, author: "y", speaks_for: "city" }] } } } as any);
+  const both = resolve(calls.parseProgram("form(form=send_signed, sign_off=rec.95)"), k, () => undefined, "registry");
+  if (!both.ok) throw new Error(both.questions.join(" "));
+  expect(both.blocks.map((x: any) => [x.kind, x.text, x.addressed_to])).toEqual([["rates_notice", "Rates notice: 10.00.", ["c1"]], ["rates_notice", "Rates notice: 20.00.", ["c2"]]]);
+  expect(new Preview(k, "city", undefined, "registry").of(both.blocks)).toContain("exactly as it was signed off under rec.95");
 });
 
 test("a form's blanks the request settles in so many words are set by code: the form it names, the copy it cites, a blank it fills or leaves empty, whom the work is for (2026-11-14)", () => {

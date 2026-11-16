@@ -1476,30 +1476,38 @@ impl Resolver<'_> {
                 Some(x) => x,
                 None => paper["signed_by"].as_str().map(String::from).unwrap_or_else(|| self.me.clone()),
             };
-            let mut block = Map::new();
-            block.insert("block".into(), json!("publish"));
-            block.insert("kind".into(), paper["kind"].clone());
-            block.insert("text".into(), json!(slice16(paper["text"].as_str().unwrap_or_default(), 16384)));
-            for (from, to) in [("to", "addressed_to"), ("data", "data"), ("visible", "visible_to"), ("basis", "basis")] {
-                if let Some(v) = paper.get(from).filter(|v| !v.is_null()) {
-                    block.insert(to.into(), v.clone());
+            // (A sign-off of several papers sends them all, each as it stands: `papers`; else the one.)
+            let each: Vec<&Json> = match paper.get("papers").and_then(Json::as_array) {
+                Some(ps) => ps.iter().collect(),
+                None => vec![&**paper],
+            };
+            let mut out = vec![];
+            for (n, paper) in each.into_iter().enumerate() {
+                let mut block = Map::new();
+                block.insert("block".into(), json!("publish"));
+                block.insert("kind".into(), paper["kind"].clone());
+                block.insert("text".into(), json!(slice16(paper["text"].as_str().unwrap_or_default(), 16384)));
+                for (from, to) in [("to", "addressed_to"), ("data", "data"), ("visible", "visible_to"), ("basis", "basis")] {
+                    if let Some(v) = paper.get(from).filter(|v| !v.is_null()) {
+                        block.insert(to.into(), v.clone());
+                    }
                 }
-            }
-            block.insert("speaks_for".into(), json!(me));
-            if let Some(r) = bind {
-                block.insert("ref".into(), json!(r));
-            }
-            // (The payments the signed copy carries go with it, in the same act, citing what signed them: a matter is the
-            // paperwork of its act, and the sign-off covered both. docs/design/broad-seats.md, G1. Payments only: an
-            // instruction to a keeper, nothing else.)
-            let mut out = vec![Json::Object(block)];
-            if let Some(with) = paper.get("with").and_then(Json::as_str) {
-                let Ok(Program::Lines(lines)) = calls::parse_program(with) else { return ask("The signed copy's payment could not be read: draft it again.") };
-                for l in lines.iter().filter(|l| l.call.fn_ == "money") {
-                    let mut call = l.call.clone();
-                    call.args.retain(|(k, _)| k != "basis");
-                    call.args.push(("basis".into(), Value::Id(id.clone())));
-                    out.extend(self.money(&call, None)?);
+                block.insert("speaks_for".into(), json!(me));
+                if let Some(r) = bind.filter(|_| n == 0) {
+                    block.insert("ref".into(), json!(r));
+                }
+                out.push(Json::Object(block));
+                // (The payments the signed copy carries go with it, in the same act, citing what signed them: a matter is
+                // the paperwork of its act, and the sign-off covered both. docs/design/broad-seats.md, G1. Payments only:
+                // an instruction to a keeper, nothing else.)
+                if let Some(with) = paper.get("with").and_then(Json::as_str) {
+                    let Ok(Program::Lines(lines)) = calls::parse_program(with) else { return ask("The signed copy's payment could not be read: draft it again.") };
+                    for l in lines.iter().filter(|l| l.call.fn_ == "money") {
+                        let mut call = l.call.clone();
+                        call.args.retain(|(k, _)| k != "basis");
+                        call.args.push(("basis".into(), Value::Id(id.clone())));
+                        out.extend(self.money(&call, None)?);
+                    }
                 }
             }
             return Ok(out);
@@ -1685,6 +1693,23 @@ mod tests {
             Resolution::Blocks(b) => panic!("{src}: {b:?}"),
             Resolution::Questions { questions, .. } => questions,
         }
+    }
+
+    #[test]
+    fn a_sign_off_of_several_papers_sends_them_all_each_as_it_stands() {
+        // (translator/test/forms.test.ts, the same: a draft written as calls of several papers, signed with each.)
+        let mut k = office();
+        let form = json!({ "id": "form-send", "record": "statement", "kind": "form", "text": "Send as signed.", "at": 0, "author": "x", "speaks_for": "city", "visible_to": "public",
+            "data": { "form": "send_signed", "office": "registry", "fields": { "sign_off": { "type": "record", "required": true } }, "copies": "=sign_off" } });
+        let papers = json!([{ "kind": "rates_notice", "text": "Rates notice: 10.00.", "to": ["c1"], "data": { "amount": 1000 } }, { "kind": "rates_notice", "text": "Rates notice: 20.00.", "to": ["c2"], "data": { "amount": 2000 } }]);
+        let so = json!({ "id": "rec.95", "record": "statement", "kind": "sign_off", "text": "Signed.", "at": 0, "author": "y", "speaks_for": "city", "addressed_to": ["city"], "visible_to": ["city"], "data": { "draft": "rec.94", "referral": "rec.93", "papers": papers } });
+        k.absorb(&json!({ "entity": "city", "t": 0, "positions": [], "channels": { "mine": { "kind": "records", "records": [form, so] } } }));
+        let out = match resolve(&parse_program("form(form=send_signed, sign_off=rec.95, to=registry)").unwrap(), &k, &|_| None, None) {
+            Resolution::Blocks(b) => b,
+            Resolution::Questions { questions, .. } => panic!("{questions:?}"),
+        };
+        let got: Vec<(Json, Json)> = out.iter().map(|b| (b["text"].clone(), b["addressed_to"].clone())).collect();
+        assert_eq!(got, vec![(json!("Rates notice: 10.00."), json!(["c1"])), (json!("Rates notice: 20.00."), json!(["c2"]))]);
     }
 
     /// (The same cases as translator/test/resolver.test.ts has for this repository's resolver.)

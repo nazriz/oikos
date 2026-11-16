@@ -380,6 +380,11 @@ impl RecordFacts {
                     }
                     facts.signed = Some((id, Arc::new(paper)))
                 }
+                // (A sign-off of a draft of several papers: each, sent together, in the name of whoever signed it off.)
+                Some("sign_off") if r["data"]["papers"].as_array().is_some_and(|p| !p.is_empty()) => {
+                    let by = s(&r["speaks_for"]).map(Value::from).unwrap_or(Value::Null);
+                    facts.signed = Some((id, Arc::new(serde_json::json!({ "papers": r["data"]["papers"], "signed_by": by }))))
+                }
                 // (A paper sent back goes again in the name of whom it was for, as the body's paper names them.)
                 Some("paper_returned") if r["data"]["paper"].is_object() => {
                     let mut paper = r["data"]["paper"].clone();

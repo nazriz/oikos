@@ -9,8 +9,8 @@ import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import type { Observation } from "../src/contracts";
 import type { ContentBlock, LlmMessage, LlmRequest } from "../src/llm/adapter";
 import { inCurrency } from "../src/money";
-import { createLlmParticipant, fitPrompt, kindWhere, LOOK_LEFT_OUT, PROMPT_MAX, PROMPT_MIN, tools, type LlmParticipantConfig } from "../src/llm/participant";
-import { LOOK_CHARS_MAX, PAPER_MAX, renderObservation } from "../src/llm/render";
+import { createLlmParticipant, fitPrompt, kindWhere, LOOK_LEFT_OUT, PROMPT_MAX, PROMPT_MIN, SET_OUT_AGAIN, supersede, tools, type LlmParticipantConfig } from "../src/llm/participant";
+import { askRef, LOOK_CHARS_MAX, PAPER_MAX, renderObservation, WAITING_CHARS, WAITING_HEAD, WAITING_SAYS } from "../src/llm/render";
 import { Matters } from "../src/readers/matters";
 
 const DAY = 86_400;
@@ -264,6 +264,27 @@ test("a whole prompt has a ceiling: the oldest of what was looked up is left out
   expect(one.characters).toBeLessThanOrEqual(PROMPT_MIN);
   expect(one.left!.cut).toBe(true);
   expect(one.messages[0]!.content).toContain("(Cut short here: there was more than can be read at once. Look again for what you need.)");
+  // What stands now is set out whole once, where it is newest: each result of a turn sets out what is waiting, as it then
+  // stands, and the older are a line saying so (2026-11-17: a rates seat drew up eight notices a turn and was shown the
+  // list eight times, growing, to 318,000 characters). What is waiting is never cut in the middle.
+  const waiting = (n: number) => `${WAITING_HEAD}\n${WAITING_SAYS}\n${Array.from({ length: n }, (_, i) => `ask-${i + 1}: a rates notice, set out.`).join("\n")}`;
+  const turn: LlmMessage[] = [{ role: "user", content: "Your notebook: (empty)" }, { role: "assistant", content: [use("a", "do", {}), use("b", "do", {})] },
+    { role: "user", content: [{ type: "tool_result", tool_use_id: "a", content: `About ask-1.\n\n${waiting(1)}` }, { type: "tool_result", tool_use_id: "b", content: `About ask-2.\n\n${waiting(2)}` }] }];
+  const once = supersede(turn);
+  const said = (once[2]!.content as any[]).map((b) => b.content);
+  expect(said[0]).toBe(`About ask-1.\n\n${SET_OUT_AGAIN(WAITING_HEAD)}`);
+  expect(said[1]).toBe(`About ask-2.\n\n${waiting(2)}`);
+  expect(supersede(once)).toEqual(once);
+  const pile = fitPrompt("system", [{ role: "user", content: `Your notebook: mine\n\n${waiting(2)}\n\n## Treasury\n${"z".repeat(30_000)}` }], 20_000, new Set());
+  expect(pile.messages[0]!.content).toContain(waiting(2));
+  // A pile longer than is set out whole at once: the oldest whole, the rest a line each, none left unsaid.
+  const many = Array.from({ length: 60 }, (_, i) => ({ id: `draft.rates.${i + 1}`, summary: `Rates notice ${i + 1}: $600.00 on lot-${i}.` }));
+  const shown = renderObservation({ ...base(9 * HOUR), drafts: many } as any, { draftText: (d: any) => `${askRef(d.id)}: ${d.summary} ${"set out in full. ".repeat(40)}` });
+  expect(shown.length).toBeLessThan(WAITING_CHARS + 8_000);
+  expect(shown).toContain("ask-1: Rates notice 1");
+  expect(shown).toMatch(/Also waiting, \d+ more, each set out in full as those above are answered/);
+  expect(shown).toContain("- ask-60: Rates notice 60: $600.00 on lot-59.");
+  expect(shown).not.toContain("draft.rates.");
 });
 
 test("a seat's look results reach its next prompt, whatever else its reports carry (a bank's whole ledger)", async () => {
