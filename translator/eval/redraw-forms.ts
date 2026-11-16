@@ -50,7 +50,26 @@ function delivery(o: { rename?: string; drop?: boolean }): Variant {
   };
 }
 
+// The withholding report: `period_end` (the day the period ended), `period_to` (the day after it, as the law counts) and
+// `due`, three dates side by side (the stakes run's rung 3, 2026-11-17).
+const WITHHOLDING = new Set(["withholding_return", "draft_withholding_return"]);
+function withholding(map: Record<string, string>, order?: string[]): Variant {
+  return {
+    change: (f) => reshaped(WITHHOLDING, f, (es) => {
+      if (order) es = [...order.flatMap((p) => es.filter(([k]) => k === p)), ...es.filter(([k]) => !order.includes(k))];
+      return es.map(([k, t]) => [map[k] ?? k, t]);
+    }),
+    back: renamedBack(Object.fromEntries(Object.entries(map).map(([x, y]) => [y, x]))),
+  };
+}
+
 export const REDRAW_VARIANTS: Record<string, Record<string, Variant>> = {
+  withholding: {
+    a: withholding({}),
+    renamed: withholding({ period_to: "day_after_period", period_end: "period_ended_on", period_from: "period_began_on", due: "due_by" }),
+    ordered: withholding({}, ["period_from", "period_to", "period_end", "due"]),
+    both: withholding({ period_to: "day_after_period", period_end: "period_ended_on", period_from: "period_began_on", due: "due_by" }, ["period_from", "period_to", "period_end", "due"]),
+  },
   tribunal: {
     a: tribunal({}), b: tribunal({ rename: true }), c: tribunal({ order: true }), d: tribunal({ typed: true }),
     bc: tribunal({ rename: true, order: true }), bd: tribunal({ rename: true, typed: true }), cd: tribunal({ order: true, typed: true }), bcd: tribunal({ rename: true, order: true, typed: true }),

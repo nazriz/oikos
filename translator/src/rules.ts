@@ -200,6 +200,33 @@ function namedValue(request: string, field: string, known?: (id: string) => bool
   return seen.size === 1 ? out : undefined;
 }
 
+/** The day a request writes for a date blank by the blank's name ("period to: year 1, day 61", "period from year 1, day
+ * 31"), the same each time it is written; its time of day, where it gives one, kept. */
+function namedDate(request: string, field: string): string | undefined {
+  const re = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}(?:\\s+field)?\\s*(?::|=|\\bis\\b)?\\s*((?:year\\s+-?\\d+,\\s*)?day\\s+\\d+(?:,?\\s+\\d{1,2}:\\d{2}(?::\\d{2})?)?)(?![\\d])`, "gi");
+  const seen = new Set<string>();
+  for (const m of request.matchAll(re)) seen.add(m[1]!.replace(/\s+/g, " "));
+  return seen.size === 1 ? [...seen][0] : undefined;
+}
+/** The figure a request writes for an amount or a count blank by the blank's name ("can pay 0", "owes: 5,330.01",
+ * "people 1"), the same each time it is written. */
+function namedFigure(request: string, field: string): string | undefined {
+  // (As written, with any sign before it or currency word after it: the resolver reads it as it reads the seat's words,
+  // in the world's own money.)
+  const name = spoken(field).replace(/[a-z]/g, (c) => `[${c}${c.toUpperCase()}]`);
+  const re = new RegExp(`(?:^|[^a-zA-Z0-9_-])${name}(?:\\s+[fF]ield)?\\s*(?::|=|\\b[iI][sS]\\b)?\\s*((?:[^\\sA-Za-z0-9,.;:()"'])?[0-9](?:[0-9.,]*[0-9])?(?:\\s?(?:[A-Z]{3}\\b|[^\\sA-Za-z0-9,.;:()"']))?)(?![0-9]|[.,][0-9]|\\s*(?:%|days?\\b|months?\\b|years?\\b|weeks?\\b))`, "g");
+  const seen = new Set<string>();
+  for (const m of request.matchAll(re)) seen.add(m[1]!.trim());
+  return seen.size === 1 ? [...seen][0] : undefined;
+}
+/** A figure's digits and separators only, for telling whether two writings are the same figure. */
+const figure = (s: string) => s.replace(/[^0-9.,]/g, "").replace(/[.,]00$/, "").replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "");
+/** A date's day, as "year,day" (a day alone is of the first year). */
+const dayOf = (s: string): string | undefined => {
+  const m = /(?:year\s+(-?\d+),\s*)?day\s+(\d+)/i.exec(s);
+  return m ? `${m[1] ?? "1"},${m[2]}` : undefined;
+};
+
 /** Whether the request says to leave a blank empty ("leave trade empty", "trade: left empty", "omitting the optional
  * trade", "trade left blank"). */
 const leftEmpty = (request: string, field: string): boolean =>
@@ -313,7 +340,7 @@ const RULES: { [name: string]: Standing } = {
   // redraws onto another form
   question: "redraw", sendAgain: "redraw", sendSigned: "redraw", signedCopySent: "redraw", draftForm: "redraw",
   // the seat names outright
-  formById: "named", namedChoice: "named", entityWith: "named", namedValue: "named", leftEmpty: "named",
+  formById: "named", namedChoice: "named", namedDate: "named", namedFigure: "named", entityWith: "named", namedValue: "named", leftEmpty: "named",
   // fills what is empty
   matterNamed: "fill", referralOfKind: "fill", recordNamed: "fill",
   // corrects what is plainly contradicted
@@ -527,6 +554,24 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       // rerun, was the one rule with a net loss on the scored set, and misfired in run c ('claim): which paper is your
       // ...'), 2026-11-15.)
       if (!v && !t.required && args[field] !== undefined && leftEmpty(request, field)) edit("leftEmpty", field, undefined);
+      // (A date blank the request names with its day, "period to: year 1, day 61": that day; one the model wrote on the
+      // same day stands as written. The stakes run's rung 3, 2026-11-17: the withholding report's `period_to` drawn as the
+      // due day, day 81, on eleven tries in two runs, each refused, and the tax withheld never reported.)
+      if (t.type === "date") {
+        const d = namedDate(request, field);
+        const had = argText(args[field]);
+        if (d && (had === undefined || dayOf(had) !== dayOf(d))) edit("namedDate", field, { text: d });
+        else if (d && had !== undefined) edit("namedDate", field, args[field]);
+      }
+      // (An amount or a count the request names with its figure, "can pay 0", "people 1": that figure; one the model
+      // wrote as the same figure stands as written. The stakes run's rung 3: the tenant's answer drawn with `can_pay` as
+      // the whole sum owed on 63 tries, 60 of them where the request said "can pay 0".)
+      if ((t.type === "amount" || t.type === "count") && !locked.has(field)) {
+        const fig = namedFigure(request, field);
+        const had = argText(args[field]);
+        if (fig && (had === undefined || figure(had) !== figure(fig))) edit("namedFigure", field, { text: fig });
+        else if (fig && had !== undefined) edit("namedFigure", field, args[field]);
+      }
     }
 
     // 3. Corrections of what is plainly contradicted, and fills of what is empty.

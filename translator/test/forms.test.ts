@@ -304,4 +304,11 @@ test("rules changed by score after the reruns and the broad rung (2026-11-17)", 
   expect(ruled(tr("landlord-10", '["Civil and Administrative Tribunal"]'), "A tribunal response in c0100's name, to tribunal (Civil and Administrative Tribunal), with a copy to landlord-10, answering application rec.5.", kt))
     .toBe("form(application=rec.5, client=c0100, form=tribunal_response, landlord=landlord-10, to=desk, tribunal=tribunal)");
   expect(ruled(tr("landlord-10", '["62"]'), "An answer in c0100's name against landlord-10, to application rec.5, ages 62.", kt)).toBe(tr("landlord-10", '["62"]'));
+  // (The stakes run's rung 3.) A date, an amount or a count the request names with its value is that value: the
+  // withholding report's `period_to` drawn as the due day; the tenant's `can_pay` drawn as the whole sum owed. Written as
+  // the same day or figure, the model's own way of writing it stands.
+  const kw = { ...k, forms: [...k.forms, form("form-desk-return", "withholding_return", { period_to: field("date"), due: field("date"), can_pay: field("amount"), owes: field("amount"), people: field("count") })] };
+  expect(ruled('form(can_pay="$5,330.01", due="year 1, day 81", form=withholding_return, owes="$5,330.01", people="1", period_to="year 1, day 81", to=desk)', "Period to: year 1, day 61; due year 1, day 81; can pay 0; owes $5,330.01; people 1.", kw))
+    .toBe('form(can_pay="0", due="year 1, day 81", form=withholding_return, owes="$5,330.01", people="1", period_to="year 1, day 61", to=desk)');
+  expect(ruled('form(form=withholding_return, owes="5330.01", period_to="year 1, day 61, 10:00", to=desk)', "Period to year 1, day 61; owes $5,330.01.", kw)).toBe('form(form=withholding_return, owes="5330.01", period_to="year 1, day 61, 10:00", to=desk)');
 });
