@@ -296,6 +296,8 @@ fn a_draft_not_as_asked_is_declined_and_done_by_the_principal_and_one_as_asked_i
     remit["data"]["level"] = json!("draft");
     h.wake(34 * DAY + 3600, world(vec![remit.clone()]));
     let referral = last_referral(&h);
+    // (A draft with no paper in it: declined whatever the review's draw, a blank page being no slip a reader misses. The
+    // whole-town rung 1 run b's factory draft rec.21636 was signed so, and its seat asked three times for a paper.)
     let wrong = statement("rec.d1", 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral }));
     let out = all(&h.wake(35 * DAY + 3600, world(vec![wrong])));
     assert!(out.contains("kind=declined") && out.lines().any(|l| l.starts_with("statement(basis=lease-1")), "found wrong: declined, and done by the principal: {out}");
@@ -309,6 +311,18 @@ fn a_draft_not_as_asked_is_declined_and_done_by_the_principal_and_one_as_asked_i
     let line = out.lines().find(|l| l.contains("kind=sign_off")).unwrap_or_default();
     let copy = line.split("\"paper\":").nth(1).unwrap_or_default();
     assert!(["\"kind\":\"notice_to_vacate\"", "\"text\":\"Please leave.\"", "\"to\":[\"t1\"]"].iter().all(|x| copy.contains(x)), "the signed copy: {line}");
+    // (A draft of several papers is signed with each of them, as it stands: a supervisor signs each letter of the batch,
+    // and whoever holds the post sends them all on the sign-off. Before 2026-11-17 it carried none.)
+    let two = format!("{NOTICE}\nstatement(kind=notice_to_vacate, text=\"Please go.\", to=[\"t2\"], basis=lease-2)");
+    let (mut h, _, mut remit) = engaged_doing(&two);
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit]));
+    let referral = last_referral(&h);
+    let both = statement("rec.d3", 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "calls": two }));
+    let out = all(&h.wake(35 * DAY + 3600, world(vec![both])));
+    let line = out.lines().find(|l| l.contains("kind=sign_off")).unwrap_or_else(|| panic!("signed: {out}"));
+    let papers = line.split("\"papers\":").nth(1).unwrap_or_default();
+    assert!(["\"text\":\"Please leave.\"", "\"to\":[\"t1\"]", "\"text\":\"Please go.\"", "\"to\":[\"t2\"]"].iter().all(|x| papers.contains(x)), "both papers signed: {line}");
 }
 
 #[test]
@@ -446,6 +460,12 @@ fn a_return_that_asks_the_principal_for_an_authority_is_met_when_its_assistant_w
     let given = out.lines().find(|l| l.contains("kind=authority")).unwrap_or_else(|| panic!("an authority, on its assistant's letter: {out}"));
     assert!(given.contains("to=[\"court\"]") && given.contains("\"posts\":[\"ll-assistant\"]") && given.contains("\"kinds\":[\"notice_to_vacate\"]") && given.contains("basis=rec.ret"), "{given}");
     assert!(!out.contains("kind=scope_answer"), "a letter is not a request for more scope: {out}");
+    // (A letter from its assistant's post it has nothing to act on: answered by the office itself, once, with how to ask
+    // it what it can answer, never left to the office's standing report. The whole-town rung 1 run b's rates seat.)
+    let answers: Vec<&String> = h.sent.iter().filter(|p| p.contains("kind=acknowledgement") && p.contains("msg.2")).collect();
+    assert_eq!(answers.len(), 1, "{}", all(&h.sent));
+    assert!(answers[0].contains("question_to_client") && answers[0].contains("report it") == false && answers[0].contains("the report form"), "{}", answers[0]);
+    assert!(!h.sent.iter().any(|p| p.contains("kind=acknowledgement") && p.contains("msg.3")), "one it acted on is not answered so: {}", all(&h.sent));
 }
 
 #[test]

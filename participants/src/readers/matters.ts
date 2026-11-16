@@ -214,7 +214,7 @@ export class Matters {
     const m = this.matters.get(ref(r) ?? "");
     if (!m) return;
     // (The latest of each kind of paper on a matter is what it goes by: the file is read newest first.)
-    if (k === "sign_off" && (!m.signed || m.signed.at <= r.at)) m.signed = { id: r.id, at: r.at, paper: d.paper };
+    if (k === "sign_off" && (!m.signed || m.signed.at <= r.at)) m.signed = { id: r.id, at: r.at, paper: d.paper ?? (Array.isArray(d.papers) ? d.papers[0] : undefined) };
     else if (k === "declined") m.declined = Math.max(m.declined ?? r.at, r.at);
     else if (k === "report" && (!m.report || m.report.at <= r.at)) m.report = { id: r.id, at: r.at, done: d.done === true || d.done === "yes", ...(typeof d.why === "string" ? { why: d.why } : {}) };
     else if (k === "draft") this.drafted(m, r.at);

@@ -308,6 +308,9 @@ pub struct State {
     /// Letters from its assistant on no paper of delegation, not yet acknowledged (their ids).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     letters: Vec<String>,
+    /// Letters (messages) from its assistant's post to an organisation's office, not yet answered (their ids).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    notes_in: Vec<String>,
     /// Its own papers, the newest [`OWN_PAPERS`], as a copy of each would go (id, kind, words, data).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     own_papers: Vec<(String, Value)>,
@@ -473,6 +476,7 @@ impl Delegating {
                 next_review,
                 asked: vec![],
                 letters: vec![],
+                notes_in: vec![],
                 own_papers: vec![],
                 acknowledged: vec![],
                 changed: false,
@@ -510,11 +514,18 @@ impl Actor for Delegating {
         s.away(pic, cx);
         // What the inner actor is shown: its own outcomes, never ours, and those of its acts the assistant has done.
         let hide = |o: &Outcome| s.own.contains_key(o.action.as_str()) || s.matters.get(o.action.as_str()).is_some_and(|m| m.referral.is_none() && o.status == OutcomeStatus::Applied);
-        let filter = !s.synth.is_empty() || pic.outcomes.iter().any(hide);
+        // (An organisation's assistant's letters are its delegation's to answer (`notes_in`), never the office's own code's:
+        // that answers the public with its standing report.)
+        let from = Assistant::of(s);
+        let letters = s.p.post.is_some() && pic.inbox.iter().any(|m| from.sent(m));
+        let filter = !s.synth.is_empty() || pic.outcomes.iter().any(hide) || letters;
         let mut shown;
         let ipic = if filter {
             shown = pic.clone();
             shown.outcomes = pic.outcomes.iter().filter(|o| !hide(o)).cloned().chain(std::mem::take(&mut s.synth)).collect();
+            if letters {
+                shown.inbox.retain(|m| !from.sent(m));
+            }
             &shown
         } else {
             pic
@@ -788,9 +799,16 @@ impl State {
         // own notice asks of it, as it does on a report that names the need. The letter is what makes it act; what is
         // needed is read from the body's notice, never from the letter's words. docs/behaviour/assistants.md.)
         // (A letter with no reference is about its one unmet need with that assistant, if it has exactly one: `on_letter`.)
-        let letters: Vec<(String, String)> = pic.inbox.iter().filter(|m| from.sent(m)).filter_map(|m| Some((m.re.as_ref().map(|x| x.to_string()).unwrap_or_default(), m.from_position.as_ref()?.to_string()))).collect();
-        for (re, post) in letters {
-            let _ = self.on_letter(&re, &post);
+        let letters: Vec<(String, String, String)> = pic.inbox.iter().filter(|m| from.sent(m)).filter_map(|m| Some((m.id.to_string(), m.re.as_ref().map(|x| x.to_string()).unwrap_or_default(), m.from_position.as_ref()?.to_string()))).collect();
+        for (id, re, post) in letters {
+            let met = self.on_letter(&re, &post);
+            // (An organisation's office answers its assistant's letter itself, in its own time, with how to ask it what
+            // it can answer: never with the office's standing report to the public, which says nothing of that. The
+            // whole-town rung 1 run b: the rates seat asked its office three questions by letter, was sent the rates
+            // report, and held twelve matters to the end.)
+            if !met && self.p.post.is_some() && !self.acknowledged.contains(&id) && !self.notes_in.contains(&id) {
+                self.notes_in.push(id);
+            }
         }
     }
 
@@ -1203,8 +1221,13 @@ impl State {
                 _ => x.calls.as_deref().map(norm) != Some(norm(&m.program)),
             }
         };
-        // (Reading it whole: a slip in it is found unless the review itself slips, the world's row for a sign-off.)
-        let missed = wrong && slip(cx, "publish/sign_off", &r.id, &SlipOptions::default());
+        // (Reading it whole: a slip in it is found unless the review itself slips, the world's row for a sign-off. A draft
+        // with no paper in it at all is no slip of detail that a reader can miss: a blank page is always seen. The
+        // whole-town rung 1 run b: the factory's code assistant's slipped draft rec.21636 held nothing, the review's draw
+        // slipped too, and the empty draft was signed; the seat that took the post at the fork asked three times for a
+        // paper that was never there.)
+        let blank = x.paper.is_none() && x.calls.as_deref().is_none_or(|c| papers_in(c).is_empty());
+        let missed = wrong && !blank && slip(cx, "publish/sign_off", &r.id, &SlipOptions::default());
         if wrong && !missed {
             self.seen.entry(Self::key(&m.agreement, &m.kind)).or_default().saw(true, &r.id);
             let found = if differs.is_empty() { "The draft is not what was asked for.".to_string() } else { format!("The draft is not as we have it: {}.", differs.join("; ")) };
@@ -1243,8 +1266,20 @@ impl State {
             let words = if x.paper.is_some() { crate::common::text(r) } else { "" };
             let carried = x.paper.clone().or_else(|| x.calls.as_deref().and_then(one_paper));
             let paper = carried.as_ref().map(|p| with_instructions(signed_copy(p, words), &m.program));
-            let words = signed_words(&r.id, paper.as_ref());
-            let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
+            // (A draft written as calls of several papers (a rates instalment's fifteen notices, drafted as one) is
+            // signed with every paper in it, each as it stands, the matter's payments with the first: a supervisor signs
+            // each letter of the batch. Whoever holds the post when the sign-off comes sends them all on it. Before
+            // 2026-11-17 such a sign-off carried none.)
+            let several: Vec<Value> = if paper.is_none() {
+                x.calls.as_deref().map(papers_in).unwrap_or_default().into_iter().enumerate().map(|(n, p)| {
+                    let copy = signed_copy(&p, "");
+                    if n == 0 { with_instructions(copy, &m.program) } else { copy }
+                }).collect()
+            } else {
+                vec![]
+            };
+            let words = if several.is_empty() { signed_words(&r.id, paper.as_ref()) } else { format!("Draft {} read and signed off, its {} papers each as it stands: send them as they stand. This is the signed copy.", r.id, several.len()) };
+            let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper, papers: several };
             self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
         }
     }
@@ -1752,7 +1787,7 @@ impl State {
         let Some(r) = self.book.get(id).cloned() else { return };
         let agreement = self.in_use().and_then(|e| e.agreement.clone()).or_else(|| self.eng.live().last().and_then(|e| e.agreement.clone())).unwrap_or_default();
         let _ = r;
-        let words = format!("We have your letter {id}. Requests for more scope go on the request form, naming the kind of matter and the level, the record of ours you need, or the limit.");
+        let words = format!("We have your letter {id}. {HOW_TO_ASK}");
         self.paper(Acknowledgement::KIND, &words, &agreement, id, papers::data(&Acknowledgement { of: id.to_string() }), Then::Plain);
         self.acknowledged.push(id.to_string());
         if self.acknowledged.len() > crate::figures::KEPT_ACKNOWLEDGED {
@@ -1771,7 +1806,7 @@ impl State {
         if found.is_empty() || missed {
             let paper = x.paper.as_ref().map(|p| with_instructions(signed_copy(p, crate::common::text(r)), &m.program));
             let words = signed_words(&r.id, paper.as_ref());
-            let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
+            let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper, papers: vec![] };
             self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
             return;
         }
@@ -2208,6 +2243,15 @@ impl State {
         }
         for id in std::mem::take(&mut self.letters) {
             self.acknowledge(&id);
+        }
+        for id in std::mem::take(&mut self.notes_in) {
+            let agreement = self.in_use().and_then(|e| e.agreement.clone()).or_else(|| self.eng.live().last().and_then(|e| e.agreement.clone())).unwrap_or_default();
+            let words = format!("We have your letter {id}. {}", HOW_TO_ASK);
+            self.paper(Acknowledgement::KIND, &words, &agreement, "", papers::data(&Acknowledgement { of: id.clone() }), Then::Plain);
+            self.acknowledged.push(id);
+            if self.acknowledged.len() > crate::figures::KEPT_ACKNOWLEDGED {
+                self.acknowledged.remove(0);
+            }
         }
     }
 
@@ -2664,6 +2708,10 @@ fn signed_copy(paper: &Value, draft_words: &str) -> Value {
     Value::Object(out)
 }
 
+/// What an office or a person says in answer to its assistant's letter: that it does not act on a letter's words, and
+/// how to ask it what it can answer. (Its own forms for each, by the names its assistant's stationery gives them.)
+pub const HOW_TO_ASK: &str = "We do not act on a letter's words. To ask us something about a matter we handed you, use the question form (question_to_client): what our account stands at, a paper of ours (by its id), who someone the matter names is, or a detail of the matter; we answer each from our own records when we next deal with our papers, or say that we cannot. Whether to send something, or not, is not a question we answer: draft it for our sign-off, and we sign it or decline it. A matter you cannot finish as handed: say so on the report form (report), done no, with why, and it is ours again. Requests for more scope go on the request form, naming the kind of matter and the level, the record of ours you need, or the limit.";
+
 /// A signed copy with the instructions to a keeper that belong to the same matter (docs/design/broad-seats.md, G1: a
 /// payment goes with the papers of its act): the matter's own payments, as its code wrote them (`with`, in the call
 /// language), which go out with the paper when the signed copy is sent, citing the sign-off. The draft carries the paper;
@@ -2834,17 +2882,28 @@ fn paper_of(line: &Line) -> serde_json::Map<String, Value> {
 /// The one paper a draft written as calls sends, in the keys a draft on a form carries it (`kind`, `text`, `to`,
 /// `visible`, `basis`, `data`). None for calls of several papers, or of none.
 fn one_paper(calls: &str) -> Option<Value> {
-    let Ok(Program::Lines(l)) = parse_program(calls) else { return None };
-    let papers: Vec<&Line> = l.iter().filter(|l| l.call.fn_ == "statement").collect();
+    let papers = papers_in(calls);
     let [one] = papers.as_slice() else { return None };
-    let p = paper_of(one);
-    let mut out = serde_json::Map::new();
-    for (from, to) in [("kind", "kind"), ("text", "text"), ("addressed_to", "to"), ("visible_to", "visible"), ("basis", "basis"), ("data", "data"), ("offer", "offer"), ("assertion", "assertion")] {
-        if let Some(v) = p.get(from) {
-            out.insert(to.to_string(), v.clone());
-        }
-    }
-    Some(Value::Object(out))
+    Some(one.clone())
+}
+
+/// Every paper a draft written as calls holds, each as a signed copy names its parts (`kind`, `text`, `to`, `visible`,
+/// `basis`, `data`): none where its calls hold no statement or cannot be read.
+fn papers_in(calls: &str) -> Vec<Value> {
+    let Ok(Program::Lines(l)) = parse_program(calls) else { return vec![] };
+    l.iter()
+        .filter(|l| l.call.fn_ == "statement")
+        .map(|line| {
+            let p = paper_of(line);
+            let mut out = serde_json::Map::new();
+            for (from, to) in [("kind", "kind"), ("text", "text"), ("addressed_to", "to"), ("visible_to", "visible"), ("basis", "basis"), ("data", "data"), ("offer", "offer"), ("assertion", "assertion")] {
+                if let Some(v) = p.get(from) {
+                    out.insert(to.to_string(), v.clone());
+                }
+            }
+            Value::Object(out)
+        })
+        .collect()
 }
 
 /// Whom a paper goes to, as a key: its addressees, sorted.

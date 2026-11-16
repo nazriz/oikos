@@ -449,6 +449,10 @@ pub struct SignOff {
     /// (the code assistant's) carries none: it sends its calls.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paper: Option<Value>,
+    /// Where the draft was written as calls of several papers: each, as it is to go, the matter's payments with the
+    /// first; sent all together on the sign-off (the form `send_signed`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub papers: Vec<Value>,
 }
 impl Paper for SignOff {
     const KIND: &'static str = "sign_off";

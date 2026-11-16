@@ -744,7 +744,13 @@ It answers in its own time (a person when they next sit down to their post, D1a;
 wake), at the table's row `publish/question_answer` (five minutes, **placeholder**, WM-1), with a `question_answer`
 paper (`known`, and the answer typed) to its assistant, seen in its matters as it comes. It never works out a figure it
 does not hold and never advises. A letter that asks a question is acknowledged, as before, not answered: its code reads
-no prose. A code assistant asks nothing. Basis: an agent asks its principal for the facts it needs (the factory's
+no prose. The acknowledgement says how to ask so that it is answered (2026-11-17): that it does not act on a letter's
+words; the question form and the four things it answers on it; that whether to send something is not a question, but a
+draft for its sign-off; that a matter the assistant cannot finish as handed goes back on the report form, done no, with
+why; and the request form for more scope. An organisation's office answers its assistant's letters (the post's
+messages) so itself, at its own time, and its own code is not shown them: before, the office's code answered them with
+its standing report to the public, which says nothing of any of that (the whole-town rung 1 run b: the rates seat asked
+three questions by letter, was sent the rates report, and held twelve matters to the end). A code assistant asks nothing. Basis: an agent asks its principal for the facts it needs (the factory's
 assistant, three times, wrote to ask who "outside" was and was never answered; a desk with a client's deadline had no
 way to ask about their position). Risk MT-43.
 

@@ -124,7 +124,9 @@ export class Preview {
    * details and what it cites): the sign-off it came back with, and the draft that sign-off signed. */
   private signedCopyOf(b: any): { signOff: string; draft?: string; returned?: true; went?: { id: string; at: number } } | undefined {
     const same = (x: unknown, y: unknown) => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
-    for (const [id, p] of this.k.signed) {
+    // (A sign-off of several papers: each of them is a signed copy under it.)
+    const each = [...this.k.signed].flatMap(([id, p]) => (Array.isArray((p as any).papers) ? (p as any).papers.map((x: any) => [id, x] as const) : [[id, p] as const]));
+    for (const [id, p] of each) {
       if (p.kind !== b.kind || typeof p.text !== "string" || !String(p.text).startsWith(String(b.text ?? "")) || !same(p.to, b.addressed_to) || !same(p.data, b.data) || !same(p.visible, b.visible_to) || !same(p.basis, b.basis)) continue;
       const draft = this.k.signedDraft.get(id);
       // (A copy a body's return carries, not a sign-off's: said as the paper sent before, and sent back.)
