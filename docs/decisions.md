@@ -14805,3 +14805,25 @@ from its referral on file whether or not it is still open.
   again on day 40 with a preview no different from the first, and paid twice.
 - **What moves:** model seats only (the preview of a second send). Code towns are byte-identical to main.
 - **Revisit if** MT-45's notice fires: a seller paid twice for one delivery in a model run.
+
+## 2026-11-16 · Housing reaches the assistant: the paper the client holds, the debt, and the run's end
+
+- **Decision 1, a hand-over cites what the client holds** (principal.rs `grounds`, `PaperIn.names`; recourse.rs
+  `trouble_papers`): a paper the client's act cites that it was never sent stands on the papers it was sent that name it
+  (the hearing notice for the landlord's application), so their words and their nearest day reach the assistant by C1;
+  and a want gives, beside the record it is against, what whom it is against sent the client citing that record, the
+  newest of each kind (the notice to vacate, the rent statement). Fixed where the hand-over is composed, not in the
+  tribunal: the client's answer still cites the application, by the reference its hearing notice gives, which is how the
+  tribunal files it; citing by reference is no god's view. Every kind, not these two: any act citing what the client was
+  not sent, any want against a standing record.
+- **Decision 2, the debt** (principal.rs `situation`, `Situ.owed`; the `situation` setting): a tenant behind says so,
+  "We owe <landlord> <amount> in rent, as their <statement|notice to vacate> of <day> says (<paper>).", from the
+  landlord's latest such paper to it; nothing reckoned by us.
+- **Decision 3, the run's end** (experiments/scope-pilot/episodes.ts): a matter handed over within the run's last
+  `END_DAYS` and not finished is never withheld nor a candidate (the price table's "the run's end"); the rung 2 dry run's
+  "FAULT: a code arm left a candidate" was a want handed over on day 60, the last.
+- **What moves:** towns with assistants: the words of hand-overs that cite an unsent paper or are wants against a record
+  (code arms too: the code assistant reads a want's facts, now with the notice in them); with `situation` on, the debt
+  sentence. Towns without assistants: nothing.
+- **Revisit if** a want's trouble papers bring in one that is not the trouble (a landlord's unrelated letter citing the
+  lease): then the want should carry the paper that started it from the moment it is born.

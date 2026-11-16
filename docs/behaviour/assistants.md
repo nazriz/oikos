@@ -165,6 +165,14 @@ at every depth (a finished act, what happened, a want) and at `advice`, for pers
   reply said neither, the claim both: the stakes run's rung 1 (situation)). Where the claim has been decided by then,
   the sentence of its position is no longer true; an office asks for evidence before it decides, so no reply of the
   study's kinds follows a decided claim (revisit if one does).
+- **A hand-over cites the paper the client holds (2026-11-16).** A paper its act cites that it was never sent (an answer
+  to a possession application cites the landlord's application, which went to the tribunal) stands on the papers it was
+  sent that name it (the hearing notice, which gives the application's reference), set out with their words and the day
+  they name (principal.rs `grounds`, `PaperIn.names`). A want handed over gives, besides the record it is against (the
+  lease), the papers that started the trouble: what whom it is against sent the client citing that record, the newest of
+  each kind (the notice to vacate, a statement of the rent account; citizen/recourse.rs `trouble_papers`). Both only what
+  came to the client. The stakes run's rung 2 dry run: a want about a notice handed over with no notice, sum or day to
+  leave by, and an answer to a hearing with no answer-by day.
 - **Where the client learns of a date later** (an evidence request after the claim was handed over), the referral cannot
   change: that paper reaches the assistant by B1 (the client passes it on), with its own date.
 - **The files it keeps.** Papers others send it, the newest 64 (`KEPT_OWN_PAPERS`), from when it has engaged a service: a
@@ -192,6 +200,10 @@ their own facts only):
   in." (A rounded period read a fortnightly payment that fell on a holiday as "every 15 days".)
 - its housing: where it is a tenant, "Our rent: <amount> every <N> days, next due on <date> (<lease>)."; where it pays
   rates instead, "Our rates: <amount>, due on <date> (<notice>)."; where neither, nothing.
+- behind with the rent (2026-11-16): what it owes its landlord, as the landlord's latest paper to it that says so puts
+  it (a statement of the rent account, its `owed`; or a notice to vacate for arrears, its `arrears`): "We owe <landlord>
+  <amount> in rent, as their <statement|notice to vacate> of <date> says (<paper>)." Their figure and day, nothing
+  reckoned by us.
 - on a matter the office's law prices by the day (a claim; a review of a refused claim, as a want or as a review
   request on a refused claim), the office's own published rule
   as the client knows it, from the support law's `date_of_effect`: at `decision`, "The office pays nothing for the days

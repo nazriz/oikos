@@ -1029,7 +1029,12 @@ impl Person {
         let key = gkey(about, whom.unwrap_or(""), against.map(|a| a.0.as_str()));
         self.recourse.handed.insert(key.clone(), w.t);
         let mut data = json!({ "answer_days": self.answer_days() });
-        let mut records: Vec<String> = against.iter().map(|a| a.0.clone()).collect();
+        // (What the want is against, and the papers that started the trouble: what whom it is against sent us about that
+        // record (its notice to vacate on the lease, its rent increase), the newest of each kind, our own papers, which
+        // the assistant is given with their words and the days they name. A want against the lease alone gave the desk
+        // no notice, no sum and no day to leave by: the stakes run's rung 2 dry run, 2026-11-16.)
+        let mut records: Vec<String> = against.map(|(record, _, by)| trouble_papers(&self.book, &me, record, by)).unwrap_or_default();
+        records.extend(against.iter().map(|a| a.0.clone()));
         if let Some(h) = self.s.home.as_ref().filter(|h| !h.owned && matches!(about, "rent_increase" | "notice")) {
             data["lease"] = json!({ "landlord": h.landlord, "agreement": h.agreement, "space": h.space, "rent": h.rent });
             records.push(h.agreement.clone());
@@ -1422,6 +1427,18 @@ impl Openings for Ways<'_> {
             told: g.told,
         })
     }
+}
+
+/// The papers that started a trouble: what `by` sent `me` that cites `record` (a notice to vacate on the lease, a rent
+/// increase on it, a statement of the rent account), the newest of each kind, newest first. Ours: they were sent to us.
+pub(crate) fn trouble_papers(book: &crate::common::Book, me: &str, record: &str, by: &str) -> Vec<String> {
+    let mut theirs: Vec<&Arc<Record>> = book
+        .records()
+        .filter(|r| matches!(r.body, RecordBody::Statement { .. }) && r.speaks_for.as_deref() == Some(by) && crate::common::addressed_to(r).iter().any(|a| *a == me) && crate::common::cites(r, record))
+        .collect();
+    theirs.sort_by(|a, b| b.at.cmp(&a.at).then_with(|| crate::common::filed_before(&b.id, &a.id)));
+    let mut kinds = BTreeSet::new();
+    theirs.into_iter().filter(|r| kinds.insert(crate::common::kind(r).unwrap_or_default().to_string())).map(|r| r.id.to_string()).collect()
 }
 
 #[cfg(test)]
@@ -2032,4 +2049,24 @@ mod tests {
         assert!(!said(&p).iter().any(|x| x["domain"] == "way" && x["option"] == "ask"), "we did not ask: our assistant did");
     }
 
+    /// (2026-11-16) A want handed over cites the papers that started it, ours: what whom it is against sent us citing the
+    /// record it is against, the newest of each kind (the notice to vacate on the lease, not only the lease); never a
+    /// paper sent to someone else, nor one of another's.
+    #[test]
+    fn a_want_handed_over_cites_the_papers_that_started_it() {
+        let mut book = Book::new();
+        let mut cite = |r: Arc<Record>, basis: &str| {
+            let mut v = serde_json::to_value(&*r).unwrap();
+            v["basis"] = json!(basis);
+            rec(v)
+        };
+        let old = cite(statement("rec.1", DAY, "notice_to_vacate", "landlord-1", json!({ "lease": "L1", "by": 30 * DAY, "arrears": 100 })), "L1");
+        let new = cite(statement("rec.2", 5 * DAY, "notice_to_vacate", "landlord-1", json!({ "lease": "L1", "by": 40 * DAY, "arrears": 200 })), "L1");
+        let stmt = cite(statement("rec.3", 2 * DAY, "rent_statement", "landlord-1", json!({ "lease": "L1", "owed": 200 })), "L1");
+        let other = cite(statement("rec.4", 6 * DAY, "notice_to_vacate", "landlord-2", json!({ "lease": "L1" })), "L1");
+        let mut elsewhere = serde_json::to_value(&*cite(statement("rec.5", 7 * DAY, "notice_to_vacate", "landlord-1", json!({})), "L1")).unwrap();
+        elsewhere["addressed_to"] = json!(["someone-else"]);
+        book.take_all([&old, &new, &stmt, &other, &rec(elsewhere)]);
+        assert_eq!(super::trouble_papers(&book, ME, "L1", "landlord-1"), vec!["rec.2".to_string(), "rec.3".to_string()]);
+    }
 }

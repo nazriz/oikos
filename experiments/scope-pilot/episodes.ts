@@ -272,7 +272,10 @@ export function episodesOf(o: ArmInput): ArmOut {
       return { request: q.request, more, ...(weighed === "ahead" ? { ahead: true } : {}), asked: q.asked, needed: q.needed, ...(q.level_then ? { level_then: q.level_then } : {}), granted: ans ? !!ans.data?.granted : null, ...(part?.why ? { why: String(part.why) } : {}),
         ...(f ? { wait_days: Math.round(Number(f.wait_milli_days) / 100) / 10, waits: Number(f.waits), late_cost_day_cents: Number(f.late_cost_day), cost_now_cents: Number(f.cost_now), cost_asked_cents: Number(f.cost_asked) } : {}) };
     });
-    const held = withheld.find((w) => w.referral === R.id);
+    // (A matter handed over within the run's last days and not finished is the run's end's, never withheld and never a
+    // candidate: the rung 2 dry run, 2026-11-16, where a want handed over on day 60, the last, read as a code arm's FAULT.)
+    const atTheEnd = end - R.at < END_DAYS * DAY;
+    const held = atTheEnd ? undefined : withheld.find((w) => w.referral === R.id);
     const did: Episode["did"] = beyond.some((b) => b.class !== "not_as_signed") ? "acted_beyond" : asked.length ? "asked_for_more" : held || beyond.length ? "candidate_override" : "waited";
     const askedFor = [...asked, ...askedNeeded, ...askedAhead];
     const seatPart = [...seatIds].find((p) => (config.participants ?? []).find((x: any) => x.id === p)?.position === seat) ?? "";

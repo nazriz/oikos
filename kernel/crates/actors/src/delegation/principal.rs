@@ -206,6 +206,10 @@ struct PaperIn {
     text: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     dates: Vec<(String, i64)>,
+    /// The papers it cites or names by reference (its basis, and the record ids among its details): what a paper of the
+    /// client's own that cites one it was never sent stands on.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    names: Vec<String>,
 }
 
 /// Why and by when, as a referral gives them (`State::grounds`).
@@ -378,10 +382,14 @@ struct Situ {
     /// Its rates: how much, due when, the notice.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     rates: Option<(i64, i64, String)>,
+    /// What it owes its landlord in rent, as the landlord's latest paper that says (a statement of the rent account, or
+    /// a notice to vacate for arrears) puts it: how much, the paper's day, the landlord, the paper, and its kind.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    owed: Option<(i64, i64, String, String, String)>,
 }
 impl Situ {
     fn is_empty(&self) -> bool {
-        self.incoming.is_empty() && self.rent.is_none() && self.rates.is_none()
+        self.incoming.is_empty() && self.rent.is_none() && self.rates.is_none() && self.owed.is_none()
     }
 }
 
@@ -676,6 +684,24 @@ impl State {
                     let l = crate::papers::agreements::lease_terms(r, &self.me);
                     if let (true, true, Some(e)) = (l.rent > 0, l.space.is_some(), l.every.filter(|e| *e > 0)) {
                         self.situ.rent = Some((l.rent, e, r.at.max(0), r.id.to_string()));
+                    }
+                }
+                // (What it owes in rent, as its landlord's latest paper to it says: a statement of the rent account, or a
+                // notice to vacate for arrears. Their figure, never one reckoned here.)
+                let to_me = crate::common::addressed_to(r).iter().any(|a| a.as_str() == self.me) || matches!(&r.visible_to, oikos_contracts::blocks::Visibility::Only(v) if v.iter().any(|a| a.as_str() == self.me));
+                if to_me && r.speaks_for.as_deref() != Some(self.me.as_str()) {
+                    let owed = if crate::common::is_kind(r, "rent_statement") {
+                        papers::read::<crate::papers::firms::RentStatement>(r).and_then(|x| x.owed)
+                    } else if crate::common::is_kind(r, "notice_to_vacate") {
+                        crate::common::Fields::i(crate::common::data(r), "arrears")
+                    } else {
+                        None
+                    };
+                    if let Some(n) = owed {
+                        if self.situ.owed.as_ref().is_none_or(|o| o.1 <= r.at) {
+                            let by = r.speaks_for.as_deref().unwrap_or(r.author.as_str()).to_string();
+                            self.situ.owed = Some((n, r.at, by, r.id.to_string(), crate::common::kind(r).unwrap_or_default().to_string()));
+                        }
                     }
                 }
                 if crate::common::is_kind(r, "rates_notice") && crate::common::addressed_to(r).iter().any(|a| a.as_str() == self.me) {
@@ -1905,6 +1931,12 @@ impl State {
         } else if let Some((amount, due, id)) = &self.situ.rates {
             out.push(format!("Our rates: {}, due on {} ({}).", money(*amount), date(*due), id));
         }
+        // (Behind with the rent: what it owes, as its landlord's latest paper puts it, in one fixed sentence. Their
+        // figure and day; nothing reckoned by us, no adjective, no advice.)
+        if let Some((n, at, by, id, kind)) = self.situ.owed.as_ref().filter(|o| o.0 > 0) {
+            let what = if kind == "notice_to_vacate" { "notice to vacate" } else { "statement" };
+            out.push(format!("We owe {by} {} in rent, as their {what} of {} says ({id}).", money(*n), date(*at)));
+        }
         // (On a matter the office's law prices by the day, a claim or a review of a refused claim: the office's own
         // published rule, as the client knows it, in one fixed sentence; nothing about what is to be done.)
         if kind == "benefit_claim" || kind.ends_with("claim_refused") || (kind == "review_request" && program.contains("claim_refused")) {
@@ -1952,6 +1984,23 @@ impl State {
                 g.why.extend(self.situation(pic, kind, program, t, cx));
             }
         }
+        // (A paper its act cites that it was never sent (the landlord's application to the tribunal, which its answer
+        // cites by the reference the hearing notice gives) stands on the papers it was sent that name it: the hearing
+        // notice, with the day it names. Nobody is told of a paper they were not sent: the client tells only what came
+        // to it. The stakes run's rung 2 dry run, 2026-11-16: an answer to a possession application handed over with no
+        // day, its hearing notice ("You may answer by year 1, day 90") never set out.)
+        let held = |id: &str| self.papers_in.iter().any(|p| p.id == id) || pic.is_some_and(|pic| pic.all_records().any(|r| r.id.as_str() == id));
+        let mut through: Vec<String> = vec![];
+        for id in &cited {
+            if !held(id) {
+                for p in self.papers_in.iter().filter(|p| p.names.iter().any(|n| n == id)) {
+                    if !cited.contains(&p.id) && !through.contains(&p.id) {
+                        through.push(p.id.clone());
+                    }
+                }
+            }
+        }
+        cited.extend(through);
         for id in cited {
             let p = self.papers_in.iter().find(|p| p.id == id).cloned().or_else(|| {
                 let r = pic?.all_records().find(|r| r.id.as_str() == id)?;
@@ -2381,7 +2430,27 @@ fn paper_in(r: &Record) -> Option<PaperIn> {
     let from = r.speaks_for.as_deref().unwrap_or(r.author.as_str()).to_string();
     let d = data.as_ref().map(|d| d.to_value()).unwrap_or(Value::Null);
     let dates = crate::papers::delegation::dates_named(&d).into_iter().map(|(k, v)| (k.to_string(), v)).collect();
-    Some(PaperIn { id: r.id.to_string(), at: r.at, kind: kind.to_string(), from, text: quoted(crate::common::text(r)), dates })
+    let mut names: Vec<String> = bases_of(r).iter().map(|b| b.to_string()).collect();
+    let mut ids = BTreeSet::new();
+    strings_of(&d, &mut ids);
+    for x in ids {
+        if x.starts_with("rec.") && !names.contains(&x) {
+            names.push(x);
+        }
+    }
+    Some(PaperIn { id: r.id.to_string(), at: r.at, kind: kind.to_string(), from, text: quoted(crate::common::text(r)), dates, names })
+}
+
+/// Every string a paper's details hold, at any depth.
+fn strings_of(v: &Value, out: &mut BTreeSet<String>) {
+    match v {
+        Value::String(s) => {
+            out.insert(s.clone());
+        }
+        Value::Array(a) => a.iter().for_each(|x| strings_of(x, out)),
+        Value::Object(o) => o.values().for_each(|x| strings_of(x, out)),
+        _ => {}
+    }
 }
 
 /// What a person who gets to their post at sittings of their own says of a body's day on a hand-over at `draft`: the

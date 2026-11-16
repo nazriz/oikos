@@ -199,6 +199,15 @@ fn a_referral_carries_the_day_its_papers_name_and_why_in_its_own_facts_and_no_fi
     assert!(line.contains("It comes from tribunal's hearing notice rec.ask") && line.contains("A hearing is listed for day 50.") && !line.contains("rec.mine of"), "the paper it came from, in its sender's words; its own is not told: {line}");
     // (Not at `draft`: no day for a draft.)
     assert!(!line.contains("draft_by"), "{line}");
+    // (2026-11-16) An act that cites a paper the principal was never sent (an answer citing the landlord's application to
+    // the tribunal) stands on the paper it was sent that names it: the hearing notice, with its day.
+    let (mut h2, _, remit2) = engaged_doing("statement(kind=notice_to_vacate, text=\"Please leave.\", to=[\"t1\"], basis=[\"rec.app\"])");
+    let mut hn = statement("rec.hn", 33 * DAY + 7200, "tribunal", "hearing_notice", &[ME], json!({ "application": "rec.app", "answer_by": 47 * DAY }));
+    hn["text"] = json!("You may answer by day 47.");
+    hn["basis"] = json!("rec.app");
+    let through = all(&h2.wake(34 * DAY + 3600, world(vec![remit2, hn])));
+    let line2 = through.lines().find(|l| l.contains("kind=referral")).unwrap_or_default().to_string();
+    assert!(line2.contains("It comes from tribunal's hearing notice rec.hn") && line2.contains(&format!("\"due\":{}", 47 * DAY)) && line2.contains("\"due_on\":\"rec.hn\""), "{line2}");
     let later = all(&h.wake(35 * DAY + 3600, world(vec![])));
     let line = later.lines().find(|l| l.contains("kind=referral")).unwrap_or_default().to_string();
     assert!(line.contains(&format!("\"due\":{}", 48 * DAY)), "kept in its files, the paper still names its day: {line}");
@@ -1201,11 +1210,13 @@ fn a_hand_over_says_how_things_stand_with_the_principal_only_where_it_is_set() {
             h.actor = wrap(&h.ctx, inner).unwrap();
         }
         let (mut h, _, remit) = engaged_on(h);
-        let out = all(&h.wake(34 * DAY + 3600, channels(vec![money(ME, 1_000_000, txs), records("mine", vec![remit, lease.clone()])])));
+        let out = all(&h.wake(34 * DAY + 3600, channels(vec![money(ME, 1_000_000, txs), records("mine", vec![remit, lease.clone(), statement("rec.rs", 0, "other", "rent_statement", &[ME], json!({ "lease": "lease-9", "owed": 355_334 }))])])));
         out.lines().find(|l| l.contains("kind=referral")).unwrap_or_default().to_string()
     };
     let on = referral_of(true, paid.clone());
     assert!(on.contains("In our account (acc-ll) today:") && on.contains("Coming in:") && on.contains("from acc-other (wages)") && on.contains("Our rent:") && on.contains("(lease-9)") && !on.contains("Nothing regular"), "{on}");
+    // (2026-11-16) Behind with the rent: what it owes, as its landlord's latest paper says, in one fixed sentence.
+    assert!(on.contains("We owe other ") && on.contains(" in rent, as their statement of ") && on.contains("(rec.rs)"), "{on}");
     let none = referral_of(true, json!([]));
     assert!(none.contains("Nothing regular is coming in.") && !none.contains("Coming in:"), "{none}");
     let off = referral_of(false, paid);
