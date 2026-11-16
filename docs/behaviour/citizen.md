@@ -273,6 +273,17 @@ Three changes on the person's side of the firm and landlord fixes (docs/decision
 
 The rates the person's values shift (`sway`) move symmetrically about the town's mean, so the town's rates stay as calibrated while people differ.
 
+## A charge is paid once we are told of it (2026-11-16; `citizen/money.rs`, `told`; risk MT-60, closed)
+
+What is recorded against a person (rates, interest on overdue rates, a fine) is its holder's record: the town's rate
+book, its register of fines. A person pays it once a paper has told them of it, never on seeing the entry alone: a paper
+addressed to them in the same act as the claim (the rates notice the claim was entered with, the demolition order a fine
+came with), or a paper from the claim's holder naming its sum and due day (a rates notice sent days later by the office's
+assistant), or one citing it; interest on a claim they were told of is told as that one was. In a town where office and
+paper go out together nothing changes; where an office's assistant sends the notice later, the owner pays when it comes.
+The lead's decision of 2026-11-16: in the whole-town rung 1 an owner paid the rates its town had entered sixteen minutes
+before, two days before any notice, a person reading a register not theirs.
+
 ## Getting to the post (stakes D1a and D1b, 2026-11-14; `kernel/crates/actors/src/post.rs`)
 
 A person reads what others send them when they next sit down to their post, not as it comes. A paper addressed to them

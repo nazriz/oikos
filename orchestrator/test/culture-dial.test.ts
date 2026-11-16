@@ -199,6 +199,9 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // (Re-taken on 2026-11-07 at WM-15, as the configs above; 2ee01f8c..., 7abe89a6..., 4be8a863... until then.)
 // (Re-taken on 2026-11-17 at reader-payments, as the configs above: a claimant's papers citing the support office's request
 // are now matched to it, so claims decided move; f50ff194..., ab26f6bd..., a326bfa3... until then.)
+// (au-vic re-taken on 2026-11-17 at claim-told (MT-60, the lead's decision): a person pays rates once the notice has told
+// them, read at their post's sitting, not on seeing the town's rate-book entry the moment it is made; au-vic's first
+// instalment falls in its 60 days, the others' 30 days hold none. 0d99861e... until then.)
 const RUST_STATE: { [profile: string]: string } = {
   "au-vic-2026": "0d99861e8b3f0910134e09e4d77ad9454ddc4e0a24cb1ac7e696d38892d77c0d",
   "gb-eng-2026": "1ef061096609457937fdf27f71b3a0af6d2d3d52336416521fcd70c35ad0ca60",
