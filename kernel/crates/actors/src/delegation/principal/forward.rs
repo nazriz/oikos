@@ -253,3 +253,123 @@ impl State {
         q.follows.as_ref().and_then(|f| self.book.get(f)).and_then(|r| papers::read::<Referral>(r)).map_or_else(|| q.kind.clone(), |o| o.kind)
     }
 }
+
+/// A paper it passed on to its assistant: the forward's id, the body's paper, the matter it came on, and the day the
+/// paper asks something by (none: it asks nothing by a day).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct PassedOn {
+    forward: String,
+    paper: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    matter: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    due: Option<i64>,
+}
+
+/// Every string a paper's details hold, at any depth: the ids it may name.
+fn strings_in(v: &Value, out: &mut BTreeSet<String>) {
+    match v {
+        Value::String(s) => {
+            out.insert(s.clone());
+        }
+        Value::Array(a) => a.iter().for_each(|x| strings_in(x, out)),
+        Value::Object(o) => o.values().for_each(|x| strings_in(x, out)),
+        _ => {}
+    }
+}
+
+impl State {
+    /// Its own forwards, as it is shown them once they are on file (the newest few): which paper each passed on, on what
+    /// matter, and by when that paper asks for something.
+    pub(super) fn note_forwards(&mut self, pic: &Picture) {
+        for r in pic.all_records() {
+            if r.speaks_for.as_deref() != Some(self.me.as_str()) || self.passed_on.iter().any(|p| p.forward == r.id.as_str()) {
+                continue;
+            }
+            let Some(f) = papers::read::<Forward>(r) else { continue };
+            self.passed_on.push(PassedOn { forward: r.id.to_string(), due: f.due(), paper: f.paper, matter: f.matter });
+            if self.passed_on.len() > UNTIED {
+                self.passed_on.remove(0);
+            }
+        }
+    }
+
+    /// One reply, one matter (docs/behaviour/assistants.md, "What the client passes on"): a draft that names a paper it
+    /// passed on (the forward, or the body's paper in it) and gives as its matter that paper, or the matter the paper came
+    /// on, is a draft of its reply to that paper. `Ok`: the reply's matter as it handed it over; `Err`: the paper, the
+    /// reply not handed over yet and the paper's day still to come (the draft is held until it is: `take_held`). None: not
+    /// such a draft. A draft on the open matter the paper came on, of that matter's own kind, is that matter's.
+    pub(super) fn reply_for(&self, r: &Record, x: &Draft, t: i64) -> Option<Result<String, String>> {
+        if self.passed_on.is_empty() {
+            return None;
+        }
+        let mut named = BTreeSet::from([x.referral.clone()]);
+        if let Some(p) = &x.paper {
+            strings_in(p, &mut named);
+        }
+        named.extend(bases_of(r).iter().map(|b| b.to_string()));
+        let p = self.passed_on.iter().rev().find(|p| named.contains(&p.forward) || named.contains(&p.paper))?;
+        let as_matter = x.referral == p.forward || x.referral == p.paper;
+        if !as_matter && p.matter.as_deref() != Some(x.referral.as_str()) {
+            return None;
+        }
+        if !as_matter {
+            if let Some(m) = self.by_referral.get(&x.referral).and_then(|a| self.matters.get(a)) {
+                let kind = x.paper.as_ref().and_then(|v| v["kind"].as_str())?;
+                if kind == m.kind {
+                    return None;
+                }
+            }
+        }
+        if let Some(rf) = self.matters.values().find(|m| m.follows.as_ref().is_some_and(|f| f.2 == p.paper)).and_then(|m| m.referral.clone()) {
+            return Some(Ok(rf));
+        }
+        p.due.filter(|d| *d >= t).map(|_| Err(p.paper.clone()))
+    }
+
+    /// A draft of a reply not handed over yet, held (once).
+    pub(super) fn hold_early(&mut self, r: &Record, paper: &str) {
+        if !self.early.iter().any(|(d, _)| d == r.id.as_str()) {
+            self.early.push((r.id.to_string(), paper.to_string()));
+        }
+    }
+
+    /// The drafts it holds for replies: each taken under its reply's matter once that is handed over, and answered as on
+    /// no matter of its own once the paper's day has passed with none handed over.
+    pub(super) fn take_held(&mut self, t: i64, cx: &mut Cx) {
+        if self.early.is_empty() {
+            return;
+        }
+        for (id, paper) in std::mem::take(&mut self.early) {
+            let Some(r) = self.book.get(&id).cloned() else { continue };
+            let Some(x) = papers::read::<Draft>(&r) else { continue };
+            let handed = self.matters.values().any(|m| m.referral.is_some() && m.follows.as_ref().is_some_and(|f| f.2 == paper));
+            let due = self.passed_on.iter().rev().find(|p| p.paper == paper).and_then(|p| p.due);
+            if handed || due.is_none_or(|d| d < t) {
+                self.take_draft(&r, x, t, cx);
+            } else {
+                self.early.push((id, paper));
+            }
+        }
+    }
+
+    /// Its answer to a paper of its assistant's that names no matter it has open with it (a draft, a request to go
+    /// ahead): said plainly, at the sitting it reads it, never dropped in silence. Whether the paper named is a matter it
+    /// handed over and has finished, or none of its own.
+    pub(super) fn not_ours(&mut self, r: &Record, what: &str, named: &str) {
+        // (Only its own assistant's: an organisation's other posts see what is addressed to it too, and a paper of the
+        // rates post's is no paper of the finance post's to answer. The first mock fork of 2026-11-16 answered so.)
+        if !self.letter(r) {
+            return;
+        }
+        let ours = self.book.get(named).filter(|q| q.speaks_for.as_deref() == Some(self.me.as_str())).and_then(|q| papers::read::<Referral>(q));
+        let agreement = ours.as_ref().map(|q| q.agreement.clone()).or_else(|| self.in_use().and_then(|e| e.agreement.clone())).or_else(|| self.eng.live().last().and_then(|e| e.agreement.clone())).unwrap_or_default();
+        let what = what.replace('_', " ");
+        let words = if ours.is_some() {
+            format!("We have your {what} {}. It names {named}, a matter we no longer have open with you: we have not taken it up as part of that matter.", r.id)
+        } else {
+            format!("We have your {what} {}. It names {named}, which is not a matter we handed you: we have not taken it up as one.", r.id)
+        };
+        self.paper(Acknowledgement::KIND, &words, &agreement, &r.id, papers::data(&Acknowledgement { of: r.id.to_string() }), Then::Plain);
+    }
+}

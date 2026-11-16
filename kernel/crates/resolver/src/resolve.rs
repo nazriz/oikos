@@ -1440,6 +1440,18 @@ impl Resolver<'_> {
                 data.insert(field.clone(), x);
             }
         }
+        // (A paper a client passed on stands for the matter it came on: a matter's blank (`referral`, `matter`) naming the
+        // forward, or the body's paper in it, is that matter, or the reply to that paper the client has since handed over
+        // and is not answered yet (one reply, one matter). The stakes run's rung 1 (situation), 2026-11-16: a client's
+        // evidence drafted with the forward as its referral, which the client read as no matter of its own.)
+        for field in ["referral", "matter"] {
+            if fields.get(field).and_then(|t| t["type"].as_str()) != Some("record") {
+                continue;
+            }
+            if let Some(m) = data.get(field).and_then(Json::as_str).and_then(|v| self.k.matter_of_passed(v)) {
+                data.insert(field.to_string(), Json::from(m));
+            }
+        }
         // (A paper of the office's own may be given its words as they are to stand, where the form has no field of that name.)
         let own_words = spec["writes"].is_object() && !fields.contains_key("text");
         let unknown: Vec<&str> = c.args.iter().map(|(k, _)| k.as_str()).filter(|a| !["to", "form", "for"].contains(a) && !fields.contains_key(*a) && !(*a == "text" && own_words)).collect();

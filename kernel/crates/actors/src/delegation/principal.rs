@@ -212,6 +212,8 @@ struct PaperIn {
 #[derive(Debug, Clone, Default)]
 struct Grounds {
     due: Option<(i64, String)>,
+    /// Who sent the paper that names `due`.
+    due_by: Option<String>,
     why: Vec<String>,
     /// Its own day for a draft (`Referral.draft_by`).
     draft_by: Option<i64>,
@@ -347,6 +349,12 @@ pub struct State {
     cited: Vec<(String, i64)>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     cites_read: BTreeSet<String>,
+    /// Its own forwards, the newest few (`note_forwards`): what each passed on, on what matter, by when.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    passed_on: Vec<forward::PassedOn>,
+    /// Drafts of a reply to a paper it passed on, come before it handed the reply over: held (draft, paper), `take_held`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    early: Vec<(String, String)>,
 }
 
 mod answers;
@@ -464,6 +472,8 @@ impl Delegating {
                 chased: BTreeMap::new(),
                 cited: vec![],
                 cites_read: BTreeSet::new(),
+                passed_on: vec![],
+                early: vec![],
             },
         })
     }
@@ -491,6 +501,8 @@ impl Actor for Delegating {
             pic
         };
         s.took_outcomes(pic);
+        // (Drafts of replies it held, taken under their matters once handed over: `take_held`.)
+        s.take_held(pic.t, cx);
         let a = self.inner.step(ipic, cx);
         match a {
             Action::Call { program, reasoning } => {
@@ -514,7 +526,7 @@ impl Actor for Delegating {
                     let kind = ks.iter().find(|k| k.as_str() != "money").or(ks.first()).cloned().unwrap_or_default();
                     if level == Level::Advice {
                         // (It does it itself, and asks what the assistant would have done.)
-                        let g = s.grounds(&kind, Level::Advice, &text, &subjects_of(&handed), None, facts.as_ref(), Some(pic), pic.t, cx);
+                        let g = s.grounds(&kind, Level::Advice, &text, &subjects_of(&handed), None, facts.as_ref(), None, Some(pic), pic.t, cx);
                         s.ask_advice(&agreement, &kind, &text, &g, cx);
                         return Action::Call { program, reasoning };
                     }
@@ -524,7 +536,7 @@ impl Actor for Delegating {
                     let want = facts.as_ref().filter(|_| depth == Depth::Want).and_then(|f| serde_json::from_value::<WantHanded>(f["want"].clone()).ok());
                     let facts = if depth == Depth::Want { facts.map(|f| f["facts"].clone()) } else { facts };
                     let mut m = Matter { kind, level, agreement: agreement.clone(), program: text.clone(), at: pic.t, referral: None, subjects: subjects_of(&handed), own: BTreeMap::new(), facts, depth, want, due: None, follows, answered: false };
-                    let g = s.grounds(&m.kind, m.level, &m.program, &m.subjects, m.want.as_ref(), m.facts.as_ref(), Some(pic), pic.t, cx);
+                    let g = s.grounds(&m.kind, m.level, &m.program, &m.subjects, m.want.as_ref(), m.facts.as_ref(), m.follows.as_ref().map(|f| f.0.as_str()), Some(pic), pic.t, cx);
                     m.due = g.due.as_ref().map(|d| d.0);
                     // (What it would have done, on record for whoever reads the log: what the matter needed. Never shown to
                     // anyone in the world.)
@@ -725,6 +737,7 @@ impl State {
         // (A body's paper citing a paper sent in its name: filed, and read now, `answers`; a person is shown it at a sitting.)
         self.cited_seen(pic, None, cx);
         self.trace(pic);
+        self.note_forwards(pic);
         for r in fresh {
             self.take(&r, pic.t, cx);
         }
@@ -985,56 +998,13 @@ impl State {
                 self.next_review = self.next_review.min(t);
             }
         } else if let Some(x) = papers::read::<Draft>(r) {
-            let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
-            let Some(m) = self.matters.get(&action).cloned() else { return };
-            // (A draft on a form, a model's, is read by what it would send: the paper's kind and to whom, against what was asked.)
-            // (Handed over as what happened, the paper is the assistant's: it is read on the kind's material details and
-            // whom it goes to, against what its own code would have sent, never its words.)
-            if m.depth == Depth::Want {
-                // (A want's draft waited on it too: from the hand-over to its own reading.)
-                self.waited(&m, t - m.at);
-                if let Some(mm) = self.matters.get_mut(&action) {
-                    mm.answered = true;
-                }
-                self.read_for_want(r, &action, &m, &x, t, cx);
-                return;
-            }
-            // (The wait on the permission path: from the hand-over to its own answer, its own records.)
-            self.waited(&m, t - m.at);
-            if let Some(mm) = self.matters.get_mut(&action) {
-                mm.answered = true;
-            }
-            let differs = if m.facts.is_some() { matter_differs(&m, &x, &self.me, r.at) } else { vec![] };
-            let wrong = if m.facts.is_some() {
-                !differs.is_empty()
-            } else {
-                match (&x.calls, &x.paper) {
-                    (None, Some(p)) => !paper_as_asked(p, &m.program),
-                    _ => x.calls.as_deref().map(norm) != Some(norm(&m.program)),
-                }
-            };
-            // (Reading it whole: a slip in it is found unless the review itself slips, the world's row for a sign-off.)
-            let missed = wrong && slip(cx, "publish/sign_off", &r.id, &SlipOptions::default());
-            if wrong && !missed {
-                self.seen.entry(Self::key(&m.agreement, &m.kind)).or_default().saw(true, &r.id);
-                let found = if differs.is_empty() { "The draft is not what was asked for.".to_string() } else { format!("The draft is not as we have it: {}.", differs.join("; ")) };
-                let d = Declined { of: r.id.to_string(), referral: x.referral.clone(), found: Some(found.clone()) };
-                self.paper(Declined::KIND, &format!("Draft {} declined. {found} We will do it ourselves.", r.id), &m.agreement, &r.id, papers::data(&d), Then::Plain);
-                self.myself(&action, &m, "We declined the draft: doing it ourselves.");
-                self.next_review = self.next_review.min(t);
-            } else {
-                // (A draft written on a form carries the paper: the sign-off is its signed copy, which the assistant sends
-                // as it stands on its form for that, `send_signed`. Before 2026-11-10 a seat had to write the paper out
-                // again on the direct form, and read that as beyond a draft-level remit: the scope pilot's one clean
-                // request, and round 5's factory seat.)
-                let paper = x.paper.as_ref().map(|p| with_instructions(signed_copy(p, crate::common::text(r)), &m.program));
-                let words = signed_words(&r.id, paper.as_ref());
-                let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
-                self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
-            }
+            self.take_draft(r, x, t, cx);
         } else if let Some(x) = papers::read::<ApprovalRequest>(r) {
-            let Some(action) = self.by_referral.get(&x.referral).cloned() else { return };
-            let Some(m) = self.matters.get(&action).cloned() else { return };
+            // (A request that names no matter open with it is answered so, never dropped in silence: `not_ours`.)
+            let Some((action, m)) = self.by_referral.get(&x.referral).cloned().and_then(|a| self.matters.get(&a).cloned().map(|m| (a, m))) else {
+                self.not_ours(r, "request", &x.referral);
+                return;
+            };
             self.waited(&m, t - m.at);
             if let Some(mm) = self.matters.get_mut(&action) {
                 mm.answered = true;
@@ -1099,7 +1069,7 @@ impl State {
                         }
                         let n = Matter { agreement: next.clone(), level, referral: None, answered: false, ..m.clone() };
                         // (Taken up again: told from its files, as on the day it was handed over.)
-                        let g = self.grounds(&n.kind, n.level, &n.program, &n.subjects, n.want.as_ref(), n.facts.as_ref(), None, t, cx);
+                        let g = self.grounds(&n.kind, n.level, &n.program, &n.subjects, n.want.as_ref(), n.facts.as_ref(), n.follows.as_ref().map(|f| f.0.as_str()), None, t, cx);
                         let step = self.referral(&n, &[], &g, cx);
                         self.matters.insert(action.clone(), n);
                         self.by_referral.remove(id);
@@ -1116,6 +1086,71 @@ impl State {
                     self.myself(&action, &m, "The service has ended with this matter still open: doing it ourselves.");
                 }
             }
+        }
+    }
+
+    /// A draft from its assistant, read (`take`). A draft for its reply to a body's paper it passed on, made before it
+    /// handed that reply over or under the matter the paper came on, is taken under the reply's matter (one reply, one
+    /// matter: `reply_for`), or held until it hands the reply over; a draft that names no matter open with it is answered
+    /// so (`not_ours`). Until 2026-11-16 both were dropped without a word: the stakes run's rung 1 (situation), where a
+    /// desk drafted a client's evidence from the forward before the client's own hand-over of it, and it was never signed.
+    fn take_draft(&mut self, r: &Arc<Record>, mut x: Draft, t: i64, cx: &mut Cx) {
+        match self.reply_for(r, &x, t) {
+            Some(Ok(rf)) => x.referral = rf,
+            Some(Err(paper)) => {
+                self.hold_early(r, &paper);
+                return;
+            }
+            None => {}
+        }
+        let Some((action, m)) = self.by_referral.get(&x.referral).cloned().and_then(|a| self.matters.get(&a).cloned().map(|m| (a, m))) else {
+            self.not_ours(r, Draft::KIND, &x.referral);
+            return;
+        };
+        // (A draft on a form, a model's, is read by what it would send: the paper's kind and to whom, against what was asked.)
+        // (Handed over as what happened, the paper is the assistant's: it is read on the kind's material details and
+        // whom it goes to, against what its own code would have sent, never its words.)
+        if m.depth == Depth::Want {
+            // (A want's draft waited on it too: from the hand-over to its own reading.)
+            self.waited(&m, t - m.at);
+            if let Some(mm) = self.matters.get_mut(&action) {
+                mm.answered = true;
+            }
+            self.read_for_want(r, &action, &m, &x, t, cx);
+            return;
+        }
+        // (The wait on the permission path: from the hand-over to its own answer, its own records.)
+        self.waited(&m, t - m.at);
+        if let Some(mm) = self.matters.get_mut(&action) {
+            mm.answered = true;
+        }
+        let differs = if m.facts.is_some() { matter_differs(&m, &x, &self.me, r.at) } else { vec![] };
+        let wrong = if m.facts.is_some() {
+            !differs.is_empty()
+        } else {
+            match (&x.calls, &x.paper) {
+                (None, Some(p)) => !paper_as_asked(p, &m.program),
+                _ => x.calls.as_deref().map(norm) != Some(norm(&m.program)),
+            }
+        };
+        // (Reading it whole: a slip in it is found unless the review itself slips, the world's row for a sign-off.)
+        let missed = wrong && slip(cx, "publish/sign_off", &r.id, &SlipOptions::default());
+        if wrong && !missed {
+            self.seen.entry(Self::key(&m.agreement, &m.kind)).or_default().saw(true, &r.id);
+            let found = if differs.is_empty() { "The draft is not what was asked for.".to_string() } else { format!("The draft is not as we have it: {}.", differs.join("; ")) };
+            let d = Declined { of: r.id.to_string(), referral: x.referral.clone(), found: Some(found.clone()) };
+            self.paper(Declined::KIND, &format!("Draft {} declined. {found} We will do it ourselves.", r.id), &m.agreement, &r.id, papers::data(&d), Then::Plain);
+            self.myself(&action, &m, "We declined the draft: doing it ourselves.");
+            self.next_review = self.next_review.min(t);
+        } else {
+            // (A draft written on a form carries the paper: the sign-off is its signed copy, which the assistant sends
+            // as it stands on its form for that, `send_signed`. Before 2026-11-10 a seat had to write the paper out
+            // again on the direct form, and read that as beyond a draft-level remit: the scope pilot's one clean
+            // request, and round 5's factory seat.)
+            let paper = x.paper.as_ref().map(|p| with_instructions(signed_copy(p, crate::common::text(r)), &m.program));
+            let words = signed_words(&r.id, paper.as_ref());
+            let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
+            self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
         }
     }
 
@@ -1860,7 +1895,10 @@ impl State {
         out
     }
 
-    fn grounds(&self, kind: &str, level: Level, program: &str, subjects: &[String], want: Option<&WantHanded>, facts: Option<&Value>, pic: Option<&Picture>, t: i64, cx: &Cx) -> Grounds {
+    /// `follows`: the matter it follows from, a reply on a matter handed over (`Matter::follows`), whose own position and
+    /// whose office's rule it says too.
+    #[allow(clippy::too_many_arguments)]
+    fn grounds(&self, kind: &str, level: Level, program: &str, subjects: &[String], want: Option<&WantHanded>, facts: Option<&Value>, follows: Option<&str>, pic: Option<&Picture>, t: i64, cx: &Cx) -> Grounds {
         let mut cited: Vec<String> = subjects.to_vec();
         cited.extend(want.and_then(|w| w.against.as_ref()).map(|a| a.record.clone()));
         cited.extend(facts.and_then(|f| f.get("records")).and_then(|r| r.as_array()).into_iter().flatten().filter_map(|x| x.as_str().map(String::from)));
@@ -1868,6 +1906,14 @@ impl State {
         cited.retain(|c| seen.insert(c.clone()));
         let date = |at: i64| crate::common::when_words(at, &cx.ctx.world);
         let mut g = Grounds::default();
+        // (A reply on a matter handed over (the evidence an office asked for on a claim) is part of that matter: it says
+        // what the matter says of its own position and of the office's rule, from the matter's own referral. Until
+        // 2026-11-16 the reply said neither, the claim both: the stakes run's rung 1 (situation).)
+        let of = follows.and_then(|f| self.book.get(f)).filter(|q| q.speaks_for.as_deref() == Some(self.me.as_str())).and_then(|q| papers::read::<Referral>(q));
+        let (kind, program, facts) = match &of {
+            Some(q) if !TOLD.iter().any(|(k, _)| *k == kind) => (q.kind.as_str(), q.calls.as_deref().unwrap_or_default(), q.facts.as_ref()),
+            _ => (kind, program, facts),
+        };
         // (Its own position, in its kind's words, from the paper its own code wrote.)
         if let Some((_, words)) = TOLD.iter().find(|(k, _)| *k == kind) {
             let own = parse_program(program).ok().and_then(|p| match p {
@@ -1898,6 +1944,7 @@ impl State {
             if let Some(d) = p.dates.iter().map(|(_, d)| *d).filter(|d| *d > t).min() {
                 if g.due.as_ref().is_none_or(|(x, _)| d < *x) {
                     g.due = Some((d, p.id.clone()));
+                    g.due_by = Some(p.from.clone());
                 }
             }
         }
@@ -1912,15 +1959,17 @@ impl State {
             let often = if every == 1 { "every day".to_string() } else { format!("every {every} days") };
             g.why.push(format!("We get to our post {often}, next on {}.", date(next)));
         }
+        // (Said as the person knows it: the body's day and hour, and the day and hour of their own last sitting before it
+        // (their next, where none is before it). Never whether a draft would be in time: that turns on when their
+        // assistant sits, which they cannot know. Until 2026-11-16 it said "a draft reaches us in time to sign before
+        // <day> if it comes by <day>", false where they sat at 21:00 and the office's day ended at 21:16 that night, the
+        // desk sitting at 09:00: the stakes run's rung 1 (situation).)
         if let (Some((due, _)), Level::Draft) = (&g.due, level) {
             match sits {
                 None => g.draft_by = Some(due - read),
                 Some(x) => {
-                    let last = last_sitting(x, t, *due, read);
-                    g.why.push(match last {
-                        Some(l) => format!("A draft reaches us in time to sign before {} if it comes by {}.", date(*due), date(l)),
-                        None => format!("Our next sitting is after {}.", date(*due)),
-                    });
+                    let (words, last) = due_sentence(g.due_by.as_deref().unwrap_or("The office"), *due, x, t, read, &date);
+                    g.why.push(words);
                     g.draft_by = last;
                 }
             }
@@ -2315,6 +2364,28 @@ fn paper_in(r: &Record) -> Option<PaperIn> {
     let d = data.as_ref().map(|d| d.to_value()).unwrap_or(Value::Null);
     let dates = crate::papers::delegation::dates_named(&d).into_iter().map(|(k, v)| (k.to_string(), v)).collect();
     Some(PaperIn { id: r.id.to_string(), at: r.at, kind: kind.to_string(), from, text: quoted(crate::common::text(r)), dates })
+}
+
+/// What a person who gets to their post at sittings of their own says of a body's day on a hand-over at `draft`: the
+/// body's day and hour, and the day and hour of their own last sitting before it that leaves `read` (their next, where
+/// none does); and that last sitting, their own day for a draft. Nothing of whether a draft will be in time.
+pub(super) fn due_sentence(by: &str, due: i64, sits: (i64, i64, i64), t: i64, read: i64, date: &dyn Fn(i64) -> String) -> (String, Option<i64>) {
+    let last = last_sitting(sits, t, due, read);
+    let asks = format!("{by} asks for this by {}, {}", date(due), clock(due));
+    let words = match last {
+        Some(l) => format!("{asks}; the last time we deal with our post before then is {}, at about {}.", date(l), clock(l)),
+        None => {
+            let n = next_sitting(sits, t);
+            format!("{asks}; we next deal with our post on {}, at about {}.", date(n), clock(n))
+        }
+    };
+    (words, last)
+}
+
+/// The hour of a moment, as a person says it ("21:16").
+fn clock(t: i64) -> String {
+    let s = t.rem_euclid(DAY);
+    format!("{:02}:{:02}", s / 3600, (s % 3600) / 60)
 }
 
 /// The first time at or after `t` that a person gets to their post, by their habit (`State::sits`: every so many days,

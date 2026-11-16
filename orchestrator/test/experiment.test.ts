@@ -35,6 +35,23 @@ test("mock models are policies over the post's code brain, and say what they cos
   expect([1, 2, 3, 4].map((i) => (flaky.decide(wake(i)) as any).action.type)).toEqual(["act", "wait", "act", "wait"]);
   expect(() => mockModel("delay", brain())).toThrow(/no mock model/);
   expect(() => mockModel("clever", brain())).toThrow(/no mock model/);
+  // (2026-11-16) diligent:sittings acts as the code decides, at the seat's own sittings only (weekdays, from 09:00, one
+  // sitting a day while there is something to do): the like-for-like reference for a model seat's timing.
+  const S = { start: 9 * 3600, end: 17 * 3600, days: 5 };
+  const seated = mockModel("diligent:sittings", brain(), S);
+  seated.decide(wake(0));
+  // (Decided at 20:00 on day 0: held, and back at the next day's sitting.)
+  expect((seated.decide(wake(20 * 3600)) as any).action).toEqual({ type: "wait", until: DAY + 9 * 3600 });
+  expect((seated.decide(wake(DAY + 9 * 3600)) as any).action).toEqual(act);
+  // (Decided on day 4, a Friday's evening (days 0 to 4 are the working days): back on the next week's first, day 7.)
+  const weekend = mockModel("diligent:sittings", brain(), S);
+  weekend.decide(wake(0));
+  expect((weekend.decide(wake(4 * DAY + 20 * 3600)) as any).action).toEqual({ type: "wait", until: 7 * DAY + 9 * 3600 });
+  // (A sitting with nothing to do closes: what the code decides later that day waits for the next.)
+  const once = mockModel("diligent:sittings", ((): DetachedActor => { let n = 0; return { step: () => ({ action: n++ === 1 ? act : { type: "wait" } }) } as unknown as DetachedActor; })(), S);
+  once.decide(wake(9 * 3600));
+  expect((once.decide(wake(10 * 3600)) as any).action).toEqual({ type: "wait", until: DAY + 9 * 3600 });
+  expect(() => mockModel("diligent:sittings", brain())).toThrow(/no office hours/);
 });
 
 test("measures count and time what the log says from the fork on", () => {

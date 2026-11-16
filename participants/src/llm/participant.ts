@@ -77,7 +77,7 @@ export interface LlmParticipantConfig {
   dayBook?: { text(t: number, since?: number): string };
   /** An assistant's matters, each with where it stands, from its own papers on them (readers/matters.ts). Set out at
    * every sitting. */
-  matters?: { text(): string };
+  matters?: { text(): string; /** The hand-over of the matter its own draft waited longest on (the debrief's `waiting`). */ waited?(): string | undefined };
   /** How hard its model reasons, where its way in takes an effort (docs/real-models.md, "Effort"): the seat's own
    * setting, sent with each of its calls. Not given: the adapter's (the model's default, or what was named with it). */
   effort?: string;
@@ -1897,7 +1897,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // its notebook as it left it. What it did is in `d.summary`, made by code from the run's log: it has no other
       // memory of the run (VISION 15, point 7: an account of an experience it cannot remember is no account).
       return await runDebrief(io, { participant: c.participant, title: c.title ?? c.participant, entity: c.entityName && c.entityName !== c.entity ? `${c.entityName} (${c.entity})` : c.entity,
-        framing: c.framing, system: lastSystem ?? c.framing.system ?? "", notebook: notes, ...(c.effort ? { effort: c.effort } : {}), ...(c.mockDebrief ? { mock: c.mockDebrief } : {}), ...(c.withMatters?.length || c.matters ? { heldMatters: true } : {}) }, d, seenSystems);
+        framing: c.framing, system: lastSystem ?? c.framing.system ?? "", notebook: notes, ...(c.effort ? { effort: c.effort } : {}), ...(c.mockDebrief ? { mock: c.mockDebrief } : {}), ...(c.withMatters?.length || c.matters ? { heldMatters: true } : {}), ...(c.matters?.waited?.() ? { waitedOn: c.matters.waited()! } : {}) }, d, seenSystems);
     },
   };
 }

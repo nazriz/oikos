@@ -180,4 +180,32 @@ test("an open matter says the client's habit and next sitting as of today, a rep
   expect(t).toContain("reported not done on year 1, day 21, before you took this post");
   expect(t).toContain("no recording of their authority with outside has reached you");
   expect(t).toContain("their authority with bank recorded on year 1, day 23 (rec.31)");
+  // (A recording that has reached it stays said while the matter is open: a later look that shows the return again
+  // does not un-say it (the stakes run's rung 1 (situation), 2026-11-16: "recorded on day 32" on day 33 only, then "no
+  // recording ... has reached you" again, and the seat asked a client for an authority already recorded).)
+  m.absorb({ t: 33 * DAY, channels: { "a/back": { kind: "records", search: true, records: [back("rec.32", 19 * DAY, "bank", "loan_application")] } } } as any);
+  expect(m.text()).toContain("their authority with bank recorded on year 1, day 23 (rec.31)");
+  // (A later return by the same body for want of it is a fact of its own, said beside the recording.)
+  m.absorb({ t: 36 * DAY, channels: { "a/back": { kind: "records", records: [back("rec.40", 35 * DAY, "bank", "loan_application")] } } } as any);
+  expect(m.text()).toContain("their authority with bank recorded on year 1, day 23 (rec.31), and sent back by bank for want of it after that, on year 1, day 36 (rec.40)");
+});
+
+test("one reply, one matter: a draft made from a paper passed on, before the client hands the reply over, is that reply's draft; and what the client said is said with its day, every sentence", () => {
+  // (The stakes run's rung 1 (situation), 2026-11-16: c0014's evidence drafted from the forward on day 38, the client's
+  // hand-over of the reply after it; the list said "no draft yet" under the reply. And the client's words repeated at
+  // every later sitting with no day, a sentence of them dropped.)
+  const m = new Matters("a/matters", "a/file");
+  m.absorbRead({ t: 37 * DAY, channels: { "a/file": { kind: "records", search: true, records: [] } } } as any);
+  const fwd = { id: "rec.82", record: "statement", kind: "forward", at: 37 * DAY, author: "x", speaks_for: "c14", text: "From outside: please send proof.", data: { paper: "rec.08", by: "outside", matter: "rec.84", data: { by: 44 * DAY } } } as any;
+  m.absorb({ t: 37 * DAY, channels: { "a/matters": { kind: "records", records: [fwd] } } } as any);
+  m.own([{ block: "publish", kind: "draft", data: { referral: "rec.84", paper: { kind: "evidence", data: { request: "rec.82" } } } }], 38 * DAY);
+  const why = ["Until the claim is decided we are not paid pension.", "In our account (acc-c14) today: $221.52.", "Nothing regular is coming in.", "It comes from outside's evidence request rec.08 of year 1, day 31: \"Please send proof.\"", "We get to our post every 7 days, next on year 1, day 44.", "outside asks for this by year 1, day 44, 21:16; the last time we deal with our post before then is year 1, day 44, at about 21:00."];
+  const reply = { id: "rec.85", record: "statement", kind: "referral", at: 38 * DAY + 3600, author: "x", speaks_for: "c14", text: `For you to draft for sign-off: evidence. ${why.join(" ")}`, data: { kind: "evidence", wants: "draft", reply_to: "rec.08", follows: "rec.84", why } } as any;
+  m.absorb({ t: 39 * DAY, channels: { "a/matters": { kind: "records", records: [reply] } } } as any);
+  const t = m.text();
+  expect(t).toContain("[rec.85] evidence, handed over by c14 on year 1, day 39: your draft went for sign-off on year 1, day 39");
+  expect(t).toContain("On year 1, day 39, handing it over, c14 said: Until the claim is decided we are not paid pension. In our account (acc-c14) today: $221.52. Nothing regular is coming in.");
+  expect(t).not.toContain("said: Until the claim is decided we are not paid pension. In our account (acc-c14) today: $221.52. Nothing regular is coming in. It comes from");
+  // (The hand-over its own draft waited longest on, in its own words: what the debrief's `waiting` sets out.)
+  expect(m.longestWait(41 * DAY)).toBe(reply.text);
 });

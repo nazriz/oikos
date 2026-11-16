@@ -756,6 +756,40 @@ impl Reconsiderations {
         })
     }
 
+    /// A request to look at a decision again, addressed to it, that names nothing it could look at again (no `about`, or
+    /// one that is no paper on its file): a body that cannot act on a paper sent to it returns it, saying why, to whom it
+    /// stands in the name of (docs/design/obstacles.md, O4: `paper_returned`, as its clerk returns a paper that falls short
+    /// of what it publishes), once. Only where the body publishes what it requires (the obstacle laws on): at level 0 such
+    /// a request lies on its file unanswered, as before. A request about another office's decision, or one of its own of
+    /// a kind with no review, is not this (it names a paper; `steps` leaves it). The stakes run's rung 1 on a weaker model,
+    /// 2026-11-16: two review requests filed in a client's name naming no refusal, and nobody told.
+    pub fn nothing_to_review<T>(&mut self, book: &Book, cx: &mut crate::Cx) -> Vec<Step<T>> {
+        let mut out = vec![];
+        let none: Vec<Arc<Record>> = book
+            .open("review_request")
+            .filter(|x| addressed_to(x).iter().any(|a| a == &self.me) && !self.handled.contains(x.id.as_str()) && x.author.as_str() != oikos_contracts::blocks::GENESIS)
+            .filter(|x| data(x).s("about").filter(|a| !a.trim().is_empty()).and_then(|a| book.get(a)).is_none())
+            .cloned()
+            .collect();
+        for r in none {
+            self.handled.insert(r.id.to_string());
+            let for_ = r.speaks_for.as_deref().unwrap_or(r.author.as_str()).to_string();
+            let said = format!("{} is returned: it does not name a decision of ours to look at again. Send it again naming the decision, by its reference.", r.id);
+            let need = serde_json::json!({ "correction": ["about"] });
+            cx.decided(serde_json::json!({ "domain": "obstacle", "law": "acceptance", "paper": r.id, "principal": for_, "counterparty": self.me, "need": need, "clears_by": "sent_again", "slip": false, "inputs": [r.id] }));
+            let copy = serde_json::json!({ "kind": "review_request", "to": addressed_to(&r), "text": crate::common::text(&r), "data": data(&r).to_value(), "basis": [r.id] });
+            out.push(because(
+                said.clone(),
+                vec![say(
+                    crate::common::intake::RETURNED,
+                    &said,
+                    Say { to: Some(vec![for_.clone()]), visible: Some(crate::steps::Visible::Only(vec![for_, self.me.clone()])), basis: Some(r.id.to_string()), data: Some(serde_json::json!({ "returned": r.id, "need": need, "paper": copy, "from": r.position.as_deref() })), ..Default::default() },
+                )],
+            ));
+        }
+        out
+    }
+
     pub fn steps<T>(&mut self, book: &Book, t: i64, redo: &mut dyn FnMut(&Record, &Record) -> Option<Redone<T>>) -> Vec<Step<T>> {
         let mut steps = vec![];
         let mut requests: Vec<&Arc<Record>> = book.open("review_request").filter(|x| addressed_to(x).iter().any(|a| a == &self.me) && !self.handled.contains(x.id.as_str())).collect();
