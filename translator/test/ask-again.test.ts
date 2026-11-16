@@ -41,7 +41,8 @@ test("a figure the draft got wrong, that the seat never wrote, is not put to the
   expect(r.asked_back).toBe(true);
   expect(t.calls()).toBe(2);
   expect(r.invalid).toEqual(["the call gave something the request did not: not an amount: c0007. Please say it another way."]);
-  expect((r as any).retries).toEqual([{ call: 'form(form=council_proposal, kind=budget, parks="c0007", proposal="Year 1 budget for staff.", to=city)', reason: "the call gave something the request did not: not an amount: c0007. Please say it another way." }]);
+  // (The staff figure the request names, "staff 303,335.76 EUR", is set from its words: namedFigure, 2026-11-17.)
+  expect((r as any).retries).toEqual([{ call: 'form(form=council_proposal, kind=budget, parks="c0007", proposal="Year 1 budget for staff.", staff="303,335.76 EUR", to=city)', reason: "the call gave something the request did not: not an amount: c0007. Please say it another way." }]);
   // Asked again, a translator that then gets it right gives a draft, and the seat is told nothing of the first.
   const second = scripted([wrong, 'form(form=council_proposal, to=city, kind=budget, staff="303.335,76 €", proposal="Year 1 budget for staff.")']);
   const good = await createTranslator(second.io, ok, () => undefined).translate({ draftId: "draft.mayor-system.2", participant: "mayor-system", as: "mayor", proposal: request, knowledge: knows() });

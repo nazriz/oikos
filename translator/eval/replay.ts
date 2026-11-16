@@ -66,7 +66,10 @@ async function arms(folders: string[]): Promise<ArmLog[]> {
     for (const folder of folders) {
       if (folder.endsWith(".json.gz")) { out.push(...(JSON.parse(gunzipSync(await Bun.file(folder).bytes()).toString()) as CompactArm[]).map(expand)); continue; }
       const { run, logs } = runOf(folder);
-      for (const log of logs) out.push(await readArm(log, run.split("/").pop()!, scratch));
+      // (A run of several seeds names each seed's arms apart, "<run>-seed-8": one arm's references repeat in the next
+      // seed's, and a request is keyed by run, arm and reference. A run of one seed keeps its own name.)
+      const seeds = new Set(logs.map((l) => /\/(seed-[0-9]+)\//.exec(l)?.[1]).filter(Boolean));
+      for (const log of logs) out.push(await readArm(log, `${run.split("/").pop()!}${seeds.size > 1 ? `-${/\/(seed-[0-9]+)\//.exec(log)![1]}` : ""}`, scratch));
     }
   } finally {
     rmSync(scratch, { recursive: true, force: true });

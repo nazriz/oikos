@@ -15239,6 +15239,47 @@ The whole-town rung 1 run b on Haiku (`runs/scope-broad-r1-b`, health check pass
 - **"and N more" at rates** (the reader's count): there is none in the rates seat's transcript. The 18 in the run are the line of papers carried from the last sitting, unchanged ("(rec.…, rec.… and 13 more: to read one again, look it up"), at the desk and the factory, which says how to open each; and the shop seat's own notebook words ("Customer receipts (acc-c0217, … and 70 more)"), its own summary. No payment list is cut.
 - **Revisit if** a seat's pile is ever more than WAITING_CHARS can list a line each within the ceiling (some hundreds of asks waiting at once), or a principal is asked often what its typed answers cannot say (MT-43).
 
+## 2026-11-17 · Rung 3 in the scored set: a day, a sum or a count the seat names is that value
+
+- **The measure:** the stakes run's rung 3 (Haiku, 60 days, two seeds each: `scope-stakes-r3-decision-slow`,
+  `-decision-slow-situation`, `-first_claim-slow-situation`) added: `~/oikos/runs/regress/requests-2026-11-17c.json.gz`
+  (4,507 requests in 32 arms, 3,293 confirmed; main's rules: 148 differences, all explained before) and
+  `scored-set-2026-11-17c.json.gz`. A run of several seeds now names each seed's arms apart (`<run>-seed-8`,
+  translator/eval/replay.ts): their references repeat. Main's rules on the set: 3,374 of 3,844 (87.8%); rung 3 alone,
+  253 misses. (`scope-stakes-r3-first_claim-slow` was not named and is not in it.)
+- **The tenant's answer, replayed:** of rung 3's 96 tribunal requests with a target, the rules these runs were made with
+  (1ab160a1) draw 16 right, main's 17: the parties and the names in `ages` were not what failed there. What failed: 63 of
+  96 tribunal draws put the whole sum owed in `can_pay`, 60 of them where the request said "can pay 0".
+- **Changes** (translator/src/rules.ts), each scored, nothing main hit lost:
+
+  | change | right first time | differences |
+  |---|---|---|
+  | main | 3,374 | 148 (explained before) |
+  | `namedDate`: a date blank the request names with its day ("period to: year 1, day 61") is that day; the model's own writing of the same day stands | 3,376 | 2, below |
+  | `namedFigure`: an amount or a count the request names with its figure ("can pay 0", "people 1") is that figure; the same figure written otherwise stands | 3,386 | 1, below |
+
+  Explained (corrections, the seat named the value and confirmed the model's other one): stakes r2 "-b" par.3.25, a
+  withholding return confirmed with `period_to` day 51 where the seat wrote "period to ... day 31"; rung 3 decision-slow
+  seed 7 desk .62, a pension draft confirmed without the birth date the seat named ("born at year -66, day 35"); rung 3
+  first_claim-slow-situation seed 7 desk .50, a tenant's answer confirmed with `can_pay` the whole sum owed where the
+  seat wrote "can pay 0" (the dangerous one: it went to the client saying the tenant could pay $5,330.01). With the set
+  rebuilt on these: 3,389 of 3,844 (88.2%); with the figure taken as written, its sign or currency word with it (a
+  test of the council's budget, "staff 303,335.76 EUR", read in the world's own money), 3,390.
+- **The withholding report, redrawn** (`translator/eval/redraw.ts`, set `withholding`): of 49 requests in rung 3 that
+  name the period's last day, our model draws `period_to` right 11 times on the form as it is; with its four dates
+  renamed (`day_after_period`, `period_ended_on`, `period_began_on`, `due_by`) 24, put in order (from, to, ended, due)
+  25, both 38; with this branch's rules, 42, 42, 46 and 43. So the names are confusable as shown. But over the 60
+  withholding returns with a target the form as it is draws 39 right, ordered 39 (one gained, one lost), renamed or both
+  37: no form change lands; the rule does the work.
+- **For the worker changing the tribunal form:** keep the blanks' names and their order. Renamed in fuller words, or with
+  the parties first, our model drew none of the six real asks right where the form as it is draws three (2026-11-17,
+  "Redrawn by our translator"); and `namedFigure` reads the seat's "can pay 0", "owes", "people", "children" by the
+  blanks' own names, which seats copy from the form as shown. Data-side changes (dropping the offer at nothing, `every`
+  in seconds) do not touch what the translator sees.
+- **Left:** `trade` 20, delivery notes and stay-on requests drawn as nothing 26, report words 8, `particulars` 9, the
+  supply request's `kind` (water drawn as energy, 2), sends naming another sign-off (a draft drawn as a send, 13).
+- **Revisit if** a seat writes a figure next to a blank's name that is not that blank's value ("can pay 0 more than").
+
 ## 2026-11-17 · A client tells its desk the office's rule as the office published it
 
 - **What was wrong:** in the stakes run's rung 3, every client hand-over on a claim or a review in the `first_claim` cells with the client's situation on said "The office pays nothing for the days before it decides." (seed 7 47 calls of the desk's shown it, seed 8 55), though the office's published rule (rec.1) and its payments paid from the first claim. The sentence is read from the client's own book (`pays_from_first_claim`, principal.rs), and the delegating wrapper's book kept only the papers of delegation, never a law: the newest support law was always none, which reads as `decision`.
