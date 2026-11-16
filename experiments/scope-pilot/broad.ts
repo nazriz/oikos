@@ -36,5 +36,11 @@ const ARMS: Arm[] = [{ name: "code", steward: { kind: "code" } }, modelArm(DEFAU
  * A real-model run sets its own, by the cost estimate, with the owner's go-ahead. */
 const DRY = { experiment_usd: 1, arm_usd: { haiku: 1 } };
 
-export default build({ name: `scope-broad-${n}`, days: 30, seeds: [7], reviewDays: 14, arms: ARMS, budget: DRY,
-  assistants: ASSISTANTS, holdLevels: "run", depth: "matter", wants: true, obstacles: 2, dateOfEffect: "decision", clientPost: "slow" });
+/** How the principals get to their post (`OIKOS_PACE`, default `slow`): the clients' post and, under `assistants`, each
+ * office's in-tray (stage 1b): `slow` the study's stated shares, `ordinary` the profile's habits, `off` neither (a
+ * client's post by the profile's habit; an office at its next wake, as before 2026-11-16). */
+const pace = (process.env.OIKOS_PACE ?? "slow") as "slow" | "ordinary" | "off";
+if (!["slow", "ordinary", "off"].includes(pace)) throw new Error("broad.ts: OIKOS_PACE is slow, ordinary or off");
+
+export default build({ name: `scope-broad-${n}${pace === "slow" ? "" : `-${pace}`}`, days: 30, seeds: [7], reviewDays: 14, arms: ARMS, budget: DRY,
+  assistants: ASSISTANTS, holdLevels: "run", depth: "matter", wants: true, obstacles: 2, dateOfEffect: "decision", ...(pace === "off" ? {} : { clientPost: pace }) });

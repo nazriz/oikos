@@ -194,6 +194,15 @@ test("a town that does not ask for assistants is generated as before; one that d
   expect(assigned.positions.filter((x: any) => !x.role_module?.params?.delegation && (x.channels ?? []).some((c: any) => c.id === "providers")).map((x: any) => x.id)).toEqual([]);
   expect(assigned.participants.some((p: any) => p.kind === "person" && p.controller?.params?.delegation)).toBe(false);
   expect(() => (build({ name: "t", days: 1, seeds: [1], reviewDays: 14, arms: [], budget: { experiment_usd: 0, arm_usd: {} }, assistants: { posts: ["nobody-here"] } }).world as any).prepare(structuredClone(classed), 1)).toThrow(/names no principal/);
+  // An office's in-tray (stage 1b, WM-20): where the town asks, every principal post's holder gets to its own assistant's
+  // papers, and only those, at sittings in its working day; the study turns it on with the clients' pace, never alone.
+  expect(JSON.stringify(classed)).not.toContain('"in_tray"');
+  const trayed = generate({ ...base, assistants: true, assistant_classes: true, post_in_tray: { every_days: [[2, 10_000]] } }) as any;
+  const trays = trayed.positions.filter((p: any) => p.role_module?.params?.delegation);
+  for (const p of trays) expect(p.role_module.params.in_tray, p.id).toMatchObject({ every_days: [[2, 10_000]], from: [p.role_module.params.delegation.post] });
+  expect(trayed.positions.filter((p: any) => p.role_module?.params?.in_tray && !p.role_module.params.delegation).map((p: any) => p.id)).toEqual([]);
+  const paced = (clientPost?: "ordinary" | "slow") => (build({ name: "t", days: 1, seeds: [1], reviewDays: 14, arms: [], budget: { experiment_usd: 0, arm_usd: {} }, assistants: { posts: ["planning"] }, ...(clientPost ? { clientPost } : {}) }).world as any).sets.filter((s: string) => s.startsWith("post_in_tray="));
+  expect([paced().length, paced("ordinary"), paced("slow").length]).toEqual([0, ["post_in_tray={}"], 1]);
 });
 
 test("in a town with assistants, principals engage by their own rule, hand matters over and hear back; every decision rests on what they were shown", async () => {

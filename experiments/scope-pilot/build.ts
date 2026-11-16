@@ -244,7 +244,7 @@ export function build(o: Options): ExperimentSpec {
     name: o.name,
     world: {
       file: "worlds/town-1000.yaml",
-      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : []), ...(o.dateOfEffect ? [`support_date_of_effect=${o.dateOfEffect}`] : []), ...(o.clientPost === "slow" ? [`paperwork=${JSON.stringify({ every_days: SLOW_POST })}`] : []), ...(o.clientSituation === "on" ? ["assistant_situation=true"] : []), ...(o.openingArrears ? ["opening_arrears=true"] : []), ...(A ? ["assistant_classes=true"] : [])],
+      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : []), ...(o.dateOfEffect ? [`support_date_of_effect=${o.dateOfEffect}`] : []), ...(o.clientPost === "slow" ? [`paperwork=${JSON.stringify({ every_days: SLOW_POST })}`] : []), ...(o.clientSituation === "on" ? ["assistant_situation=true"] : []), ...(o.openingArrears ? ["opening_arrears=true"] : []), ...(A ? ["assistant_classes=true"] : []), ...(A && o.clientPost ? [`post_in_tray=${JSON.stringify(o.clientPost === "slow" ? { every_days: SLOW_POST } : {})}`] : [])],
       prepare(config: any, seed: number) {
         // (The spec line: every post it assigns engages by hand, at its levels, for every kind it may hand over; under
         // `only` (the default) no other organisation is offered the service.)
@@ -258,7 +258,8 @@ export function build(o: Options): ExperimentSpec {
               const levels = Object.fromEntries(kinds.map((k) => [k, typeof A.levels === "string" ? A.levels : (A.levels?.[k] ?? (ORG_LEVELS as { [k: string]: string })[k] ?? "draft")]));
               pos.role_module.params = { ...pos.role_module.params, delegation: { ...structuredClone(d), review_days: o.reviewDays, ...ready, commit: commit("letting-assistant-a", levels, kinds) } };
             } else if (A.only !== false) {
-              const { delegation: _gone, ...params } = pos.role_module.params;
+              // (And its in-tray, which holds only what an assistant it now has none of would send.)
+              const { delegation: _gone, in_tray: _tray, ...params } = pos.role_module.params;
               pos.role_module.params = params;
               if (Array.isArray(pos.channels)) pos.channels = pos.channels.filter((ch: any) => ch.id !== "providers");
             }

@@ -406,10 +406,15 @@ The mechanism:
 - **Effect:** The factory and the offices' seats never wait long on their principal, so at the organisations' seats
   the permission path costs nothing in time and the study's dilemma (stakes) arises at the desk only; any measure of
   an organisation's waiting reads short.
-- **L / I:** high / medium (it is certain today) · **Status:** open (found 2026-11-14)
+- **L / I:** high / medium (it is certain today) · **Status:** closed for the study's purposes (2026-11-16, the broad
+  seats' stage 1b): where a town asks (`post_in_tray`; the study's `build.ts` under `assistants` with a pace set), the
+  holder of every principal post gets to its assistant's papers at in-tray sittings of its own, in its working day
+  (`crate::post`, the person's post wrapper given the posts whose papers wait; docs/behaviour/assistants.md, "An
+  office's in-tray"). Still open where the town does not ask (the stakes run's factory seat, every code town), and
+  for the post's other business, which keeps no working hours (WM-18). The in-tray's shares are a placeholder (MT-50).
 - **Notice by:** the times of day of an organisation's sign-offs in a delegating run (screen.ts's waits at its seats).
-- **Fix when:** a post's working hours exist for its holder's acts (WM-18), before a study reads waiting at an
-  organisation's seat; then `answer_lag` answers for an organisation from them.
+- **Fix when:** a post's working hours exist for its holder's acts (WM-18): the in-tray's sittings then fall in them,
+  and every town's offices have one.
 
 ### WM-21 · Nobody is ever away: no hospital as a place, no trips out of town
 - **Gap:** A person can be out of reach of their post only by being too ill for it at home (stakes D2, 2026-11-14:
@@ -2169,6 +2174,20 @@ The mechanism:
 - **Fix when:** before the bank is seated: an order with nothing to pay carries no payment, and a keeper pays a
   provider's monthly fee by its own transfer each month (as a bank pays its suppliers); delegating towns' hashes move.
 - **Notice by:** a `rejected_action` note for an order of a service; an assigned principal with no service delivered.
+
+### MT-50 · How often an office-holder clears its in-tray is a placeholder
+- **Gap:** The in-tray of an office (the broad seats' stage 1b) draws each post's habit from the profile's `in_tray`
+  shares (every day 70%, every second 15%, every third 10%, every fifth 5%), the same placeholder in the three profiles
+  with assistants, and the study's `slow` condition from the persons' slow shares (60% weekly). No figure is sourced.
+  The sitting falls at a minute in the post's working day, every day of the week (no weekends or holidays).
+- **Where:** `worlds/profiles/*.json` (`in_tray`, source note `in_tray`); `experiments/scope-pilot/build.ts`
+  (`SLOW_POST`); `kernel/crates/actors/src/post.rs`.
+- **Effect:** The waits at organisations' seats, and so every episode at them (a matter whose next step needs the
+  principal), scale with these shares. A comparison of organisations' seats with the desk mixes two placeholder habits.
+- **L / I:** high (certain today) / medium · **Status:** open (2026-11-16)
+- **Fix when:** a diary or time-use study of managers' handling of approvals is read; before a result compares waits
+  across kinds of seat.
+- **Notice by:** the screen's waits at organisations' seats against the desk's.
 
 ---
 

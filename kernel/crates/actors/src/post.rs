@@ -82,10 +82,26 @@ pub fn sitting_for(sits: Sits, ill: &[(String, i64, i64)], at: i64) -> i64 {
     s
 }
 
+/// A post's in-tray (the broad seats' stage 1b; risk WM-20): the habit of the person who holds a post of getting to what
+/// certain posts of its own organisation send it (its assistant's drafts, requests and reports), with the posts named.
+/// Only those papers and letters wait; the post's other business reaches its code as before.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InTray {
+    pub every_days: Vec<(i64, i64)>,
+    pub from_hour: i64,
+    pub to_hour: i64,
+    /// The posts whose papers wait in it.
+    pub from: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct State {
     me: String,
     p: Paperwork,
+    /// A post's in-tray: the posts whose papers and letters wait for its holder's sitting (empty: a person's own post,
+    /// where everything that comes by post waits).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    from: Vec<String>,
     /// The severities too serious to deal with post (the citizen's `care.off_work`), and the spans of such conditions
     /// it has had while something waited (condition, since, until).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -106,20 +122,27 @@ pub struct Posted {
     s: State,
 }
 
-/// Whether `ctx` is a person's own code with a habit given.
-fn habit(ctx: &Ctx) -> Option<Paperwork> {
-    if ctx.position.is_some() {
-        return None;
+/// Whether `ctx` is a person's own code with a habit given, or a post with an in-tray given: the habit, who it is (the
+/// person, or the post), and the posts whose papers wait (none for a person: all its post waits).
+fn habit(ctx: &Ctx) -> Option<(Paperwork, String, Vec<String>)> {
+    if let Some(pos) = ctx.position.as_ref() {
+        let t: InTray = ctx.params.get("in_tray").and_then(|v| serde_json::from_value(v.to_value()).ok())?;
+        if t.from.is_empty() {
+            return None;
+        }
+        return Some((Paperwork { every_days: t.every_days, from_hour: t.from_hour, to_hour: t.to_hour }, pos.to_string(), t.from));
     }
-    ctx.params.get("paperwork").and_then(|v| serde_json::from_value(v.to_value()).ok())
+    let p = ctx.params.get("paperwork").and_then(|v| serde_json::from_value(v.to_value()).ok())?;
+    Some((p, ctx.entity.clone(), vec![]))
 }
 
-/// The actor made for `ctx`, wrapped where it is a person's own code and the world gives a habit.
+/// The actor made for `ctx`, wrapped where it is a person's own code and the world gives a habit, or a post whose
+/// parameters give it an in-tray.
 pub fn wrap(ctx: &Ctx, inner: Box<dyn Actor>) -> Box<dyn Actor> {
     match habit(ctx) {
-        Some(p) => {
-            let off_work = ctx.params.get("care").and_then(|c| c.to_value().get("off_work").and_then(|o| serde_json::from_value(o.clone()).ok())).unwrap_or_default();
-            Box::new(Posted { inner, s: State { me: ctx.entity.clone(), p, off_work, ill: vec![], sits: None, held: vec![], letters: vec![] } })
+        Some((p, me, from)) => {
+            let off_work = if from.is_empty() { ctx.params.get("care").and_then(|c| c.to_value().get("off_work").and_then(|o| serde_json::from_value(o.clone()).ok())).unwrap_or_default() } else { vec![] };
+            Box::new(Posted { inner, s: State { me, p, from, off_work, ill: vec![], sits: None, held: vec![], letters: vec![] } })
         }
         None => inner,
     }
@@ -143,6 +166,10 @@ impl Posted {
     fn shown(&mut self, pic: &Picture, cx: &mut Cx) -> (Option<Picture>, Option<i64>) {
         let me = self.s.me.clone();
         let t = pic.t;
+        // (A person's post: whatever comes to them from someone else. A post's in-tray: what the posts named send it.)
+        let from = self.s.from.clone();
+        let by_post = |me: &str, r: &Record| if from.is_empty() { by_post(me, r) } else { matches!(r.body, RecordBody::Statement { .. }) && r.position.as_ref().is_some_and(|p| from.iter().any(|f| f.as_str() == p.as_str())) };
+        let letter_for = |me: &str, m: &Message| if from.is_empty() { letter_for(me, m) } else { m.from_position.as_ref().is_some_and(|p| from.iter().any(|f| f.as_str() == p.as_str())) };
         let new_post = pic.channels.values().any(|c| matches!(c, Seen::Records { records, search: false } if records.iter().any(|r| by_post(&me, r))))
             || pic.inbox.iter().any(|m| letter_for(&me, m));
         if !new_post && self.s.held.is_empty() && self.s.letters.is_empty() {
