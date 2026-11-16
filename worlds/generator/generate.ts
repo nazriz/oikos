@@ -3733,6 +3733,15 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // shown the account it pays its fee from, as its assistant's post is, or it cannot name the account's keeper to pay
       // from it (the first 10-seat screen, 2026-11-16: "You don't know who keeps account acc-city").)
       if (byClass && Array.isArray(pos.channels) && !pos.channels.some((c: any) => c.kind === "accounts")) pos.channels.push({ id: "account", kind: "accounts" });
+      // (And one whose post is shown no papers of its organisation's (the inspector, the planning and electoral offices) is
+      // shown those of its service: the provider's delivery and agreement in its organisation's name, and what its assistant
+      // sends it, or it orders the service and never takes it up (the 40-seat mock fork, 2026-11-16: four town offices
+      // ordered, were delivered to, and never signed or appointed).)
+      const seesService = (c: any) => c.way === "mine" && (!c.match || (!c.match.statement_kinds && !c.match.records) || (c.match.statement_kinds ?? []).includes("service_delivery"));
+      if (byClass && Array.isArray(pos.channels) && !pos.channels.some(seesService)) {
+        pos.channels.push(K.mine("service", { records: ["agreement", "signature"] }, { title: "Your service agreements" }));
+        pos.channels.push(K.mine("assistant", ["service_delivery", "service_ended", ...ASSISTANT_PAPERS, "paper_returned"], { title: "Your service, and what your assistant sends you" }));
+      }
     }
     // (A town office that may engage a service pays its fee from the town's account, so the council's mandate names it
     // beside the finance officer, for that: until 2026-11-10 only the finance office was a principal of the town's, and
