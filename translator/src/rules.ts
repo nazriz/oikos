@@ -584,7 +584,7 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     // very value of a blank it does set out, and not named in the request by its own words, is that figure written in
     // twice; left empty. The broad rung's orders, 2026-11-17: "paid within 30 days of delivery" drawn with `for_days`
     // 30 beside `pay_in_days` 30; the matter gives the days to pay and no days to serve over, and the principal declined
-    // the draft for it and placed a half-million-dollar order itself.)
+    // the draft for it and placed the order itself.)
     const facts = k.referralFacts?.get(argText(args.referral) ?? "");
     if (facts) for (const [field, t] of Object.entries(fields)) {
       const v = argText(args[field]);
