@@ -92,7 +92,16 @@ Then:
   days unpaid, arrears and housing, beside the code arm's; mistakes kept apart from choices.
 - [ ] A short results page: the price of obeying and of overstepping, in the client's money and housing.
 
-Parked until then: assistants for any post (G3, G4, G9), models holding offices (G5), working hours for every post, the
+Assistants across the town (the owner, 2026-11-16; docs/design/broad-seats.md, off by default, the desk study untouched):
+
+- [x] Stage 1: offers by class of paperwork (G3, `assistant_classes`) and the spec line `assistants` (G9), ten seats
+  (`experiments/scope-pilot/broad.ts`) on code and mock forks.
+- [ ] Stage 1b: an organisation's principal gets to its assistant's papers at its own in-tray times (WM-20).
+- [ ] Stage 2: forty seats (all factories, shops, landlords, the town's offices), code and mock.
+- [ ] Stage 3: the readers general: acts beyond and requests per seat and kind of post, authority held per principal,
+  the town's share of papers written by assistants.
+
+Parked until then: G4 (persons' forms), models holding offices (G5), working hours for every post, the
 viewer, small models' translator data.
 
 ## The path to here (2026-11-10, kept as history)
