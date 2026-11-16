@@ -732,6 +732,8 @@ fn a_question_on_a_matter_is_answered_from_the_principal_s_own_records_and_nothi
         ask("rec.q5", "other", json!({}), "ll-assistant"),
         // (From someone else's post: not its assistant asking.)
         ask("rec.q6", "balance", json!({}), "somebody-else"),
+        // (A paper of delegation of its own: said to be its own, never "we hold no paper".)
+        ask("rec.q7", "document", json!({ "paper": "rec.inv" }), "ll-assistant"),
     ];
     let mut out = all(&h.wake(35 * DAY + 7200, world(qs)));
     for i in 1..12 {
@@ -748,6 +750,13 @@ fn a_question_on_a_matter_is_answered_from_the_principal_s_own_records_and_nothi
     assert!(answer("rec.q4").is_some_and(|l| l.contains("We hold no paper rec.nobodys") && l.contains("\"known\":false")), "{out}");
     assert!(answer("rec.q5").is_some_and(|l| l.contains("We cannot say.") && l.contains("\"known\":false")), "nothing typed, nothing said: {out}");
     assert!(answer("rec.q6").is_none(), "only its own assistant is answered: {out}");
+    // (Every answer that cannot say says what the form answers and which form carries what it does not: its authority
+    // with a body on the request form. The stakes rung 3: ten questions asking a client to write to the bank.)
+    for q in ["rec.q4", "rec.q5"] {
+        assert!(answer(q).is_some_and(|l| l.contains("scope_request") && l.contains("authority blank")), "{q}: {out}");
+    }
+    assert!(answer("rec.q2").is_some_and(|l| !l.contains("scope_request")), "an answer that says, says only that");
+    assert!(answer("rec.q7").is_some_and(|l| l.contains("rec.inv is our own referral to you") && !l.contains("hold no paper")), "{out}");
 }
 
 #[test]

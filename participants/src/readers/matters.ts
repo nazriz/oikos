@@ -24,8 +24,10 @@ const MOST = 40;
 /** How many of one kind of paper one page of the reading of the file takes (it reads on until the file is exhausted):
  * the most one search gives (contracts/participant-api.schema.json, a query's `limit`). */
 const PAGE = 200;
-/** The kinds of the post's own papers that close a matter, read from its file on arrival. */
-const CLOSING = ["report", "advice"];
+/** The kinds of the post's own papers read from its file on arrival: those that close a matter, and its drafts, so that a
+ * matter its predecessor drafted is shown drafted (2026-11-17, the stakes rung 3: at the fork three matters the code seat
+ * had drafted the day before were shown "no draft yet", the seat drafted them again, and the clients signed twice). */
+const CLOSING = ["report", "advice", "draft"];
 /** How long a finished matter's line stays after the body's answer came (a reader's choice, not the world's). */
 const ANSWER_SHOWN = 14 * DAY;
 /** How much of a body's paper's words its line carries. */
