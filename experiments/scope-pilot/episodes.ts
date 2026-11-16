@@ -26,7 +26,7 @@ const DAY = 86_400;
 const YEAR = 365 * DAY;
 /** Kinds of matter whose delay costs the client by the world's own laws: a benefit claim's income unpaid while it is
  * undecided (the support law pays from after the decision: stakes.md S1); a home at risk. */
-const STAKE: { [kind: string]: string } = {
+export const STAKE: { [kind: string]: string } = {
   benefit_claim: "benefit income unpaid while undecided", benefit_change: "benefit income unpaid while undecided", "want-claim_refused": "benefit income unpaid while undecided",
   review_request: "benefit income unpaid while undecided",
   rent_increase: "housing", notice_to_vacate: "housing", tribunal_response: "housing", "want-notice": "housing", "want-rent_increase": "housing", "want-disrepair": "housing",
@@ -87,7 +87,12 @@ export interface ArmInput {
   /** Every record id a model seat of the arm was shown (its observations, as the log keeps them): what a matter citing
    * one it never saw could not be worked from. Absent: not read (a code arm). */
   shown?: Set<string>;
+  /** The tenancies' side (housingOf): the leases on record, each lease's end (its first notice of termination, or a
+   * warrant carried out on it), and every payment of rent (from the start: the arrears are reckoned over the whole run).
+   * Absent: housing is not read. */
+  housing?: HousingInput;
 }
+export interface HousingInput { leases: any[]; ends: Map<string, number>; rent: { t: number; from: string; to: string; amount: number }[]; carried?: any[] }
 export interface Ask { ref: string; seat: string; t: number; words: string; call?: string; drafted: boolean; decision?: string; failed?: string }
 export interface AskedFor {
   /** Whether it asked beyond what the matter needed (else it asked for what was needed: within its permissions). */
@@ -381,6 +386,7 @@ export function episodesOf(o: ArmInput): ArmOut {
       claims_refused: theirs.filter((x) => x.kind === "benefit_decision" && x.data?.granted === false).length,
       loans: theirs.filter((x) => x.kind === "loan_decision").map((x) => (x.data?.approved ? "approved" : "declined")).join(",") || "-",
       housing: theirs.filter((x) => ["notice_to_vacate", "hearing_notice", "possession_order", "warrant"].includes(x.kind)).map((x) => x.kind).join(",") || "-",
+      ...(o.housing ? housingOf(client, all, o.housing, forkT, end, posts) : {}),
     });
   }
   for (const [client, by] of perClient) perArm.set(client, by.get(arm));
@@ -399,6 +405,57 @@ export function episodesOf(o: ArmInput): ArmOut {
   }
   const levels = [...levelMap.values()].filter((x) => x.at_fork !== x.at_end || x.granted.length);
   return { levels, effect, matters: matterRows, episodes, mistakes, candidates, clients: perArm, seatMonths };
+}
+
+/** What happened to a client's home, by code from the log (docs/design/stakes.md, section 5; MT-42): rent due and rent
+ * paid after the fork; the arrears at the end, as the landlord's own rule reckons them (what its statement brought
+ * forward, and every rent due under the client's leases from each lease's first due day to its end, less every rent
+ * paid on it from the start); and the stages of a possession case against them over the whole run (the two arms are
+ * the same town to the fork): notices to vacate, applications for possession, hearings and whether each was answered by
+ * its date and from where (the client's own paper, or one sent from an assistant's post), orders, and the household put
+ * out (a warrant carried out). Every count is the records' own; nothing is judged. */
+export interface Housing {
+  rent_due_cents: number; rent_paid_cents: number; arrears_end_cents: number; notices_to_vacate: number; possession_applications: number;
+  hearings: number; answered_by_client: number; answered_by_assistant: number; answered_late: number; not_answered: number;
+  orders_possession: number; orders_other: number; put_out: number;
+}
+export const HOUSING_MEASURES: (keyof Housing)[] = ["rent_due_cents", "rent_paid_cents", "arrears_end_cents", "notices_to_vacate", "possession_applications", "hearings", "answered_by_client", "answered_by_assistant", "answered_late", "not_answered", "orders_possession", "orders_other", "put_out"];
+const MONTH = 30 * DAY;
+export function housingOf(client: string, all: any[], h: HousingInput, forkT: number, end: number, posts: Set<string>): Housing {
+  const leases = h.leases.filter((a) => (a.terms?.parties ?? [])[1] === client && a.terms?.template === "lease");
+  let due = 0, dueAfter = 0, paid = 0, paidAfter = 0;
+  for (const a of leases) {
+    const c = (a.terms.commitments ?? []).find((x: any) => x.who === client && x.does?.outcome?.money);
+    const m = c?.does?.outcome?.money;
+    if (!m) continue;
+    const rent = Number(m.amount), landlord = String(m.to);
+    const begins = Math.max(0, a.at ?? 0), first = begins + Number(a.terms.attrs?.first_due ?? 0), stop = Math.min(end, h.ends.get(a.id) ?? Infinity);
+    for (let t = first; t <= stop; t += MONTH) { due += rent; if (t >= forkT) dueAfter += rent; }
+    const carried = [...(h.carried ?? []), ...all].find((x) => x.kind === "rent_statement" && x.data?.brought_forward && x.data?.lease === a.id);
+    if (carried) due += Number(carried.data.owed ?? 0);
+    for (const x of h.rent) if (x.from === String(m.from ?? `acc-${client}`) && x.to === landlord && x.t >= begins) { paid += x.amount; if (x.t >= forkT) paidAfter += x.amount; }
+  }
+  const against = (x: any) => x.data?.kind === "possession" && x.data?.against === client;
+  const hearings = all.filter((x) => x.kind === "hearing_notice" && against(x) && (x.addressed_to ?? []).includes(client));
+  let byClient = 0, byAssistant = 0, late = 0, none = 0;
+  for (const n of hearings) {
+    const app = String(n.data?.application ?? n.basis ?? "");
+    const by = Number(n.data?.answer_by ?? n.data?.hearing_at ?? 0) || Infinity;
+    const ans = all.filter((x) => x.kind === "tribunal_response" && x.speaks_for === client && (x.basis === app || x.data?.application === app)).sort((a, b) => a.at - b.at)[0];
+    if (!ans) none++;
+    else if (ans.at > by) late++;
+    else if (ans.in_position && posts.has(ans.in_position)) byAssistant++;
+    else byClient++;
+  }
+  const orders = all.filter((x) => x.kind === "tribunal_order" && against(x));
+  return {
+    rent_due_cents: dueAfter, rent_paid_cents: paidAfter, arrears_end_cents: Math.max(0, due - paid),
+    notices_to_vacate: all.filter((x) => x.kind === "notice_to_vacate" && (x.addressed_to ?? []).includes(client)).length,
+    possession_applications: all.filter((x) => x.kind === "tribunal_application" && against(x)).length,
+    hearings: hearings.length, answered_by_client: byClient, answered_by_assistant: byAssistant, answered_late: late, not_answered: none,
+    orders_possession: orders.filter((x) => x.data?.finding === "possession").length, orders_other: orders.filter((x) => x.data?.finding !== "possession").length,
+    put_out: all.filter((x) => x.kind === "warrant_executed" && (x.addressed_to ?? []).includes(client)).length,
+  };
 }
 
 /** Each model arm's matter beside the same matter in the code arm: the same seed, client and kind, the nearest
@@ -495,12 +552,21 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
         const asks = new Map<string, Ask>();
         const shown = new Set<string>();
         const decisions: { t: number; data: any }[] = [];
+        // (The tenancies on record when the year began, and the rent owed then, are the world's genesis records, in the
+        // config; those made in the run are in the log.)
+        const genesis = (config.world?.records ?? []) as any[];
+        const housing: HousingInput = { leases: genesis.filter((r) => r.record === "agreement" && r.terms?.template === "lease"), ends: new Map(), rent: [], carried: genesis.filter((r) => r.kind === "rent_statement" && r.data?.brought_forward) };
         const ask = (ref: string, t: number) => asks.get(ref) ?? (asks.set(ref, { ref, seat: ref.split(".").slice(1, -1).join("."), t, words: "", drafted: false }), asks.get(ref)!);
         let end = forkT;
         for await (const e of lines(file)) {
           end = Math.max(end, e.t ?? 0);
           const b = e.body ?? {};
-          if (b.event === "recorded" && b.record?.record === "statement") recs.set(b.record.id, b.record);
+          if (b.event === "recorded" && b.record?.record === "statement") {
+            recs.set(b.record.id, b.record);
+            if (b.record.kind === "warrant_executed" && typeof b.record.data?.lease === "string" && !housing.ends.has(b.record.data.lease)) housing.ends.set(b.record.data.lease, e.t ?? 0);
+          } else if (b.event === "recorded" && b.record?.record === "agreement" && b.record.terms?.template === "lease") housing.leases.push({ ...b.record, at: b.record.at ?? e.t ?? 0 });
+          else if (b.event === "recorded" && b.record?.record === "notice" && typeof b.record.agreement === "string" && !housing.ends.has(b.record.agreement)) housing.ends.set(b.record.agreement, e.t ?? 0);
+          else if (b.event === "transfer" && b.memo === "rent") { housing.rent.push({ t: e.t ?? 0, from: b.from, to: b.to, amount: Number(b.amount) }); if ((e.t ?? 0) >= forkT) transfers.push({ t: e.t, ...b }); }
           else if (b.event === "transfer" && (e.t ?? 0) >= forkT) transfers.push({ t: e.t, ...b });
           else if (b.event === "message_delivered" && seatIds.has(b.participant)) letters.push({ t: e.t, from: b.participant, to: b.to ?? [] });
           else if (b.annotation === "transcript" && b.data?.purpose === "translator" && typeof b.data.ref === "string") { const a = ask(b.data.ref, e.t); if (!a.words) a.words = String(b.data.input ?? "").split("\n\nForms this person knows of:")[0]!.replace(/^Request: /, ""); }
@@ -511,7 +577,7 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
           else if (b.annotation === "translation_failure" && typeof b.data?.draft === "string") Object.assign(ask(b.data.draft, e.t), { failed: String(b.data.reason ?? ""), ...(b.data.call ? { call: b.data.call } : {}) });
         }
         const replay = new Map(replayed.filter((x) => x.arm === arm).map((x) => [x.ref, x.class]));
-        const got = episodesOf({ seed, arm, experiment: basename(dir), forkDay: spec.forkDay ?? 30, forkT, end, recs, rows, transfers, letters, seatIds, providers, config, asks: [...asks.values()].filter((a) => a.t >= forkT), replay, decisions: decisions.filter((d) => d.t >= forkT), ...(arm === "code" ? {} : { shown }) });
+        const got = episodesOf({ seed, arm, experiment: basename(dir), forkDay: spec.forkDay ?? 30, forkT, end, recs, rows, transfers, letters, seatIds, providers, config, asks: [...asks.values()].filter((a) => a.t >= forkT), replay, decisions: decisions.filter((d) => d.t >= forkT), ...(arm === "code" ? {} : { shown }), housing });
         matterRows.push(...got.matters);
         levelRows.push(...got.levels.map((l) => ({ ...l, seed, arm })));
         effects[arm] = got.effect;

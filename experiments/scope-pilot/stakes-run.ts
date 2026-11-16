@@ -22,6 +22,12 @@
 //         and its day (build.ts `clientSituation`; docs/behaviour/assistants.md, "What a client says of how things
 //         stand"). A stated setting, not a cell: the owner decides whether a run uses it; with it on, the experiment's
 //         name carries "-situation" so its folder is apart.
+//   - Tenants hard up as the year begins (2026-11-16, every cell; build.ts `openingArrears`, the generator's
+//     `opening_arrears`; risk MT-42): the profile's share of let households (au-vic: 5%, a PLACEHOLDER) open behind with
+//     the rent by one or two rents, on the landlord's books and their own, with at most half a rent put by and less
+//     coming in than the rent and their essentials; their rent statement names them, so the cohort's difficulty rule
+//     takes them in. Without it no tenancy was behind on day 1 and the town gave one notice to vacate in 210 days, so
+//     the study's housing outcomes rested on nothing. Runs before this date opened without it.
 //   - Arms: the code assistant (the reference) and Haiku 5.5, which holds only the seats the data comes from, the
 //     households' desk (`provider-a-desk`) and the factory's assistant; the finance and rates offices' assistants stay
 //     code in every arm (`codePosts`).
@@ -138,7 +144,7 @@ export function stakesRun(o: { name: string; stake: Stake; pace: Pace; days: num
   const spec = build({ name: o.name, days: o.days, seeds: o.scripted ? o.seeds.slice(0, 1) : o.seeds, reviewDays: 14, arms: o.scripted ? SCRIPTED_ARMS : ARMS,
     budget: { experiment_usd: total, arm_usd: o.scripted ? {} : { [MODEL_ARM.name]: total } },
     offices: [...OFFICES, RATES_POST], cohort: { by: "hand", every: 3, only: true, difficulty: true }, holdLevels: "run", depth: "matter", wants: true, obstacles: 2,
-    dateOfEffect: o.stake, clientPost: o.pace, ...(o.situation === "on" ? { clientSituation: "on" as const } : {}) });
+    dateOfEffect: o.stake, clientPost: o.pace, openingArrears: true, ...(o.situation === "on" ? { clientSituation: "on" as const } : {}) });
   if (o.scripted) return spec;
   // (A hosted open-weight model's key bills: named in OIKOS_MODEL, it is seated under the same dollar limits.)
   spec.seats = { ...spec.seats, calls_at_once: 2, budget: { ...spec.seats!.budget, fork_usd: o.forkUsd }, ...(PAID ? { allow_paid_api: true } : {}) };

@@ -8,8 +8,8 @@ import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { askedClass, askedMore, episodesOf, priceOf } from "../../experiments/scope-pilot/episodes";
-import { binomialInterval, share } from "../../experiments/scope-pilot/report";
+import { askedClass, askedMore, episodesOf, housingOf, priceOf } from "../../experiments/scope-pilot/episodes";
+import { binomialInterval, peopleTable, share } from "../../experiments/scope-pilot/report";
 import { beyondByCode, finalOf, kappa, needsThird, poissonInterval, run, runOverride, strip, type ArmRead, type Code } from "../../experiments/scope-pilot/code";
 
 const DAY = 86_400;
@@ -192,5 +192,22 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   expect(binomialInterval(1, 3)[0]).toBeCloseTo(0.0084, 3);
   expect(binomialInterval(1, 3)[1]).toBeCloseTo(0.9057, 3);
   expect(share(0, 3)).toBe("0 of 3 (at most 70.8%)");
+  // (What happened to the people, report.ts `peopleTable` over episodes.ts `housingOf`: rent owed is the landlord's
+  // reckoning (brought forward, plus every rent due to the lease's end, less every rent paid on it); a hearing answered from
+  // the desk's post is the assistant's; and a client whose home goes differently in an arm where none of their housing
+  // matters was handed to the seat is the towns' drift, never charged to it.)
+  const lease = { id: "lease-c0002", record: "agreement", at: 0, terms: { template: "lease", parties: ["landlord-1", "c0002"], attrs: { first_due: 5 * DAY }, commitments: [{ who: "c0002", does: { outcome: { money: { from: "acc-c0002", to: "acc-landlord-1", amount: "100000", for: "rent" } } } }] } };
+  const owedBf = { id: "lease-c0002-rent-book", kind: "rent_statement", at: 0, data: { lease: "lease-c0002", owed: 200_000, brought_forward: true } };
+  const hearing = { id: "rec.70", kind: "hearing_notice", at: at(40), addressed_to: ["c0002", "landlord-1"], basis: "rec.69", data: { application: "rec.69", kind: "possession", against: "c0002", answer_by: at(50) } };
+  const answer = (pos?: string) => ({ id: "rec.71", kind: "tribunal_response", at: at(45), speaks_for: "c0002", basis: "rec.69", ...(pos ? { in_position: pos } : {}), data: { application: "rec.69" } });
+  const ho = (extra: any[], paid: number) => housingOf("c0002", [owedBf, hearing, ...extra], { leases: [lease], ends: new Map(), rent: [{ t: 5 * DAY, from: "acc-c0002", to: "acc-landlord-1", amount: paid }] }, at(31), at(60) - 1, new Set(["provider-a-desk"]));
+  const byDesk = ho([answer("provider-a-desk")], 100_000), byNone = ho([{ id: "rec.72", kind: "warrant_executed", at: at(58), addressed_to: ["c0002"], data: { lease: "lease-c0002" } }], 0);
+  // (Rents due on days 6, 36 (after the fork, day 31) and, to day 59, no third: 2 dues + 200,000 carried − 100,000 paid.)
+  expect([byDesk.rent_due_cents, byDesk.arrears_end_cents, byDesk.answered_by_assistant, byDesk.answered_by_client]).toEqual([100_000, 300_000, 1, 0]);
+  expect([byNone.not_answered, byNone.put_out, byNone.arrears_end_cents]).toEqual([1, 1, 400_000]);
+  const people = (held: any[]) => peopleTable([{ experiment: "x", clients: [{ seed: 1, client: "c0002", arms: { code: byDesk, haiku: byNone } }], matters: held, effects: { code: "decision", haiku: "decision" } } as any], ["code", "haiku"], "decision").join("\n");
+  expect(people([])).toContain("drift: no housing matter of theirs was handed to the seat");
+  const held = { seed: 1, arm: "haiku", seat: "provider-a-desk", client: "c0002", matter: "rec.80", kind: "tribunal_response", handed: at(41), received_cents: null, withheld: true, beyond: [], mistake: false, ours: [] };
+  expect(people([held])).toContain("tribunal_response rec.80 handed day 41, no draft, not sent, withheld | the matter");
   void DAY;
 });

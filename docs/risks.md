@@ -2034,11 +2034,21 @@ The mechanism:
 - **Effect:** No possession case reaches an assistant: in the D3 screen (180 days, level 2) none did, and one notice to
   vacate was given in the whole town. The stakes study measures housing consequences only where they arise by
   themselves (a backlog at the support office, slow clients), so its housing outcomes rest on few or no cases.
-- **L / I:** high / medium · **Status:** open (2026-11-14; the lead: no shock and no tuning now)
-- **Fix when:** a study needs housing cases at the desk: an opening share of tenancies in arrears, at their stages, from
-  the profile (the share of renting households behind with the rent, sourced: a housing survey's arrears rate), in
-  place of "cannot pay on day 1".
-- **Notice by:** an opening caseload with no `rent_statement` of arrears; a study run with no notice to vacate.
+- **L / I:** high / medium · **Status:** mitigated for the stakes study (2026-11-16); the figures are placeholders
+- **Done (2026-11-16):** the town setting `opening_arrears` (off unless set; on in every cell of the stakes run). The
+  profile's share of let households (`tenancy.opening_arrears`) open behind by one or two rents on both books, drawn among
+  the working-age households whose income does not comfortably cover the rent, with their savings drawn below half a rent
+  (docs/behaviour/generator.md, "Tenants behind as the year begins"). In the study's town: 12 of 237 let households. Over
+  180 days all 12 were given notice and 9 went before the tribunal, 8 orders for possession were made and 1 household was
+  put out; the desk got about 5 housing matters a seat-month where it had under 2 (docs/decisions.md, 2026-11-16).
+- **Still open:** au-vic's figures (5% behind, one or two rents, at most half a rent put by) are **PLACEHOLDERS**. No
+  arrears rate for Victoria's renters was opened. Where the town has too few households who cannot comfortably carry
+  their rent, fewer than the share are behind (never the comfortable). No other profile carries the block.
+- **Fix when:** a sourced share of renters behind with the rent (a survey's arrears rate by tenure: the ABS General
+  Social Survey's "could not pay rent or mortgage on time", or HILDA) and of renters' liquid savings (the ABS Survey of
+  Income and Housing) is opened, for au-vic and for any profile a study uses.
+- **Notice by:** a stakes-run town with no `rent_statement` of arrears; a study run with no notice to vacate; a
+  profile's `tenancy.opening_arrears` still labelled PLACEHOLDER in its sources.
 
 ### MT-43 · What an assistant may ask its principal is a small typed set
 - **Gap:** An assistant's question to its principal (`question_to_client`, docs/design/stakes.md B3) is answered only

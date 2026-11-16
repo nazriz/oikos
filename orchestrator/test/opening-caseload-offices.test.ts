@@ -46,6 +46,47 @@ test("the option alone adds only the opening papers: off, the town is the town w
   expect(worldHash(a)).toBe(worldHash(b));
 });
 
+test("tenants behind as the year begins (opening_arrears): off, the town it always was; on, the profile's share behind, a debt on both books, savings drawn lower", () => {
+  // (Off, or absent: not a record, an account or a participant moves. MT-42; docs/behaviour/generator.md, "Tenants behind as the year begins".)
+  const off = generate(town({ opening_caseload: true })) as any;
+  expect(worldHash(generate(town({ opening_caseload: true, opening_arrears: false })))).toBe(worldHash(off));
+  const on = generate(town({ opening_caseload: true, opening_arrears: true })) as any;
+  expect({ ...on, world: undefined }).toEqual({ ...off, world: undefined });
+  const OA = JSON.parse(readFileSync(join(root, "worlds/profiles/au-vic-2026.json"), "utf8")).values.tenancy.opening_arrears;
+  const leases = on.world.records.filter((r: any) => r.record === "agreement" && r.terms?.template === "lease" && r.terms.commitments.some((c: any) => c.does?.outcome?.money?.for === "rent"));
+  const owed = on.world.records.filter((r: any) => r.kind === "rent_statement" && r.data?.brought_forward);
+  // The share holds where the town has enough households who cannot comfortably carry their rent (never more than that).
+  expect(owed.length).toBeGreaterThan(0);
+  expect(owed.length).toBeLessThanOrEqual(Math.round((OA.share_bps * leases.length) / 10_000));
+  const accounts = new Map<string, number>(on.world.accounts.map((a: any) => [a.id, Number(a.balance)]));
+  const before = new Map<string, number>(off.world.accounts.map((a: any) => [a.id, Number(a.balance)]));
+  const households = new Map<string, string[]>(on.world.records.filter((r: any) => r.kind === "household").map((r: any) => [r.speaks_for, r.data.members.map((m: any) => m.person)]));
+  for (const s of owed) {
+    const lease = leases.find((l: any) => l.id === s.data.lease)!;
+    const [landlord, tenant] = lease.terms.parties;
+    // A debt on the landlord's books and the tenant's: the landlord's statement of the account under the lease, to the
+    // tenant, which the landlord's rent book (common/money.rs, `brought_forward`) and the tenant (housing.rs) read as owed.
+    expect([s.speaks_for, s.addressed_to, s.basis, s.data.account]).toEqual([landlord, [tenant], lease.id, `acc-${landlord}`]);
+    expect(s.data.rents).toBeGreaterThanOrEqual(OA.rents[0]);
+    expect(s.data.rents).toBeLessThanOrEqual(OA.rents[1]);
+    expect(s.data.owed).toBe(s.data.rents * s.data.rent);
+    expect(s.data.since).toBeLessThan(0);
+    // What the household had put by was spent before the year: each member below the profile's share of a rent, never raised.
+    for (const m of (households.get(tenant) as string[]).filter((m) => accounts.has(`acc-${m}`))) {
+      expect(accounts.get(`acc-${m}`)!).toBeLessThanOrEqual(Math.min(before.get(`acc-${m}`)!, Math.floor((OA.savings_most_rent_bps * s.data.rent) / 10_000)));
+    }
+  }
+  // Nothing else in the world moves: the records added are the statements, beside the firms' registers of shareholders
+  // (shares are dealt by what people have put by, so the households who spent theirs hold fewer); only the chosen
+  // households' balances change.
+  const key = (r: unknown) => JSON.stringify(r);
+  const was = new Set(off.world.records.map(key));
+  const changed = on.world.records.filter((r: any) => !was.has(key(r)));
+  expect(changed.filter((r: any) => r.kind !== "shareholders").map((r: any) => r.kind)).toEqual(owed.map(() => "rent_statement"));
+  const chosen = new Set(owed.flatMap((s: any) => households.get(s.addressed_to[0]) as string[]).map((m: string) => `acc-${m}`));
+  expect(on.world.accounts.filter((a: any) => Number(a.balance) !== before.get(a.id) && !chosen.has(a.id)).map((a: any) => a.id)).toEqual([]);
+});
+
 test("each office's count follows the town's own flow: the dial scales it, nothing else does", () => {
   const n = (scale: number, kind: string) => ofOthers(generate(town({ seed: 5, opening_caseload: true, opening_caseload_scale_bps: scale })) as any).filter((r: any) => r.kind === kind).length;
   // (Complaints: the profile's share of adults a year, less what asking settles, over the days the desk allows to answer.)
