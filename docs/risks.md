@@ -2189,6 +2189,33 @@ The mechanism:
   across kinds of seat.
 - **Notice by:** the screen's waits at organisations' seats against the desk's.
 
+### MT-53 · Offices whose accounts are opened late are never principals
+- **Gap:** The generator makes a principal of a post only where its organisation's account already exists when the
+  principals are made. The auditor's and the complaints desks' bodies (the ombudsman, the consumer desk) have their
+  accounts opened later in generation, so though their forms are casework, they are never principals, and the town's
+  complaints desk (an office of the town) is not one either. Found when stage 2's 40-seat list named them (2026-11-16).
+- **Where:** `worlds/generator/generate.ts` (the principals' loop: `accounts.some(a => a.id === acc-<entity>)`; where those
+  bodies' accounts are pushed).
+- **Effect:** The study cannot seat the auditor's or the complaints desks' assistants, the offices that judge other
+  offices' papers; the 40-seat list takes more shops and landlords in their place.
+- **L / I:** high (certain today) / low · **Status:** open (2026-11-16)
+- **Fix when:** a study wants those offices seated: make principals after every account is opened (every delegating
+  town moves).
+- **Notice by:** `assistants: names no principal post` for one of them.
+
+### MT-54 · A person holding two principal posts engages an assistant for one of them only
+- **Gap:** In the study town one resident holds both the planning office and the works office. Both are principals by
+  class and both carry the spec's commit, but only one of the two posts engages provider A (in the 10-seat screen the
+  works office, in the 40-seat one the planning office): the other never orders. Not yet traced; likely the two posts'
+  delegation wrappers share the holder's review or its decisions (one subject).
+- **Where:** `kernel/crates/actors/src/delegation/principal.rs` (the review and `engage`, per participant); the town's
+  staffing (one person, two offices).
+- **Effect:** One of the two offices' assistants is never seated; a study naming both seats one. The 40-seat list names
+  planning and not works.
+- **L / I:** high (certain today) / low · **Status:** open (2026-11-16)
+- **Fix when:** before a study seats both: trace the engagement per post.
+- **Notice by:** an assigned principal with no `engage` decision and no order.
+
 ---
 
 ## Profiles and sources
