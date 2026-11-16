@@ -1235,7 +1235,14 @@ impl State {
             // as it stands on its form for that, `send_signed`. Before 2026-11-10 a seat had to write the paper out
             // again on the direct form, and read that as beyond a draft-level remit: the scope pilot's one clean
             // request, and round 5's factory seat.)
-            let paper = x.paper.as_ref().map(|p| with_instructions(signed_copy(p, crate::common::text(r)), &m.program));
+            // (A draft written as calls of one paper (the code assistant's) is signed with that paper too: whoever holds
+            // the post when the sign-off comes can send it as it stands, a model seat after a fork among them. Before
+            // 2026-11-16 such a sign-off carried nothing to send, and the seat that took the post over at the fork had to
+            // draft the matter again: the whole-town rung 1's delivery note, about seven days lost.)
+            // (Its words are the paper's own, not the covering note's.)
+            let words = if x.paper.is_some() { crate::common::text(r) } else { "" };
+            let carried = x.paper.clone().or_else(|| x.calls.as_deref().and_then(one_paper));
+            let paper = carried.as_ref().map(|p| with_instructions(signed_copy(p, words), &m.program));
             let words = signed_words(&r.id, paper.as_ref());
             let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
             self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
@@ -2768,6 +2775,22 @@ fn paper_of(line: &Line) -> serde_json::Map<String, Value> {
         }
     }
     out
+}
+
+/// The one paper a draft written as calls sends, in the keys a draft on a form carries it (`kind`, `text`, `to`,
+/// `visible`, `basis`, `data`). None for calls of several papers, or of none.
+fn one_paper(calls: &str) -> Option<Value> {
+    let Ok(Program::Lines(l)) = parse_program(calls) else { return None };
+    let papers: Vec<&Line> = l.iter().filter(|l| l.call.fn_ == "statement").collect();
+    let [one] = papers.as_slice() else { return None };
+    let p = paper_of(one);
+    let mut out = serde_json::Map::new();
+    for (from, to) in [("kind", "kind"), ("text", "text"), ("addressed_to", "to"), ("visible_to", "visible"), ("basis", "basis"), ("data", "data"), ("offer", "offer"), ("assertion", "assertion")] {
+        if let Some(v) = p.get(from) {
+            out.insert(to.to_string(), v.clone());
+        }
+    }
+    Some(Value::Object(out))
 }
 
 /// Whom a paper goes to, as a key: its addressees, sorted.

@@ -304,6 +304,11 @@ fn a_draft_not_as_asked_is_declined_and_done_by_the_principal_and_one_as_asked_i
     let right = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "calls": NOTICE }));
     let out = all(&h.wake(37 * DAY + 3600, world(vec![right])));
     assert!(out.contains("kind=sign_off") && !out.lines().any(|l| l.starts_with("statement(basis=lease-1")), "as asked: signed off, the assistant sends it: {out}");
+    // (A draft written as calls of one paper is signed with that paper, in its own words: whoever holds the post when the
+    // sign-off comes can send it as it stands (the whole-town rung 1's delivery note carried over the fork).)
+    let line = out.lines().find(|l| l.contains("kind=sign_off")).unwrap_or_default();
+    let copy = line.split("\"paper\":").nth(1).unwrap_or_default();
+    assert!(["\"kind\":\"notice_to_vacate\"", "\"text\":\"Please leave.\"", "\"to\":[\"t1\"]"].iter().all(|x| copy.contains(x)), "the signed copy: {line}");
 }
 
 #[test]
