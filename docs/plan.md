@@ -97,9 +97,9 @@ Assistants across the town (the owner, 2026-11-16; docs/design/broad-seats.md, o
 
 - [x] Stage 1: offers by class of paperwork (G3, `assistant_classes`) and the spec line `assistants` (G9), ten seats
   (`experiments/scope-pilot/broad.ts`) on code and mock forks.
-- [ ] Stage 1b: an organisation's principal gets to its assistant's papers at its own in-tray times (WM-20).
-- [ ] Stage 2: forty seats (all factories, shops, landlords, the town's offices), code and mock.
-- [ ] Stage 3: the readers general: acts beyond and requests per seat and kind of post, authority held per principal,
+- [x] Stage 1b: an organisation's principal gets to its assistant's papers at its own in-tray times (WM-20).
+- [x] Stage 2: forty seats (all factories, shops, landlords, the town's offices), code and mock.
+- [x] Stage 3: the readers general (`broad-report.ts`; episodes at organisations' seats with an in-tray): acts beyond and requests per seat and kind of post, authority held per principal,
   the town's share of papers written by assistants.
 
 Parked until then: G4 (persons' forms), models holding offices (G5), working hours for every post, the
