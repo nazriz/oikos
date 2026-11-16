@@ -976,6 +976,9 @@ export interface RenderOptions {
 
 /** The heading of the one place a seat's own drafts stand, waiting for its yes or no, and the line under it. */
 export const WAITING_HEAD = "## Waiting for your yes or no: what you asked for, set out";
+/** The most of what is waiting for a seat's yes or no that is set out whole at once, in characters (about twenty asks
+ * of one paper each); the rest are listed a line each. */
+export const WAITING_CHARS = 20_000;
 // (Until 2026-11-15 it ended "...: a paper someone sent you (rec. and a number), a draft for sign-off or a form is never
 // confirmed", meaning a draft someone else sent; a Haiku desk took it as its own drafts, wrote "a draft for sign-off is
 // never confirmed" into its standing rules on its first day, and left eleven of its drafts unanswered: the stakes run's
@@ -1020,7 +1023,19 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   // own draft unanswered for days, 2026-11-10: the drafts stood last, under a heading that read like any other paper's.
   if (obs.drafts.length) {
     out.push("", WAITING_HEAD, WAITING_SAYS);
-    for (const d of obs.drafts) out.push(o.draftText ? o.draftText(d) : `(${d.id}) ${d.summary}`);
+    // Set out whole, the oldest first, as many as WAITING_CHARS holds; the rest a line each, set out whole as those
+    // before them are answered (a clerk's pile: what is in front of them read in full, the rest listed). Never fewer
+    // than one whole. (2026-11-17: a rates seat's waiting list was set out whole in every result, and its prompt cut.)
+    let room = WAITING_CHARS;
+    const lined: string[] = [];
+    for (const [n, d] of obs.drafts.entries()) {
+      const whole = o.draftText ? o.draftText(d) : `(${d.id}) ${d.summary}`;
+      if (n === 0 || (!lined.length && whole.length <= room)) {
+        out.push(whole);
+        room -= whole.length;
+      } else lined.push(`- ${askRef(String(d.id))}: ${String(d.summary ?? "").replace(/\s+/g, " ").slice(0, 200)}`);
+    }
+    if (lined.length) out.push(`Also waiting, ${lined.length === 1 ? "one more, set out in full once those above are answered" : `${lined.length} more, each set out in full as those above are answered`} (to say yes or no now, Confirm or Decline it by its reference as ever):`, ...lined);
   }
   if (obs.inbox.length) {
     out.push("", "## Letters");

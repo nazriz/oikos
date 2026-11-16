@@ -25,6 +25,8 @@ function seat(sit: (n: number) => ContentBlock[], fold: (req: LlmRequest) => Con
     if (req.purpose === "notebook") {
       const a = fold(req);
       if (a === "fail") throw new Error("no answer within 180 s");
+      // (`{ cut }`: an answer that reached the room it was given, every time.)
+      if (!Array.isArray(a)) return { content: [{ type: "text", text: (a as any).cut }], usage: { input_tokens: 10, output_tokens: req.maxTokens }, stop: { reason: "max_tokens" } } as any;
       return { content: a, usage: { input_tokens: 10, output_tokens: 5 } } as any;
     }
     return { content: [...sit(++sittings), use(`end${sittings}`, "done_for_now", { days: 1 })], usage: { input_tokens: 1, output_tokens: 1 } } as any;
@@ -163,6 +165,15 @@ test("a summary that stops mid-word is kept to its last whole sentence, the seat
   expect(t.notes.some((x) => x.notebook_folded)).toBe(false);
   expect(t.notes.some((x) => x.notebook_fold_failed)).toBe(true);
   expect(endsSentence("(3 earlier notes)") && endsSentence("Done.") && !endsSentence("Waiting on the ans") && !endsSentence("owed 12,")).toBe(true);
+  // A summary cut off at its room, and again with twice the room, is no summary, whatever whole sentences it holds: the
+  // notebook stays as it was, and it is said and noted. The fold has a seat's room, not one reckoned from the length
+  // asked for (2026-11-17: 760 tokens for 1,007 characters; Haiku's reply was cut off, and was folded in).
+  const u = seat((k) => (k <= 8 ? [use("n", "notebook", { add: line(k, 900) })] : []), () => ({ cut: "Asked the city for a remit. The draft rec.104 is signed. Items" }) as any);
+  for (let d = 1; d <= 8; d++) await u.sit(d);
+  expect(u.notes.some((x) => x.notebook_folded)).toBe(false);
+  expect(u.notes.find((x) => x.notebook_fold_failed)?.notebook_fold_failed.reason).toContain("cut off");
+  const folds = u.calls.filter((c) => c.purpose === "notebook");
+  expect(folds.map((c) => c.maxTokens)).toEqual([4000, 8000]);
 });
 
 test("a text is cut at the end of a sentence, never inside one", () => {
