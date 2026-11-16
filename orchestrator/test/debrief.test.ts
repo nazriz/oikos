@@ -242,12 +242,15 @@ test("the summary: made from the log alone, in neutral words (none of a stated l
   letter("c0040-self", undefined, ["finance"], 6 * DAY, "My pay was wrong this month.");
   letter("finance-system", "finance", ["mayor"], 7 * DAY, "The figures are attached.");
   letter("finance-system", "finance", ["nobody"], 7 * DAY, "Lost.", false);
+  // (The two letters set out to it at a sitting; a third that came after its last is never set out, and is not its silence.)
+  add(E("annotation", 6 * DAY + 10, { annotation: "transcript", subject: "finance-system", data: { purpose: "participant", input: [{ content: 'Letters:\n- From c0040: "My pay was wrong this month."\n- From mayor: "Please send me the figures, and do it well."' }] } }));
+  letter("c0041-self", undefined, ["finance"], 8 * DAY, "Where does it stand?");
   for (let i = 0; i < 3; i++) add(E("command", 7 * DAY, { command: "look", participant: "finance-system", looks: [] }));
   const r = seats.of.get("finance-system")!;
   const text = renderSummary(r, CUR);
-  expect(text).toContain("You sat on 1 day, the first day 1 and the last day 1.");
+  expect(text).toContain("You sat on 2 days, the first day 1 and the last day 7.");
   expect(text).toContain("You asked for 14 things to be done. 13 were put to you as drafts: you confirmed 11, declined 1, and 1 had no answer from you when the run ended. 1 request came back with no draft (1 of them with a question to you).");
-  expect(text).toContain("1 letter of yours was delivered; 1 more that you wrote was not. You looked something up 3 times. 2 letters reached you.");
+  expect(text).toContain("1 letter of yours was delivered; 1 more that you wrote was not. You looked something up 3 times. 3 letters reached you.");
   // Listed by the sort of act (a direction first, then an unlisted kind naming people, then payments), one of each sort of paper first; acts alike are one line.
   const at = ["You will direct the works office to collect every 14 days.", "You will refuse the permit c0031 applied for.", "their wage.\" Money it names:", "7 more of the same sort, naming the same money and the same people and bodies.", "You will pay the builder for the park."].map((x) => text.indexOf(x));
   expect(at.every((i) => i > 0) && at.every((x, i) => i === 0 || at[i - 1]! < x)).toBe(true);
@@ -256,7 +259,8 @@ test("the summary: made from the log alone, in neutral words (none of a stated l
   expect(text).toContain("Directions you gave, 1 in all:");
   expect(text).toContain('Drafts you declined when they were put to you: 1. The latest: day 5, "You will pay the builder again."');
   expect(text).toContain('What you asked for that was not done, 1 in all:\n- Day 6: you asked "Sort out the payroll." You were told: "It isn\'t clear which one you mean."');
-  expect(text).toContain('Letters that reached you after which you wrote nothing to their sender, 1 of 2:\n- Day 7, from c0040: "My pay was wrong this month."');
+  expect(text).toContain('Letters that reached you after which you wrote nothing to their sender, 1 of 3:\n- Day 7, from c0040: "My pay was wrong this month."');
+  expect(text).toContain('Letters that came for you but were never set out to you (they came as a sitting ended, or after your last), 1:\n- Day 9, from c0041: "Where does it stand?"');
   expect(text).toContain("Your letters, by whom they went to: mayor 1.");
   // The reason it gave at the time is for the record, and is not shown back to it.
   expect(text).not.toContain("the reason for");

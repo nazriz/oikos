@@ -47,7 +47,7 @@ export interface Carried {
 
 interface Draft { id: string; t: number; proposal: string; summary: string; blocks: any[]; signoff?: "accept" | "reject"; note?: string; unanswered?: boolean; sitting?: Sitting }
 interface Sitting { day: number; calls: number[]; ids: Set<string> }
-interface Letter { seq: number; t: number; /** Every id its sender may be written to by; the first is how it is named. */ from: string[]; text: string }
+interface Letter { seq: number; t: number; /** Every id its sender may be written to by; the first is how it is named. */ from: string[]; text: string; /** It was set out in a prompt the seat was given (a letter that came mid-sitting may never have been). */ shown?: boolean }
 
 /** One seat's doings, folded from the log's entries. */
 export class SeatRecord {
@@ -76,6 +76,8 @@ export class SeatRecord {
     if (!s) this.sittings.set(day, (s = { day, calls: [], ids: new Set() }));
     s.calls.push(seq);
     const text = typeof input === "string" ? input : JSON.stringify(input ?? "");
+    // (A letter is shown once its words are in a prompt the seat was given.)
+    for (const l of this.received) if (!l.shown && text.includes(JSON.stringify(l.text.slice(0, 60)).slice(1, -1))) l.shown = true;
     // (Every word of the prompt that could be an id, however it was set: in brackets, after a name, in a sentence.)
     for (const m of text.matchAll(/[A-Za-z][\w.:/-]*[A-Za-z0-9]/g)) s.ids.add(m[0]);
     this.current = s;
@@ -400,7 +402,15 @@ export function renderSummary(r: SeatRecord, currency: Currency, o: { frame?: bo
   }
   // A letter that reached it, after which it wrote nothing to whoever sent it.
   const after = (l: Letter) => r.sent.some((s) => s.delivered && s.t >= l.t && s.to.some((x) => l.from.includes(x)));
-  const unanswered = r.received.filter((l) => !after(l));
+  // (Only a letter it was shown: one that came while it was at work and was never set out to it is not its silence. The
+  // whole-town rung 1: a manager's "Where does it stand?" crossed the seat's report, was never shown, and the debrief
+  // listed it as unanswered, so the seat blamed itself. 2026-11-16.)
+  const unanswered = r.received.filter((l) => l.shown && !after(l));
+  const never = r.received.filter((l) => !l.shown);
+  if (never.length) {
+    L.push("", `Letters that came for you but were never set out to you (they came as a sitting ended, or after your last), ${never.length}:`);
+    for (const l of never.slice(-LISTED.unanswered)) L.push(`- Day ${dayOf(l.t)}, from ${o.frame ? "x" : l.from[0]}: ${q(l.text, 200)}`);
+  }
   if (unanswered.length) {
     L.push("", `Letters that reached you after which you wrote nothing to their sender, ${unanswered.length} of ${r.received.length}${unanswered.length > LISTED.unanswered ? `; the latest ${LISTED.unanswered}` : ""}:`);
     for (const l of unanswered.slice(-LISTED.unanswered)) L.push(`- Day ${dayOf(l.t)}, from ${o.frame ? "x" : l.from[0]}: ${q(l.text, 200)}`);
