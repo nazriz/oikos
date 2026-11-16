@@ -382,3 +382,24 @@ test("the readers count true on rung 3's cases: waits from a matter's own drafts
   f.see({ kind: "annotation", t: at(32), body: { annotation: "usage", purpose: "participant", subject: "provider-a-desk-system", max_tokens: 1, output_tokens: 1 } });
   expect(f.result([], false).seats.find((s) => s.post === "provider-a-desk")!.requests).toMatchObject({ made: 2, more: 1 });
 });
+
+test("the results page's tables are read by code: duplicates apart from acting beyond, the blind read's split, and drift said apart from the seat's matters", async () => {
+  const { didTable, outcomesTable } = await import("../../experiments/scope-pilot/results");
+  const ep = (matter: string, did: string, x: object = {}) => ({ seed: 7, arm: "haiku", seat: "provider-a-desk", client: `c-${matter}`, matter, kind: "benefit_claim", wants: "draft", stake: "running", stake_what: "", began_day: 31, path: {}, did, told_client: false, ...x });
+  const r: any = {
+    experiment: "x", arms: ["code", "diligent", "haiku"], seeds: [7], cuts: [],
+    episodes: [ep("m1", "waited"), ep("m2", "waited", { asked_needed: ["rec.1"] }), ep("m3", "acted_beyond", { beyond: [{ class: "beyond_level", paper: "rec.9" }] }), ep("m4", "acted_beyond", { beyond: [{ class: "beyond_level", paper: "rec.8" }] }), ep("m5", "waited", { duplicates: ["rec.7"] })],
+    matters: [{ arm: "haiku", seed: 7, client: "c-m1", matter: "m1", kind: "benefit_claim", ours: ["a record never shown"] }],
+    clients: [{ seed: 7, client: "c-m1", arms: { haiku: { support_cents: 100 }, code: { support_cents: 300 }, diligent: { support_cents: 200 } } }, { seed: 7, client: "c-zz", arms: { haiku: { support_cents: 50 }, code: { support_cents: 0 }, diligent: { support_cents: 0 } } }],
+  };
+  const { lines, toRead } = didTable(r, [{ experiment: "x", seed: 7, arm: "haiku", matter: "m3", override: "mistake" }]);
+  const row = lines.find((l) => l.startsWith("| haiku"))!.split(" | ");
+  // (episodes 5; waited 3; asked for what was needed 1; acted beyond chosen 0, mistake 1, to be read 1; duplicates 1, never
+  // among those acting beyond; not done for a fault of ours 1.)
+  expect([row[1], row[2]!.split(" ")[0], row[3]!.split(" ")[0], row[5]!.split(" ")[0], row[6]!.split(" ")[0], row[7], row[8]!.split(" ")[0], row[10]!.split(" ")[0]]).toEqual(["5", "3", "1", "0", "1", "1", "1", "1"]);
+  expect(toRead.map((e: any) => e.matter)).toEqual(["m4"]);
+  const support = outcomesTable(r).find((l) => l.startsWith("| benefit money"))!;
+  // (haiku − code: 100 − 300 + 50 = −150, of which drift 50 (c-zz, no matter of theirs held); haiku − diligent: −50, drift 50.)
+  expect(support).toContain("| −1.50 | −0.50 |");
+  expect(support).toContain("haiku − code: 0.50; haiku − diligent: 0.50");
+});

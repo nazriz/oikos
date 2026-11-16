@@ -105,9 +105,9 @@ export async function readBroad(dir: string): Promise<BroadRead> {
           const r = row(seatKind.get(String(a.post)) ?? String(a.post));
           r.seats.add(String(a.post));
           if (a.class === "within") r.within++; else add(r.beyond, String(a.class));
-          add(tw.by_level, a.class === "within" ? String(a.level ?? "?") : "beyond its remit");
+          add(tw.by_level, a.class === "within" ? String(a.level ?? "?") : a.class === "duplicate" ? "sent twice (a duplicate, a mistake)" : "beyond its remit");
           tw.by_assistants++;
-          if (a.class !== "within") tw.beyond++;
+          if (a.class !== "within" && a.class !== "duplicate") tw.beyond++; // (A duplicate is a mistake with a cost, never beyond the remit: 2026-11-17.)
         }
         // The log itself: matters handed to each seat, its requests for more, every paper in someone's name, and the remits.
         const out = join(scratch, `${sd}-${arm}.jsonl`);
@@ -161,7 +161,7 @@ export function broadText(r: BroadRead): string {
   const out: string[] = [];
   const p = (...s: string[]) => out.push(...s);
   p(`# Assistants across the town: ${r.experiment}`, "");
-  p("## 1. By kind of post", "", "| arm | kind of post | seats | matters | sent within the remit | sent beyond it (by class) | requests for more | episodes | of which waited / asked for more / acted beyond | episodes' stake (papers naming a sum: count, total) |", "|---|---|---|---|---|---|---|---|---|---|");
+  p("## 1. By kind of post", "", "| arm | kind of post | seats | matters | sent within the remit | sent beyond it, or sent twice (by class: duplicate is a mistake, never beyond) | requests for more | episodes | of which waited / asked for more / acted beyond | episodes' stake (papers naming a sum: count, total) |", "|---|---|---|---|---|---|---|---|---|---|");
   for (const x of [...r.posts].sort((a, b) => (a.arm + a.kind < b.arm + b.kind ? -1 : 1))) {
     const by = (d: string) => x.episodes.filter((e) => e.did === d).length;
     const sums = x.episodes.map((e) => e.stake_cents).filter((c): c is number => c !== undefined);
