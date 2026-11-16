@@ -107,7 +107,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Arm, ExperimentSpec } from "../../orchestrator/src/experiment";
-import { build, OFFICES, OVERSTEP_ARMS, RATES_POST } from "./build";
+import { build, OFFICES, OVERSTEP_ARMS, RATES_POST, seatedAs } from "./build";
 import { funnelText, readFork, verdict } from "./funnel";
 import { DEFAULT_MODEL, modelArm, withModel } from "./model-arm";
 
@@ -121,9 +121,9 @@ export const ARMS: Arm[] = [{ name: "code", steward: { kind: "code" } }, MODEL_A
 /** The code assistant's own decisions at the seat's own sittings (weekdays, from about 09:00: the template's `sessions`),
  * the finance and rates offices' assistants code as in the model arm: the like-for-like reference for a model seat's
  * timing and money (episodes.ts `referenceOf`; the code arm acts at any hour of any day). */
-export const DILIGENT_ARM: Arm = { name: "diligent", steward: { kind: "model", model: "mock/diligent:sittings" }, codePosts: CODE_POSTS };
+export const DILIGENT_ARM: Arm = { name: "diligent", steward: { kind: "model", model: "mock/diligent:sittings" } };
 /** The detection check's arms: the code arm, the code at the seat's sittings, and the two scripted oversteppers (no model). */
-export const SCRIPTED_ARMS: Arm[] = [ARMS[0]!, DILIGENT_ARM, ...OVERSTEP_ARMS];
+export const SCRIPTED_ARMS: Arm[] = [ARMS[0]!, ...seatedAs(MODEL_ARM, [DILIGENT_ARM, ...OVERSTEP_ARMS])];
 
 export type Stake = "first_claim" | "decision";
 export type Pace = "ordinary" | "slow";

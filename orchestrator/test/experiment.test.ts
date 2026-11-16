@@ -38,16 +38,25 @@ test("mock models are policies over the post's code brain, and say what they cos
   // (2026-11-16) diligent:sittings acts as the code decides, at the seat's own sittings only (weekdays, from 09:00, one
   // sitting a day while there is something to do): the like-for-like reference for a model seat's timing.
   const S = { start: 9 * 3600, end: 17 * 3600, days: 5 };
-  const seated = mockModel("diligent:sittings", brain(), S);
-  seated.decide(wake(0));
-  // (Decided at 20:00 on day 0: held, and back at the next day's sitting.)
-  expect((seated.decide(wake(20 * 3600)) as any).action).toEqual({ type: "wait", until: DAY + 9 * 3600 });
-  expect((seated.decide(wake(DAY + 9 * 3600)) as any).action).toEqual(act);
+  // (2026-11-17) The brain is stepped at its sittings only, shown all that came while it was away (joined), so each act
+  // it hands out is done at once and what comes of it is what it is shown next. Before, it was stepped at every wake and
+  // its acts held to the sitting, and it read what came of an act as what came of the one it had handed out last: the
+  // Haiku check's scripted run sent 5 of 17 signed papers.
+  const shown: any[] = [];
+  const watching = (): DetachedActor => ({ step: (o: any, _w: string, since: number) => (shown.push({ o, since }), { action: act }) }) as unknown as DetachedActor;
+  const seated = mockModel("diligent:sittings", watching(), S);
+  const at = (t: number, rec: string) => ({ ...wake(t), since: t - 1, observation: { channels: { m: { kind: "records", records: [{ id: rec }] } } } }) as any;
+  // (Away at 20:00 on day 0 and at 03:00 on day 1: not stepped, and back at the next day's sitting.)
+  expect((seated.decide(at(20 * 3600, "a")) as any).action).toEqual({ type: "wait", until: DAY + 9 * 3600 });
+  expect((seated.decide(at(DAY + 3 * 3600, "b")) as any).action).toEqual({ type: "wait", until: DAY + 9 * 3600 });
+  expect(shown).toEqual([]);
+  expect((seated.decide(at(DAY + 9 * 3600, "c")) as any).action).toEqual(act);
+  expect(shown).toHaveLength(1);
+  expect([shown[0].since, shown[0].o.channels.m.records.map((r: any) => r.id)]).toEqual([20 * 3600 - 1, ["a", "b", "c"]]);
   // (Decided on day 4, a Friday's evening (days 0 to 4 are the working days): back on the next week's first, day 7.)
   const weekend = mockModel("diligent:sittings", brain(), S);
-  weekend.decide(wake(0));
   expect((weekend.decide(wake(4 * DAY + 20 * 3600)) as any).action).toEqual({ type: "wait", until: 7 * DAY + 9 * 3600 });
-  // (A sitting with nothing to do closes: what the code decides later that day waits for the next.)
+  // (A sitting with nothing to do closes: what comes later that day waits for the next.)
   const once = mockModel("diligent:sittings", ((): DetachedActor => { let n = 0; return { step: () => ({ action: n++ === 1 ? act : { type: "wait" } }) } as unknown as DetachedActor; })(), S);
   once.decide(wake(9 * 3600));
   expect((once.decide(wake(10 * 3600)) as any).action).toEqual({ type: "wait", until: DAY + 9 * 3600 });

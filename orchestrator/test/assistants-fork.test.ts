@@ -19,7 +19,11 @@ const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town-300.yaml"), "ut
 function town(): any {
   const P = structuredClone(loadProfile(base.profile)) as any;
   for (const pr of P.values.assistants.providers) for (const o of pr.offers) { o.fee_month = Math.round(o.fee_month / 20); o.setup = Math.round(o.setup / 20); }
-  return generateFrom({ ...base, assistants: true }, P);
+  const config = generateFrom({ ...base, assistants: true }, P) as any;
+  // (Office hours for the assistants' seats, as a profile with working days gives them: what a model seat, and the code
+  // at a seat's sittings, keeps. The code's own seats do not read them.)
+  for (const t of config.templates ?? []) if (t.controller && /^assistant-/.test(t.id)) t.controller = { ...t.controller, params: { ...t.controller.params, sessions: t.controller.params?.sessions ?? { start: 9 * 3600, end: 17 * 3600, days: 5 } } };
+  return config;
 }
 
 test("a mock seat in the assistants' kind leaves the code's world to the hash; an intervention is the principal's own act at the fork", async () => {
@@ -39,6 +43,23 @@ test("a mock seat in the assistants' kind leaves the code's world to the hash; a
     const code = await runArm(spec, 1, { name: "code", steward: { kind: "code" } }, out);
     const diligent = await runArm(spec, 1, { name: "diligent", steward: { kind: "model", model: "mock/diligent" } }, out);
     expect(diligent.stateHash).toBe(code.stateHash);
+    // (The code at the seats' own sittings, the like-for-like reference: every paper signed off before its last sitting is
+    // sent, on its own matter, and every act it does is within its remit. 2026-11-17: the Haiku check's scripted run sent
+    // 5 of its 17 signed papers, its brain stepped at every wake and its acts held to the sitting, so what came of an act
+    // was read as what came of another.)
+    const sat = await runArm(spec, 1, { name: "sittings", steward: { kind: "model", model: "mock/diligent:sittings" } }, out);
+    const d = Bun.spawnSync([kernelBinary(), "delegation", sat.log!], { stdout: "pipe" });
+    const acts = d.stdout.toString().trim().split("\n").map((l) => JSON.parse(l)).filter((r: any) => r.table === "acts" && r.t >= spec.forkDay * DAY);
+    expect(acts.length).toBeGreaterThan(0);
+    expect(acts.filter((a: any) => a.class !== "within")).toEqual([]);
+    const satJsonl = join(out, "seed-1", "sittings.jsonl");
+    expect(Bun.spawnSync([kernelBinary(), "export", sat.log!, "--out", satJsonl]).exitCode).toBe(0);
+    const satRecs = readFileSync(satJsonl, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e: any) => e.kind === "event" && e.body.event === "recorded").map((e: any) => e.body.record);
+    const lastAct = Math.max(...acts.map((a: any) => a.t));
+    const signed = satRecs.filter((r: any) => r.kind === "sign_off" && r.at >= spec.forkDay * DAY && r.at < lastAct - DAY && r.data?.paper);
+    expect(signed.length).toBeGreaterThan(0);
+    const sentOn = new Set(acts.filter((a: any) => a.signed).map((a: any) => a.referral));
+    expect(signed.filter((s: any) => !sentOn.has(s.data.referral)).map((s: any) => s.data.referral)).toEqual([]);
     // (A model arm whose every seat is in one of its code posts is the code arm, to the hash: a code-held seat is woken and
     // acts as the code arm's, not as a model's that keeps to its own post.)
     const allCodeArm = { name: "all-code", steward: { kind: "model" as const, model: "anthropic/claude-haiku-5-5" }, codePosts: ["self", ...config.positions.map((p: any) => p.id)] };

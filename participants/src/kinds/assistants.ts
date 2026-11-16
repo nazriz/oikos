@@ -21,7 +21,7 @@ export const ASSISTANT_ISSUES: Issued[] = [
     // (Said on the form since 2026-11-14: the scope pilot's baseline seats filed 5, 6 and 4 reports where the code filed
     // 41, and nothing they were shown said that the office goes by the report: its own code hears of the act from it.)
     does: "Tells whom you work for what became of a matter they handed you: done, or not and why. Their office goes by it: until they have it, the matter is open on their file, and one not done is theirs to do again.",
-    fields: { referral: f("record", "The matter you were handed.", req), client: f("entity", "Whom you work for in it.", req), done: f("choice", "Whether it is done.", { required: true, options: ["yes", "no"] }), words: f("text", "What was done, or why not.") },
+    fields: { referral: f("record", "The matter you were handed.", req), client: f("entity", "Whom you work for in it.", req), done: f("choice", "yes: what you were handed has been carried out (the paper sent, the thing asked for done), whatever answer came back; no: it could not be carried out.", { required: true, options: ["yes", "no"] }), words: f("text", "What was done and any answer that came back; or, where it could not be carried out, why.") },
     writes: { kind: "report", text: "{words}", basis: "=referral", to: ["=client"], visible: ["=self", "=client"], data: { referral: "=referral", done: "=done", why: "=words" } } },
   { form: "scope_request", title: "A request for more scope or means",
     fields: { agreement: f("record", "The service you work under.", req), client: f("entity", "Whom you ask.", req), words: f("text", "What you ask for, and why.", req),
