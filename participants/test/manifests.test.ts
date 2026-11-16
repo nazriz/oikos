@@ -2,7 +2,7 @@
 
 import { expect, test } from "bun:test";
 import { join } from "node:path";
-import { manifests, modules, paramErrors } from "../src";
+import { classOf, manifests, modules, paramErrors } from "../src";
 
 test("every module has a manifest that matches it (regenerate with: bun participants/scripts/manifests.ts)", () => {
   const r = Bun.spawnSync(["bun", join(import.meta.dir, "../scripts/manifests.ts"), "--check"]);
@@ -25,4 +25,10 @@ test("no form has a field named to: it is the routing of the call that fills it 
   const clash: string[] = [];
   for (const [name, m] of manifests()) for (const i of m.issues ?? []) if ("to" in i.fields) clash.push(`${name}: ${i.form}`);
   expect(clash).toEqual([]);
+});
+
+test("every form an office issues or hands over is of a class of paperwork, so an offer by class can take it or not (docs/design/broad-seats.md G3)", () => {
+  const none: string[] = [];
+  for (const [name, m] of Object.entries(modules)) for (const x of [...(m.issues ?? []), ...(m.handsOver ?? [])]) if (!classOf(m, x)) none.push(`${name}: ${x.form}`);
+  expect(none).toEqual([]);
 });

@@ -1064,3 +1064,22 @@ nothing new, and its saved state is as before.
 - **A profile** (`worlds/generator/profile.ts`; not a contract schema): `tenancy.opening_arrears` (`{ share_bps, rents:
   [least, most], savings_most_rent_bps }`), read only where a description sets the option; au-vic's is a placeholder.
 - No new paper or field: the tenancies behind are written as the opening caseload's `rent_statement` already is.
+
+## Offers by class of paperwork; who has an assistant in one line (2026-11-16; docs/decisions.md, "Offers by class, and the spec line that seats assistants across the town"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive. `BehaviourModule.classes` (a paper's class by kind, where it is not its form's) and the table of each form's
+class (`participants/src/shared/paper-classes.ts`, `FORM_CLASS`, `classOf`); a profile offer's `classes` beside `kinds`,
+and the profile source note `assistants_classes`; the world spec's `assistant_classes` (generator only: an
+organisations' offer that names classes takes every kind written on a form of those classes, in place of its kinds, and
+an office is a principal for its own forms of those classes only). The experiment spec's `assistants` option
+(experiments/scope-pilot/build.ts: `posts`, `persons`, `levels`, `only`). The kernel reads none of it: a published
+`ServiceOffer` still carries its `kinds`. Off unless set: every town and spec on file generates as before (the stakes
+run's config checked byte for byte).
+
+## An office's in-tray (2026-11-16; docs/decisions.md, "An office gets to its assistant's papers at its own in-tray sittings"; under the owner's blanket approval of contract changes, 2026-10-11)
+
+Additive. A post's parameter `in_tray` (`every_days`, `from_hour`, `to_hour`, `from`: the posts whose papers and
+letters wait for its holder's sitting; kernel `crate::post::InTray`); the profile's `in_tray` (`every_days`) and its
+source note; the world spec's `post_in_tray` (generator only; `every_days` overrides the profile's shares). Absent: no
+post is wrapped and every town is as before; a person's saved post state is unchanged (the new `from` is not written
+when empty).

@@ -406,10 +406,15 @@ The mechanism:
 - **Effect:** The factory and the offices' seats never wait long on their principal, so at the organisations' seats
   the permission path costs nothing in time and the study's dilemma (stakes) arises at the desk only; any measure of
   an organisation's waiting reads short.
-- **L / I:** high / medium (it is certain today) · **Status:** open (found 2026-11-14)
+- **L / I:** high / medium (it is certain today) · **Status:** closed for the study's purposes (2026-11-16, the broad
+  seats' stage 1b): where a town asks (`post_in_tray`; the study's `build.ts` under `assistants` with a pace set), the
+  holder of every principal post gets to its assistant's papers at in-tray sittings of its own, in its working day
+  (`crate::post`, the person's post wrapper given the posts whose papers wait; docs/behaviour/assistants.md, "An
+  office's in-tray"). Still open where the town does not ask (the stakes run's factory seat, every code town), and
+  for the post's other business, which keeps no working hours (WM-18). The in-tray's shares are a placeholder (MT-50).
 - **Notice by:** the times of day of an organisation's sign-offs in a delegating run (screen.ts's waits at its seats).
-- **Fix when:** a post's working hours exist for its holder's acts (WM-18), before a study reads waiting at an
-  organisation's seat; then `answer_lag` answers for an organisation from them.
+- **Fix when:** a post's working hours exist for its holder's acts (WM-18): the in-tray's sittings then fall in them,
+  and every town's offices have one.
 
 ### WM-21 · Nobody is ever away: no hospital as a place, no trips out of town
 - **Gap:** A person can be out of reach of their post only by being too ill for it at home (stakes D2, 2026-11-14:
@@ -2067,6 +2072,150 @@ The mechanism:
 - **Notice by:** `question_answer` papers with `known: false` in a run, by subject; letters to a principal with a
   question mark acknowledged and nothing done.
 
+### MT-45 · The outside's own offices have no assistant post: the support office cannot be seated
+- **Gap:** The generator makes an assistant post only for a principal of the town (`pos.entity !== "outside"`, with an
+  account of its own in the town). The support office (`outside-support`, `world.transfers`: evidence requests 10,
+  decisions 12, confirmation requests 3 a month in the study town), the tax collector and the other outside offices are
+  the outside world's, and their casework is done by the agency's officers' desk (`outside-casework`). So the design's
+  40-seat list (docs/design/broad-seats.md section 5) cannot include the support office's assistant.
+- **Where:** `worlds/generator/generate.ts` (the principals' loop, "Principals"); `world.transfers`.
+- **Effect:** The study sees the support office only from the desk's side. The office on the other side of the counter,
+  the one whose waits are the desk's stake, has no assistant of its own, so "an assistant at the office that decides"
+  is not in any arm.
+- **L / I:** high (certain today) / medium · **Status:** open (2026-11-16; accepted by the lead as not ready by the freeze)
+- **Fix when:** a study wants the office's side: an assistant post of the agency's (its own account and mandate, kept
+  outside the town), its casework forms classed `casework`, and its officers' desk as the principal.
+- **Notice by:** a spec naming `outside-support` in `assistants.posts` (it is refused: "names no principal post").
+
+### MT-46 · A utility's bills are written on no form, and a billing run is not an offer's
+- **Gap:** The energy retailer writes about 404 bills a month, and the water corporation a few, by its code on no form of
+  its own: there is no bill form, so no assistant can be handed a bill and no model can write one. By the lead's decision
+  of 2026-11-11 (design 13.2) a billing run is a billing system's work and no offer takes it.
+- **Where:** `utility.energy`, `utility.water` (no `issues` for their bills); `participants/src/shared/paper-classes.ts`.
+- **Effect:** The utilities' billing seats of the design's 40-seat list are not possible. A study seating the energy
+  retailer's assistant gets its orders and answers only (about one matter a month).
+- **L / I:** high (certain today) / low · **Status:** open (2026-11-16; accepted as not ready by the freeze)
+- **Fix when:** a study cell adds billing as a stated condition: a bill form classed `receivables`, the run as one matter
+  read a part at a time in the seat's window (design 4.6).
+- **Notice by:** a utility's assistant with no matters in the screen.
+
+### MT-47 · Papers the code writes on no form cannot be handed over or written by a model
+- **Gap:** Several kinds the town's posts write have no form of the writer's: price lists (factories 0.6, shops 0.5, the
+  builder 1 a month), interviews (factories 0.5), hours notices (shops 2.1), school certificates and places (3 and 1),
+  the clinic's consultation records (12), the inspector's inspections (about 7), the builder's and the police's returns
+  of tax withheld (1 each; the firms' own return form is not on their stationery). A principal hands over only kinds of
+  its own forms, so these stay with it; a model holding such an office could not write them.
+- **Where:** the modules' `issues` (`participants/src/engine-kinds.ts`, `participants/src/kinds/*.ts`); the form-fit
+  census (`orchestrator/test/office-papers-run.test.ts`) skips kinds with no form.
+- **Effect:** The school, the clinic, the inspector, the police and the landlords are thin seats (under one matter a
+  month); the builder about one; a shop's back office about five. The share of the town's papers an assistant could
+  write is bounded by these gaps, and a reader of the town totals must say so.
+- **L / I:** high (certain today) / medium · **Status:** open (2026-11-16; accepted as not ready by the freeze)
+- **Fix when:** a seat's matters a month decide it: each form completed by its module (about a day for five, design 4.6),
+  classed, and the form-fit census extended to it.
+- **Notice by:** the screen's "kept: done by the principal itself" against the post's own writes; a seat with nothing
+  handed.
+
+### MT-48 · Our translator has never seen the forms the broad seats use
+- **Gap:** The scored set (translator/eval/score.ts; 1,280 requests on 2026-11-16) holds only the desk's forms, the
+  factory's four drafts (delivery note, return, export invoice, supply request), the rates notice and the assistant's
+  own papers. It has no request on an order, a job advertisement, a wage offer, a payroll notice, a rental listing, a
+  rent increase, a notice to vacate, a repair order, a permit decision, a loan decision, a disposal docket or an audit
+  form. Mock forks never exercise a form (the mock's translator passes the brain's call through).
+- **Where:** `translator/` (rules and the trained model); `experiments/scope-pilot/broad.ts`.
+- **Effect:** A model in the new seats is served worse: more readings sent back, more "still wrong" in the replay, and
+  seats that give up on a paper. Its acts and requests there mix the model's behaviour with the translator's misses.
+- **L / I:** high / high · **Status:** open (2026-11-16)
+- **Fix when:** before a real-model run of more seats than the desk and the factory: generated requests on each new
+  form into the scored set, and the replay read per seat and per form.
+- **Notice by:** the replay's misses by form; the funnel's "served first time" flag at the new seats.
+
+### MT-49 · What counts as an assistant's paperwork is the experiment's reading of each form
+- **Gap:** The class of each form (`participants/src/shared/paper-classes.ts`) and the classes an offer takes are our
+  reading, not a product's published list: a loan or permit decision is `casework` (drafted for the officer, who decides
+  its blanks), a shop's delivery note is `till`, a rates notice `receivables`, the tribunal's orders `adjudication`
+  (taken by no offer). The classes' basis (feature lists of business assistants) is to confirm (ME-22).
+- **Where:** the class table; each profile's `classes` and source note `assistants_classes`.
+- **Effect:** Which posts are principals, and so which seats a study can have, follows from this reading; another
+  reading would seat different offices. The till rule keeps 216 receipts a shop-month out of the shops' assistants.
+- **L / I:** medium / medium · **Status:** open (2026-11-16)
+- **Fix when:** the products' feature lists are read and cited; a class moved changes which posts are principals and is
+  recorded in docs/decisions.md.
+- **Notice by:** a seat handed papers a business assistant would not do, or none of what it would.
+
+### MT-51 · A principal hands over again what it has already handed over and is still in hand
+- **Gap:** A principal's code that acts from a standing need (an employer short of hands advertises until its posting
+  is up) does not know that the act it handed over is in hand with its assistant: at every wake it acts again, and the
+  wrapper hands each act over as a new matter. In the first 10-seat screen (2026-11-16) the builder handed over 5,020 job
+  postings in three days and the factory's assistant put up 262; the run slowed to a crawl. In life a manager who has
+  asked the clerk to advertise does not ask again while it is in hand.
+- **Where:** `kernel/crates/actors/src/delegation/principal.rs` (`route`: no check for an open matter of the same act);
+  the employers' staffing routines (`firms/staffing.rs`).
+- **Effect:** `hiring` is kept out of the offers' classes until it is fixed, so no assistant advertises, offers wages or
+  tells payroll of a starter. Any other kind a code acts on from a standing need would loop the same way; the screen's
+  matters a seat-month show it (a seat with thousands).
+- **L / I:** high (certain for hiring) / high · **Status:** open (2026-11-16)
+- **Fix when:** before hiring is offered: the principal keeps an act whose like is open with its assistant (the same
+  kind and the same facts, not yet reported) as in hand, neither handing it over again nor doing it, as a manager
+  waits for the clerk; delegating towns' hashes move with it.
+- **Notice by:** a seat with matters of one kind in the hundreds a month in the screen.
+
+### MT-52 · A bank cannot engage an assistant: it keeps its own account
+- **Gap:** The bank's lending office is a principal by class (its loan decisions are casework), but it pays from the
+  bank's own account, which the bank keeps itself. Its order for the service carries a payment of nothing (no set-up
+  fee), which, kept by itself, is a transfer of nothing and is refused as a contract violation; and the monthly fee, a
+  standing order to the keeper, would be refused too ("You keep this money yourself, so a repeating payment means
+  paying each time"). So it never engages, and its assistant is handed nothing (the first 10-seat screen, 2026-11-16).
+- **Where:** `kernel/crates/actors/src/market/trade.rs` (`order`: a payment line of nothing); the resolver's `money` for
+  a keeper (`kernel/crates/resolver/src/resolve.rs`); the principal's fee (`market/services.rs`).
+- **Effect:** The bank's lending office, the busiest office on the other side of the counter (about ten decisions a
+  month), cannot be seated. Any other body that keeps its own money would fail the same way.
+- **L / I:** high (certain today) / medium · **Status:** open (2026-11-16)
+- **Fix when:** before the bank is seated: an order with nothing to pay carries no payment, and a keeper pays a
+  provider's monthly fee by its own transfer each month (as a bank pays its suppliers); delegating towns' hashes move.
+- **Notice by:** a `rejected_action` note for an order of a service; an assigned principal with no service delivered.
+
+### MT-50 · How often an office-holder clears its in-tray is a placeholder
+- **Gap:** The in-tray of an office (the broad seats' stage 1b) draws each post's habit from the profile's `in_tray`
+  shares (every day 70%, every second 15%, every third 10%, every fifth 5%), the same placeholder in the three profiles
+  with assistants, and the study's `slow` condition from the persons' slow shares (60% weekly). No figure is sourced.
+  The sitting falls at a minute in the post's working day, every day of the week (no weekends or holidays).
+- **Where:** `worlds/profiles/*.json` (`in_tray`, source note `in_tray`); `experiments/scope-pilot/build.ts`
+  (`SLOW_POST`); `kernel/crates/actors/src/post.rs`.
+- **Effect:** The waits at organisations' seats, and so every episode at them (a matter whose next step needs the
+  principal), scale with these shares. A comparison of organisations' seats with the desk mixes two placeholder habits.
+- **L / I:** high (certain today) / medium · **Status:** open (2026-11-16)
+- **Fix when:** a diary or time-use study of managers' handling of approvals is read; before a result compares waits
+  across kinds of seat.
+- **Notice by:** the screen's waits at organisations' seats against the desk's.
+
+### MT-53 · Offices whose accounts are opened late are never principals
+- **Gap:** The generator makes a principal of a post only where its organisation's account already exists when the
+  principals are made. The auditor's and the complaints desks' bodies (the ombudsman, the consumer desk) have their
+  accounts opened later in generation, so though their forms are casework, they are never principals, and the town's
+  complaints desk (an office of the town) is not one either. Found when stage 2's 40-seat list named them (2026-11-16).
+- **Where:** `worlds/generator/generate.ts` (the principals' loop: `accounts.some(a => a.id === acc-<entity>)`; where those
+  bodies' accounts are pushed).
+- **Effect:** The study cannot seat the auditor's or the complaints desks' assistants, the offices that judge other
+  offices' papers; the 40-seat list takes more shops and landlords in their place.
+- **L / I:** high (certain today) / low · **Status:** open (2026-11-16)
+- **Fix when:** a study wants those offices seated: make principals after every account is opened (every delegating
+  town moves).
+- **Notice by:** `assistants: names no principal post` for one of them.
+
+### MT-54 · A person holding two principal posts engages an assistant for one of them only
+- **Gap:** In the study town one resident holds both the planning office and the works office. Both are principals by
+  class and both carry the spec's commit, but only one of the two posts engages provider A (in the 10-seat screen the
+  works office, in the 40-seat one the planning office): the other never orders. Not yet traced; likely the two posts'
+  delegation wrappers share the holder's review or its decisions (one subject).
+- **Where:** `kernel/crates/actors/src/delegation/principal.rs` (the review and `engage`, per participant); the town's
+  staffing (one person, two offices).
+- **Effect:** One of the two offices' assistants is never seated; a study naming both seats one. The 40-seat list names
+  planning and not works.
+- **L / I:** high (certain today) / low · **Status:** open (2026-11-16)
+- **Fix when:** before a study seats both: trace the engagement per post.
+- **Notice by:** an assigned principal with no `engage` decision and no order.
+
 ### MT-55 · The outside buyer pays an invoice against goods of the kind on hand, not against a seller's own delivery
 - **Gap:** The world market (`world.trade`, the outside buyer) pays an invoice once enough goods of its kind have
   arrived that are not yet paid for, counted over every seller together (`held - baseline + sent - paid_for`, by kind).
@@ -2089,6 +2238,7 @@ The mechanism:
   back one with none behind it ("we hold no goods from you that are not already paid for").
 - **Notice by:** the outside's payments per seller exceeding the goods that seller carried to it; a seller paid twice
   for invoices with identical data.
+
 
 ---
 

@@ -69,6 +69,35 @@ export const SHORT_STAFFED_BPS = 3_000;
  * from the papers on file at the start, and nothing about the town's rates changes. */
 export type Cohort = { by: "hand" | "reach"; every: number; only?: boolean; difficulty?: boolean };
 
+export type Level = "advice" | "draft" | "approve" | "alone";
+/** Who has an assistant, across the town (docs/design/broad-seats.md section 5, the spec line; step G9): in place of
+ * `offices` and `cohort`, one statement of the experiment's assignment. The town's offers take paperwork by class
+ * (`assistant_classes`, step G3), so any office whose forms are of a class the offer takes is a principal.
+ * - `posts`: `module:<code>` assigns every principal post that runs that module (`module:firm.producer`: every factory);
+ *   a post's id assigns that post. Each engages provider A's organisations' offer by hand on day 1 (`delegation.commit`,
+ *   as `offices` did), at `levels`.
+ * - `persons`: the households' cohort, as `cohort` says it; absent, no person has the service.
+ * - `levels`: the level every kind a principal may hand over is engaged at, or a level by kind (a kind not named: the
+ *   study's own levels, `ORG_LEVELS`, where it names it, else `draft`). Default: `ORG_LEVELS`, else `draft`.
+ * - `only` (default true): no other organisation is offered the service (they see no offer and have no rule for one),
+ *   so that who has an assistant is the assignment alone.
+ * A post named that is not a principal in the town, or a module none of whose posts is, is an error: the spec says
+ * exactly whom it seats. */
+export interface Assistants { posts: string[]; persons?: Cohort; levels?: Level | { [kind: string]: Level }; only?: boolean }
+
+/** The principal posts an `assistants` statement assigns, from a town's config, in the config's order. */
+export function assignedPosts(config: any, posts: string[]): string[] {
+  const principals = (config.positions ?? []).filter((p: any) => p.role_module?.params?.delegation?.post);
+  const out = new Set<string>();
+  for (const name of posts) {
+    const code = name.startsWith("module:") ? name.slice("module:".length) : undefined;
+    const hit = principals.filter((p: any) => (code ? p.role_module.code === code : p.id === name));
+    if (!hit.length) throw new Error(`assistants: ${name} names no principal post in this town`);
+    for (const p of hit) out.add(p.id);
+  }
+  return principals.map((p: any) => p.id).filter((id: string) => out.has(id));
+}
+
 /** The papers on file when the year begins (the town's opening caseload, `brought_forward`) that put a person in
  * difficulty (docs/design/stakes.md, D3): addressed to them, rent owed (a landlord's statement of the rent account), a
  * notice to vacate, a hearing or an order on an application against them, a loan behind, a claim refused, a body's
@@ -170,6 +199,9 @@ export interface Options {
    * A stated setting of the town, not a cell: absent, the town exactly as before. Their opening rent statement names
    * them, so with `cohort.difficulty` they are among the desk's clients. */
   openingArrears?: boolean;
+  /** Who has an assistant across the town, in place of `offices` and `cohort` (`Assistants`; docs/design/broad-seats.md
+   * section 5). Absent: `offices` and `cohort` as before, and the town exactly as before. */
+  assistants?: Assistants;
 }
 
 /** Our own trained translator, held fixed for every arm. */
@@ -201,17 +233,39 @@ export function build(o: Options): ExperimentSpec {
   const hold = o.holdLevels === "run" ? "floor" : "freeze";
   // (The act-depth control hands every kind of the organisations' over as the finished act: docs/design/broad-seats.md,
   // G2, where every kind with a form of its principal's may go as what happened.)
-  const depths = o.depth === "act" ? { depths: Object.fromEntries(Object.keys(ORG_LEVELS).map((k) => [k, "act"])) } : {};
-  const commit = (offer: string, levels: object) => ({ offer, levels, levels_until: heldTo * DAY, keep_until: until * DAY, why, hold, ...depths });
+  const depthsOf = (kinds: string[]) => (o.depth === "act" ? { depths: Object.fromEntries(kinds.map((k) => [k, "act"])) } : {});
+  const depths = depthsOf(Object.keys(ORG_LEVELS));
+  const commit = (offer: string, levels: object, kinds?: string[]) => ({ offer, levels, levels_until: heldTo * DAY, keep_until: until * DAY, why, hold, ...(kinds ? depthsOf(kinds) : depths) });
+  const A = o.assistants;
+  if (A && (o.offices || o.cohort)) throw new Error("scope pilot: `assistants` says who has an assistant; give it in place of `offices` and `cohort`, not beside them");
   // (The readiness to grant, where the spec states one: on each principal it assigns, beside its commit.)
   const ready = o.hurdleBps !== undefined ? { hurdle_bps: o.hurdleBps } : {};
   return {
     name: o.name,
     world: {
       file: "worlds/town-1000.yaml",
-      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : []), ...(o.dateOfEffect ? [`support_date_of_effect=${o.dateOfEffect}`] : []), ...(o.clientPost === "slow" ? [`paperwork=${JSON.stringify({ every_days: SLOW_POST })}`] : []), ...(o.clientSituation === "on" ? ["assistant_situation=true"] : []), ...(o.openingArrears ? ["opening_arrears=true"] : [])],
+      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : []), ...(o.dateOfEffect ? [`support_date_of_effect=${o.dateOfEffect}`] : []), ...(o.clientPost === "slow" ? [`paperwork=${JSON.stringify({ every_days: SLOW_POST })}`] : []), ...(o.clientSituation === "on" ? ["assistant_situation=true"] : []), ...(o.openingArrears ? ["opening_arrears=true"] : []), ...(A ? ["assistant_classes=true"] : []), ...(A && o.clientPost ? [`post_in_tray=${JSON.stringify(o.clientPost === "slow" ? { every_days: SLOW_POST } : {})}`] : [])],
       prepare(config: any, seed: number) {
-        for (const post of o.offices ?? OFFICES) {
+        // (The spec line: every post it assigns engages by hand, at its levels, for every kind it may hand over; under
+        // `only` (the default) no other organisation is offered the service.)
+        if (A) {
+          const assigned = new Set(assignedPosts(config, A.posts));
+          for (const pos of config.positions) {
+            const d = pos.role_module?.params?.delegation;
+            if (!d?.post) continue;
+            if (assigned.has(pos.id)) {
+              const kinds = Object.keys(d.kinds ?? {}).sort();
+              const levels = Object.fromEntries(kinds.map((k) => [k, typeof A.levels === "string" ? A.levels : (A.levels?.[k] ?? (ORG_LEVELS as { [k: string]: string })[k] ?? "draft")]));
+              pos.role_module.params = { ...pos.role_module.params, delegation: { ...structuredClone(d), review_days: o.reviewDays, ...ready, commit: commit("letting-assistant-a", levels, kinds) } };
+            } else if (A.only !== false) {
+              // (And its in-tray, which holds only what an assistant it now has none of would send.)
+              const { delegation: _gone, in_tray: _tray, ...params } = pos.role_module.params;
+              pos.role_module.params = params;
+              if (Array.isArray(pos.channels)) pos.channels = pos.channels.filter((ch: any) => ch.id !== "providers");
+            }
+          }
+        }
+        for (const post of A ? [] : (o.offices ?? OFFICES)) {
           const pos = config.positions.find((x: any) => x.id === post);
           const d = pos?.role_module?.params?.delegation;
           if (!d) throw new Error(`scope pilot: ${post} is not a principal in this town`);
@@ -221,10 +275,11 @@ export function build(o: Options): ExperimentSpec {
         const start = 0;
         const adults = new Set(config.world.entities.filter((e: any) => e.kind === "person" && typeof e.born_at === "number" && e.born_at <= start - 18 * 365.25 * DAY).map((e: any) => e.id));
         const people = config.participants.filter((p: any) => p.kind === "person" && adults.has(p.person) && p.controller?.params?.delegation && !p.shares_body).sort((a: any, b: any) => (a.id < b.id ? -1 : 1));
-        const c = o.cohort ?? { by: "hand", every: COHORT_EVERY };
+        // (Under `assistants`, its `persons`; with none, no person is offered the service: a cohort of nobody, offered only.)
+        const c: Cohort = A ? (A.persons ?? ({ by: "hand", every: 1, only: true, none: true } as Cohort)) : (o.cohort ?? { by: "hand", every: COHORT_EVERY });
         // (And, where the spec says, every adult in difficulty at the start: `inDifficulty`, D3.)
         const troubled = c.difficulty ? inDifficulty(config) : new Set<string>();
-        const cohort = people.filter((p: any, i: number) => i % c.every === seed % c.every || troubled.has(p.person));
+        const cohort = (c as { none?: true }).none ? [] : people.filter((p: any, i: number) => i % c.every === seed % c.every || troubled.has(p.person));
         const levels = (p: any) => ({ ...PERSON_LEVELS, ...(o.wants ? WANT_LEVELS : {}), ...(troubled.has(p.person) ? DIFFICULTY_LEVELS : {}) });
         // (With a second desk, every other member of the cohort engages provider B's paid offer at the same levels.)
         if (c.by === "hand") cohort.forEach((p: any, i: number) => { p.controller = { ...p.controller, params: { ...p.controller.params, delegation: { ...structuredClone(p.controller.params.delegation), review_days: o.reviewDays, ...ready, commit: commit(o.secondDesk && i % 2 === 1 ? "personal-assistant-b" : "personal-assistant-a", levels(p)) } } }; });

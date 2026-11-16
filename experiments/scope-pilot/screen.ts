@@ -25,8 +25,18 @@ const INCOMING = new Set(["referral", "sign_off", "declined", "go_ahead", "remit
 /** An assistant's own papers about its matters (beside the principal's papers it sends). */
 const OWN = new Set(["draft", "approval_request", "report", "advice", "scope_request", "handover"]);
 
-type Row = { clients: number; matters: { [kind: string]: number }; kept: { [kind: string]: number }; steps: number; sittings: number; with_new: number; refused: number; returned: number; overdue: number; answered_back: number; obstacles: { [law: string]: number }; waited_s: number; waits: number; wait_s: number[]; grants: number };
-const row = (): Row => ({ clients: 0, matters: {}, kept: {}, steps: 0, sittings: 0, with_new: 0, refused: 0, returned: 0, overdue: 0, answered_back: 0, obstacles: {}, waited_s: 0, waits: 0, wait_s: [], grants: 0 });
+type Row = { clients: number; matters: { [kind: string]: number }; kept: { [kind: string]: number }; steps: number; sittings: number; with_new: number; refused: number; returned: number; overdue: number; answered_back: number; obstacles: { [law: string]: number }; waited_s: number; waits: number; wait_s: number[]; grants: number; worth: number[] };
+const row = (): Row => ({ clients: 0, matters: {}, kept: {}, steps: 0, sittings: 0, with_new: 0, refused: 0, returned: 0, overdue: 0, answered_back: 0, obstacles: {}, waited_s: 0, waits: 0, wait_s: [], grants: 0, worth: [] });
+
+/** What a waiting draft's paper is worth in the town's own money, where it says (an invoice's sum, an order's payment):
+ * the money its paper moves, in cents, read from the paper as drafted. Nothing where the paper names no sum. */
+export function worthOf(draft: any): number | undefined {
+  const text = JSON.stringify(draft?.data?.paper ?? draft?.data?.calls ?? "");
+  const sums = [...text.matchAll(/\\*"amount\\*":\\*"?(\d+)/g)].map((m) => Number(m[1]));
+  // (An order on terms names no payment: its worth is its quantity at its unit price.)
+  if (!sums.length) for (const m of text.matchAll(/\\*"quantity\\*":(\d+),\\*"unit_price\\*":(\d+)/g)) sums.push(Number(m[1]) * Number(m[2]));
+  return sums.length ? sums.reduce((a, b) => a + b, 0) : undefined;
+}
 
 export interface Screen {
   spec: string; seed: number; arm: string; fork_day: number; days: number;
@@ -70,7 +80,7 @@ export async function screenLog(log: string, config: any, o: { forkDay: number; 
   const engaged: Screen["households"]["engaged"] = [];
   const deliveries = new Map<string, { person: string; provider: string; at: number; ended?: number }>(); // order -> a desk's client
   const isSeat = (post: string | undefined) => !!post && post in seats;
-  const draftAt = new Map<string, { t: number; post: string }>(); // a seat's draft or request to go ahead -> when, and whose
+  const draftAt = new Map<string, { t: number; post: string; worth?: number }>(); // a seat's draft or request to go ahead -> when, whose, and what its paper moves
   const toSeat = (r: any): string | undefined => {
     // (An organisation's papers to its assistant are its own, in its principal's post; a person's go to the provider.)
     const p = principalPost.get(r.in_position ?? "");
@@ -121,14 +131,14 @@ export async function screenLog(log: string, config: any, o: { forkDay: number; 
     if (isSeat(r.in_position)) {
       postOf.set(r.author, r.in_position);
       seatRecord.set(r.id, r.in_position);
-      if (r.kind === "draft" || r.kind === "approval_request") draftAt.set(r.id, { t, post: r.in_position });
+      if (r.kind === "draft" || r.kind === "approval_request") draftAt.set(r.id, { t, post: r.in_position, worth: worthOf(r) });
       continue;
     }
     // (How long a seat's draft or request to go ahead waited on its principal's answer: what the principal's rule counts
     // as its own lateness, docs/design/obstacles.md section 10; and the remits a principal granted on a request.)
     if (r.kind === "sign_off" || r.kind === "go_ahead" || r.kind === "declined") {
       const asked = draftAt.get(r.data?.draft ?? r.data?.request ?? r.data?.of ?? "");
-      if (asked && t >= from && month(t) < months) { const m = seat(asked.post)[month(t)]!; m.waited_s += t - asked.t; m.waits++; m.wait_s.push(t - asked.t); }
+      if (asked && t >= from && month(t) < months) { const m = seat(asked.post)[month(t)]!; m.waited_s += t - asked.t; m.waits++; m.wait_s.push(t - asked.t); if (asked.worth !== undefined) m.worth.push(asked.worth); }
     }
     if (r.kind === "remit" && r.data?.answers) {
       const post = toSeat(r);
@@ -194,18 +204,26 @@ function spread(w: number[] = []): string {
   return `; ${at(0.5)}, ${at(0.9)}, ${(s.at(-1)! / 3600).toFixed(1)}`;
 }
 
+/** Sums in cents, said: how many, the median and the total, in whole units of the town's money. */
+function worthText(w: number[] = []): string {
+  if (!w.length) return "-";
+  const s = [...w].sort((a, b) => a - b);
+  const units = (c: number) => Math.round(c / 100).toLocaleString("en");
+  return `${s.length}; ${units(s[Math.ceil(s.length / 2) - 1]!)}, ${units(s.reduce((a, b) => a + b, 0))}`;
+}
+
 export function screenText(s: Screen): string {
   const lines = [`${s.spec}, seed ${s.seed}, arm ${s.arm}: ${s.days} days after the fork on day ${s.fork_day}`,
     `households offered the service: ${s.households.offered} (engaged by hand: ${s.households.by_hand}); took it up by their own rule: ${s.households.took_up}`];
   for (const e of s.households.engaged.filter((x) => !x.committed).slice(0, 20)) lines.push(`  ${e.who} engaged on day ${e.day}: saving ${e.saving} a month against a fee of ${e.fee} (cents, its rule's figures)`);
-  lines.push("", "seat | month | clients | matters (by kind) | kept: done by the principal itself, of kinds it may hand over | steps a matter | sittings (with something new) | refused | returned | silent past due | answered back | obstacles met (by law) | waited on the principal (mean hours, answers; median, 90th percentile and longest, hours) | remits granted on a request");
+  lines.push("", "seat | month | clients | matters (by kind) | kept: done by the principal itself, of kinds it may hand over | steps a matter | sittings (with something new) | refused | returned | silent past due | answered back | obstacles met (by law) | waited on the principal (mean hours, answers; median, 90th percentile and longest, hours) | remits granted on a request | what the papers waited on move (drafts naming a sum: count, median and total, in the town's money)");
   // (Only the seats that sat or were handed anything: every principal has an assistant post, mostly vacant.)
   const live = Object.entries(s.seats).filter(([post, rows]) => rows.some((m) => m.sittings || m.steps || Object.keys(m.matters).length || (post.endsWith("-desk") && Object.keys(m.kept).length)));
   for (const [post, rows] of live.sort()) rows.forEach((m, k) => {
     const n = Object.values(m.matters).reduce((a, b) => a + b, 0);
     const kinds = Object.entries(m.matters).sort((a, b) => b[1] - a[1]).map(([kk, v]) => `${kk} ${v}`).join(", ");
     const kept = Object.entries(m.kept).sort((a, b) => b[1] - a[1]).map(([kk, v]) => `${kk} ${v}`).join(", ");
-    lines.push(`${post} | ${k + 1} | ${m.clients} | ${n}${kinds ? ` (${kinds})` : ""} | ${Object.values(m.kept).reduce((a, b) => a + b, 0)}${kept ? ` (${kept})` : ""} | ${n ? (m.steps / n).toFixed(1) : "-"} | ${m.sittings} (${m.with_new}) | ${m.refused} | ${m.returned} | ${m.overdue} | ${m.answered_back} | ${Object.entries(m.obstacles).map(([k, v]) => `${k} ${v}`).join(", ") || 0} | ${m.waits ? (m.waited_s / m.waits / 3600).toFixed(1) : "-"} (${m.waits}${spread(m.wait_s)}) | ${m.grants}`);
+    lines.push(`${post} | ${k + 1} | ${m.clients} | ${n}${kinds ? ` (${kinds})` : ""} | ${Object.values(m.kept).reduce((a, b) => a + b, 0)}${kept ? ` (${kept})` : ""} | ${n ? (m.steps / n).toFixed(1) : "-"} | ${m.sittings} (${m.with_new}) | ${m.refused} | ${m.returned} | ${m.overdue} | ${m.answered_back} | ${Object.entries(m.obstacles).map(([k, v]) => `${k} ${v}`).join(", ") || 0} | ${m.waits ? (m.waited_s / m.waits / 3600).toFixed(1) : "-"} (${m.waits}${spread(m.wait_s)}) | ${m.grants} | ${worthText(m.worth)}`);
   });
   lines.push("", "(Silent past due is counted only where a seat's own paper names a due day: no paper of the code assistant does. Answered back: another party's paper citing one the seat sent, kept apart; not an obstacle by itself.)");
   return lines.join("\n");

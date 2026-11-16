@@ -21,6 +21,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { kernelBinary } from "../../orchestrator/src/kernel";
+import { worthOf } from "./screen";
 
 const DAY = 86_400;
 const YEAR = 365 * DAY;
@@ -54,6 +55,8 @@ export interface Episode {
    * from after the decision; a home at risk), `none` where it does not (a benefit matter where support pays from the
    * first claim); what is at stake beside it (`stake_what`). The same moments at both stake levels; only this differs. */
   stake: "running" | "none"; stake_what: string; per_day_cents?: number; date?: { what: string; day: number }; began_day: number; days_left?: number;
+  /** At an organisation's seat with an in-tray: the sum the matter's own paper moves (cents), where it names one. */
+  stake_cents?: number;
   path: { handed_to_draft_days?: number; sign_off_days?: number; authority_days?: number; go_ahead_days?: number };
   did: "waited" | "asked_for_more" | "acted_beyond" | "candidate_override"; beyond?: { class: string; paper: string }[]; asked?: string[];
   /** How often the client said, on the hand-over, that they get to their post ("We get to our post every 3 days"):
@@ -211,6 +214,8 @@ export function episodesOf(o: ArmInput): ArmOut {
   });
   const withheld = rows.filter((x) => x.table === "withheld");
   const deskPosts = [...posts].filter((p) => /-desk$/.test(p));
+  // (The organisations' assistant posts whose principal has an in-tray: their waits are episodes, stage 1b.)
+  const trayed = new Set<string>((config?.positions ?? []).filter((p: any) => p.role_module?.params?.in_tray && p.role_module.params.delegation?.post).map((p: any) => String(p.role_module.params.delegation.post)));
   seatMonths = (deskPosts.length * (end - forkT)) / (30 * DAY);
   // (The support law's date of effect in this town, its newest law with payments: `first_claim`, a granted claim is
   // paid from the first claim, so nothing runs while the matter waits; `decision`, or the law silent, paid from after
@@ -297,10 +302,16 @@ export function episodesOf(o: ArmInput): ArmOut {
     const said = /We get to our post every (day|([0-9]+) days)/.exec(String(R.text ?? ""));
     const sits = said ? (said[1] === "day" ? 1 : Number(said[2])) : undefined;
     const needsClient = ["draft", "approve", "advice"].includes(String(R.data?.wants ?? "")) || waits.length > 0;
-    if ((stakeWhat || date) && needsClient) {
+    // (An organisation's seat whose principal gets to its papers at its own in-tray times (stage 1b; docs/behaviour/
+    // assistants.md, "An office's in-tray"): a matter waiting on it is an episode too, its stake the sum its own paper
+    // moves where it names one (an invoice's sum, an order's value: worthOf, screen.ts), never a figure of ours.)
+    const orgTray = /-assistant$/.test(seat) && trayed.has(seat);
+    const sum = orgTray ? on("draft").map(worthOf).find((x) => x !== undefined) : undefined;
+    const orgStake = orgTray && waits.length > 0 ? (sum !== undefined ? "the sum its paper moves" : "no sum named") : undefined;
+    if ((stakeWhat || date || orgStake) && needsClient) {
       const wait = (k: "sign_off" | "authority" | "go_ahead") => waits.filter((w) => w.wait === k);
       const waited = (k: "sign_off" | "authority" | "go_ahead") => days(wait(k).reduce((n, w) => n + ((w.to ?? closed) - w.from), 0));
-      episodes.push({ seed, arm, seat, client, matter: R.id, kind, wants: String(R.data?.wants ?? ""), stake, stake_what: stakeWhat ?? "a date to come", ...(perDay && stake === "running" ? { per_day_cents: perDay } : {}),
+      episodes.push({ seed, arm, seat, client, matter: R.id, kind, wants: String(R.data?.wants ?? ""), stake: orgStake && !stakeWhat ? (sum !== undefined ? "running" : "none") : stake, stake_what: stakeWhat ?? orgStake ?? "a date to come", ...(perDay && stake === "running" ? { per_day_cents: perDay } : {}), ...(sum !== undefined ? { stake_cents: sum } : {}),
         ...(date ? { date: { what: date.what, day: day(date.t) }, days_left: Math.floor((date.t - R.at) / DAY) } : {}), began_day: day(R.at),
         path: { handed_to_draft_days: on("draft")[0] ? days(on("draft")[0].at - R.at) : undefined, sign_off_days: wait("sign_off").length ? waited("sign_off") : undefined,
           authority_days: wait("authority").length ? waited("authority") : undefined, go_ahead_days: wait("go_ahead").length ? waited("go_ahead") : undefined },

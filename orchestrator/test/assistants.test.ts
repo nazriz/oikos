@@ -8,7 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
-import { ASSISTANT_ISSUES } from "@oikos/participants";
+import { ASSISTANT_ISSUES, classOf, modules } from "@oikos/participants";
 import { runWorld } from "../src/run";
 import { FORM_CALL_NAMES } from "../../translator/src/resolver";
 import { build, inDifficulty } from "../../experiments/scope-pilot/build";
@@ -164,6 +164,45 @@ test("a town that does not ask for assistants is generated as before; one that d
   expect(withTrouble.participants.filter((p: any) => cohortIds.has(p.id) && !named.has(p.person)).map((p: any) => p.controller.params.delegation.commit.levels.tribunal_response)).not.toContain("draft");
   const profile = on.participants.find((x: any) => x.controller?.params?.delegation).controller.params.delegation.hurdle_bps;
   expect(new Set(hand().participants.filter((p: any) => p.controller?.params?.delegation).map((p: any) => p.controller.params.delegation.hurdle_bps))).toEqual(new Set([profile]));
+
+  // Offers by class (docs/design/broad-seats.md G3): a town that does not ask is as before to the byte; one that does
+  // makes a principal of every office with a form of a class an offer takes, for those kinds only (a shop's till
+  // receipts are not among them, a factory's delivery notes are; every kind the profile's list had is still taken).
+  expect(generate({ ...base, assistants: true, assistant_classes: false })).toEqual(on);
+  const classed = generate({ ...base, assistants: true, assistant_seats: ["assistant-a", "assistant-a-personal"], assistant_classes: true }) as any;
+  const offered = new Set((loadProfile(base.profile) as any).values.assistants.providers.flatMap((pr: any) => pr.offers.filter((o: any) => o.for === "organisations").flatMap((o: any) => o.classes)));
+  const byCode = (c: any, code: string) => c.positions.filter((p: any) => p.role_module?.code === code && p.role_module.params.delegation).map((p: any) => Object.keys(p.role_module.params.delegation.kinds));
+  for (const p of classed.positions.filter((x: any) => x.role_module?.params?.delegation)) {
+    const m = modules[p.role_module.code]!;
+    for (const k of Object.keys(p.role_module.params.delegation.kinds)) expect([...(m.issues ?? []), ...(m.handsOver ?? [])].some((x) => x.writes.kind === k && offered.has(classOf(m, x)!)), `${p.id}: ${k}`).toBe(true);
+  }
+  for (const ks of byCode(classed, "firm.retailer")) expect(ks).toEqual(expect.arrayContaining(["order", "withholding_report"]));
+  for (const ks of byCode(classed, "firm.retailer")) expect(ks).not.toContain("delivery_note");
+  for (const ks of byCode(classed, "firm.producer")) expect(ks).toEqual(expect.arrayContaining(["delivery_note", "order"]));
+  for (const code of ["bank.lending", "city.planning_officer", "firm.builder"]) expect(byCode(classed, code).length, code).toBe(1);
+  for (const p of principals) for (const k of Object.keys(p.role_module.params.delegation.kinds).filter((k) => !(p.role_module.code === "firm.retailer" && k === "delivery_note")))
+    expect(classed.positions.find((x: any) => x.id === p.id).role_module.params.delegation.kinds[k], `${p.id}: ${k} still taken`).toBeDefined();
+  // The spec line (G9): it assigns exactly the posts it names, by module or by id, as a commit at its levels for every
+  // kind each may hand over; under `only` no other organisation has a rule for the service, and with no `persons`
+  // nobody is offered it.
+  const line = (build({ name: "t", days: 1, seeds: [1], reviewDays: 14, arms: [], budget: { experiment_usd: 0, arm_usd: {} }, assistants: { posts: ["module:firm.producer", "planning"] } }).world as any);
+  expect(line.sets).toContain("assistant_classes=true");
+  const assigned = line.prepare(structuredClone(classed), 1);
+  const engaged = assigned.positions.filter((p: any) => p.role_module?.params?.delegation);
+  expect(engaged.map((p: any) => p.id).sort()).toEqual(classed.positions.filter((p: any) => p.role_module?.params?.delegation && (p.role_module.code === "firm.producer" || p.id === "planning")).map((p: any) => p.id).sort());
+  for (const p of engaged) expect(Object.keys(p.role_module.params.delegation.commit.levels).sort()).toEqual(Object.keys(p.role_module.params.delegation.kinds).sort());
+  expect(assigned.positions.filter((x: any) => !x.role_module?.params?.delegation && (x.channels ?? []).some((c: any) => c.id === "providers")).map((x: any) => x.id)).toEqual([]);
+  expect(assigned.participants.some((p: any) => p.kind === "person" && p.controller?.params?.delegation)).toBe(false);
+  expect(() => (build({ name: "t", days: 1, seeds: [1], reviewDays: 14, arms: [], budget: { experiment_usd: 0, arm_usd: {} }, assistants: { posts: ["nobody-here"] } }).world as any).prepare(structuredClone(classed), 1)).toThrow(/names no principal/);
+  // An office's in-tray (stage 1b, WM-20): where the town asks, every principal post's holder gets to its own assistant's
+  // papers, and only those, at sittings in its working day; the study turns it on with the clients' pace, never alone.
+  expect(JSON.stringify(classed)).not.toContain('"in_tray"');
+  const trayed = generate({ ...base, assistants: true, assistant_classes: true, post_in_tray: { every_days: [[2, 10_000]] } }) as any;
+  const trays = trayed.positions.filter((p: any) => p.role_module?.params?.delegation);
+  for (const p of trays) expect(p.role_module.params.in_tray, p.id).toMatchObject({ every_days: [[2, 10_000]], from: [p.role_module.params.delegation.post] });
+  expect(trayed.positions.filter((p: any) => p.role_module?.params?.in_tray && !p.role_module.params.delegation).map((p: any) => p.id)).toEqual([]);
+  const paced = (clientPost?: "ordinary" | "slow") => (build({ name: "t", days: 1, seeds: [1], reviewDays: 14, arms: [], budget: { experiment_usd: 0, arm_usd: {} }, assistants: { posts: ["planning"] }, ...(clientPost ? { clientPost } : {}) }).world as any).sets.filter((s: string) => s.startsWith("post_in_tray="));
+  expect([paced().length, paced("ordinary"), paced("slow").length]).toEqual([0, ["post_in_tray={}"], 1]);
 });
 
 test("in a town with assistants, principals engage by their own rule, hand matters over and hear back; every decision rests on what they were shown", async () => {

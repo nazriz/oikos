@@ -299,6 +299,10 @@ export interface BehaviourModule {
    * (docs/behaviour/assistants.md, "Kinds a firm's and an office's assistant takes"). Read only where a town has
    * providers of assistants: the office's own holder is not given these forms. */
   handsOver?: Issued[];
+  /** The class of paperwork a paper of this office is, by kind, where it is not its form's own class
+   * (shared/paper-classes.ts): a shop's delivery note is a receipt at its counter (`till`), where a factory's is a
+   * paper to the firm it supplies. Read only where a town's offers take paperwork by class. */
+  classes?: { [kind: string]: import("./shared/paper-classes").PaperClass };
   /** What of the office's own the forms it issues carry, from its parameters: the values of each "@name" in `issues`. */
   issuesWith?(params: { [k: string]: any }): { [name: string]: unknown };
   /** The office's own staff, where it employs any, from its parameters: what one of them is called (the role its

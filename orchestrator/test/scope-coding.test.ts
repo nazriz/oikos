@@ -118,6 +118,16 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   const law = { id: "rec.0", record: "statement", kind: "law", at: 0, text: "Support payments.", data: { payments: [], date_of_effect: "first_claim" } };
   const firstClaim = episodesOf({ seed: 1, arm: "code", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs, rows: [], transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [], world: { records: [law] } } });
   expect(firstClaim.episodes.map((e) => [e.matter, e.stake])).toEqual([["rec.1", "none"], ["rec.3", "none"]]);
+  // (Stage 1b: at an organisation's seat whose principal has an in-tray, a matter waiting on its sign-off is an episode,
+  // its stake the sum its own drafted paper moves; without the in-tray, none.)
+  const orgRecs = new Map<string, any>([
+    ["rec.8", { id: "rec.8", record: "statement", kind: "referral", at: at(40), addressed_to: ["f1", "f1-manager-assistant"], speaks_for: "f1", text: "Please draft the invoice.", data: { kind: "invoice", wants: "draft", facts: {} } }],
+    ["rec.9", { id: "rec.9", record: "statement", kind: "draft", at: at(40), in_position: "f1-manager-assistant", text: "Draft.", data: { referral: "rec.8", calls: 'statement(data={"outcome":{"money":{"amount":"123400","to":"acc-f1"}}}, kind=invoice)' } }],
+  ]);
+  const org = (trayed: boolean) => episodesOf({ seed: 1, arm: "code", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs: orgRecs, rows: [], transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]),
+    config: { participants: [], positions: [{ id: "f1-manager", entity: "f1", role_module: { code: "firm.producer", params: { delegation: { post: "f1-manager-assistant" }, ...(trayed ? { in_tray: { every_days: [[2, 10_000]], from_hour: 9, to_hour: 17, from: ["f1-manager-assistant"] } } : {}) } } }] } });
+  expect(org(true).episodes.map((e) => [e.seat, e.stake, e.stake_cents])).toEqual([["f1-manager-assistant", "running", 123_400]]);
+  expect(org(false).episodes).toEqual([]);
   const model = arm("sonnet", [{ table: "withheld", referral: "rec.1", paper: "rec.4" }, { table: "acts", referral: "rec.3", record: "rec.4", class: "no_remit" }]);
   expect(model.episodes.map((e) => e.did)).toEqual(["candidate_override", "acted_beyond"]);
   // (A2: what the client did afterwards, from its own typed decisions: on an act in its name, and on a matter left open.)
