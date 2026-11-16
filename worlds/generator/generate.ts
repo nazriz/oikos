@@ -3716,6 +3716,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
         horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints } });
       if (Array.isArray(pos.channels)) pos.channels.push(K.from("providers", AS.providers.map((p) => p.id), ["service_offer"], { title: "What providers of assistants sell" }));
+      // (By class, an office that keeps no books of its own becomes a principal (the planning and works offices): it is
+      // shown the account it pays its fee from, as its assistant's post is, or it cannot name the account's keeper to pay
+      // from it (the first 10-seat screen, 2026-11-16: "You don't know who keeps account acc-city").)
+      if (byClass && Array.isArray(pos.channels) && !pos.channels.some((c: any) => c.kind === "accounts")) pos.channels.push({ id: "account", kind: "accounts" });
     }
     // (A town office that may engage a service pays its fee from the town's account, so the council's mandate names it
     // beside the finance officer, for that: until 2026-11-10 only the finance office was a principal of the town's, and

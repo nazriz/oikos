@@ -2155,6 +2155,21 @@ The mechanism:
   waits for the clerk; delegating towns' hashes move with it.
 - **Notice by:** a seat with matters of one kind in the hundreds a month in the screen.
 
+### MT-52 · A bank cannot engage an assistant: it keeps its own account
+- **Gap:** The bank's lending office is a principal by class (its loan decisions are casework), but it pays from the
+  bank's own account, which the bank keeps itself. Its order for the service carries a payment of nothing (no set-up
+  fee), which, kept by itself, is a transfer of nothing and is refused as a contract violation; and the monthly fee, a
+  standing order to the keeper, would be refused too ("You keep this money yourself, so a repeating payment means
+  paying each time"). So it never engages, and its assistant is handed nothing (the first 10-seat screen, 2026-11-16).
+- **Where:** `kernel/crates/actors/src/market/trade.rs` (`order`: a payment line of nothing); the resolver's `money` for
+  a keeper (`kernel/crates/resolver/src/resolve.rs`); the principal's fee (`market/services.rs`).
+- **Effect:** The bank's lending office, the busiest office on the other side of the counter (about ten decisions a
+  month), cannot be seated. Any other body that keeps its own money would fail the same way.
+- **L / I:** certain / medium · **Status:** open (2026-11-16)
+- **Fix when:** before the bank is seated: an order with nothing to pay carries no payment, and a keeper pays a
+  provider's monthly fee by its own transfer each month (as a bank pays its suppliers); delegating towns' hashes move.
+- **Notice by:** a `rejected_action` note for an order of a service; an assigned principal with no service delivered.
+
 ---
 
 ## Profiles and sources
