@@ -336,4 +336,26 @@ test("a client's paper on the desk's form for it is the client's own, read back 
     const draft = forms.writePaper(clientDraftOf(spec) as any, { ...read!.fields, client: self, referral: "rec.1" }, { self: "provider-a-desk", now: 0, money: (x) => x });
     expect(String((draft.data as any).paper.text), form).not.toContain("{");
   }
+  // (The translator worker's redraw of the real asks on these forms, 2026-11-17.)
+  const answer = clientPapers([]).find((x) => x.form === "tribunal_response") as any;
+  const base = { client: "c0427", tribunal: "tribunal", landlord: "landlord-10", application: "rec.9" };
+  const write = (more: object) => forms.writePaper(answer, { ...base, ...more } as any, { self: "c0427", now: 0, money: (x) => x });
+  // The words already opening with what the paper's words open with: said once, never twice.
+  expect(write({ words: "Answer to application rec.9: we have nowhere else to go." }).text).toBe("Answer to application rec.9: we have nowhere else to go.");
+  expect(write({ words: "we have nowhere else to go." }).text).toBe("Answer to application rec.9: we have nowhere else to go.");
+  // Ages: two written together are the two; a word or a name is asked back in plain words.
+  expect((write({ ages: ["30, 3"] }).data as any).ages).toEqual([30, 3]);
+  expect((write({ ages: ["30 and 3", "7"] }).data as any).ages).toEqual([30, 3, 7]);
+  for (const bad of ["one", "Ann"]) expect(() => write({ ages: [bad] })).toThrow(`The ages are whole numbers, written in figures, each on its own: "${bad}" is not one.`);
+  // Counts written as words, one to twenty, read as numbers; the home is a dwelling, by the form's own type.
+  expect([calls.parseCount("four"), calls.parseCount("two"), calls.parseCount("twenty")]).toEqual([4, 2, 20]);
+  expect((clientPapers([]).find((x) => x.form === "rental_application") as any).fields.home.type).toBe("space");
+  // The tenant's words come from the hand-over unless the request quotes words for them: never "pay", never the
+  // request's own act. A draw that quotes them keeps them.
+  const draftAnswer = { id: "form-desk-draft-tribunal-response", data: { ...clientDraftOf(answer), office: "desk" } };
+  const kw = { forms: [draftAnswer], records: new Set(["rec.5", "rec.9"]), signed: new Map(), signedDraft: new Map(), returnOf: new Map(), referrals: new Map([["rec.5", "c0427"]]), referralKind: new Map([["rec.5", "tribunal_response"]]),
+    answeredReferrals: new Set<string>(), held: new Set(["desk"]), handedWords: new Map([["rec.5", "Answer to application rec.9: we say $5,330.01 is owed today; we have nowhere else to go."]]) };
+  const drawn = (words: string, request: string) => calls.programText(formRules(calls.parseProgram(`form(application=rec.9, client=c0427, form=draft_tribunal_response, landlord=landlord-10, referral=rec.5, to=desk, tribunal=tribunal, words="${words}")`), request, kw as any));
+  for (const w of ["pay", "Draft for sign-off"]) expect(drawn(w, "Draft for sign-off the tenant's answer for c0427, referral rec.5, can pay 0.")).toContain('words="we say $5,330.01 is owed today; we have nowhere else to go."');
+  expect(drawn("we cannot pay", 'Draft the answer for c0427, referral rec.5, in the words "we cannot pay".')).toContain('words="we cannot pay"');
 });

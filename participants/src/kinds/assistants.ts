@@ -137,7 +137,7 @@ export function clientPapers(payments: string[]): Issued[] {
     // application went without its listing or household, and every one was declined: the stakes rung 3, c0149.)
     { form: "rental_application", title: "An application for a home to let, in a client's name",
       does: "Applies to a landlord, in the client's name, for a home it has listed to let: the listing, the account the rent would come from, and who would live there. The landlord reads the household and picks among those who applied.",
-      fields: { client, landlord: f("entity", "The landlord whose listing it answers.", req), listing: f("record", "The listing applied for.", req), home: f("text", "The home, as the listing names it.", req),
+      fields: { client, landlord: f("entity", "The landlord whose listing it answers.", req), listing: f("record", "The listing applied for.", req), home: f("space", "The home, as the listing names it.", req),
         account: f("account", "The client's account, which the rent would come from.", req), members: f("list", "Who would live there, each by their id.", req),
         people: f("count", "How many would live there.", req), bedrooms_needed: f("count", "How many bedrooms the household needs.", req) },
       writes: { in_name_of: "=client", kind: "rental_application", text: "Application for {home}, for a household of {people}.", basis: "=listing", to: ["=landlord"], visible: ["=client", "=landlord"],
@@ -163,7 +163,7 @@ export function clientPapers(payments: string[]): Issued[] {
         people: f("count", "How many people live in the home."), children: f("count", "How many of them are children."), ages: f("list", "Their ages."),
         go_to: f("choice", "Whether they have anywhere to go.", { options: ["nowhere", "someone_to_ask", "means_for_another"] }),
         // (New blanks at the end, the others' names and order as seats and the translator have known them: 2026-11-17.)
-        words: f("text", "What they say to the tribunal, in their own words, as the matter handed over sets it out.", req),
+        words: f("text", "What they say to the tribunal, in their own words, as the matter handed over sets it out."),
         disputes_notice: f("choice", "Yes, where the notice to vacate gave fewer days than the law asks.", { options: ["yes", "no"] }),
         pay_short: f("choice", "Yes, where someone's pay has come short of what was agreed.", { options: ["yes", "no"] }),
         lived_days: f("count", "How many days they have lived there.") },

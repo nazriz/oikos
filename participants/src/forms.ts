@@ -118,6 +118,14 @@ function placeholder(t: unknown): { mark: string; name: string } | undefined {
 interface Env { fields: Filled; self: string; now: number }
 const ABSENT = Symbol("absent");
 
+/** The whole numbers one item of a list gives: itself, or several written together ("30, 3", "30 and 3"). */
+function wholeNumbers(name: string, v: unknown): number[] {
+  const t = typeof v === "string" ? v.trim() : v;
+  if (typeof t === "string" && /^[0-9]{1,6}((\s*,\s*|\s+and\s+)[0-9]{1,6})+$/.test(t)) return t.split(/\s*,\s*|\s+and\s+/).map(Number);
+  if (typeof t === "number" || (typeof t === "string" && /^-?[0-9]{1,16}$/.test(t))) return [wholeNumber(name, t as FieldValue)];
+  throw new FormError(`The ${name.replace(/_/g, " ")} are whole numbers, written in figures, each on its own: ${JSON.stringify(t)} is not one.`);
+}
+
 function wholeNumber(name: string, v: FieldValue): number {
   const n = typeof v === "number" ? v : typeof v === "string" && /^-?[0-9]{1,16}$/.test(v) ? Number(v) : NaN;
   if (!Number.isSafeInteger(n)) throw new FormError(`${name} can't be written as a whole number.`);
@@ -131,8 +139,9 @@ function fill(t: unknown, env: Env): unknown {
     const v = env.fields[p.name];
     if (v === undefined) return ABSENT;
     if (p.mark === "=") return v;
-    // (A list of whole numbers, written as numbers: `#` on a list, item by item.)
-    if (p.mark === "#") return Array.isArray(v) ? v.map((x) => wholeNumber(p.name, x)) : wholeNumber(p.name, v);
+    // (A list of whole numbers, written as numbers: `#` on a list, item by item; two written together in one item,
+    // "30, 3" or "30 and 3", are the two. Anything else in it is asked back, in plain words.)
+    if (p.mark === "#") return Array.isArray(v) ? v.flatMap((x) => wholeNumbers(p.name, x)) : wholeNumber(p.name, v);
     if (p.mark === "?") return v === "yes";
     // (A length of time in whole days, as code that counts days writes one: `%`.)
     if (p.mark === "%") return Math.floor(wholeNumber(p.name, v) / 86_400);
@@ -181,7 +190,7 @@ export function writePaper(spec: FormData, fields: Filled, o: { self: string; no
   if (!w) throw new FormError("this form writes no paper of its own");
   const env: Env = { fields, self: o.self, now: o.now };
   const inWords = (t: string) => t.replace(/\{([a-z_][a-z0-9_]{0,31})\}/g, (_, name: string) => (name === "self" ? o.self : words(fields[name], spec.fields[name]?.type, o.money)));
-  const text = o.text ?? inWords(w.text);
+  const text = o.text ?? notTwice(w.text, inWords);
   const data = w.data === undefined ? undefined : fill(w.data, env);
   // (A paper a draft carries, as it would go: its words written from the fields as the paper's own are. Until
   // 2026-11-17 a draft's paper kept its template's "{application}" in its words: the stakes rung 3. The kernel, the same.)
@@ -201,6 +210,18 @@ export function writePaper(spec: FormData, fields: Filled, o: { self: string; no
     ...(offer !== undefined && offer !== ABSENT ? { offer } : {}),
     ...(assertion !== undefined && assertion !== ABSENT ? { assertion } : {}),
   };
+}
+
+/** A paper's words where they end in a blank of words that already opens with what comes before it ("Answer to
+ * application rec.9: …" given as the words of a template "Answer to application {application}: {words}"): the words
+ * alone, never that opening twice (2026-11-17). The kernel's `fill_text`, the same. */
+function notTwice(template: string, inWords: (t: string) => string): string {
+  const m = /^(.*)\{([a-z_][a-z0-9_]{0,31})\}([.]?)$/s.exec(template);
+  const whole = inWords(template);
+  if (!m || !m[1]) return whole;
+  const before = inWords(m[1]).trim();
+  const own = inWords(`{${m[2]}}`);
+  return before && own.trim().startsWith(before) ? `${own}${own.endsWith(m[3] ?? "") ? "" : m[3]}` : whole;
 }
 
 /** The fields a template names, each once, in the order met ("=self" aside). */
@@ -365,7 +386,7 @@ function unify(t: unknown, v: unknown, env: { [name: string]: FieldValue }, spec
 
 /** The words a paper's text gives each text blank of its template that stands after a fixed piece of words: up to the
  * fixed words after it (kernel/crates/rules `words_from_text`). */
-function wordsFromText(template: string, text: string, spec: FormData): [string, string][] {
+export function wordsFromText(template: string, text: string, spec: FormData): [string, string][] {
   const out: [string, string][] = [];
   let rest = template;
   for (let i = rest.indexOf("{"); i >= 0; i = rest.indexOf("{")) {
@@ -378,7 +399,7 @@ function wordsFromText(template: string, text: string, spec: FormData): [string,
     // (Up to the fixed words after it: the rest of the template where no blank follows, else the words before the next.)
     const more = tail.includes("{");
     const stop = more ? tail.slice(0, tail.indexOf("{")) : tail;
-    if (/^[a-z_][a-z0-9_]{0,31}$/.test(name) && spec.fields[name]?.type === "text" && lit && (stop || !more)) {
+    if (/^[a-z_][a-z0-9_]{0,31}$/.test(name) && (spec.fields[name]?.type === "text" || spec.fields[name]?.type === "space") && lit && (stop || !more)) {
       const at = text.indexOf(lit);
       const from = at >= 0 ? text.slice(at + lit.length) : undefined;
       const end = from === undefined ? -1 : more ? from.indexOf(stop) : from.endsWith(tail) ? from.length - tail.length : -1;

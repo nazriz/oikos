@@ -61,6 +61,17 @@ fn placeholder(t: &Json) -> Option<(char, &str)> {
     Some((mark, name))
 }
 
+/// The whole numbers one item of a list gives: itself, or several written together ("30, 3", "30 and 3").
+fn whole_numbers(name: &str, v: &Json) -> Result<Vec<i64>, String> {
+    if let Some(s) = v.as_str() {
+        let parts: Vec<&str> = s.split(',').flat_map(|x| x.split(" and ")).map(str::trim).collect();
+        if parts.len() > 1 && parts.iter().all(|p| (1..=6).contains(&p.len()) && p.bytes().all(|b| b.is_ascii_digit())) {
+            return Ok(parts.iter().filter_map(|p| p.parse().ok()).collect());
+        }
+    }
+    whole_number(name, v).map(|n| vec![n]).map_err(|_| format!("The {} are whole numbers, written in figures, each on its own: {v} is not one.", name.replace('_', " ")))
+}
+
 fn whole_number(name: &str, v: &Json) -> Result<i64, String> {
     let n = match v {
         Json::Number(n) => n.as_i64(),
@@ -97,8 +108,9 @@ fn fill(t: &Json, env: &Env) -> Result<Option<Json>, String> {
         return Ok(Some(match mark {
             '=' => v.clone(),
             // (A list of whole numbers, written as numbers: `#` on a list, item by item.)
+            // (Two written together in one item, "30, 3" or "30 and 3", are the two; anything else is asked back.)
             '#' => match v.as_array() {
-                Some(items) => json!(items.iter().map(|x| whole_number(name, x)).collect::<Result<Vec<_>, _>>()?),
+                Some(items) => json!(items.iter().map(|x| whole_numbers(name, x)).collect::<Result<Vec<_>, _>>()?.concat()),
                 None => json!(whole_number(name, v)?),
             },
             '?' => json!(v.as_str() == Some("yes")),
@@ -170,6 +182,25 @@ fn words(v: Option<&Json>, ty: Option<&str>, money: Money, dated: Option<&Dated>
 }
 
 /// The text of a template with each `{name}` replaced by the field in words.
+/// A paper's words where they end in a blank of words that already opens with what comes before it: the words alone,
+/// never that opening twice (the TS form engine's `notTwice`, the same).
+fn not_twice(template: &str, spec_fields: &Json, env: &Env, money: Money) -> Result<String, String> {
+    let whole = fill_text(template, spec_fields, env, money)?;
+    let t = template.strip_suffix('.').unwrap_or(template);
+    let stop = if t.len() < template.len() { "." } else { "" };
+    let (Some(open), true) = (t.rfind('{'), t.ends_with('}')) else { return Ok(whole) };
+    let name = &t[open + 1..t.len() - 1];
+    if !is_name(name) || open == 0 {
+        return Ok(whole);
+    }
+    let before = fill_text(&t[..open], spec_fields, env, money)?;
+    let own = fill_text(&t[open..], spec_fields, env, money)?;
+    if !before.trim().is_empty() && own.trim().starts_with(before.trim()) {
+        return Ok(if own.ends_with(stop) { own } else { format!("{own}{stop}") });
+    }
+    Ok(whole)
+}
+
 fn fill_text(template: &str, spec_fields: &Json, env: &Env, money: Money) -> Result<String, String> {
     let mut out = String::new();
     let mut rest = template;
@@ -265,7 +296,7 @@ pub fn write_paper(spec: &Json, fields: &Map<String, Json>, me: &str, now: i64, 
     let env = Env { fields, me, now, dated };
     let text = match text {
         Some(t) => t.to_string(),
-        None => fill_text(w["text"].as_str().unwrap_or_default(), &spec["fields"], &env, money)?,
+        None => not_twice(w["text"].as_str().unwrap_or_default(), &spec["fields"], &env, money)?,
     };
     let mut out = Map::new();
     out.insert("kind".into(), w["kind"].clone());
@@ -520,7 +551,7 @@ fn words_from_text(template: &str, text: &str, fields: &Json) -> Vec<(String, St
         // (Up to the fixed words after it: the rest of the template where no blank follows, else the words before the next.)
         let more = tail.contains('{');
         let stop = tail.split('{').next().unwrap_or_default();
-        if is_name(name) && fields[name]["type"] == "text" && !lit.is_empty() && (!stop.is_empty() || !more) {
+        if is_name(name) && (fields[name]["type"] == "text" || fields[name]["type"] == "space") && !lit.is_empty() && (!stop.is_empty() || !more) {
             if let Some(at) = text.find(lit) {
                 let from = &text[at + lit.len()..];
                 let said = if more { from.find(stop).map(|e| &from[..e]) } else { from.strip_suffix(tail) };
