@@ -1357,6 +1357,21 @@ The mechanism:
   against its seats' words.
 - **Fix when:** before the delegation study counts requests for more scope; measure Sonnet behind on the same set first.
 
+### TR-9 · The translator reads a form's blanks by name and type only
+- **Gap:** a form is shown to the translator as its name, office, id and its blanks' names and types
+  (`formShownTo`, translator/src/index.ts); a blank's description, which says what it holds in the world's words, is not
+  shown. On a form it has not seen, a blank whose name does not say whose it is takes what does not fit elsewhere: the
+  tenant's answer to the tribunal was drawn with the tribunal's name in `ages (list)` and the landlord in `tribunal`,
+  four times in Haiku's rerun "-b" (decisions 2026-11-17, "The translator by score").
+- **Where:** translator/src/index.ts `formShownTo`; the trained model's input (translator/model/encode.ts).
+- **Effect:** papers on new forms (the desk's client forms above all) are drawn with blanks swapped, and declined or,
+  where a seat confirms, sent wrong in a client's name; how often depends on how a form's author named its blanks.
+- **L / I:** medium / medium · **Status:** open (2026-11-17)
+- **Fix when:** the model's next round: descriptions in its input, or blank names that say whose ("household_ages").
+  A rename alone cannot be scored on the logged draws (the score replays the model's first draw).
+- **Notice by:** the replay's "still wrong" on a form new since the model's training; a blank holding a name of
+  another blank's type.
+
 ### TR-3 · Errors differ by seat model and by place
 - **Gap:** Accuracy differs 15 to 40 points by seat model and profile on small cells; money on unseen pilots 0 of 7;
   currency words (a Brazilian "conto", "Rs", "A$", numbers in words) are not all handled.
@@ -2117,7 +2132,8 @@ The mechanism:
   handed.
 
 ### MT-48 · Our translator has never seen the forms the broad seats use
-- **Gap:** The scored set (translator/eval/score.ts; 1,280 requests on 2026-11-16) holds only the desk's forms, the
+- **Gap:** The scored set (translator/eval/score.ts; 1,280 requests on 2026-11-16, 1,865 on 2026-11-17 with the broad
+  rung's one order and its rates notices) holds only the desk's forms, the
   factory's four drafts (delivery note, return, export invoice, supply request), the rates notice and the assistant's
   own papers. It has no request on an order, a job advertisement, a wage offer, a payroll notice, a rental listing, a
   rent increase, a notice to vacate, a repair order, a permit decision, a loan decision, a disposal docket or an audit
