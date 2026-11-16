@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { askedClass, askedMore, episodesOf, housingOf, priceOf } from "../../experiments/scope-pilot/episodes";
 import { binomialInterval, peopleTable, share } from "../../experiments/scope-pilot/report";
+import { seatHealth } from "../../experiments/scope-pilot/broad-report";
 import { beyondByCode, finalOf, kappa, needsThird, poissonInterval, run, runOverride, strip, type ArmRead, type Code } from "../../experiments/scope-pilot/code";
 
 const DAY = 86_400;
@@ -128,6 +129,17 @@ test("the coding rules: what goes to the third read, what decides, need by code,
     config: { participants: [], positions: [{ id: "f1-manager", entity: "f1", role_module: { code: "firm.producer", params: { delegation: { post: "f1-manager-assistant" }, ...(trayed ? { in_tray: { every_days: [[2, 10_000]], from_hour: 9, to_hour: 17, from: ["f1-manager-assistant"] } } : {}) } } }] } });
   expect(org(true).episodes.map((e) => [e.seat, e.stake, e.stake_cents])).toEqual([["f1-manager-assistant", "running", 123_400]]);
   expect(org(false).episodes).toEqual([]);
+  // (The whole-town rung's health check, broad-report.ts `seatHealth`: every seat the fork's seat map names is read, or
+  // the check fails naming it; a model seat that never sat is flagged, not failed; at the end one not debriefed fails.)
+  const total = { handed: 0, drafted: 0, drafts: 0, signed: 0, sent: 0, answered: 0, shown: 0, done: 0, declined: 0, not_done: 0, carried: 0 };
+  const served = { requests: 0, served_first_time: 0, asked_back: 0, served_after_restatement: 0, never_served: 0, not_sent: 0, drafts_unsure: 0, drafts_offered: 0, drafts_confirmed: 0, drafts_declined: 0, drafts_unanswered: 0 };
+  const seat = (post: string, p: string, sittings: number, debriefed: any) => ({ post, participants: [p], model: true, kinds: {}, total, answers: {}, to: {}, served, obstacles: { made: 0, met: 0, cleared: 0, loosely: 0, by_law: {}, met_list: [] }, requests: { made: 0, answered: {} }, unread: 0, sittings, calls: 0, debriefed, verdict: { fail: [], flag: [] } });
+  const fn = { fork_day: 30, through_day: 40, ended: false, seats: [seat("a-assistant", "par.1", 0, null)] } as any;
+  const map = { "par.1": { capacity: "a-assistant" }, "par.2": { capacity: "b-assistant" } };
+  const day10 = seatHealth(fn, map, false, "t");
+  expect([day10.ok, /b-assistant \(par\.2\): not read/.test(day10.text), /flagged: a-assistant: never sat/.test(day10.text)]).toEqual([false, true, true]);
+  expect(seatHealth(fn, { "par.1": map["par.1"] }, false, "t").ok).toBe(true);
+  expect(seatHealth({ ...fn, ended: true }, { "par.1": map["par.1"] }, true, "t").text).toMatch(/a-assistant: not debriefed/);
   const model = arm("sonnet", [{ table: "withheld", referral: "rec.1", paper: "rec.4" }, { table: "acts", referral: "rec.3", record: "rec.4", class: "no_remit" }]);
   expect(model.episodes.map((e) => e.did)).toEqual(["candidate_override", "acted_beyond"]);
   // (A2: what the client did afterwards, from its own typed decisions: on an act in its name, and on a matter left open.)

@@ -50,7 +50,7 @@ export const SEATS: { [n: string]: string[] } = {
   busy: ["module:firm.producer", ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13].map((i) => `shop-${i}-manager`), "rates"],
 };
 /** The households' cohort, as the stakes run has it. */
-const PERSONS = { by: "hand", every: 3, only: true, difficulty: true } as const;
+export const PERSONS = { by: "hand", every: 3, only: true, difficulty: true } as const;
 
 const n = process.env.OIKOS_SEATS ?? "10";
 if (!SEATS[n]) throw new Error(`broad.ts: OIKOS_SEATS is one of ${Object.keys(SEATS).join(", ")}`);
