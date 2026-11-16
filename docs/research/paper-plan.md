@@ -1,6 +1,9 @@
 # The paper: a research plan (revised for the owner, 2026-11-08)
 
-**Status:** a draft for decision. Nothing here is registered or run. The study's definition, measures and arms are the
+**Superseded (2026-11-16):** the study is now the project plan in `docs/north-star.md`; this page is kept for its
+methods, threats and literature, which that plan still draws on.
+
+**Status (as written, 2026-11-08):** a draft for decision. Nothing here is registered or run. The study's definition, measures and arms are the
 owner's (docs/north-star.md). This page proposes them, gives alternatives, and says where the design is weak. Section 13
 lists what the owner still has to decide, and each open point is marked **[Naz]** where it arises.
 
