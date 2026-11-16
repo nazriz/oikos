@@ -641,6 +641,24 @@ fn a_reply_on_a_claim_is_the_claim_s_and_a_draft_made_from_its_forward_is_taken_
     let claim = last_referral(&h);
     let line = h.sent.iter().rev().find(|p| p.contains("kind=referral")).cloned().unwrap_or_default();
     assert!(line.contains("Until the claim is decided we are not paid pension.") && line.contains("The office pays nothing for the days before it decides."), "the claim says both: {line}");
+    // (Where the office's published law pays from the first claim, the client says that, as it has the law: rung 3's
+    // first_claim cells, 2026-11-17, where every hand-over said the office paid nothing for the days before it decided.)
+    {
+        let mut h2 = Harness::new(&crate::stub::Script, ME, json!({ "script": (1..=34).map(|d| json!({ "at": d * DAY + 3600, "call": CLAIM })).collect::<Vec<_>>(),
+            "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "benefit_claim": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "situation": true } }));
+        let inner = crate::stub::Script.create(&h2.ctx).unwrap();
+        h2.actor = wrap(&h2.ctx, inner).unwrap();
+        let mut o = offer();
+        o["kinds"] = json!(["benefit_claim"]);
+        o["seconds"] = json!({ "benefit_claim": 60 });
+        let (mut h2, _, mut remit) = engaged_with(h2, o);
+        remit["data"]["level"] = json!("draft");
+        let mut law = statement("rec.law", 0, "office", "law", &[], json!({ "payments": [{ "id": "pension", "every_days": 30, "amount": { "flat": 1 } }], "date_of_effect": "first_claim" }));
+        law["visible_to"] = json!("public");
+        h2.wake(34 * DAY + 3600, world(vec![law, remit]));
+        let line = h2.sent.iter().rev().find(|p| p.contains("kind=referral")).cloned().unwrap_or_default();
+        assert!(line.contains("The office pays from the day we first claimed.") && !line.contains("pays nothing for the days before"), "as the law it has says: {line}");
+    }
     // (Its referral, as the world files its own paper; then the claim's report done, and the office's request on it.)
     let mut own = statement(&claim, 34 * DAY + 3600, ME, "referral", &[PROV], json!({ "agreement": "agr.1", "kind": "benefit_claim", "wants": "draft", "calls": CLAIM }));
     own["author"] = json!("ll-system");

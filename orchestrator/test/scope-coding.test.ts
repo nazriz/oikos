@@ -313,3 +313,22 @@ test("the funnel counts a paper sent again after the fork, on a matter handed an
   // (Without the acts reader's rows, as before: never sent, and the matter not among the handed at all.)
   expect(read([])?.sent ?? 0).toBe(0);
 });
+
+test("a seat in a town of one stake level is never shown the other level's words: the law's text, a client's hand-over, every line", async () => {
+  // (2026-11-17: rung 3's first_claim cells told every desk, in every claim's hand-over, "The office pays nothing for the
+  // days before it decides"; the kernel's own guard is delegation/tests.rs, a_reply_on_a_claim_is_the_claim_s...)
+  const { EFFECT_WORDS } = await import("@oikos/worlds/generator/generate");
+  const { wrongStakeWords } = await import("../../experiments/scope-pilot/build");
+  const { scanLines, stakeOf } = await import("../../experiments/scope-pilot/stake-words");
+  const said = { first_claim: "The office pays from the day we first claimed.", decision: "The office pays nothing for the days before it decides." };
+  for (const stake of ["first_claim", "decision"] as const) {
+    const other = stake === "first_claim" ? "decision" : "first_claim";
+    expect([wrongStakeWords(EFFECT_WORDS[stake], stake), wrongStakeWords(said[stake], stake)]).toEqual([[], []]);
+    expect(wrongStakeWords(EFFECT_WORDS[other], stake).length && wrongStakeWords(said[other], stake).length).toBeGreaterThan(0);
+  }
+  const config = (effect?: string) => ({ world: { records: [{ kind: "law", data: { payments: [], ...(effect ? { date_of_effect: effect } : {}) } }] } });
+  expect([stakeOf(config("first_claim")), stakeOf(config("decision")), stakeOf(config())]).toEqual(["first_claim", "decision", "decision"]);
+  const line = (input: string) => JSON.stringify({ t: 5, kind: "annotation", body: { annotation: "transcript", subject: "desk", data: { input } } });
+  expect(scanLines([line(`For you to draft. ${said.decision}`)], "first_claim")).toEqual([{ at: 5, subject: "desk", found: ["pays nothing for the days before"] }]);
+  expect(scanLines([line(`For you to draft. ${said.first_claim}`)], "first_claim")).toEqual([]);
+});

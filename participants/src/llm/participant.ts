@@ -60,7 +60,10 @@ export interface LlmParticipantConfig {
    * until `end`, on the first `days` days of each week; what comes in between waits for the next sitting. Absent: it
    * takes up whatever comes, whenever it comes. */
   sessions?: { start: number; end: number; days: number };
-  /** The most actions one answer may hold (each carried out in turn; their results come back together). */
+  /** The most actions one answer may hold, where a run sets one (each carried out in turn; their results come back
+   * together); those after it are said, not looked at. Absent: every one is taken up, in order, each in its own time
+   * (2026-11-17: the default was 8, a holdover from before acts cost their performer's time; at rung 3 a seat's ninth and
+   * later requests were set aside behind a line it could miss, and three drafts waited 14 to 17 days). */
   maxActions?: number;
   /** How a draft awaiting confirmation reads (from the translator package). */
   draftText: (d: any) => string;
@@ -536,7 +539,7 @@ export function systemPrompt(c: LlmParticipantConfig, standing: string, who?: Wh
     c.title ? `You act as the ${lowerFirst(c.title)} for ${whose(c)}.` : `You are ${c.participant}, acting for ${whose(c)}.`,
     ...whoLines(c, who),
     `To do something, say what you do in plain words, and name what you're using: the amount, the account, the lot, the people, the papers. Your reports show each thing's id in brackets or after its name. Before anything takes effect, you'll see exactly what will happen, and confirm or decline it. ${CONFIRMING} You can also write to people directly.`,
-    `You can take several actions at once (up to ${c.maxActions ?? 8}): they're carried out in the order you give them, and you'll see how each went together, afterwards. So act on what you already know in one go; anything that depends on the result of an action (saying yes to something you haven't seen set out yet) waits for the next turn. Keep your notebook alongside: add to it or change a passage, rather than writing it all out again.`,
+    `You can take several actions at once${c.maxActions ? ` (up to ${c.maxActions})` : ""}: they're carried out in the order you give them, and you'll see how each went together, afterwards. So act on what you already know in one go; anything that depends on the result of an action (saying yes to something you haven't seen set out yet) waits for the next turn. Keep your notebook alongside: add to it or change a passage, rather than writing it all out again.`,
     ...(c.sessions ? [`You work office hours: one sitting each working day, when you deal with everything that's come in since the last.`] : []),
     ...(standing ? ["", "On file:", standing] : []),
   ].join("\n").trim();
@@ -1868,7 +1871,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           return away(), { type: "opt_out", statement: optOutStatement(optOut.input) };
         }
         const held = new Set((obs.positions ?? []).map((p) => p.position));
-        const max = c.maxActions ?? 8;
+        const max = c.maxActions ?? Infinity;
         for (const use of uses) {
           if (use.name === "notebook" || use.name === "done_for_now" || (use.name === "opt_out" && typeof use.input?.told_how === "string")) continue;
           const i = use.input;

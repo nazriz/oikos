@@ -15279,3 +15279,22 @@ The whole-town rung 1 run b on Haiku (`runs/scope-broad-r1-b`, health check pass
 - **Left:** `trade` 20, delivery notes and stay-on requests drawn as nothing 26, report words 8, `particulars` 9, the
   supply request's `kind` (water drawn as energy, 2), sends naming another sign-off (a draft drawn as a send, 13).
 - **Revisit if** a seat writes a figure next to a blank's name that is not that blank's value ("can pay 0 more than").
+
+## 2026-11-17 · A client tells its desk the office's rule as the office published it
+
+- **What was wrong:** in the stakes run's rung 3, every client hand-over on a claim or a review in the `first_claim` cells with the client's situation on said "The office pays nothing for the days before it decides." (seed 7 47 calls of the desk's shown it, seed 8 55), though the office's published rule (rec.1) and its payments paid from the first claim. The sentence is read from the client's own book (`pays_from_first_claim`, principal.rs), and the delegating wrapper's book kept only the papers of delegation, never a law: the newest support law was always none, which reads as `decision`.
+- **Decision** (delegation/principal.rs, `ours`): the client keeps the laws it has, so what it says of the office's rule is the rule as published, as it has it. Guard: delegation/tests.rs (a first_claim law: the hand-over says "pays from the day we first claimed", never "nothing for the days before"; it fails without the fix). And the study's guard: `wrongStakeWords` (experiments/scope-pilot/build.ts) and `stake-words.ts`, which reads every text a fork's seats were shown (every call's system prompt and input, the debrief's questions) for the other level's phrases, with its test in orchestrator/test/scope-coding.test.ts; run over a mock fork of each of rung 2's four cells.
+- **Which runs showed the wrong sentence:** only those with the client's situation on and the first_claim stake: rung 3's scope-stakes-r3-first_claim-slow-situation (both seeds). Rung 3's decision cells (the right sentence), rung 3's first_claim cell with the situation off, and rung 2's first_claim cells (15 November, the situation off) never showed it, by stake-words.ts over their logs.
+- **Revisit if** a client's hand-over says anything else of an office's rule: it must come from a law the client has.
+
+## 2026-11-17 · A grant that replaces another keeps what that one still owed
+
+- **What was wrong:** rung 3, seed 8, c0306: the claim was refused for papers not received (day 43), granted on review on day 47 with its back pay from the first claim due with the first payment (day 61); the client claimed again and the new claim was granted on day 59, replacing the review's grant (`One payment of a kind a person`, support.rs), and its back pay was dropped with it: no payment after the review's grant until day 61, and the $2,487.57 owed for the days before never paid (the code arm paid it on day 46).
+- **Decision** (boundary/support.rs): a grant that replaces a payment in force takes on what that payment still owed for the days before its first payment, paid with its own first. Guard: `where_the_law_pays_from_the_first_claim...` extended. Why the client claimed again while its review's grant stood is MT-56 (open).
+- **Revisit if** a replaced grant's back pay ought to be paid at once rather than with the next payment.
+
+## 2026-11-17 · Every action an answer asks for is taken up
+
+- **What was wrong:** a seat's ninth and later requests in one answer were set aside with a line ("only the first 8 things you ask in one answer are taken up") it could miss: at rung 3 three drafts waited 14 to 17 days and one notice was missed in the town run. The 8 (`maxActions`, participant.ts) was a holdover from before acts cost their performer's time (the action budget, `max_actions_per_wake`, was removed for that in the time crate); nothing now needs it: each act takes its own time, in turn.
+- **Decision:** with no limit set for a run (`max_actions` in a seat's params), every action an answer asks for is taken up, in order, in the same sitting; the system prompt no longer names a number. A run may still set a limit, and then those past it are said, as before. Guard: participants/test/llm-answers.test.ts (ten in one answer, all taken up, none dropped).
+- **Revisit if** a model writes runaway lists of requests (dozens in one answer), which would then be a finding to read, not a limit to set silently.

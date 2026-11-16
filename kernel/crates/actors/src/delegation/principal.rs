@@ -630,6 +630,11 @@ fn ours(r: &Record, complaints: &[String], book: &Book, from_assistant: &dyn Fn(
     match &r.body {
         RecordBody::Statement { kind, data, .. } => {
             PAPERS.contains(&kind.as_str())
+                // (The laws it has: what it tells whoever helps it of an office's rule is the rule as published, as it
+                // has it. Until 2026-11-17 its book held none, so a client in a town whose office pays from the first
+                // claim told its desk "The office pays nothing for the days before it decides": the stakes run's rung 3,
+                // every first_claim cell with the client's situation on.)
+                || kind.as_str() == "law"
                 || [crate::common::intake::RETURNED, crate::common::intake::RECORDED, crate::common::intake::AUTHORITY].contains(&kind.as_str())
                 || complaints.iter().any(|c| c == kind.as_str())
                 || (kind.as_str() == "order" && data.as_ref().and_then(|d| d.get("kind")).and_then(|k| k.as_str()).is_some_and(|k| k.starts_with("service:")))

@@ -51,22 +51,15 @@ test("an answer still unread the second time: the sitting ends with nothing done
   expect(lastText(calls[2]!)).toContain("When you were last here, your answer could not be read, so nothing was done.");
 });
 
-test("more actions than the limit: those past it are refused and the seat is told at its next turn, and, if it leaves, at its next sitting", async () => {
+test("every action one answer asks for is taken up, in order, each in its own time: none is set aside behind a limit", async () => {
+  // (Until 2026-11-17 the first 8 were taken and the rest said not looked at: at rung 3 three drafts waited 14 to 17 days
+  // behind that line and one notice was missed. A run may still set a limit (maxActions: llm-participant.test.ts).)
   const writes = Array.from({ length: 10 }, (_, i) => use(`w${i}`, "write", { to: ["clerk"], text: `Letter ${i}.`, as: "mayor" }));
   const { p, calls, notes } = harness([writes, [use("d", "done_for_now", {})]]);
-  for (let i = 0; i < 8; i++) expect(await p.step(obs(9 * HOUR + i), ctx)).toMatchObject({ type: "message", text: `Letter ${i}.` });
-  await p.step(obs(9 * HOUR + 9), ctx);
-  const results = Object.fromEntries((calls[1]!.messages.at(-1)!.content as any[]).filter((b) => b.type === "tool_result").map((b) => [b.tool_use_id, b.content]));
-  // (Said plainly as not looked at, so that it can be sent again: 2026-11-11.)
-  expect(results.w8).toBe("Not looked at: only the first 8 things you ask in one answer are taken up, and this came after them. Send it again if you still want it.");
-  expect(results.w9).toBe(results.w8);
-  expect(notes.filter((n) => n.dropped_tool_use).length).toBe(2);
-  // With done for now beside them, it leaves after the eight, and the next sitting tells it.
-  const again = harness([[...writes, use("d", "done_for_now", {})]]);
-  for (let i = 0; i < 8; i++) await again.p.step(obs(9 * HOUR + i), ctx);
-  await again.p.step(obs(9 * HOUR + 9), ctx);
-  await again.p.step(obs(20 * 86_400), ctx);
-  expect(lastText(again.calls.at(-1)!)).toContain("was not looked at: only the first 8 things you ask in one answer are taken up. Send it again if you still want it.");
+  for (let i = 0; i < 10; i++) expect(await p.step(obs(9 * HOUR + i), ctx)).toMatchObject({ type: "message", text: `Letter ${i}.` });
+  expect(calls.length).toBe(1);
+  expect(notes.some((n) => n.dropped_tool_use)).toBe(false);
+  expect(calls[0]!.system).not.toMatch(/up to \d+/);
 });
 
 // --- Leaving the study (VISION §15) ---
