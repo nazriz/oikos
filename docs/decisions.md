@@ -15238,3 +15238,44 @@ The whole-town rung 1 run b on Haiku (`runs/scope-broad-r1-b`, health check pass
 - **An assistant's letter to its own office got the office's standing report** (`principal.rs`, `notes_in`, `HOW_TO_ASK`). The rates seat wrote its office three questions on day 37 and was answered on day 39 with the rates report to the public, "it does not act on a letter's words", and held twelve matters (174 notices) to the end. Now an organisation's office answers its assistant's letters itself, in its own time, and its own code is not shown them; the answer, and the acknowledgement of a letter paper, say how to ask it what it can answer: the question form and the four things on it, that whether to send something is a draft for its sign-off, not a question, that a matter that cannot be finished as handed goes back on the report form, done no, with why, and the request form for scope. Of the seat's three questions: (1) whether notices had already been sent for the other lots of two matters is a search of the office's own register of what went, outside the typed set (a document is asked for by its id), and the seat's own file shows what it sent; (2) whether one notice should go out is a decision, and its way is a draft for sign-off; (3) whether the rates officer (c0058) is the right person to instruct it is a party question the form carries and the code answers from its papers. A real office-holder would answer all three in a line each, the first from the rate book; the typed set (MT-43) answers the third, points the second to sign-off, and cannot answer the first.
 - **"and N more" at rates** (the reader's count): there is none in the rates seat's transcript. The 18 in the run are the line of papers carried from the last sitting, unchanged ("(rec.…, rec.… and 13 more: to read one again, look it up"), at the desk and the factory, which says how to open each; and the shop seat's own notebook words ("Customer receipts (acc-c0217, … and 70 more)"), its own summary. No payment list is cut.
 - **Revisit if** a seat's pile is ever more than WAITING_CHARS can list a line each within the ceiling (some hundreds of asks waiting at once), or a principal is asked often what its typed answers cannot say (MT-43).
+
+## 2026-11-17 · Rung 3 in the scored set: a day, a sum or a count the seat names is that value
+
+- **The measure:** the stakes run's rung 3 (Haiku, 60 days, two seeds each: `scope-stakes-r3-decision-slow`,
+  `-decision-slow-situation`, `-first_claim-slow-situation`) added: `~/oikos/runs/regress/requests-2026-11-17c.json.gz`
+  (4,507 requests in 32 arms, 3,293 confirmed; main's rules: 148 differences, all explained before) and
+  `scored-set-2026-11-17c.json.gz`. A run of several seeds now names each seed's arms apart (`<run>-seed-8`,
+  translator/eval/replay.ts): their references repeat. Main's rules on the set: 3,374 of 3,844 (87.8%); rung 3 alone,
+  253 misses. (`scope-stakes-r3-first_claim-slow` was not named and is not in it.)
+- **The tenant's answer, replayed:** of rung 3's 96 tribunal requests with a target, the rules these runs were made with
+  (1ab160a1) draw 16 right, main's 17: the parties and the names in `ages` were not what failed there. What failed: 63 of
+  96 tribunal draws put the whole sum owed in `can_pay`, 60 of them where the request said "can pay 0".
+- **Changes** (translator/src/rules.ts), each scored, nothing main hit lost:
+
+  | change | right first time | differences |
+  |---|---|---|
+  | main | 3,374 | 148 (explained before) |
+  | `namedDate`: a date blank the request names with its day ("period to: year 1, day 61") is that day; the model's own writing of the same day stands | 3,376 | 2, below |
+  | `namedFigure`: an amount or a count the request names with its figure ("can pay 0", "people 1") is that figure; the same figure written otherwise stands | 3,386 | 1, below |
+
+  Explained (corrections, the seat named the value and confirmed the model's other one): stakes r2 "-b" par.3.25, a
+  withholding return confirmed with `period_to` day 51 where the seat wrote "period to ... day 31"; rung 3 decision-slow
+  seed 7 desk .62, a pension draft confirmed without the birth date the seat named ("born at year -66, day 35"); rung 3
+  first_claim-slow-situation seed 7 desk .50, a tenant's answer confirmed with `can_pay` the whole sum owed where the
+  seat wrote "can pay 0" (the dangerous one: it went to the client saying the tenant could pay $5,330.01). With the set
+  rebuilt on these: 3,389 of 3,844 (88.2%); with the figure taken as written, its sign or currency word with it (a
+  test of the council's budget, "staff 303,335.76 EUR", read in the world's own money), 3,390.
+- **The withholding report, redrawn** (`translator/eval/redraw.ts`, set `withholding`): of 49 requests in rung 3 that
+  name the period's last day, our model draws `period_to` right 11 times on the form as it is; with its four dates
+  renamed (`day_after_period`, `period_ended_on`, `period_began_on`, `due_by`) 24, put in order (from, to, ended, due)
+  25, both 38; with this branch's rules, 42, 42, 46 and 43. So the names are confusable as shown. But over the 60
+  withholding returns with a target the form as it is draws 39 right, ordered 39 (one gained, one lost), renamed or both
+  37: no form change lands; the rule does the work.
+- **For the worker changing the tribunal form:** keep the blanks' names and their order. Renamed in fuller words, or with
+  the parties first, our model drew none of the six real asks right where the form as it is draws three (2026-11-17,
+  "Redrawn by our translator"); and `namedFigure` reads the seat's "can pay 0", "owes", "people", "children" by the
+  blanks' own names, which seats copy from the form as shown. Data-side changes (dropping the offer at nothing, `every`
+  in seconds) do not touch what the translator sees.
+- **Left:** `trade` 20, delivery notes and stay-on requests drawn as nothing 26, report words 8, `particulars` 9, the
+  supply request's `kind` (water drawn as energy, 2), sends naming another sign-off (a draft drawn as a send, 13).
+- **Revisit if** a seat writes a figure next to a blank's name that is not that blank's value ("can pay 0 more than").
