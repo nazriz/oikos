@@ -19,6 +19,7 @@ import { inCalendar } from "../calendar";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { CounterWatch } from "./counter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
+import { namedRefs } from "../readers/matters";
 import { runDebrief, type DebriefInput, type DebriefRecord, type MockDebrief } from "./debrief";
 import { asksWhatItIs, TRUE_ANSWER, wayOut, wayOutAsked } from "./framing";
 import { SELF_SAID, TOLD_HOW } from "./note";
@@ -769,6 +770,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   /** A paper passed on to the seat (a client's forward of a body's paper), by the passed paper's id: the forward that
    * holds its copy. A look for the paper finds the forward. */
   const passedOn = new Map<string, string>();
+  /** A paper named on a hand-over or a paper passed on, by its reference: where it was named, and from whom. A look for
+   * it, finding nothing, says so and how it is cited (the stakes run's rung 2b, 2026-11-15). */
+  const namedIn = new Map<string, { in: string; whose: string }>();
   /** Accounts it has been shown (its own, and those money went to or came from): never someone to write to. */
   const accountsSeen = new Set<string>();
   const DAYS = 86_400;
@@ -1171,7 +1175,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       const via = paper !== undefined ? passedOn.get(paper) : undefined;
       if (via !== undefined) where.splice(0, where.length, { field: "id", op: "=", value: via });
       if (paper !== undefined) return { what, action: { type: "look", looks: [{ channel: i.report, query: { where, limit: 1 } }] },
-        looked: [i.report, { paper, ...(via ? { via } : {}), ...(Number.isInteger(i.from_entry) ? { fromEntry: i.from_entry } : {}), ...(text(i.words) ? { words: i.words } : {}) }] };
+        looked: [i.report, { paper, ...(via ? { via } : {}), ...(paper !== undefined && !via && namedIn.has(paper) ? { namedIn: namedIn.get(paper)! } : {}), ...(Number.isInteger(i.from_entry) ? { fromEntry: i.from_entry } : {}), ...(text(i.words) ? { words: i.words } : {}) }] };
       // A folder of some kinds only: asked for by its kind where it has one, and told from the list here otherwise.
       const folder = c.folders?.get(i.report);
       if (folder && !kinds.length) {
@@ -1268,7 +1272,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // name them. A search it made of such a report (a look) is shown as any look is.
       const keptHere = (id: string, ch: Observation["channels"][string]) => keptChannels.has(id) && ch.kind === "records" && !ch.search;
       for (const [id, ch] of Object.entries(own0.channels)) if (keptHere(id, ch) && ch.kind === "records") for (const r of ch.records) keptPapers.set(r.id, r);
-      for (const ch of Object.values(own0.channels)) if (ch.kind === "records") for (const r of ch.records as any[]) if (r.kind === "forward" && typeof r.data?.paper === "string") passedOn.set(r.data.paper, r.id);
+      for (const ch of Object.values(own0.channels)) if (ch.kind === "records") for (const r of ch.records as any[]) {
+        if (r.kind === "forward" && typeof r.data?.paper === "string") passedOn.set(r.data.paper, r.id);
+        if (r.kind === "referral" || r.kind === "forward") for (const x of namedRefs(r)) if (!namedIn.has(x.id)) namedIn.set(x.id, { in: r.id, whose: x.whose });
+      }
       const obs: Observation = Object.entries(own0.channels).some(([id, ch]) => keptHere(id, ch))
         ? { ...own0, channels: Object.fromEntries(Object.entries(own0.channels).filter(([id, ch]) => !keptHere(id, ch))) as Observation["channels"] }
         : own0;

@@ -34,7 +34,7 @@ const WORDS = 240;
 /** A body's paper a client passed on about a matter: an answer, or (with `due`) what it asks for by a date. */
 interface Passed { id: string; at: number; by: string; text: string; due?: number }
 
-interface Matter { id: string; at: number; kind: string; from: string; wants?: string; sits?: { every: number; next: number }; due?: { at: number; on: string }; advised?: number; signed?: { id: string; at: number; paper?: any }; declined?: number; draft?: number; sent?: number; report?: { id?: string; at: number; done: boolean; why?: string }; answer?: Passed; asks?: Passed; cites?: string[] }
+interface Matter { id: string; at: number; kind: string; from: string; wants?: string; told?: string[]; refs?: { id: string; whose: string; in: string }[]; sits?: { every: number; next: number }; due?: { at: number; on: string }; advised?: number; signed?: { id: string; at: number; paper?: any }; declined?: number; draft?: number; sent?: number; report?: { id?: string; at: number; done: boolean; why?: string }; answer?: Passed; asks?: Passed; cites?: string[] }
 
 const ref = (r: Paper): string | undefined => (typeof (r as any).data?.referral === "string" ? (r as any).data.referral : undefined);
 const same = (p: any, b: any) => p && p.kind === b.kind && JSON.stringify(p.to ?? []) === JSON.stringify(b.addressed_to ?? []) && JSON.stringify(p.data ?? null) === JSON.stringify(b.data ?? null);
@@ -59,6 +59,24 @@ const sitsOf = (text: string): { sits?: { every: number; next: number } } => {
   const next = parseDate(m[3]!.trim());
   return Number.isFinite(next) ? { sits: { every: m[2] ? Number(m[2]) : 1, next } } : {};
 };
+/** What a client says on its hand-over of how things stand with it (the world's `situation`: principal.rs), in its own
+ * fixed sentences: set out on the matter's line, so that a list that cuts a long hand-over short still shows them. */
+const toldOf = (text: string): { told?: string[] } => {
+  const told = [...text.matchAll(/(?:In our account \(|Nothing regular is coming in|Coming in: |Our rent: |Our rates: |The office pays ).*?\.(?=\s|$)/g)].map((m) => m[0].trim());
+  return told.length ? { told } : {};
+};
+/** The papers a hand-over, or a paper passed on, names by their reference, for the paper it is to do (a claim to stop, a
+ * request to answer, a decision to look at again): each with whose paper it is. A forward's: the body's; else the
+ * client's. */
+export function namedRefs(r: Paper): { id: string; whose: string }[] {
+  const d = (r as any).data ?? {};
+  const forward = (r as any).kind === "forward";
+  const whose = forward ? String(d.by ?? "") : String((r as any).speaks_for ?? "");
+  const src = forward ? JSON.stringify(d.data ?? {}) : `${JSON.stringify(d.facts ?? {})} ${String(d.calls ?? "")}`;
+  const out = new Map<string, string>();
+  for (const m of src.matchAll(/\\?"?\b(claim|about|against|request|decision|record)\\?"?\s*[:=]\s*\\?"?([a-z][a-z0-9-]*-[a-z0-9-]+|rec\.[0-9]+)/g)) out.set(m[2]!, whose);
+  return [...out].map(([id, w]) => ({ id, whose: w }));
+}
 const isBack = (r: Paper) => (r as any).record === "statement" && ((r as any).kind === "paper_returned" || (r as any).kind === "authority_recorded");
 
 export class Matters {
@@ -83,6 +101,7 @@ export class Matters {
   /** `matters`: the post's channel of matters handed to it; `file`: its own file, read on request. */
   /** Published papers its matters cite, looked up by id (`citedPath`): what was found, and every id asked for. */
   private readonly cited = new Map<string, Paper>();
+  private readonly held = new Set<string>();
   private readonly askedFor = new Set<string>();
   /** Whether the next observation answers the reader's own look-ups (not one the seat made itself). */
   private looking = false;
@@ -141,7 +160,7 @@ export class Matters {
     if ((r as any).record !== "statement") return;
     const k = (r as any).kind as string;
     if (k === "referral") {
-      if (!this.matters.has(r.id)) this.matters.set(r.id, { id: r.id, at: r.at, kind: String((r as any).data?.kind ?? "matter"), from: String((r as any).speaks_for ?? ""), ...(typeof (r as any).data?.wants === "string" ? { wants: (r as any).data.wants } : {}), ...dueOf((r as any).data), ...sitsOf(String((r as any).text ?? "")), cites: citesOf(r) });
+      if (!this.matters.has(r.id)) this.matters.set(r.id, { id: r.id, at: r.at, kind: String((r as any).data?.kind ?? "matter"), from: String((r as any).speaks_for ?? ""), ...(typeof (r as any).data?.wants === "string" ? { wants: (r as any).data.wants } : {}), ...dueOf((r as any).data), ...sitsOf(String((r as any).text ?? "")), ...toldOf(String((r as any).text ?? "")), cites: citesOf(r), refs: namedRefs(r).map((x) => ({ ...x, in: r.id })) });
       return;
     }
     const d = (r as any).data ?? {};
@@ -159,6 +178,8 @@ export class Matters {
       if (!m) return;
       const due = [d.data?.by, d.data?.answer_by, d.data?.hearing_at].map(Number).find((x) => Number.isSafeInteger(x) && x > 0);
       const p: Passed = { id: String(d.paper ?? r.id), at: r.at, by: String(d.by ?? ""), text: String(d.text ?? ""), ...(due !== undefined ? { due } : {}) };
+      // (The papers the passed-on paper names, for the matter: set out on its line where the seat holds no copy.)
+      m.refs = [...(m.refs ?? []), ...namedRefs(r).map((x) => ({ ...x, in: r.id }))];
       if (due !== undefined) { if (!m.asks || m.asks.at <= r.at) m.asks = p; }
       else if (!m.answer || m.answer.at <= r.at) m.answer = p;
       return;
@@ -193,6 +214,8 @@ export class Matters {
    * left to the file. */
   absorb(obs: Observation): Observation {
     const chans = obs.channels as any;
+    // (Every paper it has been shown, by id: what a reference named on a matter is told apart by.)
+    for (const ch of Object.values(chans ?? {}) as any[]) if (ch?.kind === "records") for (const r of ch.records ?? []) this.held.add(r.id);
     const first = this.arrived === undefined;
     if (first) this.arrived = obs.t;
     this.now = Math.max(this.now, obs.t);
@@ -312,7 +335,13 @@ export class Matters {
       const asks = this.asking(m) ? `; ${m.asks!.by} asks for something by ${day(m.asks!.due!)}, passed on to you on ${day(m.asks!.at)} (${m.asks!.id}): "${said(m.asks!)}"` : "";
       // (The published papers it cites, as found: each set out with it, in its own words.)
       const cites = (m.cites ?? []).flatMap((id) => { const r = this.cited.get(id) as any; return r ? [`\n  It cites [${r.id}] ${String(r.kind).replace(/_/g, " ")} from ${r.speaks_for ?? r.author} (${day(r.at)}): "${said({ text: String(r.text ?? "") } as Passed)}"`] : []; }).join("");
-      open.push(`- [${m.id}] ${m.kind.replace(/_/g, " ")}, handed over by ${m.from} on ${day(m.at)}: ${stands}${authority}${named}${answer}${asks}${this.closed(m) ? "" : sits}.${cites}`);
+      // (What the client said on the hand-over of how things stand with it, in its own words.)
+      const told = m.told?.length && !this.closed(m) ? `\n  ${m.from} said on handing it over: ${m.told.join(" ")}` : "";
+      // (A paper it names that the seat holds no copy of: whose own paper it is, and that it is cited as it stands. The
+      // stakes run's rung 2b, 2026-11-15: five matters a desk would not draft for a claim it could not find on its file.)
+      const unheld = (m.refs ?? []).filter((x) => !this.held.has(x.id) && x.id !== m.id);
+      const refs = unheld.length && !this.closed(m) ? `\n  ${unheld.map((x) => `${x.id}: named in ${x.in}, from ${x.whose}; not on your file: cite it as it stands, by that reference`).join("; ")}` : "";
+      open.push(`- [${m.id}] ${m.kind.replace(/_/g, " ")}, handed over by ${m.from} on ${day(m.at)}: ${stands}${authority}${named}${answer}${asks}${this.closed(m) ? "" : sits}.${told}${refs}${cites}`);
     }
     const lines = ["Your matters, and where each stands (from your own papers on them, and what your clients passed on to you about them):", ...open.slice(0, MOST)];
     if (open.length > MOST) lines.push(`(And ${open.length - MOST} more open, older.)`);

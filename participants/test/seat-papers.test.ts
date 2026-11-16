@@ -11,6 +11,7 @@ import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { inCurrency } from "../src/money";
 import { createLlmParticipant, fitPrompt, kindWhere, LOOK_LEFT_OUT, PROMPT_MAX, PROMPT_MIN, tools, type LlmParticipantConfig } from "../src/llm/participant";
 import { LOOK_CHARS_MAX, PAPER_MAX, renderObservation } from "../src/llm/render";
+import { Matters } from "../src/readers/matters";
 
 const DAY = 86_400;
 const HOUR = 3_600;
@@ -125,6 +126,20 @@ test("a paper passed on to the seat is a copy it holds: a look for it by its id 
   const r = resultsOf(calls.at(-1)!);
   expect(r.a).toContain("## The office's files: the paper rec.239\nYou hold it as a copy: it was passed on to you in rec.299, set out below. Cite it as rec.239.");
   expect(r.a).toContain("a copy of rec.239, yours to cite as rec.239");
+});
+
+test("a paper a hand-over names and the seat holds no copy of: the matter's line says it is cited as it stands, and a look for it says the same", async () => {
+  // (The stakes run's rung 2b, 2026-11-15: five matters a desk would not draft for a claim, named on its hand-over, it
+  // could not find on its file.)
+  const ref = { id: "rec.241", record: "statement", kind: "referral", author: "c0377-self", speaks_for: "c0377", at: 31 * DAY, visible_to: ["c0377", "city"], addressed_to: ["city"], text: "For you to draft for sign-off: a benefit change.",
+    data: { kind: "benefit_change", wants: "draft", facts: { claim: "claim-c0377-unemployment" } } };
+  const m = new Matters("finance/matters", "finance/files");
+  m.absorb({ t: 31 * DAY, channels: { "finance/matters": { kind: "records", records: [ref] } } } as any);
+  expect(m.text()).toContain("claim-c0377-unemployment: named in rec.241, from c0377; not on your file: cite it as it stands, by that reference");
+  const { p, calls } = harness([[use("a", "look", { report: "finance/files", paper: "claim-c0377-unemployment" })]]);
+  await p.step(found(31 * DAY, "finance/files", [ref], false), ctx);
+  await p.step(found(31 * DAY + HOUR, "finance/files", []), ctx);
+  expect(resultsOf(calls.at(-1)!).a).toContain("## The office's files: the paper claim-c0377-unemployment\nNot on your file: named in rec.241, from c0377; cite it as it stands, by that reference.");
 });
 
 test("a kind is said in plain words; a kind that finds nothing is answered with the kinds the folder holds", async () => {

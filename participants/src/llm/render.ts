@@ -653,6 +653,8 @@ export interface Looked {
   paper?: string; fromEntry?: number; about?: string; words?: string; kinds?: string[]; kindSaid?: string;
   /** The paper asked for reached the seat only passed on, inside this paper of its own (a client's forward): shown as it. */
   via?: string;
+  /** The paper asked for is held nowhere the seat can see, but a hand-over or a paper passed on names it: where, and whose. */
+  namedIn?: { in: string; whose: string };
   /** What was asked for, in words (what to find, about what, since when), as the answer says back what was searched. */
   said?: string;
   /** How many papers at most were asked of whoever keeps them (more than `limit` where the list is narrowed here). */
@@ -799,7 +801,10 @@ function lookedPapers(head: string, id: string, records: Record[], asked: Looked
     // desk looked four times for an office's request it held only in its client's forward, and let the due day pass.)
     const copy = !r && a.via ? records.find((x) => x.id === a.via) : undefined;
     if (copy) return [`## ${head}: the paper ${a.paper}`, `You hold it as a copy: it was passed on to you in ${a.via}, set out below. Cite it as ${a.paper}.`, ...paperInFull(copy, { ...a, paper: copy.id }, readings)];
-    return [`## ${head}: the paper ${a.paper}`, ...(r ? paperInFull(r, a, readings) : ["There is no paper with that id there."])];
+    // (Named on a matter and held nowhere it can see: said so, with how it is cited. Rung 2b, 2026-11-15: a desk would not
+    // cite a claim its hand-over named, finding nothing when it looked.)
+    const named = !r && a.namedIn ? `Not on your file: named in ${a.namedIn.in}, from ${a.namedIn.whose}; cite it as it stands, by that reference.` : undefined;
+    return [`## ${head}: the paper ${a.paper}`, ...(r ? paperInFull(r, a, readings) : [named ?? "There is no paper with that id there."])];
   }
   const limit = a.limit ?? 20;
   const narrowed = (r: Record) => (!folder || ofKind(r, folder)) && (a.about === undefined || namesId(r, a.about)) && (a.words === undefined || says(r, a.words));

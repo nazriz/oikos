@@ -173,7 +173,7 @@ pub fn support_law(book: &Book) -> Option<(String, Vec<PaymentRule>)> {
 }
 
 /// The support law in force: the newest with payments; of two made together, the later filed.
-fn newest_support_law(book: &Book) -> Option<&Arc<Record>> {
+pub(crate) fn newest_support_law(book: &Book) -> Option<&Arc<Record>> {
     book.open("law").filter(|r| data(r).get("payments").is_some_and(|x| x.is_array())).fold(None::<&Arc<Record>>, |a, b| match a {
         Some(a) if b.at < a.at || (b.at == a.at && filed_before(&b.id, &a.id).is_le()) => Some(a),
         _ => Some(b),

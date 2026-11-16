@@ -1055,14 +1055,17 @@ fn a_person_deals_with_what_comes_by_post_when_it_next_sits_down_to_it_and_not_b
 }
 
 /// Where it is set (`situation`), a hand-over says how things stand with the principal in fixed words from its own state:
-/// its balance today, a payment that comes to it every so often, its rent and the day it next falls due; none of it
-/// otherwise (the stakes run's rung 2, 2026-11-15: the stake never reached the seat).
+/// its balance today, what comes in regularly (as it was paid: two payments from the same payer for the same thing, a
+/// whole number of days apart), its rent and the day it next falls due; "Nothing regular is coming in." where nothing
+/// does; none of it otherwise (the stakes run's rung 2, 2026-11-15: the stake never reached the seat). Straight after
+/// its own position, before the papers it comes from.
 #[test]
 fn a_hand_over_says_how_things_stand_with_the_principal_only_where_it_is_set() {
+    use crate::market::testkit::tx;
     let agreement = |id: &str, commitments: Value| json!({ "id": id, "record": "agreement", "author": "genesis", "at": 0, "visible_to": [ME], "terms": { "template": "x", "parties": [ME, "other"], "commitments": commitments } });
     let lease = agreement("lease-9", json!([{ "who": ME, "every": 7 * DAY, "does": { "outcome": { "money": { "amount": "50000", "for": "rent", "to": "acc-other" } } } }, { "who": "other", "does": { "outcome": { "occupancy": { "in": "house-1/home.1", "who": ME } } } }]));
-    let wage = agreement("job-9", json!([{ "who": "other", "every": 14 * DAY, "does": { "outcome": { "money": { "amount": "120000", "for": "wages", "to": "acc-ll" } } } }]));
-    let referral_of = |situated: bool| {
+    let paid = json!([tx("acc-other", "acc-ll", 120_000, 20 * DAY, "wages"), tx("acc-other", "acc-ll", 120_000, 34 * DAY, "wages")]);
+    let referral_of = |situated: bool, txs: Value| {
         let mut h = principal_doing(40, 10_000, NOTICE);
         if situated {
             let script: Vec<Value> = (1..=40).map(|d: i64| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
@@ -1072,11 +1075,13 @@ fn a_hand_over_says_how_things_stand_with_the_principal_only_where_it_is_set() {
             h.actor = wrap(&h.ctx, inner).unwrap();
         }
         let (mut h, _, remit) = engaged_on(h);
-        let out = all(&h.wake(34 * DAY + 3600, world(vec![remit, lease.clone(), wage.clone()])));
+        let out = all(&h.wake(34 * DAY + 3600, channels(vec![money(ME, 1_000_000, txs), records("mine", vec![remit, lease.clone()])])));
         out.lines().find(|l| l.contains("kind=referral")).unwrap_or_default().to_string()
     };
-    let on = referral_of(true);
-    assert!(on.contains("In our account (acc-ll) today:") && on.contains("Coming in:") && on.contains("from other (job-9)") && on.contains("Our rent:") && on.contains("(lease-9)"), "{on}");
-    let off = referral_of(false);
-    assert!(!off.contains("In our account") && !off.contains("Our rent:") && !off.contains("Coming in:"), "{off}");
+    let on = referral_of(true, paid.clone());
+    assert!(on.contains("In our account (acc-ll) today:") && on.contains("Coming in:") && on.contains("from acc-other (wages)") && on.contains("Our rent:") && on.contains("(lease-9)") && !on.contains("Nothing regular"), "{on}");
+    let none = referral_of(true, json!([]));
+    assert!(none.contains("Nothing regular is coming in.") && !none.contains("Coming in:"), "{none}");
+    let off = referral_of(false, paid);
+    assert!(!off.contains("In our account") && !off.contains("Our rent:") && !off.contains("Coming in:") && !off.contains("Nothing regular"), "{off}");
 }
