@@ -12,6 +12,7 @@ import { atMost, callRecorder, forkLimits, budgetProblems, modelProblems } from 
 import { toldOf, waitingAdapter } from "../src/seat-host";
 import { Cast } from "../src/fork-cast";
 import { loadSpec, runArm, runExperiment, validate, type ExperimentSpec } from "../src/experiment";
+import { DEFAULT_MODEL, modelArm, withModel } from "../../experiments/scope-pilot/model-arm";
 
 const root = join(import.meta.dir, "../..");
 
@@ -43,6 +44,21 @@ test("only the allowed models are seated: never the largest Claude model, Fable 
   expect(modelProblems({ ...arm("codex/gpt-6-luna"), seats: { translator: { first: "decide/pod", behind: "claude-code/claude-sonnet-5-5" } } })).toEqual([]);
   expect(modelProblems({ ...arm("codex/gpt-6-luna"), seats: { translator: { first: "claude-code/claude-haiku-5-5" } } }).join()).toMatch(/our own trained translator/);
   expect(() => validate(arm("claude-code/claude-opus-5-5"))).toThrow(/never/);
+  // The stakes run's model from OIKOS_MODEL (experiments/scope-pilot/model-arm.ts): unset, Haiku 5.5 as it was, its arm
+  // and name unchanged; another model names its own arm and the experiment (so its folder) after it, with its route's
+  // params; a hosted one bills (allow_paid_api) only from a checked price entry; astra is refused.
+  expect(modelArm(DEFAULT_MODEL, ["x"]).arm).toEqual({ name: "haiku", steward: { kind: "model", model: "anthropic/claude-haiku-5-5", params: { max_tokens: 16_000 } }, codePosts: ["x"] });
+  expect(withModel("scope-stakes-r1-decision-slow", DEFAULT_MODEL)).toBe("scope-stakes-r1-decision-slow");
+  const local = modelArm("ollama/qwen2.5:14b-instruct", []);
+  expect([local.arm.name, (local.arm.steward as any).params, local.paid]).toEqual(["qwen2.5-14b-instruct", { answer: "text", max_tokens: 2_000 }, false]);
+  expect(withModel("scope-stakes-r1-decision-slow", "ollama/qwen2.5:14b-instruct")).toBe("scope-stakes-r1-decision-slow-qwen2.5-14b-instruct");
+  expect(modelArm("codex/gpt-6-luna@low", []).arm.name).toBe("gpt-6-luna-low");
+  const or = "openai-compat/openrouter/qwen/qwen3-32b";
+  expect(() => modelArm(or, [], {})).toThrow(/no price entry/);
+  expect(() => modelArm(or, [], { [or]: { input: 1, output: 1, to_confirm: true } })).toThrow(/to_confirm/);
+  const hosted = modelArm(or, [], { [or]: { input: 1, output: 1, answer: "json" } });
+  expect([hosted.arm.name, (hosted.arm.steward as any).params, hosted.paid]).toEqual(["qwen3-32b", { answer: "json", max_tokens: 8_000 }, true]);
+  expect(() => modelArm("codex/gpt-6-astra", [])).toThrow(/never seated/);
 });
 
 test("each model fork's spending limit is fixed before anything runs: the least of its own, its arm's over its seeds, and the experiment's over every model fork", () => {
