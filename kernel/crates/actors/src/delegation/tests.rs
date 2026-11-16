@@ -78,24 +78,32 @@ fn engaged_doing(call: &str) -> (Harness, String, Value) {
     engaged_on(principal_doing(40, 10_000, call))
 }
 
-fn engaged_on(mut h: Harness) -> (Harness, String, Value) {
+fn engaged_on(h: Harness) -> (Harness, String, Value) {
+    engaged_with(h, offer())
+}
+
+/// The same, with a service offering what `o` offers (its first kind the remit's).
+fn engaged_with(mut h: Harness, o: Value) -> (Harness, String, Value) {
     let mut out = vec![];
+    let kind = o["kinds"][0].clone();
     for d in 1..=29 {
-        out.extend(h.wake(d * DAY + 3600, world(if d == 1 { vec![offer_rec(10_000)] } else { vec![] })));
+        out.extend(h.wake(d * DAY + 3600, world(if d == 1 { vec![statement("rec.off", 0, PROV, "service_offer", &[], o.clone())] } else { vec![] })));
     }
     assert!(!all(&out).contains("kind=order"), "nothing is engaged before its review day");
     let at30 = all(&h.wake(30 * DAY + 3600, world(vec![])));
     assert!(at30.contains("kind=order") && at30.contains("service:assist"), "on its review day the offer it sees pays: it orders: {at30}");
     // (The order's id, as the harness named what the act made: the order line is bound `order`.)
     let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).unwrap() as i64 + 1);
-    let papers = all(&h.wake(32 * DAY + 3600, world(set_up(&order))));
+    let mut up = set_up(&order);
+    up[0]["data"]["offer"] = o;
+    let papers = all(&h.wake(32 * DAY + 3600, world(up)));
     assert!(papers.contains("sign=agr.1") && papers.contains("Service agr.1."), "it signs and sets the fee up: {papers}");
     let briefed = all(&h.wake(33 * DAY + 3600, world(vec![signed()])));
     assert!(briefed.contains("appoint=ll-assistant") && briefed.contains("to=par.sys") && briefed.contains("kind=brief"), "the system is put to work: {briefed}");
     let remit_prog = h.sent.iter().rev().find(|p| p.contains("kind=remit")).cloned().unwrap_or_default();
     assert!(remit_prog.contains("\"level\":\"alone\""), "cheap errors and a cheap service: alone, straight from doing it itself: {remit_prog}");
     let remit = json!({ "id": "rec.remit", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 33 * DAY, "visible_to": [ME, PROV],
-        "kind": "remit", "text": "From now", "addressed_to": [PROV], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "notice_to_vacate", "level": "alone" } });
+        "kind": "remit", "text": "From now", "addressed_to": [PROV], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": kind, "level": "alone" } });
     (h, order, remit)
 }
 
@@ -199,6 +207,18 @@ fn a_referral_carries_the_day_its_papers_name_and_why_in_its_own_facts_and_no_fi
     let weekly = (7, 3, 19 * 3600);
     assert_eq!(super::principal::last_sitting(weekly, 30 * DAY, 45 * DAY, 300), Some(38 * DAY + 19 * 3600));
     assert_eq!(super::principal::last_sitting(weekly, 30 * DAY, 31 * DAY, 300), None);
+    // (What they say of it is what they know: the body's day and hour, and their own last sitting before it, with its
+    // hour; never that a draft would be in time, which turns on when their assistant sits. The stakes run's rung 1
+    // (situation), 2026-11-16: "a draft reaches us in time ... if it comes by day 44", the client sitting at 21:00 on day
+    // 44, the office's day ending at 21:16 that night, the desk sitting at 09:00.)
+    let date = |t: i64| format!("day {}", t / DAY + 1);
+    let evening = (7, 1, 21 * 3600);
+    let (words, last) = super::principal::due_sentence("outside", 43 * DAY + 21 * 3600 + 960, evening, 37 * DAY, 300, &date);
+    assert_eq!(last, Some(43 * DAY + 21 * 3600));
+    assert_eq!(words, "outside asks for this by day 44, 21:16; the last time we deal with our post before then is day 44, at about 21:00.");
+    let (words, last) = super::principal::due_sentence("outside", 37 * DAY + 3600, evening, 37 * DAY, 300, &date);
+    assert!(last.is_none() && words == "outside asks for this by day 38, 01:00; we next deal with our post on day 44, at about 21:00.", "{words}");
+    assert!(!words.contains("in time"));
     // (Its own position: fixed words with no figure in them, never a cost worked out for it.)
     for (_, words) in super::principal::TOLD {
         assert!(!words.chars().any(|c| c.is_ascii_digit() || "$%".contains(c)) && words.matches('{').count() == words.matches('}').count(), "{words}");
@@ -470,6 +490,73 @@ fn a_reply_on_a_matter_handed_over_is_handed_over_too() {
     assert!(!out.lines().any(|l| l.starts_with("statement(basis=rec.ask")), "not sent by its own code: {out}");
     let out = all(&h.wake(37 * DAY + 3600, world(vec![])));
     assert!(out.lines().any(|l| l.contains("basis=rec.other") && l.contains("kind=evidence")) && !out.contains("kind=referral"), "a paper about no matter handed over is answered as before: {out}");
+}
+
+/// One reply, one matter (docs/behaviour/assistants.md, "What the client passes on"): a reply on a claim says what the
+/// claim says of the principal's position and of the office's rule; a draft of the reply made from the forward, before
+/// the reply is handed over, is held and taken under the reply's matter once it is; and a draft or a request that names
+/// no matter of its own is answered so, never dropped in silence (the stakes run's rung 1 (situation), 2026-11-16).
+#[test]
+fn a_reply_on_a_claim_is_the_claim_s_and_a_draft_made_from_its_forward_is_taken_under_it() {
+    const CLAIM: &str = "statement(kind=benefit_claim, text=\"We claim.\", to=[\"office\"], data={\"payment\":\"pension\"})";
+    let mut script: Vec<Value> = (1..=34).map(|d| json!({ "at": d * DAY + 3600, "call": CLAIM })).collect();
+    script.push(json!({ "at": 36 * DAY + 3600, "call": "statement(kind=evidence, text=\"Our papers.\", to=[\"office\"], basis=rec.ask)" }));
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "benefit_claim": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30, "situation": true } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    let mut o = offer();
+    o["kinds"] = json!(["benefit_claim"]);
+    o["seconds"] = json!({ "benefit_claim": 60 });
+    let (mut h, _, mut remit) = engaged_with(h, o);
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit]));
+    let claim = last_referral(&h);
+    let line = h.sent.iter().rev().find(|p| p.contains("kind=referral")).cloned().unwrap_or_default();
+    assert!(line.contains("Until the claim is decided we are not paid pension.") && line.contains("The office pays nothing for the days before it decides."), "the claim says both: {line}");
+    // (Its referral, as the world files its own paper; then the claim's report done, and the office's request on it.)
+    let mut own = statement(&claim, 34 * DAY + 3600, ME, "referral", &[PROV], json!({ "agreement": "agr.1", "kind": "benefit_claim", "wants": "draft", "calls": CLAIM }));
+    own["author"] = json!("ll-system");
+    let report = statement("rec.rep", 34 * DAY + 7200, ME, "report", &[ME], json!({ "referral": claim, "done": true, "created": { "sent0": "rec.sent" } }));
+    h.wake(34 * DAY + 7300, world(vec![own, report]));
+    let mut ask = statement("rec.ask", 35 * DAY, "office", "evidence_request", &[ME], json!({ "by": 45 * DAY }));
+    ask["basis"] = json!("rec.sent");
+    h.wake(35 * DAY + 3600, world(vec![ask]));
+    // (Its forward on file; and the desk's draft of the reply from it, naming the forward as its matter, before the client
+    // has handed the reply over: held, neither signed nor answered.)
+    let fwd = statement("rec.fwd", 35 * DAY + 3700, ME, "forward", &[PROV], json!({ "paper": "rec.ask", "kind": "evidence_request", "by": "office", "for": ME, "matter": claim, "data": { "by": 45 * DAY } }));
+    let early = statement("rec.early", 35 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": "rec.fwd", "paper": { "kind": "evidence", "text": "Our papers.", "to": ["office"], "basis": "rec.ask" } }));
+    let held = all(&h.wake(35 * DAY + 7300, world(vec![fwd, early])));
+    assert!(!held.contains("kind=sign_off") && !held.contains("basis=rec.early"), "held until the reply is handed over: {held}");
+    let out = all(&h.wake(36 * DAY + 3600, world(vec![])));
+    let reply = out.lines().find(|l| l.contains("kind=referral")).unwrap_or_else(|| panic!("the reply handed over: {out}")).to_string();
+    assert!(reply.contains("\"reply_to\":\"rec.ask\"") && reply.contains("Until the claim is decided we are not paid pension.") && reply.contains("The office pays nothing for the days before it decides."), "the reply says what its claim says: {reply}");
+    let reply_ref = last_referral(&h);
+    let mut later = out.clone();
+    for i in 1..4 {
+        later.push('\n');
+        later.push_str(&all(&h.wake(36 * DAY + 3600 + i * 600, world(vec![]))));
+    }
+    let signed = later.lines().find(|l| l.contains("kind=sign_off")).unwrap_or_else(|| panic!("the held draft taken under the reply: {later}"));
+    assert!(signed.contains("basis=rec.early") && signed.contains(&format!("\"referral\":\"{reply_ref}\"")), "under the reply's matter: {signed}");
+    // (A draft naming the finished claim, and a request to go ahead naming nothing of its own: each answered, plainly.)
+    let stray = statement("rec.stray", 37 * DAY, ME, "draft", &[ME], json!({ "referral": claim, "calls": CLAIM }));
+    let mut nothing = statement("rec.none", 37 * DAY, ME, "approval_request", &[ME], json!({ "referral": "rec.nothing", "gist": "Go on." }));
+    // (Each from its own assistant's post; the same paper from another post of the organisation is not its to answer.)
+    let mut stray = stray;
+    stray["in_position"] = json!("ll-assistant");
+    nothing["in_position"] = json!("ll-assistant");
+    let mut elsewhere = statement("rec.else", 37 * DAY, ME, "draft", &[ME], json!({ "referral": "rec.nothing", "calls": CLAIM }));
+    elsewhere["in_position"] = json!("other-assistant");
+    let mut out = all(&h.wake(37 * DAY + 3600, world(vec![stray, nothing, elsewhere])));
+    for i in 1..4 {
+        out.push('\n');
+        out.push_str(&all(&h.wake(37 * DAY + 3600 + i * 600, world(vec![]))));
+    }
+    let acks: Vec<&str> = out.lines().filter(|l| l.contains("kind=acknowledgement")).collect();
+    assert!(acks.iter().any(|l| l.contains("basis=rec.stray") && l.contains(&format!("It names {claim}, a matter we no longer have open with you"))), "{out}");
+    assert!(acks.iter().any(|l| l.contains("basis=rec.none") && l.contains("It names rec.nothing, which is not a matter we handed you")), "{out}");
+    assert!(!acks.iter().any(|l| l.contains("basis=rec.else")), "{out}");
 }
 
 #[test]

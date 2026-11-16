@@ -15,7 +15,7 @@ import { Knowledge } from "./knowledge";
 type Call = calls.Call;
 type Value = calls.Value;
 
-export const RESOLVER = { id: "resolver", version: "0.7.0" }; // 0.7.0: a form may record a claim beside its paper (FormWrites `claim`)
+export const RESOLVER = { id: "resolver", version: "0.7.1" }; // 0.7.1: a matter's blank naming a paper passed on (a forward, or the paper in it) is the matter it came on (2026-11-16); 0.7.0: a form may record a claim beside its paper (FormWrites `claim`)
 
 /** What the resolver reads from a structure type in the world's catalogue (which is public): its footprint, the terrains it can stand on, and its spaces. */
 export interface StructureTypeInfo {
@@ -907,6 +907,20 @@ class Resolver {
         : t.type === "list" ? this.ids(c, field)
         : t.type === "date" ? this.date(c, field)
         : this.id(c, field);
+    }
+    // (A paper a client passed on stands for the matter it came on: a matter's blank (`referral`, `matter`) naming the
+    // forward, or the body's paper in it, is that matter, as the forward records it; or the reply to that paper the client
+    // has since handed over and is not answered yet (one reply, one matter). What was drawn, and shown, is the seat's;
+    // only the matter it is filed under is the one the forward names. The stakes run's rung 1 (situation), 2026-11-16: a
+    // client's evidence drafted with the forward as its referral, which the client read as no matter of its own.)
+    for (const field of ["referral", "matter"]) {
+      const v = data[field];
+      if (spec.fields[field]?.type !== "record" || typeof v !== "string" || this.k.referrals.has(v)) continue;
+      const fw = this.k.forwards.get(v) ?? [...this.k.forwards.values()].find((x) => x.paper === v);
+      if (!fw) continue;
+      const reply = [...this.k.replyTo].filter(([id, p]) => p === fw.paper && !this.k.answeredReferrals.has(id)).map(([id]) => id);
+      const to = reply.length === 1 ? reply[0] : fw.matter;
+      if (to) data[field] = to;
     }
     // (A paper of the office's own may be given its words as they are to stand, where the form has no field of that name.)
     const ownWords = !!spec.writes && !("text" in spec.fields);

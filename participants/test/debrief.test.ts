@@ -7,7 +7,7 @@ import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { readFileSync } from "node:fs";
 import { callModel, endNeedMicroUsd, endReserveMicroUsd, keptBackFor, reserveOrRefuse, reckonedEndMicroUsd, seatsEndNeedMicroUsd, SpendingLimitReached, UsageLimitReached, type EndCosts } from "../src/llm/call";
 import { costMicroUsd } from "../src/llm/adapter";
-import { ASK_AGAIN, DEBRIEF_ANSWER_TOKENS, DEBRIEF_SYSTEM, DEBRIEF_VERSION, INSTRUCTIONS_LEFT_OUT, keptBack, mockDebrief, preamble, QUESTIONS, questionText, runDebrief, SAY_MORE, SCALES, stepsOf, type DebriefInput, type DebriefSeat, type MockDebrief } from "../src/llm/debrief";
+import { ASK_AGAIN, DEBRIEF_ANSWER_TOKENS, DEBRIEF_SYSTEM, DEBRIEF_VERSION, HANDOVER_CLOSE, HANDOVER_OPEN, INSTRUCTIONS_LEFT_OUT, keptBack, mockDebrief, preamble, QUESTIONS, questionText, runDebrief, SAY_MORE, SCALES, stepsOf, type DebriefInput, type DebriefSeat, type MockDebrief } from "../src/llm/debrief";
 import { ACCOUNT_SYSTEM, ACCOUNT_SYSTEM_REWORDED, darkAccount, mockAccount, renderAccountBrief, sampleAccounts, strataOf, writeAccount, type AccountBrief } from "../src/llm/account";
 import { COMPOSE_FOLLOW_UP } from "../src/llm/compose";
 import { Randomness } from "../src/rng";
@@ -38,6 +38,17 @@ test("the script's order: out of role first, publication before any question, th
   expect(stepsOf("full", 2, false, true).slice(-4)).toEqual(["scales", "waiting", "last", "publication"]);
   expect(stepsOf("left", 0, false, true).slice(-3)).toEqual(["waiting", "last", "publication"]);
   expect(`${QUESTIONS.waiting!.a} ${QUESTIONS.waiting!.b}`).not.toMatch(/\b(pay|paid|payment|days?|cost|money|income|unpaid)\b/i);
+  // (0.7.0.) Asked only of a seat with a hand-over whose draft waited, and with that one hand-over set out first, word
+  // for word, between its lines and with nothing of ours about it; the question after it in the same neutral words.
+  const handover = "For you to draft for sign-off: evidence. Until the claim is decided we are not paid pension. We get to our post every 7 days, next on year 1, day 44.";
+  const held = harness();
+  const withIt = await runDebrief(held.io, seat({}, { heldMatters: true, waitedOn: handover }), input(), new Set());
+  expect(withIt.steps.map((s) => s.id).slice(-3)).toEqual(["waiting", "last", "publication"]);
+  const asked = held.calls.find((c) => c.ref === "debrief/waiting")!.messages.at(-1)!.content as string;
+  expect(asked).toContain(`${HANDOVER_OPEN}\n${handover}\n${HANDOVER_CLOSE}\n`);
+  expect(asked.replace(handover, "")).not.toMatch(/\b(pay|paid|payment|days?|cost|money|income|unpaid)\b/i);
+  const none = harness();
+  expect((await runDebrief(none.io, seat({}, { heldMatters: true }), input(), new Set())).steps.map((s) => s.id)).not.toContain("waiting");
   expect(r.steps.map((s) => s.id)).toEqual(order);
   expect(calls.map((c) => c.ref)).toEqual(order.map((s) => `debrief/${s}`));
   // Every call is under the platform's one short line. The seat's standing instructions are shown once, in the opening
@@ -165,6 +176,19 @@ test("an answer with nothing in it (the scope pilot's: the answer tool called em
   expect(r.steps.find((s) => s.id === "distress")).toMatchObject({ answer: "" });
   // (Room for an answer written twice over, in words and in the tool.)
   expect(calls.every((c) => c.maxTokens === DEBRIEF_ANSWER_TOKENS) && DEBRIEF_ANSWER_TOKENS >= 2_000).toBe(true);
+  // (2026-11-16: an answer written inside the question's own shape, the schema echoed with a value, or `{const: value}`,
+  // in each property's place, is read for those values and not asked again; a schema with no answer in it still is.)
+  const shaped = (props: object): ContentBlock[] => [{ type: "tool_use", id: "s", name: "answer", input: { type: "object", additionalProperties: false, required: Object.keys(props), properties: props } } as ContentBlock];
+  const wrapped = harness((async (req: LlmRequest) => {
+    const step = (req.context?.debrief as { step: string }).step;
+    if (step === "consent") return shaped({ go_on: { const: true }, keep_back_all: { const: false } });
+    if (step === "like") return shaped({ answer: "It was a structured task.", declined: false, stop: false, keep_back: false });
+    if (step === "change") return shaped({ answer: { type: "string" }, declined: { type: "boolean" }, stop: { type: "boolean" }, keep_back: { type: "boolean" } });
+    return mockDebrief(req);
+  }) as any);
+  const w = await runDebrief(wrapped.io, seat(), input(), new Set());
+  expect(w.steps.find((s) => s.id === "like")!.answer).toBe("It was a structured task.");
+  expect(wrapped.calls.map((c) => c.ref).filter((x) => x!.endsWith("-again"))).toEqual(["debrief/change-again"]);
 });
 
 test("the wording does not lead: two wordings of every question, neither presuming distress or its absence, praising or blaming", () => {

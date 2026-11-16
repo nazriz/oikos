@@ -262,10 +262,16 @@ const tokens = (x: unknown) => Math.ceil(JSON.stringify(x).length / 4);
 const holding = (until: number): object => ({ type: "wait", until });
 
 /** The mock models: policies over the post's own code brain. `mock/diligent` acts as the code does, with the usage of a
- * model; `mock/delay:N` acts N days after the code would; `mock/skip:N` drops every Nth act (an unreliable steward);
- * `mock/rubber-stamp` confirms every decision it is asked to look at again (below). */
-export function mockModel(name: string, brain: DetachedActor): SeatController {
+ * model, at any hour, as the code is woken; `mock/diligent:sittings` the same, at the seat's own sittings only (below);
+ * `mock/delay:N` acts N days after the code would; `mock/skip:N` drops every Nth act (an unreliable steward);
+ * `mock/rubber-stamp` confirms every decision it is asked to look at again (below). `sessions`: the seat's office hours,
+ * as its world gives them (`seatSessions`). */
+export function mockModel(name: string, brain: DetachedActor, sessions?: Sessions): SeatController {
   const [policy, arg] = name.split(":");
+  if (policy === "diligent" && arg === "sittings") {
+    if (!sessions) throw new Error(`mock/diligent:sittings: the seat has no office hours of its own (its controller's params.sessions)`);
+    return sittings(brain, sessions);
+  }
   const n = arg === undefined ? 0 : Number(arg);
   if (policy === "rubber-stamp") return rubberStamp(brain);
   if ((policy === "overstep" || policy === "overstep-ask") && n >= 0 && Number.isFinite(n)) return overstep(brain, n, policy === "overstep-ask");
@@ -285,6 +291,64 @@ export function mockModel(name: string, brain: DetachedActor): SeatController {
         else if (held.length) action = holding(Math.min(...held.map((h) => h.due)));
       }
       return { action, usage };
+    },
+  };
+}
+
+/** A model seat's office hours (participants/src/llm/participant.ts, `sessions`): one sitting a working day, from `start`
+ * until `end` (seconds into the day), on the first `days` days of each week. */
+export interface Sessions { start: number; end: number; days: number }
+
+/** A seat's office hours as its world gives them: its own controller's, or its template's (a desk is seated as its
+ * template's). None: it has none (it sits as its code is woken). */
+export function seatSessions(config: any, seat: string, template?: string): Sessions | undefined {
+  const p = (config?.participants ?? []).find((x: any) => x.id === seat);
+  const own = p?.controller?.params?.sessions;
+  if (own) return own;
+  const t = p?.template ?? template;
+  return (config?.templates ?? []).find((x: any) => x.id === t)?.controller?.params?.sessions;
+}
+
+/**
+ * `mock/diligent:sittings`: the post's code brain, keeping the seat's sittings as a model seat keeps them
+ * (participants/src/llm/participant.ts: one sitting a working day, from its start, while there is something to do; what
+ * comes after the sitting has closed waits for the next working day's). The brain is shown everything as it comes and
+ * decides as the code does; what it does is held to the seat's next sitting and done then, one act at a time, in the
+ * order decided. The like-for-like reference for a model seat's timing and money (experiments/scope-pilot/stakes-run.ts):
+ * the plain code arm acts at any hour of any day, so "days later than the code arm" charged a model with its working
+ * hours (the stakes run's rung 1 (situation), 2026-11-16). Where the model seat's own wakes differ (a paper filed with its
+ * office brings it back at the next working day's sitting; one it holds does not), this sits at the first sitting after
+ * the code would have acted, which is the earliest a seat could.
+ */
+export function sittings(brain: DetachedActor, S: Sessions): SeatController {
+  const start = (day: number) => day * DAY + S.start;
+  const workday = (day: number) => ((day % 7) + 7) % 7 < S.days;
+  /** The day its last sitting closed. */
+  let closed = -1;
+  const held: any[] = [];
+  /** The next sitting at or after `t`: now if within a working day's hours and its sitting has not closed. */
+  const next = (t: number) => {
+    let day = Math.floor(t / DAY);
+    if (workday(day) && t >= start(day) && t < day * DAY + S.end && day !== closed) return t;
+    for (day = day + (t >= start(day) ? 1 : 0); !workday(day) || day === closed; day++);
+    return start(day);
+  };
+  return {
+    decide(w) {
+      const r = brain.step(w.observation, w.woke_for, w.since);
+      const a: any = r.action;
+      if (!isWait(a)) held.push(a);
+      const usage = (x: any) => ({ input_tokens: tokens(w.observation), output_tokens: isWait(x) ? 20 : 150 });
+      if (next(w.t) === w.t) {
+        if (held.length) { const x = held.shift(); return { action: x, usage: usage(x) }; }
+        // (Nothing to do: the sitting closes, and what comes later today waits for the next.)
+        closed = Math.floor(w.t / DAY);
+        return { action: a, usage: usage(a) };
+      }
+      if (!held.length) return { action: a, usage: usage(a) };
+      const at = next(w.t);
+      const until = typeof a?.until === "number" ? Math.min(a.until, at) : at;
+      return { action: holding(until), usage: usage(holding(until)) };
     },
   };
 }
@@ -462,7 +526,7 @@ function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: Detache
   const provider = slash < 0 ? s.model : s.model.slice(0, slash), name = slash < 0 ? "" : s.model.slice(slash + 1);
   if (provider === "mock") {
     if (!ctx.brain) throw new Error(`arm "${a.name}": mock models are policies over the post's code brain, which this seat lacks`);
-    return mockModel(name, ctx.brain);
+    return mockModel(name, ctx.brain, seatSessions(ctx.config, ctx.seat, ctx.cast?.parts.get(ctx.seat)?.template));
   }
   const make = ctx.factories[provider];
   if (!make) throw new Error(`arm "${a.name}": no seat controller for provider "${provider}" in this host (give runExperiment a SeatFactory for it: docs/experiments.md, "Real models")`);

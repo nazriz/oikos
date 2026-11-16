@@ -87,6 +87,11 @@ export class Knowledge {
   /** A paper of the participant's a body sent back -> the return (`paper_returned`, its `returned`): what a request to
    * send a paper again that names the paper, not the return, is about (translator/src/rules.ts). */
   readonly returnOf = new Map<string, string>();
+  /** A paper a client passed on to the participant (a `forward`) -> the body's paper it holds and the matter it came on:
+   * what a draft that names the forward, or the paper in it, as its matter is on (translator/src/rules.ts). */
+  readonly forwards = new Map<string, { paper: string; matter?: string }>();
+  /** A matter handed over that is a reply to a body's paper -> that paper (its referral's `reply_to`). */
+  readonly replyTo = new Map<string, string>();
   /** Laws and claims the participant has seen: what law warnings are judged against (§10). */
   readonly laws = new Map<string, StatementRecord>();
   /** Every record the participant has been shown, by id: what a request may cite (translator/src/rules.ts, `ruled`). */
@@ -224,7 +229,9 @@ export class Knowledge {
       if (r.kind === "referral" && typeof r.speaks_for === "string") this.referrals.set(r.id, r.speaks_for);
       if (r.kind === "referral" && typeof r.data?.kind === "string") this.referralKind.set(r.id, r.data.kind);
       if (r.kind === "referral") this.referralGives.set(r.id, givenBy(r.data));
+      if (r.kind === "referral" && typeof r.data?.reply_to === "string") this.replyTo.set(r.id, r.data.reply_to);
       if (r.kind === "paper_returned" && typeof r.data?.returned === "string") this.returnOf.set(r.data.returned, r.id);
+      if (r.kind === "forward" && typeof r.data?.paper === "string") this.forwards.set(r.id, { paper: r.data.paper, ...(typeof r.data.matter === "string" ? { matter: r.data.matter } : {}) });
       if ((r.kind === "sign_off" || r.kind === "declined") && typeof r.data?.referral === "string") this.answeredReferrals.add(r.data.referral);
       // (A sign-off's copy keeps whose sign-off it is, and a paper sent back whom it was for: the copy goes in their name.
       // kernel/crates/resolver, the same.)

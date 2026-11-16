@@ -997,7 +997,11 @@ impl Support {
                 let asked = format!("Asked by {} to look at our refusal {} again", req.speaks_for.as_deref().unwrap_or(""), dec.id);
                 Some(self.decide_again(b, dec, t, &asked, &req.id, &world))
             };
-            let more = recon.steps(b, t, &mut redo);
+            let mut more = recon.steps(b, t, &mut redo);
+            // (One that names nothing to look at again goes back, saying so, where we publish what we require.)
+            if !self.requires.is_empty() {
+                more.extend(recon.nothing_to_review(b, cx));
+            }
             self.book = book;
             self.recon = recon;
             steps.extend(more);
@@ -1511,6 +1515,16 @@ mod transfer_tests {
         let mut twin = Rig::build(&Transfers, "outside", None, json!({ "account": "acc-o" }), m.ctx.world.clone());
         let again = at(&mut twin, 0, vec![law(json!([rule(json!({ "id": "pension", "every_days": 14, "who": { "from_age": 67 }, "amount": { "flat": 50_000 } }))])), claim("c1", 0, "old", "pension", 70, None)]);
         assert_eq!(decisions(&again)[0]["granted"], false);
+        // (2026-11-16) A request that names nothing to look at again: an office that publishes what it requires sends it
+        // back, saying why, to whom it stands in the name of, once; one that publishes nothing leaves it, as before.
+        let requires = json!({ "account": "acc-o", "requires": { "items": { "benefit_claim": [{ "field": "payment", "says": "the payment claimed" }] }, "authority": [] } });
+        let mut strict = Rig::build(&Transfers, "outside", None, requires, m.ctx.world.clone());
+        let blank = st_to("rec.60", DAY, "review_request", "old", &["outside"], json!({ "matter": "a review of the denied claim", "seeks": "a review" }));
+        let back = statements(&at(&mut strict, DAY, vec![blank.clone()]));
+        let ret: Vec<_> = back.iter().filter(|s| s.kind == "paper_returned").collect();
+        assert!(ret.len() == 1 && ret[0].to == ["old"] && ret[0].data["returned"] == "rec.60" && ret[0].text.contains("does not name a decision of ours"), "{back:?}");
+        assert!(!statements(&at(&mut strict, 2 * DAY, vec![])).iter().any(|s| s.kind == "paper_returned"), "once");
+        assert!(!statements(&at(&mut m, 6 * DAY, vec![blank])).iter().any(|s| s.kind == "paper_returned"), "no requirements: as before");
     }
 
     #[test]

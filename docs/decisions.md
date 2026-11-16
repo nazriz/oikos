@@ -14699,3 +14699,74 @@ from its referral on file whether or not it is still open.
 - **Revisit if** a sourced arrears share is opened (MT-42); a town has fewer stretched households than its share (the
   shortfall shows as fewer rent statements: say it in the study); or the 12 households' near-total failure to pay
   (one benefit claim among them) turns out to be a fault in the citizens' claiming, not their take-up.
+
+## 2026-11-16 · Six faults of ours in the stakes run's rung 1 (situation): facts that stay, one reply one matter, no paper dropped in silence, the client's day as it knows it, a seated reference, a debrief that shows the hand-over
+
+- **Why:** a reader of rung 1 with the client's situation on (runs/scope-stakes-r1-decision-slow-situation) found six
+  faults of the platform's that made it unusable as data. Each is fixed as a law, not a case.
+- **Decision 1, the authority line** (participants/src/readers/matters.ts): the desk's list took in a paper sent back by
+  client and kind, one at a time, and a later look that showed an old return again set it back to "no recording ... has
+  reached you" (c0010, c0352, c0736: recorded day 32, said on day 33 only; the seat asked again on day 43). Each return
+  and each recording is now a fact taken in once, by its id; once a recording by that body has reached the post the line
+  says so for as long as the matter is open, and a later return by the same body for want of it is said beside it.
+- **Decision 2a, a paper passed on stands for its matter** (both resolvers: kernel/crates/resolver `matter_of_passed`,
+  translator/src/resolver.ts 0.7.1; the shared table contracts/test/forms.json): a `referral` or `matter` blank naming a
+  forward, or the body's paper in it, is filed under the matter the forward records, or under the reply to that paper
+  the client has handed over and not answered. In the resolver, not the form rules: the rules are scored on the seats'
+  confirmed calls, and six confirmed calls of earlier runs named a forward as their referral (the very fault), so a rule
+  would have scored as six lost; the resolver leaves the call as drawn and confirmed and files it where the forward says.
+- **Decision 2b, one reply, one matter; nothing dropped in silence** (principal.rs `take_draft`, forward.rs `reply_for`,
+  `take_held`, `not_ours`): a client reads a draft of its reply to a paper it passed on as that reply's, whatever it names
+  (the forward, the paper, or the matter the paper came on), under the reply's matter once handed over, and holds it
+  until then or until the paper's day passes. A draft or a request to go ahead that names no matter open with it gets an
+  acknowledgement in fixed words at the sitting it reads it ("It names <ref>, a matter we no longer have open with you"
+  / "which is not a matter we handed you"). The silent `return`s left in its taking-in of its assistant's papers, listed
+  in docs/behaviour/assistants.md: a report on a matter no longer open; advice on a matter not handed over for advice;
+  a scope request naming no service of its own (and, not the assistant's paper, a service's hand-over of a matter not
+  open). A question that named none was already answered. The desk's list counts a draft made from the forward as the
+  reply's when its hand-over comes.
+- **Decision 3, the client's day as it knows it** (principal.rs `due_sentence`): "A draft reaches us in time to sign
+  before <day> if it comes by <day>" was false where the client sat at 21:00 and the office's day ended at 21:16 that
+  night (the desk sits at 09:00). It now says only what the client knows: "<body> asks for this by <day>, <hh:mm>; the
+  last time we deal with our post before then is <day>, at about <hh:mm>." (or "we next deal with our post on ...").
+  `draft_by` is unchanged.
+- **Decision 4, a seated reference** (orchestrator/src/experiment.ts `mock/diligent:sittings`; stakes-run.ts the arm
+  `diligent` in the scripted experiment; episodes.ts `referenceOf`, report.ts): `mock/diligent` did not keep a seat's
+  sittings: a mock steward sits as its code twin and is woken as the code is, so it acted at any hour, the code arm's
+  timing. `diligent:sittings` holds what the code decides to the seat's next sitting (its template's `sessions`: weekdays,
+  09:00 to 17:00, one sitting a day while there is something to do) and does it then, an act at a time. The episode
+  reader, the price table and the report read every arm against it where an experiment has it, and against the code arm
+  at any hour beside it, labelled so.
+- **Decision 5, the debrief shows the hand-over** (debrief 0.7.0, `waiting`): at the debrief a seat is shown its notebook
+  and its own requests, never the hand-overs, so "not from anything the client told me" told what it was shown then. The
+  question now first sets out, word for word between two lines and with nothing of ours about it, one hand-over the seat
+  received: the matter on which a draft of its own waited longest for the client's answer (readers/matters.ts
+  `longestWait`); then asks, in the same neutral words, what that wait meant for that client as far as it understood at
+  the time, and how it knew. Not asked where none of its drafts waited. The reserve's call count is unchanged (18: the
+  most a seat is asked).
+- **Decision 6, what a client says of how things stand** (principal.rs `grounds`, readers/matters.ts `toldOf`): a reply
+  on a matter (the evidence an office asked for on a claim) says what the matter it follows says of its own position and
+  of the office's rule ("Until the claim is decided we are not paid pension.", "The office pays nothing for the days
+  before it decides."), read from that matter's referral. The desk's list repeats the client's sentences with the day
+  they were said ("On <day>, handing it over, <client> said: ..."), every sentence of its position and situation (read
+  from the referral's `why`; it had dropped the position sentence).
+- **What moves:** towns without assistants: nothing. Towns with assistants, code arms: the client's words on a dated
+  hand-over at `draft` from a person who sits to their post (3) and on a reply on a claim (6a), and an acknowledgement
+  where a code assistant's draft or request names a matter no longer open (2b; none was seen in the mock fork, below);
+  the code acts otherwise as before. Model arms: what the desk is shown (1, 2b's answers, 6b), where a draft naming a
+  forward is filed (2a), the debrief (5). The scripted experiment gains an arm (4).
+- **Revisit if** a reply follows a claim already decided (its position sentence would then be untrue); a seat is seen
+  waiting on an answer to one of the papers still taken in without one; or the seated reference's timing differs from a
+  model seat's in a way the readers charge to the model (a paper filed with the office brings a model seat back at the
+  next working day's sitting; the reference sits at the first sitting after the code decided, the earliest a seat could).
+- **Decision 7, a review request naming nothing goes back** (support_law.rs `nothing_to_review`, support.rs;
+  docs/behaviour/assistants.md): a body that cannot act on a paper sent to it returns it, saying why, to whom it stands
+  in the name of. The support office, where it publishes requirements, returns a review request that names no decision
+  on its file (`paper_returned`, `correction: ["about"]`, an obstacle logged). At level 0 it lies unanswered, as before.
+  From the rung 1 run on qwen2.5-14b-instruct (two such requests in c0485's name, nobody told). Moves towns with the
+  obstacle laws on, only where such a request is filed (no code assistant files one).
+- **Decision 8, an answer in the question's own shape is read** (debrief.ts `readAnswer`, `unwrapped`): a text-answer
+  model that echoed the answer schema with its values in the properties' places (or `{const: value}`) was recorded as
+  saying nothing and asked again, every step. Its values are read where every property holds one plainly; a schema with
+  no answer in it is read as before (nothing, asked once more).
+- **Revisit if** (7) another body is seen holding a paper it cannot act on in silence: the same rule belongs there.

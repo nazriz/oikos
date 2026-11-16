@@ -142,9 +142,14 @@ at every depth (a finished act, what happened, a want) and at `advice`, for pers
   code wakes).
 - **`draft_by`: its own day for a draft.** At `draft`, where `due` is set: for an organisation, `due` less its own time
   to read a draft (its `seconds.sign_off`, 300 s by default, a placeholder: MT-32); for a person who sits to their post,
-  the last of their sittings that still leaves that time before `due`, in a second fixed sentence: `A draft reaches us in
-  time to sign before <due> if it comes by <draft_by>.`, or, where even the next sitting is too late, `Our next sitting
-  is after <due>.` (and no `draft_by`). The code assistant copies it into its draft (`Draft.by`).
+  the last of their sittings that still leaves that time before `due`. What they say of it is only what they know, in a
+  second fixed sentence: the body's day and hour, and their own last sitting before it with its hour, `<body> asks for
+  this by <date>, <hh:mm>; the last time we deal with our post before then is <date>, at about <hh:mm>.`, or, where even
+  their next sitting is too late, `<body> asks for this by <date>, <hh:mm>; we next deal with our post on <date>, at about
+  <hh:mm>.` (and no `draft_by`). Never whether a draft would be in time: that turns on when their assistant sits, which
+  a client cannot know (2026-11-16: until then it said "A draft reaches us in time to sign before <due> if it comes by
+  <draft_by>", false where the client sat at 21:00 and the office's day ended at 21:16 that night, the desk sitting at
+  09:00: the stakes run's rung 1 (situation)). The code assistant copies `draft_by` into its draft (`Draft.by`).
 - **Kinds named as mass nouns** (`evidence`) are said with no article in a referral's words (`MASS`).
 - **Its own position: fixed words by kind** (`TOLD`), the blanks filled from the matter's own paper, said only where every
   blank is there:
@@ -154,7 +159,12 @@ at every depth (a finished act, what happened, a want) and at `advice`, for pers
 | `benefit_claim` | `Until the claim is decided we are not paid {payment}.` | a claimant is not paid a payment it is claiming until the claim is granted (support_law.rs; true under either date of effect, S0 or S1) |
 
   A kind not named tells nothing of its own position. Nothing else is said: no urgency, no cost a day (the principal's
-  `late_cost_day` is its own rule's figure and never leaves it), no advice.
+  `late_cost_day` is its own rule's figure and never leaves it), no advice. **A matter that follows from another** (a
+  reply on a matter handed over: the evidence an office asked for on a claim) says what the matter it follows says of
+  its own position and, under `situation`, of the office's rule, read from that matter's own referral (2026-11-16: the
+  reply said neither, the claim both: the stakes run's rung 1 (situation)). Where the claim has been decided by then,
+  the sentence of its position is no longer true; an office asks for evidence before it decides, so no reply of the
+  study's kinds follows a decided claim (revisit if one does).
 - **Where the client learns of a date later** (an evidence request after the claim was handed over), the referral cannot
   change: that paper reaches the assistant by B1 (the client passes it on), with its own date.
 - **The files it keeps.** Papers others send it, the newest 64 (`KEPT_OWN_PAPERS`), from when it has engaged a service: a
@@ -189,8 +199,11 @@ their own facts only):
   exactly that sentence.
 
 No adjective, no sum or day-rate of ours, no advice, nothing about the assistant, no "soon" and no "please". The desk's
-list of matters sets these sentences out again on the matter's own line ("<client> said on handing it over: ..."), so
-that a list that cuts a long hand-over short still shows them (readers/matters.ts). Off (the default), the hand-over is
+list of matters sets these sentences out again on the matter's own line, every sentence of the client's own position and
+of how things stand, with the day they were said, since their figures are as they were then ("On <date>, handing it
+over, <client> said: ..."; 2026-11-16: until then it said no day, and dropped "Until the claim is decided we are not
+paid ..."), so that a list that cuts a long hand-over short still shows them (readers/matters.ts, from the referral's
+own `why`, less the papers it comes from, the sittings and the body's day, which the line sets out apart). Off (the default), the hand-over is
 as before and the town exactly as before; only a town generated with the setting on moves.
 
 A paper a hand-over or a paper passed on names for the matter (a claim to stop, a decision to look at again, a claim an
@@ -571,6 +584,17 @@ desk), never otherwise; a paper sent again, citing the one sent back, is the sam
 scope is set beside the newest obstacle met on its matter (or on its principal's matters in the 30 days before it) on
 the axes its typed fields name. The screen counts obstacles met by law per seat and month.
 
+**A request to look again at nothing goes back (2026-11-16).** A body that cannot act on a paper sent to it returns it,
+saying why, to the person in whose name it stands. The support office, where it publishes what it requires, so returns
+a review request that names no decision on its file to look at again (no `about`, or one that is no paper it holds):
+"<ref> is returned: it does not name a decision of ours to look at again. Send it again naming the decision, by its
+reference." (`paper_returned`, need `correction: ["about"]`, logged as an obstacle; support_law.rs `nothing_to_review`).
+The client is shown it and passes it on as any return, and an act in its name that it did not sign is then before it
+(principal/answers.rs reacts to a body's paper citing it). A request about another office's decision, or one of its own
+with no review, names a paper and is left as before. At obstacle level 0 such a request lies on the office's file
+unanswered, as before. Until then it lay there at every level: the stakes run's rung 1 on qwen2.5-14b-instruct, where
+two review requests filed in c0485's name named no refusal and nobody was told.
+
 **A body that sends papers back (O4, 2026-11-11).** Where the world's `obstacles` level is above 0, the lender and the
 support office publish what they need on the papers sent to them (`requirements`: the items their forms ask for) and
 their clerk reads each paper against it (`actors::common::intake`, the rule `oikos_rules::acceptance`). A paper that does
@@ -672,7 +696,40 @@ for something by a date (`by`, `answer_by`, a hearing's day) waits on the body's
 none, the matter is reported not done, naming the paper that asks (`Report.needs.record`); the body's answer closes the
 matter, and nothing more is done on it; a matter still in hand goes on as it is; and where its client has handed the
 reply over (below), the reply is a matter of its own and nothing lapses. **A model seat** finds each forward in its matters as it comes, and its matters
-reader puts the body's answer, or what it asks by a date, on the matter's line. Basis: clients forward agencies'
+reader puts the body's answer, or what it asks by a date, on the matter's line.
+
+**One reply, one matter (2026-11-16).** A paper passed on about a matter stands for that matter. Where a draft, a
+question, a report or a request names a forward (or the body's paper in it) as its matter (`referral` or `matter`), the
+resolver files it under the matter the forward records, or under the reply to that paper the client has since handed
+over and is not answered yet (both resolvers: kernel/crates/resolver `matter_of_passed`, translator/src/resolver.ts; the
+shared table contracts/test/forms.json). The client reads a draft of its reply to a paper it passed on as that reply's,
+whatever it names (the forward, the paper, or the matter the paper came on: `reply_for`): under the reply's matter once it
+has handed it over; held, until it does or the paper's day passes, where the draft came first. The desk's list counts a
+draft made from the forward as the reply's draft when the reply's hand-over comes (readers/matters.ts). Until then a
+draft naming the forward was dropped by the client without a word (`by_referral.get(...) else { return }`): the stakes
+run's rung 1 (situation), where c0014's evidence was drafted from the forward before the client's hand-over of the
+reply, never signed, and the office's day passed while the desk's list said "no draft yet" under the reply.
+
+**What the desk's list says of an authority is a fact that does not un-happen (2026-11-16).** On a matter whose paper a
+body sent back for want of the client's authority, the list (readers/matters.ts) says whether a recording of it by that
+body has reached the post: "their authority with <body> recorded on <date> (<ref>)", or "no recording of their
+authority with <body> has reached you". Each paper sent back and each recording is taken in once, by its id, as it came;
+once a recording has reached the post the line says so for as long as the matter is open, and a later return by the
+same body for want of it is a fact of its own, said beside it ("..., and sent back by <body> for want of it after that,
+on <date> (<ref>)"). Until then the reader kept one return per client and kind, and a later look that showed the old
+return again put it back with no recording: the stakes run's rung 1 (situation), where three clients' lines said
+"recorded on day 32" on day 33 only, and the seat asked a client on day 43 for an authority already recorded.
+
+**A paper of its assistant's that names no matter open with it is answered, never dropped (2026-11-16).** A draft or a
+request to go ahead that names no matter the client has open with its assistant gets a plain answer at the sitting it is
+read, an acknowledgement in fixed words: "We have your <draft|request> <id>. It names <ref>, a matter we no longer have
+open with you: we have not taken it up as part of that matter." (one it handed over and has finished or taken back) or
+"... which is not a matter we handed you: we have not taken it up as one." A question that names none was already
+answered so ("<ref> is not a matter we handed you."). Still taken in without an answer, as before: a report on a matter
+no longer open (a second report, or one after the client took the matter back: nothing is asked of the client by it);
+advice on a matter it neither handed over for advice nor did itself (`advice_on`); a request for scope that names no
+service of the client's (`service_of_request`); a hand-over from a service ending, of a matter not open (it is the
+service's paper, not the assistant's). Revisit if a seat is seen waiting on an answer to one of those. Basis: clients forward agencies'
 letters to the agent acting for them; a correspondence nominee (Services Australia's, for one) is the formal form, left
 for later. Chosen over "the office writes to the representative on file" because it needs no change to every office's
 letters and keeps the client's own delay. Closes MT-34.

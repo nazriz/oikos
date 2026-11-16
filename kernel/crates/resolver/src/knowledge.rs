@@ -174,6 +174,16 @@ pub struct Knowledge {
     /// `data`, `basis`). What a form that sends a signed copy (`copies`) sends.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub signed: BTreeMap<Arc<str>, Arc<Value>>,
+    /// Papers a client passed on to the seat (a `forward`): its id -> the body's paper it holds, and the matter it came
+    /// on. What a matter's blank naming the forward, or the paper in it, is (`resolve.rs`, a form's matter).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub forwards: BTreeMap<String, (String, Option<String>)>,
+    /// Matters handed to the seat (referrals) -> the body's paper each is a reply to, where it is one (`reply_to`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub referrals: BTreeMap<String, Option<String>>,
+    /// Matters answered since (a sign-off or a decline names them).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub answered: BTreeSet<String>,
     /// Statements seen that are addressed to someone: who each is addressed to (whoever acts on it). What a hold on
     /// one is addressed to.
     pub addressed: Addressed,
@@ -263,6 +273,17 @@ pub struct RoutineFact {
     pub schedule: Option<String>,
 }
 
+/// What a paper of a seat's matters says of them.
+#[derive(Debug, Clone)]
+enum MatterFact {
+    /// A forward: its id, the body's paper it holds, the matter it came on.
+    Forward(String, String, Option<String>),
+    /// A referral: its id, and the paper it replies to.
+    Referral(String, Option<String>),
+    /// A sign-off or a decline: the matter it answers.
+    Answered(String),
+}
+
 /// What a record adds to what a seat knows, worked out from the record alone (never from what the seat knew before):
 /// the same for every seat it's shown to, so whoever delivers one record to many seats can work it out once.
 #[derive(Debug, Clone, Default)]
@@ -277,6 +298,8 @@ pub struct RecordFacts {
     lot: Option<(Arc<str>, Arc<[String]>)>,
     /// A sign-off that carries the paper it signed: its id, and the paper.
     signed: Option<(Arc<str>, Arc<Value>)>,
+    /// A paper of the matters handed to the seat: a forward, a referral, or an answer naming a matter.
+    matter: Option<MatterFact>,
     /// Someone asking to be paid names where the money should go: who, and the account.
     stated: Option<(String, String)>,
     /// A statement addressed to someone: its id, and who it is addressed to.
@@ -285,6 +308,23 @@ pub struct RecordFacts {
     routines: Vec<(String, RoutineFact)>,
     /// Whom the record names, and how (taken in only where the world's people have names: `Knowledge::named`).
     mentions: Vec<(String, Mention)>,
+}
+
+impl Knowledge {
+    /// The matter a paper a client passed on stands for (a forward's id, or the body's paper in it): the reply to that
+    /// paper the client has handed over and is not answered yet, where there is one; else the matter the paper came on,
+    /// as the forward records it. None: not a paper passed on, or one that names no matter.
+    pub fn matter_of_passed(&self, id: &str) -> Option<String> {
+        if self.referrals.contains_key(id) {
+            return None;
+        }
+        let (paper, matter) = self.forwards.get(id).cloned().or_else(|| self.forwards.values().find(|(p, _)| p == id).cloned())?;
+        let replies: Vec<&String> = self.referrals.iter().filter(|(r, to)| to.as_deref() == Some(paper.as_str()) && !self.answered.contains(r.as_str())).map(|(r, _)| r).collect();
+        match replies.as_slice() {
+            [one] => Some((*one).clone()),
+            _ => matter,
+        }
+    }
 }
 
 impl RecordFacts {
@@ -353,12 +393,18 @@ impl RecordFacts {
                 // baseline: 55 sends of a predecessor's sign-offs answered "no signed copy on file", 2026-11-14.)
                 Some("sign_off") => facts.signed = Some((id, Arc::new(serde_json::json!({ "no_paper": true, "draft": r["data"]["draft"] })))),
                 Some("form") => facts.form = Some((id, Arc::new(r.clone()))),
+                Some("forward") if s(&r["data"]["paper"]).is_some() => facts.matter = Some(MatterFact::Forward(id.to_string(), s(&r["data"]["paper"]).unwrap_or_default().to_string(), s(&r["data"]["matter"]).map(String::from))),
+                Some("referral") => facts.matter = Some(MatterFact::Referral(id.to_string(), s(&r["data"]["reply_to"]).map(String::from))),
                 Some("lot") => {
                     if let Some(cells) = r["data"]["cells"].as_array() {
                         facts.lot = Some((id, cells.iter().filter_map(|c| c.as_str().map(String::from)).collect()));
                     }
                 }
                 _ => {}
+            }
+            // (A sign-off or a decline answers the matter it names: whether a reply handed over is still open.)
+            if let (Some("sign_off" | "declined"), Some(m)) = (s(&r["kind"]), s(&r["data"]["referral"])) {
+                facts.matter = Some(MatterFact::Answered(m.to_string()));
             }
             // Someone asking to be paid names where the money should go.
             let m = &r["data"]["outcome"]["money"];
@@ -422,7 +468,7 @@ impl Registers {
     /// The map a seat that knows of no lot makes of this list, if every record in it is a lot and nothing more
     /// (learning them one by one from nothing gives exactly this map: each lot's cells, the last said of each).
     fn of(&mut self, list: &[Arc<RecordFacts>]) -> Option<Lots> {
-        if list.len() < A_REGISTER || !list.iter().all(|f| f.lot.is_some() && f.withdraws.is_none() && f.declares.is_none() && f.form.is_none() && f.signed.is_none() && f.stated.is_none() && f.addressed.is_none() && f.routines.is_empty()) {
+        if list.len() < A_REGISTER || !list.iter().all(|f| f.lot.is_some() && f.withdraws.is_none() && f.declares.is_none() && f.form.is_none() && f.signed.is_none() && f.matter.is_none() && f.stated.is_none() && f.addressed.is_none() && f.routines.is_empty()) {
             return None;
         }
         if let Some((_, lots)) = self.lists.iter().find(|(known, _)| known.len() == list.len() && known.iter().zip(list).all(|(a, b)| Arc::ptr_eq(a, b))) {
@@ -708,6 +754,18 @@ impl Knowledge {
         }
         if let Some((id, paper)) = &facts.signed {
             self.signed.insert(id.clone(), paper.clone());
+        }
+        match &facts.matter {
+            Some(MatterFact::Forward(id, paper, matter)) => {
+                self.forwards.insert(id.clone(), (paper.clone(), matter.clone()));
+            }
+            Some(MatterFact::Referral(id, reply)) => {
+                self.referrals.insert(id.clone(), reply.clone());
+            }
+            Some(MatterFact::Answered(m)) => {
+                self.answered.insert(m.clone());
+            }
+            None => {}
         }
         if let Some((who, to)) = &facts.stated {
             self.stated.entry(who.clone()).or_default().insert(to.clone());
