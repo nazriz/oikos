@@ -30,8 +30,15 @@
 // THE COST (forecast, from the 10- and 40-seat mock forks' call counts at Haiku 5.5's API price, orchestrator/
 // prices.json, with the desk's and the factory's cached prompt sizes measured in the stakes run's rung 2): a seat call
 // about $0.0007 at an organisation's seat and $0.0021 at the desk, a debrief about $0.011 a seat. Rung 1 (10 seats, 14
-// days): the mock made 474 seat calls in 30 days at 10 seats, so about 220 in 14 days, about $0.25 with the debriefs;
-// rung 2 (24 seats): about 550 calls, about $0.55. Both well under the $2 a fork. The scripted arms call no model.
+// days): its dry run (2026-11-16) seated 9 (planning and works share a holder, one engages: MT-54) and made 104 seat
+// calls in the 10 days to its health check, so about 150 in 14 days: about $0.10 to $0.30 with the cache, and nine
+// debriefs about $0.10; the mock's own reckoning at the uncached price was $0.14 for the 104. Rung 2 (24 seats): the
+// 40-seat mock made 1,140 calls in 30 days, so about 300 in 14 at 24 seats, about $0.25 to $0.60 with its debriefs.
+// Both well under the $2 a fork. The scripted arms call no model. Wall time: the dry run's fork took 71 s on the mock;
+// at Haiku's 3 to 9 s a call, 4 at once, about 5 to 15 minutes a rung-1 fork.
+// THE DRY RUN FAILS THE HEALTH CHECK, as main's stakes dry runs do: the mock drafts nothing at the desk and the rates
+// post ("at drafting: nothing drafted"), so its fork stops at day 10, debriefed. That is the mock, not the world: the
+// check is right to stop a model that drafts nothing.
 //
 // TO START A RUNG (on the run server, from the checkout; detached and kept awake; never deletes a run; the key is
 // OIKOS_ANTHROPIC_KEY from ~/.zshenv, never ANTHROPIC_API_KEY). First its dry run, every model played by the mock:
