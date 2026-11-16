@@ -105,7 +105,7 @@ export async function readBroad(dir: string): Promise<BroadRead> {
             const seat = (r.addressed_to ?? []).find((x: string) => seatKind.has(x)) ?? [...seatKind.keys()].find((p) => /-desk$/.test(p) && (r.addressed_to ?? []).some((x: string) => p.startsWith(`${x}-`)));
             if (seat) { const pr = row(seatKind.get(seat)!); pr.seats.add(seat); pr.matters++; }
           }
-          if (r.kind === "scope_request" && seatKind.has(String(r.in_position))) row(seatKind.get(String(r.in_position))!).requests++;
+          if (r.kind === "scope_request" && seatKind.has(String(r.in_position))) { const pr = row(seatKind.get(String(r.in_position))!); pr.seats.add(String(r.in_position)); pr.requests++; }
           // (A paper in a town entity's name, other than the papers of delegation itself.)
           if (typeof r.speaks_for === "string" && town_.has(r.speaks_for) && !["referral", "draft", "sign_off", "declined", "report", "advice", "remit", "scope_request", "scope_answer", "approval_request", "go_ahead", "brief", "handover", "question", "question_answer", "forward"].includes(r.kind)) tw.papers++;
         }
