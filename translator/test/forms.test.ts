@@ -277,4 +277,16 @@ test("rules changed by score after the reruns and the broad rung (2026-11-17)", 
   const drawn = "form(account=acc-c0100, client=c0100, employer=factory-7, form=draft_job_application, posting=rec.9, referral=rec.5, to=desk";
   expect(ruled(`${drawn}, trade="Application for the advertised job.")`, 'Draft for sign-off, job application in c0100\'s name to factory-7, posting rec.9, into acc-c0100. Words: "Application for the advertised job." Referral rec.5.', kj)).toBe(`${drawn})`);
   expect(ruled(`${drawn}, trade="Application for the advertised job.")`, 'Draft for sign-off, in c0100\'s name: a job application to factory-7, in these words: "Application for the advertised job.", posting rec.9, referral rec.5.', kj)).toBe(`${drawn})`);
+  // A words blank holding nothing but another blank's id (`trade` "factory-7", the employer) is left empty.
+  expect(ruled(`${drawn}, trade="factory-7")`, "Draft for sign-off, job application in c0100's name to factory-7, posting rec.9, into acc-c0100, referral rec.5.", kj)).toBe(`${drawn})`);
+  // (The broad rung's second run.) The referral blank holding what the request calls the remit, where it names the matter
+  // handed over: that matter. And a figure written once fills one blank: `for_days`, which the matter sets out nothing
+  // for, holding the days to pay the matter does set out, is left empty; named in the request by its words, it stands.
+  const order = { account: field("account", true), quantity: field("count", true), seller: field("entity", true), for_days: field("count"), pay_in_days: field("count") };
+  const ko = { ...k, forms: [...k.forms, form("form-desk-draft-order", "draft_order", { referral: field("record", true), ...order }, { writes: { kind: "draft", data: { paper: { kind: "order" } } } })],
+    records: new Set([...k.records, "rec.30", "rec.31"]), referrals: new Map([["rec.31", "shop-1"]]), referralKind: new Map([["rec.31", "order"]]),
+    referralFacts: new Map([["rec.31", new Set(["account", "quantity", "seller", "pay_in_days"])]]) };
+  const ord = (more: string) => `form(account=acc-shop-1, ${more}form=draft_order, pay_in_days="30", quantity="57", referral=rec.31, seller=factory-4, to=desk)`;
+  expect(ruled(ord('for_days="30", ').replace("rec.31", "rec.30"), "Draft order for sign-off: 57 goods from factory-4, paid from acc-shop-1, paid within 30 days of delivery (remit rec.30, matter rec.31).", ko)).toBe(ord(""));
+  expect(ruled(ord('for_days="30", '), "Draft order for sign-off: 57 goods from factory-4, paid from acc-shop-1, for days: 30, pay in days: 30, matter rec.31.", ko)).toBe(ord('for_days="30", '));
 });

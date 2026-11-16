@@ -15130,3 +15130,61 @@ The merge's slow tier refused `claim-told` on three tests. Two were faults the t
 - **Decision** (the `report` form, participants/src/kinds/assistants.ts, every assistant's post): done is yes when what was handed over has been carried out (the paper sent, the thing asked for done), whatever answer came back, which goes in the report's words; no when it could not be carried out, with why. The code assistant already reports so (done when its act is applied; not done when it is refused, sent back for what it lacks, or cannot be done: delegation/assistant.rs), so does the diligent reference (the same code), and the principal's code reads it so (closes on yes, takes the matter back on no). docs/behaviour/assistants.md says it.
 - **Prompts that change:** every model seat in an assistant's post that is shown its forms (the desk and every organisation's assistant): the report form's two blank descriptions. Runs before this are not like-for-like on that form.
 - **Revisit if** a principal ought to hear "carried out but refused" apart from "carried out and granted" by a typed field, not the words.
+
+## 2026-11-17 · The tenant's answer to the tribunal: six asks keyed, and what a form's blanks tell the translator
+
+- **Keyed** (`translator/eval/keyed-targets.json`): Haiku's situation-b asks .56, .57, .58, .63 and .72 (the coordinator
+  named four; .56 is the same ask, asked back on `claim_on`) with the readings their requests set out, and DeepSeek-d's
+  .57, drawn right and confirmed. The set: 1,870 with a target; this checkout 1,660 (88.8%); the five Haiku asks miss,
+  DeepSeek's hits. Regression check unchanged (142, all explained).
+- **What the score can see:** it replays the model's logged first draw on the forms as the seat was shown them in the
+  log. A change to a form's blanks (names, types) changes neither, so it scores the same by construction; it can be
+  measured only by drawing the requests again with our translator on the changed form (offline, no API), which the
+  standing rules (no model runs) leave to the coordinator. Type checks the resolver enforces would turn such draws into
+  asks back; the contract's field types (`FieldType`, outcomes.schema.json) have no list of numbers and no kind of body,
+  so that needs a contract change in both resolvers.
+- **The catalogue, read mechanically** (the forms in the extract, 76): 51 have two blanks of one type, 33 a lone free
+  blank beside typed ones. Almost all are pairs whose names say what differs (client and office, posting and referral),
+  and free blanks that are a paper's words by design; the tribunal pair (`tribunal`, `landlord`) is among the clear
+  ones, and the model still swapped it. A guard on name and type alone would flag most of the catalogue and catch
+  nothing it could not already: not written; the list is in this entry's source (the session's scratch) for review.
+- **Descriptions:** not against P1 to P15 (P3 and P11: the translator's input is the forms the seat knows of, and a
+  form's published fields, descriptions included, are world content the seat sees too); merely not done. Doing it means
+  a new input format for the trained model, so a retraining (P12), and two to four times the forms' share of its input.
+  It would not have fixed TR-9 by itself: the swapped blanks' names already said what they hold.
+- **Revisit when** the coordinator decides how a form change is to be measured.
+
+## 2026-11-17 · The broad rung's second run: a remit is no matter handed, and a figure written once fills one blank
+
+- **The measure:** `scope-broad-r1-b` (Haiku) added: `~/oikos/runs/regress/requests-2026-11-17b.json.gz` (2,545 requests
+  in 26 arms, 1,702 confirmed; this checkout's rules: 142 differences, all explained) and
+  `scored-set-2026-11-17b.json.gz`. Before any change, with the keys below: 1,757 of 1,983 (88.6%).
+- **Keyed** (seven): every order in the set carried `for_days` 30, the days to pay written twice; no matter handed over
+  sets out days to serve over (their facts: account, delivery, seller, quantity, price each, `pay_in_days` 30). The
+  seats confirmed an invented value, and the principal declined such a draft and placed the order itself. The broad
+  rung's par.8.7 and .8, the second run's par.8.5 and shop-1's four orders, the last also with the remit (rec.1452) as
+  their matter where the request names both ("(remit rec.1452, matter rec.33212)").
+- **Changes**, each scored, nothing lost:
+
+  | change (translator/src/rules.ts) | right first time | differences |
+  |---|---|---|
+  | before | 1,757 | 142 (explained before) |
+  | `referralNotHanded`: the referral holding what the request calls the remit or the agreement, where it names exactly one matter handed over as the matter or referral: that one | 1,757 | 4, below |
+  | `figureOnce`: an optional count the matter sets out nothing for, holding the value of a count it does, not named by its words: empty (knowledge: `referralFacts`) | 1,763 | 2 more |
+  | a words blank holding nothing but another blank's id (`trade` "factory-10") is empty | 1,764 | none |
+
+  The six differences are the keyed orders, now drawn without `for_days` and on their matter (explained under this
+  heading). Tried and narrowed by score: the referral rule on any record not on the seat's list of matters (four
+  confirmed draws moved, three lost: the seat's file did not list their matter); `figureOnce` on every type (three
+  delivery notes lost: `unit_price` beside `price_each`, one sum the form asks for twice, confirmed both ways).
+- **Can the form say it?** The contract's field types (`FieldType`) have `record` and no kind of record, so a blank
+  cannot today say "a matter handed over, not an agreement". A record kind on a field (`of: "referral"`) would let both
+  resolvers refuse a remit there and ask back; it needs a contract change in both, and the score cannot see it (it
+  replays the logged draws on the logged forms). The rule above uses the same fact from the seat's own file.
+- **The others:** the six questions drawn as a loan application or a benefit claim were our model's unsure draws behind
+  `none(unclear)`; with "Question to <whom>" (2026-11-17, "The translator by score") all six are now drawn as the
+  question form. "no refund": both requests were drawn as nothing (the model unsure), so no blank rule reaches them.
+  The benefit change with the referral as its `claim`, and the words set out as two letters, have no target (declined,
+  nothing confirmed after): left.
+- **Revisit if** a matter handed over sets out a figure the paper's other blank should take (then `figureOnce` must
+  read the facts' values, not only their names).

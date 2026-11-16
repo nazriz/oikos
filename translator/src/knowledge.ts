@@ -84,6 +84,9 @@ export class Knowledge {
   /** The words each matter handed over gives for a paper's details, by name (`givenBy`): what a blank on it the
    * translator filled with other words is held to (translator/src/rules.ts). */
   readonly referralGives = new Map<string, { [field: string]: string }>();
+  /** The details each matter handed over sets out (its facts' names, of any type): which blanks of its paper the matter
+   * gives a value for, and which it leaves to whoever writes the paper (translator/src/rules.ts, `figureOnce`). */
+  readonly referralFacts = new Map<string, ReadonlySet<string>>();
   /** A paper of the participant's a body sent back -> the return (`paper_returned`, its `returned`): what a request to
    * send a paper again that names the paper, not the return, is about (translator/src/rules.ts). */
   readonly returnOf = new Map<string, string>();
@@ -235,6 +238,7 @@ export class Knowledge {
       if (r.kind === "referral" && typeof r.speaks_for === "string") this.referrals.set(r.id, r.speaks_for);
       if (r.kind === "referral" && typeof r.data?.kind === "string") this.referralKind.set(r.id, r.data.kind);
       if (r.kind === "referral") this.referralGives.set(r.id, givenBy(r.data));
+      if (r.kind === "referral" && r.data?.facts && typeof r.data.facts === "object") this.referralFacts.set(r.id, new Set(Object.keys(r.data.facts).filter((x) => x !== "composed_on")));
       if (r.kind === "referral" && typeof r.data?.reply_to === "string") this.replyTo.set(r.id, r.data.reply_to);
       if (r.kind === "paper_returned" && typeof r.data?.returned === "string") this.returnOf.set(r.data.returned, r.id);
       if (typeof r.in_position === "string" && this.held.has(r.in_position) && !this.sent.some((x) => x.id === r.id)) {
