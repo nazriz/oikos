@@ -55,10 +55,21 @@ fn placeholder(t: &Json) -> Option<(char, &str)> {
     let s = t.as_str()?;
     let mark = s.chars().next()?;
     let name = s.get(1..)?;
-    if !"=#?+".contains(mark) || !is_name(name) {
+    if !"=#?+%".contains(mark) || !is_name(name) {
         return None;
     }
     Some((mark, name))
+}
+
+/// The whole numbers one item of a list gives: itself, or several written together ("30, 3", "30 and 3").
+fn whole_numbers(name: &str, v: &Json) -> Result<Vec<i64>, String> {
+    if let Some(s) = v.as_str() {
+        let parts: Vec<&str> = s.split(',').flat_map(|x| x.split(" and ")).map(str::trim).collect();
+        if parts.len() > 1 && parts.iter().all(|p| (1..=6).contains(&p.len()) && p.bytes().all(|b| b.is_ascii_digit())) {
+            return Ok(parts.iter().filter_map(|p| p.parse().ok()).collect());
+        }
+    }
+    whole_number(name, v).map(|n| vec![n]).map_err(|_| format!("The {} are whole numbers, written in figures, each on its own: {v} is not one.", name.replace('_', " ")))
 }
 
 fn whole_number(name: &str, v: &Json) -> Result<i64, String> {
@@ -96,8 +107,15 @@ fn fill(t: &Json, env: &Env) -> Result<Option<Json>, String> {
         let Some(v) = env.fields.get(name) else { return Ok(None) };
         return Ok(Some(match mark {
             '=' => v.clone(),
-            '#' => json!(whole_number(name, v)?),
+            // (A list of whole numbers, written as numbers: `#` on a list, item by item.)
+            // (Two written together in one item, "30, 3" or "30 and 3", are the two; anything else is asked back.)
+            '#' => match v.as_array() {
+                Some(items) => json!(items.iter().map(|x| whole_numbers(name, x)).collect::<Result<Vec<_>, _>>()?.concat()),
+                None => json!(whole_number(name, v)?),
+            },
             '?' => json!(v.as_str() == Some("yes")),
+            // (A length of time in whole days, as code that counts days writes one: `%`.)
+            '%' => json!(whole_number(name, v)?.div_euclid(86_400)),
             _ => json!(env.now + whole_number(name, v)?),
         }));
     }
@@ -164,6 +182,25 @@ fn words(v: Option<&Json>, ty: Option<&str>, money: Money, dated: Option<&Dated>
 }
 
 /// The text of a template with each `{name}` replaced by the field in words.
+/// A paper's words where they end in a blank of words that already opens with what comes before it: the words alone,
+/// never that opening twice (the TS form engine's `notTwice`, the same).
+fn not_twice(template: &str, spec_fields: &Json, env: &Env, money: Money) -> Result<String, String> {
+    let whole = fill_text(template, spec_fields, env, money)?;
+    let t = template.strip_suffix('.').unwrap_or(template);
+    let stop = if t.len() < template.len() { "." } else { "" };
+    let (Some(open), true) = (t.rfind('{'), t.ends_with('}')) else { return Ok(whole) };
+    let name = &t[open + 1..t.len() - 1];
+    if !is_name(name) || open == 0 {
+        return Ok(whole);
+    }
+    let before = fill_text(&t[..open], spec_fields, env, money)?;
+    let own = fill_text(&t[open..], spec_fields, env, money)?;
+    if !before.trim().is_empty() && own.trim().starts_with(before.trim()) {
+        return Ok(if own.ends_with(stop) { own } else { format!("{own}{stop}") });
+    }
+    Ok(whole)
+}
+
 fn fill_text(template: &str, spec_fields: &Json, env: &Env, money: Money) -> Result<String, String> {
     let mut out = String::new();
     let mut rest = template;
@@ -259,13 +296,18 @@ pub fn write_paper(spec: &Json, fields: &Map<String, Json>, me: &str, now: i64, 
     let env = Env { fields, me, now, dated };
     let text = match text {
         Some(t) => t.to_string(),
-        None => fill_text(w["text"].as_str().unwrap_or_default(), &spec["fields"], &env, money)?,
+        None => not_twice(w["text"].as_str().unwrap_or_default(), &spec["fields"], &env, money)?,
     };
     let mut out = Map::new();
     out.insert("kind".into(), w["kind"].clone());
     out.insert("text".into(), json!(text));
     let get = |k: &str| w.get(k).filter(|x| !x.is_null());
-    let data = get("data").map(|t| fill(t, &env)).transpose()?.flatten();
+    let mut data = get("data").map(|t| fill(t, &env)).transpose()?.flatten();
+    // (A paper a draft carries, as it would go: its words written from the fields as the paper's own are. Until
+    // 2026-11-17 a draft's paper kept its template's "{application}" in its words: the stakes rung 3.)
+    if let Some(Json::String(words)) = data.as_mut().and_then(|d| d.get_mut("paper")).and_then(|p| p.get_mut("text")) {
+        *words = fill_text(words, &spec["fields"], &env, money)?;
+    }
     let to = unique(get("to").map(|t| fill(t, &env)).transpose()?.flatten());
     let visible = match get("visible") {
         None => None,
@@ -360,8 +402,10 @@ fn bind(t: &Json, v: &Json, lists: &[&str], me: &str, now: i64, out: &mut Map<St
         }
         return match mark {
             '=' => put(out, name, v.clone(), true),
+            '#' if v.is_array() => v.as_array().is_some_and(|a| a.iter().all(|x| x.as_i64().is_some())) && put(out, name, json!(v.as_array().map(|a| a.iter().map(|x| x.to_string()).collect::<Vec<_>>())), false),
             '#' => v.as_i64().is_some() && put(out, name, v.clone(), false),
             '?' => v.as_bool().is_some_and(|b| put(out, name, json!(if b { "yes" } else { "no" }), false)),
+            '%' => v.as_i64().is_some_and(|x| put(out, name, json!(x * 86_400), false)),
             _ => v.as_i64().is_some_and(|x| put(out, name, json!(x - now), false)),
         };
     }
@@ -473,6 +517,13 @@ pub fn read_back(spec: &Json, paper: &Map<String, Json>, me: &str, now: i64) -> 
             }
         }
     }
+    // (A blank of words that only the paper's words carry (a tenant's own account of things, after "{application}: "):
+    // read from those words, where they stand as the form writes them.)
+    if let (Some(template), Some(text)) = (w["text"].as_str(), paper.get("text").and_then(Json::as_str)) {
+        for (name, words) in words_from_text(template, text, &spec["fields"]) {
+            out.entry(name).or_insert(json!(words));
+        }
+    }
     let as_is = |s: &str| Ok(s.to_string());
     let again = write_paper(spec, &out, me, now, &as_is, None, Some(paper.get("text").and_then(Json::as_str).unwrap_or_default())).ok()?;
     let same = |k: &str| bare(again.get(k)) == bare(paper.get(k));
@@ -483,6 +534,35 @@ pub fn read_back(spec: &Json, paper: &Map<String, Json>, me: &str, now: i64) -> 
         return None;
     }
     Some(out)
+}
+
+/// The words a paper's text gives each text blank of its template that stands after a fixed piece of words: the text
+/// after the first place that piece stands, up to the fixed words after it (the rest of the template where no blank
+/// follows, else the words before the next). Nothing for a blank that is not of words.
+fn words_from_text(template: &str, text: &str, fields: &Json) -> Vec<(String, String)> {
+    let mut out = vec![];
+    let mut rest = template;
+    while let Some(i) = rest.find('{') {
+        let lit = &rest[..i];
+        let after = &rest[i + 1..];
+        let Some(j) = after.find('}') else { break };
+        let name = &after[..j];
+        let tail = &after[j + 1..];
+        // (Up to the fixed words after it: the rest of the template where no blank follows, else the words before the next.)
+        let more = tail.contains('{');
+        let stop = tail.split('{').next().unwrap_or_default();
+        if is_name(name) && (fields[name]["type"] == "text" || fields[name]["type"] == "space") && !lit.is_empty() && (!stop.is_empty() || !more) {
+            if let Some(at) = text.find(lit) {
+                let from = &text[at + lit.len()..];
+                let said = if more { from.find(stop).map(|e| &from[..e]) } else { from.strip_suffix(tail) };
+                if let Some(said) = said.filter(|s| !s.trim().is_empty()) {
+                    out.push((name.to_string(), said.to_string()));
+                }
+            }
+        }
+        rest = tail;
+    }
+    out
 }
 
 /// The blanks worked out by the form's rules from those given (each blank's `worked`, a rule over the others),

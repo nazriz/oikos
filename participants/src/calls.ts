@@ -467,7 +467,9 @@ const UNIT: Record<string, number> = {
 const ADVERB: Record<string, number> = {
   hourly: 3600, daily: DAY, weekly: 7 * DAY, fortnightly: 14 * DAY, monthly: 30 * DAY, quarterly: 90 * DAY, yearly: 365 * DAY, annually: 365 * DAY,
 };
-const WORDS: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12 };
+// (One to twenty in words, where a count written so cannot be anything else: 2026-11-17, a rental application's
+// household of "four" needing "two" bedrooms. The kernel's resolver, the same: `word`.)
+const WORDS: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20 };
 
 /** "30 days", "2 weeks", "monthly", "every 3 months", "a year" → seconds. The world has no calendar: a month is 30 days, a year 365. */
 export function parseDuration(s: string): number {

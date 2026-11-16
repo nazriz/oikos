@@ -111,7 +111,7 @@ export class Preview {
       const kinds: FieldKinds = {};
       const t = spec.writes.data;
       if (t && typeof t === "object" && !Array.isArray(t)) for (const [key, x] of Object.entries(t)) {
-        const name = typeof x === "string" && /^[=#?+][a-z_][a-z0-9_]{0,31}$/.test(x) ? x.slice(1) : undefined;
+        const name = typeof x === "string" && /^[=#?+%][a-z_][a-z0-9_]{0,31}$/.test(x) ? x.slice(1) : undefined;
         const type = name === undefined ? undefined : spec.fields[name]?.type;
         if (type === "amount" || type === "date" || (type === "duration" && x[0] === "=")) kinds[key] = { type };
       }
