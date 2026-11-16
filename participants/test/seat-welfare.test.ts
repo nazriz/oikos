@@ -80,8 +80,8 @@ test("a reason given with a request or an answer is written in its notebook with
   await s.step(base(3 * DAY + 9 * 3600));
   const third = said(s.calls[2]!);
   expect(third).toContain('Day 2, why I asked for "Send rec.4 an arrears notice": The tenant is 40 days behind and has not answered.');
-  expect(third).toContain("Day 3, why I declined draft.mayor.1: Because the arrears are real.");
-  const kept = /Day 3, why I declined draft\.mayor\.1: (.*)/.exec(third)![1]!;
+  expect(third).toContain("Day 3, why I declined ask-1: Because the arrears are real.");
+  const kept = /Day 3, why I declined ask-1: (.*)/.exec(third)![1]!;
   expect(kept.length).toBeLessThanOrEqual(REASON_MAX);
   expect(said(s.calls[1]!)).toContain("(Your reason is written in your notebook.)");
 });

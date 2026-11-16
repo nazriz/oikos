@@ -1864,10 +1864,11 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           queue.push({ id: use.id, action: r.action, ...(r.label ? { label: r.label } : {}), ...(r.looked ? { looked: r.looked } : {}), ...(r.kindSaid ? { kindSaid: r.kindSaid } : {}) });
           // A reason given with a request or an answer is its own: kept on record with the act, and written in its
           // notebook with the day and what it was about, so that it can account for its choices later. One there is no
-          // room for is said, and nothing in the notebook is put out for it.
+          // room for is said, and nothing in the notebook is put out for it. What it answered is named as it was shown
+          // ("ask-1"), never by the platform's own id for it (2026-11-17: "why I confirmed draft.provider-a-desk-system.1").
           const reason = use.name === "do" ? i?.why : use.name === "confirm" ? i?.note : undefined;
           if (text(reason) && reason.trim()) {
-            const about = use.name === "do" ? `why I asked for ${quote(i.what.replace(/\s+/g, " ").trim(), 80)}` : `why I ${i.decision === "confirm" ? "confirmed" : "declined"} ${String(i.ref).trim().replace(/^\[(.*)\]$/, "$1")}`;
+            const about = use.name === "do" ? `why I asked for ${quote(i.what.replace(/\s+/g, " ").trim(), 80)}` : `why I ${i.decision === "confirm" ? "confirmed" : "declined"} ${askRef(String(i.ref).trim().replace(/^\[(.*)\]$/, "$1"))}`;
             const e = editNotebook(notes, { add: reasonLine(obs.t, about, reason) });
             if (e.problems.length) {
               after.set(use.id, `\n\n(Your reason is kept on record with it, but was not written in your notebook: it is full. To make room, strike out what is settled, or write the notebook afresh, shorter.)`);
