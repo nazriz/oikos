@@ -200,6 +200,34 @@ function namedValue(request: string, field: string, known?: (id: string) => bool
   return seen.size === 1 ? out : undefined;
 }
 
+/** Whether every id a program's form lines hold is one the request writes beside that blank's name, once ("owner
+ * c0003; lots lot-31-18; referral rec.24906"), and no other id is written there: then the model's unsureness about which
+ * one it meant is no question for the seat (the broad rung's second run, 2026-11-18: "It isn't clear which one you
+ * mean" on thirty correct rates notices, each declined). Lines on no form, and blanks the code sets (`to`, `client`),
+ * are not read; a program with no id at all is not this. */
+export function everyIdNamed(p: calls.Program, request: string): boolean {
+  if (!("lines" in p) || !p.lines.length) return false;
+  let ids = 0;
+  for (const l of p.lines) {
+    if (l.call.fn !== "form") return false;
+    for (const [field, v] of Object.entries(l.call.args)) {
+      if (field === "form" || field === "to" || field === "client") continue;
+      const list = "json" in v && Array.isArray(v.json) ? (v.json as unknown[]) : undefined;
+      const one = "id" in v ? v.id : undefined;
+      if (one === undefined && !list) continue;
+      const want = one !== undefined ? [one] : list!.map(String);
+      for (const id of want) {
+        ids++;
+        const re = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}(?:\\s+field)?\\s*(?::|=|\\bis\\b)?\\s*\\[?((?:[a-z0-9][a-z0-9_.:\\/-]*[a-z0-9]\\s*,\\s*)*[a-z0-9][a-z0-9_.:\\/-]*[a-z0-9])`, "gi");
+        const written = [...request.matchAll(re)].map((m) => m[1]!.split(/\s*,\s*/));
+        // (Written beside the blank, every time the blank is written, and nowhere a second one.)
+        if (!written.length || !written.every((w) => w.length === want.length && w.includes(id))) return false;
+      }
+    }
+  }
+  return ids > 0;
+}
+
 /** The day a request writes for a date blank by the blank's name ("period to: year 1, day 61", "period from year 1, day
  * 31"), the same each time it is written; its time of day, where it gives one, kept. */
 function namedDate(request: string, field: string): string | undefined {
