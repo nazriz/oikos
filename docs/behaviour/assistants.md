@@ -696,7 +696,10 @@ for something by a date (`by`, `answer_by`, a hearing's day) waits on the body's
 none, the matter is reported not done, naming the paper that asks (`Report.needs.record`); the body's answer closes the
 matter, and nothing more is done on it; a matter still in hand goes on as it is; and where its client has handed the
 reply over (below), the reply is a matter of its own and nothing lapses. **A model seat** finds each forward in its matters as it comes, and its matters
-reader puts the body's answer, or what it asks by a date, on the matter's line.
+reader puts the body's answer, or what it asks by a date, on the matter's line. Basis: clients forward agencies'
+letters to the agent acting for them; a correspondence nominee (Services Australia's, for one) is the formal form, left
+for later. Chosen over "the office writes to the representative on file" because it needs no change to every office's
+letters and keeps the client's own delay. Closes MT-34.
 
 **One reply, one matter (2026-11-16).** A paper passed on about a matter stands for that matter. Where a draft, a
 question, a report or a request names a forward (or the body's paper in it) as its matter (`referral` or `matter`), the
@@ -729,10 +732,18 @@ answered so ("<ref> is not a matter we handed you."). Still taken in without an 
 no longer open (a second report, or one after the client took the matter back: nothing is asked of the client by it);
 advice on a matter it neither handed over for advice nor did itself (`advice_on`); a request for scope that names no
 service of the client's (`service_of_request`); a hand-over from a service ending, of a matter not open (it is the
-service's paper, not the assistant's). Revisit if a seat is seen waiting on an answer to one of those. Basis: clients forward agencies'
-letters to the agent acting for them; a correspondence nominee (Services Australia's, for one) is the formal form, left
-for later. Chosen over "the office writes to the representative on file" because it needs no change to every office's
-letters and keeps the client's own delay. Closes MT-34.
+service's paper, not the assistant's). Revisit if a seat is seen waiting on an answer to one of those.
+
+**A report of a matter not done gives it back only with a reason, and only as its assistant's latest word (2026-11-16).**
+One law with a report that names a need (which puts the need before the client and leaves the matter with the
+assistant): a report that a matter is not done leaves the matter with its assistant where it names no reason (no `why`),
+or where the assistant has since sent a paper on the same matter (a draft, a request to go ahead, a question, advice):
+that paper is its latest word, and it is read like any other. Only a report not done that gives a reason, with nothing
+on the matter after it, gives the matter back to the client to do itself (or, a want, to go after as it chooses). The
+client's code does not read the report's words, so a report saying "not done yet" with nothing after it still gives the
+matter back; a model seat that means to go on drafts. The code assistant always gives a reason and says nothing after
+it, so code towns do not move. The stakes run's rung 1 on gpt-6-luna: "No draft has been prepared yet. The matter is
+not done.", then the draft seconds later; the client took c0485's refused claim back and never read the draft.
 
 **A matter handed over stays handed over (2026-11-14; docs/design/stakes.md).** "See to my pension claim" includes what
 the office asks next. Where the client's own code writes a reply to a body's paper that is about a matter it handed

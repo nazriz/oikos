@@ -14770,3 +14770,20 @@ from its referral on file whether or not it is still open.
   saying nothing and asked again, every step. Its values are read where every property holds one plainly; a schema with
   no answer in it is read as before (nothing, asked once more).
 - **Revisit if** (7) another body is seen holding a paper it cannot act on in silence: the same rule belongs there.
+
+## 2026-11-16 · A report not yet done leaves the matter with the assistant; the seated reference's first figure
+
+- **Decision** (principal.rs, `take` on a report, `said_since`; docs/behaviour/assistants.md): one law for a report that
+  a matter is not done. It gives the matter back to the client only where it gives a reason and the assistant has sent
+  nothing on the matter since; naming a need (as before), naming no reason, or followed by a draft, a request to go ahead,
+  a question or advice on the matter, it leaves the matter with the assistant, and what follows is read like any other.
+- **Why:** the stakes run's rung 1 on gpt-6-luna: the desk reported c0485's refused-claim matter "No draft has been
+  prepared yet. The matter is not done." and drafted the review seconds later; the client read the report at its sitting,
+  took the want back, and never read the draft (in the Haiku run the same review was granted on day 43).
+- **What moves:** model arms only. The code assistant's not-done reports always give a reason and nothing follows them.
+- **The seated reference's first figure** (the mock fork of the previous entry, scripted experiment, decision × slow,
+  14 days): `diligent` against `code` alone, the same code at the seat's hours, was 88.1 days later in all for the desk's
+  papers to go over 15 matters (102.1 to the outcome) and −$728,553.60 for the factory's assistant, its invoice held
+  past the run's end. That is what "days later than the code arm" had charged to a model for keeping office hours.
+- **Revisit if** a seat is seen reporting "not done yet" with nothing after it and the client taking the matter back:
+  the words are a seat's, and the client's code reads none; a typed "not yet" on the report form would be the fix.

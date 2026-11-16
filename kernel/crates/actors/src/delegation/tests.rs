@@ -423,6 +423,45 @@ fn a_report_that_a_matter_sent_back_is_not_done_puts_it_before_the_principal_and
     assert!(fwd.contains(&format!("\"matter\":\"{rf}\"")), "as that matter's: {fwd}");
 }
 
+/// One law for a report of a matter not done: it gives the matter back only where it gives a reason and its assistant
+/// has said nothing on the matter since. Naming a need (above), naming nothing, or followed by a draft on the matter, it
+/// leaves the matter with the assistant, and the draft that follows is read like any other (the stakes run's rung 1 on
+/// gpt-6-luna, 2026-11-16: "No draft has been prepared yet", the draft seconds after, the matter dropped).
+#[test]
+fn a_report_not_yet_done_followed_by_a_draft_leaves_the_matter_with_the_assistant() {
+    let from_post = |mut r: Value| {
+        r["in_position"] = json!("ll-assistant");
+        r
+    };
+    let taken_back = |out: &str| out.lines().any(|l| l.starts_with("statement(basis=lease-1"));
+    let run = |why: Option<&str>, then_draft: bool| {
+        let (mut h, _, mut remit) = engaged();
+        remit["data"]["level"] = json!("draft");
+        h.wake(34 * DAY + 3600, world(vec![remit]));
+        let rf = last_referral(&h);
+        let mut data = json!({ "referral": rf, "done": false });
+        if let Some(w) = why {
+            data["why"] = json!(w);
+        }
+        let mut recs = vec![from_post(statement("rec.nd", 35 * DAY, ME, "report", &[ME], data))];
+        if then_draft {
+            recs.push(from_post(statement("rec.dr", 35 * DAY + 5, ME, "draft", &[ME], json!({ "referral": rf, "calls": NOTICE }))));
+        }
+        let mut out = all(&h.wake(35 * DAY + 3600, world(recs)));
+        for i in 1..4 {
+            out.push('\n');
+            out.push_str(&all(&h.wake(35 * DAY + 3600 + i * 600, world(vec![]))));
+        }
+        out
+    };
+    let out = run(Some("No draft has been prepared yet. The matter is not done."), true);
+    assert!(!taken_back(&out) && out.lines().any(|l| l.contains("kind=sign_off") && l.contains("basis=rec.dr")), "the draft that followed is read: {out}");
+    let out = run(None, false);
+    assert!(!taken_back(&out), "no reason given: still the assistant's: {out}");
+    let out = run(Some("the office refused it"), false);
+    assert!(taken_back(&out), "a reason, and nothing since: given back, as before: {out}");
+}
+
 #[test]
 fn a_body_s_paper_about_a_matter_handed_over_is_passed_on_and_no_other() {
     // (docs/behaviour/assistants.md, "What the client passes on": one law for every paper and body. About the matter: it

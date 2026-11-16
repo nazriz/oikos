@@ -921,6 +921,16 @@ impl State {
         mine
     }
 
+    /// Whether its assistant has sent it a paper on a matter after a report on it: a draft, a request to go ahead, a
+    /// question or advice naming the matter, later than the report (or as late, filed after it).
+    fn said_since(&self, referral: &str, report: &Record) -> bool {
+        [Draft::KIND, ApprovalRequest::KIND, Question::KIND, Advice::KIND].iter().any(|k| {
+            self.book.all(k).any(|p| {
+                p.id != report.id && crate::common::Fields::s(crate::common::data(p), "referral") == Some(referral) && self.letter(p) && (p.at > report.at || (p.at == report.at && crate::common::filed_before(&report.id, &p.id) == std::cmp::Ordering::Less))
+            })
+        })
+    }
+
     /// Whether a return on file is its own copy passed on to its desk (`pass_on`), not the body's.
     fn passed_copy(&self, r: &Record) -> bool {
         r.speaks_for.as_deref() == Some(self.me.as_str())
@@ -967,6 +977,14 @@ impl State {
                 return;
             }
             let Some(m) = self.matters.get(&action).cloned() else { return };
+            // (Not done, and nothing in it gives the matter back: no need is named, no reason is given, or its assistant has
+            // sent a paper on the matter since (a draft, a request to go ahead, a question, advice), which is its latest word
+            // on it. The matter stays with its assistant, as one that names a need does (`on_letter` above), and what follows
+            // on it is read like any other. The stakes run's rung 1 on gpt-6-luna, 2026-11-16: "No draft has been prepared
+            // yet" filed seconds before the draft; the client took the matter back and never read the draft.)
+            if !x.done && x.needs.is_none() && (x.why.as_deref().is_none_or(|w| w.trim().is_empty()) || self.said_since(&x.referral, r)) {
+                return;
+            }
             let k = Self::key(&m.agreement, &m.kind);
             if x.done {
                 self.seen.entry(k).or_default().saw(false, &r.id);
