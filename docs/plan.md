@@ -36,6 +36,9 @@ The build (docs/design/stakes.md section 7; first S, C1+B2, B1, D1a, A2, E by We
 - [x] D2. A client away for days, lawfully (the smallest version: too ill for their post at home, the health model's
   own conditions; a hospital as a place and trips out of town are WM-21).
 - [x] D3. Housing cases at the desk. Done 2026-11-14 (`Cohort.difficulty`; MT-40).
+- [x] D3b. Tenants who start the year hard up, a stated setting of the town (`opening_arrears`, on in every cell of the
+  stakes run: stakes-run.ts header; MT-42, the figures placeholders). Their outcomes are in the report's "What happened to
+  the people the desk served" (report.ts `peopleTable`). Done 2026-11-16.
 - [x] E. The episode reader and per-client outcomes, the code arm as reference; mistakes apart from choices.
 - [ ] The episode rate measured on the code screen: at least 4 a desk seat-month at S1, or the cohort enlarged.
 

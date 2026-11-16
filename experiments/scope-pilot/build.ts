@@ -164,6 +164,12 @@ export interface Options {
    * `first_claim` (S0, nothing at stake: from the first claim, kept through a lapse) or `decision` (S1: benefit income
    * lost per day of delay). Absent: the law says nothing of it (pays from the decision), as before. */
   dateOfEffect?: "first_claim" | "decision";
+  /** Tenants who start the year hard up (the generator's `opening_arrears`; docs/behaviour/generator.md, "Tenants behind
+   * as the year begins"; risk MT-42): the profile's share of let households open behind with the rent, by one or two
+   * rents on the landlord's books and their own, with little put by and less coming in than the rent and essentials.
+   * A stated setting of the town, not a cell: absent, the town exactly as before. Their opening rent statement names
+   * them, so with `cohort.difficulty` they are among the desk's clients. */
+  openingArrears?: boolean;
 }
 
 /** Our own trained translator, held fixed for every arm. */
@@ -203,7 +209,7 @@ export function build(o: Options): ExperimentSpec {
     name: o.name,
     world: {
       file: "worlds/town-1000.yaml",
-      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : []), ...(o.dateOfEffect ? [`support_date_of_effect=${o.dateOfEffect}`] : []), ...(o.clientPost === "slow" ? [`paperwork=${JSON.stringify({ every_days: SLOW_POST })}`] : []), ...(o.clientSituation === "on" ? ["assistant_situation=true"] : [])],
+      sets: ["years=1", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", "assistants=true", 'assistant_seats=["assistant-a","assistant-a-personal"]', ...(o.wants ? ["assistant_wants=true"] : []), ...(o.obstacles ? [`obstacles=${o.obstacles}`] : []), ...(o.supportStaffBps !== undefined && o.supportStaffBps !== 10_000 ? [`support.staff_hours_bps=${o.supportStaffBps}`] : []), ...(o.dateOfEffect ? [`support_date_of_effect=${o.dateOfEffect}`] : []), ...(o.clientPost === "slow" ? [`paperwork=${JSON.stringify({ every_days: SLOW_POST })}`] : []), ...(o.clientSituation === "on" ? ["assistant_situation=true"] : []), ...(o.openingArrears ? ["opening_arrears=true"] : [])],
       prepare(config: any, seed: number) {
         for (const post of o.offices ?? OFFICES) {
           const pos = config.positions.find((x: any) => x.id === post);

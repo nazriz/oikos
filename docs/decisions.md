@@ -14634,3 +14634,68 @@ from its referral on file whether or not it is still open.
 - **Why:** the owner wants to see quickly whether any model behaves differently from Haiku in this setup before deciding whether the study is worth running. A free model spends nothing against the dollar limits; it is bounded by its sittings (one a working day a seat), 24 calls a sitting (TURNS_PER_WAKE) and each call's time limit (900 s local; 3 x 180 s Codex).
 - **Read:** the running ollama (pid 13097) has OLLAMA_CONTEXT_LENGTH=32768, NUM_PARALLEL=3, FLASH_ATTENTION=1, KV_CACHE_TYPE=q8_0; a 36,000-token probe came back as exactly 32,768 prompt tokens with its start lost, so the window is 32,768 and a longer prompt is cut silently: OIKOS_LOCAL_CONTEXT=32768 belongs on every local start line. The installed ollama is 0.21.2; the newer families in its library (qwen3.5, qwen3.6, gemma4) need 0.30 or later.
 - **Revisit if** a model's arm name collides with another's (two hosts serving one model: name the folder by hand), or a hosted model needs more room than 8,000 tokens for its thinking.
+
+## 2026-11-16 · Tenants hard up as the year begins (`opening_arrears`); the housing side in the report
+
+- **Decision** (worlds/generator/generate.ts; profile `tenancy.opening_arrears`; docs/behaviour/generator.md, "Tenants behind
+  as the year begins"): a setting of the town, off unless a description sets `opening_arrears` (it needs `opening_caseload`).
+  The profile's share of let households open behind with the rent. Those the opening caseload already finds unable to pay
+  count toward it, and the rest are drawn on a stream of their own (`opening-arrears`) among working-age households whose
+  income (pay and payments in force) is less than the rent and their adults' essentials. Each owes the profile's one to
+  two rents, written as the caseload's `rent_statement`, which the landlord's rent book and the tenant both read as owed.
+  Each member's opening savings are drawn lower, to at most half a rent (never raised). It is on in every cell of the
+  stakes run (build.ts `openingArrears`; the stakes-run.ts header).
+- **Why:** MT-42. With homes dealt by income, the study's town opened with nobody behind and gave one notice to vacate in
+  210 days, so the study's part 2 (what happened to the people the assistant served) had no housing cases. A real town has
+  a share of its renters behind on any day. The households are the town's own: nobody is added, no job is taken away, and
+  no rule or rate in the chain is touched. The comfortable are never drawn, so a town with too few who cannot comfortably
+  carry their rent has fewer behind than the share. Pensioners with nothing coming in are left out: they live on what the
+  retired have put by (a six-figure balance in this profile), which is not who falls behind for want of work.
+- **The figures:** au-vic 500 bps, [1, 2] rents, 5,000 bps of a rent put by at most. All **PLACEHOLDERS** (the profile's
+  source line, and MT-42). The nearest published figures, unopened and not used: ABS Household Impacts of COVID-19
+  (Oct 2020), 4% of renting households with difficulty paying rent; ANU, April 2020, 6.9% unable to meet housing costs on
+  time.
+- **Which towns move:** only a town whose description sets `opening_arrears`. Today that is the stakes run's cells, every
+  rung, from this commit (the scratch specs that import `stakesRun` too). Every other town is unchanged: with the option off
+  or absent the world hashes the same (orchestrator/test/opening-caseload-offices.test.ts). With it on, the records added
+  are the rent statements, the chosen households' balances are lower, and the firms' registers of shareholders differ,
+  because shares are dealt by what people have put by.
+- **Read, a code town of 180 days** (the stakes run's main cell, decision × slow, seed 7, code arm; with and without the
+  setting): 237 let households, 12 opening behind (7 owing two rents, 5 one), all 12 in the desk's cohort by the
+  difficulty rule, at `tribunal_response: draft`.
+
+  | stage | with the setting (of the 12) | days | without |
+  |---|---|---|---|
+  | landlord writes to ask for the rent | 11 (10) | 17 to 37, one 114 | 1 (day 114) |
+  | notice to vacate | 13 (12) | 13 to 73, one 135 | 1 (day 135) |
+  | left on the notice | 3 | 31, 66, 74 | 0 |
+  | application for possession | 9 (9) | 34 to 94 | 0 |
+  | hearing notice with an answer-by date | 9 (9) | 34 to 94 | 0 |
+  | answered (from the desk's post, the client signing) | 3 (3) | 44, 61, 67 | 0 |
+  | order for possession | 8 (8) | 91 to 150 | 0 |
+  | order to pay (an arrears claim the landlord took to a body that hears arrears first) | 3 (3) | 108, 108, 115 | 0 |
+  | left on the order | 7 | 105 to 166 | 0 |
+  | warrant carried out: put out | 1 (1) | 134 | 0 |
+
+  Where the chain thins, and why, in the world's rules (left as it is): three tenants left at their notice's date, the
+  profile's `stay_past_notice_bps` (50%, a placeholder). Six of nine hearings went unanswered, at the profile's answer rate
+  (43%) as each tenant's record leans it. Seven of eight ordered out left by the order's date. One of eight stayed, and the
+  police put that household out. Three landlords of a lively character first asked a body that hears arrears for an order
+  to pay, and gave notice later. Hardly any rent was paid after day 1: only one of the 12 claimed a benefit (their
+  people's own take-up), and the bank refused the loans two of them asked for to tide them over. No benefit covered the rent.
+- **Matters reaching the desk** (one desk seat, code arm, from day 1): housing matters (a want about a notice, the answer to
+  a possession application, a rental application) 4.5, 5.5 and 5.2 a seat-month over 60, 120 and 180 days with the
+  setting, against 1.0, 1.8 and 1.7 without. Benefit claims, changes and reviews 6.5, 5.3 and 8.8 against 7.0, 6.5 and
+  7.8. The 12 handed over 12 wants about their notice, 3 answers to a possession application, 2 benefit changes, 2 loan
+  applications and 10 job applications. 5 hearing notices were passed on to the desk by the passing-on law (forward.rs),
+  where 3 were passed on without the setting.
+- **The report** (episodes.ts `housingOf`; report.ts `peopleTable`): per client and for the cohort, rent due and paid
+  after the fork, rent owed at the end as the landlord's rule reckons it (brought forward, plus each rent due to the
+  lease's end, less each rent paid on it), notices, applications, hearings answered by the date by the client or from an
+  assistant's post (late, not at all), orders, households put out. The table is cohort totals first, then each client
+  whose outcome differs, with the housing matters the seat held and what it did on each. A client whose home differs with
+  no housing matter handed to the seat is drift. In a mock fork the mock desk drafted none of the three answers, the
+  clients answered themselves, and one order for possession was not made by day 180. The table shows exactly that.
+- **Revisit if** a sourced arrears share is opened (MT-42); a town has fewer stretched households than its share (the
+  shortfall shows as fewer rent statements: say it in the study); or the 12 households' near-total failure to pay
+  (one benefit claim among them) turns out to be a fault in the citizens' claiming, not their take-up.

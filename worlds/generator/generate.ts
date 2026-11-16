@@ -388,6 +388,14 @@ export interface TownSpec {
    * landlords' and the tribunal's files when the year begins. Off unless set: a town without it opens with every
    * rent book at nought, as before. Needs the profile's law on possession and a tribunal. */
   opening_caseload?: boolean;
+  /** With `opening_caseload`: a share of the let households open behind with the rent, as a share of tenants in any
+   * town are (docs/behaviour/generator.md, "Tenants behind as the year begins"): the profile's
+   * `tenancy.opening_arrears` (the share, the rents owed, what they have put by). Who: drawn on a stream of its own
+   * among the let households of working age whose income does not comfortably cover the rent (less than the rent and
+   * their adults' essentials coming in); never among the comfortable, so where there are too few, fewer; each owes its rents on both books (the landlord's rent
+   * statement, read by the landlord's rent book and the tenant), and its leaseholder's opening savings are drawn lower,
+   * below the rent. Off unless set: a town without it is exactly the town it was. */
+  opening_arrears?: boolean;
   /** Assistants on offer (docs/behaviour/assistants.md; docs/design/delegation.md): the profile's providers sell their services,
    * and the posts that do matters some provider takes may engage one by their own rule. Off unless set: a town without it is
    * generated exactly as before. Needs the profile's `assistants`. */
@@ -2102,12 +2110,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const BEARS = 2 * 30; // (a landlord's patience before a notice: two rents behind, for two months; firm.landlord's own default)
     const NOTICE_ENDS = BEARS + POSS.notice_days + 1, HEARD = NOTICE_ENDS + DAYS_TO_HEARING, OUT = HEARD + POSS.possession_days;
     const before = (days: number) => `${days} day${days === 1 ? "" : "s"} before the year began`;
-    for (const x of let_) {
-      if (x.income >= x.rent || x.saved >= x.rent) continue;
-      // (How long ago the first rent was missed, in days. Past the notice's date only those who stayed are still in
-      // the home: the rest are drawn again among the stages before it.)
-      let ago = draw.below(OUT);
-      if (ago >= NOTICE_ENDS && draw.below(10_000) >= POSS.stay_past_notice_bps) ago = draw.below(NOTICE_ENDS);
+    const caught = new Set<string>();
+    const write = (x: (typeof let_)[number], ago: number) => {
       const rents = Math.floor(ago / 30) + 1, owed = rents * x.rent;
       const both = [x.landlord, x.tenant];
       const paper = (id: string, kind: string, by: string, to: string[], visible: string[], basis: string, text: string, data: object) =>
@@ -2115,12 +2119,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       paper(`${x.lease}-rent-book`, "rent_statement", x.landlord, [x.tenant], both, x.lease,
         `Statement of the rent account under ${x.lease} as the year began: ${formatMoney(owed, V.currency)} of rent owed (${rents} rent${rents === 1 ? "" : "s"} of ${formatMoney(x.rent, V.currency)}), the oldest of it due ${before(ago)}.`,
         { lease: x.lease, owed, rents, rent: x.rent, since: -ago * DAY, account: `acc-${x.landlord}` });
-      if (ago < BEARS) continue;
+      if (ago < BEARS) return;
       const given = ago - BEARS, by = (POSS.notice_days + 1 - given) * DAY;
       paper(`${x.lease}-vacate`, "notice_to_vacate", x.landlord, [x.tenant], both, x.lease,
         `Notice to vacate, given ${before(given)}: the rent under ${x.lease} is in arrears. You are to leave ${x.space} by ${by > 0 ? formWords.dateWords(by) : `a day now past (${before(Math.ceil(-by / DAY))})`}. If the arrears are paid before then, this notice lapses. If you are still there after it, we may apply to the tribunal for possession.`,
         { lease: x.lease, reason: "arrears", arrears: Math.max(2, Math.floor(BEARS / 30)) * x.rent, by, given: -given * DAY, law: "law-possession" });
-      if (ago < NOTICE_ENDS) continue;
+      if (ago < NOTICE_ENDS) return;
       const applied = ago - NOTICE_ENDS, answerBy = (DAYS_TO_HEARING - applied) * DAY + 9 * 3600;
       const application = { kind: "possession", matter: "possession", against: x.tenant, about: x.lease, amount: (Math.floor(NOTICE_ENDS / 30) + 1) * x.rent, rent: x.rent, account: `acc-${x.landlord}`, space: x.space, structure: x.structure, household: x.household,
         notice: `${x.lease}-vacate`, notice_given: -given * DAY, notice_by: by, evidence: { id: x.lease, record: "agreement" } };
@@ -2130,13 +2134,56 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       paper(`${x.lease}-hearing`, "hearing_notice", "tribunal", both, [...both, "tribunal"], `${x.lease}-possession`,
         `${x.landlord} has applied to us about possession, seeking ${formatMoney(application.amount, V.currency)} (application ${x.lease}-possession). ${heard ? `The time to answer ran out ${before(ago - HEARD)}.` : `You may answer by day ${Math.floor(answerBy / DAY)}.`}`,
         { application: `${x.lease}-possession`, kind: "possession", matter: "possession", applicant: x.landlord, against: x.tenant, hearing_at: heard ? 0 : answerBy, answer_by: heard ? 0 : answerBy, about: x.lease, amount: application.amount, structure: x.structure });
-      if (!heard) continue;
+      if (!heard) return;
       const ordered = ago - HEARD, due = (POSS.possession_days - ordered) * DAY;
       paper(`${x.lease}-order`, "tribunal_order", "tribunal", both, [...both, "tribunal"], `${x.lease}-possession`,
         `Decision on ${x.lease}-possession, made ${before(ordered)}: ${x.landlord} is to have possession of ${x.space} on ${formWords.dateWords(due)}: ${x.tenant} and their household are to leave by then. If they have not, ${x.landlord} may ask our registrar for a warrant, which is carried out by those who enforce our orders, and by nobody else.`,
         { application: `${x.lease}-possession`, kind: "possession", matter: "possession", applicant: x.landlord, against: x.tenant, finding: "possession", binding: true, waited_days: DAYS_TO_HEARING, about: x.lease, structure: x.structure, amount: application.amount, due, space: x.space, household: x.household });
+    };
+    for (const x of let_) {
+      if (x.income >= x.rent || x.saved >= x.rent) continue;
+      // (How long ago the first rent was missed, in days. Past the notice's date only those who stayed are still in
+      // the home: the rest are drawn again among the stages before it.)
+      let ago = draw.below(OUT);
+      if (ago >= NOTICE_ENDS && draw.below(10_000) >= POSS.stay_past_notice_bps) ago = draw.below(NOTICE_ENDS);
+      write(x, ago);
+      caught.add(x.lease);
+    }
+    // ---- tenants behind as the year begins (`opening_arrears`; docs/behaviour/generator.md, "Tenants behind as the
+    // year begins"). A share of a real town's renting households are behind with the rent on any day; homes dealt by
+    // income leave a town with almost none who cannot pay at once. Where the spec asks, the profile's share of the let
+    // households are behind: those already behind above count toward it, and the rest are drawn, on a stream of their
+    // own, among the households of working age whose income does not comfortably cover the rent (less coming in than the
+    // rent and the essentials of their adults), never among the comfortable: where there are too few, fewer are behind. Each owes
+    // the profile's rents, the oldest missed so long ago, by the same papers as above (the landlord's statement of the
+    // rent account, which the landlord's rent book and the tenant both read as owed); and what its members had put by
+    // was spent before the year: each one's opening savings drawn lower, below the profile's share of a rent.
+    if (spec.opening_arrears) {
+      const OA = V.tenancy.opening_arrears;
+      if (!OA) throw new Error(`profile ${P.id}: opening_arrears needs the profile's tenancy.opening_arrears (the share of renters behind, the rents they owe, what they have put by)`);
+      const pick = rng("opening-arrears");
+      const ESS = V.spending.essentials_per_month;
+      const adultIds = new Set(everyone.filter((m) => m.adult).map((m) => m.id));
+      const want = Math.round((OA.share_bps * let_.length) / 10_000) - caught.size;
+      // (Of working age: a leaseholder past the profile's age of retirement with nothing coming in lives on what the
+      // retired have put by, and is not who falls behind for want of work or pay.)
+      const workingAge = new Set(everyone.filter((m) => working(m)).map((m) => m.id));
+      const pool = let_.filter((x) => !caught.has(x.lease) && workingAge.has(x.tenant) && x.income < x.rent + ESS * x.household.filter((m) => adultIds.has(m)).length);
+      for (let i = 0; i < want && pool.length; i++) {
+        const x = pool.splice(pick.below(pool.length), 1)[0]!;
+        const [lo, hi] = OA.rents;
+        const rents = lo + pick.below(hi - lo + 1), ago = (rents - 1) * 30 + pick.below(30);
+        write(x, ago);
+        caught.add(x.lease);
+        const most = Math.floor((OA.savings_most_rent_bps * x.rent) / 10_000);
+        for (const m of x.household) {
+          const acc = accounts.find((a: any) => a.id === `acc-${m}`);
+          if (acc) { const v = Math.min(Number(acc.balance), pick.below(most + 1)); acc.balance = typeof acc.balance === "string" ? String(v) : v; }
+        }
+      }
     }
   }
+  if (spec.opening_arrears && !(spec.opening_caseload && POSS && JU)) throw new Error("opening_arrears needs opening_caseload, the profile's law on possession and a tribunal");
 
   // ---- the other offices' ordinary caseload (docs/behaviour/generator.md, "The other offices' caseload"; docs/decisions.md,
   // 2026-10-12, "Opening caseloads of the other offices"). Each count is what the town's own mechanism holds in steady

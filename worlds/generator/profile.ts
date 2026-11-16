@@ -282,7 +282,12 @@ export interface Profile {
        * what the source divides the rent by ("gross" or "net" income; "expenditure" where no income is surveyed, which the
        * generator reads as income before tax). A town's first tenancies are dealt by it. Left out: homes are dealt by
        * size alone, as before. */
-      rent_share_of_income?: { of: "gross" | "net" | "expenditure"; bands: { under_bps?: number; bps: number }[]; placeholder?: boolean } };
+      rent_share_of_income?: { of: "gross" | "net" | "expenditure"; bands: { under_bps?: number; bps: number }[]; placeholder?: boolean };
+      /** Tenancies already behind with the rent as the year begins, for a town generated with `opening_arrears`
+       * (docs/behaviour/generator.md, "Tenants behind as the year begins"): the share of let households behind
+       * (`share_bps`), how many rents each owes (`rents`, the least and the most, drawn evenly), and what they have put
+       * by, at most this share of a month's rent (`savings_most_rent_bps`). Read only where a spec sets the option. */
+      opening_arrears?: { share_bps: number; rents: [number, number]; savings_most_rent_bps: number } };
     values: { [value: string]: { mean_bps: number; sd_bps: number } };
     /** What holds someone in a job they have (docs/behaviour/citizen.md, "Moving to another job"), read only for a living town: how much more another job must pay, and how much more again for each year they have been where they are. */
     job_move?: { premium_bps: number; per_year_bps: number; cap_years: number; other_trade_bps?: number };

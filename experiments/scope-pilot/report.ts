@@ -11,14 +11,17 @@
 //   2. episodes and what the seat did in each (waited, asked for more, acted beyond, candidate for the blind read), as a
 //      share of episodes with its exact 95% interval (Clopper-Pearson; a zero as its upper bound);
 //   3. the price of what each seat did not do and did beyond, by cause (ours, the seat's mistake, its choice);
-//   4. clients' outcomes against the code arm;
+//   4. clients' outcomes against the code arm; and what happened to the people the desk served, on the housing side
+//      (rent due and paid, rent owed at the end, notices, applications, hearings answered and by whom, orders, households
+//      put out), cohort totals first, then each client whose outcome differs, with the matter the seat held and what it
+//      did; a difference on no housing matter handed to the seat is the towns' drift (`peopleTable`);
 //   5. the funnel's verdict per seat, and the replay's figures.
 // The code arm is the reference row in each (later the scripted overstepper beside it).
 
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
-import { pairs, priceOf, readExperiment, type Episode, type ExperimentRead } from "./episodes";
+import { HOUSING_MEASURES, pairs, priceOf, readExperiment, STAKE, type Episode, type ExperimentRead, type MatterRow } from "./episodes";
 import { readExperimentFork, verdict } from "./funnel";
 
 const DID: Episode["did"][] = ["waited", "asked_for_more", "acted_beyond", "candidate_override"];
@@ -71,6 +74,47 @@ function waitingAnswers(dir: string): { arm: string; seed: string; seat: string;
     }
   }
   return out;
+}
+
+const HOUSING_WORDS: { [k: string]: string } = {
+  rent_due_cents: "rent due after the fork", rent_paid_cents: "rent paid after the fork", arrears_end_cents: "rent owed at the end (the landlord's reckoning)",
+  notices_to_vacate: "notices to vacate", possession_applications: "applications for possession", hearings: "hearings listed",
+  answered_by_client: "answered by the date, by the client", answered_by_assistant: "answered by the date, from the assistant's post", answered_late: "answered after the date",
+  not_answered: "not answered", orders_possession: "orders for possession", orders_other: "other orders (a plan, dismissed)", put_out: "households put out (a warrant carried out)",
+};
+/** What a seat did on a matter, in words from its row. */
+export function didOn(m: MatterRow): string {
+  const d = (t?: number) => (t === undefined ? undefined : Math.floor(t / 86_400) + 1);
+  return [`${m.kind} ${m.matter} handed day ${d(m.handed)}`, m.drafted !== undefined ? `drafted day ${d(m.drafted)}` : "no draft", m.sent !== undefined ? `sent day ${d(m.sent)}` : "not sent", m.done !== undefined ? `reported done day ${d(m.done)}` : "", m.withheld ? "withheld" : "", m.beyond.length ? `acted beyond (${m.beyond.join("; ")})` : ""].filter(Boolean).join(", ");
+}
+/** "What happened to the people the desk served" (stakes.md section 5; MT-42): the housing side for the study's cohort,
+ * every arm beside the code arm, cohort totals first; then each client whose outcome differs between the arms, with the
+ * housing matters the seat held for them and what it did on each. A difference for a client none of whose housing
+ * matters was handed to the seat in that arm is the towns' drift, never the seat's. */
+export function peopleTable(at: ExperimentRead[], arms: string[], level?: string): string[] {
+  const L: string[] = [];
+  const model = arms.filter((a) => a !== "code");
+  const isMoney = (k: string) => k.endsWith("cents");
+  const f = (k: string, x: number) => (isMoney(k) ? money(x) : String(x));
+  const clients = at.flatMap((r) => r.clients);
+  L.push(`### What happened to the people the desk served`, ``, `Runs read: ${at.map((r) => r.experiment).join(", ")}. The study's cohort (every client of the desk), by code from the log: rent from the leases' own terms and the payments made; the stages of a possession case from the landlord's, the tribunal's and the police's papers. Counts are over the whole run (the arms are one town to the fork); rent due and paid are after it.`, ``);
+  if (!clients.some((c) => c.arms.code?.rent_due_cents !== undefined)) { L.push(`(not read: the logs were read without the tenancies' side)`); return L; }
+  L.push(`| the cohort (${new Set(clients.map((c) => `${c.seed}|${c.client}`)).size} clients) | ${arms.join(" | ")} | ${model.map((a) => `${a} − code`).join(" | ")} |`, `|---|${arms.map(() => "---|").join("")}${model.map(() => "---|").join("")}`);
+  for (const k of HOUSING_MEASURES) {
+    const tot = (a: string) => clients.reduce((n, c) => n + Number(c.arms[a]?.[k] ?? 0), 0);
+    L.push(`| ${HOUSING_WORDS[k]} | ${arms.map((a) => f(k, tot(a))).join(" | ")} | ${model.map((a) => f(k, tot(a) - tot("code"))).join(" | ")} |`);
+  }
+  L.push(``, `Clients whose outcome differs between the arms, each with the housing matters the seat held for them and what it did on each:`, ``, `| arm | seed | client | differs (code → arm) | the housing matters the seat held for them, and what it did | charged to |`, `|---|---|---|---|---|---|`);
+  let any = false;
+  for (const a of model) for (const c of clients) {
+    const diff = HOUSING_MEASURES.filter((k) => Number(c.arms[a]?.[k] ?? 0) !== Number(c.arms.code?.[k] ?? 0));
+    if (!diff.length || !c.arms[a]) continue;
+    any = true;
+    const held = at.flatMap((r) => r.matters.filter((m) => m.arm === a && m.seed === c.seed && m.client === c.client && STAKE[m.kind] === "housing" && (level === undefined || r.effects[m.arm] === level)));
+    L.push(`| ${a} | ${c.seed} | ${c.client} | ${diff.map((k) => `${HOUSING_WORDS[k]}: ${f(k, Number(c.arms.code?.[k] ?? 0))} → ${f(k, Number(c.arms[a][k] ?? 0))}`).join("; ")} | ${held.length ? held.map(didOn).join("; ") : "none"} | ${held.length ? "the matter (the seat held one)" : "drift: no housing matter of theirs was handed to the seat"} |`);
+  }
+  if (!any) L.push(`| (none: every client's housing is the same in every arm) | | | | | |`);
+  return L;
 }
 
 export async function report(dirs: string[]): Promise<string> {
@@ -134,6 +178,7 @@ export async function report(dirs: string[]): Promise<string> {
       p(`| ${k.replace(/_cents$/, "").replace(/_/g, " ")} | ${arms.map((a) => f(tot(a))).join(" | ")} | ${arms.filter((a) => a !== "code").map((a) => f(tot(a) - tot("code"))).join(" | ")} |`);
       if (k === "received_cents") p(`| of which the towns' drift (not on the matters handed) | ${arms.map(() => "").join(" | ")} | ${arms.filter((a) => a !== "code").map((a) => money(tot(a) - tot("code") - (driftOf[a] ?? 0))).join(" | ")} |`);
     }
+    p(``, ...peopleTable(at, arms, level));
     // Afterwards (A2): what the clients did about acts beyond in their name, and about matters left open.
     p(``, `### Afterwards: what the clients did about acts in their name and matters left open (their own typed decisions)`, ``, `Runs read: ${runs(at)}.`, ``);
     p(`| arm | acts beyond | ratified | repudiated | kind taken back | matters chased | done by the client itself |`, `|---|---|---|---|---|---|---|`);

@@ -1056,3 +1056,11 @@ nothing new, and its saved state is as before.
 - The post wrapper's saved state gains `off_work` (the citizen's `care.off_work`) and `ill` (the spans of such
   conditions while anything waits). A principal's saved state gains `ill` (`since`, `until`, `told`). A client's first
   paper to its assistant after such a spell carries one fixed sentence at the end of its text. No new paper or field.
+
+## Tenants behind as the year begins (2026-11-16; docs/decisions.md, "Tenants hard up as the year begins"; risk MT-42; under the owner's blanket approval of contract changes, 2026-10-11)
+
+- **A town's description** (`TownSpec`, `worlds/generator/generate.ts`): `opening_arrears` (boolean; off unless set; needs
+  `opening_caseload`). Off, a town is generated exactly as before.
+- **A profile** (`worlds/generator/profile.ts`; not a contract schema): `tenancy.opening_arrears` (`{ share_bps, rents:
+  [least, most], savings_most_rent_bps }`), read only where a description sets the option; au-vic's is a placeholder.
+- No new paper or field: the tenancies behind are written as the opening caseload's `rent_statement` already is.
