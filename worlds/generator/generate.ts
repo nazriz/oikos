@@ -222,7 +222,7 @@ const ASSISTANT_MATTERS = ["referral", "sign_off", "declined", "go_ahead", "hand
  * rule "letters from offices are not answered", leaving its clients' letters asking where their matter stood unanswered:
  * rung 2 of the stakes run.) */
 export const LETTERS_PRACTICE = "Letters from this office, and what answers them. A person reads a letter from an office and keeps it, and it is on their record that the office wrote. People here do not answer a letter written in an office's own words, and do nothing on one: no reply is the ordinary case, and says nothing of whether it was read or what they think. What a person acts on, and answers where there is an answer to give, is a paper on one of the office's own forms, or another paper of a set kind (a request, a notice, an offer, a decision): each is answered on a paper of its own, which comes to the office as its post. Another office, written to, answers by saying what it acts on and how to ask it. A letter written to this office is another thing: one from someone it serves, asking where their matter stands or what has become of it, is this office's to answer, by a letter of its own or on its forms.";
-const EFFECT_WORDS: { [k in "first_claim" | "decision"]: string } = {
+export const EFFECT_WORDS: { [k in "first_claim" | "decision"]: string } = {
   first_claim: "A granted claim is paid from the day the person first claimed it, even if they had to claim it again because something we asked for came too late; what is owed for the days before is paid with the first payment.",
   decision: "A granted claim is paid from one payment period after it is decided; nothing is paid for the days before.",
 };

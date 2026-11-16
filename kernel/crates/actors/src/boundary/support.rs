@@ -931,6 +931,10 @@ impl Support {
             // payment in force and a grant started its clock afresh: the stakes probe's code arm granted a pensioner's second
             // claim on day 36 and the payment due on day 40 was never made; a refused second claim would have ended it.
             let in_force = self.paying.values().filter(|x| x.person == who && x.payment == payment).map(|x| x.next).min();
+            // (What the payment in force still owes for the days before its first payment goes on with the one that
+            // replaces it: the stakes run's rung 3, c0306, granted on review on day 47 with its back pay due with the
+            // first payment on day 61, its new claim granted on day 59, and the back pay never paid.)
+            let back_owed: i64 = self.paying.values().filter(|x| x.person == who && x.payment == payment).map(|x| x.back).sum();
             if matches!(d, Decided::Granted { .. }) {
                 self.paying.retain(|_, x| !(x.person == who && x.payment == payment));
             }
@@ -953,6 +957,9 @@ impl Support {
                     let rule = rule.expect("a claim is granted only under a rule");
                     let every = rule.every_days * DAY;
                     self.start_paying(&c, Some(rule), payment.clone(), *amount, every, in_force.map_or(t + every, |n| n.min(t + every)), *until);
+                    if let Some(p) = self.paying.get_mut(c.id.as_str()) {
+                        p.back += back_owed;
+                    }
                     paper.granted = true;
                     paper.amount = Some(*amount);
                     paper.every = Some(every);
@@ -1587,6 +1594,23 @@ mod transfer_tests {
         assert_eq!(run(Some("first_claim")), [1_400_000 + 1_100_000]);
         assert_eq!(run(Some("decision")), [1_400_000]);
         assert_eq!(run(None), [1_400_000]);
+        // (A further claim granted before that first payment does not lose what was owed: it goes with the first payment
+        // of the grant that replaces it. The stakes run's rung 3, c0306, whose back pay was never paid.)
+        let data = json!({ "support": "payments", "date_of_effect": "first_claim", "payments": [rule(json!({ "id": "pension", "every_days": 14, "who": { "from_age": 67 }, "amount": { "flat": 1_400_000 } }))] });
+        let dec = st("law-dec", 0, "law", "outside", json!({ "decisions": [{ "kind": "benefit_decision", "needs": [{ "id": "n1", "from": "claimant", "what": "proof of age", "within_days": 5, "else": "refuse" }] }] }));
+        let mut m = office();
+        at(&mut m, 0, vec![st("law-support", 0, "law", "outside", data), dec, claim("c1", 0, "old", "pension", 70, None)]);
+        let lapsed = decisions(&at(&mut m, 6 * DAY, vec![]));
+        let refusal = st_to("rec.60", 6 * DAY, "benefit_decision", "outside", &["old"], lapsed[0].clone());
+        at(&mut m, 10 * DAY, vec![refusal, claim("c2", 10 * DAY, "old", "pension", 70, None)]);
+        let evidence = st_to("rec.61", 11 * DAY, "evidence", "old", &["outside"], json!({ "claim": "c2", "need": "n1" }));
+        let granted = decisions(&at(&mut m, 11 * DAY, vec![evidence]));
+        let grant = st_to("rec.62", 11 * DAY, "benefit_decision", "outside", &["old"], granted[0].clone());
+        at(&mut m, 20 * DAY, vec![grant, claim("c3", 20 * DAY, "old", "pension", 70, None)]);
+        let evidence = st_to("rec.63", 21 * DAY, "evidence", "old", &["outside"], json!({ "claim": "c3", "need": "n1" }));
+        assert_eq!(decisions(&at(&mut m, 21 * DAY, vec![evidence]))[0]["granted"], true);
+        let cents: Vec<i64> = paid(&at(&mut m, 25 * DAY, vec![])).into_iter().map(|(_, c, _)| c).collect();
+        assert_eq!(cents.iter().sum::<i64>(), 1_400_000 + 1_100_000, "the back pay goes with the first payment: {cents:?}");
     }
 
     #[test]

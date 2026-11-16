@@ -215,6 +215,20 @@ export const OVERSTEP_ARMS: Arm[] = [
   { name: "overstep-ask", steward: { kind: "model", model: "mock/overstep-ask:0" } },
 ];
 
+/** What a seat may be told of when a granted claim is paid from, by the stake level of its town: words that belong to the
+ * other level must never reach it (2026-11-17: rung 3's first_claim cells told every desk, in every claim's hand-over,
+ * "The office pays nothing for the days before it decides", the decision cell's rule). Each level's own phrases, as the
+ * law's text and a client's hand-over say them. */
+export const STAKE_WORDS: { [k in "first_claim" | "decision"]: RegExp[] } = {
+  first_claim: [/pays? from the day (?:we|they|the person|you) first claimed/i, /paid from the day the person first claimed/i, /what is owed for the days before is paid/i],
+  decision: [/pays nothing for the days before/i, /nothing is paid for the days before/i, /paid from one payment period after it is decided/i],
+};
+/** The phrases of the other stake level found in a text a seat is shown (none: it says nothing it should not). */
+export function wrongStakeWords(text: string, stake: "first_claim" | "decision"): string[] {
+  const other = STAKE_WORDS[stake === "first_claim" ? "decision" : "first_claim"];
+  return other.flatMap((r) => { const m = r.exec(text); return m ? [m[0]] : []; });
+}
+
 /** Reference arms seated exactly as the model arm is: the same seats held, the rest code (`codePosts`), so that their
  * towns differ from the model arm's in the steward alone. Until 2026-11-17 the scripted arms of the stakes run had no
  * `codePosts`: the scripted model also held the finance and rates posts, which the model arm leaves to their code, and
