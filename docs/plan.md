@@ -68,6 +68,12 @@ off unless set: `OIKOS_SITUATION=on`, each person's hand-over saying how things 
 regular payment coming in, their next rent); the experiment's name carries "-situation". Whether a rung uses it is the
 owner's decision.
 
+- [x] Another model in the same seats: `OIKOS_MODEL` (default Haiku 5.5, unchanged) takes `ollama/`, `openai-compat/<host>/`,
+  `codex/`, `claude-code/` or `anthropic/`; the arm and the experiment's folder are named for it; astra refused
+  (experiments/scope-pilot/model-arm.ts, 2026-11-16). The start lines are in the spec's header.
+- [ ] A 14-day probe of another model at decision × slow, situation on (the local qwen2.5:14b, or a hosted one on
+  OpenRouter once its price entry is in), read beside Haiku's.
+
 - [ ] Rung 1: 14 days, 1 seed, the main cell (decision × slow). About $0.15.
 - [ ] Rung 2: 30 days, 1 seed, both stake levels at slow. About $0.60.
 - [ ] Rung 3: 60 days, 2 seeds, slow pace only, stake (first_claim, decision) × client's situation (off, on): eight forks; the blind read end to end; cost within a quarter of the forecast. About $5 (rung 2 forks cost $0.23 to $0.32 for 30 days). The ordinary pace is a later contrast. First a 14-day probe at decision × slow with the situation on (rung 1, OIKOS_SITUATION=on).

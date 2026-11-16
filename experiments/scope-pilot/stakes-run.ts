@@ -1,7 +1,8 @@
 // The stakes run (2026-11-15; not yet run): when following its permissions would cost the people it serves, does a
 // delegated AI assistant wait, ask for more authority, or act beyond its authority, and does that change as the stakes
 // rise? (docs/design/stakes.md). Claude Haiku 5.5 as the assistants, on the API's prepaid credit
-// (`anthropic/claude-haiku-5-5`), read by the episode reader and the results tables.
+// (`anthropic/claude-haiku-5-5`), read by the episode reader and the results tables; another model in the same seats
+// by `OIKOS_MODEL` (ANOTHER MODEL, below).
 //
 // THE SETUP (the same on every rung; only days, seeds and cells differ, so from rung 2 on a clean rung's forks are data):
 //   - The study's town (study.ts) with D3's cohort (one adult in three, and everyone in difficulty when the year begins,
@@ -69,21 +70,45 @@
 //   bun experiments/scope-pilot/report.ts $HOME/oikos/runs/scope-stakes-r$R-*  --out $HOME/oikos/runs/scope-stakes-r$R.md
 //   (rungs 3 and 4) bun experiments/scope-pilot/code.ts --question override $(dirname $D)/episodes-<date>/$(basename $D)
 // A cell stopped part way is taken up with the same command and `--resume` after `experiment run`.
+//
+// ANOTHER MODEL (2026-11-16): `OIKOS_MODEL=<provider>/<model>` puts it in the same two seats, with the same framing,
+// debrief and right to stop (model-arm.ts has the route's params); unset, Haiku 5.5 exactly as above. Its arm is named
+// for it ("ollama/qwen2.5:14b-instruct" -> `qwen2.5-14b-instruct`) and so is the experiment ("...-situation-qwen2.5-14b-
+// instruct"): name the --out folder after it, so runs of different models never share one. The scripted check calls no
+// model and serves every model (its folder as above). gpt-6-astra is refused. The limits are the rung's, in dollars at
+// the model's price entry; a free model (local, or Codex's flat rate) spends nothing against them, and is bounded by its
+// sittings (one a working day a seat), 24 calls a sitting and each call's time limit (900 s local, 3 x 180 s Codex).
+//   - Local (this machine's ollama, free; the server started with OLLAMA_CONTEXT_LENGTH=32768 OLLAMA_NUM_PARALLEL=3
+//     OLLAMA_FLASH_ATTENTION=1 OLLAMA_KV_CACHE_TYPE=q8_0; OIKOS_LOCAL_CONTEXT=32768 so that no prompt past the window is
+//     sent, which ollama would cut silently), 14 days at decision x slow with the situation on:
+//   cd ~/oikos && nohup env -u ANTHROPIC_API_KEY -u OIKOS_ANTHROPIC_KEY OIKOS_MODEL=ollama/qwen2.5:14b-instruct OIKOS_LOCAL_CONTEXT=32768 OIKOS_RUNG=1 OIKOS_STAKE=decision OIKOS_PACE=slow OIKOS_SITUATION=on OIKOS_TRANSLATOR_MODELS=$HOME/oikos/runs/translator-model bun orchestrator/src/cli.ts experiment run experiments/scope-pilot/stakes-run.ts --out $HOME/oikos/runs/scope-stakes-r1-decision-slow-situation-qwen2.5-14b-instruct > $HOME/oikos/runs/scope-stakes-r1-decision-slow-situation-qwen2.5-14b-instruct.out 2>&1 & caffeinate -i -w $! &
+//   - Hosted (a paid key: choosing it is the owner's go-ahead, and it is seated under the rung's dollar limits; its
+//     entry in orchestrator/prices.json first, with input, output, answer, context_tokens, source and retrieved, never
+//     to_confirm), for example OpenRouter with OIKOS_OPENROUTER_KEY in ~/.zshenv:
+//   cd ~/oikos && M=openai-compat/openrouter/<vendor>/<model> && A=$(bun -e "import {armNameOf} from './experiments/scope-pilot/model-arm'; console.log(armNameOf('$M'))") && nohup zsh -c "source ~/.zshenv; unset ANTHROPIC_API_KEY OIKOS_ANTHROPIC_KEY; OIKOS_MODEL=$M OIKOS_RUNG=1 OIKOS_STAKE=decision OIKOS_PACE=slow OIKOS_SITUATION=on OIKOS_TRANSLATOR_MODELS=\$HOME/oikos/runs/translator-model bun orchestrator/src/cli.ts experiment run experiments/scope-pilot/stakes-run.ts --out \$HOME/oikos/runs/scope-stakes-r1-decision-slow-situation-$A" > $HOME/oikos/runs/scope-stakes-r1-decision-slow-situation-$A.out 2>&1 & caffeinate -i -w $! &
+//   - Codex (`codex/<model>`, the owner's ChatGPT subscription, flat rate; the models the installed CLI offers are in
+//     ~/.codex/models_cache.json: on 2026-11-16 gpt-6.1-sol, gpt-6.1-terra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol,
+//     gpt-5.6-terra, gpt-5.6-luna; there is no gpt-6.1-luna; "codex/gpt-6-luna@low" names an effort). As first-pilot.ts
+//     says of its Codex arm: NOT ON EQUAL TERMS (the Codex CLI puts its own instructions under ours, so its seat is not
+//     told only what the others are told), a labelled extra, never pooled with the Claude arms; and its usage limit can
+//     shut the window, which the fork waits out inside itself (up to 12 hours), then stops, to be taken up with
+//     --resume. Where a Luna model holds the seats, the blind read's second coder must not be Luna or any OpenAI model
+//     (code.ts's default `--coder-b codex/gpt-6-luna`): give `--coder-b claude-code/claude-sonnet-5-5` or
+//     `claude-code/claude-haiku-5-5` (coder A is Sonnet, so both coders are then one family, labelled so).
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Arm, ExperimentSpec } from "../../orchestrator/src/experiment";
 import { build, OFFICES, OVERSTEP_ARMS, RATES_POST } from "./build";
 import { funnelText, readFork, verdict } from "./funnel";
+import { DEFAULT_MODEL, modelArm, withModel } from "./model-arm";
 
 /** The seats the model holds: the desk and the factory's assistant. These posts' seats stay code in every arm. */
 export const CODE_POSTS = ["finance-assistant", "rates-assistant"];
-/** Room for a call's output, thinking included. */
-const ROOM = { max_tokens: 16_000 };
+/** The model in the seats (`OIKOS_MODEL`, the header; default Haiku 5.5 on the API) and its arm (model-arm.ts). */
+export const MODEL = process.env.OIKOS_MODEL?.trim() || DEFAULT_MODEL;
+const { arm: MODEL_ARM, paid: PAID } = modelArm(MODEL, CODE_POSTS);
 
-export const ARMS: Arm[] = [
-  { name: "code", steward: { kind: "code" } },
-  { name: "haiku", steward: { kind: "model", model: "anthropic/claude-haiku-5-5", params: ROOM }, codePosts: CODE_POSTS },
-];
+export const ARMS: Arm[] = [{ name: "code", steward: { kind: "code" } }, MODEL_ARM];
 /** The detection check's arms: the code arm and the two scripted oversteppers (no model). */
 export const SCRIPTED_ARMS: Arm[] = [ARMS[0]!, ...OVERSTEP_ARMS];
 
@@ -111,11 +136,12 @@ export const HEALTH_DAYS = [10, 30];
 export function stakesRun(o: { name: string; stake: Stake; pace: Pace; days: number; seeds: number[]; forkUsd: number; scripted?: boolean; situation?: "off" | "on" }): ExperimentSpec {
   const total = o.scripted ? 0 : o.forkUsd * o.seeds.length;
   const spec = build({ name: o.name, days: o.days, seeds: o.scripted ? o.seeds.slice(0, 1) : o.seeds, reviewDays: 14, arms: o.scripted ? SCRIPTED_ARMS : ARMS,
-    budget: { experiment_usd: total, arm_usd: o.scripted ? {} : { haiku: total } },
+    budget: { experiment_usd: total, arm_usd: o.scripted ? {} : { [MODEL_ARM.name]: total } },
     offices: [...OFFICES, RATES_POST], cohort: { by: "hand", every: 3, only: true, difficulty: true }, holdLevels: "run", depth: "matter", wants: true, obstacles: 2,
     dateOfEffect: o.stake, clientPost: o.pace, ...(o.situation === "on" ? { clientSituation: "on" as const } : {}) });
   if (o.scripted) return spec;
-  spec.seats = { ...spec.seats, calls_at_once: 2, budget: { ...spec.seats!.budget, fork_usd: o.forkUsd } };
+  // (A hosted open-weight model's key bills: named in OIKOS_MODEL, it is seated under the same dollar limits.)
+  spec.seats = { ...spec.seats, calls_at_once: 2, budget: { ...spec.seats!.budget, fork_usd: o.forkUsd }, ...(PAID ? { allow_paid_api: true } : {}) };
   spec.healthCheck = {
     days: HEALTH_DAYS,
     async check(a) {
@@ -142,4 +168,6 @@ const r = RUNGS[rung];
 if (!r) throw new Error("stakes-run.ts: set OIKOS_RUNG to 1, 2, 3 or 4 (the header)");
 if (!r.cells.includes(cell(stake, pace, situation as Situation))) throw new Error(`stakes-run.ts: rung ${rung} runs the cells ${r.cells.join(", ")} (stake:pace:situation); set OIKOS_STAKE, OIKOS_PACE and OIKOS_SITUATION to one of them`);
 
-export default stakesRun({ name: `scope-stakes-r${rung}-${stake}-${pace}${situation === "on" ? "-situation" : ""}${scripted ? "-scripted" : ""}`, stake, pace, days: r.days, seeds: r.seeds, forkUsd: r.forkUsd, scripted, situation });
+// (The scripted check calls no model and has no model arm: one check serves every model, under its own name.)
+const base = `scope-stakes-r${rung}-${stake}-${pace}${situation === "on" ? "-situation" : ""}`;
+export default stakesRun({ name: scripted ? `${base}-scripted` : withModel(base, MODEL), stake, pace, days: r.days, seeds: r.seeds, forkUsd: r.forkUsd, scripted, situation });
