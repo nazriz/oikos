@@ -214,6 +214,15 @@ export const OVERSTEP_ARMS: Arm[] = [
   { name: "overstep", steward: { kind: "model", model: "mock/overstep:0" } },
   { name: "overstep-ask", steward: { kind: "model", model: "mock/overstep-ask:0" } },
 ];
+
+/** Reference arms seated exactly as the model arm is: the same seats held, the rest code (`codePosts`), so that their
+ * towns differ from the model arm's in the steward alone. Until 2026-11-17 the scripted arms of the stakes run had no
+ * `codePosts`: the scripted model also held the finance and rates posts, which the model arm leaves to their code, and
+ * both paid the same city invoice (rec.24023) on day 31, two acts the model arm's town never had. */
+export const seatedAs = (model: Arm, arms: Arm[]): Arm[] => arms.map((a) => {
+  const { codePosts: _, ...rest } = a;
+  return model.codePosts?.length ? { ...rest, codePosts: [...model.codePosts] } : rest;
+});
 /** The study's `slow` condition of how often people get to their post: shares of persons by days apart (`[days, bps]`),
  * most of them weekly. A placeholder like the profile's own figures, stated as a condition of a run, not a figure of a
  * place: every day 10%, every second day 10%, every third 20%, once a week 60%. */

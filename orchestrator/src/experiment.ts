@@ -18,7 +18,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { join, resolve } from "node:path";
-import { DetachedActor, RustWorld, twinSpecs, type SeatWake } from "./rust-world";
+import { DetachedActor, joinRaw, RustWorld, twinSpecs, type SeatWake } from "./rust-world";
 import { ForkReplay } from "./resume";
 import { kernelBinary, requireCurrentEngine } from "./kernel";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -207,7 +207,8 @@ export function seatify(config: any, post: string): any {
       const t = (config.templates ?? []).find((x: any) => x.id === templ);
       if (!t) throw new Error(`the world has no kind of system "${templ}"`);
       const c = t.controller ?? {};
-      if (c.type !== "llm") t.controller = { type: "llm", impl: "mock", params: { mock: { twin: true, brain: c.impl, params: c.params ?? {} } } };
+      // (Its office hours stay the seat's own: `mock/diligent:sittings` keeps them, as a model seat does.)
+      if (c.type !== "llm") t.controller = { type: "llm", impl: "mock", params: { ...(c.params?.sessions ? { sessions: c.params.sessions } : {}), mock: { twin: true, brain: c.impl, params: c.params ?? {} } } };
       else if (!c.params?.mock?.brain) throw new Error(`"${templ}"'s seats have no code brain to be their twin (mock.brain)`);
       else c.params.mock.twin = true;
       // (A system of the kind the config already has, as a provider's desk: a seat too, its twin its template's.)
@@ -325,7 +326,12 @@ export function sittings(brain: DetachedActor, S: Sessions): SeatController {
   const workday = (day: number) => ((day % 7) + 7) % 7 < S.days;
   /** The day its last sitting closed. */
   let closed = -1;
-  const held: any[] = [];
+  /** What came while it was away from its desk, joined as the kernel would have sent it had nobody looked between
+   * (`joinRaw`), and from when: shown to the brain whole at the next sitting. Until 2026-11-17 the brain was stepped at
+   * every wake and its acts held to the sitting; but the code brain reads what comes of an act as what came of the act it
+   * handed out last, so an act done a day after it was decided was read as another's, its drafts were never matched to
+   * their sign-offs, and their signed papers never went: 5 of 17 sent in the Haiku check's scripted run of 2026-11-17. */
+  let away: { observation: any; since: number } | undefined;
   /** The next sitting at or after `t`: now if within a working day's hours and its sitting has not closed. */
   const next = (t: number) => {
     let day = Math.floor(t / DAY);
@@ -335,20 +341,19 @@ export function sittings(brain: DetachedActor, S: Sessions): SeatController {
   };
   return {
     decide(w) {
-      const r = brain.step(w.observation, w.woke_for, w.since);
-      const a: any = r.action;
-      if (!isWait(a)) held.push(a);
-      const usage = (x: any) => ({ input_tokens: tokens(w.observation), output_tokens: isWait(x) ? 20 : 150 });
-      if (next(w.t) === w.t) {
-        if (held.length) { const x = held.shift(); return { action: x, usage: usage(x) }; }
-        // (Nothing to do: the sitting closes, and what comes later today waits for the next.)
-        closed = Math.floor(w.t / DAY);
-        return { action: a, usage: usage(a) };
+      if (next(w.t) !== w.t) {
+        // (Away from its desk: what came waits for the next sitting, as a model seat's does.)
+        away = away ? { ...away, observation: joinRaw(away.observation, w.observation) } : { observation: w.observation, since: w.since };
+        return { action: holding(next(w.t)), usage: { input_tokens: 0, output_tokens: 0 } };
       }
-      if (!held.length) return { action: a, usage: usage(a) };
-      const at = next(w.t);
-      const until = typeof a?.until === "number" ? Math.min(a.until, at) : at;
-      return { action: holding(until), usage: usage(holding(until)) };
+      // (At its desk: the brain is shown all that came since it last looked and decides now; each act it hands out is done
+      // at once, so what comes of it is what it is shown next, as for the code.)
+      const seen = away ? { observation: joinRaw(away.observation, w.observation), since: away.since, wokeFor: "news" } : { observation: w.observation, since: w.since, wokeFor: w.woke_for };
+      away = undefined;
+      const a: any = brain.step(seen.observation, seen.wokeFor, seen.since).action;
+      // (Nothing to do: the sitting closes, and what comes later today waits for the next.)
+      if (isWait(a)) closed = Math.floor(w.t / DAY);
+      return { action: a, usage: { input_tokens: tokens(seen.observation), output_tokens: isWait(a) ? 20 : 150 } };
     },
   };
 }
@@ -555,7 +560,8 @@ function controllerFor(a: Arm, ctx: { seat: string; post: string; brain: Detache
   const provider = slash < 0 ? s.model : s.model.slice(0, slash), name = slash < 0 ? "" : s.model.slice(slash + 1);
   if (provider === "mock") {
     if (!ctx.brain) throw new Error(`arm "${a.name}": mock models are policies over the post's code brain, which this seat lacks`);
-    return mockModel(name, ctx.brain, seatSessions(ctx.config, ctx.seat, ctx.cast?.parts.get(ctx.seat)?.template));
+    // (A seat delivered during the run is its template's: as the cast says, or, with no cast, as the steward's post names it.)
+    return mockModel(name, ctx.brain, seatSessions(ctx.config, ctx.seat, ctx.cast?.parts.get(ctx.seat)?.template ?? (templateOf(ctx.spec.post ?? "") ? templateFor(ctx.config, ctx.spec.post!, ctx.seat) : undefined)));
   }
   const make = ctx.factories[provider];
   if (!make) throw new Error(`arm "${a.name}": no seat controller for provider "${provider}" in this host (give runExperiment a SeatFactory for it: docs/experiments.md, "Real models")`);

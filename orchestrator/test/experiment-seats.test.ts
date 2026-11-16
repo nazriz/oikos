@@ -61,6 +61,20 @@ test("only the allowed models are seated: never the largest Claude model, Fable 
   expect(() => modelArm("codex/gpt-6-astra", [])).toThrow(/never seated/);
 });
 
+test("the reference and scripted arms seat exactly what the model arm seats, the rest as their code", async () => {
+  // (2026-11-17: the stakes run's scripted arms had no codePosts, so the scripted model also held the finance and rates
+  // posts the model arm leaves to their code, and both paid a city invoice the model arm's town never paid.)
+  Object.assign(process.env, { OIKOS_RUNG: "1", OIKOS_STAKE: "decision", OIKOS_PACE: "slow", OIKOS_SITUATION: "on", OIKOS_SCRIPTED: "1" });
+  delete process.env.OIKOS_MODEL;
+  for (const file of ["stakes-run", "broad-run"]) {
+    const m = await import(`../../experiments/scope-pilot/${file}`);
+    const model = m.ARMS.find((a: any) => a.steward.kind === "model");
+    const spec = m.default;
+    for (const a of spec.arms.filter((x: any) => x.steward.kind === "model")) expect([file, a.name, a.codePosts ?? []]).toEqual([file, a.name, model.codePosts ?? []]);
+    expect(spec.arms.filter((x: any) => x.steward.kind === "model").length).toBeGreaterThan(1);
+  }
+});
+
 test("each model fork's spending limit is fixed before anything runs: the least of its own, its arm's over its seeds, and the experiment's over every model fork", () => {
   expect(forkLimits(spec({ seats: { budget: { experiment_usd: 80 } } }))).toEqual({ sonnet: 10, sol: 10 });
   expect(forkLimits(spec({ seats: { budget: { experiment_usd: 80, arm_usd: 20 } } }))).toEqual({ sonnet: 5, sol: 5 });

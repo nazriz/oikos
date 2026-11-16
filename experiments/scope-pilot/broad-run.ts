@@ -57,7 +57,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Arm, ExperimentSpec } from "../../orchestrator/src/experiment";
 import { PERSONS, SEATS } from "./broad";
-import { build, OVERSTEP_ARMS } from "./build";
+import { build, OVERSTEP_ARMS, seatedAs } from "./build";
 import { readFork } from "./funnel";
 import { seatHealth as health } from "./broad-report";
 import { DEFAULT_MODEL, modelArm, withModel } from "./model-arm";
@@ -65,7 +65,7 @@ import { DEFAULT_MODEL, modelArm, withModel } from "./model-arm";
 export const MODEL = process.env.OIKOS_MODEL?.trim() || DEFAULT_MODEL;
 const { arm: MODEL_ARM, paid: PAID } = modelArm(MODEL, []);
 export const ARMS: Arm[] = [{ name: "code", steward: { kind: "code" } }, MODEL_ARM];
-export const SCRIPTED_ARMS: Arm[] = [ARMS[0]!, ...OVERSTEP_ARMS];
+export const SCRIPTED_ARMS: Arm[] = [ARMS[0]!, ...seatedAs(MODEL_ARM, OVERSTEP_ARMS)];
 
 /** A rung: its days after the fork, its seat list (broad.ts SEATS), its seeds and each fork's hard limit (USD). */
 export interface Rung { days: number; seats: string; seeds: number[]; forkUsd: number }
