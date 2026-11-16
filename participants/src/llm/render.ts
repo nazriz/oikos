@@ -218,7 +218,7 @@ function factWordsOf(raw: unknown, fields?: FieldKinds, under?: string): string 
 }
 /** The blanks of the forms a matter's facts were composed on (`composed_on`, each with its form's `spec`): what each
  * figure is, so that a sum is read as money wherever its form says it is one (a delivery note's "price each", given
- * in cents, was shown a seat as "10000" beside "$5,000.00" until 2026-11-16: the whole-town rung 1). */
+ * in cents, was shown a seat as bare cents beside sums in words until 2026-11-16: the whole-town rung 1). */
 export function composedFields(facts: unknown): FieldKinds | undefined {
   const on = (facts as { composed_on?: unknown })?.composed_on;
   if (!Array.isArray(on)) return undefined;
