@@ -573,6 +573,40 @@ can pay its fee (until 2026-11-10 the rates post could not, and its service was 
 **The code-only screen** (`experiments/scope-pilot/screen.ts <spec>`) runs a spec's code arms and gives, per assistant
 seat and month, the matters handed over, what the principal kept, steps, sittings and the obstacle events that occur.
 
+### Offers by class of paperwork (2026-11-16, design G3; off unless a town asks, `assistant_classes`)
+
+Real business-paperwork assistants are sold by what they do (accounts payable, invoicing, tax filing, hiring, case
+management), not by a list of papers. So, where a town asks, an organisations' offer names **classes of paperwork**
+(each profile's `classes`, with its source note `assistants_classes`: to confirm, ME-22) and takes every kind written on
+a form of those classes, in place of its list of kinds. Every form any office issues or hands over has a class
+(`participants/src/shared/paper-classes.ts`; a test holds the table complete): `correspondence` (answers to those who
+wrote), `payables` (orders, supply requests, a repair ordered, a draw on funds), `receivables` (delivery notes, invoices,
+rates notices), `returns` (tax withheld, tax reports), `hiring` (job advertisements, wage offers, payroll notices),
+`notices` (listings, rent increases, notices to vacate), `casework` (an office's decisions and requests on the matters
+before it, drafted for its officer: a loan decision, a permit, a valuation asked for, an audit, a possession application),
+and five no offer takes: `till` (receipts at a counter, a point-of-sale system's work), `records` (a registrar's entries
+in its register), `adjudication` (a tribunal's orders and warrants), `governance` (a council's, an electoral office's
+or a union's own acts) and `press`. A module says where a paper of its own is of another class than its form: a shop's
+delivery notes are its till's receipts to the households it sells to (`firm.retailer`, `classes`), where a factory's go to
+the firms it supplies. An office is then a principal for the kinds of its own forms in a class an offer takes, and only
+those: a shop hands over its orders and its returns, never its till; the bank's lending office, the planning office, the
+builder and the works office become principals. Every kind the profile's list had is still taken.
+
+The class is the experiment's reading of what is office paperwork, stated: deciding a loan or a permit is the officer's
+decision either way (`decided` blanks, design 4.2), and the drafting of it is what a case-management assistant is sold
+for. The outside's own offices (the support agency's, the tax collector's) have no assistant post (they keep no account
+in the town: risk MT-45).
+
+### Who has an assistant, said in one line (`assistants`, design G9; 2026-11-16)
+
+A study's spec says whom it seats in one statement (`experiments/scope-pilot/build.ts`, `assistants`), in place of
+`offices` and `cohort`: `posts` (`module:<code>` for every principal post of a module, or a post's id), `persons` (the
+households' cohort, as before), `levels` (one level, or a level by kind; by default the study's own levels where it has
+them, else `draft`) and `only` (default: no other organisation is offered the service). Each post named engages provider
+A's organisations' offer by hand on day 1 (`commit`) for every kind it may hand over; the town's offers take paperwork
+by class. A post named that is not a principal is an error. Nothing in the world's behaviour reads the statement: it is
+the experiment's condition, as `offices` was. `experiments/scope-pilot/broad.ts` seats ten posts this way.
+
 ## Obstacles (docs/design/obstacles.md)
 
 Ordinary office friction is made by the institution that makes it in life: a counterparty that sends a paper back for

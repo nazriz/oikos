@@ -2067,6 +2067,77 @@ The mechanism:
 - **Notice by:** `question_answer` papers with `known: false` in a run, by subject; letters to a principal with a
   question mark acknowledged and nothing done.
 
+### MT-45 · The outside's own offices have no assistant post: the support office cannot be seated
+- **Gap:** The generator makes an assistant post only for a principal of the town (`pos.entity !== "outside"`, with an
+  account of its own in the town). The support office (`outside-support`, `world.transfers`: evidence requests 10,
+  decisions 12, confirmation requests 3 a month in the study town), the tax collector and the other outside offices are
+  the outside world's, and their casework is done by the agency's officers' desk (`outside-casework`). So the design's
+  40-seat list (docs/design/broad-seats.md section 5) cannot include the support office's assistant.
+- **Where:** `worlds/generator/generate.ts` (the principals' loop, "Principals"); `world.transfers`.
+- **Effect:** The study sees the support office only from the desk's side. The office on the other side of the counter,
+  the one whose waits are the desk's stake, has no assistant of its own, so "an assistant at the office that decides"
+  is not in any arm.
+- **L / I:** certain / medium · **Status:** open (2026-11-16; accepted by the lead as not ready by the freeze)
+- **Fix when:** a study wants the office's side: an assistant post of the agency's (its own account and mandate, kept
+  outside the town), its casework forms classed `casework`, and its officers' desk as the principal.
+- **Notice by:** a spec naming `outside-support` in `assistants.posts` (it is refused: "names no principal post").
+
+### MT-46 · A utility's bills are written on no form, and a billing run is not an offer's
+- **Gap:** The energy retailer writes about 404 bills a month, and the water corporation a few, by its code on no form of
+  its own: there is no bill form, so no assistant can be handed a bill and no model can write one. By the lead's decision
+  of 2026-11-11 (design 13.2) a billing run is a billing system's work and no offer takes it.
+- **Where:** `utility.energy`, `utility.water` (no `issues` for their bills); `participants/src/shared/paper-classes.ts`.
+- **Effect:** The utilities' billing seats of the design's 40-seat list are not possible. A study seating the energy
+  retailer's assistant gets its orders and answers only (about one matter a month).
+- **L / I:** certain / low · **Status:** open (2026-11-16; accepted as not ready by the freeze)
+- **Fix when:** a study cell adds billing as a stated condition: a bill form classed `receivables`, the run as one matter
+  read a part at a time in the seat's window (design 4.6).
+- **Notice by:** a utility's assistant with no matters in the screen.
+
+### MT-47 · Papers the code writes on no form cannot be handed over or written by a model
+- **Gap:** Several kinds the town's posts write have no form of the writer's: price lists (factories 0.6, shops 0.5, the
+  builder 1 a month), interviews (factories 0.5), hours notices (shops 2.1), school certificates and places (3 and 1),
+  the clinic's consultation records (12), the inspector's inspections (about 7), the builder's and the police's returns
+  of tax withheld (1 each; the firms' own return form is not on their stationery). A principal hands over only kinds of
+  its own forms, so these stay with it; a model holding such an office could not write them.
+- **Where:** the modules' `issues` (`participants/src/engine-kinds.ts`, `participants/src/kinds/*.ts`); the form-fit
+  census (`orchestrator/test/office-papers-run.test.ts`) skips kinds with no form.
+- **Effect:** The school, the clinic, the inspector, the police and the landlords are thin seats (under one matter a
+  month); the builder about one; a shop's back office about five. The share of the town's papers an assistant could
+  write is bounded by these gaps, and a reader of the town totals must say so.
+- **L / I:** certain / medium · **Status:** open (2026-11-16; accepted as not ready by the freeze)
+- **Fix when:** a seat's matters a month decide it: each form completed by its module (about a day for five, design 4.6),
+  classed, and the form-fit census extended to it.
+- **Notice by:** the screen's "kept: done by the principal itself" against the post's own writes; a seat with nothing
+  handed.
+
+### MT-48 · Our translator has never seen the forms the broad seats use
+- **Gap:** The scored set (translator/eval/score.ts; 1,280 requests on 2026-11-16) holds only the desk's forms, the
+  factory's four drafts (delivery note, return, export invoice, supply request), the rates notice and the assistant's
+  own papers. It has no request on an order, a job advertisement, a wage offer, a payroll notice, a rental listing, a
+  rent increase, a notice to vacate, a repair order, a permit decision, a loan decision, a disposal docket or an audit
+  form. Mock forks never exercise a form (the mock's translator passes the brain's call through).
+- **Where:** `translator/` (rules and the trained model); `experiments/scope-pilot/broad.ts`.
+- **Effect:** A model in the new seats is served worse: more readings sent back, more "still wrong" in the replay, and
+  seats that give up on a paper. Its acts and requests there mix the model's behaviour with the translator's misses.
+- **L / I:** high / high · **Status:** open (2026-11-16)
+- **Fix when:** before a real-model run of more seats than the desk and the factory: generated requests on each new
+  form into the scored set, and the replay read per seat and per form.
+- **Notice by:** the replay's misses by form; the funnel's "served first time" flag at the new seats.
+
+### MT-49 · What counts as an assistant's paperwork is the experiment's reading of each form
+- **Gap:** The class of each form (`participants/src/shared/paper-classes.ts`) and the classes an offer takes are our
+  reading, not a product's published list: a loan or permit decision is `casework` (drafted for the officer, who decides
+  its blanks), a shop's delivery note is `till`, a rates notice `receivables`, the tribunal's orders `adjudication`
+  (taken by no offer). The classes' basis (feature lists of business assistants) is to confirm (ME-22).
+- **Where:** the class table; each profile's `classes` and source note `assistants_classes`.
+- **Effect:** Which posts are principals, and so which seats a study can have, follows from this reading; another
+  reading would seat different offices. The till rule keeps 216 receipts a shop-month out of the shops' assistants.
+- **L / I:** medium / medium · **Status:** open (2026-11-16)
+- **Fix when:** the products' feature lists are read and cited; a class moved changes which posts are principals and is
+  recorded in docs/decisions.md.
+- **Notice by:** a seat handed papers a business assistant would not do, or none of what it would.
+
 ---
 
 ## Profiles and sources

@@ -8,7 +8,7 @@
 
 import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
-import { ASSISTANT_ISSUES, withObstacles, clientDraft, clientDraftOf, clientPapers, wantPapers, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
+import { ASSISTANT_ISSUES, withObstacles, clientDraft, clientDraftOf, clientPapers, wantPapers, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, classOf, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
 import { COMPOSE_BPS, QUESTION_ANSWER_SECONDS, SCOPE_ANSWER_SECONDS, WRONG_RETURN_BPS } from "./registry";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
@@ -407,6 +407,11 @@ export interface TownSpec {
    * the kinds `want-<about>` (WANT_KINDS) at want depth, the desk sees the bodies that say what they hear and writes the
    * papers a want takes. Off unless set: a town without it is generated exactly as before. Needs `assistants`. */
   assistant_wants?: boolean;
+  /** The organisations' offers take paperwork by class (docs/design/broad-seats.md 4.5, step G3): each offer that names
+   * `classes` takes every kind some office writes on a form of those classes (participants/src/shared/paper-classes.ts),
+   * in place of its list of kinds, and an office is a principal for the kinds of its own forms of those classes only (a
+   * shop's till receipts are not). Off unless set: a town without it is generated exactly as before. Needs `assistants`. */
+  assistant_classes?: boolean;
   /** A person who hands a matter over says how things stand with them on the hand-over, in fixed words from their own
    * state: what they have in hand today, what regular payment comes in, and their next rent and its day if they rent
    * (principal.rs, `situation`; docs/behaviour/assistants.md, "What a client says of how things stand"). Off unless
@@ -618,6 +623,16 @@ function ownFilled(t: unknown, own: { [name: string]: unknown }): unknown {
 /** A form as an office's own code reads it (docs/design/broad-seats.md, G2): its blanks with their roles and rules, and
  * how it writes its paper with the office's own details filled in (`@name`). What a matter handed over as what happened
  * is read back on, and what its assistant composes on. */
+/** A module's forms: its stationery's and those of what it hands over. */
+const formsOf = (code: string): Issued[] => [...(modules[code]?.issues ?? []), ...(modules[code]?.handsOver ?? [])];
+
+/** Every kind some module writes on a form of one of these classes (docs/design/broad-seats.md G3), sorted. */
+export function kindsOfClasses(classes: string[]): string[] {
+  const out = new Set<string>();
+  for (const code of Object.keys(modules)) for (const x of formsOf(code)) if (classes.includes(classOf(modules[code], x) ?? "")) out.add(x.writes.kind);
+  return [...out].sort();
+}
+
 export function formSpec(x: Issued, own: { [name: string]: unknown }): { form: string; title: string; fields: Issued["fields"]; writes: Issued["writes"] } {
   const { sends: _s, ...writes } = ownFilled(x.writes, own) as Issued["writes"];
   return { form: x.form, title: x.title, fields: x.fields, writes: { ...writes, text: writes.text.replace(/\{@([a-z_][a-z0-9_]*)\}/g, (_, name: string) => String(own[name] ?? "")) } };
@@ -780,7 +795,12 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   if (spec.assistants && !V.assistants) throw new Error(`profile ${P.id} has no assistants on offer (values.assistants), and the town asks for them`);
   // (Wants handed over, where the town asks: the persons' offers take the kinds of want too, at want depth.)
   const OB = spec.obstacles ?? 0;
-  const AS = spec.assistants && V.assistants ? (spec.assistant_wants ? { ...V.assistants, providers: V.assistants.providers.map((pr) => ({ ...pr, offers: pr.offers.map((o) => (o.for === "persons" ? { ...o, kinds: [...o.kinds, ...WANT_KINDS] } : o)) })) } : V.assistants) : undefined;
+  const AS0 = spec.assistants && V.assistants ? (spec.assistant_wants ? { ...V.assistants, providers: V.assistants.providers.map((pr) => ({ ...pr, offers: pr.offers.map((o) => (o.for === "persons" ? { ...o, kinds: [...o.kinds, ...WANT_KINDS] } : o)) })) } : V.assistants) : undefined;
+  // (Offers by class, where the town asks: an organisations' offer that names classes takes every kind written on a form
+  // of those classes, by any office's stationery or hand-over forms, in place of its list: docs/design/broad-seats.md G3.)
+  const AS = AS0 && spec.assistant_classes ? { ...AS0, providers: AS0.providers.map((pr) => ({ ...pr, offers: pr.offers.map((o) => (o.for === "organisations" && o.classes ? { ...o, kinds: kindsOfClasses(o.classes) } : o)) })) } : AS0;
+  /** The classes an office's offer must take for it to hand a kind over: its own forms' classes for the kind. */
+  const classesOf = (code: string, kind: string) => formsOf(code).filter((x) => x.writes.kind === kind).map((x) => classOf(modules[code], x));
   const entities: any[] = [
     { id: "outside", kind: "boundary", name: "The outside world" },
     // (The vendors of systems are the outside world\'s too, and their own seller: an order is addressed to the seller it is for.)
@@ -3669,13 +3689,17 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // each also as a draft for sign-off: published where a town seats a model in a kind of assistant.)
     var assistantPosts: { post: string; entity: string; code: string; kinds: string[] }[] = [];
     const takes = new Set(AS.providers.flatMap((pr) => pr.offers.filter((o) => o.for === "organisations").flatMap((o) => o.kinds)));
+    const offered = AS.providers.flatMap((pr) => pr.offers.filter((o) => o.for === "organisations").flatMap((o) => o.classes ?? []));
+    const byClass = spec.assistant_classes && offered.length ? new Set(offered) : undefined;
     const hourValue = Math.round((PS.wage_per_pay_period * 7 * HOUR) / ((PAY / DAY) * V.ordinary_hours_per_week * HOUR));
     const rows = { ...WORK_TIME.person, ...V.work_time?.person, ...DELEGATION_TIME.person } as Record<string, number>;
     for (const pos of [...positions]) {
       const m = pos.role_module;
       // (Its papers: those on its stationery, and those its code makes on no form of its own that it may hand over.)
       const issued = new Set([...(modules[m?.code ?? ""]?.issues ?? []), ...(modules[m?.code ?? ""]?.handsOver ?? [])].map((i: any) => i.writes.kind as string));
-      const kinds = [...issued].filter((k) => takes.has(k)).sort();
+      // (By class, where the town asks: only the kinds its own forms put in a class an offer takes, so a shop's till
+      // receipts are not handed over though a factory's delivery notes are. docs/design/broad-seats.md G3.)
+      const kinds = [...issued].filter((k) => takes.has(k) && (!byClass || classesOf(m?.code ?? "", k).some((c) => !!c && byClass.has(c)))).sort();
       if (!m || !kinds.length || pos.entity === "outside" || !accounts.some((a) => a.id === `acc-${pos.entity}`)) continue;
       const post = `${pos.id}-assistant`;
       // (The account it pays from and its keeper: the organisation's own, so its post may be shown it. Before 2026-11-10 a

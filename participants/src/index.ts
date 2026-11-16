@@ -1,5 +1,6 @@
 export * from "./contracts";
 export * from "./module";
+export { FORM_CLASS, classOf, type PaperClass } from "./shared/paper-classes";
 export { ASSISTANT_ISSUES, withObstacles, clientDraft, clientDraftOf, clientPapers, wantPapers, draftOf } from "./kinds/assistants";
 export { manifests, paramErrors, type Manifest } from "./manifests";
 export * from "./rng";

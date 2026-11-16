@@ -489,7 +489,11 @@ export interface Profile {
      * in the town (`hosting: "local"`). worlds/generator/hosting.ts says what each figure is. */
     hosting?: import("./hosting").HostingFigures;
     assistants?: {
-      providers: { id: string; name: string; offers: { id: string; title: string; for: "organisations" | "persons"; template: string; kinds: string[]; levels: ("advice" | "draft" | "approve" | "alone")[];
+      providers: { id: string; name: string; offers: { id: string; title: string; for: "organisations" | "persons"; template: string; kinds: string[];
+        /** The classes of paperwork it takes (participants/src/shared/paper-classes.ts; docs/design/broad-seats.md 4.5),
+         * read in place of `kinds` only where a town asks its offers to take paperwork by class (`assistant_classes`). */
+        classes?: string[];
+        levels: ("advice" | "draft" | "approve" | "alone")[];
         speed_bps: number; claim_slip_bps: number; slip_bps: number; fee_month: number; setup: number; exit: number; notice_days: number; term_days: number; records: "principal" | "provider" | "on_request" }[] }[];
       principals: { error_cost: number; finds_bps: number; prior_matters: number; hurdle_bps: number; review_days: number; horizon_months: number; review_misses_bps: number; complaints: string[] };
     };
