@@ -279,7 +279,9 @@ What is recorded against a person (rates, interest on overdue rates, a fine) is 
 book, its register of fines. A person pays it once a paper has told them of it, never on seeing the entry alone: a paper
 addressed to them in the same act as the claim (the rates notice the claim was entered with, the demolition order a fine
 came with), or a paper from the claim's holder naming its sum and due day (a rates notice sent days later by the office's
-assistant), or one citing it; interest on a claim they were told of is told as that one was. In a town where office and
+assistant), or one citing it, or a letter from its holder about it (the letter the rates office writes when it adds
+interest to rates overdue, so that rates whose notice never came are paid from the first such letter); interest on a
+claim they were told of is told as that one was. In a town where office and
 paper go out together nothing changes; where an office's assistant sends the notice later, the owner pays when it comes.
 The lead's decision of 2026-11-16: in the whole-town rung 1 an owner paid the rates its town had entered sixteen minutes
 before, two days before any notice, a person reading a register not theirs.

@@ -290,6 +290,9 @@ pub struct Money {
     // ---- borrowing and bills
     pub borrowing: Borrower,
     pub bills_paid: BTreeSet<String>,
+    /// Charges against us that a letter from their holder told us of, naming the charge (`told`).
+    #[serde(default)]
+    pub told_by_letter: BTreeSet<String>,
     /// Bills paid lately (when, how much), for what bills come to a month.
     pub bills: Vec<(i64, i64)>,
     pub bill_seen: BTreeSet<String>,
@@ -355,6 +358,7 @@ impl Money {
             spells: BTreeMap::new(),
             borrowing: Borrower::default(),
             bills_paid: BTreeSet::new(),
+            told_by_letter: BTreeSet::new(),
             bills: vec![],
             bill_seen: BTreeSet::new(),
             billed: BTreeMap::new(),
@@ -390,6 +394,7 @@ impl Default for Money {
             spells: BTreeMap::new(),
             borrowing: Borrower::default(),
             bills_paid: BTreeSet::new(),
+            told_by_letter: BTreeSet::new(),
             bills: vec![],
             bill_seen: BTreeSet::new(),
             billed: BTreeMap::new(),
@@ -887,7 +892,7 @@ impl Person {
                     // (Only a charge it has been told of: the claim is its holder's record, and reaches us by the paper
                     // that tells us of it. The whole-town rung 1: an owner paid the rates its town had just entered in
                     // its rate book, sixteen minutes after, two days before any notice. MT-60.)
-                    if !told(&self.book, c, &me, 0) {
+                    if !told(&self.book, &self.money.told_by_letter, c, &me, 0) {
                         return None;
                     }
                     Some((c.id.to_string(), about.i("amount").unwrap_or(0), about.s("account").map(String::from), k.to_string(), about.s("for").map_or_else(|| c.id.to_string(), String::from)))
@@ -1487,8 +1492,12 @@ impl Person {
 /// rates notice sent apart from the claim by the office's assistant), or a letter naming it; and a claim made on a claim
 /// we were told of (interest on overdue rates) is told as that one was. In the code arm claim and paper are one act, so
 /// nothing there moves; where the paper goes later (an assistant's), the claim waits for it.
-pub fn told(book: &crate::common::Book, c: &Record, me: &str, depth: u8) -> bool {
+pub fn told(book: &crate::common::Book, letters: &BTreeSet<String>, c: &Record, me: &str, depth: u8) -> bool {
     let RecordBody::Claim { holder, about, .. } = &c.body else { return false };
+    // (Or a letter from its holder about it: the overdue letter that comes with interest, where no notice did.)
+    if letters.contains(c.id.as_str()) {
+        return true;
+    }
     let amount = about.i("amount");
     let due_day = about.i("due").map(|d| d.div_euclid(DAY));
     let to_me = |r: &Record| addressed_to(r).iter().any(|a| *a == me);
@@ -1504,7 +1513,7 @@ pub fn told(book: &crate::common::Book, c: &Record, me: &str, depth: u8) -> bool
         return true;
     }
     // (Made on a claim we were told of: interest on overdue rates, written to us with it.)
-    depth < 3 && crate::common::bases_of(c).iter().any(|b| book.get(b).is_some_and(|x| matches!(x.body, RecordBody::Claim { .. }) && told(book, x, me, depth + 1)))
+    depth < 3 && crate::common::bases_of(c).iter().any(|b| book.get(b).is_some_and(|x| matches!(x.body, RecordBody::Claim { .. }) && told(book, letters, x, me, depth + 1)))
 }
 
 #[cfg(test)]
@@ -1897,6 +1906,16 @@ mod tests {
         let s = run(&mut p, &c, 13 * DAY, 40, 100_000, &[notice], |p, w| p.recorded_against(w));
         let pays = calls(&s, "money");
         assert_eq!((pays.len(), pays.first().map(|x| arg_of(x, "settles"))), (1, Some("rec.5".to_string())), "the notice came: paid");
+        // (Rates whose notice never came: unpaid until the holder writes about them, as with the overdue letter that
+        // comes with interest; then paid.)
+        let unnoticed = rec(json!({ "id": "rec.7", "record": "claim", "author": "p.rates", "speaks_for": "town", "at": 50 * DAY, "visible_to": "public", "position": "right", "holder": "town", "counterparty": "c1", "about": { "kind": "rates", "amount": 6_000, "account": "acc-town", "due": 80 * DAY } }));
+        assert!(calls(&run(&mut p, &c, 51 * DAY, 40, 100_000, &[unnoticed], |p, w| p.recorded_against(w)), "money").is_empty(), "no notice: nothing paid");
+        let mut letter = pic(110 * DAY, 40, 100_000, vec![]);
+        letter.inbox = vec![serde_json::from_value(json!({ "id": "m.1", "t": 110 * DAY, "from": "p.rates", "as": "rates", "from_entity": "town", "to": ["c1"], "text": "Rates of $60.00 are overdue; interest of $0.50 has been added.", "re": "rec.7" })).unwrap()];
+        let mut d = Draws::new("p.c1", "self");
+        p.absorb(&letter, &mut Cx::new(110 * DAY, &c, &mut d, 7, vec![]));
+        let pays = calls(&run(&mut p, &c, 111 * DAY, 40, 100_000, &[], |p, w| p.recorded_against(w)), "money").iter().map(|x| arg_of(x, "settles")).collect::<Vec<_>>();
+        assert_eq!(pays, vec!["rec.7".to_string()], "told by its holder's letter about it: paid");
     }
 
     #[test]
