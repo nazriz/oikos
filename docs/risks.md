@@ -2306,7 +2306,7 @@ The mechanism:
   counterparty to.
 - **Effect:** At a delegating rates post the town's owners pay rates nobody has billed them for, and some get a notice
   after paying; a seat that drafts every notice it is handed sends demands for money already paid.
-- **L / I:** high (certain at a delegating rates post) / medium · **Status:** fixed (2026-11-16, the lead's decision:
+- **L / I:** high (certain at a delegating rates post) / medium · **Status:** fixed (decisions 2026-11-16, A charge is acted on once its holder has told us of it; the lead's decision:
   a person acts on a claim made against them from the paper that tells them of it; `citizen/money.rs`, `told`;
   docs/behaviour/citizen.md, "A charge is paid once we are told of it"). Left: firms read only the debt claims their
   workers record against them, to strike the wages those replace, never to pay a claim on sight; no other payer reads
