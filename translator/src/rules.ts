@@ -156,6 +156,7 @@ export interface FormKnowledge {
   readonly referralKind?: ReadonlyMap<string, string>;
   readonly answeredReferrals?: ReadonlySet<string>;
   readonly referralGives?: ReadonlyMap<string, { readonly [field: string]: string }>;
+  readonly referralFacts?: ReadonlyMap<string, ReadonlySet<string>>;
   readonly returnOf?: ReadonlyMap<string, string>;
   readonly held: ReadonlySet<string>;
   /** Entity -> its name, as the seat was shown it (translator/src/knowledge.ts). */
@@ -317,7 +318,7 @@ const RULES: { [name: string]: Standing } = {
   matterNamed: "fill", referralOfKind: "fill", recordNamed: "fill",
   // corrects what is plainly contradicted
   office: "code", client: "code",
-  authorityGiven: "correct", notARecord: "correct", referralIsOrder: "correct", copyNotHeld: "correct",
+  authorityGiven: "correct", notARecord: "correct", referralIsOrder: "correct", referralNotHanded: "correct", figureOnce: "correct", copyNotHeld: "correct",
   recordInWords: "correct", recordsOwnWords: "correct", papersOwnWords: "correct", handOverWords: "correct",
   letterAgain: "correct",
 };
@@ -558,7 +559,12 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     // (A referral blank holding a record that is no matter handed over, the order it is for, say: no matter; then the one
     // of its kind is taken below. Rung 1 rerun: two delivery notes' referral written as their orders.)
     const heldAs = argText(args.referral) ?? "";
-    if (fields.referral && heldAs && !k.referrals.has(heldAs) && new RegExp(`\\b(?:order|posting|claim|offer|request|invoice|decision)\\s+${escape(heldAs)}\\b`, "i").test(request)) edit("referralIsOrder", "referral", undefined);    // (A draft's matter, where the request names none: the one matter of the paper's kind handed over by whom the paper is
+    if (fields.referral && heldAs && !k.referrals.has(heldAs) && new RegExp(`\\b(?:order|posting|claim|offer|request|invoice|decision)\\s+${escape(heldAs)}\\b`, "i").test(request)) edit("referralIsOrder", "referral", undefined);
+    // (Or holding what the request itself calls the remit or the agreement, where it names exactly one matter handed over:
+    // that one. The broad rung's second run, 2026-11-17: "(remit rec.1452, matter rec.33212)" drawn with the remit as the
+    // matter, four orders confirmed so and counted as nothing drafted. Any record not on the seat's list of matters was
+    // tried first: it moved four confirmed draws whose matter the seat's file did not list.)
+    else if (fields.referral && heldAs && !k.referrals.has(heldAs) && handed.length === 1 && new RegExp(`\\b(?:remit|agreement)\\s+${escape(heldAs)}\\b`, "i").test(request) && new RegExp(`\\b(?:matter|referral)\\s*:?\\s+${escape(handed[0]!)}\\b`, "i").test(request)) edit("referralNotHanded", "referral", { id: handed[0]! });    // (A draft's matter, where the request names none: the one matter of the paper's kind handed over by whom the paper is
     // for, or by the post's principal, not yet signed off or declined. "It was read as the draft loan application, and
     // this blank of it is still empty: referral", twice in the rung 1 rerun.)
     if (fields.referral && args.referral === undefined && k.referralKind && !handed.length) {
@@ -573,6 +579,19 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       const byFacts = open.filter((id) => Object.values(k.referralGives?.get(id) ?? {}).some((v) => /^rec\.[0-9]+$/.test(v) && named.includes(v)));
       const one = open.length === 1 ? open[0] : byFacts.length === 1 ? byFacts[0] : undefined;
       if (one) edit("referralOfKind", "referral", { id: one });
+    }
+    // (A figure written once fills one blank: an optional blank the matter handed over sets out nothing for, holding the
+    // very value of a blank it does set out, and not named in the request by its own words, is that figure written in
+    // twice; left empty. The broad rung's orders, 2026-11-17: "paid within 30 days of delivery" drawn with `for_days`
+    // 30 beside `pay_in_days` 30; the matter gives the days to pay and no days to serve over, and the principal declined
+    // the draft for it and placed a half-million-dollar order itself.)
+    const facts = k.referralFacts?.get(argText(args.referral) ?? "");
+    if (facts) for (const [field, t] of Object.entries(fields)) {
+      const v = argText(args[field]);
+      // (Counts only: on a delivery note `unit_price` beside `price_each` is one sum the form asks for twice, and seats
+      // confirmed it so, three times; scored 2026-11-17.)
+      if (t.type !== "count" || t.required || v === undefined || facts.has(field) || new RegExp(`\\b${spoken(field)}\\b`, "i").test(request)) continue;
+      if (Object.keys(fields).some((g) => g !== field && facts.has(g) && fields[g]!.type === t.type && argText(args[g]) === v)) edit("figureOnce", field, undefined);
     }
     // A record blank the translator left empty, which the request fills with the one record of its sort it names (a
     // copy's blank holding no copy the seat holds is corrected to the one the request names).
@@ -591,6 +610,9 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       const v = args[field] && "text" in args[field]! ? (args[field] as { text: string }).text.trim() : undefined;
       if (t.type !== "text" || t.required || !v) continue;
       if (/^rec\.[0-9]+$/.test(v) && (k.referrals.has(v) || cited.has(v))) edit("recordInWords", field, undefined);
+      // (Or nothing but an id another blank of the paper holds, a job application's `trade` written "factory-10", its
+      // employer: the broad rung's second run, 2026-11-17.)
+      else if (ID_TOKEN.test(v) && Object.entries(args).some(([g, x]) => g !== field && g !== "to" && g !== "form" && argText(x) === v)) edit("recordInWords", field, undefined);
       // (Or holding the words the request quotes as a cited record's own, "posting rec.24032 ("Hiring: …")": what that
       // record says, not this blank's. Rung 1, 2026-11-15: a job application's `trade` written as the posting's words.)
       else if (describedSpans(request).includes(v)) edit("recordsOwnWords", field, undefined);
