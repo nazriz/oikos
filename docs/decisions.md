@@ -14817,8 +14817,8 @@ from its referral on file whether or not it is still open.
   tribunal files it; citing by reference is no god's view. Every kind, not these two: any act citing what the client was
   not sent, any want against a standing record.
 - **Decision 2, the debt** (principal.rs `situation`, `Situ.owed`; the `situation` setting): a tenant behind says so,
-  "We owe <landlord> <amount> in rent, as their <statement|notice to vacate> of <day> says (<paper>).", from the
-  landlord's latest such paper to it; nothing reckoned by us.
+  "We owe <landlord> <amount> in rent, as their <statement|notice to vacate|request for the rent> of <day> says
+  (<paper>).", from the landlord's latest such paper to it; nothing reckoned by us.
 - **Decision 3, the run's end** (experiments/scope-pilot/episodes.ts): a matter handed over within the run's last
   `END_DAYS` and not finished is never withheld nor a candidate (the price table's "the run's end"); the rung 2 dry run's
   "FAULT: a code arm left a candidate" was a want handed over on day 60, the last.

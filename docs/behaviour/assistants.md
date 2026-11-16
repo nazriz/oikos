@@ -201,8 +201,9 @@ their own facts only):
 - its housing: where it is a tenant, "Our rent: <amount> every <N> days, next due on <date> (<lease>)."; where it pays
   rates instead, "Our rates: <amount>, due on <date> (<notice>)."; where neither, nothing.
 - behind with the rent (2026-11-16): what it owes its landlord, as the landlord's latest paper to it that says so puts
-  it (a statement of the rent account, its `owed`; or a notice to vacate for arrears, its `arrears`): "We owe <landlord>
-  <amount> in rent, as their <statement|notice to vacate> of <date> says (<paper>)." Their figure and day, nothing
+  it (a statement of the rent account, its `owed`; a notice to vacate for arrears, its `arrears`; or its written
+  request for the rent owed, its `amount`): "We owe <landlord> <amount> in rent, as their <statement|notice to
+  vacate|request for the rent> of <date> says (<paper>)." Their figure and day, nothing
   reckoned by us.
 - on a matter the office's law prices by the day (a claim; a review of a refused claim, as a want or as a review
   request on a refused claim), the office's own published rule

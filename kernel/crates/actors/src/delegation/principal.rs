@@ -686,14 +686,17 @@ impl State {
                         self.situ.rent = Some((l.rent, e, r.at.max(0), r.id.to_string()));
                     }
                 }
-                // (What it owes in rent, as its landlord's latest paper to it says: a statement of the rent account, or a
-                // notice to vacate for arrears. Their figure, never one reckoned here.)
+                // (What it owes in rent, as its landlord's latest paper to it says: a statement of the rent account, a
+                // notice to vacate for arrears, or its written request for the rent owed. Their figure, never one reckoned
+                // here.)
                 let to_me = crate::common::addressed_to(r).iter().any(|a| a.as_str() == self.me) || matches!(&r.visible_to, oikos_contracts::blocks::Visibility::Only(v) if v.iter().any(|a| a.as_str() == self.me));
                 if to_me && r.speaks_for.as_deref() != Some(self.me.as_str()) {
                     let owed = if crate::common::is_kind(r, "rent_statement") {
                         papers::read::<crate::papers::firms::RentStatement>(r).and_then(|x| x.owed)
                     } else if crate::common::is_kind(r, "notice_to_vacate") {
                         crate::common::Fields::i(crate::common::data(r), "arrears")
+                    } else if crate::common::is_kind(r, "review_request") && crate::common::Fields::s(crate::common::data(r), "matter") == Some("arrears") {
+                        crate::common::Fields::i(crate::common::data(r), "amount")
                     } else {
                         None
                     };
@@ -1934,7 +1937,7 @@ impl State {
         // (Behind with the rent: what it owes, as its landlord's latest paper puts it, in one fixed sentence. Their
         // figure and day; nothing reckoned by us, no adjective, no advice.)
         if let Some((n, at, by, id, kind)) = self.situ.owed.as_ref().filter(|o| o.0 > 0) {
-            let what = if kind == "notice_to_vacate" { "notice to vacate" } else { "statement" };
+            let what = match kind.as_str() { "notice_to_vacate" => "notice to vacate", "review_request" => "request for the rent", _ => "statement" };
             out.push(format!("We owe {by} {} in rent, as their {what} of {} says ({id}).", money(*n), date(*at)));
         }
         // (On a matter the office's law prices by the day, a claim or a review of a refused claim: the office's own
