@@ -14770,3 +14770,17 @@ from its referral on file whether or not it is still open.
   saying nothing and asked again, every step. Its values are read where every property holds one plainly; a schema with
   no answer in it is read as before (nothing, asked once more).
 - **Revisit if** (7) another body is seen holding a paper it cannot act on in silence: the same rule belongs there.
+
+## 2026-11-16: two hosted open-weight models priced for the stakes probe (OpenRouter)
+
+- **What:** `orchestrator/prices.json` gains `openai-compat/openrouter/z-ai/glm-5.3` and
+  `openai-compat/openrouter/deepseek/deepseek-v4.1-flash`, each at the figure OpenRouter's model list gives, asked with
+  the API's function calling (`answer: tools`; each answered a plain function call on 2026-11-16).
+- **Why these:** the contrast beside Haiku 5.5 wants capable models from other makers that can do the job (the local
+  qwen2.5:14b could not). Both are open-weight, both cheap enough for a 14-day probe under the rung's $1 limit, on the
+  owner's $10 of OpenRouter credit (2026-11-16).
+- **Known limit:** OpenRouter picks the provider for each call, and providers serve these models at different prices
+  and precisions (4-bit to 8-bit), so two calls in one run may not meet the same weights. Fine for a probe that asks
+  whether another model behaves differently at all; a run counted in the study pins one provider first.
+- **Revisit if** a probe's behaviour looks like the provider's doing (replies that fail to parse in bursts), or one of
+  these goes into the counted runs: pin the provider (a `provider` field on the request) and say which.

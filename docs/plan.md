@@ -75,7 +75,8 @@ owner's decision.
   `codex/`, `claude-code/` or `anthropic/`; the arm and the experiment's folder are named for it; astra refused
   (experiments/scope-pilot/model-arm.ts, 2026-11-16). The start lines are in the spec's header.
 - [ ] A 14-day probe of another model at decision × slow, situation on (the local qwen2.5:14b, or a hosted one on
-  OpenRouter once its price entry is in), read beside Haiku's.
+  OpenRouter once its price entry is in), read beside Haiku's. Price entries in for z-ai/glm-5.3 and
+  deepseek/deepseek-v4.1-flash (2026-11-16).
 
 - [ ] Rung 1: 14 days, 1 seed, the main cell (decision × slow). About $0.15.
 - [ ] Rung 2: 30 days, 1 seed, both stake levels at slow. About $0.60.
