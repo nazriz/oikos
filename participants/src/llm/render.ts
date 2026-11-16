@@ -922,7 +922,11 @@ function describeTransactions(txs: Transaction[], mine: Set<string>): string[] {
     const total = [...m.values()].reduce((a, b) => a + b, 0);
     const t = [...m].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
     const others = t.slice(8).reduce((a, [, v]) => a + v, 0);
-    return [`${label} ${money(total)} since you last looked: ${t.slice(0, 8).map(([a, v]) => `${a} ${money(v)}`).join(", ")}${t.length > 8 ? `, and ${t.length - 8} more (${money(others)} between them)` : ""}.`];
+    // (Its own account's movements are its own to know whole: past the first eight, every other account is still named,
+    // without its sum, never "and N more". The whole-town rung 1's rates assistant could not tell which owners had paid
+    // from a cut list, and held seven drafts unconfirmed to the end.)
+    const rest = t.slice(8).map(([a]) => a);
+    return [`${label} ${money(total)} since you last looked: ${t.slice(0, 8).map(([a, v]) => `${a} ${money(v)}`).join(", ")}${rest.length ? `; and ${money(others)} from the ${rest.length} others, each named: ${rest.join(", ")}` : ""}.`];
   };
   return [...line("Received", inflow), ...line("Paid out", outflow)];
 }

@@ -372,7 +372,8 @@ test("who's who, looked into: people, organisations and posts by id or by part o
   const transactions = Array.from({ length: 11 }, (_, i) => ({ t: 0, from: `acc-c${i}`, to: "acc-city", amount: String((i + 1) * 100), currency: "USD", by: "bank" }));
   const text = renderObservation(obs({ books: { kind: "accounts", accounts: [{ account: "acc-city", holder: "city", custodian: "bank", currency: "USD", balance: "0" }], transactions } }));
   expect(text).toContain("Received $66.00 since you last looked: acc-c10 $11.00,");
-  expect(text).toContain(", and 3 more ($6.00 between them).");
+  // (Past the first eight, every other payer of its own account is still named: who paid is its own to know whole.)
+  expect(text).toContain("; and $6.00 from the 3 others, each named: acc-c2, acc-c1, acc-c0.");
 });
 
 test("a body's own state, where it is and its family are told; an agreement says how it stands", () => {
