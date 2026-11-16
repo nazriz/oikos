@@ -700,7 +700,7 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       if (act || quotedWhole) edit("handOverWords", field, { text: g });
     }
     // (A blank of the paper's own words the matter handed over gives in its paper's words (a tenant's answer: "we say
-    // $5,330.01 is owed today; …"): those words, unless the request quotes words for it. The translator worker's redraw
+    // 5,330.01 is owed today; …"): those words, unless the request quotes words for it. The translator worker's redraw
     // of 110 real asks, 2026-11-17: the blank held the quoted words in 40, "pay" (from "can pay 0") in 32, the request's
     // own act in 11, and nothing in 7. A paper never goes with "pay" or "Draft for sign-off" as someone's words.)
     const handOver = k.handedWords?.get(argText(args.referral) ?? "");
