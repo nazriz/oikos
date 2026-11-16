@@ -332,3 +332,53 @@ test("a seat in a town of one stake level is never shown the other level's words
   expect(scanLines([line(`For you to draft. ${said.decision}`)], "first_claim")).toEqual([{ at: 5, subject: "desk", found: ["pays nothing for the days before"] }]);
   expect(scanLines([line(`For you to draft. ${said.first_claim}`)], "first_claim")).toEqual([]);
 });
+
+test("the readers count true on rung 3's cases: waits from a matter's own drafts, worked-on under a forward, done as last reported, the end's matters, duplicates apart, claim days to the end, and one definition of asking for more", () => {
+  const at = (d: number) => (d - 1) * DAY;
+  const st = (id: string, kind: string, d: number, x: object = {}, more: object = {}) => ({ id, record: "statement", kind, at: at(d), speaks_for: "c0306", addressed_to: ["c0306"], in_position: "provider-a-desk", data: x, ...more });
+  const referral = (id: string, kind: string, d: number, x: object = {}) => st(id, "referral", d, { kind, wants: "draft", facts: {}, ...x }, { addressed_to: ["provider-a"], in_position: undefined, text: `Please draft the ${kind}.` });
+  const recs = new Map<string, any>([
+    // c0306 (first_claim-slow-situation seed 8): the claim drafted day 51, signed day 52; the evidence drafted under it day 57, never signed.
+    ["rec.39700", referral("rec.39700", "benefit_claim", 50)],
+    ["rec.40639", st("rec.40639", "draft", 51, { referral: "rec.39700", paper: { kind: "benefit_claim", to: ["outside"] } })],
+    ["rec.42549", st("rec.42549", "sign_off", 52, { referral: "rec.39700", draft: "rec.40639" }, { in_position: undefined })],
+    ["rec.44735", st("rec.44735", "draft", 57, { referral: "rec.39700", paper: { kind: "evidence", to: ["outside"] } })],
+    // c0113's (seed 8): reported done day 25, not done day 27, drafted again day 38 and not answered by the end.
+    ["rec.21431", referral("rec.21431", "loan_application", 25)],
+    ["rec.21432", st("rec.21432", "draft", 25, { referral: "rec.21431" })],
+    ["rec.21488", st("rec.21488", "sign_off", 25, { referral: "rec.21431", draft: "rec.21432" }, { in_position: undefined })],
+    ["rec.21492", st("rec.21492", "report", 25, { referral: "rec.21431", done: true })],
+    ["rec.22494", st("rec.22494", "report", 27, { referral: "rec.21431", done: false })],
+    ["rec.31162", st("rec.31162", "draft", 38, { referral: "rec.21431", paper: { kind: "loan_application" } })],
+    // An evidence matter drafted under the forward of the office's request it answers (decision-slow-situation seed 7).
+    ["rec.50", referral("rec.50", "evidence", 40, { reply_to: "rec.ask" })],
+    ["rec.fwd", st("rec.fwd", "forward", 39, { paper: "rec.ask" }, { addressed_to: ["provider-a"] })],
+    ["rec.51", st("rec.51", "draft", 39, { referral: "rec.fwd", paper: { kind: "evidence", to: ["outside"] } })],
+  ]);
+  const rows = [{ table: "acts", referral: "rec.39700", record: "rec.43000", class: "duplicate" }];
+  const out = episodesOf({ seed: 8, arm: "haiku", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs, rows, transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [] } });
+  const ep = (m: string) => out.episodes.find((e) => e.matter === m)!;
+  const row = (m: string) => out.matters.find((x) => x.matter === m)!;
+  expect(ep("rec.39700").path.sign_off_days).toBe(1);
+  expect(row("rec.21431").signoff_seconds! >= 0).toBe(true);
+  expect(row("rec.50").drafted).toBe(at(39));
+  // (A duplicate: counted apart, a mistake, never acted beyond.)
+  expect([ep("rec.39700").did, ep("rec.39700").duplicates, row("rec.39700").mistake]).toEqual(["waited", ["rec.43000"], true]);
+  // (c0113's: its last report says not done, and its draft waits on the client at the end: the run's end, not the seat's choice.)
+  expect([row("rec.21431").done, row("rec.21431").waiting_at_end]).toEqual([undefined, true]);
+  const code = { ...row("rec.21431"), arm: "code", done: at(26), waiting_at_end: undefined };
+  expect(priceOf([row("rec.21431"), code], at(60), "code").find((x) => x.matter === "rec.21431")?.cause).toBe("the run's end");
+  // (Claim days: a claim handed over and never sent counts its days to the end.)
+  const claims = episodesOf({ seed: 8, arm: "haiku", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs: new Map([["rec.39700", referral("rec.39700", "benefit_claim", 50)]]), rows: [], transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [{ person: "c0306", controller: { params: { delegation: { commit: true } } } }] } });
+  expect((claims.clients.get("c0306") as any)?.claim_days_undecided).toBe(10);
+  // (One definition of asking for more: the funnel counts a request for exactly what the block needed as made, not as more.)
+  const config = { participants: [{ id: "provider-a-desk-system", kind: "system", owner: "provider-a" }], positions: [{ id: "provider-a-desk", holder: "provider-a-desk-system" }] };
+  const f = new FunnelReader(config, {}, 30);
+  const needed = { table: "requests", request: "rec.q1", post: "provider-a-desk", asked: { authority: "outside" }, axes: { means: "within" }, needed: { kind: "benefit_claim", wants: "draft" } };
+  const more = { table: "requests", request: "rec.q2", post: "provider-a-desk", asked: { level: "alone", kind: "benefit_change" }, level_then: "draft", needed: { kind: "benefit_change", wants: "draft" } };
+  expect([askedClass(needed), askedClass(more)]).toEqual(["needed", "more"]);
+  f.knowActs([needed, more]);
+  for (const id of ["rec.q1", "rec.q2"]) f.see({ kind: "event", t: at(32), body: { event: "recorded", record: { id, kind: "scope_request", author: "provider-a-desk-system", in_position: "provider-a-desk", data: {} } } });
+  f.see({ kind: "annotation", t: at(32), body: { annotation: "usage", purpose: "participant", subject: "provider-a-desk-system", max_tokens: 1, output_tokens: 1 } });
+  expect(f.result([], false).seats.find((s) => s.post === "provider-a-desk")!.requests).toMatchObject({ made: 2, more: 1 });
+});

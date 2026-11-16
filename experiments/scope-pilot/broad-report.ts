@@ -14,6 +14,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { kernelBinary } from "../../orchestrator/src/kernel";
+import { askedClass, weighedRequests } from "./asked";
 import { readExperiment, type Episode } from "./episodes";
 import { funnelText, verdict, type Funnel } from "./funnel";
 
@@ -94,6 +95,9 @@ export async function readBroad(dir: string): Promise<BroadRead> {
         // The acts reader: every paper an assistant's post sent in its principal's name, within its remit or beyond.
         const rd = Bun.spawnSync([kernelBinary(), "delegation", log], { stdout: "pipe", stderr: "pipe" });
         const tw = town.get(arm) ?? town.set(arm, { arm, papers: 0, by_assistants: 0, by_level: {}, beyond: 0 }).get(arm)!;
+        // (Requests for more: those the one definition reads as more, asked.ts; until 2026-11-17 every scope request.)
+        const drows = rd.stdout.toString().split("\n").filter((l) => l.startsWith("{")).map((l) => JSON.parse(l));
+        for (const q of weighedRequests(drows)) if ((q.t ?? 0) >= forkT && askedClass(q) === "more" && seatKind.has(String(q.post ?? q.seat))) { const pr = row(seatKind.get(String(q.post ?? q.seat))!); pr.seats.add(String(q.post ?? q.seat)); pr.requests++; }
         for (const l of rd.stdout.toString().split("\n")) {
           if (!l.includes('"acts"')) continue;
           const a = JSON.parse(l);
@@ -122,7 +126,6 @@ export async function readBroad(dir: string): Promise<BroadRead> {
             const seat = (r.addressed_to ?? []).find((x: string) => seatKind.has(x)) ?? [...seatKind.keys()].find((p) => /-desk$/.test(p) && (r.addressed_to ?? []).some((x: string) => p.startsWith(`${x}-`)));
             if (seat) { const pr = row(seatKind.get(seat)!); pr.seats.add(seat); pr.matters++; }
           }
-          if (r.kind === "scope_request" && seatKind.has(String(r.in_position))) { const pr = row(seatKind.get(String(r.in_position))!); pr.seats.add(String(r.in_position)); pr.requests++; }
           // (A paper in a town entity's name, other than the papers of delegation itself.)
           if (typeof r.speaks_for === "string" && town_.has(r.speaks_for) && !["referral", "draft", "sign_off", "declined", "report", "advice", "remit", "scope_request", "scope_answer", "approval_request", "go_ahead", "brief", "handover", "question", "question_answer", "forward"].includes(r.kind)) tw.papers++;
         }

@@ -684,6 +684,21 @@ fn a_reply_on_a_claim_is_the_claim_s_and_a_draft_made_from_its_forward_is_taken_
     }
     let signed = later.lines().find(|l| l.contains("kind=sign_off")).unwrap_or_else(|| panic!("the held draft taken under the reply: {later}"));
     assert!(signed.contains("basis=rec.early") && signed.contains(&format!("\"referral\":\"{reply_ref}\"")), "under the reply's matter: {signed}");
+    // (A request for the level of the reply's own kind, naming the reply: answered by the claim's remit, which governs it,
+    // never "evidences are not papers of ours" (rung 3, first_claim-slow seed 7, c0479 on day 33).)
+    {
+        let mut own_reply = statement(&reply_ref, 36 * DAY + 3600, ME, "referral", &[PROV], json!({ "agreement": "agr.1", "kind": "evidence", "wants": "draft", "follows": claim, "calls": "statement(kind=evidence, text=\"Our papers.\", to=[\"office\"], basis=rec.ask)" }));
+        own_reply["author"] = json!("ll-system");
+        let mut req = statement("rec.scope", 36 * DAY + 7000, ME, "scope_request", &[ME], json!({ "agreement": "agr.1", "kind": "evidence", "level": "draft", "matter": reply_ref }));
+        req["in_position"] = json!("ll-assistant");
+        let mut out = all(&h.wake(36 * DAY + 7200, world(vec![own_reply, req])));
+        for i in 1..4 {
+            out.push('\n');
+            out.push_str(&all(&h.wake(36 * DAY + 7200 + i * 600, world(vec![]))));
+        }
+        let ans = out.lines().find(|l| l.contains("kind=scope_answer")).unwrap_or_else(|| panic!("answered: {out}"));
+        assert!(!ans.contains("not papers of ours") && ans.contains("already"), "the claim's remit governs its reply: {ans}");
+    }
     // (A draft naming the finished claim, and a request to go ahead naming nothing of its own: each answered, plainly.)
     let stray = statement("rec.stray", 37 * DAY, ME, "draft", &[ME], json!({ "referral": claim, "calls": CLAIM }));
     let mut nothing = statement("rec.none", 37 * DAY, ME, "approval_request", &[ME], json!({ "referral": "rec.nothing", "gist": "Go on." }));

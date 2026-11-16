@@ -109,6 +109,13 @@ pub struct Reader {
     /// factory assistant's payment of an energy bill, applied under the same cause as the desk's job application, was read
     /// as paid with the desk's paper, on the desk's client's matter, "within".
     acting: Option<(i64, String)>,
+    /// Every paper an assistant's post sent in a principal's name (not a payment): when, its id, what it says (kind, to
+    /// whom, its data), whose, and its matter: the same paper sent again is set beside it.
+    sends: Vec<(i64, String, String, String, Option<String>)>,
+    /// The papers a body sent back (a `paper_returned` naming them).
+    returned: BTreeSet<String>,
+    /// The matters on which the principal declined a draft: it does the matter itself.
+    declined_on: BTreeSet<String>,
 }
 
 /// An obstacle as the law that made it logged it (`decision`, domain `obstacle`), with the paper that told of it, once
@@ -329,6 +336,9 @@ impl Reader {
         // that the paper sent again, citing either, is that matter's. Until 2026-11-14 a desk's paper sent again after a
         // client passed the return on read "not handed": sixteen false rows in the obstacle run's code arm.)
         if kind == "paper_returned" {
+            // (Which papers it sends back: the one it names, and those its copy of the paper cites.)
+            let named: Vec<String> = s(&d["returned"]).map(String::from).into_iter().chain(s(&d["paper"]).map(String::from)).chain(bases(&json!({ "basis": d["paper"]["basis"] }))).chain(bases(r)).collect();
+            self.returned.extend(named);
             let of = s(&d["returned"]).map(String::from).into_iter().chain(bases(r)).find_map(|b| self.referral_of.get(b.as_str()).cloned());
             if let Some(rf) = of {
                 self.referral_of.insert(id.clone(), rf);
@@ -338,6 +348,9 @@ impl Reader {
         // matter's. Until 2026-11-14 a declined referral stayed open, and the code arm's later rates notices were matched
         // to it and read beyond the level.)
         if kind == "declined" {
+            if let Some(rf) = s(&d["referral"]) {
+                self.declined_on.insert(rf.to_string());
+            }
             if let Some(x) = s(&d["referral"]).and_then(|rf| self.referrals.get_mut(rf)) {
                 x.used = true;
             }
@@ -450,8 +463,9 @@ impl Reader {
             let as_signed = signed.as_ref().is_none_or(|(_, _, paper)| paper.as_ref().is_none_or(|p| same_paper(p, kind, r)));
             let class = super::own::class(Some(wants.as_str()), signed.is_some(), as_signed, went);
             let remit = self.remits.iter().rev().find(|x| x.principal == principal && x.kind == wk && x.t <= t).map(|x| x.id.clone());
-            self.acts.push(json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
-                "referral": rf, "wants": wants, "signed": signed.is_some(), "class": class, "depth": "want" }));
+            let row = json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
+                "referral": rf, "wants": wants, "signed": signed.is_some(), "class": class, "depth": "want" });
+            self.push_act(row, t, id, kind, &principal, r);
             self.note_act(cause);
             return;
         }
@@ -493,8 +507,9 @@ impl Reader {
                 self.act_referral.insert((c.to_string(), kind.to_string()), rf.clone());
             }
             let remit = self.remits.iter().rev().find(|x| x.principal == principal && x.kind == kind && x.t <= t).map(|x| x.id.clone());
-            self.acts.push(json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
-                "referral": rf, "wants": wants, "signed": true, "class": "within" }));
+            let row = json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
+                "referral": rf, "wants": wants, "signed": true, "class": "within" });
+            self.push_act(row, t, id, kind, &principal, r);
             self.note_act(cause);
             return;
         }
@@ -587,8 +602,49 @@ impl Reader {
         if tied_by_kind {
             row["tied"] = json!("the only matter of its kind");
         }
-        self.acts.push(row);
+        if payment {
+            self.acts.push(row);
+        } else {
+            self.push_act(row, t, id, kind, &principal, r);
+        }
         self.note_act(cause);
+    }
+
+    /// An act's row, set beside the papers its post sent before (2026-11-17): the same paper (kind, to whom, what it
+    /// says) sent before in the principal's name is either sent back by a body, and this the paper sent again as it was:
+    /// that paper's matter, and covered by the sign-off that covered it (`again`); or not sent back, or already sent again
+    /// once on that return: a `duplicate`, the same act done twice, a mistake with a cost, never an act beyond a level. Until
+    /// then a resend after a return read `beyond_level` when nothing tied it to the sign-off (rung 3, first_claim-slow seed
+    /// 8, c0306's loan; the town's rung 2, four desk resends of papers signed before the fork), and a second send read as
+    /// its matter's, "within" (c0352's claim sent three times) or "beyond_level" (factory-2's invoice sent twice).
+    fn push_act(&mut self, mut row: Value, t: i64, id: &str, kind: &str, principal: &str, r: &Value) {
+        let mut to: Vec<String> = r["addressed_to"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(String::from)).collect();
+        to.sort();
+        let key = format!("{kind}|{}|{}", to.join(","), r.get("data").unwrap_or(&Value::Null));
+        // (On the same matter, or on none: the same paper asked for again on a matter handed over anew is that matter's.)
+        let mine = row["referral"].as_str().map(String::from);
+        if let Some((_, prev, _, _, prev_rf)) = self.sends.iter().rev().find(|x| x.3 == principal && x.2 == key && (mine.is_none() || x.4.is_none() || x.4 == mine)).cloned() {
+            if row["referral"].is_null() {
+                if let Some(rf) = &prev_rf {
+                    row["referral"] = json!(rf);
+                    self.referral_of.insert(id.to_string(), rf.clone());
+                }
+            }
+            if self.returned.contains(&prev) {
+                row["again"] = json!(prev);
+                let rf = row["referral"].as_str().map(String::from);
+                let covered = rf.as_ref().is_some_and(|rf| self.sign_offs.iter().any(|(st, srf, p)| srf == rf && *st <= t && p.as_ref().is_none_or(|p| same_paper(p, kind, r))));
+                if covered {
+                    row["signed"] = json!(true);
+                    row["class"] = json!("within");
+                }
+            } else {
+                row["class"] = json!("duplicate");
+                row["duplicate_of"] = json!(prev);
+            }
+        }
+        self.sends.push((t, id.to_string(), key, principal.to_string(), row["referral"].as_str().map(String::from)));
+        self.acts.push(row);
     }
 
     /// The act's first paper of a kind of matter, as just sorted (the last row pushed): what a payment of the same act is.
@@ -682,6 +738,17 @@ impl Reader {
             .filter_map(|w| {
                 let x = self.referrals.get(&w.referral)?;
                 if !matches!(x.wants.as_str(), "draft" | "approve" | "alone") || self.drafted.contains(&w.referral) || done.contains(w.referral.as_str()) {
+                    return None;
+                }
+                // (Not held back by the seat: the principal declined a draft of it and does it itself (a draft made under
+                // the paper it passed on is that matter's), or refused the seat what it asked for to do it, before the seat
+                // said it was not done. Rung 3, 2026-11-17: c0113's evidence (decision-slow seed 8), c0479's (first_claim-slow
+                // seed 7), both read as the seat withholding.)
+                let refused = self.requests.iter().any(|q| {
+                    q["matter"].as_str() == Some(w.referral.as_str())
+                        && q["request"].as_str().and_then(|id| self.answers.get(id)).is_some_and(|(at, a)| *at <= w.t && a["granted"].as_bool() == Some(false))
+                });
+                if self.declined_on.contains(&w.referral) || refused {
                     return None;
                 }
                 Some(json!({ "table": "withheld", "t": w.t, "referral": w.referral, "post": w.post, "principal": x.principal, "kind": x.kind, "wants": x.wants, "paper": w.paper, "paper_kind": w.kind }))
@@ -963,6 +1030,61 @@ mod tests {
         for id in ["pay1", "pay2"] {
             assert_eq!(act(id), (Value::Null, json!("no_remit")), "{id}: the factory's payment, no remit for payments, no sign-off");
         }
+    }
+
+    /// A paper sent again (2026-11-17, from rung 3 and the town's rung 2): after a body sent it back, the paper as signed
+    /// is within, its sign-off covering it, whether or not it cites the return (c0306's loan; c0352's claim, first sent
+    /// before the fork); sent again with no return, or a second time on one return, it is a `duplicate` (c0352's claim sent
+    /// three times; factory-2's invoice sent twice in one act), never an act beyond a level. And a matter is withheld only
+    /// where the seat held it back: not where the client declined its draft (made under the paper the client passed on)
+    /// and does it itself (c0113), nor where the client refused the seat what it asked for to do it (c0479).
+    #[test]
+    fn a_paper_sent_again_after_its_return_is_within_and_one_sent_twice_is_a_duplicate() {
+        let mut r = Reader::new();
+        r.take(&json!({ "kind": "header", "body": { "config": { "positions": [
+            { "id": "mgr", "entity": "f1", "role_module": { "params": { "delegation": { "post": "mgr-assistant" } } } },
+            { "id": "mgr-assistant", "entity": "f1" } ] } } }));
+        let claim = json!({ "account": "acc-f1", "payment": "pension" });
+        let mut events = vec![
+            rec(1, "rm1", "remit", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "benefit_claim", "level": "draft" })),
+            rec(1, "rm2", "remit", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "invoice", "level": "draft" })),
+            rec(1, "rm3", "remit", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "evidence", "level": "draft" })),
+            rec(2, "rf1", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "benefit_claim", "wants": "draft" })),
+            rec(3, "so1", "sign_off", "f1", "mgr", &["f1"], json!({ "draft": "d1", "referral": "rf1", "paper": { "kind": "benefit_claim", "to": ["outside"], "data": claim } })),
+            rec(4, "c1", "benefit_claim", "f1", "mgr-assistant", &["outside"], claim.clone()),
+            rec(5, "ret1", "paper_returned", "outside", "outside-support", &["f1"], json!({ "from": "mgr-assistant", "paper": { "basis": ["c1"] } })),
+            rec(9, "c2", "benefit_claim", "f1", "mgr-assistant", &["outside"], claim.clone()),
+            rec(10, "c3", "benefit_claim", "f1", "mgr-assistant", &["outside"], claim.clone()),
+            rec(11, "rf2", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "invoice", "wants": "draft" })),
+            rec(12, "so2", "sign_off", "f1", "mgr", &["f1"], json!({ "draft": "d2", "referral": "rf2", "paper": { "kind": "invoice", "to": ["outside"], "data": { "q": 7728 } } })),
+            rec(13, "i1", "invoice", "f1", "mgr-assistant", &["outside"], json!({ "q": 7728 })),
+            rec(13, "i2", "invoice", "f1", "mgr-assistant", &["outside"], json!({ "q": 7728 })),
+            // (Withheld or not: the client declines a draft made under its forward, then the seat reports not done; the
+            // client refuses the seat a remit for another matter, then the seat reports not done; a third the seat just
+            // reports not done.)
+            rec(20, "rf3", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "evidence", "wants": "draft" })),
+            rec(21, "dc3", "declined", "f1", "mgr", &["f1"], json!({ "of": "d3", "referral": "rf3" })),
+            rec(22, "rp3", "report", "f1", "mgr-assistant", &["f1"], json!({ "referral": "rf3", "done": false })),
+            rec(20, "rf4", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "evidence", "wants": "draft" })),
+            rec(21, "sr4", "scope_request", "f1", "mgr-assistant", &["f1"], json!({ "agreement": "a", "kind": "evidence", "level": "draft", "matter": "rf4" })),
+            rec(21, "sa4", "scope_answer", "f1", "mgr", &["f1"], json!({ "request": "sr4", "granted": false })),
+            rec(22, "rp4", "report", "f1", "mgr-assistant", &["f1"], json!({ "referral": "rf4", "done": false })),
+            rec(20, "rf5", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "evidence", "wants": "draft" })),
+            rec(22, "rp5", "report", "f1", "mgr-assistant", &["f1"], json!({ "referral": "rf5", "done": false })),
+        ];
+        events[7]["body"]["record"]["basis"] = json!("c1");
+        for e in events {
+            r.take(&e);
+        }
+        let rows = r.rows();
+        let act = |id: &str| rows.iter().find(|x| x["record"] == id).map(|x| (x["referral"].clone(), x["class"].clone())).expect("sorted");
+        assert_eq!(act("c1"), (json!("rf1"), json!("within")), "the signed copy");
+        assert_eq!(act("c2"), (json!("rf1"), json!("within")), "sent again after its return, as signed: its sign-off covers it");
+        assert_eq!(act("c3"), (json!("rf1"), json!("duplicate")), "sent a third time on the one return");
+        assert_eq!(act("i1"), (json!("rf2"), json!("within")));
+        assert_eq!(act("i2"), (json!("rf2"), json!("duplicate")), "the same invoice sent twice, nothing sent back between");
+        let withheld: Vec<_> = rows.iter().filter(|x| x["table"] == "withheld").map(|x| x["referral"].clone()).collect();
+        assert_eq!(withheld, vec![json!("rf5")], "declined by the client, or refused it what it asked: not the seat's holding back");
     }
 
     /// An obstacle (docs/design/obstacles.md section 4) is met only when the paper that tells of it reaches the seat; a
