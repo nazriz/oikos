@@ -756,6 +756,34 @@ round by the coordinator (decisions, 2026-11-17, "The tenant's answer to the tri
   `ages`, the model drew none of the five asks right (decisions, 2026-11-17, "Redrawn by our translator"). Train on
   requests on the new forms first; add descriptions where a blank's name cannot say enough.
 
+## For the next round: what only training can fix (measured 2026-11-17)
+
+The scored set as of 2026-11-17 (`~/oikos/runs/regress/scored-set.json.gz`, built from `requests.json.gz`, 26 arms of
+23 real runs): 1,766 of 1,983 right first time with the rules as of `tribunal-redraw`; 217 misses. Every rule tried on what follows lost
+more than it gained, or reached nothing (docs/decisions.md, 2026-11-15 to 2026-11-17). List them with `bun
+translator/eval/score.ts current --misses`; draw any of them again on a changed form with `translator/eval/redraw.ts`
+(our model, offline). Seat models are named; our translator drew every one.
+- **Drawn as nothing (78):** the model under its cut-off; its own draw, withheld, is wrong on every one redrawn. By the
+  target's form: question to client 20, delivery note 16 and draft delivery note 14, report 11, the rest one to four
+  each. By run: the first pilot 21 (qwen's arm most), Haiku's situation-b 11, qwen's stakes rerun 8, the broad rung 13
+  (both runs), the r2 Haiku runs 16.
+- **Words blanks written otherwise than the seat confirmed (about 56):** evidence `need` 15; a question's `words` or
+  `name` 12; job application `trade` 9 (the paper's words, "Draft for sign-off", the employer: confirmed both ways
+  across runs, so no rule can tell); review request `particulars`/`seeks` 8; scope request `words` 5; report `words` 4;
+  `advice` 3. Haiku mostly; GLM and luna a few.
+- **A draft for sign-off drawn as the send of a signed paper (10):** loan application 5, evidence 3, review request 2
+  (Haiku: stakes r1 "-b", situation, situation-b, r2). Sent back to the translator once (`misread`); the first draw is
+  what counts.
+- **Price, quantity and total swapped (10):** draft delivery note `unit_price` 5 (the count or the total in it), export
+  invoice 4 (the total as the price each, GLM's among them), the broad rung's order 1 (the total as the price each, the
+  quantity as the days to pay). A rule on "<figure> each" lost 25.
+- **The tenant's answer to the tribunal (3 left):** Haiku situation-b .56 and .58 (no `ages`; .56 a record in
+  `claim_on`), .72 ("one" for ages and people, the sum owed as what can be paid). The form is new to the model; no form
+  change drew them better (decisions, "Redrawn by our translator").
+- **Letters where the question form was meant (13):** "Question to <whom>" drawn as a letter, kept a letter on purpose
+  because seats confirm such letters (decisions, "The translator by score"); a model that draws the form saves the
+  seat's redraft.
+
 ## Not built
 
 - The retrain's first two steps as one command: generated parts are written and checked by their own commands, and
