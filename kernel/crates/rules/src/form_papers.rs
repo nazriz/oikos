@@ -55,7 +55,7 @@ fn placeholder(t: &Json) -> Option<(char, &str)> {
     let s = t.as_str()?;
     let mark = s.chars().next()?;
     let name = s.get(1..)?;
-    if !"=#?+".contains(mark) || !is_name(name) {
+    if !"=#?+%".contains(mark) || !is_name(name) {
         return None;
     }
     Some((mark, name))
@@ -96,8 +96,14 @@ fn fill(t: &Json, env: &Env) -> Result<Option<Json>, String> {
         let Some(v) = env.fields.get(name) else { return Ok(None) };
         return Ok(Some(match mark {
             '=' => v.clone(),
-            '#' => json!(whole_number(name, v)?),
+            // (A list of whole numbers, written as numbers: `#` on a list, item by item.)
+            '#' => match v.as_array() {
+                Some(items) => json!(items.iter().map(|x| whole_number(name, x)).collect::<Result<Vec<_>, _>>()?),
+                None => json!(whole_number(name, v)?),
+            },
             '?' => json!(v.as_str() == Some("yes")),
+            // (A length of time in whole days, as code that counts days writes one: `%`.)
+            '%' => json!(whole_number(name, v)?.div_euclid(86_400)),
             _ => json!(env.now + whole_number(name, v)?),
         }));
     }
@@ -265,7 +271,12 @@ pub fn write_paper(spec: &Json, fields: &Map<String, Json>, me: &str, now: i64, 
     out.insert("kind".into(), w["kind"].clone());
     out.insert("text".into(), json!(text));
     let get = |k: &str| w.get(k).filter(|x| !x.is_null());
-    let data = get("data").map(|t| fill(t, &env)).transpose()?.flatten();
+    let mut data = get("data").map(|t| fill(t, &env)).transpose()?.flatten();
+    // (A paper a draft carries, as it would go: its words written from the fields as the paper's own are. Until
+    // 2026-11-17 a draft's paper kept its template's "{application}" in its words: the stakes rung 3.)
+    if let Some(Json::String(words)) = data.as_mut().and_then(|d| d.get_mut("paper")).and_then(|p| p.get_mut("text")) {
+        *words = fill_text(words, &spec["fields"], &env, money)?;
+    }
     let to = unique(get("to").map(|t| fill(t, &env)).transpose()?.flatten());
     let visible = match get("visible") {
         None => None,
@@ -360,8 +371,10 @@ fn bind(t: &Json, v: &Json, lists: &[&str], me: &str, now: i64, out: &mut Map<St
         }
         return match mark {
             '=' => put(out, name, v.clone(), true),
+            '#' if v.is_array() => v.as_array().is_some_and(|a| a.iter().all(|x| x.as_i64().is_some())) && put(out, name, json!(v.as_array().map(|a| a.iter().map(|x| x.to_string()).collect::<Vec<_>>())), false),
             '#' => v.as_i64().is_some() && put(out, name, v.clone(), false),
             '?' => v.as_bool().is_some_and(|b| put(out, name, json!(if b { "yes" } else { "no" }), false)),
+            '%' => v.as_i64().is_some_and(|x| put(out, name, json!(x * 86_400), false)),
             _ => v.as_i64().is_some_and(|x| put(out, name, json!(x - now), false)),
         };
     }
@@ -473,6 +486,13 @@ pub fn read_back(spec: &Json, paper: &Map<String, Json>, me: &str, now: i64) -> 
             }
         }
     }
+    // (A blank of words that only the paper's words carry (a tenant's own account of things, after "{application}: "):
+    // read from those words, where they stand as the form writes them.)
+    if let (Some(template), Some(text)) = (w["text"].as_str(), paper.get("text").and_then(Json::as_str)) {
+        for (name, words) in words_from_text(template, text, &spec["fields"]) {
+            out.entry(name).or_insert(json!(words));
+        }
+    }
     let as_is = |s: &str| Ok(s.to_string());
     let again = write_paper(spec, &out, me, now, &as_is, None, Some(paper.get("text").and_then(Json::as_str).unwrap_or_default())).ok()?;
     let same = |k: &str| bare(again.get(k)) == bare(paper.get(k));
@@ -483,6 +503,35 @@ pub fn read_back(spec: &Json, paper: &Map<String, Json>, me: &str, now: i64) -> 
         return None;
     }
     Some(out)
+}
+
+/// The words a paper's text gives each text blank of its template that stands after a fixed piece of words: the text
+/// after the first place that piece stands, up to the fixed words after it (the rest of the template where no blank
+/// follows, else the words before the next). Nothing for a blank that is not of words.
+fn words_from_text(template: &str, text: &str, fields: &Json) -> Vec<(String, String)> {
+    let mut out = vec![];
+    let mut rest = template;
+    while let Some(i) = rest.find('{') {
+        let lit = &rest[..i];
+        let after = &rest[i + 1..];
+        let Some(j) = after.find('}') else { break };
+        let name = &after[..j];
+        let tail = &after[j + 1..];
+        // (Up to the fixed words after it: the rest of the template where no blank follows, else the words before the next.)
+        let more = tail.contains('{');
+        let stop = tail.split('{').next().unwrap_or_default();
+        if is_name(name) && fields[name]["type"] == "text" && !lit.is_empty() && (!stop.is_empty() || !more) {
+            if let Some(at) = text.find(lit) {
+                let from = &text[at + lit.len()..];
+                let said = if more { from.find(stop).map(|e| &from[..e]) } else { from.strip_suffix(tail) };
+                if let Some(said) = said.filter(|s| !s.trim().is_empty()) {
+                    out.push((name.to_string(), said.to_string()));
+                }
+            }
+        }
+        rest = tail;
+    }
+    out
 }
 
 /// The blanks worked out by the form's rules from those given (each blank's `worked`, a rule over the others),

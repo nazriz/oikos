@@ -131,6 +131,23 @@ export function clientPapers(payments: string[]): Issued[] {
       fields: { client, office: f("entity", "The office that asked.", req), request: f("record", "The office's request.", req), claim: f("record", "The client's claim.", req),
         need: f("text", "What is sent, in a few words, if you wish: the office goes by the request it answers."), last_employer: f("entity", "The client's last employer, where the office asks for one.") },
       writes: { in_name_of: "=client", kind: "evidence", text: "For my claim {claim}: the papers asked for.", basis: "=request", to: ["=office"], visible: ["=client", "=office"], data: { claim: "=claim", need: "=need", request: "=request", last_employer: "=last_employer" } } },
+    // (A household's application for a home let, and a complaint to the town about a service: the fields the landlord's
+    // and the town's code read, as the citizen's own code writes them (citizen/housing.rs, `hunt`; recourse.rs,
+    // `Complaint`). Until 2026-11-17 the desk drafted both on the general form, which carries words only, so a rental
+    // application went without its listing or household, and every one was declined: the stakes rung 3, c0149.)
+    { form: "rental_application", title: "An application for a home to let, in a client's name",
+      does: "Applies to a landlord, in the client's name, for a home it has listed to let: the listing, the account the rent would come from, and who would live there. The landlord reads the household and picks among those who applied.",
+      fields: { client, landlord: f("entity", "The landlord whose listing it answers.", req), listing: f("record", "The listing applied for.", req), home: f("text", "The home, as the listing names it.", req),
+        account: f("account", "The client's account, which the rent would come from.", req), members: f("list", "Who would live there, each by their id.", req),
+        people: f("count", "How many would live there.", req), bedrooms_needed: f("count", "How many bedrooms the household needs.", req) },
+      writes: { in_name_of: "=client", kind: "rental_application", text: "Application for {home}, for a household of {people}.", basis: "=listing", to: ["=landlord"], visible: ["=client", "=landlord"],
+        data: { listing: "=listing", account: "=account", members: "=members", household: { people: "=people", bedrooms_needed: "=bedrooms_needed" } } } },
+    { form: "complaint", title: "A complaint to the town about a service, in a client's name",
+      does: "Tells the town, in the client's name, that a service at their home has not been done: what, where, and for how long. The town's office reads it and answers.",
+      fields: { client, office: f("entity", "The office complained to.", req), about: f("text", "What has not been done, as the town names the service (waste).", req),
+        structure: f("text", "The client's home's building, as the town names it.", req), days: f("count", "For about how many days.", req) },
+      writes: { in_name_of: "=client", kind: "complaint", text: "Our {about} at {structure} hasn't been collected for about {days} days.", to: ["=office"], visible: ["=client", "=office"],
+        data: { structure: "=structure", about: "=about", days: "=days" } } },
     // (A tenant's answer to an application for possession, in the client's name: the fields the tribunal and the landlord
     // read (`TribunalResponse`, as the tribunal's own form for a tenant, shared/papers.ts `POSSESSION_ANSWER`). Until
     // 2026-11-17 the desk had no form for it and drafted on the general one, which carries words only, so its draft
@@ -144,10 +161,19 @@ export function clientPapers(payments: string[]): Issued[] {
         out_of_work_since: f("date", "Where someone in the home is out of work: since when."), claim: f("choice", "A claim for support: refused, or made and not yet decided.", { options: ["refused", "pending"] }),
         claim_on: f("date", "The day it was refused or made."), ill: f("choice", "Yes, where someone in the home is ill.", { options: ["yes", "no"] }),
         people: f("count", "How many people live in the home."), children: f("count", "How many of them are children."), ages: f("list", "Their ages."),
-        go_to: f("choice", "Whether they have anywhere to go.", { options: ["nowhere", "someone_to_ask", "means_for_another"] }) },
-      writes: { in_name_of: "=client", kind: "tribunal_response", text: "Answer to application {application}.", basis: "=application", to: ["=tribunal", "=landlord"], visible: ["=client", "=tribunal", "=landlord"],
-        data: { application: "=application", owes: "#owes", disputes_sum: "?disputes_sum", offer: "#can_pay", every: "=every", out_of_work_since: "=out_of_work_since", claim: "=claim", claim_on: "=claim_on", ill: "?ill",
-          people: "=people", children: "=children", ages: "=ages", go_to: "=go_to" } } },
+        go_to: f("choice", "Whether they have anywhere to go.", { options: ["nowhere", "someone_to_ask", "means_for_another"] }),
+        // (New blanks at the end, the others' names and order as seats and the translator have known them: 2026-11-17.)
+        words: f("text", "What they say to the tribunal, in their own words, as the matter handed over sets it out.", req),
+        disputes_notice: f("choice", "Yes, where the notice to vacate gave fewer days than the law asks.", { options: ["yes", "no"] }),
+        pay_short: f("choice", "Yes, where someone's pay has come short of what was agreed.", { options: ["yes", "no"] }),
+        lived_days: f("count", "How many days they have lived there.") },
+      // (What the tenant's own answer says, in the same units: its interval in days (`every_days`, the `every` blank in
+      // whole days: `%`), as the tenant's code writes it, where until 2026-11-17 the form wrote `every` in seconds; its
+      // ages as numbers; their words, as theirs; and every detail theirs carries. The stakes rung 3: c0427's answer went
+      // with no words of the tenant's and its interval in seconds. citizen/housing.rs, `answer_tribunal`.)
+      writes: { in_name_of: "=client", kind: "tribunal_response", text: "Answer to application {application}: {words}", basis: "=application", to: ["=tribunal", "=landlord"], visible: ["=client", "=tribunal", "=landlord"],
+        data: { application: "=application", owes: "#owes", offer: "#can_pay", every_days: "%every", disputes_sum: "?disputes_sum", disputes_notice: "?disputes_notice", out_of_work_since: "=out_of_work_since",
+          pay_short: "?pay_short", claim: "=claim", claim_on: "=claim_on", ill: "?ill", people: "=people", children: "=children", ages: "#ages", lived_days: "=lived_days", go_to: "=go_to" } } },
   ];
 }
 

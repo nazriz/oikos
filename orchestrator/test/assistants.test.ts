@@ -103,7 +103,7 @@ test("a town that does not ask for assistants is generated as before; one that d
   // are not on the words-only draft: H4b, "One right call" C.)
   // (A tenant's answer has its own since 2026-11-17: on the words-only draft it carried no figures and went to the
   // tribunal alone, and every one was declined; the stakes reruns, c0336.)
-  const own = ["benefit_change", "benefit_claim", "job_application", "loan_application", "tribunal_response"];
+  const own = ["benefit_change", "benefit_claim", "complaint", "job_application", "loan_application", "rental_application", "tribunal_response"];
   expect(draft.data.fields.kind.options).toEqual([...personal.kinds].filter((k: string) => !own.includes(k)).sort());
   const deskForms = seated.world.records.filter((r: any) => r.kind === "form" && r.data?.office === "provider-a-desk").map((r: any) => r.data.form);
   for (const k of own) expect(deskForms).toEqual(expect.arrayContaining([k, `draft_${k}`]));

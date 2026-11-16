@@ -107,7 +107,7 @@ export function parseDate(s: string, now = 0): number {
   return ((year - 1) * 365 + (day - 1)) * DAY + hour * 3_600 + minute * 60 + second;
 }
 
-const MARKS = ["=", "#", "?", "+"];
+const MARKS = ["=", "#", "?", "+", "%"];
 const NAME = /^[a-z_][a-z0-9_]{0,31}$/;
 /** The field a template's string stands for, and how; undefined: the string is as written. */
 function placeholder(t: unknown): { mark: string; name: string } | undefined {
@@ -131,8 +131,11 @@ function fill(t: unknown, env: Env): unknown {
     const v = env.fields[p.name];
     if (v === undefined) return ABSENT;
     if (p.mark === "=") return v;
-    if (p.mark === "#") return wholeNumber(p.name, v);
+    // (A list of whole numbers, written as numbers: `#` on a list, item by item.)
+    if (p.mark === "#") return Array.isArray(v) ? v.map((x) => wholeNumber(p.name, x)) : wholeNumber(p.name, v);
     if (p.mark === "?") return v === "yes";
+    // (A length of time in whole days, as code that counts days writes one: `%`.)
+    if (p.mark === "%") return Math.floor(wholeNumber(p.name, v) / 86_400);
     return env.now + wholeNumber(p.name, v);
   }
   if (Array.isArray(t)) {
@@ -177,8 +180,13 @@ export function writePaper(spec: FormData, fields: Filled, o: { self: string; no
   const w = spec.writes;
   if (!w) throw new FormError("this form writes no paper of its own");
   const env: Env = { fields, self: o.self, now: o.now };
-  const text = o.text ?? w.text.replace(/\{([a-z_][a-z0-9_]{0,31})\}/g, (_, name: string) => (name === "self" ? o.self : words(fields[name], spec.fields[name]?.type, o.money)));
+  const inWords = (t: string) => t.replace(/\{([a-z_][a-z0-9_]{0,31})\}/g, (_, name: string) => (name === "self" ? o.self : words(fields[name], spec.fields[name]?.type, o.money)));
+  const text = o.text ?? inWords(w.text);
   const data = w.data === undefined ? undefined : fill(w.data, env);
+  // (A paper a draft carries, as it would go: its words written from the fields as the paper's own are. Until
+  // 2026-11-17 a draft's paper kept its template's "{application}" in its words: the stakes rung 3. The kernel, the same.)
+  const carried = data && data !== ABSENT && typeof data === "object" ? (data as any).paper : undefined;
+  if (carried && typeof carried === "object" && typeof carried.text === "string") carried.text = inWords(carried.text);
   const to = w.to === undefined ? [] : unique(fill(w.to, env) as unknown[]);
   const visible = w.visible === undefined ? undefined : w.visible === "public" ? "public" : unique(fill(w.visible, env) as unknown[]);
   const basis = w.basis === undefined ? ABSENT : fill(w.basis, env);
@@ -272,6 +280,12 @@ function bind(env: { [name: string]: FieldValue }, spec: FormData, p: { mark: st
   } else if (p.mark === "+") {
     if (typeof v !== "number" || v <= now) return false;
     got = v - now;
+  } else if (p.mark === "%") {
+    if (typeof v !== "number" || !Number.isSafeInteger(v)) return false;
+    got = v * 86_400;
+  } else if (p.mark === "#" && type === "list") {
+    if (!Array.isArray(v) || !v.every((x) => typeof x === "number" && Number.isSafeInteger(x))) return false;
+    got = v.map(String);
   } else if (p.mark === "#") {
     if (typeof v !== "number" || !Number.isSafeInteger(v)) return false;
     got = type === "amount" || type === "choice" || type === "text" ? String(v) : v;
@@ -349,6 +363,33 @@ function unify(t: unknown, v: unknown, env: { [name: string]: FieldValue }, spec
   return same(t, v);
 }
 
+/** The words a paper's text gives each text blank of its template that stands after a fixed piece of words: up to the
+ * fixed words after it (kernel/crates/rules `words_from_text`). */
+function wordsFromText(template: string, text: string, spec: FormData): [string, string][] {
+  const out: [string, string][] = [];
+  let rest = template;
+  for (let i = rest.indexOf("{"); i >= 0; i = rest.indexOf("{")) {
+    const lit = rest.slice(0, i);
+    const after = rest.slice(i + 1);
+    const j = after.indexOf("}");
+    if (j < 0) break;
+    const name = after.slice(0, j);
+    const tail = after.slice(j + 1);
+    // (Up to the fixed words after it: the rest of the template where no blank follows, else the words before the next.)
+    const more = tail.includes("{");
+    const stop = more ? tail.slice(0, tail.indexOf("{")) : tail;
+    if (/^[a-z_][a-z0-9_]{0,31}$/.test(name) && spec.fields[name]?.type === "text" && lit && (stop || !more)) {
+      const at = text.indexOf(lit);
+      const from = at >= 0 ? text.slice(at + lit.length) : undefined;
+      const end = from === undefined ? -1 : more ? from.indexOf(stop) : from.endsWith(tail) ? from.length - tail.length : -1;
+      const said = from !== undefined && end >= 0 ? from.slice(0, end) : "";
+      if (said.trim()) out.push([name, said]);
+    }
+    rest = tail;
+  }
+  return out;
+}
+
 /**
  * The fields a form would have to be given to write exactly this paper, or undefined if it could not have written
  * it. Checked by writing it again: what comes back is the paper, to the letter (its words given as they stand where
@@ -361,8 +402,19 @@ export function fieldsFor(spec: FormData, paper: Paper, o: { self: string; now: 
   const part = (t: unknown, v: unknown) => (t === undefined ? v === undefined : unify(t, v, env, spec, o.self, o.now));
   if (!part(w.data, paper.data) || !part(w.offer, paper.offer) || !part(w.assertion, paper.assertion)) return undefined;
   if (w.to !== undefined ? !unify(w.to, paper.addressed_to ?? [], env, spec, o.self, o.now) : (paper.addressed_to ?? []).length > 0) return undefined;
-  if (w.visible === "public" ? paper.visible_to !== "public" : w.visible !== undefined ? !Array.isArray(paper.visible_to) || !unify(w.visible, paper.visible_to, env, spec, o.self, o.now) : paper.visible_to !== undefined) return undefined;
+  // (Who sees it is a set: read where it can be in the form's order, else checked as a set once written again, as the
+  // kernel's `read_back` does. The kernel writes it sorted, so a tenant's answer seen by "c0003, landlord-1, tribunal"
+  // was not read through a form that writes "client, tribunal, landlord": 2026-11-17.)
+  if (w.visible === "public" ? paper.visible_to !== "public" : w.visible !== undefined ? !Array.isArray(paper.visible_to) : paper.visible_to !== undefined) return undefined;
+  if (Array.isArray(w.visible) && Array.isArray(paper.visible_to)) { const seen = { ...env }; if (unify(w.visible, paper.visible_to, seen, spec, o.self, o.now)) Object.assign(env, seen); }
+  // (Whose name it goes in, where the form names a blank for it: who it speaks for.)
+  const inName = w.in_name_of ? placeholder(w.in_name_of) : undefined;
+  const speaks = (paper as { speaks_for?: unknown }).speaks_for;
+  if (inName && inName.mark === "=" && typeof speaks === "string" && !(inName.name in env)) bind(env, spec, inName, speaks, o.now);
   if (w.basis !== undefined ? !unify(w.basis, paper.basis, env, spec, o.self, o.now) : paper.basis !== undefined) return undefined;
+  // (A blank of words only the paper's words carry: read from them where they stand as the form writes them. The
+  // kernel's `read_back`, the same: `words_from_text`.)
+  for (const [name, said] of wordsFromText(w.text, String(paper.text ?? ""), spec)) if (!(name in env)) env[name] = said;
   for (const [name, f] of Object.entries(spec.fields)) if (f.required && !(name in env)) return undefined;
   let again: Paper;
   try {
@@ -372,5 +424,7 @@ export function fieldsFor(spec: FormData, paper: Paper, o: { self: string; now: 
   }
   const text = again.text === paper.text ? undefined : paper.text;
   if (text !== undefined && "text" in spec.fields) return undefined;
-  return same({ ...again, text: paper.text }, paper) ? { fields: env, ...(text !== undefined ? { text } : {}) } : undefined;
+  const asSet = (x: unknown) => (Array.isArray(x) ? JSON.stringify([...new Set(x.map(String))].sort()) : JSON.stringify(x ?? null));
+  if (asSet(again.visible_to) !== asSet(paper.visible_to)) return undefined;
+  return same({ ...again, text: paper.text, ...(paper.visible_to !== undefined ? { visible_to: paper.visible_to } : {}), ...(speaks !== undefined ? { speaks_for: speaks } : {}) } as Paper, paper) ? { fields: env, ...(text !== undefined ? { text } : {}) } : undefined;
 }

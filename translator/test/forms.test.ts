@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import Ajv2020 from "ajv/dist/2020";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { calls, canonical } from "@oikos/participants";
+import { calls, canonical, clientDraftOf, clientPapers, forms } from "@oikos/participants";
 import FORMS from "../../contracts/test/forms.json";
 import { MockAdapter } from "@oikos/participants/llm";
 import { createTranslator, formRules, formShown } from "../src/index";
@@ -311,4 +311,29 @@ test("rules changed by score after the reruns and the broad rung (2026-11-17)", 
   expect(ruled('form(can_pay="$5,330.01", due="year 1, day 81", form=withholding_return, owes="$5,330.01", people="1", period_to="year 1, day 81", to=desk)', "Period to: year 1, day 61; due year 1, day 81; can pay 0; owes $5,330.01; people 1.", kw))
     .toBe('form(can_pay="0", due="year 1, day 81", form=withholding_return, owes="$5,330.01", people="1", period_to="year 1, day 61", to=desk)');
   expect(ruled('form(form=withholding_return, owes="5330.01", period_to="year 1, day 61, 10:00", to=desk)', "Period to year 1, day 61; owes $5,330.01.", kw)).toBe('form(form=withholding_return, owes="5330.01", period_to="year 1, day 61, 10:00", to=desk)');
+});
+
+test("a client's paper on the desk's form for it is the client's own, read back and written again: every detail, in the same units (2026-11-17)", () => {
+  // (As the citizen's own code writes each: citizen/housing.rs `hunt` and `answer_tribunal`, recourse.rs `Complaint`.
+  // The stakes rung 3: rental applications went on the words-only form without their listing or household, and a
+  // tenant's answer on its form went with no offer, no words and its interval in seconds.)
+  const own: { form: string; paper: any }[] = [
+    { form: "rental_application", paper: { kind: "rental_application", text: "Application for apts-3/dwelling.2, for a household of 3.", addressed_to: ["landlord-2"], visible_to: ["c0149", "landlord-2"], basis: "rec.40",
+      data: { listing: "rec.40", account: "acc-c0149", members: ["c0149", "c0150", "c0151"], household: { people: 3, bedrooms_needed: 2 } } } },
+    { form: "complaint", paper: { kind: "complaint", text: "Our waste at apts-3 hasn't been collected for about 18 days.", addressed_to: ["city"], visible_to: ["c0149", "city"], data: { structure: "apts-3", about: "waste", days: 18 } } },
+    { form: "tribunal_response", paper: { kind: "tribunal_response", text: "Answer to application rec.9: we say $5,330.01 is owed today; we can pay nothing toward it beyond the rent now; I live here alone (aged 63); we have nowhere else to go.",
+      addressed_to: ["tribunal", "landlord-10"], visible_to: ["c0427", "tribunal", "landlord-10"], basis: "rec.9",
+      data: { application: "rec.9", owes: 533001, offer: 0, every_days: 30, out_of_work_since: 1_728_000, people: 1, children: 0, ages: [63], lived_days: 200, go_to: "nowhere" } } },
+  ];
+  for (const { form, paper } of own) {
+    const spec = clientPapers([]).find((x) => x.form === form) as any;
+    const self = paper.visible_to[0];
+    const read = forms.fieldsFor(spec, paper, { self, now: 0, money: (x) => x });
+    expect(read, form).toBeDefined();
+    const again = forms.writePaper(spec, { ...read!.fields, client: self }, { self, now: 0, money: (x) => x, ...(read!.text ? { text: read!.text } : {}) });
+    expect(again, form).toMatchObject({ kind: paper.kind, text: paper.text, data: paper.data, addressed_to: paper.addressed_to });
+    // (Its draft carries the paper as it would go, its words written from the fields: never a template's "{application}".)
+    const draft = forms.writePaper(clientDraftOf(spec) as any, { ...read!.fields, client: self, referral: "rec.1" }, { self: "provider-a-desk", now: 0, money: (x) => x });
+    expect(String((draft.data as any).paper.text), form).not.toContain("{");
+  }
 });
