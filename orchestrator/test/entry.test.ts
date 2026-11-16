@@ -29,6 +29,12 @@ test("a failed shop's premises are bought by someone who founds a new shop there
   const young = config.participants.find((p: any) => p.controller?.impl === "citizen.default" && p.controller.params.in_labour_force !== false &&
     age(p.person) >= 25 && age(p.person) < 50 && config.world.accounts.some((a: any) => a.id === `acc-${p.person}`))!;
   config.world.accounts.find((a: any) => a.id === `acc-${young.person}`).balance = "60000000";
+  // And is the enterprising sort, who values doing things of their own, new things and getting on: whether a founder
+  // with means starts a business is the mind's weighing (`venture`), and a founder who values none of these chooses it
+  // only on an unlikely draw, which may come late or not at all (2026-11-17: the town's course moved with a change to
+  // when charges are paid, and the draw that founded the shop came on day 228, not day 101).
+  const own = young.controller.params.own_values;
+  Object.assign(own, { self_direction: 8500, stimulation: 8000, achievement: 8000 });
   const out = join(root, "runs", "test-entry");
   rmSync(out, { recursive: true, force: true });
   // (Run seed 2, 2026-10-12, draws named for the day or the matter: in the generated seed's run the new shop had hired nobody into its
@@ -82,6 +88,12 @@ test("in a living town a shop founded in the run keeps a record of its own, by i
   const young = config.participants.find((p: any) => p.controller?.impl === "citizen.default" && p.controller.params.in_labour_force !== false &&
     age(p.person) >= 25 && age(p.person) < 50 && config.world.accounts.some((a: any) => a.id === `acc-${p.person}`))!;
   config.world.accounts.find((a: any) => a.id === `acc-${young.person}`).balance = "60000000";
+  // And is the enterprising sort, who values doing things of their own, new things and getting on: whether a founder
+  // with means starts a business is the mind's weighing (`venture`), and a founder who values none of these chooses it
+  // only on an unlikely draw, which may come late or not at all (2026-11-17: the town's course moved with a change to
+  // when charges are paid, and the draw that founded the shop came on day 228, not day 101).
+  const own = young.controller.params.own_values;
+  Object.assign(own, { self_direction: 8500, stimulation: 8000, achievement: 8000 });
   const out = join(root, "runs", "test-entry-living");
   rmSync(out, { recursive: true, force: true });
   // (120 days, 300 until 2026-10-31, the slow tier's budget: measured that day, the shop is founded, its post made and its
