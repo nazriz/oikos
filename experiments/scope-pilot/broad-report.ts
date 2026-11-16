@@ -15,8 +15,25 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { kernelBinary } from "../../orchestrator/src/kernel";
 import { readExperiment, type Episode } from "./episodes";
+import { funnelText, verdict, type Funnel } from "./funnel";
 
 const DAY = 86_400;
+
+/** The health of one fork's seats (broad-run.ts's check, at a health day and at the end): every post its seat map names
+ * read and judged by the funnel's own verdict, none silently left out. A seat the map names that the funnel did not read
+ * fails ("not read"); a model seat that never sat is flagged (a thin seat: its principal had nothing to hand it), not
+ * failed; at the end, a model seat not debriefed fails (the verdict's own rule). */
+export function seatHealth(f: Funnel, seatMap: { [participant: string]: { capacity: string } }, ended: boolean, label: string): { ok: boolean; text: string } {
+  const fail: string[] = [], flag: string[] = [];
+  const read = new Set(f.seats.flatMap((s) => s.participants));
+  for (const [p, s] of Object.entries(seatMap)) if (!read.has(p)) fail.push(`${s.capacity} (${p}): not read`);
+  for (const s of f.seats.filter((x) => x.model)) {
+    const v = verdict(s, ended);
+    if (v.fail.length) fail.push(`${s.post}: ${v.fail.join("; ")}`);
+    if (!s.sittings) flag.push(`${s.post}: never sat`);
+  }
+  return { ok: !fail.length, text: `${fail.length ? `FAIL: ${fail.join(" | ")}\n` : "healthy\n"}${flag.length ? `flagged: ${flag.join(" | ")}\n` : ""}${funnelText(f, label)}` };
+}
 const LEVELS = ["none", "advice", "draft", "approve", "alone"];
 
 type Count = { [k: string]: number };
