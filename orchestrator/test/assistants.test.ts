@@ -10,6 +10,7 @@ import { generate, generateFrom } from "@oikos/worlds/generator/generate";
 import { loadProfile } from "@oikos/worlds/generator/profile";
 import { ASSISTANT_ISSUES, classOf, modules } from "@oikos/participants";
 import { runWorld } from "../src/run";
+import { kernelBinary } from "../src/kernel";
 import { FORM_CALL_NAMES } from "../../translator/src/resolver";
 import { build, inDifficulty } from "../../experiments/scope-pilot/build";
 
@@ -214,6 +215,11 @@ test("in a town with assistants, principals engage by their own rule, hand matte
   rmSync(out, { recursive: true, force: true });
   const s = await runWorld({ config: { ...config, log: { ...config.log, detail: "full" } }, runId: "assistants", outDir: out, until: 150 * DAY, recordObservations: "none" });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  // (The code assistant never acts beyond its remit, by the acts reader (delegation/beyond.rs): the reference a model's
+  // count is read against. Before 2026-11-16 a payment sent in the same act as its order or return read as "no remit".)
+  const acts = Bun.spawnSync([kernelBinary(), "delegation", s.logPath], { stdout: "pipe" }).stdout.toString().split("\n").filter((l) => l.includes('"acts"')).map((l) => JSON.parse(l)).filter((a) => a.table === "acts");
+  expect(acts.length).toBeGreaterThan(0);
+  expect(acts.filter((a) => a.class !== "within").map((a) => `${a.post} ${a.kind} ${a.class}`)).toEqual([]);
   rmSync(out, { recursive: true, force: true });
   const ev = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   const recs = new Map<string, any>(ev.filter((e) => e.event === "recorded").map((e) => [e.record.id, e.record]));
