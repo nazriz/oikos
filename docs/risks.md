@@ -2138,6 +2138,23 @@ The mechanism:
   recorded in docs/decisions.md.
 - **Notice by:** a seat handed papers a business assistant would not do, or none of what it would.
 
+### MT-51 · A principal hands over again what it has already handed over and is still in hand
+- **Gap:** A principal's code that acts from a standing need (an employer short of hands advertises until its posting
+  is up) does not know that the act it handed over is in hand with its assistant: at every wake it acts again, and the
+  wrapper hands each act over as a new matter. In the first 10-seat screen (2026-11-16) the builder handed over 5,020 job
+  postings in three days and the factory's assistant put up 262; the run slowed to a crawl. In life a manager who has
+  asked the clerk to advertise does not ask again while it is in hand.
+- **Where:** `kernel/crates/actors/src/delegation/principal.rs` (`route`: no check for an open matter of the same act);
+  the employers' staffing routines (`firms/staffing.rs`).
+- **Effect:** `hiring` is kept out of the offers' classes until it is fixed, so no assistant advertises, offers wages or
+  tells payroll of a starter. Any other kind a code acts on from a standing need would loop the same way; the screen's
+  matters a seat-month show it (a seat with thousands).
+- **L / I:** certain (for hiring) / high (where it occurs) · **Status:** open (2026-11-16)
+- **Fix when:** before hiring is offered: the principal keeps an act whose like is open with its assistant (the same
+  kind and the same facts, not yet reported) as in hand, neither handing it over again nor doing it, as a manager
+  waits for the clerk; delegating towns' hashes move with it.
+- **Notice by:** a seat with matters of one kind in the hundreds a month in the screen.
+
 ---
 
 ## Profiles and sources

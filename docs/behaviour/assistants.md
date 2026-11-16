@@ -584,7 +584,9 @@ wrote), `payables` (orders, supply requests, a repair ordered, a draw on funds),
 rates notices), `returns` (tax withheld, tax reports), `hiring` (job advertisements, wage offers, payroll notices),
 `notices` (listings, rent increases, notices to vacate), `casework` (an office's decisions and requests on the matters
 before it, drafted for its officer: a loan decision, a permit, a valuation asked for, an audit, a possession application),
-and five no offer takes: `till` (receipts at a counter, a point-of-sale system's work), `records` (a registrar's entries
+and six no offer takes: `hiring`, not yet (an employer's staffing code advertises again at every wake its posting is
+not up, so a posting handed over is handed over again and again: the first 10-seat screen's builder handed over 5,020 in
+three days; risk MT-51), `till` (receipts at a counter, a point-of-sale system's work), `records` (a registrar's entries
 in its register), `adjudication` (a tribunal's orders and warrants), `governance` (a council's, an electoral office's
 or a union's own acts) and `press`. A module says where a paper of its own is of another class than its form: a shop's
 delivery notes are its till's receipts to the households it sells to (`firm.retailer`, `classes`), where a factory's go to
