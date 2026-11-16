@@ -3,6 +3,7 @@ import { factWords, money, outcomeWords, renderObservation, renderStanding, rule
 import { canonical } from "../src/canon";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
+import CATALOGUE from "../../kernel/crates/rules/forms/papers.json";
 
 // The world these tests are in writes its money as the profile says (the platform has no money of its own).
 inCurrency(PROFILE.values.currency);
@@ -18,6 +19,18 @@ test("the papers of delegation read in the office's words: a signed copy as the 
   const signed = factWords({ draft: "rec.80", referral: "rec.79", paper: { kind: "invoice", text: "Invoice: 12 goods.", to: ["outside"], data: { outcome: { money: { amount: "12000", to: "acc-factory-1" } } } } });
   expect(signed).toContain("the paper: an invoice to outside");
   expect(signed).toContain("$120.00");
+  // (What happened, as a matter hands it over, read on its own forms: every blank a form types as a sum reads as money,
+  // never as bare cents, on every form in the catalogue (a delivery note's "price each: 10000", the whole-town rung 1).)
+  const forms = Object.values(CATALOGUE as any).flatMap((v: any) => (Array.isArray(v) ? v : [v]));
+  let sums = 0;
+  for (const f of forms) for (const [name, x] of Object.entries(f.fields as { [k: string]: { type: string } })) {
+    if (x.type !== "amount") continue;
+    const said = factWords({ agreement: "rec.1", kind: f.writes.kind, wants: "draft", facts: { [name]: 1_234_567, composed_on: [{ spec: f }] } });
+    expect(said, `${f.form}: ${name}`).toContain("$12,345.67");
+    expect(said, `${f.form}: ${name}`).not.toMatch(/1234567|1,234,567(?!\.)/);
+    sums++;
+  }
+  expect(sums).toBeGreaterThan(40);
   const answer = factWords({ request: "rec.81", granted: false, reasons: [{ asked: "level", granted: false, why: "held" }], look_again_at: 86_400 * 60, paper: { id: "rec.9", kind: "lease_terms", text: "Lease.", data: {} } });
   expect(answer).not.toMatch(/held|reasons|why|5184000|5,184,000/);
   expect(answer).toContain(when(86_400 * 60));

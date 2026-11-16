@@ -208,13 +208,23 @@ function factWordsOf(raw: unknown, fields?: FieldKinds, under?: string): string 
     else if (isPlain(v) || (Array.isArray(v) && v.every(isPlain)) || (typeof v === "object" && oneFigure(k, v as object))) {
       // (One detail at a time, so that each is read by its own name, as `readable` reads a paper's.)
       for (const [k2, v2] of Object.entries(readable({ [k]: v }, { ...(fields ? { fields } : {}), ...(sumNow ? { money: sumNow } : {}) }, under) as object)) parts.push(`${words(k2)}: ${Array.isArray(v2) ? (v2.length ? v2.map(plainValue).join(", ") : "none") : isPlain(v2) ? plainValue(v2) : `(${factWords(v2, undefined, k)})`}`);
-    } else if (k === "facts" && v !== null && typeof v === "object" && !Array.isArray(v)) last.unshift(`what happened: ${factWords(v, undefined, k)}`);
+    } else if (k === "facts" && v !== null && typeof v === "object" && !Array.isArray(v)) last.unshift(`what happened: ${factWords(v, composedFields(v), k)}`);
     // (Several papers' details, each in turn and numbered, their own details run together: a rates instalment's notices
     // read as brackets inside brackets until 2026-11-11. docs/design/broad-seats.md, G2.)
-    else if (Array.isArray(v) && v.length && v.every((x) => x !== null && typeof x === "object" && !Array.isArray(x))) parts.push(`${words(k)}: ${v.map((x, i) => `${i + 1}. ${factWords(x, undefined, k).replace(/; /g, ", ")}`).join("; ")}`);
+    else if (Array.isArray(v) && v.length && v.every((x) => x !== null && typeof x === "object" && !Array.isArray(x))) parts.push(`${words(k)}: ${v.map((x, i) => `${i + 1}. ${factWords(x, fields, k).replace(/; /g, ", ")}`).join("; ")}`);
     else parts.push(`${words(k)}: (${factWords(v, undefined, k)})`);
   }
   return [...parts, ...last].join("; ");
+}
+/** The blanks of the forms a matter's facts were composed on (`composed_on`, each with its form's `spec`): what each
+ * figure is, so that a sum is read as money wherever its form says it is one (a delivery note's "price each", given
+ * in cents, was shown a seat as "10000" beside "$5,000.00" until 2026-11-16: the whole-town rung 1). */
+export function composedFields(facts: unknown): FieldKinds | undefined {
+  const on = (facts as { composed_on?: unknown })?.composed_on;
+  if (!Array.isArray(on)) return undefined;
+  const out: FieldKinds = {};
+  for (const c of on) Object.assign(out, (c as any)?.spec?.fields ?? {});
+  return Object.keys(out).length ? out : undefined;
 }
 /** Whether a detail is a provider's offer of a service (its kinds of matter, its fee a month): said as sentences. */
 const isOffer = (v: unknown): v is { [k: string]: any } => !!v && typeof v === "object" && !Array.isArray(v) && Array.isArray((v as any).kinds) && whole((v as any).fee_month);
