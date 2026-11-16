@@ -100,6 +100,9 @@ pub struct Reader {
     /// The referral each act (its cause) was sorted against, by kind: every paper of a matter handed over is that
     /// matter's, however many one act sends (a rates instalment's fifteen notices).
     act_referral: BTreeMap<(i64, String), String>,
+    /// The paper of a kind of matter each act (its cause) sent first, as it was sorted: its referral, what the matter was
+    /// handed at, whether signed, and its class. A payment the same act makes is that paper's (G1).
+    act_paper: BTreeMap<i64, (Value, Value, bool, Value)>,
 }
 
 /// An obstacle as the law that made it logged it (`decision`, domain `obstacle`), with the paper that told of it, once
@@ -435,9 +438,18 @@ impl Reader {
             let remit = self.remits.iter().rev().find(|x| x.principal == principal && x.kind == wk && x.t <= t).map(|x| x.id.clone());
             self.acts.push(json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
                 "referral": rf, "wants": wants, "signed": signed.is_some(), "class": class, "depth": "want" }));
+            self.note_act(cause);
             return;
         }
         let level = self.level(&principal, kind, t);
+        if let Some((rf, wants, signed, class)) = self.paid_with(cause, kind, r) {
+            if let Some(rf) = rf.as_str() {
+                self.referral_of.insert(id.to_string(), rf.to_string());
+            }
+            self.acts.push(json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": Value::Null, "level": level,
+                "referral": rf, "wants": wants, "signed": signed, "class": class, "paid_with": true }));
+            return;
+        }
         // (A payment sent with a signed copy, citing the sign-off whose copy carried it: the signed matter's, within its
         // remit as signed. docs/design/broad-seats.md, G1. A payment a seat makes of its own, citing no such sign-off,
         // is sorted as any other act.)
@@ -469,6 +481,7 @@ impl Reader {
             let remit = self.remits.iter().rev().find(|x| x.principal == principal && x.kind == kind && x.t <= t).map(|x| x.id.clone());
             self.acts.push(json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
                 "referral": rf, "wants": wants, "signed": true, "class": "within" }));
+            self.note_act(cause);
             return;
         }
         // (A paper sent again, citing one sorted against a matter (one returned, say): that matter's.)
@@ -525,6 +538,27 @@ impl Reader {
         let remit = self.remits.iter().rev().find(|x| x.principal == principal && x.kind == kind && x.t <= t).map(|x| x.id.clone());
         self.acts.push(json!({ "table": "acts", "t": t, "record": id, "post": post, "principal": principal, "kind": kind, "remit": remit, "level": level,
             "referral": referral, "wants": wants, "signed": signed.is_some(), "class": class }));
+        self.note_act(cause);
+    }
+
+    /// The act's first paper of a kind of matter, as just sorted (the last row pushed): what a payment of the same act is.
+    fn note_act(&mut self, cause: Option<i64>) {
+        let (Some(c), Some(a)) = (cause, self.acts.last()) else { return };
+        if a["kind"] != "request" && !a["referral"].is_null() {
+            let v = (a["referral"].clone(), a["wants"].clone(), a["signed"].as_bool().unwrap_or(false), a["class"].clone());
+            self.act_paper.entry(c).or_insert(v);
+        }
+    }
+
+    /// A payment made in the same act as a paper of a matter its post sent (an order paid with the order, a return with
+    /// the tax it reports: docs/design/broad-seats.md, G1): that paper's, sorted as it was. Before 2026-11-16 such a
+    /// payment, citing no sign-off when the assistant composed the act itself, read as "no remit": the code assistant's
+    /// thirty in the 40-seat mock fork, all orders' and returns' payments.
+    fn paid_with(&self, cause: Option<i64>, kind: &str, r: &Value) -> Option<(Value, Value, bool, Value)> {
+        if kind != "request" || r["data"]["outcome"]["money"].is_null() {
+            return None;
+        }
+        cause.and_then(|c| self.act_paper.get(&c).cloned())
     }
 
     /// What became of each want handed over (docs/design/handing-over.md section 7, measure 1): `served` (the want met,
@@ -805,6 +839,11 @@ mod tests {
             e["body"]["cause"] = json!(cause);
             e
         };
+        let pay = |t: i64, cause: i64, id: &str| {
+            let mut e = rec(t, id, "request", "f1", "mgr-assistant", &["bank"], json!({ "outcome": { "money": { "from": "acc-f1", "to": "acc-town", "amount": "100" } } }));
+            e["body"]["cause"] = json!(cause);
+            e
+        };
         for e in [
             rec(1, "rm1", "remit", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "rates_notice", "level": "draft" })),
             rec(2, "rf1", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "rates_notice", "wants": "draft", "calls": calls })),
@@ -814,6 +853,8 @@ mod tests {
             by_act(5, 70, "n2", "o2"),
             by_act(5, 70, "n3", "o3"),
             by_act(6, 80, "n4", "o1"),
+            pay(5, 70, "p1"),
+            pay(7, 90, "p2"),
         ] {
             r.take(&e);
         }
@@ -823,6 +864,11 @@ mod tests {
             assert_eq!(act(id), (json!("rf1"), json!("within")), "{id}: a paper of the signed matter's act");
         }
         assert_eq!(act("n4"), (json!("rf2"), json!("beyond_level")), "another act is the next matter's, sent unsigned");
+        // (A payment in the same act as the matter's papers, citing nothing (the assistant composed the act): that paper's,
+        // as it was sorted (G1; the 40-seat mock fork's thirty orders' and returns' payments, read as "no remit"). One in an
+        // act with no paper of a matter is its own, as before.)
+        assert_eq!(act("p1"), (json!("rf1"), json!("within")), "paid with the signed notices");
+        assert_eq!(act("p2").1, json!("no_remit"), "a payment of its own");
     }
 
     /// An obstacle (docs/design/obstacles.md section 4) is met only when the paper that tells of it reaches the seat; a
