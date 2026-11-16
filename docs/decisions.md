@@ -15188,3 +15188,42 @@ The merge's slow tier refused `claim-told` on three tests. Two were faults the t
   nothing confirmed after): left.
 - **Revisit if** a matter handed over sets out a figure the paper's other blank should take (then `figureOnce` must
   read the facts' values, not only their names).
+
+## 2026-11-17 · Redrawn by our translator: the tribunal form and the delivery note's two prices; two rules by score
+
+- **The measure** (`translator/eval/redraw.ts`, variants in `redraw-forms.ts`): our served model (round3-s2, offline)
+  draws the requests again on the forms each seat held, as logged or changed, and each draw is scored as `score.ts`
+  scores it. On the forms as logged it reproduces all six tribunal draws and 104 of 140 delivery-note draws exactly (the
+  rest: draws logged as nothing, where the redraw reads the draw the cut-off withheld, and first-pilot draws served by
+  an older model).
+- **The tenant's answer to the tribunal** (Haiku situation-b .56, .57, .58, .63, .72; DeepSeek-d .57), right first
+  time with this branch's rules: (a) as it is, 3 of 6; (b) blanks renamed in fuller words, 0; (c) parties first, 0;
+  (d) `ages` shown as a list of counts, 0 (one draw, `ages=one`, would be refused); bc, bd, cd, bcd, 0. Every change
+  kept `tribunal` as the landlord or the client and lost DeepSeek's right draw (its `ages` came back as one figure, not a
+  list). No form change lands.
+- **Two rules instead** (translator/src/rules.ts), on the logged draws, nothing lost, regression check unchanged (148,
+  all explained): `partyNamed`, an entity blank holding whom another entity blank of the paper holds, where the blank is
+  named for a body the seat knows by that id and the request writes its id or its name, is that body (`tribunal`);
+  `nameInList`, a list of ids holds no one's name (`ages` holding "Civil and Administrative Tribunal" loses it).
+  1,764 to 1,766 of 1,983: .57 and .63 now drawn right; .56 and .58 are drawn with the right parties and no `ages`; .72
+  keeps the model's figures ("one", the sum owed as what can be paid).
+- **Field types** (item 2): the smallest addition is `of` on a list field (`{"type": "list", "of": "count"}`,
+  outcomes.schema.json `fields` and module.schema.json), read by both resolvers (each item a count, else asked back
+  "should be a list of whole numbers"), by `participants/src/forms.ts` (the list written as numbers, as the tribunal's
+  own form for a tenant writes `ages`), shown by `formShownTo` ("list of counts"), with cases in
+  contracts/test/forms.json; old logs stay valid (`of` absent means ids). About half a day with the kernel rebuilt.
+  Measured worth here: one refusal in six, no draw made right. A party of a named kind needs each resolver to know an
+  entity's kind from the seat's file, which neither holds today: not cheap. Not started; for the coordinator.
+- **The delivery note's `unit_price` and `price_each`** are two different things, both of type amount: the price
+  charged where it was not the order's own (a price risen since an order paid ahead; written to the note, read by the
+  buyer's code, `DeliveryNote.unit_price`) and, on terms, the price of each that what is owed is worked out from (read
+  back from `owed`, not written). Redrawn over the 140 delivery notes in the set: as it is 96 right; `unit_price` renamed
+  `price_risen_to` 95 (four draws that put the count there now right, five confirmed targets that held the price twice
+  now missed, three more drawn as nothing); dropped from the form 91. No change lands; a confirmed note with the price
+  in both blanks is harmless (the buyer's code reads the same price). The delivery notes logged as drawn as nothing are the
+  model unsure under its cut-off, its own draw withheld (the redraw reads that draw, `wrote`): every one of those draws is
+  wrong on every variant (sureness 0 to 0.85), so the cut-off withheld them rightly and no change to the form rescues
+  them; they are for training.
+- **The catalogue check** (item 4): on reading, no form asks for the same thing in two blanks (the delivery note's two
+  are different things); a guard that cannot tell sameness from name and type would guard nothing, so none is written.
+- **Revisit if** a form's redraw shows a change that draws more right with nothing lost, or a run asks back on `ages`.

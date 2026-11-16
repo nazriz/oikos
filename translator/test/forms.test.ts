@@ -289,4 +289,12 @@ test("rules changed by score after the reruns and the broad rung (2026-11-17)", 
   const ord = (more: string) => `form(account=acc-shop-1, ${more}form=draft_order, pay_in_days="30", quantity="57", referral=rec.31, seller=factory-4, to=desk)`;
   expect(ruled(ord('for_days="30", ').replace("rec.31", "rec.30"), "Draft order for sign-off: 57 goods from factory-4, paid from acc-shop-1, paid within 30 days of delivery (remit rec.30, matter rec.31).", ko)).toBe(ord(""));
   expect(ruled(ord('for_days="30", '), "Draft order for sign-off: 57 goods from factory-4, paid from acc-shop-1, for days: 30, pay in days: 30, matter rec.31.", ko)).toBe(ord('for_days="30", '));
+  // (The tenant's answer to the tribunal.) Two parties of one paper are not the same party: the blank named for a body
+  // the seat knows by that id, holding the other party, is that body; and a list of ids holds no one's name.
+  const kt = { ...k, forms: [...k.forms, form("form-desk-tribunal-response", "tribunal_response", { client: field("entity", true), tribunal: field("entity", true), landlord: field("entity", true), application: field("record", true), ages: field("list") })],
+    names: new Map([["tribunal", "Civil and Administrative Tribunal"], ["landlord-10", "Property Co. 10"]]) };
+  const tr = (tribunal: string, ages: string) => `form(ages=${ages}, application=rec.5, client=c0100, form=tribunal_response, landlord=landlord-10, to=desk, tribunal=${tribunal})`;
+  expect(ruled(tr("landlord-10", '["Civil and Administrative Tribunal"]'), "A tribunal response in c0100's name, to tribunal (Civil and Administrative Tribunal), with a copy to landlord-10, answering application rec.5.", kt))
+    .toBe("form(application=rec.5, client=c0100, form=tribunal_response, landlord=landlord-10, to=desk, tribunal=tribunal)");
+  expect(ruled(tr("landlord-10", '["62"]'), "An answer in c0100's name against landlord-10, to application rec.5, ages 62.", kt)).toBe(tr("landlord-10", '["62"]'));
 });

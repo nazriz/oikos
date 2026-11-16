@@ -739,6 +739,23 @@ them four times: on the held-out side right in all from 42 of 131 (round3-s2) to
 96, the 14B 2 to 6 and 10 of 27; Claude's sets as v5's (the same recipe without them). At the certified cut 12 and 13
 small-model requests are served. Models `round/models/sm-D-deberta-s1`, `-s2`; scores and tables in `round/scores/`.
 
+## For the next round: blanks' descriptions in the input (2026-11-17)
+
+The served model reads each form as one line of its name, office, id and its blanks by name and type
+(`formShownTo`, translator/src/index.ts); a blank's description, which says what it holds in the world's words, is not
+shown. Showing it is within the design (P3, P11: a form's published fields are the seat's knowledge) and was left to this
+round by the coordinator (decisions, 2026-11-17, "The tenant's answer to the tribunal").
+- **What it takes:** a new input format (each blank as `name (type: description)`), so every training row is re-rendered
+  (`model/rerender.ts`) and the model retrained; nothing else in the call language changes.
+- **What it costs:** descriptions run 5 to 20 words a blank; a seat is shown 25 to 60 forms of 3 to 15 blanks, so the
+  forms' part of the input grows two to four times. More seats then pass the reader's limit and are shown a subset
+  (`model/subset.ts`); latency grows about as the input does. A cheaper variant: descriptions only for the forms a
+  request names or the model's choose pass picks (`encode.ts`, the fill pass), which keeps the choose input as it is.
+- **What to expect:** by itself, little on the faults seen so far. On the tenant's answer to the tribunal the swapped
+  blanks' names (`tribunal`, `landlord`) already said what they hold; redrawn with fuller names, parties first, or a typed
+  `ages`, the model drew none of the five asks right (decisions, 2026-11-17, "Redrawn by our translator"). Train on
+  requests on the new forms first; add descriptions where a blank's name cannot say enough.
+
 ## Not built
 
 - The retrain's first two steps as one command: generated parts are written and checked by their own commands, and
