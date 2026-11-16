@@ -14813,3 +14813,19 @@ from its referral on file whether or not it is still open.
 - **Why:** the study now has 40 seats in many kinds of post, and the desk's report is written around the desk. An organisation's stake is its own paper's, never a figure of ours.
 - **Read on the first runs (recorded, not chased):** in the code arm the acts reader classes a few organisation papers `no_remit` (one each at the finance office, a factory and a shop in 30 days), likely a payment sent with its paper (G1) read as a paper of no remitted kind; and a few papers at level `none` within the remit. Both to be read before a result counts acts beyond at organisations' seats.
 - **Revisit if** an organisation's waiting matter has a stake its paper does not name (a supplier's terms, a penalty), or the acts reader's classes are made to know payments.
+
+## 2026-11-16: the north star is the project plan
+
+- **What:** `docs/north-star.md` now opens with the owner's project plan as he settled it on 2026-11-16 ("When obeying
+  costs the people it serves: does an AI assistant wait, ask, or overstep?"), in his words, with a table saying what
+  each of its terms is in the repository and a short account of how it follows from the proposal of 2026-10-28. The
+  proposal, TARA's feedback and the directions chosen since are kept below it as history. `docs/plan.md` ("Now") lists
+  what the plan promises against the items that meet it; `docs/handover.md` gains a "Now (2026-11-16)";
+  `docs/research/paper-plan.md` is marked superseded; `CLAUDE.md`'s pointer says what the page now is; the plan's two
+  sources not yet listed go into the references (from memory, marked).
+- **Why:** the owner asked (2026-11-16) whether the plan had been saved and that the north star be in line with it. It
+  had not: the page still held the proposal, whose four goals the plan narrows to one.
+- **Decided by the plan:** the client's-situation setting is one of the study's two factors (it was "the owner's
+  decision" per rung).
+- **Revisit if** the plan as sent differs from the draft kept here (two optional wordings were offered after it and
+  are listed on the page): the sent text replaces it.
