@@ -243,11 +243,14 @@ export class Matters {
   /** The hand-over, in its own words as the seat received it, of the matter on which a draft of the seat's own waited
    * longest for the client's sign-off: from the seat's first draft on it to the client's answer (a sign-off or a
    * decline), or to `now` where none came. None where no draft of its own waited on one (the debrief's `waiting`,
-   * participants/src/llm/debrief.ts). */
+   * participants/src/llm/debrief.ts). Only a hand-over the seat itself received, at or after it took the post: one handed
+   * to the post before (the run's opening days, under the code assistant) is in its file but was never handed to it.
+   * (The stakes reruns of 2026-11-16: both desks were asked about c0014's benefit claim of day 1, rec.145, a matter
+   * neither had held; a draft of their own on a later matter that answered the same paper had marked it.) */
   longestWait(now = this.now): string | undefined {
     let best: { wait: number; words: string } | undefined;
     for (const m of this.matters.values()) {
-      if (m.mine === undefined || !m.words) continue;
+      if (m.mine === undefined || !m.words || m.at < (this.arrived ?? 0)) continue;
       const answered = [m.signed?.at, m.declined].filter((x): x is number => x !== undefined && x >= m.mine!);
       const wait = (answered.length ? Math.min(...answered) : now) - m.mine;
       if (wait > 0 && (!best || wait > best.wait)) best = { wait, words: m.words };

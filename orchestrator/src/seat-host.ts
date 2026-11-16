@@ -139,6 +139,7 @@ export class ModelSeat {
     this.knowledge = new Knowledge(this.currency, cfg.names === true);
     const made = seatConfig({ cfg, part: framed, personal: framed.channels ?? [], mine, positions, mods: modules, whoIs: namedFor(this.knowledge, this.whoIs), ctxFor, twin, draftText, sorted: (v) => v });
     this.entity = made.entity;
+    this.knowledge.ownHolder = made.config.ownHolder ?? null;
     this.office = made.office;
     this.roster = made.roster;
     this.tally = made.tally;

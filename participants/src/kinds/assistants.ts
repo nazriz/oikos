@@ -131,6 +131,23 @@ export function clientPapers(payments: string[]): Issued[] {
       fields: { client, office: f("entity", "The office that asked.", req), request: f("record", "The office's request.", req), claim: f("record", "The client's claim.", req),
         need: f("text", "What is sent, in a few words, if you wish: the office goes by the request it answers."), last_employer: f("entity", "The client's last employer, where the office asks for one.") },
       writes: { in_name_of: "=client", kind: "evidence", text: "For my claim {claim}: the papers asked for.", basis: "=request", to: ["=office"], visible: ["=client", "=office"], data: { claim: "=claim", need: "=need", request: "=request", last_employer: "=last_employer" } } },
+    // (A tenant's answer to an application for possession, in the client's name: the fields the tribunal and the landlord
+    // read (`TribunalResponse`, as the tribunal's own form for a tenant, shared/papers.ts `POSSESSION_ANSWER`). Until
+    // 2026-11-17 the desk had no form for it and drafted on the general one, which carries words only, so its draft
+    // could not say what the client's own answer says in figures, and every one was declined (the stakes reruns, c0336).)
+    { form: "tribunal_response", title: "An answer to an application for possession of a client's home, in their name",
+      does: "Files, in the client's name, their answer to their landlord's application to the tribunal for possession of their home: what they say is owed, what they could pay, and their circumstances. It goes to the tribunal, with a copy to the landlord. Nothing need be filled in but the application and whom it goes to; what is left out is not held against anyone.",
+      fields: { client, tribunal: f("entity", "The tribunal, as the notice of hearing names it.", req), application: f("record", "The application answered, as the notice of hearing names it.", req),
+        landlord: f("entity", "The landlord who applied: a copy goes to them.", req), owes: f("amount", "What the client says is owed today."),
+        disputes_sum: f("choice", "Yes, where the client says less is owed than the landlord says.", { options: ["yes", "no"] }),
+        can_pay: f("amount", "What the household could pay a month toward what is owed, beyond the rent (nothing: 0)."), every: f("duration", "How often that could be paid."),
+        out_of_work_since: f("date", "Where someone in the home is out of work: since when."), claim: f("choice", "A claim for support: refused, or made and not yet decided.", { options: ["refused", "pending"] }),
+        claim_on: f("date", "The day it was refused or made."), ill: f("choice", "Yes, where someone in the home is ill.", { options: ["yes", "no"] }),
+        people: f("count", "How many people live in the home."), children: f("count", "How many of them are children."), ages: f("list", "Their ages."),
+        go_to: f("choice", "Whether they have anywhere to go.", { options: ["nowhere", "someone_to_ask", "means_for_another"] }) },
+      writes: { in_name_of: "=client", kind: "tribunal_response", text: "Answer to application {application}.", basis: "=application", to: ["=tribunal", "=landlord"], visible: ["=client", "=tribunal", "=landlord"],
+        data: { application: "=application", owes: "#owes", disputes_sum: "?disputes_sum", offer: "#can_pay", every: "=every", out_of_work_since: "=out_of_work_since", claim: "=claim", claim_on: "=claim_on", ill: "?ill",
+          people: "=people", children: "=children", ages: "=ages", go_to: "=go_to" } } },
   ];
 }
 

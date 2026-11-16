@@ -120,6 +120,15 @@ export function readable(x: unknown, how: { fields?: FieldKinds; money?: (a: str
  * person by themselves (principle 14). Set for the report being written. */
 export type WhoIs = (id: string) => { id: string; name?: string; of?: string } | undefined;
 let whoIs: WhoIs | undefined;
+/** An account set out by whose it is, by name where the world gives one: "Factory 1's account (acc-factory-1)". One rule
+ * for every account a seat sees that its own participant does not hold: an organisation's an assistant works for, a
+ * client's a desk sees, a town's a post keeps. Nothing more is said of it, either way. (2026-11-17: an assistant's
+ * sitting set out its principal's account as if its own, and the factory's assistant in the DeepSeek rerun paid two of
+ * its principal's bills from it.) */
+export function accountOf(account: string, holder: string, who: WhoIs | undefined = whoIs): string {
+  const name = who?.(holder)?.name ?? holder;
+  return `${name}'s account (${account})`;
+}
 /** Whoever wrote a paper, as the world knows them. */
 const writer = (id: string) => whoIs?.(id)?.id ?? id;
 /** Someone by name and id, and the organisation whose post it is: how a letter is signed. */
@@ -932,6 +941,10 @@ function describeTransactions(txs: Transaction[], mine: Set<string>): string[] {
 }
 
 export interface RenderOptions {
+  /** Whose accounts are the seat's own: its participant's own person (`LlmParticipantConfig.ownHolder`); null, a seat
+   * with no account of its own (a system). Absent: the entity it acts for, as before 2026-11-17. Every other account is
+   * set out by whose it is (`accountOf`). */
+  ownHolder?: string | null;
   /** Items shown per report before earlier ones are only counted. */
   maxRecords?: number;
   /** Reports whose items are standing documents (shown separately, in full). */
@@ -1048,7 +1061,8 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
       const shownAccounts = others ? ch.accounts.filter((a) => a.holder === obs.entity) : ch.accounts;
       out.push("", `## ${title(id)}`);
       if (others) out.push(`(The ${num(others)} ${others === 1 ? "account" : "accounts"} you keep for others, as at your last report: set out again with your next.)`);
-      for (const a of shownAccounts) out.push(`- ${a.account}${a.holder === obs.entity ? "" : ` (${a.holder}'s)`}, kept by ${a.custodian === obs.entity ? "you" : a.custodian}: ${money(a.balance)}`);
+      const own = o.ownHolder === undefined ? obs.entity : o.ownHolder;
+      for (const a of shownAccounts) out.push(`- ${a.holder === own ? a.account : accountOf(a.account, a.holder)}, kept by ${a.custodian === obs.entity ? "you" : a.custodian}: ${money(a.balance)}`);
       out.push(...describeTransactions(ch.transactions, new Set(ch.accounts.map((a) => a.account))).map((l) => `  ${l}`));
     } else if (ch.kind === "holdings") {
       out.push("", `## ${title(id)}`);

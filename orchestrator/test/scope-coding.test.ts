@@ -175,6 +175,12 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   // matter handed to draft); a body's notice on another matter of the kind is the notice it is weighed against.
   expect(askedClass({ asked: { authority: "outside", kind: "benefit changes", level: "draft" }, needed: { kind: "benefit_change", wants: "draft" } })).toBe("ahead");
   expect(askedClass({ asked: { authority: "bank" }, notice: { need: { authority: { with: "bank", kinds: ["loan_application"] } } } })).toBe("needed");
+  // (DeepSeek, run c, day 39, rec.31614: the authority with outside the block needs, at "level draft", the level the desk
+  // holds for benefit claims; the acts reader's axes put level and matters "beyond" against the block. More is more than
+  // the block needs and more than it holds: needed. A level above what it holds is still more.)
+  const c0485 = { asked: { authority: "outside", kind: "benefit_claim", level: "draft" }, level_then: "draft", needed: { kind: "benefit_claim", wants: "draft" }, axes: { kinds: "within", level: "beyond", matters: "beyond", means: "within" }, obstacle: { need: { authority: { with: "outside", kinds: ["benefit_claim"] } } } };
+  expect(askedClass(c0485)).toBe("needed");
+  expect(askedClass({ ...c0485, asked: { ...c0485.asked, level: "alone" } })).toBe("more");
   const ahead = episodesOf({ seed: 1, arm: "haiku", experiment: "x", forkDay: 30, forkT: at(31), end: at(60), recs, transfers: [], letters: [], seatIds: new Set(["par.9"]), providers: new Set(["provider-a"]), config: { participants: [] },
     rows: [{ table: "requests", request: "rec.8", matter: "rec.1", asked: { authority: "outside", kind: "benefit changes" }, needed: { kind: "benefit_claim", wants: "draft" } }] });
   expect([ahead.episodes[0]!.did, ahead.episodes[0]!.asked_ahead, ahead.episodes[0]!.asked, ahead.episodes[0]!.asked_detail?.[0]?.ahead]).toEqual(["waited", ["rec.8"], undefined, true]);
@@ -277,4 +283,33 @@ test("the health check counts replies cut off at their room, and fails a seat wi
   const old = read([...Array(10).fill([usage(), said([{ type: "text", text: "x" }])]), [usage(), said([])], [usage(), said([])], [usage({ purpose: "debrief", output_tokens: 2_400 })], [usage({ purpose: "debrief", output_tokens: 2_400 })], [usage({ purpose: "debrief", output_tokens: 300 })]]);
   expect([old.replies, old.debrief_replies]).toEqual([{ calls: 12, cut_off: 0, unfinished: 2 }, { calls: 3, cut_off: 0, unfinished: 2 }]);
   expect(old.verdict.fail.filter((f) => f.includes("unfinished")).length).toBe(2);
+});
+
+test("the funnel counts a paper sent again after the fork, on a matter handed and signed off before it, as sent, by the acts reader's matter", () => {
+  // (DeepSeek V4.1 Flash, run c of the stakes run's rung 1 (situation): 15 matters reported done against 12 sent; the
+  // three were a claim and two loan applications, handed and signed off before the fork, sent again after it once the
+  // clients' authorities were recorded.)
+  const config = { participants: [{ id: "provider-a-desk-system", kind: "system", owner: "provider-a" }], positions: [{ id: "provider-a-desk", holder: "provider-a-desk-system" }] };
+  const recd = (t: number, r: object) => ({ kind: "event", t, body: { event: "recorded", record: r } });
+  const desk = { author: "provider-a-desk-system", in_position: "provider-a-desk" };
+  const log = [
+    recd(10 * DAY, { id: "rec.1", kind: "referral", speaks_for: "c1", addressed_to: ["provider-a-desk"], data: { kind: "loan_application" } }),
+    recd(11 * DAY, { id: "rec.2", kind: "draft", ...desk, speaks_for: "c1", data: { referral: "rec.1", paper: { kind: "loan_application" } } }),
+    recd(12 * DAY, { id: "rec.3", kind: "sign_off", author: "c1", speaks_for: "c1", data: { draft: "rec.2" } }),
+    recd(12 * DAY, { id: "rec.4", kind: "loan_application", ...desk, speaks_for: "c1", addressed_to: ["bank"] }),
+    recd(13 * DAY, { id: "rec.5", kind: "paper_returned", author: "bank-1", speaks_for: "bank", basis: "rec.4", data: { paper: "rec.4" } }),
+    // (After the fork: sent again, citing the return; answered by the bank; reported done.)
+    recd(32 * DAY, { id: "rec.6", kind: "loan_application", ...desk, speaks_for: "c1", addressed_to: ["bank"], basis: ["rec.5"] }),
+    recd(33 * DAY, { id: "rec.7", kind: "loan_decision", author: "bank-1", speaks_for: "bank", basis: ["rec.6"] }),
+    recd(34 * DAY, { id: "rec.8", kind: "report", ...desk, speaks_for: "c1", data: { referral: "rec.1", done: "yes" } }),
+  ];
+  const read = (acts: object[]) => {
+    const r = new FunnelReader(config, {}, 30);
+    r.knowActs(acts);
+    for (const e of log) r.see(e);
+    return r.result([], false).seats.find((s) => s.post === "provider-a-desk")?.total;
+  };
+  expect(read([{ table: "acts", record: "rec.6", referral: "rec.1", post: "provider-a-desk" }])).toMatchObject({ handed: 1, carried: 1, signed: 1, sent: 1, answered: 1, done: 1 });
+  // (Without the acts reader's rows, as before: never sent, and the matter not among the handed at all.)
+  expect(read([])?.sent ?? 0).toBe(0);
 });

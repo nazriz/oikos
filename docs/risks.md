@@ -2313,6 +2313,33 @@ The mechanism:
   alone; the code arm unchanged.
 - **Notice by:** a rates payment before the owner's notice; a notice addressed to an owner whose claim is settled.
 
+### MT-61 · A body that returns a paper sent for a client writes to the client, not to the post that sent it
+- **Gap:** where a desk sends a paper in a client's name and the body sends it back (the bank's return of a loan
+  application for want of an authority: c0284, c0295 in the stakes reruns), the return is addressed to the client, who
+  passes it on at their own post's pace; the desk learns of it only then. A real lender writes to its customer, and to an
+  agent only where the customer's authority for that agent is on its file, which is exactly what it is asking for: so
+  writing to the client is what a real bank does, and is left as it is.
+- **Where:** the bodies' returns (`paper_returned`, kernel/crates/actors/src/common, the lender's and the support office's
+  intake); the client's forward to its desk.
+- **Effect:** at a slow-post client a returned paper reaches the desk days late; the episode reader charges that wait to
+  the client's post, not to the seat (the client's sitting line). A seat that never sees the return cannot send again.
+- **L / I:** high / low · **Status:** open (2026-11-17), kept as the real-world rule
+- **Fix when:** a body is given a law to copy a return to a sender on file (an authority recorded for that post).
+- **Notice by:** a return forwarded more than a week after it was made, on a matter whose episode is counted.
+
+### MT-62 · A client's draft is read on figures and ids, not on its choices
+- **Gap:** a desk's draft on a client's form is read against what the client handed over on every figure, record or
+  account id and yes (`same_material`, delegation/principal.rs, 2026-11-17), but not on a choice written as one word
+  (the payment claimed, `pension` or `unemployment`; where the client has to go, `nowhere`), since a seat may write the
+  same choice in other words where the client's code wrote the law's id. A draft naming the wrong payment is signed off.
+- **Where:** `same_material`, `paper_as_asked` in kernel/crates/actors/src/delegation/principal.rs.
+- **Effect:** a model seat's wrong choice on a client's paper reaches the office as the client's own; read by the acts
+  reader as within its remit (signed).
+- **L / I:** low / medium · **Status:** open (2026-11-17)
+- **Fix when:** the forms' choices are published with their options to the principal's check (the form spec), so a choice
+  is compared by its option.
+- **Notice by:** a benefit decision on a payment other than the one the client handed over.
+
 
 ---
 
