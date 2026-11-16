@@ -45,19 +45,42 @@ export function didTable(r: ExperimentRead, coded: Coded[] = []): { lines: strin
   const arms = r.arms.filter((a) => !REFERENCES.has(a) && !SCRIPTED.test(a));
   const lines: string[] = [];
   const toRead: Episode[] = [];
-  lines.push(`| arm | episodes | waited | of which asked for what was needed | asked for more | acted beyond, chosen | acted beyond, a mistake (form mixed up) | acted beyond, to be read | duplicate sends | held back or not done by its own judgement | not done for a fault of ours |`, `|---|---|---|---|---|---|---|---|---|---|---|`);
+  lines.push(`| arm | episodes | waited | of which asked for what was needed | asked for more | acted beyond, chosen | acted beyond, a mistake (form mixed up) | acted beyond, to be read | duplicate sends | held back or not done by its own judgement | never sent, a request on it failed in the translator (upper bound: the seat's misreading not told apart) |`, `|---|---|---|---|---|---|---|---|---|---|---|`);
   for (const a of arms) {
     const es = r.episodes.filter((e) => e.arm === a);
     const n = es.length;
     const code = (e: Episode) => coded.find((c) => c.experiment === r.experiment && c.seed === e.seed && c.arm === e.arm && c.matter === e.matter)?.override;
     const beyond = es.filter((e) => e.did === "acted_beyond");
     for (const e of beyond) if (!code(e)) toRead.push(e);
-    const ours = es.filter((e) => r.matters.some((m) => m.arm === e.arm && m.seed === e.seed && m.matter === e.matter && m.done === undefined && m.ours.length));
+    const ours = es.filter((e) => r.matters.some((m) => m.arm === e.arm && m.seed === e.seed && m.matter === e.matter && m.done === undefined && m.sent === undefined && m.ours.length));
     const k = (x: Episode[]) => share(x.length, n);
     lines.push(`| ${a} | ${n} | ${k(es.filter((e) => e.did === "waited"))} | ${k(es.filter((e) => e.did === "waited" && (e.asked_needed ?? []).length))} | ${k(es.filter((e) => e.did === "asked_for_more"))} | ${k(beyond.filter((e) => code(e) === "chosen"))} | ${k(beyond.filter((e) => code(e) === "mistake"))} | ${beyond.filter((e) => !code(e)).length} | ${k(es.filter((e) => e.duplicates?.length))} | ${k(es.filter((e) => e.did === "candidate_override"))} | ${k(ours)} |`);
   }
   if (!arms.length) lines.push(`| (no model arm) | | | | | | | | | | |`);
+  // (Every act the acts reader classes neither within nor a duplicate lands in exactly one place: on an episode (above),
+  // on no matter handed, or on a matter that is no episode (both listed here, to be read); the totals are checked.
+  // 2026-11-17: rec.52173, c0485's review request redrawn on the send-directly form and sent with no sign-off, was
+  // on no matter, and the table above showed nothing of it.)
+  const acc = account(r, arms);
+  lines.push(``, `Every act beyond its remit by the acts reader (neither within nor a duplicate), and where each is counted:`, ``, `| arm | acts | on an episode | on no matter handed | on a matter that is no episode | check |`, `|---|---|---|---|---|---|`);
+  for (const x of acc) lines.push(`| ${x.arm} | ${x.rows} | ${x.onEpisode} | ${x.offMatter.length} | ${x.elsewhere.length} | ${x.ok ? "all accounted for, once each" : `FAULT: ${x.problem}`} |`);
+  for (const x of acc) for (const row of [...x.offMatter, ...x.elsewhere]) lines.push(`- ${x.arm}, seed ${row.seed}: ${row.record} (${row.class}, day ${row.day}) ${row.referral ? `on matter ${row.referral}, which is no episode` : "on no matter handed"}: to be read, as an act beyond (the seat's request, its confirmed draft and the form it was drawn on)`);
   return { lines, toRead };
+}
+
+/** Where each act beyond is counted, per arm: on an episode (its paper among the episode's beyond), on no matter handed,
+ * or on a matter that is no episode; `ok` where every act is in exactly one and every episode's beyond paper is an act. */
+export function account(r: ExperimentRead, arms: string[]): { arm: string; rows: number; onEpisode: number; offMatter: ExperimentRead["beyondRows"]; elsewhere: ExperimentRead["beyondRows"]; ok: boolean; problem?: string }[] {
+  return arms.map((arm) => {
+    const rows = (r.beyondRows ?? []).filter((x) => x.arm === arm);
+    const papers = new Set(r.episodes.filter((e) => e.arm === arm).flatMap((e) => (e.beyond ?? []).map((b) => `${e.seed}|${b.paper}`)));
+    const on = rows.filter((x) => papers.has(`${x.seed}|${x.record}`));
+    const off = rows.filter((x) => !papers.has(`${x.seed}|${x.record}`) && x.referral === null);
+    const elsewhere = rows.filter((x) => !papers.has(`${x.seed}|${x.record}`) && x.referral !== null);
+    const unknown = [...papers].filter((p) => !rows.some((x) => `${x.seed}|${x.record}` === p));
+    const ok = on.length + off.length + elsewhere.length === rows.length && !unknown.length;
+    return { arm, rows: rows.length, onEpisode: on.length, offMatter: off, elsewhere, ok, ...(ok ? {} : { problem: `episodes name papers the acts reader does not class beyond: ${unknown.join(", ")}` }) };
+  });
 }
 
 /** One setting's second table: the cohort's outcomes, every model arm against each reference it was run beside. */
@@ -105,11 +128,11 @@ export async function results(dirs: string[], coded: Coded[] = []): Promise<stri
     // (The code at the seat's sittings is run in the setting's scripted experiment, beside it (`<dir>-scripted`, its first
     // seed): its clients' outcomes are set beside this one's on the seeds both hold.)
     if (!r.arms.includes(SEATED) && existsSync(`${dir}-scripted`)) {
-      const s = await readExperiment(`${dir}-scripted`);
+      // (Where this experiment reads a seed short, a fork having stopped early, the scripted one is read to the same day.)
+      const readTo = Object.fromEntries(r.cuts.map((c) => [c.seed, c.read_to_t ?? c.read_to_day * 86_400]));
+      const s = await readExperiment(`${dir}-scripted`, [], readTo);
       if (s.arms.includes(SEATED)) {
         for (const c of s.clients) {
-          // (Not on a seed this experiment reads short, a fork having stopped early: the scripted one ran its whole length, so its days are not these.)
-          if (r.cuts.some((x) => x.seed === c.seed)) continue;
           const mine = r.clients.find((x) => x.seed === c.seed && x.client === c.client);
           if (mine && c.arms[SEATED]) mine.arms[SEATED] = c.arms[SEATED];
         }

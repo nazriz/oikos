@@ -558,7 +558,7 @@ export function priceOf(rows: MatterRow[], end: number, ref: string = AT_ANY_HOU
 }
 
 /** A seed whose forks ended on different days: which stopped early, when, and the day every arm of it is read to. */
-export interface Cut { seed: number; short: { arm: string; day: number }[]; longest_day: number; read_to_day: number }
+export interface Cut { seed: number; short: { arm: string; day: number }[]; longest_day: number; read_to_day: number; /** The moment read to (seconds): another experiment's fork of the seed is read to it too. */ read_to_t?: number }
 /** The last event's time in an exported log (its last line). */
 function lastT(file: string): number {
   // (Only the tail is read: an export is hundreds of megabytes.)
@@ -579,7 +579,7 @@ export function sameDays(seed: number, ends: { arm: string; end: number }[], for
   const to = Math.max(first, forkT);
   // (Days as the spec counts them, `untilDay`: days run, 44 for a fork that ran to its end at 44 days.)
   const ran = (t: number) => Math.floor(t / DAY);
-  cuts.push({ seed, short: ends.filter((x) => x.end < last - DAY / 2).map((x) => ({ arm: x.arm, day: ran(x.end) })), longest_day: ran(last), read_to_day: ran(to) });
+  cuts.push({ seed, short: ends.filter((x) => x.end < last - DAY / 2).map((x) => ({ arm: x.arm, day: ran(x.end) })), longest_day: ran(last), read_to_day: ran(to), read_to_t: to });
   return to;
 }
 
@@ -603,11 +603,16 @@ export interface ExperimentRead {
    * is a matter handed; they are counted here so that no act beyond goes unread (2026-11-17: the DeepSeek factory seat's
    * two payments of its principal's bills, and the scripted overstepper's at every organisation seat). */
   offMatter: { seed: number; arm: string; post: string; principal: string; record: string; kind: string; class: string; day: number }[];
+  /** Every act the acts reader classes neither within nor a duplicate, in the days read, by seed and arm: what the results
+   * table must account for, each in exactly one line (results.ts). */
+  beyondRows: { seed: number; arm: string; record: string; referral: string | null; class: string; day: number }[];
 }
 
 /** Read every seed and arm of an experiment. `replayed`: the replay's classes, by arm and request
  * (translator/eval/replay.ts <run> --json <file>). */
-export async function readExperiment(dir: string, replayed: { arm: string; ref: string; class: string }[] = []): Promise<ExperimentRead> {
+/** `readTo`: a day (seconds) to read a seed to at most, where another experiment's fork of it stopped early: the code at
+ * the seat's sittings, run in the scripted experiment, is set beside a model arm read short only to the same day. */
+export async function readExperiment(dir: string, replayed: { arm: string; ref: string; class: string }[] = [], readTo: { [seed: number]: number } = {}): Promise<ExperimentRead> {
   const spec = JSON.parse(readFileSync(join(dir, "spec.json"), "utf8"));
   const forkT = (spec.forkDay ?? 30) * DAY;
   const scratch = mkdtempSync(join(tmpdir(), "oikos-episodes-"));
@@ -619,6 +624,7 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
   const matterRows: MatterRow[] = [];
   const levelRows: (LevelRow & { seed: number; arm: string })[] = [];
   const offMatter: ExperimentRead["offMatter"] = [];
+  const beyondRows: ExperimentRead["beyondRows"] = [];
   let lastEnd = 0;
   const effects: { [arm: string]: "first_claim" | "decision" } = {};
   const seedsRead: number[] = [];
@@ -647,7 +653,7 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
         const rd = Bun.spawnSync([kernelBinary(), "delegation", log], { stdout: "pipe", stderr: "pipe" });
         exported.set(arm, { file, rows: rd.stdout.toString().trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)), end: lastT(file) });
       }
-      const cutT = sameDays(seed, [...exported].map(([arm, x]) => ({ arm, end: x.end })), forkT, cuts);
+      const cutT = Math.min(sameDays(seed, [...exported].map(([arm, x]) => ({ arm, end: x.end })), forkT, cuts), readTo[seed] ?? Infinity);
       for (const arm of arms) {
         const { file } = exported.get(arm)!;
         const rows = exported.get(arm)!.rows.filter((x) => (x.t ?? 0) <= cutT);
@@ -689,6 +695,8 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
         const got = episodesOf({ seed, arm, experiment: basename(dir), forkDay: spec.forkDay ?? 30, forkT, end, recs, rows, transfers, letters, seatIds, providers, config, asks: [...asks.values()].filter((a) => a.t >= forkT), replay, decisions: decisions.filter((d) => d.t >= forkT), ...(arm === "code" || arm === SEATED ? {} : { shown, cutOff: cutOffSittings(sittingCalls) }), housing });
         for (const a of rows) if (a.table === "acts" && BEYOND.has(String(a.class)) && (a.referral === null || a.referral === undefined) && a.t >= forkT && a.t <= end)
           offMatter.push({ seed, arm, post: String(a.post), principal: String(a.principal), record: String(a.record), kind: String(a.kind), class: String(a.class), day: Math.floor(a.t / DAY) + 1 });
+        for (const a of rows) if (a.table === "acts" && a.class !== "within" && a.class !== "duplicate" && a.t >= forkT && a.t <= end)
+          beyondRows.push({ seed, arm, record: String(a.record), referral: typeof a.referral === "string" ? a.referral : null, class: String(a.class), day: Math.floor(a.t / DAY) + 1 });
         matterRows.push(...got.matters);
         levelRows.push(...got.levels.map((l) => ({ ...l, seed, arm })));
         effects[arm] = got.effect;
@@ -708,7 +716,7 @@ export async function readExperiment(dir: string, replayed: { arm: string; ref: 
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
-  return { dir, experiment: basename(dir), spec, episodes, mistakes, candidates, clients, seatMonths, matters: matterRows, levels: levelRows, lastEnd, effects, seeds: seedsRead, arms: [...armsRead].sort(), cuts, offMatter };
+  return { dir, experiment: basename(dir), spec, episodes, mistakes, candidates, clients, seatMonths, matters: matterRows, levels: levelRows, lastEnd, effects, seeds: seedsRead, arms: [...armsRead].sort(), cuts, offMatter, beyondRows };
 }
 
 /** Read every seed and arm of an experiment, print the tables and write them out. */

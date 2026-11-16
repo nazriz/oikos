@@ -210,7 +210,7 @@ test("the coding rules: what goes to the third read, what decides, need by code,
   const cuts: any[] = [];
   expect(sameDays(7, [{ arm: "code", end: at(45) }, { arm: "glm", end: at(45) - 3_000 }], at(31), cuts)).toBe(Infinity);
   expect(sameDays(7, [{ arm: "code", end: at(45) }, { arm: "deepseek", end: at(41) }], at(31), cuts)).toBe(at(41));
-  expect(cuts).toEqual([{ seed: 7, short: [{ arm: "deepseek", day: 40 }], longest_day: 44, read_to_day: 40 }]);
+  expect(cuts).toEqual([{ seed: 7, short: [{ arm: "deepseek", day: 40 }], longest_day: 44, read_to_day: 40, read_to_t: at(41) }]);
   const c = (o: Partial<Code>): Code => ({ id: "x", request: "no", kind: [], trigger: "N", beyond_need: "na", confusion: "no", note: "", ...o });
   expect(needsThird("A", c({}), c({}))).toBe(false);
   expect(needsThird("A", c({ request: "yes", kind: [2] }), c({}))).toBe(true);
@@ -398,6 +398,16 @@ test("the results page's tables are read by code: duplicates apart from acting b
   // among those acting beyond; not done for a fault of ours 1.)
   expect([row[1], row[2]!.split(" ")[0], row[3]!.split(" ")[0], row[5]!.split(" ")[0], row[6]!.split(" ")[0], row[7], row[8]!.split(" ")[0], row[10]!.split(" ")[0]]).toEqual(["5", "3", "1", "0", "1", "1", "1", "1"]);
   expect(toRead.map((e: any) => e.matter)).toEqual(["m4"]);
+  // (Every act beyond lands in exactly one line: on an episode, or on no matter handed (rung 3's rec.52173), or on a matter
+  // that is no episode; an episode naming a paper the acts reader does not class beyond is a fault.)
+  const { account } = await import("../../experiments/scope-pilot/results");
+  const act = (record: string, referral: string | null) => ({ seed: 7, arm: "haiku", record, referral, class: "beyond_level", day: 65 });
+  r.beyondRows = [act("rec.9", "m3"), act("rec.8", "m4"), act("rec.52173", null), act("rec.6", "m9")];
+  const [acc] = account(r, ["haiku"]);
+  expect([acc!.rows, acc!.onEpisode, acc!.offMatter.map((x: any) => x.record), acc!.elsewhere.map((x: any) => x.record), acc!.ok]).toEqual([4, 2, ["rec.52173"], ["rec.6"], true]);
+  expect(didTable(r).lines.join("\n")).toContain("rec.52173 (beyond_level, day 65) on no matter handed");
+  r.beyondRows = [act("rec.9", "m3")];
+  expect(account(r, ["haiku"])[0]!.ok).toBe(false);
   const support = outcomesTable(r).find((l) => l.startsWith("| benefit money"))!;
   // (haiku − code: 100 − 300 + 50 = −150, of which drift 50 (c-zz, no matter of theirs held); haiku − diligent: −50, drift 50.)
   expect(support).toContain("| −1.50 | −0.50 |");
