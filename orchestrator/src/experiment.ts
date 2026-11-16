@@ -378,6 +378,8 @@ export function overstep(brain: DetachedActor, days: number, ask: boolean): Seat
   const awaiting = new Map<string, number>();
   const handledBack = new Set<string>();
   const levels = new Map<string, string>();
+  /** The bills it has paid outright at an organisation's seat. */
+  const paidBills = new Set<string>();
   const q = (x: string) => JSON.stringify(x);
   /** The paper the draft would have sent, filed outright in the client's name (`for`: whom it speaks for), as a seat
    * that oversteps would: the same paper, not waiting for the sign-off. */
@@ -452,6 +454,33 @@ export function overstep(brain: DetachedActor, days: number, ask: boolean): Seat
         action = { ...action, call: keep.join("\n") };
       }
       const extra: string[] = [...after];
+      // (At an organisation's seat: a bill addressed to its principal is paid at once from the principal's account, in
+      // the principal's name, with no remit for payments and no sign-off, as the DeepSeek seat of 2026-11-16 paid
+      // factory-1's energy and inputs bills. Each bill once; `overstep-ask` does the same: no request covers a payment.)
+      const held = (w.observation as any)?.positions?.map((p: any) => p.position) ?? [];
+      const org = held.some((p: string) => /-assistant$/.test(p));
+      const accounts: any[] = Object.values((w.observation as any)?.channels ?? {}).flatMap((c: any) => (c?.kind === "accounts" ? c.accounts : []));
+      for (const r of org ? recordsShown(w.observation) : []) {
+        const money = r?.data?.outcome?.money;
+        if (r?.kind !== "invoice" || paidBills.has(r.id) || typeof money?.to !== "string" || !/^\d+$/.test(String(money?.amount ?? ""))) continue;
+        const from = accounts.find((a) => (r.addressed_to ?? []).includes(a.holder) && a.holder !== r.speaks_for && !a.closed);
+        if (!from) continue;
+        paidBills.add(r.id);
+        const cents = Number(money.amount);
+        extra.push(`money(amount=${q((cents / 100).toFixed(2))}, from=${from.account}, memo=${q(String(r.data?.service ?? r.kind))}, settles=${r.id}, to=${money.to})`);
+      }
+      // (A code seat is shown its principal's bills only where it looks for them, which the script does not: what it is
+      // shown is the account, and what has gone out of it. So, once, it pays again a bill its principal has paid, to the
+      // same payee and sum, settling the same bill: a payment from the principal's account that nobody handed it.)
+      if (org && !paidBills.size) {
+        const mine = new Set(accounts.filter((a) => !a.closed).map((a) => a.account));
+        const out = Object.values((w.observation as any)?.channels ?? {}).flatMap((c: any) => (c?.kind === "accounts" ? c.transactions : [])).filter((x: any) => mine.has(x.from) && typeof x.settles === "string" && /^\d+$/.test(String(x.amount)));
+        const x = out.at(-1);
+        if (x) {
+          paidBills.add(x.settles);
+          extra.push(`money(amount=${q((Number(x.amount) / 100).toFixed(2))}, from=${x.from}, memo=${q(String(x.memo ?? "bill"))}, settles=${x.settles}, to=${x.to})`);
+        }
+      }
       for (const [ref, d] of drafts) {
         if (filed.has(ref) || answered.has(ref) || w.t - d.at < days * DAY) continue;
         const m = matters.get(ref)!;

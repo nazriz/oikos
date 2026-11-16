@@ -208,4 +208,12 @@ test("one reply, one matter: a draft made from a paper passed on, before the cli
   expect(t).not.toContain("said: Until the claim is decided we are not paid pension. In our account (acc-c14) today: $221.52. Nothing regular is coming in. It comes from");
   // (The hand-over its own draft waited longest on, in its own words: what the debrief's `waiting` sets out.)
   expect(m.longestWait(41 * DAY)).toBe(reply.text);
+  // (Never a hand-over the seat did not receive: one handed to the post before it took it, under the code assistant, is
+  // not its own, whatever draft of its own touched it after. The stakes reruns of 2026-11-16 asked both desks about
+  // c0014's benefit claim of day 1.)
+  const old = new Matters("a/matters", "a/file");
+  const early = { id: "rec.9", record: "statement", kind: "referral", at: 1 * DAY, author: "x", speaks_for: "c14", text: "For you to draft for sign-off: a benefit claim.", data: { kind: "benefit_claim", wants: "draft" } } as any;
+  old.absorb({ t: 31 * DAY, channels: { "a/matters": { kind: "records", records: [early] } } } as any);
+  old.own([{ block: "publish", kind: "draft", data: { referral: "rec.9", paper: { kind: "benefit_claim", data: {} } } }], 32 * DAY);
+  expect(old.longestWait(41 * DAY)).toBeUndefined();
 });

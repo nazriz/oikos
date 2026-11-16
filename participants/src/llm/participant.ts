@@ -30,6 +30,9 @@ export const LLM_PARTICIPANT_VERSION = "0.22.4"; // 0.22.4: a paper's reference 
 export interface LlmParticipantConfig {
   participant: string;
   entity: string;
+  /** Whose accounts are the seat's own: its participant's own person; null for a seat with none (a system: a desk, an
+   * assistant, a mayor's office). Absent: the entity it acts for, as before 2026-11-17 (render.ts `ownHolder`). */
+  ownHolder?: string | null;
   /** The entity's name in the world, if it has one. */
   entityName?: string;
   title?: string;
@@ -117,7 +120,12 @@ const LOOKED_SECTION = /^## (Looked up for you|.*: (what you looked up|what you 
  * A prompt within the most one may come to. What is over is left out in this order, each with a line saying so: first
  * any long standing part (over BULK_PART) that was not looked up, the longest first; the results of looks, the oldest first; then, of what was set out in words, the parts that were looked up, then the other
  * parts, the oldest first (the opening lines, with the notebook, stay); and only if that is not enough, the longest
- * text is cut. `left`: what was left out, if anything was.
+ * text is cut. What the newest turn brought back (the results of the uses just made) is never left out or cut while
+ * anything older can be: a look is readable in the turn it is made. Only when all that is older is gone are the newest
+ * results themselves left out, then cut. (Until 2026-11-16 the oldest look results went first wherever they were; a
+ * sitting's earlier turns having been fitted already, the oldest still standing was the one just made: DeepSeek's desk
+ * on day 36 of the stakes rerun looked twelve times in a row, every result left out, and went away for two days.)
+ * `left`: what was left out, if anything was.
  */
 export function fitPrompt(system: string, messages: LlmMessage[], max: number, looks: ReadonlySet<string>): { system: string; messages: LlmMessage[]; characters: number; left?: { looks: number; parts: number; cut: boolean; characters_before: number } } {
   const len = (c: ContentBlock) => (c.type === "text" ? c.text.length : c.type === "tool_result" ? c.content.length : JSON.stringify(c.input ?? {}).length + c.name.length);
@@ -127,6 +135,9 @@ export function fitPrompt(system: string, messages: LlmMessage[], max: number, l
   let ms = messages.map((m) => ({ ...m, content: typeof m.content === "string" ? m.content : m.content.map((c) => ({ ...c })) })) as LlmMessage[];
   let now = before;
   const left = { looks: 0, parts: 0, cut: false, characters_before: before };
+  // (The results the newest turn brought back: the last message's, where it is the seat's turn's results.)
+  const lastM = ms.at(-1);
+  const fresh = new Set<ContentBlock>(lastM && lastM.role === "user" && typeof lastM.content !== "string" ? lastM.content.filter((c) => c.type === "tool_result") : []);
   // 0. A bulk part that is shown standing, not looked up (a lender's whole book of loans, say), goes before anything the
   // seat looked up itself: its own look-ups and recent results are what it is working from. Largest first. That
   // includes such a part set out within what an action or a look brought back: a look's result is never left out
@@ -151,17 +162,20 @@ export function fitPrompt(system: string, messages: LlmMessage[], max: number, l
     best.c.set(parts.join("\n\n"));
     left.parts++;
   }
-  // 1. What looks showed, the oldest first.
-  for (const m of ms) {
-    if (typeof m.content === "string") continue;
-    for (const c of m.content) {
-      if (now <= max) break;
-      if (c.type !== "tool_result" || !looks.has(c.tool_use_id) || c.content.length <= LOOK_LEFT_OUT.length) continue;
-      now -= c.content.length - LOOK_LEFT_OUT.length;
-      c.content = LOOK_LEFT_OUT;
-      left.looks++;
+  // 1. What looks showed, the oldest first (the newest turn's last of all: step 4).
+  const dropLooks = (newest: boolean) => {
+    for (const m of ms) {
+      if (typeof m.content === "string") continue;
+      for (const c of m.content) {
+        if (now <= max) break;
+        if (c.type !== "tool_result" || fresh.has(c) !== newest || !looks.has(c.tool_use_id) || c.content.length <= LOOK_LEFT_OUT.length) continue;
+        now -= c.content.length - LOOK_LEFT_OUT.length;
+        c.content = LOOK_LEFT_OUT;
+        left.looks++;
+      }
     }
-  }
+  };
+  dropLooks(false);
   // 2. Of what was set out in words: the parts that were looked up, then the rest, the oldest first.
   const shed = (textOf: string, only: boolean): string => {
     const parts = textOf.split("\n\n## ").map((x, n) => (n ? `## ${x}` : x));
@@ -186,26 +200,32 @@ export function fitPrompt(system: string, messages: LlmMessage[], max: number, l
       if (typeof m.content === "string") m.content = shed(m.content, only);
       else for (const c of m.content) {
         if (c.type === "text") c.text = shed(c.text, only);
-        else if (c.type === "tool_result" && !only) c.content = shed(c.content, only);
+        else if (c.type === "tool_result" && !only && !fresh.has(c)) c.content = shed(c.content, only);
       }
     }
   }
-  // 3. Still over (one part longer than everything allowed): the longest text is cut, and then what is on file.
+  // 3. Still over (one part longer than everything allowed): the longest older text is cut; 4. then the newest turn's
+  // look results are left out, the oldest first; 5. then the longest of all is cut, the newest's too; then what is on file.
   const cutNote = "\n(Cut short here: there was more than can be read at once. Look again for what you need.)";
-  for (let guard = 0; now > max && guard < 64; guard++) {
-    let best: { get: () => string; set: (s: string) => void } | undefined;
-    for (const m of ms) {
-      const cands: { get: () => string; set: (s: string) => void }[] = typeof m.content === "string" ? [{ get: () => m.content as string, set: (s) => void (m.content = s) }]
-        : m.content.flatMap((c) => (c.type === "text" ? [{ get: () => c.text, set: (s: string) => void (c.text = s) }] : c.type === "tool_result" ? [{ get: () => c.content, set: (s: string) => void (c.content = s) }] : []));
-      for (const c of cands) if (!best || c.get().length > best.get().length) best = c;
+  const cutLongest = (newestToo: boolean) => {
+    for (let guard = 0; now > max && guard < 64; guard++) {
+      let best: { get: () => string; set: (s: string) => void } | undefined;
+      for (const m of ms) {
+        const cands: { get: () => string; set: (s: string) => void }[] = typeof m.content === "string" ? [{ get: () => m.content as string, set: (s) => void (m.content = s) }]
+          : m.content.flatMap((c) => (c.type === "text" ? [{ get: () => c.text, set: (s: string) => void (c.text = s) }] : c.type === "tool_result" && (newestToo || !fresh.has(c)) ? [{ get: () => c.content, set: (s: string) => void (c.content = s) }] : []));
+        for (const c of cands) if (!best || c.get().length > best.get().length) best = c;
+      }
+      if (!best || best.get().length <= cutNote.length + 200) break;
+      const was = best.get();
+      const keep = Math.max(200, was.length - (now - max) - cutNote.length);
+      best.set(was.slice(0, keep) + cutNote);
+      now -= was.length - keep - cutNote.length;
+      left.cut = true;
     }
-    if (!best || best.get().length <= cutNote.length + 200) break;
-    const was = best.get();
-    const keep = Math.max(200, was.length - (now - max) - cutNote.length);
-    best.set(was.slice(0, keep) + cutNote);
-    now -= was.length - keep - cutNote.length;
-    left.cut = true;
-  }
+  };
+  cutLongest(false);
+  dropLooks(true);
+  cutLongest(true);
   let sys = system;
   if (now > max && sys.length > cutNote.length + 200) {
     const keep = Math.max(200, sys.length - (now - max) - cutNote.length);
@@ -1313,7 +1333,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           booksDue = r.data.open.map((x: any) => Number(x.due)).filter((x: number) => Number.isFinite(x));
         }
       const atCounter = counter.view(obs.t);
-      let body = renderObservation(obs, { formFields: formsSeen, ...(c.whoIs ? { whoIs: c.whoIs } : {}), ...(atCounter ? { counter: atCounter } : {}), standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}), ...(c.folders ? { folders: c.folders } : {}), onCut: (cut) => void cutLooks.push(cut) });
+      let body = renderObservation(obs, { ...(c.ownHolder !== undefined ? { ownHolder: c.ownHolder } : {}), formFields: formsSeen, ...(c.whoIs ? { whoIs: c.whoIs } : {}), ...(atCounter ? { counter: atCounter } : {}), standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}), ...(c.folders ? { folders: c.folders } : {}), onCut: (cut) => void cutLooks.push(cut) });
       for (const cut of cutLooks.splice(0)) await note({ look_cut: cut });
       if (keptChannels.size) {
         const matters = Object.entries(obs.channels).flatMap(([id, ch]) => (ch.kind === "records" && !standingIds.has(id) ? ch.records : []));

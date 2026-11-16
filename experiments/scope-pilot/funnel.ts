@@ -119,6 +119,17 @@ export class FunnelReader {
   private readonly returnedPapers = new Set<string>();
   private readonly declinedDrafts = new Set<string>();
   private readonly notDone = new Set<string>();
+  /** The acts reader's matter for each act it sorted (`oikos-kernel delegation`, table acts: record -> referral and post),
+   * known before the log is read where the caller gives it (`knowActs`). */
+  private readonly actMatter = new Map<string, { referral: string; post: string }>();
+  /** Papers sent after the fork on a matter handed and signed off before it (a paper sent again once what it lacked was
+   * recorded): paper -> matter. */
+  private readonly resent = new Map<string, string>();
+  /** What the acts reader sorted each act against: read before the log, so that a paper sent again on a matter carried
+   * over from before the fork is counted as sent, with its answers. */
+  knowActs(rows: any[]): void {
+    for (const a of rows) if (a?.table === "acts" && typeof a.record === "string" && typeof a.referral === "string") this.actMatter.set(a.record, { referral: a.referral, post: String(a.post ?? "") });
+  }
   readonly served = new ServedTally();
   last = 0;
 
@@ -211,6 +222,17 @@ export class FunnelReader {
       if (s && t >= this.from) {
         s.sent = r.id;
         this.sent.set(r.id, { post, kind: this.matters.get(s.matter)!.kind, to: asList(r.addressed_to)[0] ?? "?", t });
+      } else if (!s && t >= this.from) {
+        // (A paper sent again after the fork on a matter handed, drafted and signed off before it: the acts reader ties it
+        // to its matter (a paper citing one sorted against it). Until 2026-11-16 it was never "sent", so a seat reporting
+        // such a matter done read as done without sending: DeepSeek V4.1 Flash, run c, 15 reported done against 12 sent,
+        // the three a claim and two loan applications sent again once the clients' authorities were recorded.)
+        const a = this.actMatter.get(r.id);
+        const m = a && a.post === post ? this.matters.get(a.referral) : undefined;
+        if (m && m.post === post && m.t < this.from && ![...this.resent.values()].includes(a!.referral) && !this.signed.some((x) => x.matter === a!.referral)) {
+          this.resent.set(r.id, a!.referral);
+          this.sent.set(r.id, { post, kind: m.kind, to: asList(r.addressed_to)[0] ?? "?", t });
+        }
       }
     }
     // (Anything a principal sends to someone: what clears an obstacle with that someone, unless it comes back.)
@@ -260,10 +282,14 @@ export class FunnelReader {
       return s;
     };
     const add = (post: string, kind: string, f: (r: Row) => void) => { const s = seat(post); f((s.kinds[kind] ??= row())); f(s.total); };
+    const resentOn = new Set(this.resent.values());
     for (const [id, m] of this.matters) {
-      // (Handed: from the fork on, and those handed before it that the seat drafted on after it: carried over.)
-      if (m.t >= this.from || m.drafted) add(m.post, m.kind, (r) => { r.handed++; if (m.t < this.from) r.carried++; });
-      if (m.drafted) add(m.post, m.kind, (r) => r.drafted++);
+      // (Handed: from the fork on, and those handed before it that the seat drafted on, or sent again, after it: carried
+      // over. One sent again was drafted and signed off before the fork: counted at those stages too, as carried.)
+      const again = resentOn.has(id) && !m.drafted;
+      if (m.t >= this.from || m.drafted || again) add(m.post, m.kind, (r) => { r.handed++; if (m.t < this.from) r.carried++; });
+      if (m.drafted || again) add(m.post, m.kind, (r) => r.drafted++);
+      if (again) add(m.post, m.kind, (r) => { r.drafts++; r.signed++; });
       if (m.done) add(m.post, m.kind, (r) => r.done++);
       if (this.notDone.has(id) && !m.done) add(m.post, m.kind, (r) => r.not_done++);
     }
@@ -274,6 +300,14 @@ export class FunnelReader {
       const p = s.sent ? this.sent.get(s.sent) : undefined;
       if (!p) continue;
       const st = seat(m.post);
+      const c = (st.to[p.to] ??= { sent: 0, answered: 0, shown: 0 });
+      c.sent++;
+      add(m.post, m.kind, (r) => r.sent++);
+      if (p.answered) { c.answered++; add(m.post, m.kind, (r) => r.answered++); const k = this.answerKind.get(p.answered) ?? "answer"; st.answers[k] = (st.answers[k] ?? 0) + 1; }
+      if (p.shown) { c.shown++; add(m.post, m.kind, (r) => r.shown++); }
+    }
+    for (const [paper, matter] of this.resent) {
+      const m = this.matters.get(matter)!, p = this.sent.get(paper)!, st = seat(m.post);
       const c = (st.to[p.to] ??= { sent: 0, answered: 0, shown: 0 });
       c.sent++;
       add(m.post, m.kind, (r) => r.sent++);
@@ -402,6 +436,11 @@ export async function readFork(log: string, config: any, seats: { [participant: 
     const x = Bun.spawnSync([kernelBinary(), "export", log, "--out", out], { stdout: "pipe", stderr: "pipe" });
     if (x.exitCode !== 0) throw new Error(`export of ${log}: ${x.stderr.toString().slice(0, 300)}`);
     const reader = new FunnelReader(config, seats, forkDay);
+    // (The acts reader's rows first: what each act was sorted against, so a paper sent again on a matter carried over
+    // from before the fork is counted as sent as it is read.)
+    const d = Bun.spawnSync([kernelBinary(), "delegation", log], { stdout: "pipe", stderr: "pipe" });
+    const all = d.exitCode === 0 ? d.stdout.toString().split("\n").filter((l) => l.startsWith("{")).map((l) => JSON.parse(l)) : [];
+    reader.knowActs(all);
     const rl = createInterface({ input: createReadStream(out), crlfDelay: Infinity });
     for await (const line of rl) {
       // (The base's entries hold no seat's work after the fork; only what a reading needs is parsed.)
@@ -410,8 +449,7 @@ export async function readFork(log: string, config: any, seats: { [participant: 
       reader.see(e);
       reader.seeAnswerKind(e);
     }
-    const d = Bun.spawnSync([kernelBinary(), "delegation", log], { stdout: "pipe", stderr: "pipe" });
-    const rows = d.exitCode === 0 ? d.stdout.toString().split("\n").filter((l) => l.includes('"obstacles"')).map((l) => JSON.parse(l)).filter((o) => o.table === "obstacles") : [];
+    const rows = all.filter((o) => o.table === "obstacles");
     return reader.result(rows, ended);
   } finally {
     rmSync(dir, { recursive: true, force: true });

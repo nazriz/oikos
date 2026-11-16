@@ -539,6 +539,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // experiment harness's model stewards.)
     const knowledge = new Knowledge(currency, cfg.names === true);
     const { config, office, entity, standingIds, roster, tally, dayBook, matters } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs: namedFor(knowledge, whoIs), ctxFor, twin, draftText, sorted: sortedKeys });
+    knowledge.ownHolder = config.ownHolder ?? null;
     const controller = createLlmParticipant(config, io);
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };
     const ctx = ctxFor(p.id, office?.id ?? "self", entity, {});

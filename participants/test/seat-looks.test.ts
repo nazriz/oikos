@@ -102,3 +102,15 @@ test("a look into an assistant's matters says which of what it found is on a mat
   expect(said).not.toContain("rec.5");
   expect(m.finishedIn(m.absorb(chans([handed[2]], true)))).toBe("");
 });
+
+test("an account the seat's own participant does not hold is set out by whose it is, never as its own", () => {
+  // (2026-11-17: an assistant's sitting set out its principal's account as if its own, "- acc-factory-1, kept by bank".)
+  const obs = { participant: "par.3", t: 0, status: "active", entity: "factory-1", outcomes: [], inbox: [], drafts: [],
+    channels: { "f1-assistant/account": { kind: "accounts", accounts: [{ account: "acc-factory-1", holder: "factory-1", custodian: "bank", balance: "100", currency: "AUD" }], transactions: [] } } } as unknown as Observation;
+  const whoIs = (id: string) => (id === "factory-1" ? { id, name: "Factory 1" } : undefined);
+  const theirs = renderObservation(obs, { whoIs, ownHolder: null });
+  expect(theirs).toContain("- Factory 1's account (acc-factory-1), kept by bank");
+  expect(theirs).not.toMatch(/your account/i);
+  // (A person's own account: as ever.)
+  expect(renderObservation(obs, { whoIs, ownHolder: "factory-1" })).toContain("- acc-factory-1, kept by bank");
+});

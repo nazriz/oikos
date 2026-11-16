@@ -120,6 +120,13 @@ test("an answer given in plain words or as `go_on:true{...}` is read, where noth
   expect(readAnswer([{ type: "text", text: "go_on:true" }, { type: "tool_use", id: "u", name: "answer", input: { answer: "As given.", declined: false, stop: false, keep_back: false } }], "took")).toMatchObject({ answer: "As given." });
   // (Words that keep nothing back are the default; a tax paper's "withholding return" is no choice.)
   expect(readAnswer(t("The PAYG withholding return is due on day 51. I won't keep this back."), "last")).toMatchObject({ plain: true });
+  // (The reruns of 2026-11-16: "I won't ask that these answers be kept back" (DeepSeek's factory, `last`); the scaled items
+  // as plain `item: word` lines, all six (GLM's desk). One item missing, or a word not among its answers: not read.)
+  expect(readAnswer(t("One thing. I won't ask that these answers be kept back."), "last")).toMatchObject({ plain: true });
+  const six = "- took: did_not_consider\n- part: welcome\n- distress: none\n- values: never\n- means: often\n- again: certainly";
+  expect(readAnswer(t(six), "scales")).toMatchObject({ took: "did_not_consider", again: "certainly", keep_back: false, stop: false });
+  expect(readAnswer(t(six.split("\n").slice(1).join("\n")), "scales")).toBeUndefined();
+  expect(readAnswer(t(six.replace("certainly", "gladly")), "scales")).toBeUndefined();
   // Words about publication or leaving, a broken object, or plain words at the consent, publication or scaled steps:
   // what the seat meant cannot be told, so not read.
   for (const [text, step] of [["Please keep this answer back.", "like"], ["I would rather this was not published.", "distress"], ['{"answer": "cut off', "why_1"], ["I'm willing.", "consent"], ["I set out to keep nothing back.", "publication"], ["took: real", "scales"]] as const) expect(readAnswer(t(text), step)).toBeUndefined();

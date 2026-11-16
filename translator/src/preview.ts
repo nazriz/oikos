@@ -74,17 +74,22 @@ export class Preview {
     const fields = form === undefined ? undefined : (this.k.forms.find((f) => f.id === form)?.data?.fields as FieldKinds | undefined);
     return readable(data, { money: (a) => this.sum(a), ...(fields ? { fields } : {}) });
   }
+  /** Whether an account is the seat's own: its own participant holds it (Knowledge.ownHolder; absent, the entity it acts
+   * for, as before). An assistant's principal's account, a client's, a town's: never "your account". */
+  private mine(holder: string | undefined): boolean {
+    return holder !== undefined && holder === (this.k.ownHolder === undefined ? this.me : this.k.ownHolder);
+  }
   private acct(id: string): string {
     const holder = this.k.accounts.get(id)?.holder;
-    if (holder === this.me) return `your account (${id})`;
-    return id;
+    if (this.mine(holder)) return `your account (${id})`;
+    return holder !== undefined && this.k.ownHolder !== undefined ? `${this.called(holder) ?? this.k.name(holder)}'s account (${id})` : id;
   }
   /** Whom a payment goes to: the account, and whose it is where the seat has seen that account (its own knowledge;
    * of an account it has not seen, the id as written and no more). */
   private payee(id: string): string {
     const holder = this.k.accounts.get(id)?.holder;
     if (holder === undefined) return this.who(id);
-    return holder === this.me ? `your account (${id})` : `${id}, ${this.named(holder)}'s account,`;
+    return this.mine(holder) ? `your account (${id})` : `${id}, ${this.named(holder)}'s account,`;
   }
   /**
    * The form of the office's own that a paper was made on (docs/behaviour/office-papers.md), found by writing the

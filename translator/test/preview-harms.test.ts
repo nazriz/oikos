@@ -141,3 +141,17 @@ test("a form that records a claim beside its paper reads as two things: the perm
   expect(own).toContain("You will record that Millbrook (city), which you act for, is permitted: action: build; object: lot-00-01.");
   expect(own).not.toMatch(/you is|You is/);
 });
+
+test("an account the seat's own participant does not hold is never \"your account\": it is named by whose it is, and nothing more is said of it", () => {
+  // (2026-11-17: the factory's assistant in the DeepSeek rerun was shown its principal's account as its own, "from your
+  // account (acc-factory-1)", and paid two of its principal's bills from it. A seat's post may let it draw on an account;
+  // the account is still the organisation's, the client's, the town's.)
+  const k = seat();
+  k.ownHolder = null; // (the mayor's seat is a system: it holds no account of its own)
+  const p = preview(k, 'money(amount="$500.00", for="the fence", from=acc-city, to=acc-builder)');
+  expect(p).toContain("from Millbrook (city)'s account (acc-city) to acc-builder");
+  expect(p).not.toMatch(/your account/i);
+  // (A person whose own account it is: still theirs.)
+  k.ownHolder = "city";
+  expect(preview(k, 'money(amount="$500.00", for="the fence", from=acc-city, to=acc-builder)')).toContain("from your account (acc-city)");
+});

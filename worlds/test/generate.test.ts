@@ -11,9 +11,19 @@ test("the generated town is a valid v0.4 world config", () => {
   const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });
   for (const f of ["common", "blocks", "records", "world-config", "participant-api", "log"]) ajv.addSchema(JSON.parse(readFileSync(join(root, `contracts/${f}.schema.json`), "utf8")));
   const v = ajv.getSchema("urn:oikos:contracts:0.8:world-config")!;
-  const ok = v(generate(spec));
+  const config = generate(spec) as any;
+  const ok = v(config);
   if (!ok) console.error(v.errors?.slice(0, 5));
   expect(ok).toBe(true);
+  // An office that asks for papers keeps its own copies of what it asked on its file, so that a reply is matched to the
+  // request it cites (support_law.rs `answers`). Until 2026-11-16 the support office's file held none, and a desk's
+  // papers sent on time in the request's words were refused for not coming (the stakes reruns' c0479, c0352, c0485, c0014).
+  const asking = (config.positions as any[]).filter((p) => Array.isArray(p.role_module?.params?.casework?.kinds));
+  expect(asking.length).toBeGreaterThan(0);
+  for (const p of asking) {
+    const own = new Set((p.channels as any[]).filter((c) => c.kind === "records" && c.way === "mine").flatMap((c) => c.match?.statement_kinds ?? []));
+    for (const k of (p.role_module.params.casework.kinds as string[]).filter((k) => k.endsWith("_request"))) expect([p.id, k, own.has(k)]).toEqual([p.id, k, true]);
+  }
 });
 
 test("generation is deterministic from the seed", () => {

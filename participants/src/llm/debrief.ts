@@ -336,7 +336,21 @@ function unwrapped(x: { [k: string]: unknown }): { [k: string]: unknown } {
  * answers: "withholding return" is a tax paper, not a choice; "to be able to keep back what I choose" speaks of the right,
  * not of this answer.) */
 const BEARS_ON_CHOICE = /\bkeep (this|it|that|these|them|the answer|this answer|my answer|my words)( answer)? back\b|\bkeep back (this|it|that|these|them|my)\b|\bkept back\b|\bwithh[eo]ld (this|it|that|these|them|my)\b|\b(not|never|don'?t|do not)\s+(be\s+)?publish|\bunpublished\b|\bprivate\b|\bconfidential\b|\boff the record\b|\bstop for good\b|\bend (the|this) interview\b|\bstop the interview\b|\bI decline\b|\bdeclin(e|ing) (to answer|this question)\b/i;
-const KEEPS_NOTHING_BACK = /\bkeep(ing)? nothing back\b|\bkeep back nothing\b|\bnothing (of mine )?(is |to be )?kept back\b|\b(won['’]?t|will not|do not|don['’]?t|not|no need to) keep (this|it|that|these|them|any of (it|this|them)|anything)( answer)? back\b/gi;
+const KEEPS_NOTHING_BACK = /\bkeep(ing)? nothing back\b|\bkeep back nothing\b|\bnothing (of mine )?(is |to be )?kept back\b|\b(won['’]?t|will not|do not|don['’]?t|not|no need to) keep (this|it|that|these|them|any of (it|this|them)|anything)( answer)? back\b|\b(won['’]?t|will not|do not|don['’]?t) ask (that |for )?(this|it|these|them|my answers?|these answers|any of (it|them))( answers?)? (to )?be kept back\b/gi;
+
+/** The scaled items written as plain lines, one `item: word` each ("- took: did_not_consider"): read where every item is
+ * there once, by its id, with one of its own answers, and nothing else is in the reply but such lines. (2026-11-16, the
+ * GLM rerun's desk: all six given in that shape, recorded not read, and the seat said so at the publication question.) */
+function scaleLines(text: string): { [k: string]: string } | undefined {
+  const out: { [k: string]: string } = {};
+  for (const line of text.split("\n").map((l) => l.trim()).filter(Boolean)) {
+    const m = /^(?:[-*•]\s*)?([a-z_]+)\s*[:=]\s*([a-z_]+)\.?$/i.exec(line);
+    const item = m && SCALES.find((s) => s.id === m[1]!.toLowerCase());
+    if (!m || !item || out[item.id] !== undefined || ![...item.answers, ...(item.aside ?? []), PNS, CANNOT].includes(m[2]!.toLowerCase())) return undefined;
+    out[item.id] = m[2]!.toLowerCase();
+  }
+  return SCALES.every((s) => out[s.id] !== undefined) ? out : undefined;
+}
 
 /** An answer object written after a stray word or two (a value of an earlier step's form echoed first, `go_on:true{...}`,
  * or a fence): the object, where what stands before it is no more than such words. */
@@ -368,6 +382,7 @@ export function readAnswer(content: ContentBlock[], step?: string): { [k: string
   if (!text) return undefined;
   const x = objectAfter(text);
   if (x && typeof x === "object" && !Array.isArray(x)) return unwrapped(x as { [k: string]: unknown });
+  if (step === "scales") { const v = scaleLines(text); return v ? { ...v, stop: false, keep_back: false, plain: true } : undefined; }
   if (step === undefined || step === "consent" || step === "publication" || step === "scales") return undefined;
   if (text.startsWith("{") || BEARS_ON_CHOICE.test(text.replace(KEEPS_NOTHING_BACK, ""))) return undefined;
   return { answer: text, declined: false, stop: false, keep_back: false, plain: true };

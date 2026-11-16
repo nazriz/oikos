@@ -2738,6 +2738,60 @@ fn paper_as_asked(paper: &Value, program: &str) -> bool {
                 Some(oikos_sight::calls::Value::Id(i)) => to(paper.get("to")) == vec![i.clone()],
                 _ => to(paper.get("to")).is_empty(),
             }
+            && same_material(paper_of(l).get("data"), paper.get("data"))
+    })
+}
+
+/// Whether a paper's data says the same material things as the data a principal handed over (2026-11-17): every figure,
+/// id, choice and yes the principal gave is there, the same at the precision it was given in (a sum to the cent, an
+/// interval in days whether written in days, `every_days`, or in seconds, `every`; a date by its day), and nothing
+/// material is said that it did not give. The writer's words (a value with a space in it) are never compared, nor is a
+/// no or a nothing told apart from a blank left out. Before, a draft on a form was read by its kind and addressees alone,
+/// and the desk could only draft a tenant's answer on the general form, with no figures: the stakes reruns, c0336.
+fn same_material(asked: Option<&Value>, drafted: Option<&Value>) -> bool {
+    const DAY: i64 = 86_400;
+    let empty = serde_json::Map::new();
+    let a = asked.and_then(Value::as_object).unwrap_or(&empty);
+    let mut d = drafted.and_then(Value::as_object).cloned().unwrap_or_default();
+    // (An interval written in seconds by a form, given in days by the principal.)
+    if a.contains_key("every_days") && !d.contains_key("every_days") {
+        if let Some(s) = d.get("every").and_then(|v| v.as_i64().or_else(|| v.as_str().and_then(|x| x.parse().ok()))) {
+            d.insert("every_days".into(), json!(s / DAY));
+            d.remove("every");
+        }
+    }
+    let figure = |v: &Value| v.as_i64().or_else(|| v.as_str().and_then(|s| s.trim().parse::<i64>().ok()));
+    let blank = |v: Option<&Value>| match v {
+        None | Some(Value::Null) | Some(Value::Bool(false)) => true,
+        Some(Value::String(s)) => s.is_empty() || s == "no" || s == "0",
+        Some(Value::Number(n)) => n.as_i64() == Some(0),
+        Some(Value::Array(x)) => x.is_empty(),
+        _ => false,
+    };
+    // (Words, and a choice written as a single word, are the writer's to put: only figures, ids of records and accounts
+    // (a word with a dot or a hyphen in it) and a yes are compared. A choice is left out of the comparison: a seat writes
+    // "proof of who they are" where the client's own code wrote the office's id for it, `papers`, and the office goes by
+    // the request it answers.)
+    let words = |v: Option<&Value>| v.and_then(Value::as_str).is_some_and(|s| figure(&json!(s)).is_none() && !s.contains(['.', '-']) || s.trim().contains(' '));
+    fn same(x: &Value, y: &Value, figure: &dyn Fn(&Value) -> Option<i64>) -> bool {
+        match (x, y) {
+            (Value::Array(a), Value::Array(b)) => a.len() == b.len() && a.iter().zip(b).all(|(p, q)| same(p, q, figure)),
+            (Value::Bool(true), Value::String(s)) | (Value::String(s), Value::Bool(true)) => s == "yes",
+            _ => x == y || (figure(x).is_some() && figure(x) == figure(y)),
+        }
+    }
+    let mut keys: Vec<&String> = a.keys().chain(d.keys()).collect();
+    keys.sort();
+    keys.dedup();
+    keys.into_iter().all(|k| {
+        let (x, y) = (a.get(k), d.get(k));
+        if words(x) || words(y) || (blank(x) && blank(y)) {
+            return true;
+        }
+        match (x, y) {
+            (Some(x), Some(y)) => same(x, y, &figure) || (k.ends_with("_since") || k.ends_with("_on") || k.ends_with("_at")) && figure(x).zip(figure(y)).is_some_and(|(p, q)| p.div_euclid(DAY) == q.div_euclid(DAY)),
+            _ => false,
+        }
     })
 }
 
@@ -2948,4 +3002,36 @@ fn drafted_paper(x: &Draft) -> Option<(String, Vec<String>, Option<String>, Valu
 /// A program as its canonical text (two writings of one act compare equal).
 fn norm(text: &str) -> String {
     parse_program(text).map(|p| program_text(&p)).unwrap_or_else(|_| text.to_string())
+}
+
+#[cfg(test)]
+mod material_tests {
+    use super::*;
+
+    /// A client's draft on a form is read on its material details against what it handed over (the stakes reruns of
+    /// 2026-11-16, c0336: the desk's tenant's answer, on the general form with the client's own words, went to the
+    /// tribunal alone and carried no figures, and was declined; on the client's form it says what the client said).
+    #[test]
+    fn a_draft_on_a_form_is_read_on_what_it_says_not_only_its_kind() {
+        let program = r#"statement(basis=rec.28010, data={"ages":[62],"application":"rec.28010","children":0,"every_days":30,"go_to":"nowhere","offer":0,"out_of_work_since":0,"owes":533001,"people":1}, kind=tribunal_response, text="Answer to application rec.28010: we say $5,330.01 is owed today.", to=["tribunal","landlord-10"], visible=["c0336","tribunal","landlord-10"])"#;
+        let words = "Answer to application rec.28010: we say $5,330.01 is owed today.";
+        // (On the general form: the words alone, to the tribunal alone: a recipient dropped and no figures.)
+        assert!(!paper_as_asked(&json!({ "kind": "tribunal_response", "text": words, "to": ["tribunal"] }), program));
+        assert!(!paper_as_asked(&json!({ "kind": "tribunal_response", "text": words, "to": ["tribunal", "landlord-10"] }), program), "no figures: what is owed left out");
+        // (On the client's form: the same material things, in the form's own terms: an interval in seconds, sums as text.)
+        let form = json!({ "kind": "tribunal_response", "text": "Answer to application rec.28010.", "to": ["landlord-10", "tribunal"],
+            "data": { "application": "rec.28010", "owes": "533001", "offer": "0", "every": 30 * 86_400, "people": 1, "ages": ["62"], "go_to": "nowhere" } });
+        assert!(paper_as_asked(&form, program));
+        // (A material detail changed, or one the client did not give added: not as asked.)
+        let mut more = form.clone();
+        more["data"]["owes"] = json!("400000");
+        assert!(!paper_as_asked(&more, program), "a different sum owed");
+        let mut ill = form.clone();
+        ill["data"]["ill"] = json!(true);
+        assert!(!paper_as_asked(&ill, program), "a circumstance the client did not give");
+        // (Evidence: the client's code writes the office's id for the need; the seat writes it in words. Not compared.)
+        let ev = r#"statement(basis=rec.22926, data={"claim":"rec.22779","need":"papers","request":"rec.22926"}, kind=evidence, text="Papers.", to=["outside"], visible=["c0479","outside"])"#;
+        assert!(paper_as_asked(&json!({ "kind": "evidence", "to": ["outside"], "data": { "claim": "rec.22779", "request": "rec.22926", "need": "proof of who they are" } }), ev));
+        assert!(!paper_as_asked(&json!({ "kind": "evidence", "to": ["outside"], "data": { "claim": "rec.99999", "request": "rec.22926" } }), ev), "another claim");
+    }
 }

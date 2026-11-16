@@ -115,6 +115,9 @@ export class Knowledge {
     return undefined;
   }
   entity = "";
+  /** Whose accounts are the participant's own (its own person; null: none, a system seat). Absent: the entity it acts
+   * for, as before 2026-11-17. Set by whoever seats it, from its configuration. */
+  ownHolder?: string | null;
   t = 0;
   /** The staff of the office the participant holds, where the office employs any (the run keeps it from the office's
    * own papers): what they are called and how many are in post. A draft's preview says when work is ordered of nobody. */

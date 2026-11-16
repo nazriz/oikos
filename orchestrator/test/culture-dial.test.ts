@@ -118,7 +118,10 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
   // decision right is the officers' casework, so a review takes an officer's time. efde801f..., d8370e0f..., a023b11d...
   // for the configs and 1895f02c..., 402f7523..., 3a1ff10c... for the states, until then. docs/decisions.md, "Every
   // person gets to their post at their own sitting", "The every-town batch re-pinned".)
-  ? { "au-vic-2026": "b0eff76377970af2", "gb-eng-2026": "eb7d8f28d05af36c", "ke-nakuru-2026": "2c41f0468729e087" }
+  // (Re-taken on 2026-11-17 at reader-payments, the config hashes: the support office's own file holds the requests for
+  // papers it makes (docs/decisions.md, "Papers for a claim: the office's own file holds what it asked"). b0eff763...,
+  // eb7d8f28..., 2c41f046... until then.)
+  ? { "au-vic-2026": "88bd87cc4d0ff0e7", "gb-eng-2026": "6f48a9719c63ca71", "ke-nakuru-2026": "ec413542808acad7" }
   : { "au-vic-2026": "803b3fbf848a16e8", "gb-eng-2026": "f65fb7ddf05c8f9d", "ke-nakuru-2026": "fc1d9dceb0110c10" };
 // (The Rust states re-taken once on 2026-10-19 at the cut-over: shops spread their restocking across suppliers, prices read the month's
 // evidence and move by price points, an order at a raised price is served at the shop's price, the outside pays an export at its
@@ -194,10 +197,12 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // with main at 3fc51b7d (main's trips, retail, environment office and refounding fixes under it; the configs did not move);
 // main's d8300873..., e9564040..., 7bf5ae46..., until then.)
 // (Re-taken on 2026-11-07 at WM-15, as the configs above; 2ee01f8c..., 7abe89a6..., 4be8a863... until then.)
+// (Re-taken on 2026-11-17 at reader-payments, as the configs above: a claimant's papers citing the support office's request
+// are now matched to it, so claims decided move; f50ff194..., ab26f6bd..., a326bfa3... until then.)
 const RUST_STATE: { [profile: string]: string } = {
-  "au-vic-2026": "f50ff194129e76869f497b5499f1689018f6af3a1d39885c7c45bb1a83139aed",
-  "gb-eng-2026": "ab26f6bd7910e0b11e7071687a9f9cd94022ae6a26dc0672c8b82388c14c6956",
-  "ke-nakuru-2026": "a326bfa392f90ad0b0ee9c5b63dbb91e65dd496839e0d1e0546fc9bf1cb0dbc9",
+  "au-vic-2026": "0d99861e8b3f0910134e09e4d77ad9454ddc4e0a24cb1ac7e696d38892d77c0d",
+  "gb-eng-2026": "1ef061096609457937fdf27f71b3a0af6d2d3d52336416521fcd70c35ad0ca60",
+  "ke-nakuru-2026": "cbf6fa013880d2a617f8a3554e09e7638036ee2e38aa9597b7da5ed31133dbb6",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {

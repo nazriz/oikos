@@ -3967,10 +3967,13 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       lanes: casework.lanes, controller: code("system.genesis"), framing: unstated });
   }
   // Support paid from outside the town (for a town, the national government's): its payments office reads the published
-  // law and applies it. Its own book: the claims made to it, and, where a payment is reckoned from a record of
-  // contributions, the employers' reports addressed to it.
+  // law and applies it. Its own book: the claims made to it, its own copies of what it asked about them (papers, an
+  // employer's confirmation: a reply is matched to the request it cites, support_law.rs `answers`, which reads the
+  // request on the office's file; until 2026-11-16 the file held none, so every reply was matched by the need's id
+  // alone, which no seat is shown, and the stakes rerun's c0479 was refused for papers sent on time citing the request),
+  // and, where a payment is reckoned from a record of contributions, the employers' reports addressed to it.
   office("outside-support", "outside", "Support payments", undefined,
-    [{ id: "ledger", kind: "accounts" }, K.mine("claims", ["benefit_claim", "benefit_change", "benefit_decision", "case_for_decision", DECISION_KIND.evidence, DECISION_KIND.confirmation, ...(OB ? ["authority", "authority_recorded", "paper_returned", "requirements"] : [])]),
+    [{ id: "ledger", kind: "accounts" }, K.mine("claims", ["benefit_claim", "benefit_change", "benefit_decision", "case_for_decision", DECISION_KIND.evidence, DECISION_KIND.confirmation, DECISION_KIND.evidence_request, DECISION_KIND.confirmation_request, ...(OB ? ["authority", "authority_recorded", "paper_returned", "requirements"] : [])]),
       // (And, where things go wrong: what is asked of it, and what a body that hears such things tells it and decides.)
       ...(FR ? [K.mine("reviews", [DECISION_KIND.request, DECISION_KIND.review, "complaint_notice", "venue_decision", "hearing_notice", "tribunal_order", "benefit_decision", DECISION_KIND.answer, "complaint_response", "tribunal_response"])] : []),
       K.mine("gone", ["death_registration", "departure"]), lawBook,

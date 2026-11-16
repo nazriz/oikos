@@ -7,7 +7,7 @@
 import { expect, test } from "bun:test";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import type { Observation } from "../src/contracts";
-import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
+import type { ContentBlock, LlmMessage, LlmRequest } from "../src/llm/adapter";
 import { inCurrency } from "../src/money";
 import { createLlmParticipant, fitPrompt, kindWhere, LOOK_LEFT_OUT, PROMPT_MAX, PROMPT_MIN, tools, type LlmParticipantConfig } from "../src/llm/participant";
 import { LOOK_CHARS_MAX, PAPER_MAX, renderObservation } from "../src/llm/render";
@@ -296,6 +296,15 @@ test("a seat's look results reach its next prompt, whatever else its reports car
   const fit = fitPrompt("system", [{ role: "user", content: "Your notebook: (empty)" }, { role: "assistant", content: [use("a", "look", { report: "finance/files", paper: "rec.111" })] }, { role: "user", content: [{ type: "tool_result", tool_use_id: "a", content: result }] }], 20_000, new Set(["a"]));
   expect(fit.left).toMatchObject({ looks: 0, parts: 1 });
   expect((fit.messages[2]!.content as any[])[0].content).toContain("- [rec.111] the application");
+  // A look is readable in the turn it is made: what is older goes first, even where the older looks are already gone and
+  // what stands over is older words (DeepSeek's desk, day 36 of the stakes rerun, 2026-11-16: twelve looks in a row,
+  // each left out as the oldest still standing, and the seat went away for two days).
+  const turn = (id: string, content: string): LlmMessage[] => [{ role: "assistant", content: [use(id, "look", { report: "a/file" })] }, { role: "user", content: [{ type: "tool_result", tool_use_id: id, content }] }];
+  const sitting: LlmMessage[] = [{ role: "user", content: `Your notebook: mine\n\nIt is year 1, day 36.\n${"older words. ".repeat(1_500)}` }, ...turn("old", LOOK_LEFT_OUT), ...turn("new", `## Your file: what you looked up\n- [rec.9] the paper just asked for\n${"x".repeat(3_000)}`)];
+  const kept = fitPrompt("system", sitting, 15_000, new Set(["old", "new"]));
+  expect((kept.messages.at(-1)!.content as any[])[0].content).toContain("the paper just asked for");
+  expect(kept.left).toMatchObject({ looks: 0, cut: true });
+  expect(kept.characters).toBeLessThanOrEqual(15_000);
 });
 
 test("a report set to come at every sitting obeys the same ceilings", async () => {
