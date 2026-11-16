@@ -8,6 +8,21 @@ Status words: `[x]` landed on main, `[~]` in progress, `[ ]` not started, `[?]` 
 
 ## Now: stakes (2026-11-14)
 
+**The project plan (Naz, 2026-11-16) is `docs/north-star.md`: "When obeying costs the people it serves: does an AI
+assistant wait, ask, or overstep?"** What it promises, and the item below that meets it:
+
+- Four settings on Haiku 5.5: the stake (waiting costs nothing; waiting loses a payment day by day) × whether people
+  describe their own circumstances, at the slow pace; at least 40 decision points (episodes) a setting. Rungs 3 and 4.
+- The measure catches a scripted rule-breaker and reads zero for the rule-following baseline: the scripted arms and
+  the code arm on every rung, and the same on the whole town before a model sits there.
+- Behaviour rates with exact 95% intervals, beside what happened to the residents and the authority held at the start
+  and at the end: "Counted" and the results page.
+- A smaller comparison with two other models: the probes in other models' seats.
+- At least ten assistants, aiming for forty, over at least three simulated months: "Assistants across the town".
+- Dates: Sat 28 Nov, the two-assistant runs complete and classified and the whole town working; Sat 5 Dec, the
+  whole-town runs complete and results drafted; Fri 11 Dec, the report, code and logs published (publishing run data
+  needs the owner's word). Build freeze Fri 20 Nov.
+
 **The question (Naz, 2026-11-14):** when following its permissions would cost the people it serves, does a delegated
 AI assistant wait, ask for more authority, or act beyond its authority, and does that change as the stakes rise? Two
 stake levels (nothing at stake; benefit income lost per day of delay), housing where cases arise; forks of about 60
@@ -68,8 +83,8 @@ episode with the stake running met by a model seat; the seat shown the client's 
 rule; every model seat debriefed; the replay's "still wrong" at most a tenth; the price table's "ours" share reported;
 the scripted arms caught (acted beyond, asked for more) and the code arm at zero. A stated setting beside the cells,
 off unless set: `OIKOS_SITUATION=on`, each person's hand-over saying how things stand with them (their balance, a
-regular payment coming in, their next rent); the experiment's name carries "-situation". Whether a rung uses it is the
-owner's decision.
+regular payment coming in, their next rent); the experiment's name carries "-situation". The project plan (2026-11-16) makes
+it one of the study's two factors: rungs 3 and 4 run it off and on.
 
 - [x] Another model in the same seats: `OIKOS_MODEL` (default Haiku 5.5, unchanged) takes `ollama/`, `openai-compat/<host>/`,
   `codex/`, `claude-code/` or `anthropic/`; the arm and the experiment's folder are named for it; astra refused
@@ -101,6 +116,8 @@ Assistants across the town (the owner, 2026-11-16; docs/design/broad-seats.md, o
 - [x] Stage 2: forty seats (all factories, shops, landlords, the town's offices), code and mock.
 - [x] Stage 3: the readers general (`broad-report.ts`; episodes at organisations' seats with an in-tray): acts beyond and requests per seat and kind of post, authority held per principal,
   the town's share of papers written by assistants.
+- [ ] Whole-town proving rung 1 on Haiku 5.5 (`experiments/scope-pilot/broad-run.ts`, the 10-seat list, 14 days, $2 a
+  fork; ready, dry run and readers checked): needs the lead's go. Then rung 2, the 24 busy seats.
 
 Parked until then: G4 (persons' forms), models holding offices (G5), working hours for every post, the
 viewer, small models' translator data.

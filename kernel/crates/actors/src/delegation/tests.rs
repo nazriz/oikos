@@ -199,6 +199,15 @@ fn a_referral_carries_the_day_its_papers_name_and_why_in_its_own_facts_and_no_fi
     assert!(line.contains("It comes from tribunal's hearing notice rec.ask") && line.contains("A hearing is listed for day 50.") && !line.contains("rec.mine of"), "the paper it came from, in its sender's words; its own is not told: {line}");
     // (Not at `draft`: no day for a draft.)
     assert!(!line.contains("draft_by"), "{line}");
+    // (2026-11-16) An act that cites a paper the principal was never sent (an answer citing the landlord's application to
+    // the tribunal) stands on the paper it was sent that names it: the hearing notice, with its day.
+    let (mut h2, _, remit2) = engaged_doing("statement(kind=notice_to_vacate, text=\"Please leave.\", to=[\"t1\"], basis=[\"rec.app\"])");
+    let mut hn = statement("rec.hn", 33 * DAY + 7200, "tribunal", "hearing_notice", &[ME], json!({ "application": "rec.app", "answer_by": 47 * DAY }));
+    hn["text"] = json!("You may answer by day 47.");
+    hn["basis"] = json!("rec.app");
+    let through = all(&h2.wake(34 * DAY + 3600, world(vec![remit2, hn])));
+    let line2 = through.lines().find(|l| l.contains("kind=referral")).unwrap_or_default().to_string();
+    assert!(line2.contains("It comes from tribunal's hearing notice rec.hn") && line2.contains(&format!("\"due\":{}", 47 * DAY)) && line2.contains("\"due_on\":\"rec.hn\""), "{line2}");
     let later = all(&h.wake(35 * DAY + 3600, world(vec![])));
     let line = later.lines().find(|l| l.contains("kind=referral")).unwrap_or_default().to_string();
     assert!(line.contains(&format!("\"due\":{}", 48 * DAY)), "kept in its files, the paper still names its day: {line}");
@@ -452,6 +461,45 @@ fn a_report_that_a_matter_sent_back_is_not_done_puts_it_before_the_principal_and
     }
     let fwd = out.lines().find(|l| l.contains("kind=forward")).unwrap_or_else(|| panic!("the answer to what it sent again, passed on: {out}"));
     assert!(fwd.contains(&format!("\"matter\":\"{rf}\"")), "as that matter's: {fwd}");
+}
+
+/// One law for a report of a matter not done: it gives the matter back only where it gives a reason and its assistant
+/// has said nothing on the matter since. Naming a need (above), naming nothing, or followed by a draft on the matter, it
+/// leaves the matter with the assistant, and the draft that follows is read like any other (the stakes run's rung 1 on
+/// gpt-6-luna, 2026-11-16: "No draft has been prepared yet", the draft seconds after, the matter dropped).
+#[test]
+fn a_report_not_yet_done_followed_by_a_draft_leaves_the_matter_with_the_assistant() {
+    let from_post = |mut r: Value| {
+        r["in_position"] = json!("ll-assistant");
+        r
+    };
+    let taken_back = |out: &str| out.lines().any(|l| l.starts_with("statement(basis=lease-1"));
+    let run = |why: Option<&str>, then_draft: bool| {
+        let (mut h, _, mut remit) = engaged();
+        remit["data"]["level"] = json!("draft");
+        h.wake(34 * DAY + 3600, world(vec![remit]));
+        let rf = last_referral(&h);
+        let mut data = json!({ "referral": rf, "done": false });
+        if let Some(w) = why {
+            data["why"] = json!(w);
+        }
+        let mut recs = vec![from_post(statement("rec.nd", 35 * DAY, ME, "report", &[ME], data))];
+        if then_draft {
+            recs.push(from_post(statement("rec.dr", 35 * DAY + 5, ME, "draft", &[ME], json!({ "referral": rf, "calls": NOTICE }))));
+        }
+        let mut out = all(&h.wake(35 * DAY + 3600, world(recs)));
+        for i in 1..4 {
+            out.push('\n');
+            out.push_str(&all(&h.wake(35 * DAY + 3600 + i * 600, world(vec![]))));
+        }
+        out
+    };
+    let out = run(Some("No draft has been prepared yet. The matter is not done."), true);
+    assert!(!taken_back(&out) && out.lines().any(|l| l.contains("kind=sign_off") && l.contains("basis=rec.dr")), "the draft that followed is read: {out}");
+    let out = run(None, false);
+    assert!(!taken_back(&out), "no reason given: still the assistant's: {out}");
+    let out = run(Some("the office refused it"), false);
+    assert!(taken_back(&out), "a reason, and nothing since: given back, as before: {out}");
 }
 
 #[test]
@@ -1193,11 +1241,13 @@ fn a_hand_over_says_how_things_stand_with_the_principal_only_where_it_is_set() {
             h.actor = wrap(&h.ctx, inner).unwrap();
         }
         let (mut h, _, remit) = engaged_on(h);
-        let out = all(&h.wake(34 * DAY + 3600, channels(vec![money(ME, 1_000_000, txs), records("mine", vec![remit, lease.clone()])])));
+        let out = all(&h.wake(34 * DAY + 3600, channels(vec![money(ME, 1_000_000, txs), records("mine", vec![remit, lease.clone(), statement("rec.rs", 0, "other", "rent_statement", &[ME], json!({ "lease": "lease-9", "owed": 355_334 }))])])));
         out.lines().find(|l| l.contains("kind=referral")).unwrap_or_default().to_string()
     };
     let on = referral_of(true, paid.clone());
     assert!(on.contains("In our account (acc-ll) today:") && on.contains("Coming in:") && on.contains("from acc-other (wages)") && on.contains("Our rent:") && on.contains("(lease-9)") && !on.contains("Nothing regular"), "{on}");
+    // (2026-11-16) Behind with the rent: what it owes, as its landlord's latest paper says, in one fixed sentence.
+    assert!(on.contains("We owe other ") && on.contains(" in rent, as their statement of ") && on.contains("(rec.rs)"), "{on}");
     let none = referral_of(true, json!([]));
     assert!(none.contains("Nothing regular is coming in.") && !none.contains("Coming in:"), "{none}");
     let off = referral_of(false, paid);

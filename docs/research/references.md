@@ -1154,3 +1154,12 @@ Searched with web search on 2026-11-07.
 | GLMMs for counts; multilevel models; power by simulation | Bolker et al. (2009), *Trends in Ecology & Evolution* 24(3); Gelman and Hill (2007), Cambridge University Press; Arnold, Hogan, Colford and Hubbard (2011), *BMC Medical Research Methodology* 11:94; Green and MacLeod (2016), "SIMR", *Methods in Ecology and Evolution* 7(4) (records seen; the last one's author list to confirm) | paper-plan 4.6, 6 |
 | Krippendorff's alpha (0.8 for firm conclusions, 0.667 for tentative ones) | Krippendorff (2004), *Human Communication Research* 30(3); Hayes and Krippendorff (2007), *Communication Methods and Measures* 1(1) (records seen; the thresholds from memory, to confirm) | paper-plan 5 |
 | A workplace's electricity and water by the hour worked: an industry's use (an energy account, a water account) over its hours worked (a labour account) | Department of Climate Change, Energy, the Environment and Water, *Australian Energy Statistics*, Table F (energy use by industry), 2023-24; ABS, *Water Account, Australia*, 2021-22; ABS, *Labour Account Australia*, hours actually worked by industry, 2023-24 (all recalled, not opened: to confirm) | au-vic profile `utilities.workplace` (the other profiles' are placeholders from it); `hour-<industry>` recipes; docs/behaviour/utilities.md, "Workplaces"; risk WM-15 |
+
+### The project plan's framing (2026-11-16)
+
+Nothing opened on 2026-11-16 for this entry: both lines are cited from memory and marked.
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Formal authority (the right to decide) against real authority (who in effect decides): a principal who rubber-stamps what its agent proposes has handed over real authority while keeping the formal kind | Aghion and Tirole (1997), "Formal and Real Authority in Organizations", *Journal of Political Economy* 105(1), 1-29 (pages to confirm) | docs/north-star.md (the project plan, step 4); docs/design/obstacles.md section 10; docs/design/stakes.md; docs/behaviour/assistants.md |
+| "Rogue AIs" as one of four classes of catastrophic risk, power-seeking among its paths: the problem area the project plan is filed under | Hendrycks, Mazeika and Woodside (2023), "An Overview of Catastrophic AI Risks", Center for AI Safety, arXiv:2306.12001 (to confirm) | docs/north-star.md (the project plan, "Problem") |

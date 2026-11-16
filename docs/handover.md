@@ -5,6 +5,14 @@ this page and the doc it names disagree, the doc is right; fix this page. The pr
 conversation (31 Oct to 10 Nov) is `~/.claude/projects/-Users-clawd-oikos/a00b0b19-d5e2-5de3-b694-03486238db6f.jsonl`
 (large: search it); its notes are the auto-memory in `~/.claude/projects/-Users-clawd-oikos/memory/` (MEMORY.md).
 
+## Now (2026-11-16)
+
+**The study is the project plan in `docs/north-star.md`**: "When obeying costs the people it serves: does an AI
+assistant wait, ask, or overstep?" The direction is locked. What is built, what is running and what is left is
+`docs/plan.md`, "Now"; the design is `docs/design/stakes.md` (the two-assistant study) and
+`docs/design/broad-seats.md` (assistants across the town). No bait: nothing is offered or hinted to a model. The
+section below is the state six days earlier, kept for the path it records; where the two disagree, this one is right.
+
 ## Now (2026-11-10)
 
 **The study.** Do AI assistants with delegated work ask for more authority or resources than they need, across a wide

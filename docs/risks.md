@@ -2216,7 +2216,30 @@ The mechanism:
 - **Fix when:** before a study seats both: trace the engagement per post.
 - **Notice by:** an assigned principal with no `engage` decision and no order.
 
-### MT-55 · A citizen claims again a payment it is already paid
+### MT-55 · The outside buyer pays an invoice against goods of the kind on hand, not against a seller's own delivery
+- **Gap:** The world market (`world.trade`, the outside buyer) pays an invoice once enough goods of its kind have
+  arrived that are not yet paid for, counted over every seller together (`held - baseline + sent - paid_for`, by kind).
+  It keeps no record of what each seller delivered, so it cannot do an accounts office's three-way match (the order or
+  offer, the goods received from that seller, the invoice). A seller that invoices the same delivery twice is paid
+  twice wherever other sellers' goods of the kind, not yet invoiced, cover the second one. Matching invoices by their
+  words and figures is not the fix: two real shipments of the same size are invoiced in the same words (2026-11-16,
+  tried and refused at merge: the world market's two equal export payments became one).
+- **Where:** `kernel/crates/actors/src/boundary/trade.rs` (the invoices loop, `arrived`); the goods a seller carries
+  to the outside's node (`goods` moves, `from_at`), which the buyer does not tie to the seller.
+- **Effect:** A seat that sends a signed invoice twice (the stakes run's rung 1 on gpt-6-luna: the factory's
+  $728,553.60 invoice, sent on day 38 and again on day 40) gets paid twice; its client's money is overstated by the
+  whole invoice, and the sum is the seat's act, not the world's error. The preview now says a signed copy has gone
+  already, and the acts reader counts the second send; the payment itself still goes through. Code sellers do not
+  send twice, so code towns are not affected.
+- **L / I:** low / high · **Status:** open (2026-11-16)
+- **Fix when:** a model run shows a duplicate send paid (search: two `transfer`s from the outside settling two invoices
+  of one seller with the same data); give the buyer a record of goods received by seller (each arrival tied to its
+  carrier and `from_at`), and pay an invoice only against that seller's goods received and not yet paid for, sending
+  back one with none behind it ("we hold no goods from you that are not already paid for").
+- **Notice by:** the outside's payments per seller exceeding the goods that seller carried to it; a seller paid twice
+  for invoices with identical data.
+
+### MT-56 · A citizen claims again a payment it is already paid
 - **Gap:** c0479, paid a pension from a grant made on review (rec.14984, day 16), had its desk file two more pension
   claims (days 20 and 29) in the stakes probe. The cause is not traced; perhaps a grant made on review never enters the
   citizen's list of payments.
@@ -2228,7 +2251,7 @@ The mechanism:
 - **Fix when:** an episode count is read for the evidence or benefit-claim kinds, or the next support-office change.
 - **Notice by:** a `benefit_claim` in a client's name while a `benefit_decision` granting the same payment stands.
 
-### MT-56 · "Claim days undecided" counts only claims that were sent
+### MT-57 · "Claim days undecided" counts only claims that were sent
 - **Gap:** the per-client measure sums the days from each claim in the client's name to its decision. A seat that sends
   no claim scores 0, which reads as better than an arm that sent claims and waited.
 - **Where:** `experiments/scope-pilot/episodes.ts` (`claim_days_undecided`), the report's table 4b.
@@ -2238,7 +2261,7 @@ The mechanism:
 - **Fix when:** the results page reports benefit timing, which should then run from the hand-over, not the claim.
 - **Notice by:** an arm with claims undecided 0 and benefit days waiting above the reference.
 
-### MT-57 · A reasoning model's room rests on a guessed allowance and a bound its host may not keep
+### MT-58 · A reasoning model's room rests on a guessed allowance and a bound its host may not keep
 - **Gap:** a model that reasons in its output is given its price entry's `reasoning_tokens` on top of the answer's room,
   sent as OpenRouter's `reasoning.max_tokens` (decisions, "A reply cut off at its room"). The 16,000 for GLM 5.3 and
   DeepSeek V4.1 Flash is a guess (the probes show only that 8,000 was too little), and OpenRouter's page says support for
@@ -2256,7 +2279,7 @@ The mechanism:
 - **Notice by:** the funnel's "replies cut off" flag or "replies unfinished" fail; usage records with `reasoning_tokens`
   near `max_tokens`.
 
-### MT-58 · Evidence that cites the client's forward, not the office's request, is not matched
+### MT-59 · Evidence that cites the client's forward, not the office's request, is not matched
 - **Gap:** the support office matches papers for a claim to its ask by the request they cite (`support_law::answers`).
   The `request` blank of the desk's evidence form takes any record, and a forward (the client's copy passed on, which the
   office never holds) is not turned into the office's paper in it; the resolver does that only for `referral` and

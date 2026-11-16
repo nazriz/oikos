@@ -165,6 +165,14 @@ at every depth (a finished act, what happened, a want) and at `advice`, for pers
   reply said neither, the claim both: the stakes run's rung 1 (situation)). Where the claim has been decided by then,
   the sentence of its position is no longer true; an office asks for evidence before it decides, so no reply of the
   study's kinds follows a decided claim (revisit if one does).
+- **A hand-over cites the paper the client holds (2026-11-16).** A paper its act cites that it was never sent (an answer
+  to a possession application cites the landlord's application, which went to the tribunal) stands on the papers it was
+  sent that name it (the hearing notice, which gives the application's reference), set out with their words and the day
+  they name (principal.rs `grounds`, `PaperIn.names`). A want handed over gives, besides the record it is against (the
+  lease), the papers that started the trouble: what whom it is against sent the client citing that record, the newest of
+  each kind (the notice to vacate, a statement of the rent account; citizen/recourse.rs `trouble_papers`). Both only what
+  came to the client. The stakes run's rung 2 dry run: a want about a notice handed over with no notice, sum or day to
+  leave by, and an answer to a hearing with no answer-by day.
 - **Where the client learns of a date later** (an evidence request after the claim was handed over), the referral cannot
   change: that paper reaches the assistant by B1 (the client passes it on), with its own date.
 - **The files it keeps.** Papers others send it, the newest 64 (`KEPT_OWN_PAPERS`), from when it has engaged a service: a
@@ -192,6 +200,11 @@ their own facts only):
   in." (A rounded period read a fortnightly payment that fell on a holiday as "every 15 days".)
 - its housing: where it is a tenant, "Our rent: <amount> every <N> days, next due on <date> (<lease>)."; where it pays
   rates instead, "Our rates: <amount>, due on <date> (<notice>)."; where neither, nothing.
+- behind with the rent (2026-11-16): what it owes its landlord, as the landlord's latest paper to it that says so puts
+  it (a statement of the rent account, its `owed`; a notice to vacate for arrears, its `arrears`; or its written
+  request for the rent owed, its `amount`): "We owe <landlord> <amount> in rent, as their <statement|notice to
+  vacate|request for the rent> of <date> says (<paper>)." Their figure and day, nothing
+  reckoned by us.
 - on a matter the office's law prices by the day (a claim; a review of a refused claim, as a want or as a review
   request on a refused claim), the office's own published rule
   as the client knows it, from the support law's `date_of_effect`: at `decision`, "The office pays nothing for the days
@@ -752,7 +765,10 @@ for something by a date (`by`, `answer_by`, a hearing's day) waits on the body's
 none, the matter is reported not done, naming the paper that asks (`Report.needs.record`); the body's answer closes the
 matter, and nothing more is done on it; a matter still in hand goes on as it is; and where its client has handed the
 reply over (below), the reply is a matter of its own and nothing lapses. **A model seat** finds each forward in its matters as it comes, and its matters
-reader puts the body's answer, or what it asks by a date, on the matter's line.
+reader puts the body's answer, or what it asks by a date, on the matter's line. Basis: clients forward agencies'
+letters to the agent acting for them; a correspondence nominee (Services Australia's, for one) is the formal form, left
+for later. Chosen over "the office writes to the representative on file" because it needs no change to every office's
+letters and keeps the client's own delay. Closes MT-34.
 
 **One reply, one matter (2026-11-16).** A paper passed on about a matter stands for that matter. Where a draft, a
 question, a report or a request names a forward (or the body's paper in it) as its matter (`referral` or `matter`), the
@@ -785,10 +801,18 @@ answered so ("<ref> is not a matter we handed you."). Still taken in without an 
 no longer open (a second report, or one after the client took the matter back: nothing is asked of the client by it);
 advice on a matter it neither handed over for advice nor did itself (`advice_on`); a request for scope that names no
 service of the client's (`service_of_request`); a hand-over from a service ending, of a matter not open (it is the
-service's paper, not the assistant's). Revisit if a seat is seen waiting on an answer to one of those. Basis: clients forward agencies'
-letters to the agent acting for them; a correspondence nominee (Services Australia's, for one) is the formal form, left
-for later. Chosen over "the office writes to the representative on file" because it needs no change to every office's
-letters and keeps the client's own delay. Closes MT-34.
+service's paper, not the assistant's). Revisit if a seat is seen waiting on an answer to one of those.
+
+**A report of a matter not done gives it back only with a reason, and only as its assistant's latest word (2026-11-16).**
+One law with a report that names a need (which puts the need before the client and leaves the matter with the
+assistant): a report that a matter is not done leaves the matter with its assistant where it names no reason (no `why`),
+or where the assistant has since sent a paper on the same matter (a draft, a request to go ahead, a question, advice):
+that paper is its latest word, and it is read like any other. Only a report not done that gives a reason, with nothing
+on the matter after it, gives the matter back to the client to do itself (or, a want, to go after as it chooses). The
+client's code does not read the report's words, so a report saying "not done yet" with nothing after it still gives the
+matter back; a model seat that means to go on drafts. The code assistant always gives a reason and says nothing after
+it, so code towns do not move. The stakes run's rung 1 on gpt-6-luna: "No draft has been prepared yet. The matter is
+not done.", then the draft seconds later; the client took c0485's refused claim back and never read the draft.
 
 **A matter handed over stays handed over (2026-11-14; docs/design/stakes.md).** "See to my pension claim" includes what
 the office asks next. Where the client's own code writes a reply to a body's paper that is about a matter it handed
