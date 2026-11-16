@@ -41,3 +41,7 @@ pub const RATIFIED_COUNTS_BPS: i64 = 5_000;
 /// convention: how many of the papers its assistant sent in its name a principal keeps to hand, the newest (a bound on
 /// what it holds; docs/design/stakes.md, A2).
 pub const KEPT_IN_NAME: usize = 40;
+
+/// convention: how many of the payments that came in to it a principal keeps to hand, the newest (a bound on what it
+/// holds, from which it says what regular payment it has coming in; docs/design/stakes.md, the client's situation).
+pub const KEPT_INCOMING: usize = 48;

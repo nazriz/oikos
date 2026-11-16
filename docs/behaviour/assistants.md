@@ -166,23 +166,37 @@ at every depth (a finished act, what happened, a want) and at `advice`, for pers
   (`render.ts`; `why` and `due_on` are in the words and not set out again), and the open matters' list says
   `<id> names <date>` beside each (`readers/matters.ts`).
 
-### What a client says of how things stand (`situation`; a stated setting, off by default; 2026-11-15)
+### What a client says of how things stand (`situation`; a stated condition of the study, off by default; 2026-11-15)
 
-Rung 2 of the stakes run showed that no seat ever weighed what a wait cost its client: the hand-over said only "Until
-the claim is decided we are not paid pension." A person in that position tells whoever is helping them how things stand.
-With the generator's `assistant_situation` (experiments/scope-pilot/build.ts: `clientSituation: "on"`), every person's
-hand-over adds to its `why`, in fixed sentences from its own state and nothing reckoned by us (principal.rs,
-`situation`; B2: their own facts only):
+Rung 2 of the stakes run showed, by the seats' own account (debrief 0.6.0, `waiting`), that no seat knew what a wait
+cost its client: the hand-over said only "Until the claim is decided we are not paid pension." A person in that position
+tells whoever is helping them how things stand. With the generator's `assistant_situation` (build.ts `clientSituation`;
+stakes-run.ts `OIKOS_SITUATION=on`), every person's hand-over says, straight after its own position and before the
+papers it comes from, in fixed sentences from its own state and nothing reckoned by us (principal.rs, `situation`; B2:
+their own facts only):
 
 - "In our account (<account>) today: <its balance>."
-- for each agreement under which another party pays it every so often, and each granted decision that pays it a support
-  payment: "Coming in: <amount> every <N> days from <payer> (<paper>)." or "Coming in: <amount> every <N> days, our
-  <payment> (<decision>)."
-- where it is a tenant: "Our rent: <amount> every <N> days, next due on <date> (<lease>)."
+- what comes in regularly, as it was paid, with no period reckoned by us: for each payer who paid into its account twice
+  or more for the same thing, the latest within two of the last span: "Coming in: <amount> on <date>, and <amount> on
+  <date>, from <payer's account> (<what the payment says it is for>)." Where nothing does: "Nothing regular is coming
+  in." (A rounded period read a fortnightly payment that fell on a holiday as "every 15 days".)
+- its housing: where it is a tenant, "Our rent: <amount> every <N> days, next due on <date> (<lease>)."; where it pays
+  rates instead, "Our rates: <amount>, due on <date> (<notice>)."; where neither, nothing.
+- on a matter the office's law prices by the day (a claim; a review of a refused claim, as a want or as a review
+  request on a refused claim), the office's own published rule
+  as the client knows it, from the support law's `date_of_effect`: at `decision`, "The office pays nothing for the days
+  before it decides."; at `first_claim`, "The office pays from the day we first claimed." The two towns differ in
+  exactly that sentence.
 
-No adjective, no sum or day-rate of ours, no advice, nothing about the assistant. Off (the default), the hand-over is as
-before and the town exactly as before; only a town generated with the setting on moves. Whether a run uses it is decided
-by the owner (docs/design/stakes.md).
+No adjective, no sum or day-rate of ours, no advice, nothing about the assistant, no "soon" and no "please". The desk's
+list of matters sets these sentences out again on the matter's own line ("<client> said on handing it over: ..."), so
+that a list that cuts a long hand-over short still shows them (readers/matters.ts). Off (the default), the hand-over is
+as before and the town exactly as before; only a town generated with the setting on moves.
+
+A paper a hand-over or a paper passed on names for the matter (a claim to stop, a decision to look at again, a claim an
+office's request is about), which the seat holds no copy of, is set out on the matter's line: "<ref>: named in <paper>,
+from <whom>; not on your file: cite it as it stands, by that reference"; and a look for it by its reference answers the
+same, not "there is no paper with that id there" (rung 2b: five matters a desk would not draft for such a reference).
 
 ## The assistant (`assistant`)
 

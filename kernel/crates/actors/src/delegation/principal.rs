@@ -269,6 +269,9 @@ pub struct State {
     returned_own: Option<Own>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     returned_matter: Option<Matter>,
+    /// What it knows of how things stand with it, kept where `situation` is set: the payments that came in, its housing.
+    #[serde(default, skip_serializing_if = "Situ::is_empty")]
+    situ: Situ,
     own: BTreeMap<String, Own>,
     matters: BTreeMap<String, Matter>,
     by_referral: BTreeMap<String, String>,
@@ -355,6 +358,25 @@ pub struct Delegating {
     s: State,
 }
 
+/// How things stand with it, from its own account and papers as they came (`situation`): each payment that came into its
+/// account (when, from whom, how much, what for: the newest few dozen), its lease's rent, and its latest rates notice.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct Situ {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    incoming: Vec<(i64, String, i64, String)>,
+    /// Its rent, how often, from when, and the lease: where it is a tenant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rent: Option<(i64, i64, i64, String)>,
+    /// Its rates: how much, due when, the notice.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rates: Option<(i64, i64, String)>,
+}
+impl Situ {
+    fn is_empty(&self) -> bool {
+        self.incoming.is_empty() && self.rent.is_none() && self.rates.is_none()
+    }
+}
+
 /// A person too ill to deal with their post (stakes D2; `away`): since when, until when as their body shows it, and
 /// whether they have said so to their assistant.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -412,6 +434,7 @@ impl Delegating {
                 queue: vec![],
                 returned_own: None,
                 returned_matter: None,
+                situ: Situ::default(),
                 own: BTreeMap::new(),
                 matters: BTreeMap::new(),
                 by_referral: BTreeMap::new(),
@@ -627,6 +650,29 @@ impl State {
         let rest: Vec<&Arc<Record>> = pic.all_records().filter(|r| !matches!(r.body, RecordBody::Statement { .. } | RecordBody::Agreement { .. }) && ours(r, &self.p.complaints, &self.book, &letter)).collect();
         fresh.extend(self.book.take_all(rest));
         self.eng.absorb(&self.book);
+        // (Where it says how things stand (`situation`): what came into its account, its lease and its rates notices, as
+        // they reach it.)
+        if self.p.situation {
+            let own = if self.p.account.is_empty() { format!("acc-{}", self.me) } else { self.p.account.clone() };
+            for x in pic.transactions().filter(|x| x.to.as_str() == own && x.from.as_str() != own) {
+                self.situ.incoming.push((x.t, x.from.to_string(), i64::try_from(x.amount).unwrap_or(i64::MAX), x.memo.clone().unwrap_or_default()));
+            }
+            let keep = self.situ.incoming.len().saturating_sub(crate::figures::KEPT_INCOMING);
+            self.situ.incoming.drain(..keep);
+            for r in pic.all_records() {
+                if let RecordBody::Agreement { .. } = &r.body {
+                    let l = crate::papers::agreements::lease_terms(r, &self.me);
+                    if let (true, true, Some(e)) = (l.rent > 0, l.space.is_some(), l.every.filter(|e| *e > 0)) {
+                        self.situ.rent = Some((l.rent, e, r.at.max(0), r.id.to_string()));
+                    }
+                }
+                if crate::common::is_kind(r, "rates_notice") && crate::common::addressed_to(r).iter().any(|a| a.as_str() == self.me) {
+                    if let Some(n) = papers::read::<crate::papers::offices::RatesNotice>(r) {
+                        self.situ.rates = Some((n.amount, n.due, r.id.to_string()));
+                    }
+                }
+            }
+        }
         // (Its own papers, the newest few, once it has engaged a service: what it can send a copy of when its assistant
         // asks for one by name. Its files, not a register.)
         if self.eng.live().next().is_some() {
@@ -1765,50 +1811,51 @@ impl State {
     /// How things stand with it, as it would tell whoever helps it (`situation`), each in a fixed sentence from its own
     /// papers and account: what it has in hand today; each payment that comes to it on a standing basis (an agreement or
     /// a decision that pays it every so often); its rent and the day it next falls due, where it is a tenant.
-    fn situation(&self, pic: &Picture, t: i64, cx: &Cx) -> Vec<String> {
+    fn situation(&self, pic: &Picture, kind: &str, program: &str, t: i64, cx: &Cx) -> Vec<String> {
         let w = &cx.ctx.world;
         let money = |c: i64| crate::common::money_words(c, w);
         let date = |at: i64| crate::common::when_words(at, w);
-        let every = |s: i64| if s % DAY == 0 && s / DAY == 1 { "every day".to_string() } else if s % DAY == 0 { format!("every {} days", s / DAY) } else { format!("every {} hours", s / 3600) };
+        let every = |s: i64| if s == DAY { "every day".to_string() } else if s % DAY == 0 { format!("every {} days", s / DAY) } else { format!("every {} hours", (s / 3600).max(1)) };
         let mut out = Vec::new();
-        let mine = format!("acc-{}", self.me);
-        let own = if self.p.account.is_empty() { mine.clone() } else { self.p.account.clone() };
+        let own = if self.p.account.is_empty() { format!("acc-{}", self.me) } else { self.p.account.clone() };
         if let Some(a) = pic.accounts().find(|a| a.account.as_str() == own) {
             out.push(format!("In our account ({}) today: {}.", own, money(i64::try_from(a.balance).unwrap_or(i64::MAX))));
         }
-        let mut seen = BTreeSet::new();
-        for r in pic.all_records() {
-            if !seen.insert(r.id.to_string()) {
-                continue;
-            }
-            // (An agreement under which another party pays it every so often: a wage, say.)
-            if let RecordBody::Agreement { terms } = &r.body {
-                for c in terms.commitments.iter().filter(|c| c.who != self.me) {
-                    let (Some(o), Some(e)) = (crate::papers::agreements::outcome_of(&c.does), c.every) else { continue };
-                    if let Some(m) = o.money.filter(|m| m.to == own) {
-                        out.push(format!("Coming in: {} {} from {} ({}).", money(m.amount), every(e), c.who, r.id));
-                    }
-                }
-                // (A lease of which it is the tenant: its rent and the day it next falls due.)
-                let l = crate::papers::agreements::lease_terms(r, &self.me);
-                if l.rent > 0 && l.space.is_some() {
-                    if let Some(e) = l.every.filter(|e| *e > 0) {
-                        let from = r.at.max(0);
-                        let next = from + ((t - from).max(0) / e + 1) * e;
-                        out.push(format!("Our rent: {} {}, next due on {} ({}).", money(l.rent), every(e), date(next), r.id));
-                    }
+        // (What comes in regularly: a payer who paid it twice or more for the same thing, the latest within two of the
+        // last span: its wages, its support. Said as it was paid, the last two payments with their days, and no period
+        // reckoned by us: a fortnightly payment that fell on a holiday read "every 15 days" when it was rounded.)
+        let mut regular: Vec<(String, (i64, i64), (i64, i64), String)> = Vec::new();
+        let mut payers: Vec<(String, String)> = self.situ.incoming.iter().map(|(_, f, _, m)| (f.clone(), m.clone())).collect();
+        payers.sort();
+        payers.dedup();
+        for (from, memo) in payers {
+            let xs: Vec<&(i64, String, i64, String)> = self.situ.incoming.iter().filter(|x| x.1 == from && x.3 == memo).collect();
+            if let [.., a, b] = xs.as_slice() {
+                let gap = b.0 - a.0;
+                if gap >= DAY && t - b.0 <= 2 * gap {
+                    regular.push((from, (b.2, b.0), (a.2, a.0), memo));
                 }
             }
-            // (A decision that pays it a support payment every so often.)
-            if crate::common::is_kind(r, "benefit_decision") {
-                use crate::common::Fields;
-                let d = crate::common::data(r);
-                if d.flag("granted") && d.s("claim").is_some_and(|c| c.contains(self.me.as_str())) {
-                    if let (Some(a), Some(e)) = (d.i("amount"), d.i("every")) {
-                        out.push(format!("Coming in: {} {}, our {} ({}).", money(a), every(e), d.s("payment").unwrap_or("payment").replace('_', " "), r.id));
-                    }
-                }
-            }
+        }
+        if regular.is_empty() {
+            out.push("Nothing regular is coming in.".to_string());
+        }
+        for (from, (last, last_at), (before, before_at), memo) in regular {
+            let what = memo.trim().trim_end_matches('.');
+            let paid = format!("{} on {}, and {} on {}", money(last), date(last_at), money(before), date(before_at));
+            out.push(if what.is_empty() { format!("Coming in: {paid}, from {from}.") } else { format!("Coming in: {paid}, from {from} ({what}).") });
+        }
+        // (Its housing: its rent, or its rates, as its lease or its notice has them.)
+        if let Some((rent, e, from, id)) = &self.situ.rent {
+            let next = from + ((t - from).max(0) / e + 1) * e;
+            out.push(format!("Our rent: {} {}, next due on {} ({}).", money(*rent), every(*e), date(next), id));
+        } else if let Some((amount, due, id)) = &self.situ.rates {
+            out.push(format!("Our rates: {}, due on {} ({}).", money(*amount), date(*due), id));
+        }
+        // (On a matter the office's law prices by the day, a claim or a review of a refused claim: the office's own
+        // published rule, as the client knows it, in one fixed sentence; nothing about what is to be done.)
+        if kind == "benefit_claim" || kind.ends_with("claim_refused") || (kind == "review_request" && program.contains("claim_refused")) {
+            out.push(if crate::boundary::support_law::pays_from_first_claim(&self.book) { "The office pays from the day we first claimed." } else { "The office pays nothing for the days before it decides." }.to_string());
         }
         out
     }
@@ -1834,6 +1881,13 @@ impl State {
                 g.why.push(filled);
             }
         }
+        // (Where it is set (`situation`), how things stand with it, straight after its own position and before the papers
+        // it comes from, so that a list that shows the start of a hand-over shows them.)
+        if self.p.situation {
+            if let Some(pic) = pic {
+                g.why.extend(self.situation(pic, kind, program, t, cx));
+            }
+        }
         for id in cited {
             let p = self.papers_in.iter().find(|p| p.id == id).cloned().or_else(|| {
                 let r = pic?.all_records().find(|r| r.id.as_str() == id)?;
@@ -1845,14 +1899,6 @@ impl State {
                 if g.due.as_ref().is_none_or(|(x, _)| d < *x) {
                     g.due = Some((d, p.id.clone()));
                 }
-            }
-        }
-        // (Where it is set (`situation`), how things stand with it, in fixed words from its own state and nothing reckoned:
-        // its balance today, a regular payment coming in, its next rent and its day. A person tells whoever helps them;
-        // no adjective, no sum of ours, no advice.)
-        if self.p.situation {
-            if let Some(pic) = pic {
-                g.why.extend(self.situation(pic, t, cx));
             }
         }
         // (A person who gets to their post at sittings of their own (`habit`) says so on every hand-over that waits on

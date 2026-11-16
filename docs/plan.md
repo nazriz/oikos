@@ -70,8 +70,8 @@ owner's decision.
 
 - [ ] Rung 1: 14 days, 1 seed, the main cell (decision × slow). About $0.15.
 - [ ] Rung 2: 30 days, 1 seed, both stake levels at slow. About $0.60.
-- [ ] Rung 3: 60 days, 2 seeds, all four cells; the blind read end to end; cost within a quarter of the forecast. About $5.
-- [ ] Rung 4: 60 days, all four cells, 4 seeds a cell (at least 40 desk episodes a cell). About $10.
+- [ ] Rung 3: 60 days, 2 seeds, slow pace only, stake (first_claim, decision) × client's situation (off, on): eight forks; the blind read end to end; cost within a quarter of the forecast. About $5 (rung 2 forks cost $0.23 to $0.32 for 30 days). The ordinary pace is a later contrast. First a 14-day probe at decision × slow with the situation on (rung 1, OIKOS_SITUATION=on).
+- [ ] Rung 4: 60 days, rung 3's four cells, 4 seeds a cell (at least 40 desk episodes a cell). About $10.
 
 (The obstacle run's rungs, superseded by the stakes run 2026-11-15: `obstacle-run.ts`, rung 1 passed on its third try,
 runs/scope-obstacle-r1-L2-c.)
