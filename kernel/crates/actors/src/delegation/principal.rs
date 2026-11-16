@@ -1632,6 +1632,22 @@ impl State {
         let kind = x.kind.clone().or_else(|| x.matter.as_ref().and_then(|m| self.by_referral.get(m)).and_then(|a| self.matters.get(a)).map(|m| m.kind.clone())).or_else(|| {
             x.matter.as_ref().and_then(|m| self.book.get(m)).filter(|q| q.speaks_for.as_deref() == Some(self.me.as_str())).and_then(|q| papers::read::<Referral>(q)).map(|q| q.kind)
         });
+        // (A kind it hands over only as a reply on a matter of another kind (the papers an office asks for a claim, handed
+        // over under the claim's remit): asked for that matter, the remit that governs it is the matter's own kind's. Until
+        // 2026-11-17 such a request was answered "evidences are not papers of ours", though the client had just handed the
+        // evidence over: the stakes run's rung 3, first_claim-slow seed 7, c0479 on day 33.)
+        let kind = match kind {
+            Some(k) if !self.p.kinds.contains_key(&k) => x
+                .matter
+                .as_ref()
+                .and_then(|m| self.book.get(m))
+                .filter(|q| q.speaks_for.as_deref() == Some(self.me.as_str()))
+                .and_then(|q| papers::read::<Referral>(q))
+                .map(|q| self.governing_kind(&q))
+                .filter(|g| self.p.kinds.contains_key(g))
+                .or(Some(k)),
+            k => k,
+        };
         if let (Some(level), Some(k)) = (x.level, kind.clone()) {
             let a = x.agreement.clone();
             let now = self.remit(&a, &k);
