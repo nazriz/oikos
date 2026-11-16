@@ -52,6 +52,20 @@ fn a_factory_the_offer_never_named_is_paid_for_what_it_ships_up_to_the_months_ap
     assert!(t2.contains("quantity=\"50\"") && t2.contains("returned"), "50 beyond the month's appetite are sent back: {t2}");
 }
 
+/// (2026-11-16) A payables office's duplicate check: an invoice the same in every particular as one it has paid is
+/// returned as paid, and nothing is paid on it, even with goods enough on hand; one that differs is paid as ever.
+#[test]
+fn an_invoice_already_paid_sent_again_is_returned_as_paid_and_not_paid_twice() {
+    let mut h = harness(json!({}));
+    h.wake(3 * 3600, world(vec![], &[], json!([])));
+    let t1 = all(&h.wake(6 * DAY, world(vec![invoice("rec.10", 5 * DAY, "new", 100, 450)], &[("outside", "flour", 100)], json!([]))));
+    assert!(t1.contains("settles=rec.10"), "{t1}");
+    let t2 = all(&h.wake(8 * DAY, world(vec![invoice("rec.12", 7 * DAY, "new", 100, 450)], &[("outside", "flour", 250)], json!([]))));
+    assert!(!t2.contains("settles=rec.12") && t2.contains("kind=paper_returned") && t2.contains("our invoice rec.10 again") && t2.contains("to=[\"new\"]"), "{t2}");
+    let t3 = all(&h.wake(9 * DAY, world(vec![invoice("rec.13", 8 * DAY, "new", 120, 450)], &[("outside", "flour", 250)], json!([]))));
+    assert!(t3.contains("settles=rec.13"), "a different invoice is paid: {t3}");
+}
+
 #[test]
 fn goods_that_have_not_come_are_not_paid_for_and_the_invoice_is_declined_after_the_wait() {
     let mut h = harness(json!({ "wait_days": 14 }));

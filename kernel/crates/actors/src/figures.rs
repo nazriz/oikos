@@ -19,6 +19,10 @@ pub const QUOTED_CHARS: usize = 240;
 /// what it holds).
 pub const KEPT_ACKNOWLEDGED: usize = 512;
 
+/// convention: how many invoices a buyer keeps of those it has paid, the newest, to tell one sent again from a new one (a
+/// bound on what it holds; boundary/trade.rs, its duplicate check).
+pub const KEPT_PAID_INVOICES: usize = 400;
+
 /// convention: how many matters a principal keeps the trace of, the newest, to tell a body's paper about one from any
 /// other (a bound on what it holds; docs/behaviour/assistants.md, "What the client passes on").
 pub const KEPT_TRACES: usize = 256;

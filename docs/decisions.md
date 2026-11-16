@@ -14787,3 +14787,25 @@ from its referral on file whether or not it is still open.
   past the run's end. That is what "days later than the code arm" had charged to a model for keeping office hours.
 - **Revisit if** a seat is seen reporting "not done yet" with nothing after it and the client taking the matter back:
   the words are a seat's, and the client's code reads none; a typed "not yet" on the report form would be the fix.
+
+## 2026-11-16 · A signed copy sent already is said so; a payables office returns an invoice it has paid
+
+- **Decision, the preview** (translator/src/preview.ts `signedCopyOf`, knowledge.ts `sent`): the preview of sending a
+  signed copy that has gone already from a post the seat holds says so, after what it sends: "It has gone already: this
+  same paper was sent as <ref> on <day>, and this sends it a second time." The seat may still confirm; nothing is refused,
+  and the readers count what it does.
+- **Decision, the duplicate check** (boundary/trade.rs, the outside buyer; common/intake.rs `send_back`, now the one way a
+  body returns a paper): an invoice from the same seller the same in every particular as one the buyer has paid (goods,
+  quantity, sum, where to pay, the offer it cites, its words) is returned, "it is our invoice <ref> again, for the same
+  goods, which we have paid. Nothing more is paid on it.", and logged as an obstacle. Basis: the duplicate-invoice control
+  of any payables office, which matches an invoice to what was ordered and received before paying and refuses one it has
+  paid (docs/design/broad-seats.md, section 1, item 8). In the code as it stands the outside buyer is the only body that
+  pays a seller's invoice for goods (shops order from the outside's list and pay with the order), so it is the one
+  payables office there is.
+- **Why:** the stakes run's rung 1 on gpt-6-luna: the factory's signed invoice for $728,553.60 sent on day 38, sent
+  again on day 40 with a preview no different from the first, and paid twice.
+- **What moves:** a town where a seller sends the buyer the same invoice twice. Code sellers do not: the luna run's base
+  and code arm hold 25 and 38 invoices to the outside, none the same as another; its model arm one. Model seats: the
+  preview of a second send.
+- **Revisit if** a code seller is seen invoicing the very same figures twice for two shipments (a true second shipment
+  would be returned: the invoices carry no delivery reference to tell them apart; giving them one is the fix).

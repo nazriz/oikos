@@ -176,6 +176,16 @@ pub fn check(book: &Book, me: &str, req: &Requirements, r: &Record, cx: &mut Cx)
     }
     cx.decided(json!({ "domain": "obstacle", "law": if need.get("authority").is_some() { "authority" } else { "acceptance" }, "paper": r.id, "principal": for_,
         "counterparty": me, "need": need, "clears_by": if need.get("authority").is_some() { "authority" } else { "sent_again" }, "slip": slipped, "inputs": [r.id] }));
+    Some((said.clone(), send_back(r, me, &said, need)))
+}
+
+/// A body's paper sending back a paper it received and will not act on, saying why in its own words (`said`) and what
+/// would clear it (`need`): to whom the paper is for, the paper as it was beside it, to be sent again as it stands. The
+/// one way every body that checks what it receives returns a paper (O4; docs/design/broad-seats.md, section 1, item 8).
+pub fn send_back(r: &Record, me: &str, said: &str, need: serde_json::Value) -> Call {
+    let kind = super::kind(r).unwrap_or_default();
+    let for_ = r.speaks_for.as_deref().unwrap_or(r.author.as_str()).to_string();
+    let post = r.position.as_deref();
     // (To whoever it is for: a body writes to the one the paper speaks for, as it would to a claimant, and not to a post
     // it has no authority for, which is no one a paper is addressed to. They tell whoever sent it for them.)
     let to: Vec<String> = vec![for_.clone()];
@@ -183,6 +193,5 @@ pub fn check(book: &Book, me: &str, req: &Requirements, r: &Record, cx: &mut Cx)
     vis.push(me.to_string());
     // (The paper as it was, to be sent again as it stands, citing it: a form sends it so, `copies`.)
     let copy = json!({ "kind": kind, "to": super::addressed_to(r), "text": super::text(r), "data": data(r).to_value(), "basis": [r.id] });
-    let call = say(RETURNED, &said, Say { to: Some(to), visible: Some(Visible::Only(vis)), basis: Some(r.id.to_string()), data: Some(json!({ "returned": r.id, "need": need, "paper": copy, "from": post })), ..Default::default() });
-    Some((said, call))
+    say(RETURNED, said, Say { to: Some(to), visible: Some(Visible::Only(vis)), basis: Some(r.id.to_string()), data: Some(json!({ "returned": r.id, "need": need, "paper": copy, "from": post })), ..Default::default() })
 }

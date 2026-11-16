@@ -101,6 +101,9 @@ struct Market {
     paid_for: BTreeMap<String, i64>,
     baseline: BTreeMap<String, i64>,
     answered: BTreeSet<String>,
+    /// Invoices we paid, the newest few hundred: what an invoice the same in every particular is told against.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    settled: Vec<String>,
     /// How long our freight took to each place we sent goods to (law 9): what a note tells the buyer to expect.
     #[serde(default)]
     freight: BTreeMap<String, i64>,
@@ -317,6 +320,25 @@ impl Plan for Market {
                 ));
                 continue;
             };
+            // (Our accounts office's duplicate check, as any payables office makes one before it pays: an invoice from the
+            // same seller the same in every particular as one we have paid (the goods, how many, the sum, where to pay,
+            // the offer it cites, its words) is that invoice again. It goes back, saying it is paid, through the way every
+            // body returns a paper (common/intake.rs `send_back`), and nothing is paid. Basis: a payables office matches
+            // each invoice to what was ordered and received and refuses one it has paid (the "duplicate invoice" control;
+            // docs/design/broad-seats.md, section 1, item 8). The stakes run's rung 1 on gpt-6-luna, 2026-11-16: the
+            // factory's signed invoice sent twice and paid twice. A second shipment invoiced in the very
+            // same words and figures is returned too, as a clerk would query it: the seller writes again saying so.)
+            let twin = self.settled.iter().rev().filter_map(|id| self.book.get(id)).find(|x| {
+                x.id != inv.id && x.speaks_for == inv.speaks_for && crate::common::text(x) == crate::common::text(&inv) && data(x).to_value() == d.to_value() && crate::common::bases_of(x) == crate::common::bases_of(&inv)
+            });
+            if let Some(first) = twin {
+                let first = first.id.to_string();
+                self.answered.insert(inv.id.to_string());
+                let said = format!("{} is returned: it is our invoice {first} again, for the same goods, which we have paid. Nothing more is paid on it.", inv.id);
+                cx.decided(json!({ "domain": "obstacle", "law": "acceptance", "paper": inv.id, "principal": from, "counterparty": me, "need": { "paid": first }, "clears_by": "none", "slip": false, "inputs": [inv.id, first] }));
+                steps.push(because(said.clone(), vec![crate::common::intake::send_back(&inv, &me, &said, json!({ "paid": first }))]));
+                continue;
+            }
             if arrived(self, &kind) < q {
                 if t - inv.at >= self.p.wait_days * DAY {
                     self.answered.insert(inv.id.to_string());
@@ -328,6 +350,10 @@ impl Plan for Market {
                 continue;
             }
             self.answered.insert(inv.id.to_string());
+            self.settled.push(inv.id.to_string());
+            if self.settled.len() > crate::figures::KEPT_PAID_INVOICES {
+                self.settled.remove(0);
+            }
             *self.paid_for.entry(kind.clone()).or_insert(0) += q;
             // Room this month: in all, whoever the seller (the first invoices to arrive are the first paid).
             let room = offer.1 - self.bought.get(&kind).copied().unwrap_or(0);
@@ -426,6 +452,7 @@ impl Kind for WorldTrade {
             paid_for: BTreeMap::new(),
             baseline: BTreeMap::new(),
             answered: BTreeSet::new(),
+            settled: vec![],
         })))
     }
     fn restore(&self, _: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {

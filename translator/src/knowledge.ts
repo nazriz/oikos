@@ -90,6 +90,9 @@ export class Knowledge {
   /** A paper a client passed on to the participant (a `forward`) -> the body's paper it holds and the matter it came on:
    * what a draft that names the forward, or the paper in it, as its matter is on (translator/src/rules.ts). */
   readonly forwards = new Map<string, { paper: string; matter?: string }>();
+  /** Papers sent from a post the participant holds, as they went (the newest few hundred): what a send of a signed copy
+   * that has gone already is told by (translator/src/preview.ts). */
+  readonly sent: { id: string; at: number; kind: string; text: string; to: unknown; data: unknown; basis: unknown }[] = [];
   /** A matter handed over that is a reply to a body's paper -> that paper (its referral's `reply_to`). */
   readonly replyTo = new Map<string, string>();
   /** Laws and claims the participant has seen: what law warnings are judged against (§10). */
@@ -231,6 +234,10 @@ export class Knowledge {
       if (r.kind === "referral") this.referralGives.set(r.id, givenBy(r.data));
       if (r.kind === "referral" && typeof r.data?.reply_to === "string") this.replyTo.set(r.id, r.data.reply_to);
       if (r.kind === "paper_returned" && typeof r.data?.returned === "string") this.returnOf.set(r.data.returned, r.id);
+      if (typeof r.in_position === "string" && this.held.has(r.in_position) && !this.sent.some((x) => x.id === r.id)) {
+        this.sent.push({ id: r.id, at: r.at, kind: String(r.kind), text: String(r.text ?? ""), to: r.addressed_to, data: r.data, basis: r.basis });
+        if (this.sent.length > 400) this.sent.shift();
+      }
       if (r.kind === "forward" && typeof r.data?.paper === "string") this.forwards.set(r.id, { paper: r.data.paper, ...(typeof r.data.matter === "string" ? { matter: r.data.matter } : {}) });
       if ((r.kind === "sign_off" || r.kind === "declined") && typeof r.data?.referral === "string") this.answeredReferrals.add(r.data.referral);
       // (A sign-off's copy keeps whose sign-off it is, and a paper sent back whom it was for: the copy goes in their name.
