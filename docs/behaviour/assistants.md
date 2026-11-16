@@ -230,7 +230,10 @@ The code that plays a provider's system when no model holds it (`kernel/crates/a
 works in the post it was appointed to and sees what that post's channels show: the delivery that names it, its
 principal's brief (which tells it which service it serves, and what not to act on), remits, referrals and answers. It does
 each referral at the level asked (`advice`; a `draft` then, once signed off, exactly that; an `approval_request` then, on
-the go-ahead, the act; or the act), and `report`s what came of it. Where it slips (its template's row in the world's table
+the go-ahead, the act; or the act), and `report`s what came of it: done (yes) once what it was handed has been carried
+out (the paper sent, the thing asked for done), whatever answer comes back, which goes in the report's words; not done
+(no) where it could not be carried out, with why. The report form says the same to a model in the seat (2026-11-17), and
+the principal's code reads it so: a matter reported done is closed, one reported not done comes back to it. Where it slips (its template's row in the world's table
 of slips, never its provider's claim), the matter is lost as it is written: wrong advice, a draft that is not what was
 asked, or an act never sent though its report says done, as it believes. It acts on nothing it was not handed, and never
 asks for more scope (a procedure does not; a model in the seat may, by a `scope_request`).
