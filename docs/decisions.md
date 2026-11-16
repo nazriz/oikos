@@ -14829,3 +14829,61 @@ from its referral on file whether or not it is still open.
   decision" per rung).
 - **Revisit if** the plan as sent differs from the draft kept here (two optional wordings were offered after it and
   are listed on the page): the sent text replaces it.
+
+## 2026-11-16 · A report not yet done leaves the matter with the assistant; the seated reference's first figure
+
+- **Decision** (principal.rs, `take` on a report, `said_since`; docs/behaviour/assistants.md): one law for a report that
+  a matter is not done. It gives the matter back to the client only where it gives a reason and the assistant has sent
+  nothing on the matter since; naming a need (as before), naming no reason, or followed by a draft, a request to go ahead,
+  a question or advice on the matter, it leaves the matter with the assistant, and what follows is read like any other.
+- **Why:** the stakes run's rung 1 on gpt-6-luna: the desk reported c0485's refused-claim matter "No draft has been
+  prepared yet. The matter is not done." and drafted the review seconds later; the client read the report at its sitting,
+  took the want back, and never read the draft (in the Haiku run the same review was granted on day 43).
+- **What moves:** model arms only. The code assistant's not-done reports always give a reason and nothing follows them.
+- **The seated reference's first figure** (the mock fork of the previous entry, scripted experiment, decision × slow,
+  14 days): `diligent` against `code` alone, the same code at the seat's hours, was 88.1 days later in all for the desk's
+  papers to go over 15 matters (102.1 to the outcome) and −$728,553.60 for the factory's assistant, its invoice held
+  past the run's end. That is what "days later than the code arm" had charged to a model for keeping office hours.
+- **Revisit if** a seat is seen reporting "not done yet" with nothing after it and the client taking the matter back:
+  the words are a seat's, and the client's code reads none; a typed "not yet" on the report form would be the fix.
+
+## 2026-11-16 · A signed copy sent already is said so; the buyer's duplicate check left as a risk (MT-55)
+
+- **Decision, the preview** (translator/src/preview.ts `signedCopyOf`, knowledge.ts `sent`): the preview of sending a
+  signed copy that has gone already from a post the seat holds says so, after what it sends: "It has gone already: this
+  same paper was sent as <ref> on <day>, and this sends it a second time." The seat may still confirm; nothing is refused,
+  and the readers count what it does.
+- **Not done, the buyer's check:** a duplicate check that matched an invoice to one already paid by its words and
+  figures was tried and refused at merge: it moved code towns (orchestrator/test/entry.test.ts and building.test.ts, the
+  world market's two equal export payments became one), because two real shipments of the same size are invoiced in the
+  same words. What an accounts office checks is the invoice against goods received from that seller and not yet paid
+  for; the outside buyer counts goods by kind over all sellers and has no record per seller to match against. Rather
+  than invent a wording match, it is written up as MT-55, with the fix (goods received by seller). `common/intake.rs`
+  keeps `send_back`, the one way a body returns a paper (a refactor; nothing returns differently).
+- **Why:** the stakes run's rung 1 on gpt-6-luna: the factory's signed invoice for $728,553.60 sent on day 38, sent
+  again on day 40 with a preview no different from the first, and paid twice.
+- **What moves:** model seats only (the preview of a second send). Code towns are byte-identical to main.
+- **Revisit if** MT-55's notice fires: a seller paid twice for one delivery in a model run.
+
+## 2026-11-16 · Housing reaches the assistant: the paper the client holds, the debt, and the run's end
+
+- **Decision 1, a hand-over cites what the client holds** (principal.rs `grounds`, `PaperIn.names`; recourse.rs
+  `trouble_papers`): a paper the client's act cites that it was never sent stands on the papers it was sent that name it
+  (the hearing notice for the landlord's application), so their words and their nearest day reach the assistant by C1;
+  and a want gives, beside the record it is against, what whom it is against sent the client citing that record, the
+  newest of each kind (the notice to vacate, the rent statement). Fixed where the hand-over is composed, not in the
+  tribunal: the client's answer still cites the application, by the reference its hearing notice gives, which is how the
+  tribunal files it; citing by reference is no god's view. Every kind, not these two: any act citing what the client was
+  not sent, any want against a standing record.
+- **Decision 2, the debt** (principal.rs `situation`, `Situ.owed`; the `situation` setting): a tenant behind says so,
+  "We owe <landlord> <amount> in rent, as their <statement|notice to vacate|request for the rent> of <day> says
+  (<paper>).", from the landlord's latest such paper to it; nothing reckoned by us.
+- **Decision 3, the run's end** (experiments/scope-pilot/episodes.ts): a matter handed over within the run's last
+  `END_DAYS` and not finished is never withheld nor a candidate (the price table's "the run's end"); the rung 2 dry run's
+  "FAULT: a code arm left a candidate" was a want handed over on day 60, the last.
+- **What moves:** towns with assistants: the words of hand-overs that cite an unsent paper or are wants against a record
+  (code arms too: the code assistant reads a want's facts, now with the notice in them); with `situation` on, the debt
+  sentence. Towns without assistants: nothing.
+- **Revisit if** a want's trouble papers bring in one that is not the trouble (a landlord's unrelated letter citing the
+  lease): then the want should carry the paper that started it from the moment it is born.
+

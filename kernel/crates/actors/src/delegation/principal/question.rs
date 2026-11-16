@@ -74,7 +74,7 @@ impl State {
         }
         if let Some((_, v)) = self.own_papers.iter().find(|(x, _)| x == id) {
             let dates = crate::papers::delegation::dates_named(&v["data"]).into_iter().map(|(k, d)| (k.to_string(), d)).collect();
-            return Some(PaperIn { id: id.to_string(), at: 0, kind: v["kind"].as_str().unwrap_or_default().to_string(), from: self.me.clone(), text: quoted(v["text"].as_str().unwrap_or_default()), dates });
+            return Some(PaperIn { id: id.to_string(), at: 0, kind: v["kind"].as_str().unwrap_or_default().to_string(), from: self.me.clone(), text: quoted(v["text"].as_str().unwrap_or_default()), dates, names: vec![] });
         }
         let r = self.book.get(id).cloned().or_else(|| pic.all_records().find(|r| r.id.as_str() == id).cloned())?;
         let mine = r.speaks_for.as_deref() == Some(self.me.as_str()) || addressed_to(&r).iter().any(|a| *a == self.me);

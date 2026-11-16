@@ -2216,6 +2216,30 @@ The mechanism:
 - **Fix when:** before a study seats both: trace the engagement per post.
 - **Notice by:** an assigned principal with no `engage` decision and no order.
 
+### MT-55 · The outside buyer pays an invoice against goods of the kind on hand, not against a seller's own delivery
+- **Gap:** The world market (`world.trade`, the outside buyer) pays an invoice once enough goods of its kind have
+  arrived that are not yet paid for, counted over every seller together (`held - baseline + sent - paid_for`, by kind).
+  It keeps no record of what each seller delivered, so it cannot do an accounts office's three-way match (the order or
+  offer, the goods received from that seller, the invoice). A seller that invoices the same delivery twice is paid
+  twice wherever other sellers' goods of the kind, not yet invoiced, cover the second one. Matching invoices by their
+  words and figures is not the fix: two real shipments of the same size are invoiced in the same words (2026-11-16,
+  tried and refused at merge: the world market's two equal export payments became one).
+- **Where:** `kernel/crates/actors/src/boundary/trade.rs` (the invoices loop, `arrived`); the goods a seller carries
+  to the outside's node (`goods` moves, `from_at`), which the buyer does not tie to the seller.
+- **Effect:** A seat that sends a signed invoice twice (the stakes run's rung 1 on gpt-6-luna: the factory's
+  $728,553.60 invoice, sent on day 38 and again on day 40) gets paid twice; its client's money is overstated by the
+  whole invoice, and the sum is the seat's act, not the world's error. The preview now says a signed copy has gone
+  already, and the acts reader counts the second send; the payment itself still goes through. Code sellers do not
+  send twice, so code towns are not affected.
+- **L / I:** low / high · **Status:** open (2026-11-16)
+- **Fix when:** a model run shows a duplicate send paid (search: two `transfer`s from the outside settling two invoices
+  of one seller with the same data); give the buyer a record of goods received by seller (each arrival tied to its
+  carrier and `from_at`), and pay an invoice only against that seller's goods received and not yet paid for, sending
+  back one with none behind it ("we hold no goods from you that are not already paid for").
+- **Notice by:** the outside's payments per seller exceeding the goods that seller carried to it; a seller paid twice
+  for invoices with identical data.
+
+
 ---
 
 ## Profiles and sources
