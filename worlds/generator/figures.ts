@@ -412,6 +412,10 @@ export const FIGURE_BASIS: Basis[] = [
     prof("paperwork.every_days.*.*", "paperwork"),
     prof("paperwork.from_hour", "paperwork"),
     prof("paperwork.to_hour", "paperwork"),
+    // (An office's in-tray, where a town asks: the profile's shares, or a study's stated ones, in the post's working day.)
+    prof("in_tray.every_days.*.*", "in_tray"),
+    prof("in_tray.from_hour", "round.work_start_hour"),
+    prof("in_tray.to_hour", "round.work_end_hour"),
   ].flatMap((r) => PARAMS_AT.map((at) => ({ ...r, family: `any module: ${r.at}${r.given ? ` (${r.given})` : ""}`, at: `${at}.${r.at}` }))),
   // Delegation (docs/behaviour/assistants.md): what a principal weighs, and what a provider sells, where a town has
   // assistants on offer (`assistants: true`).

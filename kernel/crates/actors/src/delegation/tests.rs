@@ -298,6 +298,37 @@ fn a_draft_not_as_asked_is_declined_and_done_by_the_principal_and_one_as_asked_i
 }
 
 #[test]
+fn an_office_gets_to_its_assistants_papers_at_its_in_tray_sittings_and_to_nothing_else_later() {
+    // (The broad seats' stage 1b, risk WM-20: the holder of a principal post gets to what its assistant's post sends it
+    // every second day between ten and eleven (`in_tray`, crate::post). Before it, an office signed off at its next wake.)
+    let script: Vec<Value> = (1..=40).map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE })).collect();
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script, "in_tray": { "every_days": [[2, 10_000]], "from_hour": 10, "to_hour": 11, "from": ["ll-assistant"] },
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "notice_to_vacate": { "own_seconds": 1800, "error_cost": 1000 } }, "hour_value": 4000, "review_days": 30 } }));
+    h.ctx.position = Some("ll-office".into());
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = crate::post::wrap(&h.ctx, wrap(&h.ctx, inner).unwrap());
+    let (mut h, _, mut remit) = engaged_on(h);
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit.clone()]));
+    let referral = last_referral(&h);
+    let came = 34 * DAY + 4 * 3600;
+    let mut draft = statement("rec.d1", came, ME, "draft", &[ME], json!({ "referral": referral, "calls": NOTICE }));
+    draft["in_position"] = json!("ll-assistant");
+    assert!(!all(&h.wake(came, world(vec![draft]))).contains("kind=sign_off"), "it waits in the in-tray");
+    let mut t = came;
+    let at = loop {
+        t += 3600;
+        assert!(t < came + 3 * DAY, "signed off by the next sitting: {}", all(&h.sent));
+        if all(&h.wake(t, world(vec![]))).contains("kind=sign_off") {
+            break t;
+        }
+    };
+    assert!((10 * 3600..=11 * 3600).contains(&at.rem_euclid(DAY)), "at its in-tray hours: {}", at.rem_euclid(DAY));
+    // (Its other business is its code's at once: the next day's notice is handed over at its own hour, not held.)
+    assert!(h.sent.iter().filter(|p| p.contains("kind=referral")).count() >= 2, "{}", all(&h.sent));
+}
+
+#[test]
 fn a_draft_on_a_form_is_read_by_the_paper_it_would_send() {
     let (mut h, _, mut remit) = engaged();
     remit["data"]["level"] = json!("draft");

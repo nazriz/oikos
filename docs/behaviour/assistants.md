@@ -259,7 +259,27 @@ code does, and the principal reads what it is shown.
 
 - **Who it is not.** An organisation's principal (an office, a factory's manager) deals with its post whenever its post's
   code wakes, as before: news wakes it at any hour, and the world gives the post no working hours a principal could read
-  (WM-20).
+  (WM-20), unless the town gives its offices an in-tray (below).
+
+### An office's in-tray (the broad seats' stage 1b, 2026-11-16; off unless a town asks, `post_in_tray`)
+
+A post is held by a person, and a person gets to what their assistant leaves for them when they next clear their
+in-tray, not the minute it lands. Where the town asks, the holder of every principal post gets to what its assistant's
+post sends it (drafts to sign off, requests to go ahead, requests for more scope, questions, reports, letters) at
+sittings of its own: a habit drawn once for the post from the world's seeded draws (`paperwork-<post>`), how many days
+apart from the profile's `in_tray` shares (a PLACEHOLDER: every day 70%, every second day 15%, every third 10%, every
+fifth 5%; MT-50), at a minute in the post's working day (the profile's `round.work_start_hour` to `work_end_hour`). The
+same wrapper as a person's post (`crate::post`), given the posts whose papers wait (`in_tray.from`: its assistant's
+post): only those papers and letters are held, and only until the sitting; everything else the post's code is shown at
+once, as before, so its other business (its trade, its staff, its own decisions) is untouched, and a town that gives no
+in-tray is exactly as before. What it does at the sitting is its own act then, at the table's row.
+
+- **A stated condition of a run:** the study's `build.ts`, under `assistants`, turns it on with the clients' pace
+  (`clientPost`): `ordinary`, the profile's in-tray shares; `slow`, the study's slow shares (as for persons); absent,
+  off. A spec may give other shares (`post_in_tray.every_days`).
+- **What an assistant faces:** its draft waits, and what waits is the paper's own business: an invoice not sent is money
+  not yet asked for, an order not placed is goods not yet coming. The screen (`screen.ts`) reports each seat's waits and
+  what the papers waited on move, in the town's own money, read from the paper as drafted.
 - **What a desk sees:** nothing new. A draft simply waits for its client, as a real one does. A client too ill to deal
   with their post (stakes D2) says so on the first paper they next write to the desk, in their own fixed words ("We
   have been ill since <date>.", or "We were ill from <date> until <date>."); before that the desk is told nothing.

@@ -246,6 +246,10 @@ export interface Profile {
      * hours of the day they do it in (their free hours outside work). Drawn once for each person; read today by persons
      * with an assistant only. */
     paperwork?: { every_days: [number, number][]; from_hour: number; to_hour: number };
+    /** How the holder of an office gets to what its assistant sends it (the broad seats' stage 1b; risk WM-20;
+     * docs/behaviour/assistants.md, "An office's in-tray"): days apart, with the share of posts of each, at a time in the
+     * post's working day (round.work_start_hour to round.work_end_hour). Read only where a town asks (`post_in_tray`). */
+    in_tray?: { every_days: [number, number][] };
     /** The age people here stop work, where the profile gives one age for everyone; with `labour_force_share_by_age`,
      * the age the profile's other figures by age turn on (the retired's savings, the end of the payments for those out
      * of work, a retirement fund's access) and the top of the working ages the measures use. */

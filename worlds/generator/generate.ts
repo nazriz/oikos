@@ -412,6 +412,12 @@ export interface TownSpec {
    * in place of its list of kinds, and an office is a principal for the kinds of its own forms of those classes only (a
    * shop's till receipts are not). Off unless set: a town without it is generated exactly as before. Needs `assistants`. */
   assistant_classes?: boolean;
+  /** An office's in-tray (the broad seats' stage 1b; risk WM-20; docs/behaviour/assistants.md, "An office's in-tray"):
+   * the holder of every principal post gets to what its assistant's post sends it at sittings of its own, a habit drawn
+   * once per post from the profile's `in_tray` (`every_days` here overrides its shares: a study's stated condition), in
+   * the post's working day. Only those papers wait; the post's other business is as before. Off unless set: a town
+   * without it is generated exactly as before. Needs `assistants`. */
+  post_in_tray?: { every_days?: [number, number][] };
   /** A person who hands a matter over says how things stand with them on the hand-over, in fixed words from their own
    * state: what they have in hand today, what regular payment comes in, and their next rent and its day if they rent
    * (principal.rs, `situation`; docs/behaviour/assistants.md, "What a client says of how things stand"). Off unless
@@ -3715,6 +3721,13 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
         seconds: { referral: rows["publish/referral"], sign_off: rows["publish/sign_off"], go_ahead: rows["publish/go_ahead"] },
         finds_bps: AS.principals.finds_bps, prior_matters: AS.principals.prior_matters, hurdle_bps: AS.principals.hurdle_bps, review_days: AS.principals.review_days,
         horizon_months: AS.principals.horizon_months, complaints: AS.principals.complaints } });
+      // (Where the town asks, its holder gets to what its assistant sends it at sittings of its own, in its working day:
+      // crate::post's in-tray, the broad seats' stage 1b, risk WM-20.)
+      if (spec.post_in_tray) {
+        if (!V.in_tray || !RD) throw new Error(`profile ${P.id} has no in_tray (how an office's holder gets to its assistant's papers) or no working day (round), and the town asks for an in-tray`);
+        const tray = paperworkOf({ every_days: spec.post_in_tray.every_days ?? V.in_tray.every_days, from_hour: RD.work_start_hour, to_hour: RD.work_end_hour });
+        m.params.in_tray = { ...tray, from: [post] };
+      }
       if (Array.isArray(pos.channels)) pos.channels.push(K.from("providers", AS.providers.map((p) => p.id), ["service_offer"], { title: "What providers of assistants sell" }));
       // (By class, an office that keeps no books of its own becomes a principal (the planning and works offices): it is
       // shown the account it pays its fee from, as its assistant's post is, or it cannot name the account's keeper to pay
