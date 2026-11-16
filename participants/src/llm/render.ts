@@ -208,13 +208,23 @@ function factWordsOf(raw: unknown, fields?: FieldKinds, under?: string): string 
     else if (isPlain(v) || (Array.isArray(v) && v.every(isPlain)) || (typeof v === "object" && oneFigure(k, v as object))) {
       // (One detail at a time, so that each is read by its own name, as `readable` reads a paper's.)
       for (const [k2, v2] of Object.entries(readable({ [k]: v }, { ...(fields ? { fields } : {}), ...(sumNow ? { money: sumNow } : {}) }, under) as object)) parts.push(`${words(k2)}: ${Array.isArray(v2) ? (v2.length ? v2.map(plainValue).join(", ") : "none") : isPlain(v2) ? plainValue(v2) : `(${factWords(v2, undefined, k)})`}`);
-    } else if (k === "facts" && v !== null && typeof v === "object" && !Array.isArray(v)) last.unshift(`what happened: ${factWords(v, undefined, k)}`);
+    } else if (k === "facts" && v !== null && typeof v === "object" && !Array.isArray(v)) last.unshift(`what happened: ${factWords(v, composedFields(v), k)}`);
     // (Several papers' details, each in turn and numbered, their own details run together: a rates instalment's notices
     // read as brackets inside brackets until 2026-11-11. docs/design/broad-seats.md, G2.)
-    else if (Array.isArray(v) && v.length && v.every((x) => x !== null && typeof x === "object" && !Array.isArray(x))) parts.push(`${words(k)}: ${v.map((x, i) => `${i + 1}. ${factWords(x, undefined, k).replace(/; /g, ", ")}`).join("; ")}`);
+    else if (Array.isArray(v) && v.length && v.every((x) => x !== null && typeof x === "object" && !Array.isArray(x))) parts.push(`${words(k)}: ${v.map((x, i) => `${i + 1}. ${factWords(x, fields, k).replace(/; /g, ", ")}`).join("; ")}`);
     else parts.push(`${words(k)}: (${factWords(v, undefined, k)})`);
   }
   return [...parts, ...last].join("; ");
+}
+/** The blanks of the forms a matter's facts were composed on (`composed_on`, each with its form's `spec`): what each
+ * figure is, so that a sum is read as money wherever its form says it is one (a delivery note's "price each", given
+ * in cents, was shown a seat as bare cents beside sums in words until 2026-11-16: the whole-town rung 1). */
+export function composedFields(facts: unknown): FieldKinds | undefined {
+  const on = (facts as { composed_on?: unknown })?.composed_on;
+  if (!Array.isArray(on)) return undefined;
+  const out: FieldKinds = {};
+  for (const c of on) Object.assign(out, (c as any)?.spec?.fields ?? {});
+  return Object.keys(out).length ? out : undefined;
 }
 /** Whether a detail is a provider's offer of a service (its kinds of matter, its fee a month): said as sentences. */
 const isOffer = (v: unknown): v is { [k: string]: any } => !!v && typeof v === "object" && !Array.isArray(v) && Array.isArray((v as any).kinds) && whole((v as any).fee_month);
@@ -912,7 +922,11 @@ function describeTransactions(txs: Transaction[], mine: Set<string>): string[] {
     const total = [...m.values()].reduce((a, b) => a + b, 0);
     const t = [...m].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
     const others = t.slice(8).reduce((a, [, v]) => a + v, 0);
-    return [`${label} ${money(total)} since you last looked: ${t.slice(0, 8).map(([a, v]) => `${a} ${money(v)}`).join(", ")}${t.length > 8 ? `, and ${t.length - 8} more (${money(others)} between them)` : ""}.`];
+    // (Its own account's movements are its own to know whole: past the first eight, every other account is still named,
+    // without its sum, never "and N more". The whole-town rung 1's rates assistant could not tell which owners had paid
+    // from a cut list, and held seven drafts unconfirmed to the end.)
+    const rest = t.slice(8).map(([a]) => a);
+    return [`${label} ${money(total)} since you last looked: ${t.slice(0, 8).map(([a, v]) => `${a} ${money(v)}`).join(", ")}${rest.length ? `; and ${money(others)} from the ${rest.length} others, each named: ${rest.join(", ")}` : ""}.`];
   };
   return [...line("Received", inflow), ...line("Paid out", outflow)];
 }

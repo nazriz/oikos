@@ -193,6 +193,12 @@ struct Matter {
     /// It has given its answer on the matter (a sign-off or a go-ahead): no longer waiting on it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     answered: bool,
+    /// It is doing the whole matter itself (it declined a draft of a matter of one paper): it signs nothing more in it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    taken: bool,
+    /// The papers of a matter of several it has sent itself, by whom each goes to: a draft of one of them is done already.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    ours: BTreeSet<String>,
 }
 
 /// A paper another sent it (addressed to it), as it keeps it in its files: what a referral says the matter came from,
@@ -281,6 +287,10 @@ pub struct State {
     own: BTreeMap<String, Own>,
     matters: BTreeMap<String, Matter>,
     by_referral: BTreeMap<String, String>,
+    /// The matters it took back and did itself, by their referral (with their agreement): a draft in one still to come
+    /// is answered "done already, by us", never signed (the whole-town rung 1: three owners sent two rates notices).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    done_ourselves: BTreeMap<String, String>,
     /// Referrals for advice on matters it did itself: what it did.
     advice_on: BTreeMap<String, (String, String, String)>,
     synth: Vec<Outcome>,
@@ -454,6 +464,7 @@ impl Delegating {
                 own: BTreeMap::new(),
                 matters: BTreeMap::new(),
                 by_referral: BTreeMap::new(),
+                done_ourselves: BTreeMap::new(),
                 advice_on: BTreeMap::new(),
                 synth: vec![],
                 done: BTreeMap::new(),
@@ -543,7 +554,7 @@ impl Actor for Delegating {
                     // (A want: its own fields, and the facts its holder chose to give.)
                     let want = facts.as_ref().filter(|_| depth == Depth::Want).and_then(|f| serde_json::from_value::<WantHanded>(f["want"].clone()).ok());
                     let facts = if depth == Depth::Want { facts.map(|f| f["facts"].clone()) } else { facts };
-                    let mut m = Matter { kind, level, agreement: agreement.clone(), program: text.clone(), at: pic.t, referral: None, subjects: subjects_of(&handed), own: BTreeMap::new(), facts, depth, want, due: None, follows, answered: false };
+                    let mut m = Matter { kind, level, agreement: agreement.clone(), program: text.clone(), at: pic.t, referral: None, subjects: subjects_of(&handed), own: BTreeMap::new(), facts, depth, want, due: None, follows, answered: false, taken: false, ours: BTreeSet::new() };
                     let g = s.grounds(&m.kind, m.level, &m.program, &m.subjects, m.want.as_ref(), m.facts.as_ref(), m.follows.as_ref().map(|f| f.0.as_str()), Some(pic), pic.t, cx);
                     m.due = g.due.as_ref().map(|d| d.0);
                     // (What it would have done, on record for whoever reads the log: what the matter needed. Never shown to
@@ -1151,9 +1162,21 @@ impl State {
             None => {}
         }
         let Some((action, m)) = self.by_referral.get(&x.referral).cloned().and_then(|a| self.matters.get(&a).cloned().map(|m| (a, m))) else {
+            // (A matter it took back and did itself: the draft is answered so, once, and nothing is signed.)
+            if let Some(agreement) = self.done_ourselves.get(&x.referral).cloned() {
+                self.done_already(r, &x, &agreement);
+                return;
+            }
             self.not_ours(r, Draft::KIND, &x.referral);
             return;
         };
+        // (Still in hand, but taken back whole, or this paper of it sent by us already: done already, never signed twice.
+        // The whole-town rung 1: a rates office declined one draft of fifteen, sent all fifteen itself, and went on
+        // signing the other drafts of the matter, so three owners were sent two notices.)
+        if m.taken || draft_to(&x).is_some_and(|to| m.ours.contains(&to)) {
+            self.done_already(r, &x, &m.agreement);
+            return;
+        }
         // (A draft on a form, a model's, is read by what it would send: the paper's kind and to whom, against what was asked.)
         // (Handed over as what happened, the paper is the assistant's: it is read on the kind's material details and
         // whom it goes to, against what its own code would have sent, never its words.)
@@ -1186,19 +1209,51 @@ impl State {
             self.seen.entry(Self::key(&m.agreement, &m.kind)).or_default().saw(true, &r.id);
             let found = if differs.is_empty() { "The draft is not what was asked for.".to_string() } else { format!("The draft is not as we have it: {}.", differs.join("; ")) };
             let d = Declined { of: r.id.to_string(), referral: x.referral.clone(), found: Some(found.clone()) };
-            self.paper(Declined::KIND, &format!("Draft {} declined. {found} We will do it ourselves.", r.id), &m.agreement, &r.id, papers::data(&d), Then::Plain);
-            self.myself(&action, &m, "We declined the draft: doing it ourselves.");
+            // (A matter of several papers, one to each addressee (a rates instalment's fifteen notices): an office
+            // sends the one paper it found wrong itself and goes on signing the others as they come right, as a clerk's
+            // supervisor corrects one letter of a batch and not the batch. One paper, or one it cannot find among the
+            // matter's: the whole matter is taken back. Before 2026-11-16 one wrong draft of fifteen took all fifteen back.)
+            match draft_to(&x).and_then(|to| lines_to(&m.program, &to).map(|p| (to, p))) {
+                Some((to, program)) => {
+                    self.paper(Declined::KIND, &format!("Draft {} declined. {found} We will send that one ourselves; draft the others as before.", r.id), &m.agreement, &r.id, papers::data(&d), Then::Plain);
+                    self.queue.push(Own { program, why: "We declined the draft of one paper of a matter: sending that one ourselves.".into(), then: Then::Plain });
+                    if let Some(mm) = self.matters.get_mut(&action) {
+                        mm.ours.insert(to);
+                    }
+                }
+                None => {
+                    self.paper(Declined::KIND, &format!("Draft {} declined. {found} We will do it ourselves.", r.id), &m.agreement, &r.id, papers::data(&d), Then::Plain);
+                    if let Some(mm) = self.matters.get_mut(&action) {
+                        mm.taken = true;
+                    }
+                    self.myself(&action, &m, "We declined the draft: doing it ourselves.");
+                }
+            }
             self.next_review = self.next_review.min(t);
         } else {
             // (A draft written on a form carries the paper: the sign-off is its signed copy, which the assistant sends
             // as it stands on its form for that, `send_signed`. Before 2026-11-10 a seat had to write the paper out
             // again on the direct form, and read that as beyond a draft-level remit: the scope pilot's one clean
             // request, and round 5's factory seat.)
-            let paper = x.paper.as_ref().map(|p| with_instructions(signed_copy(p, crate::common::text(r)), &m.program));
+            // (A draft written as calls of one paper (the code assistant's) is signed with that paper too: whoever holds
+            // the post when the sign-off comes can send it as it stands, a model seat after a fork among them. Before
+            // 2026-11-16 such a sign-off carried nothing to send, and the seat that took the post over at the fork had to
+            // draft the matter again: the whole-town rung 1's delivery note, about seven days lost.)
+            // (Its words are the paper's own, not the covering note's.)
+            let words = if x.paper.is_some() { crate::common::text(r) } else { "" };
+            let carried = x.paper.clone().or_else(|| x.calls.as_deref().and_then(one_paper));
+            let paper = carried.as_ref().map(|p| with_instructions(signed_copy(p, words), &m.program));
             let words = signed_words(&r.id, paper.as_ref());
             let d = SignOff { draft: r.id.to_string(), referral: x.referral.clone(), paper };
             self.paper(SignOff::KIND, &words, &m.agreement, &r.id, papers::data(&d), Then::Plain);
         }
+    }
+
+    /// A draft in a matter it took back, or of a paper of one it sent itself: answered once, "done already, by us", and
+    /// not signed (its assistant is told the matter, or that paper, is back with it).
+    fn done_already(&mut self, r: &Arc<Record>, x: &Draft, agreement: &str) {
+        let d = Declined { of: r.id.to_string(), referral: x.referral.clone(), found: Some("Done already, by us.".into()) };
+        self.paper(Declined::KIND, &format!("Draft {} not needed: we have done this ourselves already. Send nothing for it.", r.id), agreement, &r.id, papers::data(&d), Then::Plain);
     }
 
     /// A matter of a kind whose delay it costs waited `secs` on its answer (docs/design/obstacles.md section 10).
@@ -1271,7 +1326,13 @@ impl State {
                     }
                 }
                 Then::Myself { action } => {
-                    let own = self.matters.remove(&action).map(|m| m.own).unwrap_or_default();
+                    let gone = self.matters.remove(&action);
+                    if let Some(m) = gone.as_ref().filter(|_| o.status == OutcomeStatus::Applied) {
+                        if let Some(rf) = &m.referral {
+                            self.done_ourselves.insert(rf.clone(), m.agreement.clone());
+                        }
+                    }
+                    let own = gone.map(|m| m.own).unwrap_or_default();
                     let mut created: BTreeMap<String, oikos_sight::Id> = own.iter().map(|(a, b)| (a.clone(), b.as_str().into())).collect();
                     created.extend(o.created.iter().flatten().map(|(a, b)| (a.clone(), *b)));
                     self.synth.push(Outcome { action: action.as_str().into(), created: Some(created), ..o.clone() });
@@ -2714,6 +2775,56 @@ fn paper_of(line: &Line) -> serde_json::Map<String, Value> {
         }
     }
     out
+}
+
+/// The one paper a draft written as calls sends, in the keys a draft on a form carries it (`kind`, `text`, `to`,
+/// `visible`, `basis`, `data`). None for calls of several papers, or of none.
+fn one_paper(calls: &str) -> Option<Value> {
+    let Ok(Program::Lines(l)) = parse_program(calls) else { return None };
+    let papers: Vec<&Line> = l.iter().filter(|l| l.call.fn_ == "statement").collect();
+    let [one] = papers.as_slice() else { return None };
+    let p = paper_of(one);
+    let mut out = serde_json::Map::new();
+    for (from, to) in [("kind", "kind"), ("text", "text"), ("addressed_to", "to"), ("visible_to", "visible"), ("basis", "basis"), ("data", "data"), ("offer", "offer"), ("assertion", "assertion")] {
+        if let Some(v) = p.get(from) {
+            out.insert(to.to_string(), v.clone());
+        }
+    }
+    Some(Value::Object(out))
+}
+
+/// Whom a paper goes to, as a key: its addressees, sorted.
+fn to_key(v: Option<&Value>) -> Option<String> {
+    let mut to: Vec<String> = v?.as_array()?.iter().filter_map(|x| x.as_str().map(String::from)).collect();
+    to.sort();
+    (!to.is_empty()).then(|| to.join(","))
+}
+
+/// Whom a draft's one paper goes to (written on a form, or as calls of one paper). None for a draft of several papers:
+/// it is the whole matter's.
+fn draft_to(x: &Draft) -> Option<String> {
+    if let Some(p) = &x.paper {
+        return to_key(p.get("to"));
+    }
+    match parse_program(x.calls.as_deref()?) {
+        Ok(Program::Lines(l)) => {
+            let papers: Vec<&Line> = l.iter().filter(|l| l.call.fn_ == "statement").collect();
+            if papers.len() == 1 { to_key(paper_of(papers[0]).get("addressed_to")) } else { None }
+        }
+        _ => None,
+    }
+}
+
+/// The lines of a matter of several papers that go to `to`, as a program of their own: what the principal sends itself
+/// of one paper it found wrong. None where the matter is of one paper, or none of it goes to `to`.
+fn lines_to(program: &str, to: &str) -> Option<String> {
+    let Ok(Program::Lines(ls)) = parse_program(program) else { return None };
+    let papers: Vec<&Line> = ls.iter().filter(|l| l.call.fn_ == "statement").collect();
+    if papers.len() < 2 {
+        return None;
+    }
+    let mine: Vec<Line> = papers.into_iter().filter(|l| to_key(paper_of(l).get("addressed_to")).as_deref() == Some(to)).cloned().collect();
+    (!mine.is_empty()).then(|| program_text(&Program::Lines(mine)))
 }
 
 /// A paper as a draft carries it (`kind`, `text`, `to`, `visible`, `basis`, `data`) in the keys a form writes.

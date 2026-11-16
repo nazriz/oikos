@@ -3,6 +3,7 @@ import { factWords, money, outcomeWords, renderObservation, renderStanding, rule
 import { canonical } from "../src/canon";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
+import CATALOGUE from "../../kernel/crates/rules/forms/papers.json";
 
 // The world these tests are in writes its money as the profile says (the platform has no money of its own).
 inCurrency(PROFILE.values.currency);
@@ -18,6 +19,18 @@ test("the papers of delegation read in the office's words: a signed copy as the 
   const signed = factWords({ draft: "rec.80", referral: "rec.79", paper: { kind: "invoice", text: "Invoice: 12 goods.", to: ["outside"], data: { outcome: { money: { amount: "12000", to: "acc-factory-1" } } } } });
   expect(signed).toContain("the paper: an invoice to outside");
   expect(signed).toContain("$120.00");
+  // (What happened, as a matter hands it over, read on its own forms: every blank a form types as a sum reads as money,
+  // never as bare cents, on every form in the catalogue (a delivery note's "price each: 10000", the whole-town rung 1).)
+  const forms = Object.values(CATALOGUE as any).flatMap((v: any) => (Array.isArray(v) ? v : [v]));
+  let sums = 0;
+  for (const f of forms) for (const [name, x] of Object.entries(f.fields as { [k: string]: { type: string } })) {
+    if (x.type !== "amount") continue;
+    const said = factWords({ agreement: "rec.1", kind: f.writes.kind, wants: "draft", facts: { [name]: 1_234_567, composed_on: [{ spec: f }] } });
+    expect(said, `${f.form}: ${name}`).toContain("$12,345.67");
+    expect(said, `${f.form}: ${name}`).not.toMatch(/1234567|1,234,567(?!\.)/);
+    sums++;
+  }
+  expect(sums).toBeGreaterThan(40);
   const answer = factWords({ request: "rec.81", granted: false, reasons: [{ asked: "level", granted: false, why: "held" }], look_again_at: 86_400 * 60, paper: { id: "rec.9", kind: "lease_terms", text: "Lease.", data: {} } });
   expect(answer).not.toMatch(/held|reasons|why|5184000|5,184,000/);
   expect(answer).toContain(when(86_400 * 60));
@@ -359,7 +372,8 @@ test("who's who, looked into: people, organisations and posts by id or by part o
   const transactions = Array.from({ length: 11 }, (_, i) => ({ t: 0, from: `acc-c${i}`, to: "acc-city", amount: String((i + 1) * 100), currency: "USD", by: "bank" }));
   const text = renderObservation(obs({ books: { kind: "accounts", accounts: [{ account: "acc-city", holder: "city", custodian: "bank", currency: "USD", balance: "0" }], transactions } }));
   expect(text).toContain("Received $66.00 since you last looked: acc-c10 $11.00,");
-  expect(text).toContain(", and 3 more ($6.00 between them).");
+  // (Past the first eight, every other payer of its own account is still named: who paid is its own to know whole.)
+  expect(text).toContain("; and $6.00 from the 3 others, each named: acc-c2, acc-c1, acc-c0.");
 });
 
 test("a body's own state, where it is and its family are told; an agreement says how it stands", () => {

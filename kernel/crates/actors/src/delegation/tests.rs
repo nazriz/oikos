@@ -304,6 +304,11 @@ fn a_draft_not_as_asked_is_declined_and_done_by_the_principal_and_one_as_asked_i
     let right = statement("rec.d2", 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "calls": NOTICE }));
     let out = all(&h.wake(37 * DAY + 3600, world(vec![right])));
     assert!(out.contains("kind=sign_off") && !out.lines().any(|l| l.starts_with("statement(basis=lease-1")), "as asked: signed off, the assistant sends it: {out}");
+    // (A draft written as calls of one paper is signed with that paper, in its own words: whoever holds the post when the
+    // sign-off comes can send it as it stands (the whole-town rung 1's delivery note carried over the fork).)
+    let line = out.lines().find(|l| l.contains("kind=sign_off")).unwrap_or_default();
+    let copy = line.split("\"paper\":").nth(1).unwrap_or_default();
+    assert!(["\"kind\":\"notice_to_vacate\"", "\"text\":\"Please leave.\"", "\"to\":[\"t1\"]"].iter().all(|x| copy.contains(x)), "the signed copy: {line}");
 }
 
 #[test]
@@ -335,6 +340,29 @@ fn an_office_gets_to_its_assistants_papers_at_its_in_tray_sittings_and_to_nothin
     assert!((10 * 3600..=11 * 3600).contains(&at.rem_euclid(DAY)), "at its in-tray hours: {}", at.rem_euclid(DAY));
     // (Its other business is its code's at once: the next day's notice is handed over at its own hour, not held.)
     assert!(h.sent.iter().filter(|p| p.contains("kind=referral")).count() >= 2, "{}", all(&h.sent));
+}
+
+#[test]
+fn of_a_matter_of_several_papers_one_wrong_draft_is_sent_by_the_principal_alone_and_nothing_is_signed_twice() {
+    // (The whole-town rung 1: a rates office declined one draft of fifteen notices, sent all fifteen itself, and went on
+    // signing the others' drafts, so three owners were sent two notices. Now it sends the one it found wrong itself,
+    // signs the others as they come right, and answers a later draft of a paper it sent "done already".)
+    let two = "statement(kind=notice_to_vacate, text=\"Please leave.\", to=[\"t1\"], basis=lease-1)\nstatement(kind=notice_to_vacate, text=\"Please leave.\", to=[\"t2\"], basis=lease-2)";
+    let (mut h, _, mut remit) = engaged_doing(two);
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit.clone()]));
+    let referral = last_referral(&h);
+    let draft = |id: &str, kind: &str, to: &str, at: i64| statement(id, at, ME, "draft", &[ME], json!({ "referral": referral, "paper": { "kind": kind, "text": "Please leave.", "to": [to] } }));
+    let out = all(&h.wake(35 * DAY + 3600, world(vec![remit.clone(), draft("rec.w1", "repair_order", "t1", 34 * DAY + 7200)])));
+    let no = out.lines().find(|l| l.contains("kind=declined")).unwrap_or_else(|| panic!("{out}"));
+    assert!(no.contains("send that one ourselves"), "{no}");
+    let mine: Vec<&str> = out.lines().filter(|l| l.starts_with("statement(") && l.contains("kind=notice_to_vacate")).collect();
+    assert_eq!(mine.len(), 1, "only the paper found wrong, sent by the principal: {out}");
+    assert!(mine[0].contains("\"t1\"") && !mine[0].contains("\"t2\""), "{}", mine[0]);
+    let out = all(&h.wake(36 * DAY + 3600, world(vec![remit.clone(), draft("rec.w2", "notice_to_vacate", "t2", 35 * DAY + 7200), draft("rec.w3", "notice_to_vacate", "t1", 35 * DAY + 7300)])));
+    assert!(out.lines().any(|l| l.contains("kind=sign_off") && l.contains("rec.w2")), "the other paper, right, signed: {out}");
+    assert!(!out.lines().any(|l| l.contains("kind=sign_off") && l.contains("rec.w3")), "never signed twice: {out}");
+    assert!(out.lines().any(|l| l.contains("kind=declined") && l.contains("rec.w3") && l.contains("done this ourselves already")), "{out}");
 }
 
 #[test]

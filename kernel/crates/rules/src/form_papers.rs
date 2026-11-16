@@ -547,7 +547,19 @@ pub fn differs(spec: &Json, mine: &Map<String, Json>, drafted: &Map<String, Json
     let mut names: Vec<String> = mine.keys().chain(drafted.keys()).filter(|k| role(spec, k) != "words").cloned().collect();
     names.sort();
     names.dedup();
-    names.into_iter().filter(|k| !alike(mine.get(k), drafted.get(k))).collect()
+    names.into_iter().filter(|k| !alike_as(spec["fields"][k.as_str()]["type"].as_str(), mine.get(k), drafted.get(k))).collect()
+}
+
+/// Whether two values of a blank are the same at the precision the blank is given in: a date is a day (a paper's due
+/// date, a day of effect), so two times in one day are the same date; a form whose blank must be a time of day says
+/// so by its type. Whoever checks a draft reads a date as the paper shows it, by its day: before 2026-11-16 the rates
+/// office compared a notice's due date to the second (day 61 at 00:29:54, its claim's), while its assistant was shown,
+/// and wrote, only "day 61", and every such draft was declined (the whole-town rung 1).
+fn alike_as(type_: Option<&str>, a: Option<&Json>, b: Option<&Json>) -> bool {
+    match (type_, figure(a), figure(b)) {
+        (Some("date"), Some(x), Some(y)) => x.div_euclid(DAY) == y.div_euclid(DAY),
+        _ => alike(a, b),
+    }
 }
 
 #[cfg(test)]
@@ -599,6 +611,25 @@ mod tests {
             checked += 1;
         }
         assert!(checked > 50, "{checked}");
+    }
+
+    /// A draft is checked at the precision its blanks are given in: every date blank of every form is a day, so a date in
+    /// the same day as the principal's own is the same date, and one a day off is not (the whole-town rung 1's rates
+    /// notices: due day 61 at 00:29:54 against the draft's "day 61", all declined).
+    #[test]
+    fn a_date_blank_is_the_same_date_within_its_day_and_not_a_day_off() {
+        let mut dates = 0;
+        for f in crate::forms::all() {
+            let spec = serde_json::to_value(&f).unwrap();
+            for (name, x) in f.fields.iter().filter(|(_, x)| x.type_ == "date") {
+                let at = |t: i64| Map::from_iter([(name.to_string(), json!(t))]);
+                assert!(differs(&spec, &at(60 * DAY + 1_794), &at(60 * DAY)).is_empty(), "{}: {name} within its day", f.form);
+                assert_eq!(differs(&spec, &at(60 * DAY + 1_794), &at(59 * DAY)), vec![name.to_string()], "{}: {name} a day off", f.form);
+                let _ = x;
+                dates += 1;
+            }
+        }
+        assert!(dates > 30, "{dates}");
     }
 
     /// A blank worked out by its form's rule is not given where the rule gives the principal's own figure, and the paper

@@ -2293,6 +2293,27 @@ The mechanism:
 - **Notice by:** a `benefit_decision` refused for "papers ... did not come" where the desk's evidence came in time;
   evidence whose `request` is a forward.
 
+### MT-60 · Under delegation an owner pays the rates claim before any notice is sent
+- **Gap:** The rates office records each owner's claim in its rate book when it hands the instalment's notices over
+  (G1: a claim recorded in the principal's own register stays with the principal), and the owner, the claim's
+  counterparty, sees it and pays it at once, before any notice is sent: in the whole-town rung 1, c0003 paid
+  $684.95 "Paying rates rec.24049" sixteen minutes after the claim was recorded on day 30 and two days before any
+  notice. The notice that follows demands money already paid. In the code arm the claim and the notice are one act, so
+  owners pay after the notice. The rates seat was right about the world when it held back drafts for owners it saw
+  had paid.
+- **Where:** `kernel/crates/actors/src/offices/treasury.rs` (the claim recorded with the notices);
+  `delegation/principal.rs` (`route`: the claim kept by the principal); the owners' code that pays a claim it is
+  counterparty to.
+- **Effect:** At a delegating rates post the town's owners pay rates nobody has billed them for, and some get a notice
+  after paying; a seat that drafts every notice it is handed sends demands for money already paid.
+- **L / I:** high (certain at a delegating rates post) / medium · **Status:** open (2026-11-16; the lead asked for the
+  answer, not a fix yet)
+- **Fix when:** before a counted run seats the rates post: the claim is recorded with the notice it goes with (the
+  office's clerk enters it when the notice goes out), or an owner pays rates on the notice it holds, never on a claim
+  alone; the code arm unchanged.
+- **Notice by:** a rates payment before the owner's notice; a notice addressed to an owner whose claim is settled.
+
+
 ---
 
 ## Profiles and sources

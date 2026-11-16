@@ -602,6 +602,10 @@ fn two_posts_of_one_organisation_that_keep_to_their_own_are_not_shown_each_other
             let r = step(&mut run, &rb_act("developer", json!([{"block": "publish", "kind": "referral", "text": id, "addressed_to": to, "visible_to": ["city", "devco"]}]))).unwrap();
             assert!(r.events.iter().any(|e| matches!(e.body, EventBody::ActionApplied { .. })), "{id}: not applied: {:?}", r.events);
         }
+        // (A paper written in the finance post, to the town: the finance post's, not the mayor's (the whole-town rung 1:
+        // one assistant's drafts to the town were on its fellow assistants' files). 2026-11-16.)
+        let r = step(&mut run, &rb_act("finance", json!([{"block": "publish", "kind": "referral", "text": "from-finance", "addressed_to": ["city"], "visible_to": ["city"]}]))).unwrap();
+        assert!(r.events.iter().any(|e| matches!(e.body, EventBody::ActionApplied { .. })), "from-finance: not applied: {:?}", r.events);
         let seen = |run: &mut Run<Vec<u8>>, who: &str, post: &str| {
             let o = run.command(&Command::Observe { participant: who.into(), only: None }).unwrap().observation.unwrap();
             let mut texts: Vec<String> = match o.channels.get(format!("{post}/matters").as_str()) {
@@ -616,7 +620,7 @@ fn two_posts_of_one_organisation_that_keep_to_their_own_are_not_shown_each_other
         };
         (seen(&mut run, "finance-system", "finance"), seen(&mut run, "mayor-system", "mayor"))
     };
-    assert_eq!(shown(true), (vec!["for-finance".to_string(), "for-the-town".to_string()], vec!["for-the-mayor".to_string(), "for-the-town".to_string()]));
-    // (Without it, as before: each post is shown all three, its organisation's papers.)
-    assert_eq!(shown(false).0.len(), 3);
+    assert_eq!(shown(true), (vec!["for-finance".to_string(), "for-the-town".to_string(), "from-finance".to_string()], vec!["for-the-mayor".to_string(), "for-the-town".to_string()]));
+    // (Without it, as before: each post is shown all four, its organisation's papers.)
+    assert_eq!(shown(false).1.len(), 4);
 }

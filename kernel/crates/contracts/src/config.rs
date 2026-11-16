@@ -1387,7 +1387,19 @@ impl RecordFilter {
         }
         let crate::blocks::RecordBody::Statement { addressed_to: Some(to), .. } = &rec.body else { return true };
         let ours: Vec<&str> = to.iter().map(|x| x.as_str()).filter(|x| post_of(x).as_deref() == Some(me)).collect();
-        ours.is_empty() || ours.contains(&post)
+        if ours.contains(&post) {
+            return true;
+        }
+        // (A paper written in another post of the organisation, and not to this one, is that post's: one assistant's
+        // draft to its office is not on another assistant's file because both work for the town. The whole-town rung 1:
+        // the inspector's, the finance office's and the planning office's assistants were shown the rates assistant's
+        // drafts, addressed to the town and so to no post of it. 2026-11-16.)
+        // (Only a paper to the organisation itself: one another post sends out to someone else (the provider's sales post's
+        // service delivery to a client) is the organisation's dealings, shown as ever.)
+        if rec.position.as_deref().is_some_and(|p| post_of(p).as_deref() == Some(me)) && !to.is_empty() && to.iter().all(|x| x.as_str() == me) {
+            return false;
+        }
+        ours.is_empty()
     }
 
     /// The collections a filter names, as the world's `knowing` names them: a statement kind (`lot`), statements
