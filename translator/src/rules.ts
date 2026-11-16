@@ -318,7 +318,7 @@ const RULES: { [name: string]: Standing } = {
   matterNamed: "fill", referralOfKind: "fill", recordNamed: "fill",
   // corrects what is plainly contradicted
   office: "code", client: "code",
-  authorityGiven: "correct", notARecord: "correct", referralIsOrder: "correct", referralNotHanded: "correct", figureOnce: "correct", copyNotHeld: "correct",
+  authorityGiven: "correct", notARecord: "correct", referralIsOrder: "correct", referralNotHanded: "correct", figureOnce: "correct", partyNamed: "correct", nameInList: "correct", copyNotHeld: "correct",
   recordInWords: "correct", recordsOwnWords: "correct", papersOwnWords: "correct", handOverWords: "correct",
   letterAgain: "correct",
 };
@@ -538,6 +538,26 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       const said = g?.[1]?.trim().toLowerCase();
       const whom = g?.[2] ?? (said ? [...(k.names ?? new Map<string, string>())].find(([e, n]) => n.toLowerCase() === said || e === said)?.[0] ?? (k.held.has(said) ? said : undefined) : undefined);
       if (whom && !isRecord(whom)) edit("authorityGiven", field, { id: whom });
+    }
+    // (Two parties of one paper are not the same party: an entity blank holding whom another entity blank of the paper
+    // holds, where the blank is named for a body the seat knows by that very id and the request writes it, by its id or
+    // its name, is that body. The tenant's answer to the tribunal, 2026-11-17: "to tribunal (Civil and Administrative
+    // Tribunal)" drawn with the landlord, or the client, as the tribunal, in four of five asks.)
+    for (const [field, t] of Object.entries(fields)) {
+      const v = argText(args[field]);
+      if (t.type !== "entity" || v === undefined || v === field || !k.names?.has(field)) continue;
+      const twice = Object.keys(fields).some((g) => g !== field && fields[g]!.type === "entity" && argText(args[g]) === v);
+      const written = new RegExp(`(?:^|[^a-z0-9_-])${escape(field)}(?:$|[^a-z0-9_-])`, "i").test(request) || request.toLowerCase().includes(k.names.get(field)!.toLowerCase());
+      if (twice && written) edit("partyNamed", field, { id: field });
+    }
+    // (A list blank holds ids (contracts: FieldType): an item that is a name the seat knows someone by is not one of its
+    // ids, and is left out. The same asks: `ages` holding "Civil and Administrative Tribunal".)
+    for (const [field, t] of Object.entries(fields)) {
+      const v = args[field];
+      if (t.type !== "list" || !v || !("json" in v) || !Array.isArray(v.json)) continue;
+      const known = new Set([...(k.names?.values() ?? [])].map((n) => n.toLowerCase()));
+      const kept = (v.json as unknown[]).filter((x) => !(typeof x === "string" && known.has(x.toLowerCase())));
+      if (kept.length !== v.json.length) edit("nameInList", field, kept.length ? { json: kept } as calls.Value : undefined);
     }
     const copyField = typeof f.data?.copies === "string" ? f.data.copies.replace(/^=/, "") : undefined;
     // (A record blank holding what is no record the seat may cite, a connection's id in a referral, is not filled: the
