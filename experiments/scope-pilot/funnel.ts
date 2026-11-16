@@ -67,6 +67,8 @@ const row = (): Row => ({ handed: 0, drafted: 0, drafts: 0, signed: 0, sent: 0, 
 
 export interface SeatFunnel {
   post: string; participants: string[]; model: boolean;
+  /** Where the seat took its post after the fork (a principal that engaged the provider during the run): the day. */
+  engaged_day?: number;
   kinds: { [kind: string]: Row }; total: Row;
   answers: { [kind: string]: number };
   /** Papers sent, by counterparty, with how many were answered and shown. */
@@ -99,6 +101,7 @@ export class FunnelReader {
   private readonly principalPost = new Map<string, string>(); // a principal's post -> its assistant post
   private readonly providers = new Set<string>();
   private readonly seatOf = new Map<string, string>(); // a seat's participant -> its post
+  private readonly engaged = new Map<string, number>(); // an assistant's post first held after the fork -> when
   private readonly model = new Set<string>(); // participants that made a model call
   private readonly matters = new Map<string, { post: string; kind: string; principal: string; t: number; drafted?: boolean; done?: boolean }>();
   private readonly drafts = new Map<string, { matter: string; paper?: string }>();
@@ -183,6 +186,15 @@ export class FunnelReader {
         const seen = JSON.stringify(b.data ?? {});
         for (const [id, a] of this.answers) if (a.t <= t && !this.sent.get(a.sent)!.shown && seen.includes(`"${id}"`)) this.sent.get(a.sent)!.shown = true;
       }
+      return;
+    }
+    // (A seat appointed to an assistant's post during the run, a principal having engaged the provider after the fork:
+    // its seat from then, listed with the day. The stakes rung 3: landlord-10 engaged on day 64, and its seat, par.14,
+    // sat 19 times and was in no reader.)
+    if (e.kind === "event" && b.event === "appointed" && typeof b.holder === "string" && typeof b.position === "string" && (this.posts.has(b.position) || /-assistant$/.test(b.position))) {
+      if (!this.posts.has(b.position)) this.posts.set(b.position, { principal: undefined, desk: false });
+      this.seatOf.set(b.holder, b.position);
+      if (t >= this.from && !this.engaged.has(b.position)) this.engaged.set(b.position, t);
       return;
     }
     if (e.kind === "command") {
@@ -318,6 +330,7 @@ export class FunnelReader {
       const s = seat(post);
       if (!s.participants.includes(participant)) s.participants.push(participant);
       if (this.model.has(participant)) s.model = true;
+      if (this.engaged.has(post)) s.engaged_day = Math.round((this.engaged.get(post)! / DAY) * 100) / 100;
       s.unread += this.unread.get(participant) ?? 0;
       s.sittings += this.sittings.get(participant)?.size ?? 0;
       s.calls += this.calls.get(participant) ?? 0;
@@ -419,7 +432,7 @@ export function funnelText(f: Funnel, label: string): string {
     const t = s.total;
     const head = `${short(s.post)}: ${t.handed} handed${t.carried ? ` (${t.carried} from before the fork)` : ""}, ${t.drafted} drafted (${t.drafts} drafts), ${t.signed} signed (${t.declined} declined), ${t.sent} sent, ${t.answered} answered, ${s.model ? `${t.shown} shown, ` : ""}${t.done} reported done`;
     lines.push(`${head}: ${s.verdict.fail.length ? `FAIL ${s.verdict.fail.join("; ")}` : "ok"}${s.verdict.flag.length ? ` [flagged: ${s.verdict.flag.join("; ")}]` : ""}`);
-    lines.push(`  ${s.model ? "model" : "code"} seat ${s.participants.join(", ")} in ${s.post}: ${s.sittings} sittings, ${s.calls} calls; translator: ${s.served.requests} requests, ${s.served.served_first_time} served first time, ${s.served.served_after_restatement} after a restatement, ${s.served.never_served} never, ${s.served.not_sent} not sent; drafts confirmed ${s.served.drafts_confirmed}, declined ${s.served.drafts_declined}`);
+    lines.push(`  ${s.model ? "model" : "code"} seat ${s.participants.join(", ")} in ${s.post}${s.engaged_day !== undefined ? ` (engaged after the fork, on day ${Math.floor(s.engaged_day)})` : ""}: ${s.sittings} sittings, ${s.calls} calls; translator: ${s.served.requests} requests, ${s.served.served_first_time} served first time, ${s.served.served_after_restatement} after a restatement, ${s.served.never_served} never, ${s.served.not_sent} not sent; drafts confirmed ${s.served.drafts_confirmed}, declined ${s.served.drafts_declined}`);
     lines.push(`  obstacles: ${s.obstacles.made} made, ${s.obstacles.met} met, ${s.obstacles.cleared} cleared (loosely ${s.obstacles.loosely})${Object.keys(s.obstacles.by_law).length ? ` (${Object.entries(s.obstacles.by_law).map(([k, v]) => `${k} ${v.made}/${v.met}/${v.cleared}`).join(", ")})` : ""}; requests for more ${s.requests.made}${s.requests.made ? ` (${Object.entries(s.requests.answered).map(([k, v]) => `${k} ${v}`).join(", ")})` : ""}; reported not done ${t.not_done}; unread answers ${s.unread}; replies cut off ${s.replies.cut_off}, unfinished ${s.replies.unfinished} of ${s.replies.calls}; debrief replies cut off ${s.debrief_replies.cut_off}, unfinished ${s.debrief_replies.unfinished} of ${s.debrief_replies.calls}; debriefed: ${s.debriefed ?? (s.model ? "no" : "-")}`);
     if (Object.keys(s.to).length) lines.push(`  sent to: ${Object.entries(s.to).sort((a, b) => b[1].sent - a[1].sent).map(([c, v]) => `${c} ${v.sent} (answered ${v.answered}${s.model ? `, shown ${v.shown}` : ""})`).join(", ")}`);
     for (const [k, r] of Object.entries(s.kinds).sort((a, b) => b[1].handed - a[1].handed)) lines.push(`    ${k}: ${STAGES.map((st) => (st === "shown" && !s.model ? "-" : r[st])).join(" → ")}${r.declined ? ` (declined ${r.declined})` : ""}`);
@@ -444,7 +457,7 @@ export async function readFork(log: string, config: any, seats: { [participant: 
     const rl = createInterface({ input: createReadStream(out), crlfDelay: Infinity });
     for await (const line of rl) {
       // (The base's entries hold no seat's work after the fork; only what a reading needs is parsed.)
-      if (!/"recorded"|"annotation"|"command":"observe"/.test(line.slice(0, 400)) && !line.includes('"recorded"')) continue;
+      if (!/"recorded"|"annotation"|"command":"observe"|"appointed"/.test(line.slice(0, 400)) && !line.includes('"recorded"')) continue;
       const e = JSON.parse(line);
       reader.see(e);
       reader.seeAnswerKind(e);

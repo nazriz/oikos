@@ -126,6 +126,9 @@ test("an answer given in plain words or as `go_on:true{...}` is read, where noth
   const six = "- took: did_not_consider\n- part: welcome\n- distress: none\n- values: never\n- means: often\n- again: certainly";
   expect(readAnswer(t(six), "scales")).toMatchObject({ took: "did_not_consider", again: "certainly", keep_back: false, stop: false });
   expect(readAnswer(t(six.split("\n").slice(1).join("\n")), "scales")).toBeUndefined();
+  // (An answer object whose strings hold line breaks as they are, which JSON does not allow: read, the breaks kept. The
+  // stakes rung 3: eight answers written so, recorded not read.)
+  expect(readAnswer(t('{"answer":"Mainly the way concerns are raised.\n\nThe record shows a gap.","declined":false,"stop":false,"keep_back":false}'), "change")).toMatchObject({ answer: "Mainly the way concerns are raised.\n\nThe record shows a gap.", stop: false });
   expect(readAnswer(t(six.replace("certainly", "gladly")), "scales")).toBeUndefined();
   // Words about publication or leaving, a broken object, or plain words at the consent, publication or scaled steps:
   // what the seat meant cannot be told, so not read.
@@ -154,6 +157,23 @@ test("a seat may decline any question, the whole interview, or stop part-way; ea
   expect(stopped.steps.map((s) => s.id)).toEqual(["consent", "took", "like", "distress", "values"]);
   // (Nothing more to say at the last question is not leaving: what may be published is still asked.)
   expect((await runDebrief(harness().io, seat({ stop_at: "last" }), input(), new Set())).steps.map((s) => s.id).slice(-2)).toEqual(["last", "publication"]);
+  // (A stop is asked about once, saying what would not be asked; it ends the interview only if the seat says so again,
+  // and a stop marked by a slip of form, taken back, does not. The stakes rung 3: a desk's stop inside its answer to
+  // whether it would take part again, and four questions never asked.)
+  const sure = harness();
+  await runDebrief(sure.io, seat({ stop_at: "values" }), input(), new Set());
+  const asked = sure.calls.find((c) => (c.context as any)?.debrief?.step === "values-stop")!;
+  expect(String(asked.messages.at(-1)!.content)).toContain("these will not be asked: ");
+  expect(String(asked.messages.at(-1)!.content)).toContain("publication (what of this may be published)");
+  const slipped = await runDebrief(harness(async (req) => {
+    const step = (req.context as any)?.debrief?.step as string;
+    if (step === "again") return [{ type: "tool_use", id: "u", name: "answer", input: { answer: "Yes, conditionally.", declined: false, stop: true, keep_back: false } }] as ContentBlock[];
+    if (step === "again-stop") return [{ type: "tool_use", id: "u", name: "answer", input: { answer: "", stop: false } }] as ContentBlock[];
+    return mockDebrief(req);
+  }).io, seat({}), input(), new Set());
+  expect(slipped.ended).toBe("complete");
+  expect(slipped.steps.find((s) => s.id === "again")).toMatchObject({ answer: "Yes, conditionally.", stop_withdrawn: true });
+  expect(slipped.steps.map((s) => s.id)).toContain("publication");
 });
 
 test("a seat that left the study is asked too, more briefly, starting from its own statement", async () => {
