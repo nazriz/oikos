@@ -2067,7 +2067,7 @@ The mechanism:
 - **Notice by:** `question_answer` papers with `known: false` in a run, by subject; letters to a principal with a
   question mark acknowledged and nothing done.
 
-### MT-45 · The outside buyer pays an invoice against goods of the kind on hand, not against a seller's own delivery
+### MT-55 · The outside buyer pays an invoice against goods of the kind on hand, not against a seller's own delivery
 - **Gap:** The world market (`world.trade`, the outside buyer) pays an invoice once enough goods of its kind have
   arrived that are not yet paid for, counted over every seller together (`held - baseline + sent - paid_for`, by kind).
   It keeps no record of what each seller delivered, so it cannot do an accounts office's three-way match (the order or

@@ -14788,7 +14788,7 @@ from its referral on file whether or not it is still open.
 - **Revisit if** a seat is seen reporting "not done yet" with nothing after it and the client taking the matter back:
   the words are a seat's, and the client's code reads none; a typed "not yet" on the report form would be the fix.
 
-## 2026-11-16 · A signed copy sent already is said so; the buyer's duplicate check left as a risk (MT-45)
+## 2026-11-16 · A signed copy sent already is said so; the buyer's duplicate check left as a risk (MT-55)
 
 - **Decision, the preview** (translator/src/preview.ts `signedCopyOf`, knowledge.ts `sent`): the preview of sending a
   signed copy that has gone already from a post the seat holds says so, after what it sends: "It has gone already: this
@@ -14799,12 +14799,12 @@ from its referral on file whether or not it is still open.
   world market's two equal export payments became one), because two real shipments of the same size are invoiced in the
   same words. What an accounts office checks is the invoice against goods received from that seller and not yet paid
   for; the outside buyer counts goods by kind over all sellers and has no record per seller to match against. Rather
-  than invent a wording match, it is written up as MT-45, with the fix (goods received by seller). `common/intake.rs`
+  than invent a wording match, it is written up as MT-55, with the fix (goods received by seller). `common/intake.rs`
   keeps `send_back`, the one way a body returns a paper (a refactor; nothing returns differently).
 - **Why:** the stakes run's rung 1 on gpt-6-luna: the factory's signed invoice for $728,553.60 sent on day 38, sent
   again on day 40 with a preview no different from the first, and paid twice.
 - **What moves:** model seats only (the preview of a second send). Code towns are byte-identical to main.
-- **Revisit if** MT-45's notice fires: a seller paid twice for one delivery in a model run.
+- **Revisit if** MT-55's notice fires: a seller paid twice for one delivery in a model run.
 
 ## 2026-11-16 · Housing reaches the assistant: the paper the client holds, the debt, and the run's end
 
