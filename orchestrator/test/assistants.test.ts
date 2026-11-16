@@ -191,7 +191,7 @@ test("a town that does not ask for assistants is generated as before; one that d
   const engaged = assigned.positions.filter((p: any) => p.role_module?.params?.delegation);
   expect(engaged.map((p: any) => p.id).sort()).toEqual(classed.positions.filter((p: any) => p.role_module?.params?.delegation && (p.role_module.code === "firm.producer" || p.id === "planning")).map((p: any) => p.id).sort());
   for (const p of engaged) expect(Object.keys(p.role_module.params.delegation.commit.levels).sort()).toEqual(Object.keys(p.role_module.params.delegation.kinds).sort());
-  for (const p of assigned.positions.filter((x: any) => !x.role_module?.params?.delegation)) expect((p.channels ?? []).some((c: any) => c.id === "providers"), p.id).toBe(false);
+  expect(assigned.positions.filter((x: any) => !x.role_module?.params?.delegation && (x.channels ?? []).some((c: any) => c.id === "providers")).map((x: any) => x.id)).toEqual([]);
   expect(assigned.participants.some((p: any) => p.kind === "person" && p.controller?.params?.delegation)).toBe(false);
   expect(() => (build({ name: "t", days: 1, seeds: [1], reviewDays: 14, arms: [], budget: { experiment_usd: 0, arm_usd: {} }, assistants: { posts: ["nobody-here"] } }).world as any).prepare(structuredClone(classed), 1)).toThrow(/names no principal/);
 });
