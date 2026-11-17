@@ -440,3 +440,21 @@ test("a matter that is the same paper to each of several is drafted as one, each
   if (!asNamed.ok) throw new Error(asNamed.questions.join(" "));
   expect((asNamed.blocks[0] as any).data.papers).toHaveLength(2);
 });
+
+// (The check runs, 2026-11-19.) The body a scope request names in "give authority to the desk to act for them with
+// <body>" or "give <body>'s authority" is its `authority`, never the client; a list the request names with whole numbers
+// ("ages: 62", "Ages: 30, 3.") is those numbers; a quote right after a blank's name is not its value.
+test("the body a scope request names, and a list of numbers named by its blank (the check runs, 2026-11-19)", () => {
+  const field = (type: string, required = false) => ({ type, ...(required ? { required: true } : {}) });
+  const k = { forms: [{ id: "form-desk-scope-request", data: { form: "scope_request", office: "desk", fields: { agreement: field("record", true), client: field("entity", true), authority: field("entity"), matter: field("record"), words: field("text", true) } } },
+    { id: "form-desk-tribunal-response", data: { form: "tribunal_response", office: "desk", fields: { client: field("entity", true), application: field("record", true), ages: field("list") } } }],
+    records: new Set(["rec.5", "rec.6"]), signed: new Map(), signedDraft: new Map(), referrals: new Map([["rec.5", "c0100"]]), answeredReferrals: new Set<string>(), held: new Set(["desk"]), names: new Map<string, string>() };
+  const ruled = (program: string, request: string) => calls.programText(formRules(calls.parseProgram(program), request, k as any));
+  const scope = (who: string) => `form(agreement=rec.6, authority=${who}, client=c0100, form=scope_request, matter=rec.5, to=desk, words="give it")`;
+  expect(ruled(scope("c0100"), "Request scope from c0100 (agreement rec.6): ask c0100 to give authority to desk to act for them with bank on their loan application rec.5.")).toBe(scope("bank"));
+  expect(ruled(scope("desk"), "Scope request to c0100 (agreement rec.6): ask c0100 to give bank's authority for desk to act for them on rec.5.")).toBe(scope("bank"));
+  const tr = (ages: string) => `form(ages=${ages}, application=rec.5, client=c0100, form=tribunal_response, to=desk)`;
+  expect(ruled(tr("c0100"), "Draft the tribunal response for c0100: application rec.5; ages: 62; people: 1.")).toBe(tr('["62"]'));
+  expect(ruled(tr('["30, 3"]'), "Draft the tribunal response for c0100: application rec.5. Ages: 30, 3.")).toBe(tr('["30","3"]'));
+  expect(ruled(tr("c0100"), 'Fill in the tribunal response. Its blank "ages" is filled in with the client. Application rec.5.')).toBe(tr("c0100"));
+});

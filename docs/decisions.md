@@ -15423,3 +15423,31 @@ The 24-seat rung 2 on Haiku (`runs/scope-broad-r2`, stopped by the health check 
 - **The health check failed a seat in the middle of its work** (`experiments/scope-pilot/funnel.ts`, `LATE_SITTINGS`). "At send: 63 of 204 signed sent" stopped the fork with 173 sign-offs come over its last two days and one sitting since. A paper now counts against a stage only once the seat has sat three times since it came without doing it: the first sitting may be taken up by what else came, the second to finish; by the third it is left, not in hand. At send, a seat fails where five or more, and over a fifth of those signed, are so late; at drafting, where ten or more matters are late and none drafted.
 - **The town rungs' limits** (`experiments/scope-pilot/broad-run.ts`). Measured: $0.027 a day at 10 seats, $0.145 a day at 24 (rates 46%, before the batch draft). Rung 1 (14 days, 10 seats) about $0.40, limit $1; rung 2 (14 days, 24 seats) about $2.00, limit $4; a new rung 3 (90 days, 24 seats) about $13, limit $26: each about twice its forecast, written in the header.
 - **Revisit if** a seat's own knowledge is lost at a run's resume (what it confirmed to send is then known only from its file), or a buyer is paid twice for one delivery by two different papers (MT-55's three-way match).
+
+## 2026-11-19 · The check runs: the body a scope request names, and the ages the hand-over gives
+
+- **The measure:** the three 14-day check runs on the final code (`scope-stakes-r1-decision-slow-situation-c`, Haiku;
+  `-glm-5.3-d`; `-deepseek-v4.1-flash-e`; made at 066f47db) added: `~/oikos/runs/regress/requests-2026-11-19.json.gz`
+  (5,306 requests in 36 arms, 3,928 confirmed; main's rules: 152 differences, all explained before) and
+  `scored-set-2026-11-19.json.gz`. Main on it: 4,060 of 4,618 (87.9%); with eight scope requests keyed (below), 4,056.
+- **The scope request's `authority`** (Haiku, eight): the model wrote the client or the desk where the seat named the
+  body, in two phrasings no rule read: "give authority to provider-a-desk to act for them with outside" and "give
+  bank's authority for provider-a-desk". Not `namedValue` over-reaching (the model's own draw); the four confirmed were
+  answered "not lodged". Keyed with the body. `authorityGiven` now reads both phrasings (the body by the name the seat
+  was shown, or the one-word id it wrote, never the paper's client nor a post the seat holds): 4,056 to 4,060.
+  Four differences, the keyed confirmed four, explained here. The form's type cannot say "a body that checks
+  authority" (an entity is an entity); the resolver asking back on a person or the desk would need a kind of entity in
+  both resolvers (as 2026-11-17's `of` on a list): not done.
+- **The tenant's answer's `ages`** (GLM, seven asked back): the seat wrote "ages: 62" every time ("ages: [62]", "Its
+  blank "ages" is filled in with: 62"); the model put the client's id in `ages`, and once `namedValue` read the quote
+  after a blank's name as its value. Two changes: `namedValue` needs a space, a colon or "is" between a blank's name and
+  its value; `namedNumbers`, a list the request names with whole numbers ("ages: 62", "ages: 30, 3") is those numbers.
+  4,060 to 4,064, and with the set rebuilt on the explanation, 4,069 (a list's numbers may end a sentence: "Ages: 62.").
+  One difference explained: rung 3's c0969 .125, confirmed with `ages` one item "30, 3", now two. GLM's seven: five now
+  drawn with ages 62; left, "Its blank "ages" is filled in with: 62" and "Their ages, each in figures on its own: 62",
+  where no name stands beside the figure. So it is a rule of ours, not a fill: the seats did write the ages.
+- **Left:** report words the seat rewrote in quotes the next time (11, Haiku), evidence `need` cut at "as asked" (6),
+  scope request words (4), evidence drafted on the general form where the seat later chose it (3): words blanks and the
+  seat's own choices, for training. The report's `client` left empty and the review request without `about` had no
+  target in the set (asked back, nothing confirmed after).
+- **Revisit if** a seat writes a list of figures after a list blank's name that are not its items.
