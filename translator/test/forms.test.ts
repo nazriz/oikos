@@ -113,7 +113,9 @@ test("a signed copy sent is previewed as that copy, under its sign-off, and not 
   const first = resolve(calls.parseProgram("form(form=send_signed, sign_off=rec.81)"), k2, () => undefined, "registry");
   if (!first.ok) throw new Error(first.questions.join(" "));
   k2.sending(first.blocks as unknown[], 5 * 86_400);
-  expect(k2.twice(first.blocks as unknown[])).toMatchObject({ pending: true });
+  expect(k2.twice(first.blocks as unknown[], 5 * 86_400 + 60)).toMatchObject({ pending: true });
+  // (Only the same act within the sitting: a shop's same delivery note for the rest of an order, days later, is another act.)
+  expect(k2.twice(first.blocks as unknown[], 6 * 86_400)).toBeUndefined();
   const second = resolve(calls.parseProgram("form(form=send_signed, sign_off=rec.81)"), k2, () => undefined, "registry");
   expect(!second.ok && second.questions.join(" ")).toContain("This paper went already on year 1, day 6, when you confirmed sending it.");
   // (2026-11-17) A sign-off of a draft of several papers: sent all together on it, each as it stands and said so.

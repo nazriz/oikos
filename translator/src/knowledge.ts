@@ -36,6 +36,9 @@ export function givenBy(d: any): { [field: string]: string } {
   return out;
 }
 
+/** One sitting, in seconds: turns closer together than this are one sitting (experiments/scope-pilot/funnel.ts, the same). */
+export const SITTING = 3_600;
+
 export class Knowledge {
   /** `currency`: how the world's money is written (its config's first currency): what the resolver reads and writes
    * amounts in. The platform has none of its own. `named`: whether the world's people and bodies have names of their
@@ -101,29 +104,29 @@ export class Knowledge {
   readonly forwards = new Map<string, { paper: string; matter?: string }>();
   /** Papers sent from a post the participant holds, as they went (the newest few hundred): what a send of a signed copy
    * that has gone already is told by (translator/src/preview.ts). */
-  readonly sent: { id: string; at: number; kind: string; text: string; to: unknown; data: unknown; basis: unknown; pending?: true }[] = [];
+  readonly sent: { id: string; at: number; kind: string; text: string; to: unknown; data: unknown; basis: unknown; pending?: true; act?: string }[] = [];
   /** When each signed copy it holds came (a sign-off, or a body's return): a copy goes once from it (`sentFrom`). */
   readonly signedAt = new Map<string, number>();
 
   /** What it has confirmed to send and is not yet on file (an act done later in the sitting's time): held as sent, so that
    * a second send of the same paper in the same sitting is told it has gone. The record replaces it when it comes. */
   sending(blocks: unknown[], at: number): void {
+    const act = JSON.stringify(blocks);
     for (const b of blocks as any[]) {
       if (b?.block !== "publish" || typeof b.kind !== "string") continue;
-      this.sent.push({ id: "", at, kind: b.kind, text: String(b.text ?? ""), to: b.addressed_to, data: b.data, basis: b.basis, pending: true });
+      this.sent.push({ id: "", at, kind: b.kind, text: String(b.text ?? ""), to: b.addressed_to, data: b.data, basis: b.basis, pending: true, act });
       if (this.sent.length > 400) this.sent.shift();
     }
   }
 
-  /** A paper among these blocks that it confirmed to send already in this sitting (a second ask for the same send,
-   * drawn before the first was confirmed): the first's entry. */
-  twice(blocks: unknown[]): { id: string; at: number; pending?: true } | undefined {
-    for (const b of blocks as any[]) {
-      if (b?.block !== "publish") continue;
-      const went = this.sent.find((x) => x.pending && x.kind === b.kind && x.text === String(b.text ?? "") && JSON.stringify(x.to ?? null) === JSON.stringify(b.addressed_to ?? null) && JSON.stringify(x.data ?? null) === JSON.stringify(b.data ?? null) && JSON.stringify(x.basis ?? null) === JSON.stringify(b.basis ?? null));
-      if (went) return went;
-    }
-    return undefined;
+  /** The same act, sending a paper, that it confirmed already in this sitting (a second ask for the same send, drawn
+   * before the first was confirmed): the first's entry. Only the whole act, and only within the sitting (`SITTING`): the
+   * same words sent again on another day, or with other goods or work beside them, are another act (a shop's second
+   * delivery note for the rest of an order, the twin-seat year, 2026-11-17). */
+  twice(blocks: unknown[], now: number): { id: string; at: number; pending?: true } | undefined {
+    if (!(blocks as any[]).some((b) => b?.block === "publish")) return undefined;
+    const act = JSON.stringify(blocks);
+    return this.sent.find((x) => x.pending && x.act === act && now - x.at < SITTING);
   }
 
   /** The paper sent, from a post it holds, that is this one exactly (its kind, words, whom it goes to, its details and

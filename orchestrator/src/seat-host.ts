@@ -405,7 +405,7 @@ export class ModelSeat {
     this.arranged?.signed(d.id, decision);
     if (decision !== "accept") return undefined;
     // (The same paper confirmed twice in a sitting, drawn twice before the first was confirmed: the second is not sent.)
-    const twice = this.knowledge.twice(d.blocks as unknown[]);
+    const twice = this.knowledge.twice(d.blocks as unknown[], this.t);
     if (twice) {
       this.o.world.annotate({ annotation: "note", subject: this.o.seat, data: { sent_twice_refused: { draft: d.id } } });
       this.notices.push({ t: this.t, text: `${d.id}: ${wentWords("it", twice, false)}`, re: d.id });

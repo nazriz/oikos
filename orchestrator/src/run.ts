@@ -849,7 +849,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     arranged?.signed(d.id, decision);
     if (decision !== "accept") return;
     // (The same paper confirmed twice in a sitting, drawn twice before the first was confirmed: the second is not sent.)
-    const twice = u.knowledge.twice(d.blocks as unknown[]);
+    const twice = u.knowledge.twice(d.blocks as unknown[], t);
     if (twice) {
       await notSent(u, "confirmed", `${d.id}: ${wentWords("it", twice, false)}`, { sent_twice_refused: d.id });
       return;
