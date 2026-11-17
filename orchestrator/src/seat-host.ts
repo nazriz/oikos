@@ -17,7 +17,7 @@ import {
   applyFraming, createLlmParticipant, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, reserveOrRefuse, seatsEndNeedMicroUsd, LLM_PARTICIPANT_VERSION, MOCK_VERSION, mockPolicies, MockAdapter, ModelCallFailed, ModelUnreachable,
   SpendingLimitReached, stepsOf, UsageLimitReached, type Budget, type DebriefInput, type FramingSpec, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price,
 } from "@oikos/participants/llm";
-import { createAlone, createArrangement, createTranslator, draftText, Knowledge, NOT_CHECKED, TRANSLATOR_VERSION, type Draft, type Route } from "@oikos/translator";
+import { createAlone, createArrangement, createTranslator, draftText, Knowledge, NOT_CHECKED, TRANSLATOR_VERSION, wentWords, type Draft, type Route } from "@oikos/translator";
 import { actedOn, drawTies, largest, leftAlone, besideOf, renderSummary, SeatRecords, idsFrom } from "./debrief-summary";
 import { DEBRIEF_PROMPT_CHARS, endCosts, MAX_FAILURES_IN_A_ROW } from "./run";
 import { joinRaw, RAW, type DetachedActor, type RustWorld, type SeatWake } from "./rust-world";
@@ -404,7 +404,16 @@ export class ModelSeat {
     this.o.world.annotate({ annotation: "signoff", participant: this.o.seat, draft: d.id, draft_hash: p.hash, decision, ...(note ? { note } : {}) });
     this.arranged?.signed(d.id, decision);
     if (decision !== "accept") return undefined;
+    // (The same paper confirmed twice in a sitting, drawn twice before the first was confirmed: the second is not sent.)
+    const twice = this.knowledge.twice(d.blocks as unknown[]);
+    if (twice) {
+      this.o.world.annotate({ annotation: "note", subject: this.o.seat, data: { sent_twice_refused: { draft: d.id } } });
+      this.notices.push({ t: this.t, text: `${d.id}: ${wentWords("it", twice, false)}`, re: d.id });
+      return undefined;
+    }
     this.matters?.own(d.blocks as any[], this.t);
+    // (What it confirmed to send is sent, as far as its own file goes, from now: translator/src/knowledge.ts `sending`.)
+    this.knowledge.sending(d.blocks as unknown[], this.t);
     if (this.o.brain && this.o.adapter.provider === "mock" && /form=scope_request\b/.test(d.proposal ?? "")) this.scripted++;
     let by: string[] | undefined;
     if (d.call) try { by = this.performers(calls.parseProgram(d.call)).by; } catch { /* (a call that does not read names no one) */ }

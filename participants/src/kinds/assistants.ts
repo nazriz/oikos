@@ -17,6 +17,14 @@ export const ASSISTANT_ISSUES: Issued[] = [
   { form: "approval_request", title: "A request to go ahead with a matter",
     fields: { referral: f("record", "The matter you were handed.", req), client: f("entity", "Whom you work for in it.", req), gist: f("text", "What you mean to do, in a sentence.", req) },
     writes: { kind: "approval_request", text: "May we go ahead? {gist}", basis: "=referral", to: ["=client"], visible: ["=self", "=client"], data: { referral: "=referral", gist: "=gist" } } },
+  // (A matter that is the same paper to each of several (a rates run's notices, one to each owner): drafted as one, as a
+  // clerk prepares a run, each paper as the matter's facts give it, for one sign-off and one send. The town rung 2: the
+  // rates seat drafted 204 notices one by one, 204 sign-offs, 46% of the run's cost; the code assistant drafts each
+  // matter's fifteen as one.)
+  { form: "draft_as_handed", title: "A draft for sign-off of a matter's papers, each as the matter sets it out",
+    does: "Draws up every paper of a matter handed over as what happened, one to each as the matter sets them out, written on the office's own form for each from the matter's details, as one draft for one sign-off. Once signed off, all are sent at once with one send. Where any of them should differ from what the matter gives, draft that one on its own form instead.",
+    fields: { referral: f("record", "The matter you were handed.", req) }, batch: "=referral",
+    writes: { kind: "draft", text: "Draft for sign-off: the papers of matter {referral}, each as the matter sets it out.", basis: "=referral", to: ["=self"], visible: ["=self"], data: { referral: "=referral" } } } as Issued,
   { form: "report", title: "What became of a matter",
     // (Said on the form since 2026-11-14: the scope pilot's baseline seats filed 5, 6 and 4 reports where the code filed
     // 41, and nothing they were shown said that the office goes by the report: its own code hears of the act from it.)

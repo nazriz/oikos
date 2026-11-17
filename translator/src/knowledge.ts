@@ -90,6 +90,9 @@ export class Knowledge {
   /** The words of the paper each matter handed over as a finished act carries (its call's `text=`): what a blank of the
    * paper's words is, where the request quotes none (translator/src/rules.ts, `handOverWords`). */
   readonly handedWords = new Map<string, string>();
+  /** What each matter handed over as what happened gives, whole: its papers' blanks and the forms they are written on
+   * (`composed_on`), for a draft of the matter's papers as handed over (the form `draft_as_handed`). */
+  readonly handedFacts = new Map<string, any>();
   /** A paper of the participant's a body sent back -> the return (`paper_returned`, its `returned`): what a request to
    * send a paper again that names the paper, not the return, is about (translator/src/rules.ts). */
   readonly returnOf = new Map<string, string>();
@@ -98,7 +101,37 @@ export class Knowledge {
   readonly forwards = new Map<string, { paper: string; matter?: string }>();
   /** Papers sent from a post the participant holds, as they went (the newest few hundred): what a send of a signed copy
    * that has gone already is told by (translator/src/preview.ts). */
-  readonly sent: { id: string; at: number; kind: string; text: string; to: unknown; data: unknown; basis: unknown }[] = [];
+  readonly sent: { id: string; at: number; kind: string; text: string; to: unknown; data: unknown; basis: unknown; pending?: true }[] = [];
+  /** When each signed copy it holds came (a sign-off, or a body's return): a copy goes once from it (`sentFrom`). */
+  readonly signedAt = new Map<string, number>();
+
+  /** What it has confirmed to send and is not yet on file (an act done later in the sitting's time): held as sent, so that
+   * a second send of the same paper in the same sitting is told it has gone. The record replaces it when it comes. */
+  sending(blocks: unknown[], at: number): void {
+    for (const b of blocks as any[]) {
+      if (b?.block !== "publish" || typeof b.kind !== "string") continue;
+      this.sent.push({ id: "", at, kind: b.kind, text: String(b.text ?? ""), to: b.addressed_to, data: b.data, basis: b.basis, pending: true });
+      if (this.sent.length > 400) this.sent.shift();
+    }
+  }
+
+  /** A paper among these blocks that it confirmed to send already in this sitting (a second ask for the same send,
+   * drawn before the first was confirmed): the first's entry. */
+  twice(blocks: unknown[]): { id: string; at: number; pending?: true } | undefined {
+    for (const b of blocks as any[]) {
+      if (b?.block !== "publish") continue;
+      const went = this.sent.find((x) => x.pending && x.kind === b.kind && x.text === String(b.text ?? "") && JSON.stringify(x.to ?? null) === JSON.stringify(b.addressed_to ?? null) && JSON.stringify(x.data ?? null) === JSON.stringify(b.data ?? null) && JSON.stringify(x.basis ?? null) === JSON.stringify(b.basis ?? null));
+      if (went) return went;
+    }
+    return undefined;
+  }
+
+  /** The paper sent, from a post it holds, that is this one exactly (its kind, words, whom it goes to, its details and
+   * what it cites), at or after `since`: the newest, confirmed or on file. */
+  sentFrom(paper: { kind?: unknown; text?: unknown; to?: unknown; data?: unknown; basis?: unknown }, since: number): { id: string; at: number; pending?: true } | undefined {
+    const same = (x: unknown, y: unknown) => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
+    return [...this.sent].reverse().find((x) => x.at >= since && x.kind === paper.kind && x.text === String(paper.text ?? "") && same(x.to, paper.to) && same(x.data, paper.data) && same(x.basis, paper.basis));
+  }
   /** A matter handed over that is a reply to a body's paper -> that paper (its referral's `reply_to`). */
   readonly replyTo = new Map<string, string>();
   /** Laws and claims the participant has seen: what law warnings are judged against (§10). */
@@ -242,10 +275,14 @@ export class Knowledge {
       if (r.kind === "referral" && typeof r.data?.kind === "string") this.referralKind.set(r.id, r.data.kind);
       if (r.kind === "referral") this.referralGives.set(r.id, givenBy(r.data));
       if (r.kind === "referral" && typeof r.data?.calls === "string") { const m = /\btext="((?:[^"\\]|\\.)*)"/.exec(r.data.calls); if (m) { try { this.handedWords.set(r.id, JSON.parse(`"${m[1]}"`)); } catch { /* (words that do not read: none) */ } } }
+      if (r.kind === "referral" && r.data?.facts && typeof r.data.facts === "object") this.handedFacts.set(r.id, r.data.facts);
       if (r.kind === "referral" && r.data?.facts && typeof r.data.facts === "object") this.referralFacts.set(r.id, new Set(Object.keys(r.data.facts).filter((x) => x !== "composed_on")));
       if (r.kind === "referral" && typeof r.data?.reply_to === "string") this.replyTo.set(r.id, r.data.reply_to);
       if (r.kind === "paper_returned" && typeof r.data?.returned === "string") this.returnOf.set(r.data.returned, r.id);
       if (typeof r.in_position === "string" && this.held.has(r.in_position) && !this.sent.some((x) => x.id === r.id)) {
+        // (The paper it confirmed, now on file: in its place.)
+        const was = this.sent.findIndex((x) => x.pending && x.kind === r.kind && x.text === String(r.text ?? "") && JSON.stringify(x.to ?? null) === JSON.stringify(r.addressed_to ?? null) && JSON.stringify(x.data ?? null) === JSON.stringify(r.data ?? null));
+        if (was >= 0) this.sent.splice(was, 1);
         this.sent.push({ id: r.id, at: r.at, kind: String(r.kind), text: String(r.text ?? ""), to: r.addressed_to, data: r.data, basis: r.basis });
         if (this.sent.length > 400) this.sent.shift();
       }
@@ -253,6 +290,7 @@ export class Knowledge {
       if ((r.kind === "sign_off" || r.kind === "declined") && typeof r.data?.referral === "string") this.answeredReferrals.add(r.data.referral);
       // (A sign-off's copy keeps whose sign-off it is, and a paper sent back whom it was for: the copy goes in their name.
       // kernel/crates/resolver, the same.)
+      if (r.kind === "sign_off" || r.kind === "paper_returned") this.signedAt.set(r.id, r.at);
       if ((r.kind === "sign_off" || r.kind === "paper_returned") && r.data?.paper && typeof r.data.paper === "object" && !Array.isArray(r.data.paper)) {
         const by = r.kind === "sign_off" ? r.speaks_for : r.data.for;
         this.signed.set(r.id, typeof by === "string" ? { ...r.data.paper, signed_by: by } : r.data.paper);

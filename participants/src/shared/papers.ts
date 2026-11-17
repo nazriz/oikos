@@ -424,8 +424,8 @@ export const EDITOR: Issued[] = [
 
 /** An order to a supplier, a delivery note and a report of theft, as a shop or a works writes them (trade.ts). */
 /** An order to a supplier (trade.ts, `order`): the paper a seller acts on. Any office that buys in has it. */
-export const ORDER: Issued = { form: "order", title: "An order to a supplier, paid with the order",
-    does: "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting. The seller delivers once an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
+export const ORDER: Issued = { form: "order", title: "An order to a supplier",
+    does: "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting; or, bought on the seller's terms of trade (paid_within_days_of_delivery), pay within those days of delivery. The seller delivers once an order is paid in full, or at once on its terms, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
     // (The two counts of days are named for what they count and the days to pay come right after the price: shown only
     // `for_days` and `pay_in_days`, our translator wrote the days to pay in both, or the quantity in the second, on 51 of
     // 69 real orders; so named and placed, on none (translator/eval/redraw.ts; docs/decisions.md, 2026-11-18). What the
@@ -434,7 +434,9 @@ export const ORDER: Issued = { form: "order", title: "An order to a supplier, pa
       paid_within_days_of_delivery: f("count", "Where it is bought on the seller's terms of trade: the days it is paid within, from delivery."),
       deliver_to: f("entity", "Who is to receive them.", req), at: f("structure", "Where they are to be delivered.", req), account: f("account", "The account the order is paid from.", req), retry_of: f("record", "An earlier order this one repeats."),
       served_over_days: f("count", "How many days the order may be served over.") },
-    writes: { kind: "order", text: "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. Paid with this order.", to: ["=seller"], visible: ["=self", "=seller"],
+    // (Its words say what it does: on the seller's terms, when it is to be paid; else paid with it, as trade.rs writes
+    // an order of its own. Until 2026-11-17 every order said "Paid with this order".)
+    writes: { kind: "order", text: "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. {paid_within_days_of_delivery?To be paid within [paid_within_days_of_delivery] days of delivery, on your terms.|Paid with this order.}", to: ["=seller"], visible: ["=self", "=seller"],
       data: { kind: "=kind", quantity: "=quantity", unit_price: "#unit_price", deliver_to: "=deliver_to", at: "=at", account: "=account", retry_of: "=retry_of", for_days: "=served_over_days", pay_in_days: "=paid_within_days_of_delivery" } } };
 
 export const TRADE: Issued[] = [

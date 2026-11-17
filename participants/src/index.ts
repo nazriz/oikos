@@ -31,7 +31,7 @@ export { Matters } from "./readers/matters";
 export { KIND as DECISION_KIND, type DecisionLaw, type Need as DecisionNeed } from "./shared/decisions";
 export { particularsOf } from "./shared/frictions";
 export { diaryText } from "./readers/diary";
-export { planLaw, planLawWords, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, possessionOrderFor } from "./shared/papers";
+export { ORDER, planLaw, planLawWords, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, possessionOrderFor } from "./shared/papers";
 import type { BehaviourModule } from "./module";
 // (The kinds whose TypeScript actors were deleted at the cut-over: what is still read of each, the engine runs them.)
 import { bankPaymentSystem, bodyPayroll, disposal, electoralOffice, energy, exportDemand, founded, funding, grants, idle, migration, newspaper, producer, retailer, retirementFund, statistics, taxCollector, trade, transfers, valuer, water, weather } from "./engine-kinds";

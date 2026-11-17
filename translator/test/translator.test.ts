@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { MockAdapter } from "@oikos/participants/llm";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
-import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, LABEL_TEXT, NOT_CHECKED, NOT_PUT, notInDraft, plainer, translatorContext, translatorSystem, UNCLEAR, unsureText } from "../src/index";
+import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, LABEL_TEXT, NOT_CHECKED, NOT_PUT, notInDraft, plainer, translatorContext, translatorSystem, UNCLEAR, UNSURE_ACT, unsureText } from "../src/index";
 
 const law = { id: "law-planning", record: "statement", author: "genesis", at: 0, visible_to: "public", kind: "law", text: "No building without a permit.",
   adico: { deontic: "must_not" }, formal: { language: "cel", condition: "block.block == 'construct' && !holds_liberty(actor, 'build', block.lot)" } } as any;
@@ -128,7 +128,10 @@ test("asked back, a translator may say what was unclear: one of a few fixed sent
   const says = (unsure: unknown) => unsureText(unsure, req);
   expect(says({ kind: "which" })).toBe("It isn't clear which one you mean. Name each person, account, paper and place by its id, as your reports show it in brackets after its name.");
   expect(says({ kind: "words" })).toBe("It isn't clear which words are to go as they stand. Put them in quotation marks.");
+  // (Said beside a draft that was drawn up, so never "nothing was drawn up": a seat told so beside a send it had
+  // confirmed asked for it again and sent the paper twice, town rung 2, 2026-11-17.)
   expect(says({ kind: "act" })).toBe(UNCLEAR);
+  expect(unsureText({ kind: "act" }, req, true)).toBe(UNSURE_ACT);
   // (A form's empty blanks, each with what goes in it, and what a restatement says: told "The council proposal needs:
   // proposal, kind." a 7B model wrote the same words again, 2026-11-10.)
   expect(says({ kind: "form_needs", form: "council_proposal", fields: ["proposal", "kind"] })).toBe("It was read as the council proposal, and these blanks of it are still empty: proposal; kind (one of law, budget, other). Nothing was drawn up. Say it again with the council proposal named and what goes in each of those blanks, in your own words, each named by the blank it is for.");

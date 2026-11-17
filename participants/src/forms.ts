@@ -46,7 +46,10 @@ export interface FormWrites {
 export interface FormClaim { when?: { [field: string]: string }; position: "right" | "liberty" | "power" | "immunity"; holder: string; about: unknown; basis?: string }
 /** The claim a form records, as the act that records it has it. */
 export interface WrittenClaim { position: FormClaim["position"]; holder: string; about: unknown; basis?: string }
-export interface FormData { form: string; office?: string; submit_as: string; submit_to: string[]; fields: { [name: string]: FormFieldSpec }; writes?: FormWrites; copies?: string }
+export interface FormData { form: string; office?: string; submit_as: string; submit_to: string[]; fields: { [name: string]: FormFieldSpec }; writes?: FormWrites; copies?: string;
+  /** A draft of a matter's papers as handed over: the field naming the matter (`=referral`), each of whose papers the
+   * draft carries as its own form writes it from the matter's facts (`papers`). */
+  batch?: string }
 
 /** A field as the form reads it: an amount (a decimal string), a length of time, a date or a count (a number), a
  * list (its ids), or words. */
@@ -176,6 +179,8 @@ function words(v: FieldValue | undefined, type: string | undefined, money: (amou
   if (v === undefined) return "none";
   if (Array.isArray(v)) return v.length ? v.join(", ") : "none";
   if (type === "amount" && typeof v === "string") return money(v);
+  // (A sum given as a number is a sum too: money reads as money on every paper. The kernel, the same.)
+  if (type === "amount" && typeof v === "number" && Number.isSafeInteger(v)) return money(String(v));
   if (type === "duration" && typeof v === "number") return durationWords(v);
   if (type === "date" && typeof v === "number") return dateWords(v);
   return String(v);
@@ -189,7 +194,11 @@ export function writePaper(spec: FormData, fields: Filled, o: { self: string; no
   const w = spec.writes;
   if (!w) throw new FormError("this form writes no paper of its own");
   const env: Env = { fields, self: o.self, now: o.now };
-  const inWords = (t: string) => t.replace(/\{([a-z_][a-z0-9_]{0,31})\}/g, (_, name: string) => (name === "self" ? o.self : words(fields[name], spec.fields[name]?.type, o.money)));
+  // (Words that depend on whether a blank is given: `{name?words if it is|words if not}`, the words if it is naming it
+  // by `[name]`. An order on terms says when it is to be paid; one paid with it says so. The kernel's `fill_text`, the same.)
+  const inWords = (t: string) => t
+    .replace(/\{([a-z_][a-z0-9_]{0,31})\?([^|{}]*)\|([^{}]*)\}/g, (_, name: string, yes: string, no: string) => (fields[name] !== undefined ? yes : no).replace(/\[([a-z_][a-z0-9_]{0,31})\]/g, (__, n: string) => words(fields[n], spec.fields[n]?.type, o.money)))
+    .replace(/\{([a-z_][a-z0-9_]{0,31})\}/g, (_, name: string) => (name === "self" ? o.self : words(fields[name], spec.fields[name]?.type, o.money)));
   const text = o.text ?? notTwice(w.text, inWords);
   const data = w.data === undefined ? undefined : fill(w.data, env);
   // (A paper a draft carries, as it would go: its words written from the fields as the paper's own are. Until

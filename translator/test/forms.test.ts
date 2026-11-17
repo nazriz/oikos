@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import Ajv2020 from "ajv/dist/2020";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { calls, canonical, clientDraftOf, clientPapers, forms } from "@oikos/participants";
+import { ASSISTANT_ISSUES, calls, canonical, clientDraftOf, clientPapers, forms, ORDER } from "@oikos/participants";
 import FORMS from "../../contracts/test/forms.json";
 import { MockAdapter } from "@oikos/participants/llm";
 import { createTranslator, formRules, formShown } from "../src/index";
@@ -98,6 +98,24 @@ test("a signed copy sent is previewed as that copy, under its sign-off, and not 
   k.absorb({ ...FORMS.observation, channels: { mine: { kind: "records", records: [{ id: "rec.90", record: "statement", kind: blk.kind, text: blk.text, addressed_to: blk.addressed_to, data: blk.data, ...(blk.basis ? { basis: blk.basis } : {}), visible_to: blk.visible_to, at: 3 * 86_400 + 600, author: "x", speaks_for: "city", in_position: "registry" }] } } } as any);
   const twice = new Preview(k, "city", undefined, "registry").of(sent.blocks);
   expect(twice).toContain("It has gone already: this same paper was sent as rec.90 on year 1, day 4, and this sends it a second time.");
+  // (2026-11-17) And asked for again, it is not drawn up: a signed paper goes once, as the post's own file shows it gone.
+  // The town rung 2: a factory sent one signed invoice twice in a sitting, and it was paid twice.
+  const again = resolve(calls.parseProgram("form(form=send_signed, sign_off=rec.81)"), k, () => undefined, "registry");
+  expect(again.ok).toBe(false);
+  if (!again.ok) expect(again.questions.join(" ")).toBe("This paper went already on year 1, day 4, as rec.90. A signed paper goes once: rec.81 has been sent. Nothing was done.");
+  // Asked for in full, the form named by its id and the copy named, the rules draw it as asked and the world refuses it.
+  const named = formRules(calls.parseProgram("none(unclear)"), "Send as signed (form-registry-send-signed): sign_off rec.81.", k);
+  expect(calls.programText(named)).toContain("form=send_signed");
+  const namedAgain = resolve(named as any, k, () => undefined, "registry");
+  expect(!namedAgain.ok && namedAgain.questions.join(" ")).toContain("A signed paper goes once: rec.81 has been sent.");
+  // The same within a sitting, confirmed and not yet on file: held as sent from the moment it is confirmed.
+  const k2 = seat();
+  const first = resolve(calls.parseProgram("form(form=send_signed, sign_off=rec.81)"), k2, () => undefined, "registry");
+  if (!first.ok) throw new Error(first.questions.join(" "));
+  k2.sending(first.blocks as unknown[], 5 * 86_400);
+  expect(k2.twice(first.blocks as unknown[])).toMatchObject({ pending: true });
+  const second = resolve(calls.parseProgram("form(form=send_signed, sign_off=rec.81)"), k2, () => undefined, "registry");
+  expect(!second.ok && second.questions.join(" ")).toContain("This paper went already on year 1, day 6, when you confirmed sending it.");
   // (2026-11-17) A sign-off of a draft of several papers: sent all together on it, each as it stands and said so.
   const papers = [{ kind: "rates_notice", text: "Rates notice: 10.00.", to: ["c1"], visible: ["city", "c1"], data: { amount: 1000 } }, { kind: "rates_notice", text: "Rates notice: 20.00.", to: ["c2"], visible: ["city", "c2"], data: { amount: 2000 } }];
   k.absorb({ ...FORMS.observation, channels: { mine: { kind: "records", records: [{ id: "rec.95", record: "statement", kind: "sign_off", text: "Signed.", addressed_to: ["city"], data: { draft: "rec.94", referral: "rec.93", papers }, visible_to: ["city"], at: 4 * 86_400, author: "y", speaks_for: "city" }] } } } as any);
@@ -383,4 +401,40 @@ test("a form the request names, with every blank it requires named, is drawn fro
   expect(drawn("Fill in form-desk-draft-stay-on-request: client c0100; landlord landlord-12; lease lease-c0100; home apts-12/dwelling.12; notice rec.6; referral rec.5."))
     .toBe('form(client=c0100, form=draft_stay_on_request, home="apts-12/dwelling.12", landlord=landlord-12, lease=lease-c0100, notice=rec.6, referral=rec.5, to=desk)');
   expect(drawn("Fill in form-desk-draft-stay-on-request: client c0100; landlord landlord-12; lease lease-c0100; notice rec.6; referral rec.5.")).toBe("none(unclear)");
+});
+
+test("an order's words say what it does, and money reads as money however the sum is given (2026-11-17)", () => {
+  // (The town rung 2: orders on 30-day terms said "Paid with this order", and four seats held delivery notes over it; a
+  // code assistant's orders read "102 food at 12727 each".)
+  const money = (a: string) => `$${(Number(a) / 100).toFixed(2)}`;
+  const base = { seller: "factory-10", kind: "food", quantity: 102, deliver_to: "shop-9", at: "shop-9-premises", account: "acc-shop-9" };
+  const write = (more: object) => forms.writePaper(ORDER as any, { ...base, ...more } as any, { self: "shop-9", now: 0, money }).text;
+  expect(write({ unit_price: "12727", paid_within_days_of_delivery: 30 })).toBe("Order: 102 food at $127.27 each, delivered to shop-9 at shop-9-premises. To be paid within 30 days of delivery, on your terms.");
+  expect(write({ unit_price: "12727" })).toBe("Order: 102 food at $127.27 each, delivered to shop-9 at shop-9-premises. Paid with this order.");
+  expect(write({ unit_price: 12727 })).toContain("at $127.27 each");
+});
+
+test("a matter that is the same paper to each of several is drafted as one, each paper as the matter gives it, for one sign-off (2026-11-17)", () => {
+  // (The town rung 2: the rates seat drafted a run's 204 notices one by one, 204 sign-offs, 46% of the run's cost.)
+  const k = seat();
+  const notice = { form: "rates_notice", fields: { owner: { type: "entity", required: true }, amount: { type: "amount", required: true }, lots: { type: "list", required: true } },
+    writes: { kind: "rates_notice", text: "Rates notice: {amount} on {lots}.", to: ["=owner"], visible: ["=self", "=owner"], data: { amount: "#amount", lots: "=lots" } } };
+  const facts = { papers: [{ owner: "c1", amount: "68495", lots: ["lot-1"] }, { owner: "c2", amount: "62147", lots: ["lot-2"] }], composed_on: [{ spec: notice, bind: null }, { spec: notice, bind: null }] };
+  const batch = (ASSISTANT_ISSUES as any[]).find((x) => x.form === "draft_as_handed");
+  k.absorb({ ...FORMS.observation, channels: { mine: { kind: "records", records: [
+    { id: "form-registry-draft-as-handed", record: "statement", kind: "form", text: "Draft as handed.", at: 0, author: "x", speaks_for: "city", visible_to: ["city"], data: { ...batch, office: "registry", submit_as: "registry", submit_to: ["registry"] } },
+    { id: "rec.70", record: "statement", kind: "referral", text: "For you to draft for sign-off: rates notices.", at: 86_400, author: "y", speaks_for: "city", addressed_to: ["registry"], visible_to: ["city"], data: { kind: "rates_notice", wants: "draft", depth: "matter", facts } },
+  ] } } } as any);
+  const r = resolve(calls.parseProgram("form(form=draft_as_handed, referral=rec.70, to=registry)"), k, () => undefined, "registry");
+  if (!r.ok) throw new Error(r.questions.join(" "));
+  const papers = (r.blocks[0] as any).data.papers;
+  expect((r.blocks[0] as any).kind).toBe("draft");
+  expect(papers.map((p: any) => [p.kind, p.to, p.data.amount])).toEqual([["rates_notice", ["c1"], 68495], ["rates_notice", ["c2"], 62147]]);
+  expect(papers[0].text).toBe("Rates notice: XYZ 684.95 on lot-1.");
+  // Named by its id with its one blank, drawn as named (rule fromNamed), and so drafted whole.
+  const named = formRules(calls.parseProgram("none(unclear)"), "Fill in form-registry-draft-as-handed: referral rec.70.", k);
+  expect(calls.programText(named)).toBe("form(form=draft_as_handed, referral=rec.70, to=registry)");
+  const asNamed = resolve(named as any, k, () => undefined, "registry");
+  if (!asNamed.ok) throw new Error(asNamed.questions.join(" "));
+  expect((asNamed.blocks[0] as any).data.papers).toHaveLength(2);
 });

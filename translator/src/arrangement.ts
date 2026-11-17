@@ -290,7 +290,7 @@ export function createAlone(one: One) {
         // about an id the seat itself wrote is a false alarm. The broad rung's second run, 2026-11-18: thirty correct rates
         // notices declined for it. Kept wherever an id is not so written, or two could fill the blank.)
         const falseWhich = (answered?.unsure as { kind?: string } | undefined)?.kind === "which" && (() => { try { return everyIdNamed(calls.parseProgram(t.draft.call), req.proposal); } catch { return false; } })();
-        const unclear = answered?.withheld && answered.unsure && !falseWhich ? unsureText(answered.unsure, req) : undefined;
+        const unclear = answered?.withheld && answered.unsure && !falseWhich ? unsureText(answered.unsure, req, true) : undefined;
         return { ...t, ...(unclear ? { told: [unclear, UNSURE_DRAFT] } : {}), route: { arrangement: "alone", used: "first", stage, ...(unclear ? { unsure_offered: true } : {}), first: side } };
       }
       if (!restated) {

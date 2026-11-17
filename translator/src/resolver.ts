@@ -66,6 +66,10 @@ export function toldAlike(a: string | null | undefined, b: string | null | undef
 
 class Ask extends Error {}
 
+/** What a seat is told of a second send of a signed copy, or of a paper sent back sent again a second time (fixed). */
+export const wentWords = (id: string, went: { id: string; at: number; pending?: true }, returned: boolean) =>
+  `This paper went already${` on ${forms.dateWords(Math.floor(went.at / 86_400) * 86_400)}, ${went.pending ? "when you confirmed sending it" : `as ${went.id}`}`}. ${returned ? `A paper sent back goes again once for each time it is sent back: ${id} has been answered so.` : `A signed paper goes once: ${id} has been sent.`} Nothing was done.`;
+
 /** What a seat naming a sign-off that carries no paper is told (kernel/crates/resolver `no_paper_words`, word for word):
  * a sign-off of a draft written as acts, not on a form, has nothing on it to send (2026-11-14: the scope pilot's
  * baseline answered 55 such sends "no signed copy on file", as if the seat had named the wrong record). */
@@ -886,7 +890,7 @@ class Resolver {
       const where = [...new Set(elsewhere.map((x) => Knowledge.formOf(x)))];
       throw new Ask(`The ${name.replace(/_/g, " ")} form isn't one ${to} takes: it goes to ${where.join(" or ")}.`);
     }
-    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } }; writes?: forms.FormWrites; copies?: string };
+    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } }; writes?: forms.FormWrites; copies?: string; batch?: string };
     const data: { [k: string]: unknown } = {};
     const missing: string[] = [];
     for (const [field, t] of Object.entries(spec.fields)) {
@@ -938,6 +942,13 @@ class Resolver {
       if (!paper) throw new Ask(`You have no signed copy on file as ${id}: name the sign-off that came back with the paper signed.`);
       // (A sign-off of several papers sends them all, each as it stands: `papers`; else the one.)
       const each: any[] = Array.isArray((paper as any).papers) ? (paper as any).papers : [paper];
+      // (A signed copy goes once from its sign-off, and a paper sent back goes again once for each time it came back: a
+      // second is refused, as the post's own file shows it gone. The town rung 2: a factory sent one signed invoice
+      // twice in a sitting, and it was paid twice; a desk sent one returned claim three times.)
+      for (const one of each) {
+        const went = this.k.sentFrom({ kind: one.kind, text: one.text, to: one.to, data: one.data, basis: one.basis }, this.k.signedAt.get(id) ?? 0);
+        if (went) throw new Ask(wentWords(id, went, this.k.returnOf && [...this.k.returnOf.values()].includes(id)));
+      }
       const out: Block[] = [];
       for (const [n, one] of each.entries()) {
         const block: Block = { block: "publish", kind: one.kind, text: String(one.text ?? "").slice(0, 16384) } as Block;
@@ -955,6 +966,27 @@ class Resolver {
     }
     // A paper of the office's own (contracts: FormWrites): written from the fields as the form says, the statement
     // the rest of the world reads. It does not cite the form.
+    // A draft of a matter's papers as handed over (FormData `batch`): each paper the matter gives, written on its own
+    // form from the matter's facts, carried in the one draft (`papers`), for one sign-off and one send.
+    let batch: { kind: unknown; text: string; to?: unknown; visible?: unknown; basis?: unknown; data?: unknown }[] | undefined;
+    if (typeof spec.batch === "string" && spec.batch.startsWith("=")) {
+      const rid = String(data[spec.batch.slice(1)] ?? "");
+      const facts = this.k.handedFacts.get(rid);
+      const on: any[] = Array.isArray(facts?.composed_on) ? facts.composed_on : [];
+      const blanks: any[] = Array.isArray(facts?.papers) ? facts.papers : facts ? [facts] : [];
+      if (!on.length || on.length !== blanks.length) throw new Ask(`${rid} is not a matter handed over as what happened, with its papers set out: draft its paper on the office's own form for it.`);
+      const by = this.k.referrals.get(rid);
+      batch = blanks.map((b, i) => {
+        const { composed_on: _c, ...given } = b ?? {};
+        const p = this.written(() => forms.writePaper(on[i].spec as forms.FormData, given as forms.Filled, { self: typeof by === "string" ? by : this.me, now: this.k.t, money: (a) => this.sum(a) }));
+        return { kind: p.kind, text: p.text, ...(p.addressed_to ? { to: p.addressed_to } : {}), ...(p.visible_to ? { visible: p.visible_to } : {}), ...(p.basis ? { basis: p.basis } : {}), ...(p.data !== undefined ? { data: p.data } : {}) };
+      });
+    }
+    if (spec.writes && batch) {
+      const me = this.id(c, "for") ?? this.me;
+      const paper = this.written(() => forms.writePaper(spec as forms.FormData, data as forms.Filled, { self: me, now: this.k.t, money: (a) => this.sum(a) }));
+      return [{ block: "publish", ...paper, data: { ...(paper.data as object), papers: batch }, text: paper.text.slice(0, 16384), speaks_for: me, ...(bind ? { ref: bind } : {}) } as Block];
+    }
     if (spec.writes) {
       // (In the name of whom the form says, where it names a field for it: a client's paper is the client's. Rung 1's
       // investigation, 2026-11-14: a desk's paper filed outright went in its provider's name, so no body asked for the

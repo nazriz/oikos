@@ -34,7 +34,7 @@ import { culture as cultureNs, reading as readingNs } from "@oikos/participants"
 import { DayBook, Matters, calls, canonical, diaryText, forms, DECISIONS, OUTCOMES, WORDS, type Words, inCurrency, inCalendar, modules as builtin, Randomness, Roster, Tally, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type OutcomeRecord, formatMoney, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { lexiconReader, READING_TABLE, Tagger, READING_VERSION, type Reader, type ReadingTable } from "@oikos/participants/llm";
 import { ACCOUNT_TOKENS, ACCOUNT_VERSION, ACCOUNTS_DEFAULT, ACCOUNTS_MOST, darkAccount, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, endNeedMicroUsd, keptBackFor, reserveOrRefuse, reckonedEndMicroUsd, type EndCosts, type MockPolicy, mockAccount, sampleAccounts, stepsOf, writeAccount, type AccountBrief, type AccountCounts, type DebriefInput, type DebriefWording, COMPOSE_VERSION, createCompose, mockCompose, type ComposerConfig, CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
-import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
+import { createArrangement, createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, wentWords, type Draft, type Resolution, type Route, NOT_CHECKED } from "@oikos/translator";
 import { Draws } from "./draws";
 import { Kernel } from "./kernel";
 import { DetachedActor, joinRaw, RAW, rustManifests } from "./rust-world";
@@ -848,6 +848,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // (With two translators as one: a draft of the first's that is declined sends the seat's next request behind.)
     arranged?.signed(d.id, decision);
     if (decision !== "accept") return;
+    // (The same paper confirmed twice in a sitting, drawn twice before the first was confirmed: the second is not sent.)
+    const twice = u.knowledge.twice(d.blocks as unknown[]);
+    if (twice) {
+      await notSent(u, "confirmed", `${d.id}: ${wentWords("it", twice, false)}`, { sent_twice_refused: d.id });
+      return;
+    }
     const as = d.as ?? capacityOf(u);
     // (Done by whom, where the request named someone of its staff: the roster says who they are, as it did when the request was drawn up.)
     let by: string[] | undefined;
@@ -855,6 +861,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const r = await begin(u, { command: "act", participant: u.participant, ...(as ? { as } : {}), blocks: d.blocks, ...(by?.length ? { by } : {}),
       provenance: { via: "translator", proposal: d.proposal, draft: d.id, draft_hash: p.hash, translator: d.translator, call: d.call, resolver: d.resolver }, ...(p.reasoning ? { reasoning: p.reasoning } : {}) });
     if (r !== null) u.llm?.matters?.own(d.blocks as any[], t);
+    // (What it confirmed to send is sent, as far as its own file goes, from now: translator/src/knowledge.ts `sending`.)
+    if (r !== null) u.knowledge.sending(d.blocks as unknown[], t);
     if (r === null) await notSent(u, "confirmed", `What you confirmed (${d.id}) could not be put into effect as it was drawn up, and nothing was done. You could ask for it again, in other words.`, { rejected_draft: d.id });
     // A standing work order of an office with nobody in post: on file, and said plainly with its result that nobody
     // follows it yet (a works manager set two for a crew of nobody and waited a month: 2026-10-09).
