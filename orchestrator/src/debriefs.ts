@@ -110,8 +110,11 @@ const scaleNumber = (id: string, word: string): number | null => { const i = SCA
  * read is not (`isNotRead`), whatever an older record's `kept_back` says: before script 0.7.1 such steps were listed
  * there, though the seat had chosen nothing of the kind. */
 export const isKeptBack = (r: DebriefRecord, s: DebriefStep) => (s.id === "consent" || s.id === "publication" ? r.kept_back_all : r.kept_back_all || (!s.unread && r.kept_back.includes(s.id)));
-/** Whether a step's answer could not be read (ours): not published, and reported as not read, never as kept back. */
-export const isNotRead = (r: DebriefRecord, s: DebriefStep) => !!s.unread && !isKeptBack(r, s);
+/** Whether a step's answer could not be read (ours): not published, and reported as not read, never as kept back. Where
+ * the seat's answer to the publication question could not be read, none of its answers is published: what it meant for
+ * them at its last word cannot be told, and an unread choice never defaults to publishing (the 14-day check,
+ * 2026-11-17: two such answers would have published every answer under the standing before it). */
+export const isNotRead = (r: DebriefRecord, s: DebriefStep) => (!!s.unread || (s.id !== "consent" && r.steps.some((x) => x.id === "publication" && x.unread))) && !isKeptBack(r, s);
 
 /**
  * A run's debriefs as rows: those published (one a step; a step kept back is a row that says so and nothing more),

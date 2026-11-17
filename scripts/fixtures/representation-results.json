@@ -1,5 +1,5 @@
 {
- "//": "The 30-day results of each town (worlds/town.yaml, worlds/town-1000.yaml; profiles au-vic-2026, gb-eng-2026, us-oh-2026) at 4 engine threads, taken at 7816af1c by `bun scripts/same-results.ts --pin scripts/fixtures/representation-results.json`. orchestrator/test/representation.test.ts holds every build to them: a change of representation leaves them byte-identical. A change meant to change results re-takes them, in its own commit, with the reason.",
+ "//": "The 30-day results of each town (worlds/town.yaml, worlds/town-1000.yaml; profiles au-vic-2026, gb-eng-2026, us-oh-2026) at 4 engine threads, taken at 83fb0008 by `bun scripts/same-results.ts --pin scripts/fixtures/representation-results.json`. orchestrator/test/representation.test.ts holds every build to them: a change of representation leaves them byte-identical. A change meant to change results re-takes them, in its own commit, with the reason.",
  "towns": {
   "200-au-vic-2026": {
    "state_hash": "3d5175f3cae84b7c45477afc0dc8eb94944304bbe07b7d2d29eec622fec09d23",
@@ -14,16 +14,16 @@
    "log_sha256": "5ef143eb125a69cb05cf7c2f1fc59e065c5df1f033589d49aeec84fb10485df9"
   },
   "1000-au-vic-2026": {
-   "state_hash": "b2d42bdf9248f39a5a34b481a4c4949807a5565bf262a566850d07a5f935472d",
-   "log_sha256": "fcdf99ec0d879348f3a61608b9c4bfe6a17abf3f1786af3d16bfb92197827e57"
+   "state_hash": "821252a2cc51bd6782db49e2a29489a59e40ffb10a589da259c72957625a0092",
+   "log_sha256": "8a9e1291c31eac232434c1a594209faa7a7a9f0cad5d3fb0caee8e357a00a82b"
   },
   "1000-gb-eng-2026": {
    "state_hash": "73725a5ed649a5dd78f26bd49e77eda1bed2413095922d6dfe84703d7be8383e",
    "log_sha256": "c9a9ec69cd93302035a29908a3ef51c5c03a1e4e6c8c7bbc395e636af70c2586"
   },
   "1000-us-oh-2026": {
-   "state_hash": "9b3af2e4c237d0fd41ca5c9fb59ec050545f5c9e87bed3363260d679067d91ec",
-   "log_sha256": "f9005201b2e25d4481182dd3136099b8c556370c0914d5fd99076bb0ed7a61ed"
+   "state_hash": "4bae697ff98f8ea5ee1d6aaa9cfa0a37e15b687497a06e060d222f01897fe424",
+   "log_sha256": "cf4dd97ebd30cee96a09a7a1d3414bf19ce84563991e73572f3c5fc54811db9b"
   }
  }
 }

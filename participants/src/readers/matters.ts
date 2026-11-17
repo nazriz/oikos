@@ -36,10 +36,13 @@ const WORDS = 240;
 /** A body's paper a client passed on about a matter: an answer, or (with `due`) what it asks for by a date. */
 interface Passed { id: string; at: number; by: string; text: string; due?: number }
 
-interface Matter { id: string; at: number; kind: string; from: string; wants?: string; told?: string[]; replyTo?: string; words?: string; firstDraft?: number; mine?: number; refs?: { id: string; whose: string; in: string }[]; sits?: { every: number; next: number }; due?: { at: number; on: string }; advised?: number; signed?: { id: string; at: number; paper?: any }; declined?: number; draft?: number; sent?: number; report?: { id?: string; at: number; done: boolean; why?: string }; answer?: Passed; asks?: Passed; cites?: string[] }
+interface Matter { id: string; at: number; kind: string; from: string; wants?: string; told?: string[]; replyTo?: string; words?: string; firstDraft?: number; mine?: number; refs?: { id: string; whose: string; in: string }[]; sits?: { every: number; next: number }; due?: { at: number; on: string }; advised?: number; signed?: { id: string; at: number; paper?: any }; declined?: number; draft?: number; sent?: number; sends?: { at: number; id?: string }[]; report?: { id?: string; at: number; done: boolean; why?: string }; answer?: Passed; asks?: Passed; cites?: string[] }
 
 const ref = (r: Paper): string | undefined => (typeof (r as any).data?.referral === "string" ? (r as any).data.referral : undefined);
-const same = (p: any, b: any) => p && p.kind === b.kind && JSON.stringify(p.to ?? []) === JSON.stringify(b.addressed_to ?? []) && JSON.stringify(p.data ?? null) === JSON.stringify(b.data ?? null);
+/** Data with its keys in order, and a list of ids as a set: one paper however its parts were written. */
+const norm = (x: unknown): unknown => (Array.isArray(x) ? x.map(norm) : x && typeof x === "object" ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, norm((x as any)[k])])) : x);
+const idSet = (x: unknown) => JSON.stringify((x === undefined || x === null ? [] : Array.isArray(x) ? x : [x]).map(String).sort());
+const same = (p: any, b: any) => p && p.kind === b.kind && idSet(p.to) === idSet(b.addressed_to) && JSON.stringify(norm(p.data ?? null)) === JSON.stringify(norm(b.data ?? null));
 /** The day a paper a matter came from names, as its referral gives it (docs/design/stakes.md, C1). */
 const dueOf = (d: any): { due?: { at: number; on: string } } => (Number.isSafeInteger(Number(d?.due)) && d?.due !== null && d?.due !== undefined && typeof d?.due_on === "string" ? { due: { at: Number(d.due), on: d.due_on } } : {});
 /** The most cited papers looked up at one sitting. */
@@ -111,7 +114,7 @@ export class Matters {
    * authority. Each a fact as it came, taken in once: a later look that shows the same paper again changes nothing (the
    * stakes run's rung 1 (situation), 2026-11-16: a look at a return of day 18 reset the line to "no recording ... has
    * reached you" three days after the recording had). */
-  private readonly returns = new Map<string, { key: string; at: number; by: string; wanted: boolean }>();
+  private readonly returns = new Map<string, { key: string; at: number; by: string; wanted: boolean; paper?: any }>();
   /** Authorities recorded for the post's clients, by id: for whom, by whom (none: the paper does not say). */
   private readonly recorded = new Map<string, { for: string; at: number; by?: string }>();
   /** Papers its clients passed on to it, by the forward's id: the body's paper it holds, and the matter it came on. */
@@ -193,7 +196,7 @@ export class Matters {
     }
     const d = (r as any).data ?? {};
     if (k === "paper_returned" && typeof d.for === "string" && typeof d.paper?.kind === "string") {
-      if (!this.returns.has(r.id)) this.returns.set(r.id, { key: `${d.for}|${d.paper.kind}`, at: r.at, by: String(d.by ?? (r as any).speaks_for ?? ""), wanted: !!d.need?.authority });
+      if (!this.returns.has(r.id)) this.returns.set(r.id, { key: `${d.for}|${d.paper.kind}`, at: r.at, by: String(d.by ?? (r as any).speaks_for ?? ""), wanted: !!d.need?.authority, paper: d.paper });
       return;
     }
     if (k === "authority_recorded" && typeof d.for === "string") {
@@ -213,6 +216,8 @@ export class Matters {
       return;
     }
     if (k === "draft") { this.ownDraft(idsIn(d), r.at, ref(r)); return; }
+    // (A paper of a matter's that went from the post, on its record: said on the matter's line.)
+    if (typeof (r as any).in_position === "string" && this.sentPaper(r, r.at, r.id)) return;
     const m = this.matters.get(ref(r) ?? "");
     if (!m) return;
     // (The latest of each kind of paper on a matter is what it goes by: the file is read newest first.)
@@ -288,7 +293,8 @@ export class Matters {
     const rec = (p: string): Paper[] => (chans?.[p]?.kind === "records" ? chans[p].records ?? [] : []);
     for (const r of rec(this.matterPath)) this.take(r);
     const others = Object.keys(chans ?? {}).filter((p) => p !== this.matterPath && p !== this.filePath);
-    for (const p of others) for (const r of rec(p)) if (isBack(r)) this.take(r);
+    // (And the papers it sees that went from a post: a send on a matter, when it is one.)
+    for (const p of others) for (const r of rec(p)) if (isBack(r) || typeof (r as any).in_position === "string") this.take(r);
     // (What the look-ups for cited papers found: kept, and set out with the matters that cite them, not as a look.)
     let o: Observation = obs;
     if (this.citedPath && this.looking && chans?.[this.citedPath]?.search) {
@@ -353,8 +359,28 @@ export class Matters {
       if (b.kind === "report" && m) m.report = { at: t, done: b.data?.done === true || b.data?.done === "yes", ...(typeof b.data?.why === "string" ? { why: b.data.why } : {}) };
       else if (b.kind === "draft") this.ownDraft(idsIn(b.data), t, m?.id, true);
       else if (b.kind === "advice" && m) m.advised = t;
-      else for (const x of this.matters.values()) if (x.signed && x.sent === undefined && same(x.signed.paper, b)) { x.sent = t; break; }
+      else this.sentPaper(b, t);
     }
+  }
+
+  /** A paper the post sent that is a matter's (its signed paper, or the paper a body sent back on it): taken as a send
+   * on that matter, once (its record, when it comes, takes the place of the seat's own confirmation of it). What has
+   * gone on a matter is said on its line from these, not left to the seat's notebook (the 14-day check, 2026-11-17: a
+   * desk's notebook lost "Re-sent rec.16612 and rec.16722", its matters said nothing of it, and it sent both again). */
+  private sentPaper(b: any, at: number, id?: string): boolean {
+    for (const m of this.matters.values()) {
+      const backs = [...this.returns.values()].filter((x) => x.key === `${m.from}|${m.kind}` && x.paper);
+      if (!(m.signed?.paper && same(m.signed.paper, b)) && !backs.some((x) => same(x.paper, b))) continue;
+      const sends = (m.sends ??= []);
+      if (id && sends.some((s) => s.id === id)) return true;
+      const mine = id ? sends.findIndex((s) => !s.id && s.at <= at) : -1;
+      if (mine >= 0) sends[mine] = { at, id };
+      else sends.push({ at, ...(id ? { id } : {}) });
+      sends.sort((a, c) => a.at - c.at);
+      if (m.sent === undefined) m.sent = at;
+      return true;
+    }
+    return false;
   }
 
   /** Each matter still open, with where it stands; the finished ones counted. Empty before the seat has any. */
@@ -388,11 +414,15 @@ export class Matters {
       const today = Math.floor(this.now / DAY) * DAY;
       const sits = m.sits ? (() => { const step = m.sits!.every * DAY; const first = Math.floor(m.sits!.next / DAY) * DAY; const k = first >= today ? 0 : Math.ceil((today - first) / step); return `; ${m.from} gets to their post ${m.sits!.every === 1 ? "every day" : `every ${m.sits!.every} days`}, next on ${day(first + k * step)}`; })() : "";
       const nothing = m.wants === "advice" ? "no advice given yet" : m.wants === "approve" ? "no request to go ahead yet" : m.wants === "alone" ? "not yet done" : "no draft yet";
+      // (What has gone on it from the post, each send with its day and its record: "sent", or "sent again" for any after the
+      // first or after a body sent it back.)
+      const backAt = rets.map((x) => x.at);
+      const gone = (m.sends ?? []).map((s, i) => `; ${i > 0 || backAt.some((b) => b <= s.at) ? "sent again" : "sent"} on ${day(s.at)}${s.id ? ` as ${s.id}` : " (as you confirmed it)"}`).join("");
       const where = m.signed
         // (Said as whose the report is: "not yet reported" read as a report to come from someone else, and a desk waited
         // for it on eleven matters it had sent (the stakes run's rung 1, 2026-11-15).)
         ? returned ? `signed off on ${day(m.signed.at)} (${m.signed.id})${returned}; you have not reported on it`
-          : m.sent !== undefined ? `signed off on ${day(m.signed.at)} (${m.signed.id}); sent on ${day(m.sent)}; you have not reported on it`
+          : m.sent !== undefined ? `signed off on ${day(m.signed.at)} (${m.signed.id})${gone || `; sent on ${day(m.sent)}`}; you have not reported on it`
           // (Signed off before the seat took the post, and nothing of it seen since: whether it went is not known here.)
           : m.signed.at < (this.arrived ?? 0) ? `signed off on ${day(m.signed.at)} (${m.signed.id}), before you took this post; not reported on` : `signed off on ${day(m.signed.at)} (${m.signed.id}); not yet sent`
         : m.draft !== undefined ? `your draft went for sign-off on ${day(m.draft)}; no answer yet` : nothing;
@@ -416,7 +446,8 @@ export class Matters {
       // stakes run's rung 2b, 2026-11-15: five matters a desk would not draft for a claim it could not find on its file.)
       const unheld = (m.refs ?? []).filter((x) => !this.held.has(x.id) && x.id !== m.id);
       const refs = unheld.length && !this.closed(m) ? `\n  ${unheld.map((x) => `${x.id}: named in ${x.in}, from ${x.whose}; not on your file: cite it as it stands, by that reference`).join("; ")}` : "";
-      open.push(`- [${m.id}] ${m.kind.replace(/_/g, " ")}, handed over by ${m.from} on ${day(m.at)}: ${stands}${authority}${named}${answer}${asks}${this.closed(m) ? "" : sits}.${told}${refs}${cites}`);
+      const goneToo = stands === where && !!m.signed && !returned && m.sent !== undefined ? "" : gone;
+      open.push(`- [${m.id}] ${m.kind.replace(/_/g, " ")}, handed over by ${m.from} on ${day(m.at)}: ${stands}${goneToo}${authority}${named}${answer}${asks}${this.closed(m) ? "" : sits}.${told}${refs}${cites}`);
     }
     const lines = ["Your matters, and where each stands (from your own papers on them, and what your clients passed on to you about them):", ...open.slice(0, MOST)];
     if (open.length > MOST) lines.push(`(And ${open.length - MOST} more open, older.)`);

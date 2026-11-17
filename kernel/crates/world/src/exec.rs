@@ -1901,8 +1901,12 @@ impl<'a> Exec<'a> {
     /// Make and store a record authored by the acting participant, in its capacity. Checks only that
     /// everything it references exists.
     fn new_record(&mut self, body: RecordBody, speaks_for: Option<Id>, visible_to: Option<Visibility>, basis: Option<Basis>) -> R<Id> {
+        // (A post keeps a copy of what it sends, in its own name or another's: a record made in a position is seen by that
+        // position's organisation, whoever else it names. The 14-day check, 2026-11-17: a desk's claims and evidence,
+        // written in its clients' names to their counterparty alone, were not on its own file, and it was told so of papers
+        // it had sent. A person acting as themselves names whom they please: a secret ballot's vote is the counting body's.)
         let visible_to = match visible_to {
-            Some(Visibility::Only(ids)) => Visibility::only(ids.iter().map(|i| self.r(i)).collect::<R<Vec<_>>>()?),
+            Some(Visibility::Only(ids)) => Visibility::only(ids.iter().map(|i| self.r(i)).collect::<R<Vec<_>>>()?.into_iter().chain(self.position.map(|_| self.entity))),
             Some(v) => v,
             None => self.default_visibility(&body, speaks_for.as_deref())?,
         };

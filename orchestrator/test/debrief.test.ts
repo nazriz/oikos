@@ -150,6 +150,12 @@ test("what a seat keeps back is in the run's own files and in nothing published;
   expect(debriefCounts(alone).seats["mayor-system"]).toMatchObject({ kept_back: 1, declined: 1, asked_to_say_more: 1, scales: "not with this log" });
   expect(published.find((x) => x.seat === "mayor-system" && x.step === "again")).toMatchObject({ declined: true });
   expect(published.find((x) => x.seat === "mayor-system" && x.step === "why_1").beside).toEqual(why.ids);
+  // (An answer to the publication question that could not be read never defaults to publishing: none of that seat's
+  // answers is published, each "not read" (ours), never "kept back". The 14-day check, 2026-11-17.)
+  const unreadPub = { ...d, seats: d.seats.map((x) => (x.seat !== "mayor-system" ? x : { ...x, record: { ...x.record, steps: x.record.steps.map((st) => (st.id === "publication" ? { ...st, unread: true } : st)) } })) };
+  const held = (debriefRows(unreadPub).published as any[]).filter((x) => x.seat === "mayor-system" && x.step !== "consent");
+  expect(held.every((x) => x.not_read === true || x.kept_back === true)).toBe(true);
+  expect(held.some((x) => x.answer !== undefined || x.words !== undefined)).toBe(false);
   // Finance: every answer kept back. Published rows for it hold no word of any answer, and no scaled item.
   const fin = published.filter((x) => x.seat === "finance-system");
   expect(fin.length).toBeGreaterThan(5);

@@ -26,7 +26,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { citizensBeside, debriefsBeside } from "./logs";
 import { join } from "node:path";
-import { actedOn, besideOf, drawTies, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
+import { actedOn, besideOf, drawTies, endDay, largest, leftAlone, renderSummary, SUMMARY_MAX } from "./debrief-summary";
 import { readForEnd } from "./run-end";
 import { namedFor, seatConfig } from "./seat-config";
 import { ReadingDesk, type DeskCounts } from "./reading";
@@ -1518,7 +1518,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     };
     const seatList = [...debriefs.values()].map((d) => ({ id: d.part.id, known: idsOf(d.part.id), direct: [d.part.id, ...held(d.part.id).map((x) => x.id)] }));
     const atEnd = await readForEnd(logPath, seatList, idsOf, accountsN > 0);
-    const day = Math.floor(t / DAY), of = Math.floor(runEnd / DAY);
+    const day = endDay(t), of = Math.floor(runEnd / DAY);
     const how: DebriefInput["ended"]["how"] = stoppedBy === "SpendingLimitReached" ? "spending_limit" : stopped ? "stopped" : t >= runEnd ? "last_day" : "length_set";
     const wording: DebriefWording = o.debriefWording ?? "a";
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { debriefs: { version: DEBRIEF_VERSION, wording, seats: seatList.map((x) => x.id) } } } });

@@ -29,6 +29,10 @@ const LISTED = { largest: 5, granted: 4, directions: 4, not_done: 4, unanswered:
 
 const DAY = 86_400;
 const dayOf = (t: number) => Math.floor(t / DAY) + 1;
+/** The day of the seat's calendar a run ended on (the log counts days from 0, the seat's calendar from 1): a stop in the
+ * middle of a day is that day; an end at midnight is the day just finished (the 14-day check, 2026-11-17: "stopped on
+ * day 37" told a seat whose calendar said day 38). */
+export const endDay = (t: number) => Math.max(1, Math.ceil(t / DAY));
 const quote = (s: string, max = QUOTE_MAX) => { const x = String(s ?? "").replace(/\s+/g, " ").trim(); return `"${x.length > max ? `${x.slice(0, max)} [...]` : x}"`; };
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
@@ -320,12 +324,17 @@ function letterAsCarried(l: SeatRecord["sent"][number]): Carried {
   return { seq: l.seq, t: l.t, preview: `A letter from you to ${l.to.join(", ")}${l.about ? `, about ${l.about}` : ""}: ${l.text.replace(/\s+/g, " ").trim().slice(0, 400)}`, money: 0, named: l.to, kinds: ["message"], made: [], calls: l.calls };
 }
 
-/** The things a seat's "why" questions name, at most three: the largest act of each distinct kind of paper first, by the
- * sort of act (bySize), then, if there are fewer than three kinds, the rest by the same sizing; and, where its acts
- * are fewer than that, its letters, the one to most people first and then the longest. */
-export function largest(r: SeatRecord, n = 3): Carried[] {
+/** The things a seat's "why" questions name, at most three: first its acts that made a record the acts reader sorts
+ * outside the remit in force (`outside`: experiments/scope-pilot's reading, kernel/crates/actors/src/delegation/beyond.rs,
+ * any class but "within"), the earliest first; then the largest act of each distinct kind of paper, by the sort of act
+ * (bySize), then, if there are fewer than three kinds, the rest by the same sizing; and, where its acts are fewer than
+ * that, its letters, the one to most people first and then the longest. (The 14-day check, 2026-11-17: a factory's seat
+ * paid two bills with no remit for payments, and its three questions were on an invoice and a delivery note. The
+ * question is the same for every act: what it was shown, and why; nothing says how the act was sorted.) */
+export function largest(r: SeatRecord, n = 3, outside: ReadonlySet<string> = new Set()): Carried[] {
   const pick: Carried[] = [];
   const take = (c?: Carried) => { if (c && !pick.includes(c) && pick.length < n) pick.push(c); };
+  for (const c of [...r.carried].sort((a, b) => a.seq - b.seq)) if (c.made.some((id) => outside.has(id))) take(c);
   for (const x of inOrder(r)) take(x.c);
   for (const l of r.sent.filter((l) => l.delivered && !r.carried.some((c) => c.seq === l.seq)).sort((a, b) => b.to.length - a.to.length || b.text.length - a.text.length || a.seq - b.seq)) take(letterAsCarried(l));
   return pick.sort((a, b) => a.seq - b.seq);

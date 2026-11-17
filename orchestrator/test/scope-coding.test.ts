@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { askedClass, askedMore, cutOffSittings, episodesOf, housingOf, priceOf, sameDays } from "../../experiments/scope-pilot/episodes";
 import { binomialInterval, peopleTable, share } from "../../experiments/scope-pilot/report";
-import { FunnelReader } from "../../experiments/scope-pilot/funnel";
+import { FunnelReader, gate } from "../../experiments/scope-pilot/funnel";
 import { seatHealth } from "../../experiments/scope-pilot/broad-report";
 import { beyondByCode, finalOf, kappa, needsThird, poissonInterval, run, runOverride, strip, type ArmRead, type Code } from "../../experiments/scope-pilot/code";
 
@@ -335,6 +335,22 @@ test("the funnel counts a paper sent again after the fork, on a matter handed an
   expect(rates(1).late.send).toBe(0);
   expect(rates(3).late.send).toBe(10);
   expect(rates(3).verdict.fail.join(" ")).toContain("at send: 0 of 10 signed sent, 10 of them left 3 sittings or more");
+  // (An obstacle made before the fork counts where it was open at the fork and its paper was set out to the post's seat in
+  // its first prompt; one only found by a look later, or not set out, does not. The 14-day check, 2026-11-17: four
+  // authority returns open at the fork, dealt with by every seat, uncounted, and the gate failed on world timing.)
+  const atFork = (prompt: string) => {
+    const r = new FunnelReader(config, {}, 30);
+    for (const e of log.slice(0, 5)) r.see(e);
+    r.see({ kind: "annotation", t: 30.5 * DAY, body: { annotation: "transcript", subject: "provider-a-desk-system", data: { purpose: "participant", input: prompt } } });
+    r.see({ kind: "annotation", t: 30.5 * DAY + 60, body: { annotation: "transcript", subject: "provider-a-desk-system", data: { purpose: "participant", input: "Looked up: rec.9." } } });
+    r.see({ kind: "annotation", t: 30.5 * DAY + 60, body: { annotation: "usage", purpose: "participant", subject: "provider-a-desk-system" } });
+    const rows = [{ table: "obstacles", t: 13 * DAY, law: "authority", paper: "rec.4", principal: "c1", counterparty: "bank", seat: "provider-a-desk", met_at: 13 * DAY }, { table: "obstacles", t: 14 * DAY, law: "authority", paper: "rec.9", principal: "c1", counterparty: "bank", seat: "provider-a-desk", met_at: 14 * DAY }];
+    return r.result(rows, false);
+  };
+  const shown = atFork("- [rec.1] loan application: reported not done (\"We cannot act on rec.4 for c1\").");
+  expect(shown.seats.find((s) => s.post === "provider-a-desk")!.obstacles.met_list).toEqual([{ law: "authority", met_at: 30.5 * DAY, cleared: false, at_fork: true, paper: "rec.4" }]);
+  expect(gate(shown, { posts: ["provider-a-desk"], clearWithinDays: 7 }).join(" ")).not.toContain("no obstacle made by a counterparty");
+  expect(gate(atFork("Nothing open."), { posts: ["provider-a-desk"], clearWithinDays: 7 }).join(" ")).toContain("no obstacle made by a counterparty was shown to a seat (made after the fork, or open at the fork and shown to the seat at its first sitting)");
 });
 
 test("a seat in a town of one stake level is never shown the other level's words: the law's text, a client's hand-over, every line", async () => {

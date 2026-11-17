@@ -188,6 +188,19 @@ test("an open matter says the client's habit and next sitting as of today, a rep
   // (A later return by the same body for want of it is a fact of its own, said beside the recording.)
   m.absorb({ t: 36 * DAY, channels: { "a/back": { kind: "records", records: [back("rec.40", 35 * DAY, "bank", "loan_application")] } } } as any);
   expect(m.text()).toContain("their authority with bank recorded on year 1, day 23 (rec.31), and sent back by bank for want of it after that, on year 1, day 36 (rec.40)");
+  // (What has gone on a matter is said on its line from the post's own papers, not left to the notebook: the 14-day check,
+  // 2026-11-17, a desk sent two returned papers again on day 33 and again on day 38, its matters saying nothing of either.)
+  const paper = { kind: "benefit_claim", text: "Claim.", to: ["outside"], data: { payment: "pension", account: "acc-c1" }, basis: ["rec.9"] };
+  const m2 = new Matters("a/matters", "a/file");
+  m2.absorbRead({ t: 30 * DAY, channels: { "a/file": { kind: "records", search: true, records: [report] } } } as any);
+  m2.absorb({ t: 30 * DAY, channels: { "a/matters": { kind: "records", records: [ref("rec.1", 8 * DAY, "benefit_claim")] }, "a/back": { kind: "records", records: [{ ...back("rec.30", 18 * DAY, "outside", "benefit_claim"), data: { for: "c1", by: "outside", need: { authority: { for: "c1", with: "outside" } }, paper } }] } } } as any);
+  // Its own confirmation first, then the record of it (one id where the return has a list, its details in another order).
+  m2.own([{ block: "publish", kind: "benefit_claim", text: "Claim.", addressed_to: ["outside"], data: { payment: "pension", account: "acc-c1" }, basis: ["rec.9"] }], 32 * DAY);
+  expect(m2.text()).toContain("sent again on year 1, day 33 (as you confirmed it)");
+  m2.absorb({ t: 33 * DAY, channels: { "a/mine": { kind: "records", records: [{ id: "rec.26769", record: "statement", kind: "benefit_claim", at: 32 * DAY + 60, author: "desk", in_position: "desk", speaks_for: "c1", text: "Claim.", addressed_to: ["outside"], data: { account: "acc-c1", payment: "pension" }, basis: "rec.9" }] } } } as any);
+  expect(m2.text()).toContain('before you took this post ("We cannot act on it for c1."); sent again on year 1, day 33 as rec.26769;');
+  m2.own([{ block: "publish", kind: "benefit_claim", text: "Claim.", addressed_to: ["outside"], data: { payment: "pension", account: "acc-c1" }, basis: ["rec.9"] }], 37 * DAY);
+  expect(m2.text()).toContain("; sent again on year 1, day 33 as rec.26769; sent again on year 1, day 38 (as you confirmed it)");
 });
 
 test("one reply, one matter: a draft made from a paper passed on, before the client hands the reply over, is that reply's draft; and what the client said is said with its day, every sentence", () => {
