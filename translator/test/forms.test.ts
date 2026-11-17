@@ -371,3 +371,16 @@ test("a client's paper on the desk's form for it is the client's own, read back 
   for (const w of ["pay", "Draft for sign-off"]) expect(drawn(w, "Draft for sign-off the tenant's answer for c0427, referral rec.5, can pay 0.")).toContain('words="we say $5,330.01 is owed today; we have nowhere else to go."');
   expect(drawn("we cannot pay", 'Draft the answer for c0427, referral rec.5, in the words "we cannot pay".')).toContain('words="we cannot pay"');
 });
+
+// (The stakes run's rung 3, the housing wants, 2026-11-18.) Nothing drawn, where the request names a form by its id and
+// every blank it requires by name with its value: that form, those blanks. Not where a required blank is not named.
+test("a form the request names, with every blank it requires named, is drawn from the request when the model drew nothing", () => {
+  const field = (type: string, required = false) => ({ type, ...(required ? { required: true } : {}) });
+  const stay = { referral: field("record", true), client: field("entity", true), landlord: field("entity", true), lease: field("record", true), notice: field("record", true), home: field("text", true) };
+  const k = { forms: [{ id: "form-desk-draft-stay-on-request", data: { form: "draft_stay_on_request", office: "desk", fields: stay } }], records: new Set(["rec.5", "rec.6"]), signed: new Map(), signedDraft: new Map(),
+    referrals: new Map([["rec.5", "c0100"]]), answeredReferrals: new Set<string>(), held: new Set(["desk"]), names: new Map([["landlord-12", "Landlord 12"]]) };
+  const drawn = (request: string) => calls.programText(formRules(calls.parseProgram("none(unclear)"), request, k as any));
+  expect(drawn("Fill in form-desk-draft-stay-on-request: client c0100; landlord landlord-12; lease lease-c0100; home apts-12/dwelling.12; notice rec.6; referral rec.5."))
+    .toBe('form(client=c0100, form=draft_stay_on_request, home="apts-12/dwelling.12", landlord=landlord-12, lease=lease-c0100, notice=rec.6, referral=rec.5, to=desk)');
+  expect(drawn("Fill in form-desk-draft-stay-on-request: client c0100; landlord landlord-12; lease lease-c0100; notice rec.6; referral rec.5.")).toBe("none(unclear)");
+});

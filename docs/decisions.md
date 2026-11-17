@@ -15388,3 +15388,22 @@ Six 60-day two-assistant Haiku runs (frozen at 1ab160a1; `runs/scope-stakes-r3-*
   - **Unread (about 2):** disrepair matters still wrong in the replay whose cause is not told apart here.
 - **What would still fail after this:** the translator's share and the seat's own, about 7 of the 22 (a third).
 - **Revisit if** a want's paper names neither the record the want stands against nor whom it is about: then the reading must come from the paper's typed outcome (`would`), as `brings`.
+
+## 2026-11-18 · The housing wants: a form named with every blank is drawn from the request
+
+- **The requests** (the stakes run's rung 3, in the 11-18 set): the stay-on requests and disrepair requests of c0348,
+  c0443, c0603, c0336, c0351, c0681, c0795 and c0060 still missed: 26 with a target, all drawn from the seats' next
+  confirmed request on the same matter (no key needed: every target names the home and the matter as the seat did).
+- **`fromNamed`** (translator/src/rules.ts, standing "named"): where the model drew nothing and the request names a form
+  outright and every blank it requires by its name with its value ("Fill in form-…-draft-stay-on-request: client c0351;
+  landlord landlord-12; lease lease-c0351; home apts-12/dwelling.12; notice rec.47100; referral rec.48605"), that form
+  with the blanks so named, and nothing else; ids as written (the resolver checks them as any draw's). 3,879 to 3,887 of
+  4,398, nothing lost, regression check unchanged (152, all explained): c0351's three, c0603's three, c0681's two.
+- **Tried and not landed:** a words blank holding the matter's home with other words around it ("let c0336 stay on at
+  apts-10/dwelling.7") set to the home: the want hands over its lease, not a home blank, so no rule can read it from the
+  hand-over; no change.
+- **Left for training (18):** a draft for sign-off of "a request to put right" drawn as a send of a signed paper (c0795,
+  c0348, c0351: five, sent back once by `misread`); `home` written as the request's act, the notice or a sentence (c0336, c0351,
+  c0060, c0443, c0603: seven); nothing drawn where the request names no form (c0603 .217, c0060, c0336: three); a stay-on request with
+  a letter beside it (c0443 .104); a review request's `particulars` cut short (two).
+- **Revisit if** a seat names a form and all its blanks and means another form.
