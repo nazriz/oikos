@@ -185,7 +185,7 @@ A model call that fails (after its adapter's own time limits and retries) is rec
 2. **Dissolving an organisation is a statement, not a block.** Its accounts are held at banks, so what happens to its money is the banks' act, on reading the dissolution.
 3. **Claims are append-only, and "current holder" is interpretation.** Selling land adds a transfer record. A registry (the land titles office, run by code) is what people trust about who owns what, as in reality.
 4. **Initial records are authored by `genesis`**: the world as it began, attributed to nobody in it.
-5. **Records carry visibility.** Laws are usually public; leases are seen by their parties; instructions by the account holder and the bank. When a block doesn't say, the kernel applies these defaults (the author's entity can always see its own records):
+5. **Records carry visibility.** Laws are usually public; leases are seen by their parties; instructions by the account holder and the bank. The author's entity always sees its own records: a block that names who sees one has its author's entity added (a post keeps a copy of what it sends, in its own name or another's; 2026-11-17). When a block doesn't say, the kernel applies these defaults:
    - entity declarations, claims without a counterparty, and statements without addressees: public;
    - claims with a counterparty: author, holder and counterparty;
    - agreements: author and parties;

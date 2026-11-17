@@ -119,6 +119,10 @@ export async function checkLog(path: string, opts: { pay_lag_days?: number; queu
     records.set(r.id, r);
     if (r.record === "withdrawal" && r.withdraws) withdrawn.set(r.withdraws, e.t);
     wholeMoney(e, r.data, `${r.id}.data`);
+    // A post keeps a copy of what it sends: a record made in a position is seen by that position's organisation, whoever
+    // else it names (contracts/README.md, "Records carry visibility"; the 14-day check, 2026-11-17).
+    const postEntity = typeof r.in_position === "string" ? positionEntity.get(r.in_position) : undefined;
+    if (postEntity && Array.isArray(r.visible_to)) { saw("records made in a post"); if (!r.visible_to.includes(postEntity)) flag("a_post_sees_its_own", e, `${r.id}, made in ${r.in_position}, is not visible to ${postEntity}`); }
     // A notice to vacate gives at least the days the law it cites gives, counted from the day after it is on record.
     if (r.kind === "notice_to_vacate" && Number.isSafeInteger(r.data?.by)) {
       const law = typeof r.data.law === "string" ? records.get(r.data.law) : undefined;
