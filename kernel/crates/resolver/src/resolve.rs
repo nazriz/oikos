@@ -1528,7 +1528,49 @@ impl Resolver<'_> {
                     Stop::Ask(m) | Stop::Unit(m) | Stop::Ambiguous(m, _) => m,
                 })
             };
-            let paper = forms::write_paper(spec, &data, &me, self.k.t, &money, self.k.dated.as_ref(), own.as_deref()).map_err(Stop::Ask)?;
+            let mut paper = forms::write_paper(spec, &data, &me, self.k.t, &money, self.k.dated.as_ref(), own.as_deref()).map_err(Stop::Ask)?;
+            // (A draft of a matter's papers as handed over: each written on the form the hand-over names for it, from its
+            // details, all in the one draft for one sign-off. Only the same paper to each of several: a matter of one
+            // paper is drafted on its own form, its blanks decided by whoever drafts it. translator/src/resolver.ts,
+            // the same; the 14-day check's desk drew five single papers so, as copies, 2026-11-17.)
+            if let Some(field) = spec["batch"].as_str().and_then(|b| b.strip_prefix('=')) {
+                let rid = data.get(field).and_then(Json::as_str).unwrap_or_default().to_string();
+                let words = format!("{rid} is not the same paper to each of several, set out in the hand-over: draft its paper on the office's own form for it (its draft form), deciding what goes in each blank.");
+                let Some((by, given)) = self.k.handed.get(&rid) else { return Err(Stop::Ask(words)) };
+                let on = given["composed_on"].as_array().cloned().unwrap_or_default();
+                let blanks = given["papers"].as_array().cloned().unwrap_or_default();
+                if blanks.len() < 2 || on.len() != blanks.len() {
+                    return Err(Stop::Ask(words));
+                }
+                let mut papers = vec![];
+                for (o, b) in on.iter().zip(&blanks) {
+                    let mut fields = b.as_object().cloned().unwrap_or_default();
+                    fields.remove("composed_on");
+                    let p = forms::write_paper(&o["spec"], &fields, by, self.k.t, &money, self.k.dated.as_ref(), None).map_err(Stop::Ask)?;
+                    let mut x = Map::new();
+                    for (from, to) in [("kind", "kind"), ("text", "text"), ("addressed_to", "to"), ("visible_to", "visible"), ("basis", "basis"), ("data", "data")] {
+                        if let Some(v) = p.get(from) {
+                            x.insert(to.into(), v.clone());
+                        }
+                    }
+                    papers.push(Json::Object(x));
+                }
+                let d = paper.entry("data").or_insert_with(|| json!({}));
+                if let Some(d) = d.as_object_mut() {
+                    d.insert("papers".into(), Json::Array(papers));
+                }
+            }
+            // (A draft for sign-off goes to whoever must sign it: the matter's principal, whom its referral speaks for
+            // (the office itself, for an office's assistant; the client, for a desk), and is seen by the post and by them.
+            // One rule for every draft form, whatever its template names. translator/src/resolver.ts `toSigner`.)
+            if paper.get("kind").and_then(Json::as_str) == Some("draft") {
+                let rid = paper.get("data").and_then(|d| d.get("referral")).and_then(Json::as_str).map(String::from);
+                if let Some((by, _)) = rid.and_then(|r| self.k.handed.get(&r)) {
+                    let seen: Vec<String> = if &me == by { vec![me.clone()] } else { vec![me.clone(), by.clone()] };
+                    paper.insert("addressed_to".into(), json!([by]));
+                    paper.insert("visible_to".into(), json!(seen));
+                }
+            }
             let mut block = Map::new();
             block.insert("block".into(), json!("publish"));
             for (k, v) in paper {
@@ -1710,6 +1752,38 @@ mod tests {
         };
         let got: Vec<(Json, Json)> = out.iter().map(|b| (b["text"].clone(), b["addressed_to"].clone())).collect();
         assert_eq!(got, vec![(json!("Rates notice: 10.00."), json!(["c1"])), (json!("Rates notice: 20.00."), json!(["c2"]))]);
+    }
+
+    #[test]
+    fn a_draft_goes_to_whoever_signs_it_and_a_matter_of_several_papers_is_drafted_whole() {
+        // (The 14-day check, 2026-11-17: a desk filed five client drafts to its own organisation on `draft_as_handed`,
+        // written for an office whose holder signs, and the engine wrote none of the papers. translator/test/forms.test.ts,
+        // the same for ours.) Every draft form's draft goes to the matter's principal, whatever its template names.
+        let mut k = office();
+        let notice = json!({ "form": "rates_notice", "fields": { "owner": { "type": "entity", "required": true }, "amount": { "type": "amount", "required": true } },
+            "writes": { "kind": "rates_notice", "text": "Rates notice: {amount}.", "to": ["=owner"], "visible": ["=self", "=owner"], "data": { "amount": "#amount" } } });
+        let form = |id: &str, data: Json| json!({ "id": id, "record": "statement", "kind": "form", "text": id, "at": 0, "author": "x", "speaks_for": "city", "visible_to": "public", "data": data });
+        let batch = form("form-batch", json!({ "form": "draft_as_handed", "office": "desk", "fields": { "referral": { "type": "record", "required": true } }, "batch": "=referral",
+            "writes": { "kind": "draft", "text": "Draft of {referral}.", "basis": "=referral", "to": ["=self"], "visible": ["=self"], "data": { "referral": "=referral" } } }));
+        let one = form("form-one", json!({ "form": "draft_evidence", "office": "desk", "fields": { "referral": { "type": "record", "required": true }, "words": { "type": "text", "required": true } },
+            "writes": { "kind": "draft", "text": "Draft: {words}", "basis": "=referral", "to": ["=self"], "visible": ["=self"], "data": { "referral": "=referral" } } }));
+        let referral = |id: &str, by: &str, facts: Json| json!({ "id": id, "record": "statement", "kind": "referral", "text": "For you to draft.", "at": 0, "author": format!("{by}-self"), "speaks_for": by, "addressed_to": ["desk"], "visible_to": ["city", by], "data": { "kind": "rates_notice", "wants": "draft", "facts": facts } });
+        let two = json!({ "papers": [{ "owner": "c1", "amount": "1000" }, { "owner": "c2", "amount": "2000" }], "composed_on": [{ "spec": notice, "bind": null }, { "spec": notice, "bind": null }] });
+        let single = json!({ "papers": [{ "owner": "c1", "amount": "1000" }], "composed_on": [{ "spec": notice, "bind": null }] });
+        k.absorb(&json!({ "entity": "city", "t": 0, "positions": [{ "position": "desk", "entity": "city", "title": "Desk", "role": "desk" }], "channels": { "mine": { "kind": "records", "records": [batch, one, referral("rec.70", "c9", two), referral("rec.71", "c9", single), referral("rec.72", "city", json!({}))] } } }));
+        let run = |src: &str| resolve(&parse_program(src).unwrap(), &k, &|_| None, Some("desk"));
+        let b = match run("form(form=draft_as_handed, referral=rec.70, to=desk)") { Resolution::Blocks(b) => b, Resolution::Questions { questions, .. } => panic!("drafted: {questions:?}") };
+        assert_eq!((b[0]["addressed_to"].clone(), b[0]["visible_to"].clone()), (json!(["c9"]), json!(["city", "c9"])), "to the client who signs it: {:?}", b[0]);
+        let papers = b[0]["data"]["papers"].as_array().cloned().unwrap_or_default();
+        assert_eq!(papers.iter().map(|p| (p["to"].clone(), p["text"].clone())).collect::<Vec<_>>(), vec![(json!(["c1"]), json!("Rates notice: XYZ 10.00.")), (json!(["c2"]), json!("Rates notice: XYZ 20.00."))]);
+        // One paper: drafted on its own form, not copied out of the hand-over.
+        let Resolution::Questions { questions, .. } = run("form(form=draft_as_handed, referral=rec.71, to=desk)") else { panic!("refused") };
+        assert!(questions[0].contains("is not the same paper to each of several"), "{questions:?}");
+        // Any draft form: to the matter's principal; an office's own matter, to the office.
+        let Resolution::Blocks(b) = run("form(form=draft_evidence, referral=rec.71, words=\"The papers.\", to=desk)") else { panic!("drafted") };
+        assert_eq!(b[0]["addressed_to"], json!(["c9"]));
+        let Resolution::Blocks(b) = run("form(form=draft_evidence, referral=rec.72, words=\"The papers.\", to=desk)") else { panic!("drafted") };
+        assert_eq!((b[0]["addressed_to"].clone(), b[0]["visible_to"].clone()), (json!(["city"]), json!(["city"])));
     }
 
     /// (The same cases as translator/test/resolver.test.ts has for this repository's resolver.)

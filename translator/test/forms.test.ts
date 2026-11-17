@@ -14,7 +14,7 @@ import { createTranslator, formRules, formShown } from "../src/index";
 import { everyIdNamed, misread } from "../src/rules";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
-import { durationWords, resolve } from "../src/resolver";
+import { durationWords, resolve, shortOfRequired, toSigner } from "../src/resolver";
 
 interface Case { name: string; program: string; as?: string; blocks?: unknown[]; asks?: string[] }
 const CASES = FORMS.cases as Case[];
@@ -468,6 +468,37 @@ test("a matter that is the same paper to each of several is drafted as one, each
   const asNamed = resolve(named as any, k, () => undefined, "registry");
   if (!asNamed.ok) throw new Error(asNamed.questions.join(" "));
   expect((asNamed.blocks[0] as any).data.papers).toHaveLength(2);
+  // (An office's own matter: the draft goes to the office, its signer, as before.)
+  expect([(r.blocks[0] as any).addressed_to, (r.blocks[0] as any).visible_to]).toEqual([["city"], ["city"]]);
+  // (2026-11-17, the 14-day check) A draft goes to whoever signs it: at a desk, the client whose matter it is, and every
+  // draft form so, whatever its template names: no draft of an assistant post's goes to its own organisation unless that
+  // organisation is the matter's principal. A matter of one paper is drafted on its own form, not copied out of the hand-over.
+  const desk = seat();
+  const drafts = [...(ASSISTANT_ISSUES as any[]).filter((x) => x.writes?.kind === "draft"), ...clientPapers([]).map((x: any) => clientDraftOf(x))];
+  desk.absorb({ ...FORMS.observation, channels: { mine: { kind: "records", records: [
+    ...drafts.map((x, i) => ({ id: `form-registry-d${i}`, record: "statement", kind: "form", text: x.form, at: 0, author: "x", speaks_for: "city", visible_to: ["city"], data: { ...x, office: "registry", submit_as: "registry", submit_to: ["registry"] } })),
+    { id: "rec.80", record: "statement", kind: "referral", text: "For you to draft.", at: 86_400, author: "c9-self", speaks_for: "c9", addressed_to: ["registry"], visible_to: ["city", "c9"], data: { kind: "rates_notice", wants: "draft", facts } },
+    { id: "rec.81", record: "statement", kind: "referral", text: "For you to draft.", at: 86_400, author: "c9-self", speaks_for: "c9", addressed_to: ["registry"], visible_to: ["city", "c9"], data: { kind: "rates_notice", wants: "draft", facts: { papers: [facts.papers[0]], composed_on: [facts.composed_on[0]] } } },
+  ] } } } as any);
+  const toClient = resolve(calls.parseProgram("form(form=draft_as_handed, referral=rec.80, to=registry)"), desk, () => undefined, "registry");
+  if (!toClient.ok) throw new Error(toClient.questions.join(" "));
+  expect([(toClient.blocks[0] as any).addressed_to, (toClient.blocks[0] as any).visible_to, (toClient.blocks[0] as any).data.papers.length]).toEqual([["c9"], ["city", "c9"], 2]);
+  const single = resolve(calls.parseProgram("form(form=draft_as_handed, referral=rec.81, to=registry)"), desk, () => undefined, "registry");
+  expect(!single.ok && single.questions.join(" ")).toContain("rec.81 is not the same paper to each of several");
+  for (const d of drafts) {
+    const as = (x: string) => (x === "=self" ? "city" : "c9");
+    const p = { kind: d.writes.kind, addressed_to: (d.writes.to ?? []).map(as), visible_to: (d.writes.visible ?? []).map(as), data: { referral: "rec.80" } };
+    expect(toSigner(p as { kind: string; addressed_to?: string[] }, "city", desk).addressed_to as string[], d.form).toEqual(["c9"]);
+  }
+  // (2026-11-17, the 14-day check) A blank the body a paper goes to publishes it needs is asked for before anything is
+  // drawn, in a draft for sign-off too: c0485's review request went to the support office without the decision it was
+  // about, twice, and came back to the client. Only where the body says so: a landlord asked to repair needs no paper.
+  desk.absorb({ ...FORMS.observation, channels: { notices: { kind: "records", records: [{ id: "rec.5", record: "statement", kind: "requirements", text: "What outside needs.", at: 0, author: "o", speaks_for: "outside", visible_to: "public",
+    data: { requires: { items: { review_request: [{ field: "about", says: "the decision to look at again, by its reference" }] }, authority: [] } } }] } } } as any);
+  const review = (data: object, to = "outside") => [{ block: "publish", kind: "draft", addressed_to: ["c9"], data: { referral: "rec.80", paper: { kind: "review_request", to: [to], data } } }];
+  expect(shortOfRequired(review({ matter: "claim_refused" }), desk)).toBe("outside publishes that a review request sent to it must give the decision to look at again, by its reference; this one leaves about empty. Nothing was drawn up: say it again with it.");
+  expect(shortOfRequired(review({ matter: "claim_refused", about: "rec.6709" }), desk)).toBeUndefined();
+  expect(shortOfRequired(review({ matter: "disrepair" }, "landlord-11"), desk)).toBeUndefined();
 });
 
 // (The check runs, 2026-11-19.) The body a scope request names in "give authority to the desk to act for them with

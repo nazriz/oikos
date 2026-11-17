@@ -235,6 +235,10 @@ export const EFFECT_WORDS: { [k in "first_claim" | "decision"]: string } = {
 const OBSTACLE_ITEMS: Record<string, { field: string; says: string }[]> = {
   loan_application: [{ field: "amount", says: "how much" }, { field: "months", says: "over how many months" }, { field: "account", says: "the account to pay it into" }, { field: "purpose", says: "what it is for" }],
   benefit_claim: [{ field: "payment", says: "the payment claimed" }, { field: "account", says: "the account to pay it into" }],
+  // (A request to look at a decision again names the decision: the support office sends back one that does not
+  // (kernel/crates/actors/src/boundary/support_law.rs, `nothing_to_review`), and from 2026-11-17 publishes that it needs it,
+  // as a body publishes what it needs on the papers sent to it. The 14-day check: c0485's request went without it twice.)
+  review_request: [{ field: "about", says: "the decision to look at again, by its reference" }],
 };
 // (How often a body's clerk wrongly sends back a paper in order, by obstacle level, WRONG_RETURN_BPS, is in the registry.)
 /** A body's requirements at an obstacle level, as its `requires` parameter (none at level 0). */
@@ -3978,7 +3982,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       ...(FR ? [K.mine("reviews", [DECISION_KIND.request, DECISION_KIND.review, "complaint_notice", "venue_decision", "hearing_notice", "tribunal_order", "benefit_decision", DECISION_KIND.answer, "complaint_response", "tribunal_response"])] : []),
       K.mine("gone", ["death_registration", "departure"]), lawBook,
       ...(PAYMENTS.some((r) => r.who?.record || "share_bps" in r.amount) || DECISIONS.some((d) => d.needs?.some((n) => n.from === "employer")) ? [K.mine("contributions", ["withholding_report"])] : [])],
-    code("world.transfers", { account: "acc-outside", publish_every_days: 30, ...obstacleRequires(OB, ["benefit_claim"], spec.support_date_of_effect ? [EFFECT_WORDS[spec.support_date_of_effect]] : []),
+    code("world.transfers", { account: "acc-outside", publish_every_days: 30, ...obstacleRequires(OB, ["benefit_claim", "review_request"], spec.support_date_of_effect ? [EFFECT_WORDS[spec.support_date_of_effect]] : []),
       ...(FR ? { respond: { grant_bps: FR.put_right_on_asking_bps } } : {}), ...(casework ? { casework: { by: casework.id, kinds: CASEWORK_KINDS } } : {}) }));
   // The tax collector (for a town, the higher government's; docs/behaviour/public-finance.md, "The taxpayer's account"): it keeps each
   // taxpayer's account from what is its own, the returns addressed to it and the payments into its accounts, and decides claims for tax

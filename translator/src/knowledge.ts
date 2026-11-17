@@ -163,6 +163,9 @@ export class Knowledge {
     const went = this.sentFrom(paper, this.signedAt.get(copy) ?? 0);
     return went ? { copy, went, returned: [...this.returnOf.values()].includes(copy) } : undefined;
   }
+  /** What each body publishes it needs on the papers sent to it (its `requirements` notice): body -> kind -> the fields
+   * and what each says. What a paper drawn to that body is checked by before anything is drawn (translator/src/index.ts). */
+  readonly requires = new Map<string, { [kind: string]: { field: string; says: string }[] }>();
   /** A matter handed over that is a reply to a body's paper -> that paper (its referral's `reply_to`). */
   readonly replyTo = new Map<string, string>();
   /** Laws and claims the participant has seen: what law warnings are judged against (§10). */
@@ -307,6 +310,7 @@ export class Knowledge {
       if (r.kind === "referral") this.referralGives.set(r.id, givenBy(r.data));
       if (r.kind === "referral" && typeof r.data?.calls === "string") { const m = /\btext="((?:[^"\\]|\\.)*)"/.exec(r.data.calls); if (m) { try { this.handedWords.set(r.id, JSON.parse(`"${m[1]}"`)); } catch { /* (words that do not read: none) */ } } }
       if (r.kind === "referral" && r.data?.facts && typeof r.data.facts === "object") this.handedFacts.set(r.id, r.data.facts);
+      if (r.kind === "requirements" && typeof r.speaks_for === "string" && r.data?.requires?.items && typeof r.data.requires.items === "object") this.requires.set(r.speaks_for, r.data.requires.items);
       if (r.kind === "referral" && r.data?.facts && typeof r.data.facts === "object") this.referralFacts.set(r.id, new Set(Object.keys(r.data.facts).filter((x) => x !== "composed_on")));
       if (r.kind === "referral" && typeof r.data?.reply_to === "string") this.replyTo.set(r.id, r.data.reply_to);
       if (r.kind === "paper_returned" && typeof r.data?.returned === "string") this.returnOf.set(r.data.returned, r.id);

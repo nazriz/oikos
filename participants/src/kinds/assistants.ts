@@ -22,7 +22,7 @@ export const ASSISTANT_ISSUES: Issued[] = [
   // rates seat drafted 204 notices one by one, 204 sign-offs, 46% of the run's cost; the code assistant drafts each
   // matter's fifteen as one.)
   { form: "draft_as_handed", title: "A draft for sign-off of a matter's papers, each as the matter sets it out",
-    does: "Draws up every paper of a matter handed over as what happened, one to each as the matter sets them out, written on the office's own form for each from the matter's details, as one draft for one sign-off. Once signed off, all are sent at once with one send. Where any of them should differ from what the matter gives, draft that one on its own form instead.",
+    does: "For a matter that is the same paper to each of several (a run of notices, one to each): draws up every one of them as the matter sets them out, written on the office's own form for each from the matter's details, as one draft for one sign-off, to whoever signs it. Once signed off, all are sent at once with one send. A matter of one paper is drafted on its own form, deciding what goes in each blank; where any of several should differ from what the matter gives, draft that one on its own form instead.",
     fields: { referral: f("record", "The matter you were handed.", req) }, batch: "=referral",
     writes: { kind: "draft", text: "Draft for sign-off: the papers of matter {referral}, each as the matter sets it out.", basis: "=referral", to: ["=self"], visible: ["=self"], data: { referral: "=referral" } } } as Issued,
   { form: "report", title: "What became of a matter",
