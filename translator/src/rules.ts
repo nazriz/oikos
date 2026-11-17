@@ -186,7 +186,9 @@ function formFor(k: FormKnowledge, name: string, to?: string): FormKnowledge["fo
 /** The value the request writes for a blank, by the blank's name: the one id, or quoted words, written right after it
  * ("lots lot-25-06", "connection: e-1", 'purpose "a business"', "owner = c0057"), the same each time it is written. */
 function namedValue(request: string, field: string, known?: (id: string) => boolean): { id: string } | { text: string } | undefined {
-  const re = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}(?:\\s+field)?\\s*(?::|=|\\bis\\b)?\\s*(?:"([^"]{1,200})"|“([^”]{1,200})”|\\[?([a-z0-9][a-z0-9_.:\\/-]*[a-z0-9]))`, "gi");
+  // (Something between the name and its value, a space, a colon or "is": `Its blank "ages" is filled in with: 62` is no
+  // value '" is filled in with: 62. Its blank "' for `ages` (GLM's check run, 2026-11-19).)
+  const re = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}(?:\\s+field)?(?:\\s*(?::|=|\\bis\\b)\\s*|\\s+)(?:"([^"]{1,200})"|“([^”]{1,200})”|\\[?([a-z0-9][a-z0-9_.:\\/-]*[a-z0-9]))`, "gi");
   const seen = new Set<string>();
   let out: { id: string } | { text: string } | undefined;
   for (const m of request.matchAll(re)) {
@@ -369,7 +371,7 @@ const RULES: { [name: string]: Standing } = {
   // redraws onto another form
   question: "redraw", sendAgain: "redraw", fromNamed: "named", sendSigned: "redraw", signedCopySent: "redraw", draftForm: "redraw",
   // the seat names outright
-  formById: "named", namedChoice: "named", namedDate: "named", namedFigure: "named", priceEach: "correct", entityWith: "named", namedValue: "named", leftEmpty: "named",
+  formById: "named", namedChoice: "named", namedDate: "named", namedFigure: "named", namedNumbers: "named", priceEach: "correct", entityWith: "named", namedValue: "named", leftEmpty: "named",
   // fills what is empty
   matterNamed: "fill", referralOfKind: "fill", recordNamed: "fill",
   // corrects what is plainly contradicted
@@ -611,6 +613,12 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       // rerun, was the one rule with a net loss on the scored set, and misfired in run c ('claim): which paper is your
       // ...'), 2026-11-15.)
       if (!v && !t.required && args[field] !== undefined && leftEmpty(request, field)) edit("leftEmpty", field, undefined);
+      // (A list the request names with whole numbers, "ages: 62", "ages [66, 62]": those numbers. GLM's check run,
+      // 2026-11-19: "ages: 62" written seven times, drawn each time with the client's id in `ages`, and asked back.)
+      if (t.type === "list" && !several) {
+        const m = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}(?:\\s*(?::|=|\\bis\\b)\\s*|\\s+)\\[?([0-9]{1,3}(?:\\s*(?:,|and)\\s*[0-9]{1,3})*)\\]?(?![0-9/:-]|[.,][0-9]|\\s*(?:days?|years?|months?)\\b)`, "i").exec(request);
+        if (m) edit("namedNumbers", field, { json: m[1]!.split(/\s*(?:,|and)\s*/) } as calls.Value);
+      }
       // (A date blank the request names with its day, "period to: year 1, day 61": that day; one the model wrote on the
       // same day stands as written. The stakes run's rung 3, 2026-11-17: the withholding report's `period_to` drawn as the
       // due day, day 81, on eleven tries in two runs, each refused, and the tax withheld never reported.)
@@ -645,8 +653,15 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       // (Whom, as "give <whom> its <blank>", "give Millbrook Savings Bank its authority": by its id or the name the seat
       // was shown. Rung 1 rerun, 2026-11-15: four asks for a body's authority drawn with the client in `authority`.)
       const g = new RegExp(`\\bgive\\s+(?:the\\s+)?([A-Za-z][A-Za-z0-9 '&.-]{0,60}?)(?:\\s*\\(([a-z][a-z0-9_-]*[a-z0-9])\\))?\\s+(?:its|their|your|the client's)\\s+${spoken(field)}\\b`, "i").exec(request);
-      const said = g?.[1]?.trim().toLowerCase();
-      const whom = g?.[2] ?? (said ? [...(k.names ?? new Map<string, string>())].find(([e, n]) => n.toLowerCase() === said || e === said)?.[0] ?? (k.held.has(said) ? said : undefined) : undefined);
+      // (Or "give <whom>'s <blank> for …", or "give <blank> to <the post> to act for them with <whom>": the check runs,
+      // 2026-11-19, eight scope requests drawn with the client or the desk as the body, four confirmed and answered
+      // "not lodged".)
+      const g2 = g ?? new RegExp(`\\bgive\\s+(?:the\\s+)?([A-Za-z][A-Za-z0-9 &.-]{0,60}?)(?:\\s*\\(([a-z][a-z0-9_-]*[a-z0-9])\\))?'s\\s+${spoken(field)}\\b`, "i").exec(request)
+        ?? new RegExp(`\\bgive\\s+(?:their\\s+|your\\s+)?${spoken(field)}\\s+(?:to|for)\\s+[a-z0-9-]+\\s+to\\s+act\\s+for\\s+(?:them|you|him|her)\\s+with\\s+(?:the\\s+)?([A-Za-z][A-Za-z0-9 &.-]{0,60}?)(?:\\s*\\(([a-z][a-z0-9_-]*[a-z0-9])\\))?(?=[\\s,.;:]|$)`, "i").exec(request);
+      const said = g2?.[1]?.trim().toLowerCase();
+      const whom = g2?.[2] ?? (said ? [...(k.names ?? new Map<string, string>())].find(([e, n]) => n.toLowerCase() === said || e === said)?.[0] ?? (k.held.has(said) ? said : undefined) : undefined)
+        // (A one-word id the seat writes there, not the paper's client nor a post it holds: the body as written.)
+        ?? (g2 && !g && said && /^[a-z][a-z0-9-]*$/.test(said) && said !== argText(args.client) && !k.held.has(said) ? said : undefined);
       if (whom && !isRecord(whom)) edit("authorityGiven", field, { id: whom });
     }
     // (Two parties of one paper are not the same party: an entity blank holding whom another entity blank of the paper
