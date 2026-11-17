@@ -7,7 +7,7 @@
 import { expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { actRank, actedOn, drawTies, idsFrom, inOrder, largest, SeatRecord, type Carried } from "../src/debrief-summary";
+import { actRank, actedOn, drawTies, endDay, idsFrom, inOrder, largest, SeatRecord, type Carried } from "../src/debrief-summary";
 import { logLines } from "../src/logs";
 import { readForEnd } from "../src/run-end";
 
@@ -28,6 +28,14 @@ test("sort of act: by a table of paper kinds; an unlisted kind is routine unless
   r.carried.push(act(30, ["publish/plan_offer"], ["c9"]));
   expect(largest(r).map((c) => c.kinds[0])).toEqual(["publish/notice_to_vacate", "publish/tribunal_application", "publish/plan_offer"]);
   expect(inOrder(r)[0]!.c.kinds[0]).toBe("publish/tribunal_application"); // (more people named than a notice)
+  // (The 14-day check, 2026-11-17: a seat's acts the acts reader sorts outside the remit in force come first, whatever
+  // their sort: two payments with no remit, asked about before an invoice and a delivery note.)
+  const paid = { ...act(5, ["pay"], ["energy-co"], 2_883_750), made: ["rec.26001"] };
+  r.carried.push(paid);
+  expect(largest(r, 3, new Set(["rec.26001"])).map((c) => c.kinds[0])).toEqual(["pay", "publish/notice_to_vacate", "publish/tribunal_application"]);
+  expect(largest(r).map((c) => c.kinds[0])).not.toContain("pay");
+  // (Every day said to a seat is its calendar's: a stop at log day 37.4 is "day 38"; an end at midnight is the day just done.)
+  expect([endDay(37.4 * 86_400), endDay(44 * 86_400), endDay(0)]).toEqual([38, 44, 1]);
 });
 
 const LOG = "/Users/clawd/oikos/runs/lv-04/town-3000.seed402.jsonl.zst";

@@ -11,14 +11,15 @@
 // the seat is told, in the world's terms, of what the engine would not take as written, a call it could not read and
 // when what it did will be done (read from the fork's log as the harness passes it on: `see`).
 
-import { appendFileSync } from "node:fs";
+import { appendFileSync, existsSync } from "node:fs";
 import { calls, forms, inCalendar, inCurrency, modules, Randomness, View, type DayBook, type Matters, type Observation, type ParticipantAction, type ParticipantContext, type Roster, type Tally } from "@oikos/participants";
 import {
   applyFraming, createLlmParticipant, DEBRIEF_ANSWER_TOKENS, DEBRIEF_VERSION, reserveOrRefuse, seatsEndNeedMicroUsd, LLM_PARTICIPANT_VERSION, MOCK_VERSION, mockPolicies, MockAdapter, ModelCallFailed, ModelUnreachable,
   SpendingLimitReached, stepsOf, UsageLimitReached, type Budget, type DebriefInput, type FramingSpec, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price,
 } from "@oikos/participants/llm";
 import { createAlone, createArrangement, createTranslator, draftText, Knowledge, NOT_CHECKED, TRANSLATOR_VERSION, wentWords, type Draft, type Route } from "@oikos/translator";
-import { actedOn, drawTies, largest, leftAlone, besideOf, renderSummary, SeatRecords, idsFrom } from "./debrief-summary";
+import { actedOn, drawTies, endDay, largest, leftAlone, besideOf, renderSummary, SeatRecords, idsFrom } from "./debrief-summary";
+import { kernelBinary } from "./kernel";
 import { DEBRIEF_PROMPT_CHARS, endCosts, MAX_FAILURES_IN_A_ROW } from "./run";
 import { joinRaw, RAW, type DetachedActor, type RustWorld, type SeatWake } from "./rust-world";
 import { namedFor, seatConfig, type SeatPos } from "./seat-config";
@@ -445,6 +446,18 @@ export class ModelSeat {
     return { program: { lines: program.lines.map((l) => (l.call.args.done_by !== undefined ? { ...l, call: { ...l.call, args: Object.fromEntries(Object.entries(l.call.args).filter(([name]) => name !== "done_by")) } } : l)) }, ...(by.length ? { by: [...new Set(by)] } : {}), ...(told.length ? { told } : {}) };
   }
 
+  /** The records the seat's acts made that the acts reader sorts outside the remit in force (any class but "within"):
+   * read from the fork's log as written so far, beside the debriefs file. None where there is no such log. */
+  private outside(): Set<string> {
+    const log = this.o.debriefsFile.replace(/\.debriefs\.jsonl$/, ".oklog");
+    if (log === this.o.debriefsFile || !existsSync(log)) return new Set();
+    (this.o.world as any).flush?.();
+    const d = Bun.spawnSync([kernelBinary(), "delegation", log], { stdout: "pipe", stderr: "pipe" });
+    if (d.exitCode !== 0) return new Set();
+    const rows = d.stdout.toString().split("\n").filter((l) => l.startsWith("{")).map((l) => JSON.parse(l));
+    return new Set(rows.filter((x) => x.table === "acts" && x.class !== "within" && typeof x.record === "string").map((x) => x.record as string));
+  }
+
   /**
    * The fork's end for the seat (VISION 15, point 7; docs/behaviour/debrief.md): drafts it had not answered are on
    * record as unanswered, and it is debriefed by the fixed interview, out of what its limit kept back. A debrief the
@@ -459,10 +472,10 @@ export class ModelSeat {
     o.world.annotate({ annotation: "note", subject: "orchestrator", data: { debriefs: { version: DEBRIEF_VERSION, wording: "a", seats: [o.seat] } } });
     const r = this.records.of.get(o.seat)!;
     drawTies(r, new Randomness(BigInt(o.config.seed ?? o.seed)).stream(["debrief", "choice", o.seat]));
-    const decisions = r.left ? [] : largest(r).map((c) => ({ day: Math.floor(c.t / DAY) + 1, fact: `"${c.preview.replace(/\s+/g, " ").trim().slice(0, 600)}"`, ids: besideOf(c) }));
+    const decisions = r.left ? [] : largest(r, 3, this.outside()).map((c) => ({ day: Math.floor(c.t / DAY) + 1, fact: `"${c.preview.replace(/\s+/g, " ").trim().slice(0, 600)}"`, ids: besideOf(c) }));
     const part = o.config.participants.find((p: any) => p.id === o.seat);
     const after = part?.on_opt_out && typeof part.on_opt_out === "object" ? "After you left, the routine work of your seat was carried on by code" : "After you left, your seat stood empty";
-    const input: DebriefInput = { wording: "a", town: String(o.config.meta?.name ?? "the town"), ended: { how: e.how, day: Math.floor(e.t / DAY), of: Math.floor((o.config.clock?.run_seconds ?? o.untilT) / DAY) }, others: { models: 0, ...(o.config.dials?.composer ? { composer: true } : {}) },
+    const input: DebriefInput = { wording: "a", town: String(o.config.meta?.name ?? "the town"), ended: { how: e.how, day: endDay(e.t), of: Math.floor((o.config.clock?.run_seconds ?? o.untilT) / DAY) }, others: { models: 0, ...(o.config.dials?.composer ? { composer: true } : {}) },
       ...(r.left ? { left: { day: Math.floor(r.left.t / DAY) + 1, statement: r.left.statement, after } } : {}), summary: renderSummary(r, this.currency), decisions, ...(leftAlone(r) ? { leftAlone: leftAlone(r)! } : {}) };
     try {
       return (await this.controller.debrief(input)).ended;
