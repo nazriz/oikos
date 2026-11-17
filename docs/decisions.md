@@ -15406,4 +15406,8 @@ Six 60-day two-assistant Haiku runs (frozen at 1ab160a1; `runs/scope-stakes-r3-*
   c0348, c0351: five, sent back once by `misread`); `home` written as the request's act, the notice or a sentence (c0336, c0351,
   c0060, c0443, c0603: seven); nothing drawn where the request names no form (c0603 .217, c0060, c0336: three); a stay-on request with
   a letter beside it (c0443 .104); a review request's `particulars` cut short (two).
+- **Redrawn on the stay-on form as `wants` leaves it** (`home` not required; `translator/eval/redraw.ts`, set `stayOn`;
+  47 rung-3 stay-on and disrepair requests): right 28 on the form as logged, 27 on the new (the one lost leaves `home`
+  out, which the new form allows); `home` written as other words 7 to 4, left out 1 to 5. The form change helps a little
+  and costs nothing the new form does not allow.
 - **Revisit if** a seat names a form and all its blanks and means another form.

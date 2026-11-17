@@ -76,7 +76,15 @@ function order(map: Record<string, string>, first?: string[]): Variant {
   };
 }
 
+// The stay-on request as `wants` left it (2026-11-18): `home` no longer required.
+const STAY = new Set(["stay_on_request", "draft_stay_on_request"]);
+const stayOn = (homeRequired: boolean): Variant => ({
+  change: (f) => reshaped(STAY, f, (es) => es.map(([k, t]) => (k === "home" ? [k, { ...t, required: homeRequired || undefined }] : [k, t]))),
+  back: (p) => p,
+});
+
 export const REDRAW_VARIANTS: Record<string, Record<string, Variant>> = {
+  stayOn: { a: stayOn(true), wants: stayOn(false) },
   order: {
     a: order({}),
     renamed: order({ for_days: "served_over_days", pay_in_days: "paid_within_days_of_delivery" }),
