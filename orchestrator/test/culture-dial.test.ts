@@ -202,10 +202,13 @@ const CONFIG_BEFORE: { [profile: string]: string } = onRust
 // (au-vic re-taken on 2026-11-17 at claim-told (MT-60, the lead's decision): a person pays rates once the notice has told
 // them, read at their post's sitting, not on seeing the town's rate-book entry the moment it is made; au-vic's first
 // instalment falls in its 60 days, the others' 30 days hold none. 0d99861e... until then.)
+// (ke-nakuru re-taken on 2026-11-17 at final-faults: a record made in a post is now visible to the post's organisation
+// whoever else it names (kernel exec.rs `new_record`), and one of ke-nakuru's offices names a list without itself in its
+// 30 days; the others' records already named theirs. cbf6fa01... until then.)
 const RUST_STATE: { [profile: string]: string } = {
   "au-vic-2026": "206e99704bbcaf61ed9ba5adea580cd3c52ca6124219ed7aa7fed4a145460d62",
   "gb-eng-2026": "1ef061096609457937fdf27f71b3a0af6d2d3d52336416521fcd70c35ad0ca60",
-  "ke-nakuru-2026": "cbf6fa013880d2a617f8a3554e09e7638036ee2e38aa9597b7da5ed31133dbb6",
+  "ke-nakuru-2026": "9fe042c69d7c140a25bceaaf3358e03246eef91199e158cd6b8013c6a31ffd3d",
 };
 
 test("the dial in the world config is a schema-valid setting; a size that would break the arithmetic is refused when the run starts", async () => {
