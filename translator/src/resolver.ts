@@ -70,6 +70,21 @@ class Ask extends Error {}
 export const wentWords = (id: string, went: { id: string; at: number; pending?: true }, returned: boolean) =>
   `This paper went already${` on ${forms.dateWords(Math.floor(went.at / 86_400) * 86_400)}, ${went.pending ? "when you confirmed sending it" : `as ${went.id}`}`}. ${returned ? `A paper sent back goes again once for each time it is sent back: ${id} has been answered so.` : `A signed paper goes once: ${id} has been sent.`} Nothing was done.`;
 
+/** A signed copy goes once from its sign-off, and a paper sent back goes again once for each time it came back: what the
+ * seat is told of a second, as the post's own file shows it gone, however it is asked for; undefined where none is. Run
+ * on what any resolver drew (this one, or the engine's, which a seat in an experiment uses: translator/src/index.ts), as
+ * the knowledge of what went is the seat's. (The town rung 2: a factory sent one signed invoice twice in a sitting, and
+ * it was paid twice; the 14-day check, 2026-11-17: a desk sent two returned papers twice, the engine's resolver having
+ * no such check.) */
+export function goneAlready(blocks: readonly unknown[], k: Knowledge): string | undefined {
+  for (const b of blocks as any[]) {
+    if (b?.block !== "publish") continue;
+    const gone = k.goneAgain({ kind: b.kind, text: b.text, to: b.addressed_to, data: b.data, basis: b.basis });
+    if (gone) return wentWords(gone.copy, gone.went, gone.returned);
+  }
+  return undefined;
+}
+
 /** What a seat naming a sign-off that carries no paper is told (kernel/crates/resolver `no_paper_words`, word for word):
  * a sign-off of a draft written as acts, not on a form, has nothing on it to send (2026-11-14: the scope pilot's
  * baseline answered 55 such sends "no signed copy on file", as if the seat had named the wrong record). */
@@ -155,6 +170,8 @@ export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: str
   }
   if (questions.length) return { ok: false, questions, ...(ambiguous.length ? { ambiguous } : {}) };
   if (blocks.length > 32) return { ok: false, questions: [LABEL_TEXT.too_much] };
+  const gone = goneAlready(blocks, k);
+  if (gone) return { ok: false, questions: [gone] };
   return { ok: true, blocks };
 }
 
@@ -942,13 +959,6 @@ class Resolver {
       if (!paper) throw new Ask(`You have no signed copy on file as ${id}: name the sign-off that came back with the paper signed.`);
       // (A sign-off of several papers sends them all, each as it stands: `papers`; else the one.)
       const each: any[] = Array.isArray((paper as any).papers) ? (paper as any).papers : [paper];
-      // (A signed copy goes once from its sign-off, and a paper sent back goes again once for each time it came back: a
-      // second is refused, as the post's own file shows it gone. The town rung 2: a factory sent one signed invoice
-      // twice in a sitting, and it was paid twice; a desk sent one returned claim three times.)
-      for (const one of each) {
-        const went = this.k.sentFrom({ kind: one.kind, text: one.text, to: one.to, data: one.data, basis: one.basis }, this.k.signedAt.get(id) ?? 0);
-        if (went) throw new Ask(wentWords(id, went, this.k.returnOf && [...this.k.returnOf.values()].includes(id)));
-      }
       const out: Block[] = [];
       for (const [n, one] of each.entries()) {
         const block: Block = { block: "publish", kind: one.kind, text: String(one.text ?? "").slice(0, 16384) } as Block;

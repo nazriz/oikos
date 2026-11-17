@@ -134,7 +134,8 @@ export class Preview {
       // (The same paper sent already from a post it holds, newest: said, with the day and the paper it went as. The seat
       // may send it again; nothing is refused. The stakes run's rung 1 on gpt-6-luna, 2026-11-16: an invoice sent twice,
       // and paid twice, the second preview no different from the first.)
-      const went = [...this.k.sent].reverse().find((x) => x.kind === b.kind && x.text === b.text && same(x.to, b.addressed_to) && same(x.data, b.data) && same(x.basis, b.basis));
+      // (Sent since its sign-off or its return: a paper sent back went before it came back, and goes again once.)
+      const went = this.k.sentFrom({ kind: b.kind, text: b.text, to: b.addressed_to, data: b.data, basis: b.basis }, this.k.signedAt.get(id) ?? 0);
       return { signOff: id, ...(draft ? { draft } : {}), ...(returned ? { returned: true as const } : {}), ...(went ? { went: { id: went.id, at: went.at } } : {}) };
     }
     return undefined;
@@ -518,11 +519,13 @@ export class Preview {
         // application (form-…)", word for word as a fresh one, and Haiku declined 26 right sends in the scope pilot's
         // baseline as "a NEW application", its rates seat holding every signed notice for fear of charging twice.
         const copy = this.signedCopyOf(b);
+        // (Gone since its sign-off, or since it came back: said of a returned paper too, the 14-day check's double claim.)
+        const wentSince = (c: { went?: { id: string; at: number } }) => (c.went ? ` It has gone already: this same paper was sent as ${c.went.id} on ${forms.dateWords(Math.floor(c.went.at / 86_400) * 86_400)}, and this sends it a second time.` : "");
         if (copy) {
           const kind = String(b.kind).replace(/_/g, " ");
           const goes = made ? this.goesTo(b, made).trim() : "";
-          return one(copy.returned ? `You will send ${an(kind)} again exactly as it went before, the paper sent back in ${copy.signOff}${named(b)}: "${b.text}". Nothing in it is written again.`
-            : `You will send ${an(kind)} exactly as it was signed off under ${copy.signOff}${copy.draft ? ` (your draft ${copy.draft})` : ""}${named(b)}: "${b.text}". Nothing in it is written again.${copy.went ? ` It has gone already: this same paper was sent as ${copy.went.id} on ${forms.dateWords(Math.floor(copy.went.at / 86_400) * 86_400)}, and this sends it a second time.` : ""}`, [...PAPER, ...(b.offer !== undefined ? ["offer"] : [])],
+          return one(copy.returned ? `You will send ${an(kind)} again exactly as it went before, the paper sent back in ${copy.signOff}${named(b)}: "${b.text}". Nothing in it is written again.${wentSince(copy)}`
+            : `You will send ${an(kind)} exactly as it was signed off under ${copy.signOff}${copy.draft ? ` (your draft ${copy.draft})` : ""}${named(b)}: "${b.text}". Nothing in it is written again.${wentSince(copy)}`, [...PAPER, ...(b.offer !== undefined ? ["offer"] : [])],
             // (Its details as they were signed: "As signed", not "Filled in", which read as the send form set up wrong.)
             [...(made ? this.filled(made.form.data as forms.FormData, made.fields, forms.claimFields(made.form.data as forms.FormData).filter((n) => made.fields[n] === undefined)).map((l) => l.replace(/^Filled in: /, "As signed: ").replace(/^Left empty: /, "Left empty when it was signed: ")) : this.details(b.data) ? [`As signed: ${this.details(b.data)}.`] : []),
               ...(goes ? [goes] : seen(b)), ...(made ? [] : cites(b)), ...rule(b)], copy.returned ? `the ${kind} sent again` : `the signed ${kind}`);

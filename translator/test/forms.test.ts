@@ -118,6 +118,35 @@ test("a signed copy sent is previewed as that copy, under its sign-off, and not 
   expect(k2.twice(first.blocks as unknown[], 6 * 86_400)).toBeUndefined();
   const second = resolve(calls.parseProgram("form(form=send_signed, sign_off=rec.81)"), k2, () => undefined, "registry");
   expect(!second.ok && second.questions.join(" ")).toContain("This paper went already on year 1, day 6, when you confirmed sending it.");
+  // (2026-11-17, the 14-day check) A paper sent back goes again once, with the shapes the log has: the return carries the
+  // paper's basis as a list, the record the post sent has it as one id. Haiku sent c0352's claim again from one return on
+  // days 32 and 37, told "Nothing stands in the way right now", and a second claim was opened.
+  const DAY = 86_400;
+  const back = { id: "rec.16612", record: "statement", kind: "paper_returned", text: "From outside: We cannot act on rec.13137 for c0352.", at: 17 * DAY, author: "c0352-self", speaks_for: "c0352", addressed_to: ["city"], visible_to: ["c0352", "city"],
+    data: { by: "outside", for: "c0352", returned: "rec.13137", paper: { basis: ["rec.13137"], data: { account: "acc-c0352", born_at: -2112480000, payment: "pension" }, kind: "benefit_claim", text: "Claim: pension.", to: ["outside"] } } };
+  const went = (id: string, at: number, basis: unknown) => ({ id, record: "statement", kind: "benefit_claim", text: "Claim: pension.", at, author: "x", speaks_for: "c0352", in_position: "registry", addressed_to: ["outside"], visible_to: ["c0352", "outside", "city"], basis, data: { payment: "pension", account: "acc-c0352", born_at: -2112480000 } });
+  const mine = (records: object[]) => ({ ...FORMS.observation, channels: { mine: { kind: "records", records } } }) as any;
+  const sendAgain = (kk: Knowledge) => resolve(calls.parseProgram("form(form=send_again, returned=rec.16612)"), kk, () => undefined, "registry");
+  // Its own confirmation first, then the record (one id where the return has a list), then asked again days later.
+  const k3 = seat();
+  k3.absorb(mine([went("rec.13137", 10 * DAY, "rec.13137"), back]));
+  const once = sendAgain(k3);
+  if (!once.ok) throw new Error(once.questions.join(" "));
+  expect(new Preview(k3, "city", undefined, "registry").of(once.blocks)).not.toContain("It has gone already");
+  k3.sending(once.blocks as unknown[], 32 * DAY);
+  k3.absorb(mine([went("rec.26769", 32 * DAY + 60, "rec.13137")]));
+  const twiceBack = sendAgain(k3);
+  expect(!twiceBack.ok && twiceBack.questions.join(" ")).toBe("This paper went already on year 1, day 33, as rec.26769. A paper sent back goes again once for each time it is sent back: rec.16612 has been answered so. Nothing was done.");
+  expect(new Preview(k3, "city", undefined, "registry").of(once.blocks)).toContain("It has gone already: this same paper was sent as rec.26769");
+  // Written out word for word, citing what it cited or the return it answers (as the code desk sends one again), the same.
+  for (const basis of ["rec.13137", "rec.16612"]) {
+    const written = resolve(calls.parseProgram(`statement(basis=${basis}, data={"account":"acc-c0352","born_at":-2112480000,"payment":"pension"}, for=c0352, kind=benefit_claim, text="Claim: pension.", to=["outside"])`), k3, () => undefined, "registry");
+    expect(!written.ok && written.questions.join(" ")).toContain("rec.16612 has been answered so.");
+  }
+  // The record first, as a seat's file is read at a fork, with the list on the record and the paper's details in another order.
+  const k4 = seat();
+  k4.absorb(mine([{ ...went("rec.26769", 32 * DAY, ["rec.13137"]), data: { born_at: -2112480000, account: "acc-c0352", payment: "pension" } }, back]));
+  expect(!sendAgain(k4).ok).toBe(true);
   // (2026-11-17) A sign-off of a draft of several papers: sent all together on it, each as it stands and said so.
   const papers = [{ kind: "rates_notice", text: "Rates notice: 10.00.", to: ["c1"], visible: ["city", "c1"], data: { amount: 1000 } }, { kind: "rates_notice", text: "Rates notice: 20.00.", to: ["c2"], visible: ["city", "c2"], data: { amount: 2000 } }];
   k.absorb({ ...FORMS.observation, channels: { mine: { kind: "records", records: [{ id: "rec.95", record: "statement", kind: "sign_off", text: "Signed.", addressed_to: ["city"], data: { draft: "rec.94", referral: "rec.93", papers }, visible_to: ["city"], at: 4 * 86_400, author: "y", speaks_for: "city" }] } } } as any);
