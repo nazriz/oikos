@@ -23,7 +23,7 @@ import { mockCompose } from "./compose";
 import { mockAccount } from "./account";
 import { mockDebrief } from "./debrief";
 
-export const MOCK_VERSION = "0.6.2"; // 0.6.2: an assistant seat may be scripted to ask for more scope (`scope_after_days` beside its brain), to exercise that path; 0.6.1: a claim its brain records beside a paper is said on the form that records both, where the office has one; 0.6.0: back at its desk as often as its brain's own module looks in (it sat weekly whatever the office); a look the brain asks for while reading what it missed between sittings is made at the sitting (it was dropped, and the brain never asked again); 0.5.0: a paper the brain issues is asked for on the office's own form for it, where it has one; 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
+export const MOCK_VERSION = "0.6.3"; // 0.6.3: an assistant seat may be scripted to ask once more for each copy it sent (`resend`), to exercise the refusal of a second send; 0.6.2: an assistant seat may be scripted to ask for more scope (`scope_after_days` beside its brain), to exercise that path; 0.6.1: a claim its brain records beside a paper is said on the form that records both, where the office has one; 0.6.0: back at its desk as often as its brain's own module looks in (it sat weekly whatever the office); a look the brain asks for while reading what it missed between sittings is made at the sitting (it was dropped, and the brain never asked again); 0.5.0: a paper the brain issues is asked for on the office's own form for it, where it has one; 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
 
 export interface MockBrain {
   controller: Controller;
@@ -50,7 +50,16 @@ export interface MockBrain {
   scopeAt?: number;
   /** (Its scripted requests made so far.) */
   scoped?: number;
+  /** Asks once more, at a sitting a day or more later, for each paper it sent as signed or sent again (the forms that
+   * send a copy as it stands), as a seat that forgot it had sent them would: to exercise the refusal of a second send
+   * (translator/src/resolver.ts, `wentWords`). */
+  resend?: boolean;
+  /** (Its sends of a copy, to be asked for once more, and when each was asked for.) */
+  resent?: { program: string; at: number; again?: true }[];
 }
+
+/** A request that sends a copy as it stands (a signed copy, or a paper sent back): by the form it names, or as the code desk writes a send of a signed or returned paper (bound `sentN`, kernel/crates/actors/src/delegation/assistant.rs). */
+const SENDS_COPY = /\bform=(send_signed|send_again)\b|^sent[0-9]+ = /m;
 
 /** The mock's scripted request for more scope (`MockBrain.scopeAt`), on its own form, if it is due and it can make one. */
 function scopeRequest(brain: MockBrain, obs: { t: number }, forms: FormData[], recs: any[]): string | undefined {
@@ -260,6 +269,9 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     const as = brain.capacity === "self" ? {} : { as: brain.capacity };
     const scope = scopeRequest(brain, obs, [...(stationery.get(id)?.values() ?? [])].sort((x, y) => (x.form < y.form ? -1 : 1)), handed.get(id) ?? []);
     if (scope) { brain.busy = true; return [tool("do", { what: PREFIX + scope, ...as })]; }
+    // (Scripted: a send of a copy asked for once more, a day or more on, `MockBrain.resend`.)
+    const repeat = brain.resend ? brain.resent?.find((x) => !x.again && obs.t - x.at >= 86_400) : undefined;
+    if (repeat) { repeat.again = true; brain.busy = true; return [tool("do", { what: PREFIX + repeat.program, ...as })]; }
     const next = q.shift();
     if (next?.type === "message") return [tool("write", { to: next.to, text: next.text, ...as, ...(next.re ? { about: next.re } : {}) })];
     if (next) {
@@ -268,6 +280,7 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
       inCalendar(brain.ctx.world.calendar);
       const said = onOwnForms(next.call, [...(stationery.get(id)?.values() ?? [])].sort((x, y) => (x.form < y.form ? -1 : 1)), { self: brain.ctx.entity, now: obs.t, currency: brain.ctx.world.currency });
       brain.busy = true;
+      if (brain.resend && SENDS_COPY.test(said.program)) (brain.resent ??= []).push({ program: said.program, at: obs.t });
       return [tool("notebook", { text: `Last request on day ${Math.floor(obs.t / 86_400)}.` }), tool("do", { what: PREFIX + said.program, ...as })];
     }
     // Done for now: back when the brain itself would next look in (the time it gave, or its module's own rhythm).

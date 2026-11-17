@@ -527,7 +527,7 @@ function withBrain(adapter: LlmAdapter, o: ModelSeatOptions, made: ReturnType<ty
   const part = o.config.participants.find((p: any) => p.id === o.seat);
   const pp = part?.controller?.params ?? {};
   const bctx = ctxFor(o.seat, cap ?? "self", made.entity, pp.mock?.params ?? {});
-  const mb: MockBrain = { controller: controller as any, ctx: bctx, capacity: cap ?? "self", cadence: brain.schedule().cadence, ...(pp.mock?.scope_after_days !== undefined ? { scopeAt: o.world.t() + pp.mock.scope_after_days * 86_400 } : {}) };
+  const mb: MockBrain = { controller: controller as any, ctx: bctx, capacity: cap ?? "self", cadence: brain.schedule().cadence, ...(pp.mock?.scope_after_days !== undefined ? { scopeAt: o.world.t() + pp.mock.scope_after_days * 86_400 } : {}), ...(pp.mock?.resend ? { resend: true } : {}) };
   const policies = mockPolicies(new Map([[o.seat, mb]]));
   // (The mock's own name stays: the log says the mock answered, whatever the arm's model is called.)
   return new MockAdapter(adapter.model, policies);

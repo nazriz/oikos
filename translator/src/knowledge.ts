@@ -39,6 +39,20 @@ export function givenBy(d: any): { [field: string]: string } {
 /** One sitting, in seconds: turns closer together than this are one sitting (experiments/scope-pilot/funnel.ts, the same). */
 export const SITTING = 3_600;
 
+/** Ids however they are written: one, or a list in any order. */
+const idList = (x: unknown): string[] => (x === undefined || x === null ? [] : (Array.isArray(x) ? x : [x]).map(String)).sort();
+
+/** A paper as one string for "the same paper": its kind, its words, whom it goes to (a set of ids however written) and
+ * its details whatever the order of their keys. Not what it cites: the same paper sent again cites the paper it was
+ * (["rec.13137"] on a body's return, "rec.13137" on the record the post sent) or the return it answers ("rec.16612", as
+ * the code desk sends one again). Compared as written, a returned paper sent again was never the paper that went (the
+ * stakes run's 14-day check, 2026-11-17: c0352's claim and c0010's loan each sent twice from one return, a second claim
+ * opened, a loan declined twice). */
+export function paperKey(p: { kind?: unknown; text?: unknown; to?: unknown; data?: unknown; basis?: unknown }): string {
+  const sorted = (x: unknown): unknown => (Array.isArray(x) ? x.map(sorted) : x && typeof x === "object" ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, sorted((x as any)[k])])) : x);
+  return JSON.stringify([String(p.kind ?? ""), String(p.text ?? ""), idList(p.to), sorted(p.data ?? null)]);
+}
+
 export class Knowledge {
   /** `currency`: how the world's money is written (its config's first currency): what the resolver reads and writes
    * amounts in. The platform has none of its own. `named`: whether the world's people and bodies have names of their
@@ -132,8 +146,22 @@ export class Knowledge {
   /** The paper sent, from a post it holds, that is this one exactly (its kind, words, whom it goes to, its details and
    * what it cites), at or after `since`: the newest, confirmed or on file. */
   sentFrom(paper: { kind?: unknown; text?: unknown; to?: unknown; data?: unknown; basis?: unknown }, since: number): { id: string; at: number; pending?: true } | undefined {
-    const same = (x: unknown, y: unknown) => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
-    return [...this.sent].reverse().find((x) => x.at >= since && x.kind === paper.kind && x.text === String(paper.text ?? "") && same(x.to, paper.to) && same(x.data, paper.data) && same(x.basis, paper.basis));
+    const key = paperKey(paper);
+    return [...this.sent].reverse().find((x) => x.at >= since && paperKey(x) === key);
+  }
+  /** A paper that is a signed copy it holds (a sign-off's, or a body's return's) and has gone since the newest such copy
+   * came: that copy, the paper as it went, and whether the copy is a return. A signed copy goes once, and a paper sent back
+   * goes again once for each time it came back, however the send is asked for: on the form that sends a copy, or written
+   * out word for word (a code desk sends a returned paper again as a statement). */
+  goneAgain(paper: { kind?: unknown; text?: unknown; to?: unknown; data?: unknown; basis?: unknown }): { copy: string; went: { id: string; at: number; pending?: true }; returned: boolean } | undefined {
+    const key = paperKey(paper);
+    // (A copy it is: the same paper, citing what the copy cites or the copy itself, a return answered by sending again.)
+    const cites = idList(paper.basis);
+    const copies = [...this.signed].filter(([id, p]) => (Array.isArray((p as any).papers) ? (p as any).papers : [p]).some((x: any) => paperKey(x) === key && cites.every((c) => c === id || idList(x.basis).includes(c)))).map(([id]) => id);
+    const copy = copies.sort((a, b) => (this.signedAt.get(b) ?? 0) - (this.signedAt.get(a) ?? 0))[0];
+    if (!copy) return undefined;
+    const went = this.sentFrom(paper, this.signedAt.get(copy) ?? 0);
+    return went ? { copy, went, returned: [...this.returnOf.values()].includes(copy) } : undefined;
   }
   /** A matter handed over that is a reply to a body's paper -> that paper (its referral's `reply_to`). */
   readonly replyTo = new Map<string, string>();
@@ -284,7 +312,8 @@ export class Knowledge {
       if (r.kind === "paper_returned" && typeof r.data?.returned === "string") this.returnOf.set(r.data.returned, r.id);
       if (typeof r.in_position === "string" && this.held.has(r.in_position) && !this.sent.some((x) => x.id === r.id)) {
         // (The paper it confirmed, now on file: in its place.)
-        const was = this.sent.findIndex((x) => x.pending && x.kind === r.kind && x.text === String(r.text ?? "") && JSON.stringify(x.to ?? null) === JSON.stringify(r.addressed_to ?? null) && JSON.stringify(x.data ?? null) === JSON.stringify(r.data ?? null));
+        const key = paperKey({ kind: r.kind, text: r.text, to: r.addressed_to, data: r.data, basis: r.basis });
+        const was = this.sent.findIndex((x) => x.pending && paperKey(x) === key);
         if (was >= 0) this.sent.splice(was, 1);
         this.sent.push({ id: r.id, at: r.at, kind: String(r.kind), text: String(r.text ?? ""), to: r.addressed_to, data: r.data, basis: r.basis });
         if (this.sent.length > 400) this.sent.shift();

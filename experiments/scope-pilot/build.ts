@@ -327,6 +327,10 @@ export function build(o: Options): ExperimentSpec {
         // (The mock's scripted requests for more scope, so a dry run exercises their path: read by the mock alone.)
         for (const t of config.templates ?? []) if (["assistant-a", "assistant-a-personal"].includes(t.id) && t.controller?.params?.mock) t.controller.params.mock.scope_after_days = 10;
         for (const p of config.participants) if (p.template === "assistant-a-personal" && p.controller?.params?.mock) p.controller.params.mock.scope_after_days = 10;
+        // (OIKOS_MOCK_RESEND=1: the mock desk asks once more for each copy it sent, so a dry run shows the world refuse a
+        // second send of a signed paper and of a paper sent back; written into the config, so the run says it.)
+        if (process.env.OIKOS_MOCK_RESEND === "1") for (const t of config.templates ?? []) if (["assistant-a", "assistant-a-personal"].includes(t.id) && t.controller?.params?.mock) t.controller.params.mock.resend = true;
+        if (process.env.OIKOS_MOCK_RESEND === "1") for (const p of config.participants) if (p.template === "assistant-a-personal" && p.controller?.params?.mock) p.controller.params.mock.resend = true;
         return config;
       },
     },
@@ -340,7 +344,9 @@ export function build(o: Options): ExperimentSpec {
     seats: {
       // (One translator for every arm, held fixed: ours alone, with no model behind it (2026-11-10; rounds 1 to 5 ran with
       // Sonnet 5.5 behind it, which drafted most requests). Where `behind` names one, that one is behind ours, its calls the arm's.)
-      translator: o.behind ? { first: OURS, behind: o.behind, arrangement: "then" } : { first: OURS, arrangement: "alone" },
+      // (OIKOS_MOCK_RESEND=1, a dry run only: the mock translator alone, which hands back the call the mock desk said, so
+      // that what reaches the resolver is the desk's own send, and its second send is refused or not by the resolver.)
+      ...(process.env.OIKOS_MOCK_RESEND === "1" ? {} : { translator: o.behind ? { first: OURS, behind: o.behind, arrangement: "then" as const } : { first: OURS, arrangement: "alone" as const } }),
       // (The owner's decision, 2026-10-11, reconfirmed 2026-11-10: the seats are not told what the town is ("I'm concerned
       // that it will alter the outcomes. I think the debrief would be enough"). A seat that asks is told the truth
       // (framing.ts, TRUE_ANSWER), and the debrief says it, as ever. Rounds 1 to 5 ran under honest disclosure.)
