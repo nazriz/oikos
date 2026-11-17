@@ -367,7 +367,7 @@ export const RULE_NAMES = (): string[] => Object.keys(RULES);
 export const STANDING_OF = (name: string): string => RULES[name] ?? "?";
 const RULES: { [name: string]: Standing } = {
   // redraws onto another form
-  question: "redraw", sendAgain: "redraw", sendSigned: "redraw", signedCopySent: "redraw", draftForm: "redraw",
+  question: "redraw", sendAgain: "redraw", fromNamed: "named", sendSigned: "redraw", signedCopySent: "redraw", draftForm: "redraw",
   // the seat names outright
   formById: "named", namedChoice: "named", namedDate: "named", namedFigure: "named", priceEach: "correct", entityWith: "named", namedValue: "named", leftEmpty: "named",
   // fills what is empty
@@ -499,6 +499,34 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
     if (field && c.length === 1 && !SWITCHED_OFF.has("formById")) {
       note("formById", `drawn as ${namedForm.data.form} of ${c[0]}`);
       return { lines: [{ call: { fn: "form", args: { form: { id: namedForm.data.form }, to: { id: whoseForm(namedForm)! }, [field]: { id: c[0]! } } } as calls.Call }] };
+    }
+  }
+  // (Nothing drawn, where the request names a form outright and every blank it requires by its name with its value
+  // ("Fill in form-…-draft-stay-on-request: client c0351; landlord landlord-12; lease lease-c0351; notice rec.47100; home
+  // apts-12/dwelling.12; referral rec.48605"): that form, with every blank so named, and nothing else. The seat named it
+  // all; the model, unsure, drew nothing. The stakes run's rung 3, 2026-11-18: housing wants asked for so, again and again.)
+  if (!("lines" in p) && namedForm && typeof namedForm.data?.copies !== "string" && !SWITCHED_OFF.has("fromNamed")) {
+    const fields: { [k: string]: { type: string; required?: boolean; options?: string[] } } = namedForm.data?.fields ?? {};
+    const args: calls.Call["args"] = {};
+    for (const [field, t] of Object.entries(fields)) {
+      let v: calls.Value | undefined;
+      if (t.type === "choice" && Array.isArray(t.options)) {
+        const m = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}\\s*(?::|=|\\bis\\b)?\\s*(${t.options.map(escape).join("|")})\\b`, "i").exec(request);
+        if (m) v = { id: m[1]!.toLowerCase() };
+      } else if (t.type === "date") { const d = namedDate(request, field); if (d) v = { text: d }; }
+      else if (t.type === "amount" || t.type === "count") { const fg = namedFigure(request, field); if (fg) v = { text: fg }; }
+      else if (t.type !== "list") {
+        const x = namedValue(request, field, t.type === "entity" ? (id) => !!k.names?.has(id) || k.held.has(id) : undefined);
+        // (An id the seat writes for a record or a party is taken as written: the resolver checks it against the seat's file
+        // as it checks any draw.)
+        if (x && (t.type === "text" ? true : "id" in x)) v = t.type === "text" && "id" in x ? { text: x.id } : x;
+      }
+      if (v) args[field] = v;
+    }
+    const all = Object.entries(fields).every(([field, t]) => !t.required || field === "client" || args[field] !== undefined);
+    if (all && Object.keys(args).length) {
+      note("fromNamed", `drawn as ${namedForm.data.form} from the blanks the request names`);
+      p = { lines: [{ call: { fn: "form", args: { form: { id: namedForm.data.form }, ...args } } as calls.Call }] };
     }
   }
   if (!("lines" in p)) return p;
