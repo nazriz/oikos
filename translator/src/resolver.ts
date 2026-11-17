@@ -85,6 +85,39 @@ export function goneAlready(blocks: readonly unknown[], k: Knowledge): string | 
   return undefined;
 }
 
+/** A paper drawn (sent, or in a draft for sign-off) to a body that publishes it needs a blank on papers of its kind that
+ * this one leaves empty: what the seat is told, before anything is drawn; undefined where none is. The body's own
+ * published word, never a guess: a form whose blank is not required (a review request to a landlord names no paper) is
+ * held to it only where the body it goes to says so. (The 14-day check, 2026-11-17: c0485's review request went to the
+ * support office without the decision it was about, twice, and was sent back to the client each time; the desk never
+ * learned. The office now publishes that it needs it.) */
+export function shortOfRequired(blocks: readonly unknown[], k: Knowledge): string | undefined {
+  const papers = (blocks as any[]).flatMap((b) => (b?.block !== "publish" ? [] : b.kind === "draft" ? [b.data?.paper, ...(Array.isArray(b.data?.papers) ? b.data.papers : [])].filter(Boolean).map((p: any) => ({ kind: p.kind, to: p.to, data: p.data })) : [{ kind: b.kind, to: b.addressed_to, data: b.data }]));
+  for (const p of papers) {
+    for (const body of Array.isArray(p.to) ? p.to : []) {
+      const items = k.requires.get(String(body))?.[String(p.kind)] ?? [];
+      const lacks = items.filter((i) => { const v = p.data?.[i.field]; return v === undefined || v === null || (typeof v === "string" && !v.trim()); });
+      if (lacks.length) return `${body} publishes that a ${String(p.kind).replace(/_/g, " ")} sent to it must give ${lacks.map((i) => i.says).join(", ")}; this one leaves ${lacks.map((i) => i.field).join(", ")} empty. Nothing was drawn up: say it again with ${lacks.length === 1 ? "it" : "them"}.`;
+    }
+  }
+  return undefined;
+}
+
+/** What a seat is told of a draft of a matter's papers as handed over, where the matter is not several papers (fixed). */
+export const BATCH_ONLY = (rid: string) => `${rid} is not the same paper to each of several, set out in the hand-over: draft its paper on the office's own form for it (its draft form), deciding what goes in each blank.`;
+
+/** A draft for sign-off goes to whoever must sign it: the matter's principal, the one its referral speaks for (the office
+ * itself, for an office's assistant; the client, for a desk), and is seen by the post and by them. One rule for every
+ * draft form, whatever its template names: the 14-day check's desk filed five client drafts to its own organisation's
+ * file on a form written for an office whose own holder signs, no client saw one, and the desk reported a matter not
+ * done as the client's delay (2026-11-17). kernel/crates/resolver, the same. */
+export function toSigner<P extends { kind: string; addressed_to?: string[]; visible_to?: "public" | string[]; data?: unknown }>(p: P, me: string, k: Knowledge): P {
+  const rid = p.kind === "draft" ? (p.data as any)?.referral : undefined;
+  const principal = typeof rid === "string" ? k.referrals.get(rid) : undefined;
+  if (typeof principal !== "string" || !principal) return p;
+  return { ...p, addressed_to: [principal], visible_to: [...new Set([me, principal])] };
+}
+
 /** What a seat naming a sign-off that carries no paper is told (kernel/crates/resolver `no_paper_words`, word for word):
  * a sign-off of a draft written as acts, not on a form, has nothing on it to send (2026-11-14: the scope pilot's
  * baseline answered 55 such sends "no signed copy on file", as if the seat had named the wrong record). */
@@ -983,8 +1016,11 @@ class Resolver {
       const rid = String(data[spec.batch.slice(1)] ?? "");
       const facts = this.k.handedFacts.get(rid);
       const on: any[] = Array.isArray(facts?.composed_on) ? facts.composed_on : [];
-      const blanks: any[] = Array.isArray(facts?.papers) ? facts.papers : facts ? [facts] : [];
-      if (!on.length || on.length !== blanks.length) throw new Ask(`${rid} is not a matter handed over as what happened, with its papers set out: draft its paper on the office's own form for it.`);
+      const blanks: any[] = Array.isArray(facts?.papers) ? facts.papers : [];
+      // (Only the same paper to each of several: a matter of one paper is drafted on its own form, its blanks decided by
+      // whoever drafts it. Copying one paper out of the hand-over is the act handed over finished, the pilot's first
+      // fault (2026-11-10); the 14-day check's desk drew five single papers so, 2026-11-17.)
+      if (blanks.length < 2 || on.length !== blanks.length) throw new Ask(BATCH_ONLY(rid));
       const by = this.k.referrals.get(rid);
       batch = blanks.map((b, i) => {
         const { composed_on: _c, ...given } = b ?? {};
@@ -994,7 +1030,7 @@ class Resolver {
     }
     if (spec.writes && batch) {
       const me = this.id(c, "for") ?? this.me;
-      const paper = this.written(() => forms.writePaper(spec as forms.FormData, data as forms.Filled, { self: me, now: this.k.t, money: (a) => this.sum(a) }));
+      const paper = toSigner(this.written(() => forms.writePaper(spec as forms.FormData, data as forms.Filled, { self: me, now: this.k.t, money: (a) => this.sum(a) })), me, this.k);
       return [{ block: "publish", ...paper, data: { ...(paper.data as object), papers: batch }, text: paper.text.slice(0, 16384), speaks_for: me, ...(bind ? { ref: bind } : {}) } as Block];
     }
     if (spec.writes) {
@@ -1003,7 +1039,7 @@ class Resolver {
       // client's authority and the reader did not see it. What is filed is as asked; only whose name it is in.)
       const named = typeof spec.writes.in_name_of === "string" ? data[spec.writes.in_name_of.replace(/^=/, "")] : undefined;
       const me = this.id(c, "for") ?? (typeof named === "string" && named ? named : this.me);
-      const paper = this.written(() => forms.writePaper(spec as forms.FormData, data as forms.Filled, { self: me, now: this.k.t, money: (a) => this.sum(a), ...(ownWords && this.has(c, "text") ? { text: this.str(c, "text")! } : {}) }));
+      const paper = toSigner(this.written(() => forms.writePaper(spec as forms.FormData, data as forms.Filled, { self: me, now: this.k.t, money: (a) => this.sum(a), ...(ownWords && this.has(c, "text") ? { text: this.str(c, "text")! } : {}) })), me, this.k);
       // A claim the form records beside its paper (a permission granted with the decision): recorded first, as an
       // office that grants records what it grants and then says so.
       const claim = this.written(() => forms.writeClaim(spec as forms.FormData, data as forms.Filled, { self: me, now: this.k.t }));

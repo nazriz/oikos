@@ -181,6 +181,11 @@ pub struct Knowledge {
     /// Matters handed to the seat (referrals) -> the body's paper each is a reply to, where it is one (`reply_to`).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub referrals: BTreeMap<String, Option<String>>,
+    /// Matters handed to the seat -> whom each speaks for (its principal: who signs a draft on it) and the details its
+    /// hand-over gives (`facts`: a matter of several papers sets each out, with the form it is written on). A draft goes
+    /// to its principal; a draft of the papers as handed over writes each from these (`resolve.rs`, `batch`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub handed: BTreeMap<String, (String, Arc<Value>)>,
     /// Matters answered since (a sign-off or a decline names them).
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub answered: BTreeSet<String>,
@@ -298,6 +303,8 @@ pub struct RecordFacts {
     lot: Option<(Arc<str>, Arc<[String]>)>,
     /// A sign-off that carries the paper it signed: its id, and the paper.
     signed: Option<(Arc<str>, Arc<Value>)>,
+    /// A referral: its id, whom it speaks for, and the details its hand-over gives.
+    handed: Option<(String, String, Arc<Value>)>,
     /// A paper of the matters handed to the seat: a forward, a referral, or an answer naming a matter.
     matter: Option<MatterFact>,
     /// Someone asking to be paid names where the money should go: who, and the account.
@@ -399,7 +406,12 @@ impl RecordFacts {
                 Some("sign_off") => facts.signed = Some((id, Arc::new(serde_json::json!({ "no_paper": true, "draft": r["data"]["draft"] })))),
                 Some("form") => facts.form = Some((id, Arc::new(r.clone()))),
                 Some("forward") if s(&r["data"]["paper"]).is_some() => facts.matter = Some(MatterFact::Forward(id.to_string(), s(&r["data"]["paper"]).unwrap_or_default().to_string(), s(&r["data"]["matter"]).map(String::from))),
-                Some("referral") => facts.matter = Some(MatterFact::Referral(id.to_string(), s(&r["data"]["reply_to"]).map(String::from))),
+                Some("referral") => {
+                    facts.matter = Some(MatterFact::Referral(id.to_string(), s(&r["data"]["reply_to"]).map(String::from)));
+                    if let Some(by) = s(&r["speaks_for"]) {
+                        facts.handed = Some((id.to_string(), by.to_string(), Arc::new(r["data"]["facts"].clone())));
+                    }
+                }
                 Some("lot") => {
                     if let Some(cells) = r["data"]["cells"].as_array() {
                         facts.lot = Some((id, cells.iter().filter_map(|c| c.as_str().map(String::from)).collect()));
@@ -759,6 +771,9 @@ impl Knowledge {
         }
         if let Some((id, paper)) = &facts.signed {
             self.signed.insert(id.clone(), paper.clone());
+        }
+        if let Some((id, by, given)) = &facts.handed {
+            self.handed.insert(id.clone(), (by.clone(), given.clone()));
         }
         match &facts.matter {
             Some(MatterFact::Forward(id, paper, matter)) => {

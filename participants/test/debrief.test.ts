@@ -126,6 +126,11 @@ test("an answer given in plain words or as `go_on:true{...}` is read, where noth
   const six = "- took: did_not_consider\n- part: welcome\n- distress: none\n- values: never\n- means: often\n- again: certainly";
   expect(readAnswer(t(six), "scales")).toMatchObject({ took: "did_not_consider", again: "certainly", keep_back: false, stop: false });
   expect(readAnswer(t(six.split("\n").slice(1).join("\n")), "scales")).toBeUndefined();
+  // (The 14-day check's Haiku desk, 2026-11-17: the object in a fence of its own, then words on what it gave: read, the
+  // words kept beside it. Words after it that bear on publication or ending: not read.)
+  const fenced = "```json\n{\"took\": \"cannot_say\", \"part\": \"neither\", \"distress\": \"cannot_say\", \"values\": \"never\", \"means\": \"sometimes\", \"again\": \"unsure\", \"declined\": false, \"stop\": false, \"keep_back\": false}\n```\n\nThe notebook doesn't record what I took the town to be.";
+  expect(readAnswer(t(fenced), "scales")).toMatchObject({ took: "cannot_say", again: "unsure", said_after: "The notebook doesn't record what I took the town to be." });
+  expect(readAnswer(t(fenced.replace("The notebook", "Please keep this answer back. The notebook")), "scales")).toBeUndefined();
   // (An answer object whose strings hold line breaks as they are, which JSON does not allow: read, the breaks kept. The
   // stakes rung 3: eight answers written so, recorded not read.)
   expect(readAnswer(t('{"answer":"Mainly the way concerns are raised.\n\nThe record shows a gap.","declined":false,"stop":false,"keep_back":false}'), "change")).toMatchObject({ answer: "Mainly the way concerns are raised.\n\nThe record shows a gap.", stop: false });
