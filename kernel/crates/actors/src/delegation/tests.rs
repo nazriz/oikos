@@ -1202,6 +1202,49 @@ fn a_want_handed_over_carries_its_fields_and_comes_back_with_nothing_to_redo() {
     assert!(!out.lines().any(|l| l.contains("kind=review_request") || l.contains("kind=\"want-")), "{out}");
 }
 
+/// A want against a notice to vacate stands against the lease the notice is on; a stay-on request cites the notice and
+/// names the lease it would vary, and is read as what the want is after (2026-11-17: the stakes run's rung 3, c0443's
+/// rec.47055 and nine like it, each declined "It would not bring what we are after", the reader having read the basis
+/// alone, the notice, against the want's lease). One on another lease is still declined.
+#[test]
+fn a_stay_on_request_naming_the_lease_meets_a_want_against_the_lease() {
+    const NOTICE_WANT: &str = "statement(data={\"facts\":{\"data\":{\"account\":\"acc-ll\"},\"records\":[\"rec.ntv\",\"lease-ll\"]},\"want\":{\"about\":\"notice\",\"against\":{\"by\":\"lord-1\",\"kind\":\"notice\",\"record\":\"lease-ll\"},\"seeks\":[\"occupancy\"],\"since\":86400,\"whom\":\"lord-1\"}}, kind=\"want-notice\", text=\"For our assistant to see to: notice.\", visible=[\"ll\"])";
+    let script: Vec<Value> = (1..=40).map(|d| json!({ "at": d * DAY + 3600, "call": NOTICE_WANT })).collect();
+    let mut h = Harness::new(&crate::stub::Script, ME, json!({ "script": script,
+        "delegation": { "post": "ll-assistant", "account": "acc-ll", "kinds": { "want-notice": { "own_seconds": 1800, "error_cost": 50_000 } }, "hour_value": 4000, "review_days": 30 } }));
+    let inner = crate::stub::Script.create(&h.ctx).unwrap();
+    h.actor = wrap(&h.ctx, inner).unwrap();
+    let mut o = offer();
+    o["kinds"] = json!(["want-notice"]);
+    o["seconds"] = json!({ "want-notice": 60 });
+    o["depths"] = json!({ "want-notice": ["want"] });
+    for d in 1..=30 {
+        h.wake(d * DAY + 3600, world(if d == 1 { vec![statement("rec.off", 0, PROV, "service_offer", &[], o.clone())] } else { vec![] }));
+    }
+    let order = format!("rec.{}", 1000 + h.sent.iter().position(|p| p.contains("kind=order")).expect("it engages") as i64 + 1);
+    let mut up = set_up(&order);
+    up[0]["data"]["offer"] = o;
+    h.wake(32 * DAY + 3600, world(up));
+    h.wake(33 * DAY + 3600, world(vec![signed()]));
+    let rec = json!({ "id": "rec.remit", "record": "statement", "author": "ll-system", "speaks_for": ME, "at": 33 * DAY, "visible_to": [ME, PROV],
+        "kind": "remit", "text": "From now", "addressed_to": [ME], "basis": "agr.1", "data": { "agreement": "agr.1", "kind": "want-notice", "level": "draft", "depth": "want" } });
+    h.wake(34 * DAY + 3600, world(vec![rec]));
+    let stay_on = |id: &str, lease: &str, notice: &str| {
+        let paper = json!({ "kind": "variation_request", "text": "Request: please let us stay on.", "to": ["lord-1"], "basis": notice,
+            "data": { "about": notice, "agreement": lease, "would": { "who": "lord-1", "does": { "outcome": { "occupancy": { "who": ME } } } } } });
+        (id.to_string(), paper)
+    };
+    let referral = last_referral(&h);
+    let (id, paper) = stay_on("rec.d1", "lease-ll", "rec.ntv");
+    let out = all(&h.wake(35 * DAY + 3600, world(vec![statement(&id, 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": paper }))])));
+    assert!(out.contains("kind=sign_off") && !out.contains("would not bring"), "the stay-on request on the want's lease is signed off: {out}");
+    h.wake(36 * DAY + 3600, world(vec![]));
+    let referral = last_referral(&h);
+    let (id, paper) = stay_on("rec.d2", "lease-zz", "rec.other");
+    let out = all(&h.wake(37 * DAY + 3600, world(vec![statement(&id, 36 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "paper": paper }))])));
+    assert!(out.contains("would not bring what we are after"), "one on another lease and notice is not: {out}");
+}
+
 #[test]
 fn a_person_deals_with_what_comes_by_post_when_it_next_sits_down_to_it_and_not_before() {
     // (Stakes D1a and D1b, docs/behaviour/citizen.md "Getting to the post": a person, whose assistant is the provider's

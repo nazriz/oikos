@@ -198,8 +198,11 @@ export function wantPapers(): Issued[] {
         data: { agreement: "=lease", about: "=notice", would: { who: "=client", does: { outcome: { money: { amount: "=rent" } } }, every: 30 * DAY } } } },
     { form: "stay_on_request", title: "A request to a landlord to let a client stay on, in their name",
       does: "Asks the client's landlord, in the client's name, to let them stay on at their home, in answer to a notice to leave. The landlord answers yes or no.",
-      fields: { client, landlord: f("entity", "The client's landlord.", req), lease: f("record", "The client's lease.", req), notice: f("record", "The notice to leave.", req), home: f("text", "The client's home, as the lease names it.", req) },
-      writes: { in_name_of: "=client", kind: "variation_request", text: "Request: please let us stay on at {home}.", basis: "=notice", to: ["=landlord"], visible: ["=client", "=landlord"],
+      fields: { client, landlord: f("entity", "The client's landlord.", req), lease: f("record", "The client's lease.", req), notice: f("record", "The notice to leave.", req), home: f("text", "The client's home, as the lease names it, if you have it: the landlord goes by the lease.") },
+      // (The home is the lease's: the landlord reads the lease the request names, never the words. Until 2026-11-17 it was
+      // a blank to fill, and a request that did not name it was never drawn: the stakes run's rung 3, five wants left
+      // with the request unmade, c0336's, c0351's, c0603's, c0681's.)
+      writes: { in_name_of: "=client", kind: "variation_request", text: "Request: please let us stay on in our home under {lease}.", basis: "=notice", to: ["=landlord"], visible: ["=client", "=landlord"],
         data: { agreement: "=lease", about: "=notice", would: { who: "=landlord", does: { outcome: { occupancy: { who: "=client", in: "=home" } } } } } } },
     { form: "venue_application", title: "An application to a body that hears a matter, in a client's name",
       does: "Applies, in the client's name, to a body whose published notice says it hears the matter. It tells the other side and decides, or recommends. A fee, where its notice names one, is paid besides, by a payment from the client's account.",
