@@ -1853,13 +1853,20 @@ impl State {
         }
         let mut bears = to.clone();
         bears.extend(data.get("against").and_then(Value::as_str).map(String::from));
+        // (What the paper undoes or varies: the record the want stands against, where the paper names it among its own
+        // (its basis, what it is about, the agreement it would vary), else its basis. A want about a notice to vacate
+        // stands against the lease the notice is on; a stay-on request cites the notice and names the lease it would
+        // vary. Until 2026-11-17 only the basis was read, the notice, never the lease, and every such draft was declined
+        // "It would not bring what we are after": the stakes run's rung 3, c0443's rec.47055 and nine like it.)
+        let named: Vec<String> = basis.iter().cloned().chain(["about", "agreement"].iter().filter_map(|k| data.get(*k).and_then(Value::as_str).map(String::from))).collect();
+        let undone = w.against.as_ref().map(|a| a.record.clone()).filter(|r| named.contains(r)).or(basis);
         let o = crate::mind::wants::Opening {
             key: "draft".into(),
             kind: "draft".into(),
             id: None,
             by: None,
             brings: vec![],
-            undoes: basis.map(|b| crate::mind::wants::Undoes { record: Some(b), kinds: None }),
+            undoes: undone.map(|b| crate::mind::wants::Undoes { record: Some(b), kinds: None }),
             bears: Some(bears),
         };
         let seeks = w.seeks.iter().filter_map(|k| serde_json::from_value(json!(k)).ok()).collect();

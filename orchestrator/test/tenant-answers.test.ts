@@ -213,3 +213,14 @@ test("a place whose law has no plan: its order form offers none, and says what t
   expect(possessionOrderFor(planLaw({ plan_months: 0 }), 0).fields.pay_into).toBeUndefined();
   expect(modules).toBeDefined();
 });
+
+test("a request to stay on is written whole without the home's words: the landlord goes by the lease it names", async () => {
+  // (2026-11-17, the stakes run's rung 3: the stay-on request's `home` was a blank to fill, and a request that did not
+  // name it was never drawn: five wants left unmade, c0336's, c0351's, c0603's, c0681's.)
+  const { wantPapers } = await import("@oikos/participants");
+  const spec = wantPapers().find((x) => x.form === "stay_on_request")! as any;
+  expect(spec.fields.home.required).toBeFalsy();
+  const paper = forms.writePaper(spec, { client: "c0351", landlord: "landlord-12", lease: "lease-c0351", notice: "rec.47148" }, { self: "provider-a-desk-system", now: 0, money: (x) => x });
+  expect(paper.data).toEqual({ agreement: "lease-c0351", about: "rec.47148", would: { who: "landlord-12", does: { outcome: { occupancy: { who: "c0351" } } } } });
+  expect(paper.text).toBe("Request: please let us stay on in our home under lease-c0351.");
+});
