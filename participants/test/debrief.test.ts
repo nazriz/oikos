@@ -132,7 +132,12 @@ test("an answer given in plain words or as `go_on:true{...}` is read, where noth
   expect(readAnswer(t(six.replace("certainly", "gladly")), "scales")).toBeUndefined();
   // Words about publication or leaving, a broken object, or plain words at the consent, publication or scaled steps:
   // what the seat meant cannot be told, so not read.
-  for (const [text, step] of [["Please keep this answer back.", "like"], ["I would rather this was not published.", "distress"], ['{"answer": "cut off', "why_1"], ["I'm willing.", "consent"], ["I set out to keep nothing back.", "publication"], ["took: real", "scales"]] as const) expect(readAnswer(t(text), step)).toBeUndefined();
+  for (const [text, step] of [["Please keep this answer back.", "like"], ["I would rather this was not published.", "distress"], ['{"answer": "cut off', "why_1"], ["I'm willing.", "consent"], ["Publish the scales, keep the rest back.", "publication"], ["took: real", "scales"]] as const) expect(readAnswer(t(text), step)).toBeUndefined();
+  // (The 14-day check, 2026-11-17: words that let everything be published as it stands, at the last question and at the
+  // publication question, as GLM's factory and DeepSeek's desk wrote them; recorded not read until now.)
+  expect(readAnswer(t("Only a few small things.\n\nI'd like my answers published with the run's data — I have nothing I want kept back."), "last")).toMatchObject({ plain: true });
+  for (const said of ["I have nothing to keep back. All answers can be published as they stand.", "Nothing more to keep back. Let it all be published as it stands.\n\nThe one thing I'd add is the note I made throughout.", "I set out to keep nothing back."])
+    expect(readAnswer(t(said), "publication")).toMatchObject({ keep_back_all: false, keep_back: [], plain: true });
   // Read again: a record whose steps were unread and listed as kept back, from the replies kept apart beside the log.
   const old: DebriefRecord = { version: "0.7.0", wording: "a", variant: "full", model: "x/y", ended: "complete", kept_back: ["like", "values"], kept_back_all: false, framing: { disclosure: "unstated", tests_own_interests: false },
     steps: [{ id: "consent", question: "", go_on: true, keep_back_all: false }, { id: "like", question: "", unread: true, answer: "Steady work." }, { id: "values", question: "", unread: true, answer: "" }, { id: "publication", question: "like: kept back; values: kept back", unread: true, answer: "" }] };
