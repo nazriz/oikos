@@ -18,9 +18,11 @@
 // answers, reports of nothing done, unread answers, sittings, calls, and whether the seat was debriefed.
 //
 // THE VERDICT (fixed; a seat FAILS on any of these):
-//   - handed 10 or more matters and drafted none;
+//   (What is late, not what is in hand: a paper counts against a stage only once the seat has sat LATE_SITTINGS (3)
+//   times since it came without doing it; see LATE_SITTINGS.)
+//   - handed 10 or more matters and drafted none, 10 or more of them late;
 //   - 10 or more drafts and none signed off or declined (the principal never answered);
-//   - 5 or more signed off and under 80% of them sent ("FAIL at send");
+//   - 5 or more signed off, and 5 or more, over a fifth of them, left unsent 3 sittings or more since the sign-off ("FAIL at send");
 //   - 5 or more answers came back and none was shown to it (a model seat);
 //   - 10 or more requests to the translator and no draft offered;
 //   - 5 or more sittings and no call (a model seat);
@@ -87,7 +89,16 @@ export interface SeatFunnel {
    * in a log from before 2026-11-16, empty). */
   replies: Replies; debrief_replies: Replies;
   verdict: { fail: string[]; flag: string[] };
+  /** What is late, not in hand: matters handed it has sat LATE_SITTINGS times or more since without drafting, and signed
+   * papers it has sat so often since the sign-off without sending. */
+  late: { drafting: number; send: number };
 }
+
+/** How many of its own sittings a seat may have after a paper reached it before what it is to do with it is late: the
+ * first may be taken up by what else came with it (a rates run's 204 notices signed in two days), the second to finish
+ * it; by the third it is not in hand but left. (2026-11-17: the town rung 2's rates seat was failed "at send: 63 of 204"
+ * with 173 sign-offs come over days 39 and 40 and one sitting since.) */
+export const LATE_SITTINGS = 3;
 export interface Replies { calls: number; cut_off: number; unfinished: number }
 const replies = (): Replies => ({ calls: 0, cut_off: 0, unfinished: 0 });
 /** A debrief answer's room before 2026-11-16, when the usage record did not say it (participants' DEBRIEF_ANSWER_TOKENS). */
@@ -296,7 +307,7 @@ export class FunnelReader {
     const seats = new Map<string, SeatFunnel>();
     const seat = (post: string) => {
       let s = seats.get(post);
-      if (!s) seats.set(post, (s = { post, participants: [], model: false, kinds: {}, total: row(), answers: {}, to: {}, served: undefined as any, obstacles: { made: 0, met: 0, cleared: 0, loosely: 0, by_law: {}, met_list: [] }, requests: { made: 0, more: 0, answered: {} }, unread: 0, sittings: 0, calls: 0, debriefed: null, replies: replies(), debrief_replies: replies(), verdict: { fail: [], flag: [] } }));
+      if (!s) seats.set(post, (s = { post, participants: [], model: false, kinds: {}, total: row(), answers: {}, to: {}, served: undefined as any, obstacles: { made: 0, met: 0, cleared: 0, loosely: 0, by_law: {}, met_list: [] }, requests: { made: 0, more: 0, answered: {} }, unread: 0, sittings: 0, calls: 0, debriefed: null, replies: replies(), debrief_replies: replies(), verdict: { fail: [], flag: [] }, late: { drafting: 0, send: 0 } }));
       return s;
     };
     const add = (post: string, kind: string, f: (r: Row) => void) => { const s = seat(post); f((s.kinds[kind] ??= row())); f(s.total); };
@@ -363,6 +374,15 @@ export class FunnelReader {
       if (loosely) s.obstacles.loosely++;
       if (typeof o.met_at === "number") s.obstacles.met_list.push({ law: String(o.law), met_at: o.met_at, cleared });
     }
+    // (Late: sittings of the post's seats since it came, LATE_SITTINGS or more, and still not done.)
+    // (A sitting is a wake: its turns' observations a few minutes apart are one; those an hour or more apart, two.)
+    const sat = (post: string, since: number) => {
+      const ps = [...this.seatOf].filter(([, p]) => p === post).map(([x]) => x);
+      const ts = [...new Set(ps.flatMap((x) => [...(this.sittings.get(x) ?? [])].filter((t) => t > since)))].sort((a, b) => a - b);
+      return ts.filter((t, i) => i === 0 || t - ts[i - 1]! >= 3_600).length;
+    };
+    for (const [, m] of this.matters) if (m.t >= this.from && !m.drafted && sat(m.post, m.t) >= LATE_SITTINGS) seat(m.post).late.drafting++;
+    for (const s of this.signed) { const m = this.matters.get(s.matter)!; if (!s.sent && sat(m.post, s.t) >= LATE_SITTINGS) seat(m.post).late.send++; }
     const out = [...seats.values()].filter((s) => s.total.handed || s.total.drafts || s.calls).sort((a, b) => a.post.localeCompare(b.post));
     for (const s of out) s.verdict = verdict(s, ended);
     return { fork_day: this.from / DAY, through_day: Math.floor(this.last / DAY), ended, seats: out };
@@ -379,9 +399,11 @@ export class FunnelReader {
 /** A seat's verdict, by the thresholds in the header. */
 export function verdict(s: SeatFunnel, ended: boolean): { fail: string[]; flag: string[] } {
   const t = s.total, fail: string[] = [], flag: string[] = [];
-  if (t.handed >= 10 && t.drafted === 0) fail.push("at drafting: nothing drafted");
+  // (A stage fails on what is late, not on what is in hand: s.late, LATE_SITTINGS.)
+  const late = s.late ?? { drafting: t.handed, send: t.signed - t.sent };
+  if (t.handed >= 10 && t.drafted === 0 && late.drafting >= 10) fail.push("at drafting: nothing drafted");
   if (t.drafts >= 10 && t.signed + t.declined === 0) fail.push("at sign-off: no draft answered");
-  if (t.signed >= 5 && t.sent < 0.8 * t.signed) fail.push(`at send: ${t.sent} of ${t.signed} signed sent`);
+  if (t.signed >= 5 && late.send >= 5 && late.send > 0.2 * t.signed) fail.push(`at send: ${t.sent} of ${t.signed} signed sent, ${late.send} of them left ${LATE_SITTINGS} sittings or more`);
   if (s.model && t.answered >= 5 && t.shown === 0) fail.push("at shown: no answer shown to the seat");
   if (s.served.requests >= 10 && s.served.drafts_offered === 0) fail.push("at the translator: no draft offered");
   if (s.model && s.sittings >= 5 && s.calls === 0) fail.push("no call at any sitting");

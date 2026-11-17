@@ -2247,7 +2247,7 @@ The mechanism:
   whole invoice, and the sum is the seat's act, not the world's error. The preview now says a signed copy has gone
   already, and the acts reader counts the second send; the payment itself still goes through. Code sellers do not
   send twice, so code towns are not affected.
-- **L / I:** low / high · **Status:** open (2026-11-16)
+- **L / I:** low (since 2026-11-17: a post's second send of a signed copy is refused, decisions 2026-11-17, "The town rung 2's faults") / high · **Status:** open (2026-11-16). Seen: the town rung 2, factory-2's invoice sent twice in a sitting and paid twice, $762,908.16 each; the send is now refused at the seat, and the buyer's own three-way match is still the fix here.
 - **Fix when:** a model run shows a duplicate send paid (search: two `transfer`s from the outside settling two invoices
   of one seller with the same data); give the buyer a record of goods received by seller (each arrival tied to its
   carrier and `from_at`), and pay an invoice only against that seller's goods received and not yet paid for, sending

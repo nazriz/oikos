@@ -429,6 +429,10 @@ pub struct Draft {
     /// A draft written on a form (a model's): the paper as it would go (`kind`, `text`, `to`, `data`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paper: Option<Value>,
+    /// A draft of a matter's papers as handed over, one for each (a rates run's notices: the form `draft_as_handed`),
+    /// each as it would go: signed together, sent together (2026-11-17).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub papers: Vec<Value>,
     /// The principal's day for it, as its referral gave it (`Referral.draft_by`), copied by whoever drafts.
     #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient::opt_int")]
     pub by: Option<i64>,

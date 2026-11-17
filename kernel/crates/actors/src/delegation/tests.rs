@@ -377,6 +377,23 @@ fn of_a_matter_of_several_papers_one_wrong_draft_is_sent_by_the_principal_alone_
     assert!(out.lines().any(|l| l.contains("kind=sign_off") && l.contains("rec.w2")), "the other paper, right, signed: {out}");
     assert!(!out.lines().any(|l| l.contains("kind=sign_off") && l.contains("rec.w3")), "never signed twice: {out}");
     assert!(out.lines().any(|l| l.contains("kind=declined") && l.contains("rec.w3") && l.contains("done this ourselves already")), "{out}");
+    // (2026-11-17) The matter's papers drafted as one (`papers`, the form `draft_as_handed`): signed as one, each paper
+    // as it stands, for one send; one left out is not as we have it. The town rung 2: 204 notices, 204 sign-offs.
+    let (mut h, _, mut remit) = engaged_doing(two);
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit.clone()]));
+    let referral = last_referral(&h);
+    let paper = |to: &str, lease: &str| json!({ "kind": "notice_to_vacate", "text": "Please leave.", "to": [to], "basis": lease });
+    let short = statement("rec.b1", 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "papers": [paper("t1", "lease-1")] }));
+    assert!(all(&h.wake(35 * DAY + 3600, world(vec![remit.clone(), short]))).contains("kind=declined"), "one of two: declined");
+    let (mut h, _, mut remit) = engaged_doing(two);
+    remit["data"]["level"] = json!("draft");
+    h.wake(34 * DAY + 3600, world(vec![remit.clone()]));
+    let referral = last_referral(&h);
+    let both = statement("rec.b2", 34 * DAY + 7200, ME, "draft", &[ME], json!({ "referral": referral, "papers": [paper("t1", "lease-1"), paper("t2", "lease-2")] }));
+    let out = all(&h.wake(35 * DAY + 3600, world(vec![remit, both])));
+    let signed = out.lines().find(|l| l.contains("kind=sign_off")).unwrap_or_else(|| panic!("both: signed as one: {out}"));
+    assert!(signed.contains("\"papers\"") && signed.contains("\"t1\"") && signed.contains("\"t2\""), "{signed}");
 }
 
 #[test]

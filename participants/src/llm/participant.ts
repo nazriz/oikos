@@ -115,6 +115,9 @@ export const PROMPT_MAX = 150_000;
 export const PROMPT_MIN = 12_000;
 /** What stands where a look's result was, once it has been left out. */
 export const LOOK_LEFT_OUT = "(What this look showed is no longer set out here: there was more than can be read at once, and the oldest of what you looked up was left out first. Look again for what you need.)";
+/** An earlier turn's result kept as a line (fitPrompt 2b): at most this long, with EARLIER_SAID. */
+export const EARLIER_LINE_MAX = 240;
+export const EARLIER_SAID = "(Set out in full when it came; look again for it if you need it.)";
 /** A standing part longer than this is bulk: left out before the seat's own look-ups when a prompt is over. */
 export const BULK_PART = 20_000;
 const LOOKED_SECTION = /^## (Looked up for you|.*: (what you looked up|what you looked at|who you looked for|what was found there|the paper |new since you last looked))/;
@@ -205,6 +208,24 @@ export function fitPrompt(system: string, messages: LlmMessage[], max: number, l
         if (c.type === "text") c.text = shed(c.text, only);
         else if (c.type === "tool_result" && !only && !fresh.has(c)) c.content = shed(c.content, only);
       }
+    }
+  }
+  // 2b. What the earlier turns of the sitting brought back, the oldest first: each a line, its first, with a word that it
+  // was set out whole when it came. A long sitting is many turns of short results, none long enough to cut alone: the
+  // town rung 2's rates seat, 204 notices drafted and sent one by one, came to 267,000 characters in 43 turns, every part
+  // of it under 2,000, and was cut 13 times in the middle of its work. Nothing is cut before this has been done.
+  for (const m of ms) {
+    if (now <= max) break;
+    if (typeof m.content === "string" || m.role !== "user") continue;
+    for (const c of m.content) {
+      if (now <= max) break;
+      // (Never what is waiting for its yes or no, as it stands: that is set out whole, once, where newest.)
+      if (c.type !== "tool_result" || fresh.has(c) || c.content.length <= EARLIER_LINE_MAX || c.content === LOOK_LEFT_OUT || c.content.includes(WAITING_HEAD)) continue;
+      const first = c.content.split("\n", 1)[0]!.slice(0, EARLIER_LINE_MAX - EARLIER_SAID.length - 2);
+      const line = `${first} ${EARLIER_SAID}`;
+      now -= c.content.length - line.length;
+      c.content = line;
+      left.parts++;
     }
   }
   // 3. Still over (one part longer than everything allowed): the longest older text is cut; 4. then the newest turn's

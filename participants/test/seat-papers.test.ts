@@ -9,7 +9,7 @@ import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import type { Observation } from "../src/contracts";
 import type { ContentBlock, LlmMessage, LlmRequest } from "../src/llm/adapter";
 import { inCurrency } from "../src/money";
-import { createLlmParticipant, fitPrompt, kindWhere, LOOK_LEFT_OUT, PROMPT_MAX, PROMPT_MIN, SET_OUT_AGAIN, supersede, tools, type LlmParticipantConfig } from "../src/llm/participant";
+import { createLlmParticipant, EARLIER_SAID, fitPrompt, kindWhere, LOOK_LEFT_OUT, PROMPT_MAX, PROMPT_MIN, SET_OUT_AGAIN, supersede, tools, type LlmParticipantConfig } from "../src/llm/participant";
 import { askRef, LOOK_CHARS_MAX, PAPER_MAX, renderObservation, WAITING_CHARS, WAITING_HEAD, WAITING_SAYS } from "../src/llm/render";
 import { Matters } from "../src/readers/matters";
 
@@ -277,6 +277,15 @@ test("a whole prompt has a ceiling: the oldest of what was looked up is left out
   expect(supersede(once)).toEqual(once);
   const pile = fitPrompt("system", [{ role: "user", content: `Your notebook: mine\n\n${waiting(2)}\n\n## Treasury\n${"z".repeat(30_000)}` }], 20_000, new Set());
   expect(pile.messages[0]!.content).toContain(waiting(2));
+  // A long sitting of many short results, none long enough to cut alone (the town rung 2's rates seat: 43 turns, 267,000
+  // characters, cut 13 times): the earlier turns' results each a line, the newest whole, nothing cut.
+  const sitting: LlmMessage[] = [{ role: "user", content: "Your notebook: mine" }];
+  for (let i = 0; i < 60; i++) sitting.push({ role: "assistant", content: [use(`d${i}`, "do", { what: `notice ${i}` })] }, { role: "user", content: [{ type: "tool_result", tool_use_id: `d${i}`, content: `Done: what you confirmed (${i}).\n${"what came of it. ".repeat(30)}` }] });
+  const long = fitPrompt("system", sitting, 15_000, new Set());
+  expect(long.left?.cut).toBe(false);
+  expect(long.characters).toBeLessThanOrEqual(15_000);
+  expect((long.messages.at(-1)!.content as any[])[0].content).toContain("what came of it. what came of it.");
+  expect((long.messages[2]!.content as any[])[0].content).toBe(`Done: what you confirmed (0). ${EARLIER_SAID}`);
   // A pile longer than is set out whole at once: the oldest whole, the rest a line each, none left unsaid.
   const many = Array.from({ length: 60 }, (_, i) => ({ id: `draft.rates.${i + 1}`, summary: `Rates notice ${i + 1}: $600.00 on lot-${i}.` }));
   const shown = renderObservation({ ...base(9 * HOUR), drafts: many } as any, { draftText: (d: any) => `${askRef(d.id)}: ${d.summary} ${"set out in full. ".repeat(40)}` });

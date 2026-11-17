@@ -74,7 +74,7 @@
       }
     },
     {
-      "does": "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting. The seller delivers once an order is paid in full, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
+      "does": "How the office buys from a supplier, the outside world's market among them: it places the order at the seller's listed price. The form pays nothing by itself: pay the whole sum into the account the seller's price list names, at the same sitting; or, bought on the seller's terms of trade (paid_within_days_of_delivery), pay within those days of delivery. The seller delivers once an order is paid in full, or at once on its terms, sends back money that comes with no order waiting for it, and declines an order unpaid after a week.",
       "fields": {
         "account": {
           "description": "The account the order is paid from.",
@@ -125,7 +125,7 @@
         }
       },
       "form": "order",
-      "title": "An order to a supplier, paid with the order",
+      "title": "An order to a supplier",
       "writes": {
         "data": {
           "account": "=account",
@@ -139,7 +139,7 @@
           "unit_price": "#unit_price"
         },
         "kind": "order",
-        "text": "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. Paid with this order.",
+        "text": "Order: {quantity} {kind} at {unit_price} each, delivered to {deliver_to} at {at}. {paid_within_days_of_delivery?To be paid within [paid_within_days_of_delivery] days of delivery, on your terms.|Paid with this order.}",
         "to": [
           "=seller"
         ],

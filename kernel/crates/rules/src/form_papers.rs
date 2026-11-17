@@ -174,11 +174,27 @@ fn words(v: Option<&Json>, ty: Option<&str>, money: Money, dated: Option<&Dated>
             }
         }
         (Some(Json::String(s)), Some("amount")) => money(s)?,
+        // (A sum given as a number is a sum too: money reads as money on every paper, whoever wrote it. The town rung 2:
+        // a code assistant's orders read "102 food at 12727 each".)
+        (Some(Json::Number(n)), Some("amount")) if n.as_i64().is_some() => money(&n.to_string())?,
         (Some(Json::Number(n)), Some("duration")) if n.as_i64().is_some() => duration_words(n.as_i64().unwrap_or_default()),
         (Some(Json::Number(n)), Some("date")) if n.as_i64().is_some() => date_words_in(n.as_i64().unwrap_or_default(), dated),
         (Some(Json::String(s)), _) => s.clone(),
         (Some(x), _) => x.to_string(),
     })
+}
+
+/// A conditional piece at the start of `after` (just past its `{`): `name?yes|no}`. Its name, its two words, and the
+/// length of it to the closing brace.
+fn conditional(after: &str) -> Option<(&str, &str, &str, usize)> {
+    let q = after.find('?')?;
+    let name = &after[..q];
+    if !is_name(name) {
+        return None;
+    }
+    let close = after.find('}')?;
+    let bar = after[q + 1..close].find('|')? + q + 1;
+    Some((name, &after[q + 1..bar], &after[bar + 1..close], close + 1))
 }
 
 /// The text of a template with each `{name}` replaced by the field in words.
@@ -207,6 +223,33 @@ fn fill_text(template: &str, spec_fields: &Json, env: &Env, money: Money) -> Res
     while let Some(i) = rest.find('{') {
         out.push_str(&rest[..i]);
         let after = &rest[i + 1..];
+        // (Words that depend on whether a blank is given: `{name?words if it is|words if not}`, the words if it is
+        // naming it by `[name]`. An order's "To be paid within [pay_in_days] days of delivery, on your terms." or "Paid
+        // with this order.": the words say what the paper does. The town rung 2: orders on 30-day terms said "Paid with
+        // this order", and four seats held delivery notes over it.)
+        if let Some((name, yes, no, len)) = conditional(after) {
+            let chosen = if env.fields.get(name).is_some_and(|v| !v.is_null()) { yes } else { no };
+            let mut piece = String::new();
+            let mut r = chosen;
+            while let Some(a) = r.find('[') {
+                piece.push_str(&r[..a]);
+                let b = r[a..].find(']').map(|x| a + x);
+                match b {
+                    Some(b) if is_name(&r[a + 1..b]) => {
+                        piece.push_str(&words(env.fields.get(&r[a + 1..b]), spec_fields[&r[a + 1..b]]["type"].as_str(), money, env.dated)?);
+                        r = &r[b + 1..];
+                    }
+                    _ => {
+                        piece.push('[');
+                        r = &r[a + 1..];
+                    }
+                }
+            }
+            piece.push_str(r);
+            out.push_str(&piece);
+            rest = &after[len..];
+            continue;
+        }
         match after.find('}') {
             Some(j) if is_name(&after[..j]) => {
                 let name = &after[..j];

@@ -1223,6 +1223,8 @@ impl State {
         } else {
             match (&x.calls, &x.paper) {
                 (None, Some(p)) => !paper_as_asked(p, &m.program),
+                // (A draft of the matter's papers, each as asked: all of them, one to each, none else.)
+                (None, None) if !x.papers.is_empty() => x.papers.len() != papers_in(&m.program).len() || !x.papers.iter().all(|p| paper_as_asked(p, &m.program)),
                 _ => x.calls.as_deref().map(norm) != Some(norm(&m.program)),
             }
         };
@@ -1231,7 +1233,7 @@ impl State {
         // whole-town rung 1 run b: the factory's code assistant's slipped draft rec.21636 held nothing, the review's draw
         // slipped too, and the empty draft was signed; the seat that took the post at the fork asked three times for a
         // paper that was never there.)
-        let blank = x.paper.is_none() && x.calls.as_deref().is_none_or(|c| papers_in(c).is_empty());
+        let blank = x.paper.is_none() && x.papers.is_empty() && x.calls.as_deref().is_none_or(|c| papers_in(c).is_empty());
         let missed = wrong && !blank && slip(cx, "publish/sign_off", &r.id, &SlipOptions::default());
         if wrong && !missed {
             self.seen.entry(Self::key(&m.agreement, &m.kind)).or_default().saw(true, &r.id);
@@ -1275,7 +1277,13 @@ impl State {
             // signed with every paper in it, each as it stands, the matter's payments with the first: a supervisor signs
             // each letter of the batch. Whoever holds the post when the sign-off comes sends them all on it. Before
             // 2026-11-17 such a sign-off carried none.)
-            let several: Vec<Value> = if paper.is_none() {
+            // (A draft of a matter's papers as handed over: each as it stands, the matter's payments with the first.)
+            let several: Vec<Value> = if paper.is_none() && !x.papers.is_empty() {
+                x.papers.iter().enumerate().map(|(n, p)| {
+                    let copy = signed_copy(p, "");
+                    if n == 0 { with_instructions(copy, &m.program) } else { copy }
+                }).collect()
+            } else if paper.is_none() {
                 x.calls.as_deref().map(papers_in).unwrap_or_default().into_iter().enumerate().map(|(n, p)| {
                     let copy = signed_copy(&p, "");
                     if n == 0 { with_instructions(copy, &m.program) } else { copy }
@@ -2992,6 +3000,7 @@ fn matter_differs(m: &Matter, x: &Draft, me: &str, t: i64) -> Vec<String> {
     };
     let drafted: Vec<serde_json::Map<String, Value>> = match (&x.paper, &x.calls) {
         (Some(p), _) => vec![paper_of_draft(p)],
+        (None, _) if !x.papers.is_empty() => x.papers.iter().map(paper_of_draft).collect(),
         (None, Some(c)) => match parse_program(c) {
             Ok(Program::Lines(l)) => l.iter().filter(|l| l.call.fn_ == "statement").map(paper_of).collect(),
             _ => return all(),
@@ -3024,6 +3033,11 @@ fn matter_differs(m: &Matter, x: &Draft, me: &str, t: i64) -> Vec<String> {
                 out.push(says);
             }
         }
+    }
+    // (A draft of the matter's papers as handed over is all of them, one to each: one left out, or one too many, is not
+    // as we have it.)
+    if !x.papers.is_empty() && x.papers.len() != asked.len() {
+        out.push(format!("how many papers ({} drafted, {} handed over)", x.papers.len(), asked.len()));
     }
     out
 }

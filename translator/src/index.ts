@@ -231,6 +231,8 @@ export type Unsure =
   | { kind: "form_field" | "form_needs"; form: string; fields: string[] }
   | { kind: "form_option"; form: string; field: string };
 
+/** What a seat is told with a draft that was drawn up as best it could be read, where what was to be done was unclear. */
+export const UNSURE_ACT = "It isn't clear what is to be done: what is set out below is what it was read as.";
 /** What a seat is told when it isn't clear what is to happen: what a request that can be drawn up says (fixed). */
 export const UNCLEAR = "It isn't clear what is to be done, so nothing was drawn up. Say it again as one thing to be done, in a sentence: what is to happen, to or for whom, naming each person, account and paper by its id, with any words that are to stand on a paper in quotation marks.";
 
@@ -279,11 +281,14 @@ export function plainer(notices: string[], req: TranslateRequest, call?: string)
   });
 }
 
-/** The sentence for it, or undefined where it names what this person's forms don't hold (then the plain text of `unclear` stands). */
-export function unsureText(u: unknown, req: TranslateRequest): string | undefined {
+/** The sentence for it, or undefined where it names what this person's forms don't hold (then the plain text of `unclear`
+ * stands). `drawn`: said beside a draft that was drawn up as it was read. */
+export function unsureText(u: unknown, req: TranslateRequest, drawn = false): string | undefined {
   const x = u as { kind?: string; form?: unknown; fields?: unknown; field?: unknown } | undefined;
   if (!x || typeof x.kind !== "string") return undefined;
-  if (x.kind === "act") return UNCLEAR;
+  // (Beside a draft that was drawn up, never "so nothing was drawn up": a factory's seat, told it beside the draft it
+  // then confirmed, believed it, and sent the signed invoice again: the town rung 2, paid twice.)
+  if (x.kind === "act") return drawn ? UNSURE_ACT : UNCLEAR;
   if (x.kind === "which") return "It isn't clear which one you mean. Name each person, account, paper and place by its id, as your reports show it in brackets after its name.";
   if (x.kind === "words") return "It isn't clear which words are to go as they stand. Put them in quotation marks.";
   const form = req.knowledge.forms.find((f) => f.data?.form === x.form);
@@ -593,7 +598,7 @@ export function draftText(d: Draft): string {
 export { createAlone, createArrangement, STANDS, STILL_NOT_READ, UNSURE_DRAFT, type Arrangement, type Arranged, type Route, type RouteSide, type Why } from "./arrangement";
 export { Knowledge } from "./knowledge";
 export { Preview } from "./preview";
-export { LABEL_TEXT, RESOLVER, resolve, type Resolution } from "./resolver";
+export { LABEL_TEXT, RESOLVER, resolve, wentWords, type Resolution } from "./resolver";
 export { formRules, idsIn, ON_ITS_FORM, paperWords, quotedSpans, recordTest, ruled, type Ruled } from "./rules";
 
 /** The blanks a call's form lines filled, by name, as written (the preview says what became of each that the paper does

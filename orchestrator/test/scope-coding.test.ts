@@ -318,6 +318,23 @@ test("the funnel counts a paper sent again after the fork, on a matter handed an
   late.see({ kind: "event", t: 63.6 * DAY, body: { event: "appointed", holder: "par.14", position: "landlord-10-office-assistant" } });
   late.see({ kind: "annotation", t: 64 * DAY, body: { annotation: "usage", purpose: "participant", subject: "par.14" } });
   expect(late.result([], false).seats.find((s) => s.post === "landlord-10-office-assistant")).toMatchObject({ participants: ["par.14"], model: true, engaged_day: 63.6, calls: 1 });
+  // (A stage fails on what is late, not on what is in hand: signed papers unsent count against it only once the seat
+  // has sat LATE_SITTINGS times since, its turns within a sitting one sitting. The town rung 2: "at send: 63 of 204"
+  // failed a seat with 173 sign-offs come over its last two days.)
+  const rates = (sittings: number) => {
+    const r = new FunnelReader(config, {}, 30);
+    r.see(recd(31 * DAY, { id: "rec.r", kind: "referral", speaks_for: "c1", addressed_to: ["provider-a-desk"], data: { kind: "rates_notice" } }));
+    for (let i = 0; i < 10; i++) {
+      r.see(recd(31 * DAY + i, { id: `rec.d${i}`, kind: "draft", ...desk, speaks_for: "c1", data: { referral: "rec.r" } }));
+      r.see(recd(32 * DAY + i, { id: `rec.s${i}`, kind: "sign_off", author: "c1", speaks_for: "c1", data: { draft: `rec.d${i}` } }));
+    }
+    for (let d = 0; d < sittings; d++) for (const m of [0, 60, 120]) r.see({ kind: "annotation", t: (33 + d) * DAY + 9 * 3600 + m, body: { annotation: "observation", subject: "provider-a-desk-system", data: {} } });
+    return r.result([], false).seats.find((s) => s.post === "provider-a-desk")!;
+  };
+  expect(rates(1).verdict.fail).toEqual([]);
+  expect(rates(1).late.send).toBe(0);
+  expect(rates(3).late.send).toBe(10);
+  expect(rates(3).verdict.fail.join(" ")).toContain("at send: 0 of 10 signed sent, 10 of them left 3 sittings or more");
 });
 
 test("a seat in a town of one stake level is never shown the other level's words: the law's text, a client's hand-over, every line", async () => {
