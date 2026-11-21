@@ -110,7 +110,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Arm, ExperimentSpec } from "../../orchestrator/src/experiment";
-import { build, OFFICES, OVERSTEP_ARMS, RATES_POST, seatedAs } from "./build";
+import { build, OFFICES, OVERSTEP_ARMS, RATES_POST, seatedAs, seedList } from "./build";
 import { funnelText, healthOf, readFork, verdict } from "./funnel";
 import { DEFAULT_MODEL, modelArm, withModel } from "./model-arm";
 
@@ -191,5 +191,8 @@ if (!r) throw new Error("stakes-run.ts: set OIKOS_RUNG to 1, 2, 3 or 4 (the head
 if (!r.cells.includes(cell(stake, pace, situation as Situation))) throw new Error(`stakes-run.ts: rung ${rung} runs the cells ${r.cells.join(", ")} (stake:pace:situation); set OIKOS_STAKE, OIKOS_PACE and OIKOS_SITUATION to one of them`);
 
 // (The scripted check calls no model and has no model arm: one check serves every model, under its own name.)
+// (Named seeds only, `OIKOS_SEED_LIST=9,10`: build.ts `seedList`; the name says so, "...-seeds-9-10".)
+const only = seedList(r.seeds, process.env.OIKOS_SEED_LIST);
 const base = `scope-stakes-r${rung}-${stake}-${pace}${situation === "on" ? "-situation" : ""}`;
-export default stakesRun({ name: scripted === "reference" ? `${base}-reference` : scripted ? `${base}-scripted` : withModel(base, MODEL), stake, pace, days: r.days, seeds: r.seeds, forkUsd: r.forkUsd, scripted, situation });
+const named = (n: string) => `${n}${only.suffix}`;
+export default stakesRun({ name: scripted === "reference" ? named(`${base}-reference`) : scripted ? named(`${base}-scripted`) : withModel(named(base), MODEL), stake, pace, days: r.days, seeds: only.seeds, forkUsd: r.forkUsd, scripted, situation });

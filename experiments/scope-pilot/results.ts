@@ -15,8 +15,8 @@
 //      difference that is drift between the towns (clients none of whose matters of that sort the seat held) said apart.
 //
 //   bun experiments/scope-pilot/results.ts <experiment folder> ... [--replay-of-each] [--coded <file.json>] [--out <file.md>]
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { AT_ANY_HOUR, END_DAYS, HOUSING_MEASURES, readExperiment, SEATED, STAKE, type Episode, type ExperimentRead, type MatterRow } from "./episodes";
 import { share } from "./report";
 import { LATE_SITTINGS } from "./funnel";
@@ -148,6 +148,46 @@ export function account(r: ExperimentRead, arms: string[]): { arm: string; rows:
   });
 }
 
+/** A fork's result in an experiment's results.json: its state hash at the end, and how it ended. */
+function resultOf(dir: string, seed: number, arm: string): { stateHash?: string; error?: string; stopped?: { by: string } } | undefined {
+  const f = join(dir, "results.json");
+  if (!existsSync(f)) return undefined;
+  return (JSON.parse(readFileSync(f, "utf8")) as any[]).find((x) => x.seed === seed && x.arm === arm);
+}
+
+/** Seeds of a setting re-run into a folder of their own beside it (`<dir>-seeds-<n>-<m>`, 2026-11-21: decision-slow-
+ * situation's seed 9 crashed at day 65 and seed 10 was stopped wrongly at day 40, and a finished experiment is never
+ * taken up again). For each seed there, every model arm comes from the later folder; the code arm too unless its end
+ * state is the same in both folders (the same state hash: then the original is kept); the cut-short attempt stays where
+ * it is, kept and not counted. Changes `r` in place; returns what the header says of each seed. */
+export async function withReruns(r: ExperimentRead, dir: string, replayFor?: (dir: string) => string): Promise<string[]> {
+  const parent = dirname(dir), name = basename(dir);
+  const later = existsSync(parent) ? readdirSync(parent).filter((d) => d.startsWith(`${name}-seeds-`) && !/-(reference|scripted)/.test(d.slice(name.length)) && existsSync(join(parent, d, "spec.json"))).sort() : [];
+  const said: string[] = [];
+  for (const d of later) {
+    const at = join(parent, d);
+    const rf = replayFor?.(at) ?? `${at}.replay.json`;
+    const x = await readExperiment(at, existsSync(rf) ? JSON.parse(readFileSync(rf, "utf8")) : []);
+    for (const seed of x.seeds.filter((s) => r.seeds.includes(s))) {
+      const model = x.arms.filter((a) => !REFERENCES.has(a));
+      const codeSame = !!resultOf(dir, seed, AT_ANY_HOUR)?.stateHash && resultOf(dir, seed, AT_ANY_HOUR)?.stateHash === resultOf(at, seed, AT_ANY_HOUR)?.stateHash;
+      const take = new Set([...model, ...(codeSame ? [] : [AT_ANY_HOUR])]);
+      const why = model.map((a) => { const o = resultOf(dir, seed, a); const c = r.cuts.find((k) => k.seed === seed)?.short.find((k) => k.arm === a); return `${a} ${o?.error ? "crashed" : o?.stopped ? `stopped (${o.stopped.by})` : "cut short"}${c ? ` at day ${c.day}` : ""}`; }).join(", ");
+      const mine = (k: { seed: number; arm: string }) => k.seed === seed && take.has(k.arm);
+      r.episodes = [...r.episodes.filter((e) => !mine(e)), ...x.episodes.filter(mine)];
+      r.matters = [...r.matters.filter((m) => !mine(m)), ...x.matters.filter(mine)];
+      r.beyondRows = [...(r.beyondRows ?? []).filter((m) => !mine(m)), ...(x.beyondRows ?? []).filter(mine)];
+      r.offMatter = [...r.offMatter.filter((m) => !mine(m)), ...x.offMatter.filter(mine)];
+      r.levels = [...r.levels.filter((m) => !mine(m)), ...x.levels.filter(mine)];
+      for (const c of r.clients.filter((c) => c.seed === seed)) { const y = x.clients.find((z) => z.seed === seed && z.client === c.client); for (const a of take) if (y?.arms[a]) c.arms[a] = y.arms[a]; else delete c.arms[a]; }
+      // (The seed's cut was the attempt cut short; the re-run's own, if any, holds now, for the reference read beside it too.)
+      r.cuts = [...r.cuts.filter((c) => c.seed !== seed), ...x.cuts.filter((c) => c.seed === seed)];
+      said.push(`Seed ${seed}: ${[...take].join(" and ")} from ${d} (re-run: the first attempt's ${why}); the code arm ${codeSame ? `from ${name}, its end state the same in both folders (state hash)` : `from ${d} too, its end state differing from ${name}'s`}; the first attempt kept in ${name}, not counted.`);
+    }
+  }
+  return said;
+}
+
 /** One setting's second table: the cohort's outcomes, every model arm against each reference it was run beside. */
 export function outcomesTable(r: ExperimentRead): string[] {
   const refs = r.arms.filter((a) => REFERENCES.has(a));
@@ -192,6 +232,9 @@ export async function results(dirs: string[], coded: Coded[] = [], replayFor?: (
     const rf = replayFor?.(dir) ?? `${dir}.replay.json`;
     const replay = existsSync(rf) ? JSON.parse(readFileSync(rf, "utf8")) : [];
     const r = await readExperiment(dir, replay);
+    // (A seed re-run into a folder of its own beside the setting (`<dir>-seeds-9-10`: stakes-run.ts OIKOS_SEED_LIST) is
+    // read from there: see `withReruns`.)
+    const reruns = await withReruns(r, dir, replayFor);
     // (The code at the seat's sittings, like for like: from the setting's reference experiment beside it (`<dir>-reference`,
     // every seed: stakes-run.ts, OIKOS_SCRIPTED=reference), else its scripted one (`<dir>-scripted`, its first seed only,
     // said in the header). Its clients' outcomes are set beside this one's on the seeds both hold.)
@@ -211,7 +254,7 @@ export async function results(dirs: string[], coded: Coded[] = [], replayFor?: (
         r.arms = [...r.arms, SEATED];
       }
     }
-    out.push(``, `## ${r.experiment}`, ``, `Seeds ${r.seeds.join(", ")}; arms ${r.arms.join(", ")}.${diligentFrom ? ` ${diligentFrom}.` : ""}${r.cuts.length ? ` ${r.cuts.map((c) => `Seed ${c.seed}: every arm read to day ${c.read_to_day} (${c.short.map((s) => `${s.arm} stopped at day ${s.day}`).join("; ")}).`).join(" ")}` : ""}`, ``, `### What the seats did`, ``);
+    out.push(``, `## ${r.experiment}`, ``, `Seeds ${r.seeds.join(", ")}; arms ${r.arms.join(", ")}.${diligentFrom ? ` ${diligentFrom}.` : ""}${reruns.length ? ` ${reruns.join(" ")}` : ""}${r.cuts.length ? ` ${r.cuts.map((c) => `Seed ${c.seed}: every arm read to day ${c.read_to_day} (${c.short.map((s) => `${s.arm} stopped at day ${s.day}`).join("; ")}).`).join(" ")}` : ""}`, ``, `### What the seats did`, ``);
     const did = didTable(r, coded);
     out.push(...did.lines);
     if (did.faults.length) { console.error(`results.ts: FAULT in ${r.experiment}: ${did.faults.join("; ")}`); process.exitCode = 1; }
