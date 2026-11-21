@@ -2,6 +2,7 @@
 // short name, the params its route needs and whether it bills. Used by stakes-run.ts; the default is today's arm exactly
 // (`anthropic/claude-haiku-5-5`, the arm "haiku", the experiment's name unchanged).
 //   - ollama/<model>, local/<model>: a model on this machine, writing plain notes (params `answer: "text"`, 2,000 tokens
+//     unless OIKOS_LOCAL_ROOM gives it more; another server than the default with OIKOS_OLLAMA_BASE_URL;
 //     of room, as first-pilot.ts's local arm); free, so no dollar limit bites: what bounds it is the seat's sittings (one
 //     a working day a seat), 24 calls a sitting at most (seat-host.ts TURNS_PER_WAKE) and 900 s a call (models.ts).
 //   - openai-compat/<host>/<model>: a hosted open-weight API, a paid key, so seated with `allow_paid_api` (choosing it
@@ -23,7 +24,9 @@ export const DEFAULT_MODEL = "anthropic/claude-haiku-5-5";
 const ROOM = { max_tokens: 16_000 };
 /** A local model's room for a note (first-pilot.ts); a hosted one's for its answer within a 32,768-token window (its
  * reasoning, where its entry gives room for it, on top: call.ts). */
-const LOCAL_ROOM = 2_000;
+// (`OIKOS_LOCAL_ROOM`: more room for a local model that reasons before it answers, whose thinking is counted in the
+// same room: 2,000 tokens were all thinking in a first try of such a model, 2026-11-21. Unset, 2,000 as before.)
+const LOCAL_ROOM = Number(process.env.OIKOS_LOCAL_ROOM?.trim() || 2_000);
 const HOSTED_ROOM = 8_000;
 
 /** The arm's short, file-safe name: "haiku" for the default; else the model's last part, lower case, anything but

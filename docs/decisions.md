@@ -15562,3 +15562,12 @@ hash matches the original's (then the original); the reference from `<dir>-refer
 fork); the header says which seed comes from which folder and why, and that the first attempt is kept, not counted.
 report.ts still reads each folder as its own experiment (it does not pool a setting's folders). Revisit if a seed is
 re-run twice (the later folder by name wins) or a re-run's town differs from the original's before the fork.
+
+## 2026-11-21 · A local model's room for its answer can be set (OIKOS_LOCAL_ROOM)
+
+- **Decision** (`experiments/scope-pilot/model-arm.ts`): a local model's room for one answer is 2,000 tokens unless
+  `OIKOS_LOCAL_ROOM` gives more. A local model that reasons before it answers (Inkling 2 Mini through Ollama, the
+  owner's choice of 2026-11-21) has its thinking counted in the same room, as the hosted reasoning models' was before
+  they were given room of their own (2026-11-16); nothing else of the local route changes (plain notes, no dollar limit).
+- **Revisit if** local models get entries of their own (answer mode, reasoning room, context), as hosted ones have:
+  then this variable goes.
