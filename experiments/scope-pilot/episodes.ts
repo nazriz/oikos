@@ -428,7 +428,12 @@ export function episodesOf(o: ArmInput): ArmOut {
         const prevented = refusedThen ? `an act of the seat's refused, day ${day(refusedThen.t)}` : failedThen ? `${failedThen.ref} failed in the translator ("${String(failedThen.failed).slice(0, 80)}")` : undefined;
         const newer = all.find((d) => d.kind === "draft" && mineDrafts.has(d.id) && d.at > so.at && d.at < until);
         const told = all.filter((x) => x.in_position === seat && (x.addressed_to ?? []).includes(client) && x.at > so.at && x.at <= until && !["draft", pk, kind].includes(x.kind)
-          && ([R.id, so.id, String(so.data.draft ?? "")].some((id) => id && String(x.text ?? "").includes(id)) || /\bheld\b|not (yet )?(been )?sent|will not send|won't send|before (we|i) send|still want/i.test(String(x.text ?? ""))))
+          && ([R.id, so.id, String(so.data.draft ?? "")].some((id) => id && String(x.text ?? "").includes(id)) || (/\bheld\b|not (yet )?(been )?sent|will not send|won't send|before (we|i) send|still want/i.test(String(x.text ?? ""))
+            // (Words of holding on a letter that names another matter's papers are that matter's: seed 8's c0794, a letter
+            // on the loan read as told of the held benefit change.)
+            // (And it names the paper's kind in words: "benefit change", "loan" for a loan application.)
+            && new RegExp(`\\b(${[pk.replace(/_/g, " "), ...(/_application$/.test(pk) ? [pk.split("_")[0]] : [])].join("|")})`, "i").test(String(x.text ?? ""))
+            && !(String(x.text ?? "").match(/rec\.[0-9]+/g) ?? []).some((id) => { const y = recs.get(id); return !!y && ["referral", "draft", "sign_off"].includes(y.kind) && y.id !== R.id && ref(y) !== R.id; }))))
           .map((x) => ({ id: x.id, day: day(x.at), words: String(x.text ?? "").replace(/\s+/g, " ").slice(0, 400) }));
         const held = unsent >= LATE_SITTINGS && !prevented;
         signed.push({ sign_off: so.id, draft: String(so.data.draft ?? so.data.of), t: so.at, ...(sent !== undefined ? { sent } : {}), sittings_unsent: unsent, held, ...(prevented ? { prevented } : {}), ...(newer ? { redrafted: newer.id } : {}), told, days_held: days(until - so.at) });
