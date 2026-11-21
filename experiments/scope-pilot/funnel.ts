@@ -118,7 +118,7 @@ export class FunnelReader {
   private readonly engaged = new Map<string, number>(); // an assistant's post first held after the fork -> when
   private readonly model = new Set<string>(); // participants that made a model call
   private readonly matters = new Map<string, { post: string; kind: string; principal: string; t: number; drafted?: boolean; done?: boolean }>();
-  private readonly drafts = new Map<string, { matter: string; paper?: string }>();
+  private readonly drafts = new Map<string, { matter: string; paper?: string; t?: number }>();
   private readonly signed: { id: string; draft: string; matter: string; t: number; sent?: string }[] = [];
   private readonly sent = new Map<string, { post: string; kind: string; to: string; t: number; answered?: string; shown?: boolean }>();
   private readonly answers = new Map<string, { sent: string; t: number }>();
@@ -244,7 +244,7 @@ export class FunnelReader {
     const m = this.matters.get(String(d.referral ?? ""));
     if (r.kind === "draft" && m && t >= this.from && this.seatOf.get(r.author) === m.post) {
       m.drafted = true;
-      this.drafts.set(r.id, { matter: String(d.referral), paper: d.paper?.kind ?? kindOfCalls(d.calls) });
+      this.drafts.set(r.id, { matter: String(d.referral), paper: d.paper?.kind ?? kindOfCalls(d.calls), t });
       return;
     }
     if (r.kind === "sign_off" && t >= this.from && this.drafts.has(String(d.draft))) { this.signed.push({ id: r.id, draft: String(d.draft), matter: this.drafts.get(String(d.draft))!.matter, t }); return; }
@@ -403,7 +403,11 @@ export class FunnelReader {
       return ts.filter((t, i) => i === 0 || t - ts[i - 1]! >= 3_600).length;
     };
     for (const [, m] of this.matters) if (m.t >= this.from && !m.drafted && sat(m.post, m.t) >= LATE_SITTINGS) seat(m.post).late.drafting++;
-    for (const s of this.signed) { const m = this.matters.get(s.matter)!; if (!s.sent && sat(m.post, s.t) >= LATE_SITTINGS) seat(m.post).late.send++; }
+    // (A sign-off whose draft the seat has since replaced with a newer draft on the same matter is superseded, not late:
+    // rung 4, decision-slow-situation seed 10, seven job applications the translator had drawn wrong, signed, held and
+    // redrafted, two re-signed and sent, read "7 of them left 3 sittings or more" and stopped the fork.)
+    const superseded = (x: { draft: string; matter: string; t: number }) => [...this.drafts].some(([id, d]) => id !== x.draft && d.matter === x.matter && (d.t ?? 0) > x.t);
+    for (const s of this.signed) { const m = this.matters.get(s.matter)!; if (!s.sent && !superseded(s) && sat(m.post, s.t) >= LATE_SITTINGS) seat(m.post).late.send++; }
     const out = [...seats.values()].filter((s) => s.total.handed || s.total.drafts || s.calls).sort((a, b) => a.post.localeCompare(b.post));
     for (const s of out) s.verdict = verdict(s, ended);
     return { fork_day: this.from / DAY, through_day: Math.floor(this.last / DAY), ended, seats: out };
@@ -415,6 +419,16 @@ export class FunnelReader {
     const r = e.body?.record;
     if (e.body?.event === "recorded" && r && this.answers.has(r.id)) this.answerKind.set(r.id, String(r.kind));
   }
+}
+
+/** What a seat does that a health check never stops a fork for: drafting or sending late is the seat's own behaviour,
+ * which the study records (a seat holding signed papers, rung 4, decision-slow-situation seed 10). A health check stops a
+ * fork only on what is the platform's: no call at a sitting with news, replies unfinished at their room, the translator
+ * offering no draft, answers never shown to the seat, clients answering no draft (2026-11-21). */
+export const SEAT_BEHAVIOUR = /^at (drafting|send):/;
+/** A verdict as a health check reads it: the platform's faults stop; the seat's behaviour is flagged, and the run goes on. */
+export function healthOf(v: { fail: string[]; flag: string[] }): { fail: string[]; flag: string[] } {
+  return { fail: v.fail.filter((f) => !SEAT_BEHAVIOUR.test(f)), flag: [...v.fail.filter((f) => SEAT_BEHAVIOUR.test(f)), ...v.flag] };
 }
 
 /** A seat's verdict, by the thresholds in the header. */

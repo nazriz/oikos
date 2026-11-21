@@ -230,8 +230,11 @@ export function contractErrors(p: Program): string[] {
 const quote = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
 function valueText(v: Value): string {
-  if ("id" in v) return v.id;
-  if ("var" in v) return v.var;
+  // (An id or a name that is not one whole token (empty, or with a character no id has) is printed as text, so that what
+  // is printed always reads back: the world's parser refused such a call and, until 2026-11-21, the fork died with it.)
+  const whole = (x: unknown) => typeof x === "string" && ID.exec(x)?.[0] === x;
+  if ("id" in v) return whole(v.id) ? v.id : quote(String(v.id ?? ""));
+  if ("var" in v) return whole(v.var) ? v.var : quote(String(v.var ?? ""));
   if ("text" in v) return quote(v.text);
   if ("json" in v) return canonical(v.json);
   return callText(v.call);

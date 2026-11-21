@@ -72,6 +72,9 @@
 //   OIKOS_RUNG=1 OIKOS_STAKE=decision OIKOS_PACE=slow OIKOS_TRANSLATOR_MODELS=$HOME/oikos/runs/translator-model bun orchestrator/src/cli.ts experiment run experiments/scope-pilot/stakes-run.ts --out $HOME/oikos/runs/scope-stakes-r1-decision-slow-dry --mock-models
 // Then the rung (R and its cells: rung 1 "decision:slow"; rung 2 "first_claim:slow decision:slow"; rungs 3 and 4 all four):
 //   cd ~/oikos && R=1 CELLS="decision:slow" && nohup zsh -c "source ~/.zshenv; unset ANTHROPIC_API_KEY; for C in $CELLS; do S=\${C%%:*}; P=\${C##*:}; OIKOS_RUNG=$R OIKOS_STAKE=\$S OIKOS_PACE=\$P OIKOS_TRANSLATOR_MODELS=\$HOME/oikos/runs/translator-model bun orchestrator/src/cli.ts experiment run experiments/scope-pilot/stakes-run.ts --out \$HOME/oikos/runs/scope-stakes-r$R-\$S-\$P || exit 1; OIKOS_SCRIPTED=1 OIKOS_RUNG=$R OIKOS_STAKE=\$S OIKOS_PACE=\$P OIKOS_TRANSLATOR_MODELS=\$HOME/oikos/runs/translator-model bun orchestrator/src/cli.ts experiment run experiments/scope-pilot/stakes-run.ts --out \$HOME/oikos/runs/scope-stakes-r$R-\$S-\$P-scripted || exit 1; done" > $HOME/oikos/runs/scope-stakes-r$R.out 2>&1 & caffeinate -i -w $! &
+// THE REFERENCES ALONE, every seed (no model, no key, nothing spent): the like-for-like `diligent` for a counted rung,
+// read by results.ts from `<cell>-reference` beside the cell (before it, from `-scripted`, first seed only):
+//   cd ~/oikos && OIKOS_SCRIPTED=reference OIKOS_RUNG=4 OIKOS_STAKE=decision OIKOS_PACE=slow OIKOS_TRANSLATOR_MODELS=$HOME/oikos/runs/translator-model bun orchestrator/src/cli.ts experiment run experiments/scope-pilot/stakes-run.ts --out $HOME/oikos/runs/scope-stakes-r4-decision-slow-reference
 // AFTER A RUNG, for each cell's folder D (and its -scripted beside it):
 //   bun experiments/scope-pilot/funnel.ts $D --gate rung1
 //   bun translator/eval/replay.ts $D --json $D.replay.json
@@ -108,7 +111,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Arm, ExperimentSpec } from "../../orchestrator/src/experiment";
 import { build, OFFICES, OVERSTEP_ARMS, RATES_POST, seatedAs } from "./build";
-import { funnelText, readFork, verdict } from "./funnel";
+import { funnelText, healthOf, readFork, verdict } from "./funnel";
 import { DEFAULT_MODEL, modelArm, withModel } from "./model-arm";
 
 /** The seats the model holds: the desk and the factory's assistant. These posts' seats stay code in every arm. */
@@ -124,6 +127,10 @@ export const ARMS: Arm[] = [{ name: "code", steward: { kind: "code" } }, MODEL_A
 export const DILIGENT_ARM: Arm = { name: "diligent", steward: { kind: "model", model: "mock/diligent:sittings" } };
 /** The detection check's arms: the code arm, the code at the seat's sittings, and the two scripted oversteppers (no model). */
 export const SCRIPTED_ARMS: Arm[] = [ARMS[0]!, ...seatedAs(MODEL_ARM, [DILIGENT_ARM, ...OVERSTEP_ARMS])];
+/** The references alone (`OIKOS_SCRIPTED=reference`): the code arm and the code at the seat's sittings, on every seed of
+ * the rung, no overstepper and no model: the like-for-like reference for a counted run, each seed (2026-11-21: the
+ * scripted check runs its first seed only, so "haiku - diligent" held one seed of four). */
+export const REFERENCE_ARMS: Arm[] = [ARMS[0]!, ...seatedAs(MODEL_ARM, [DILIGENT_ARM])];
 
 export type Stake = "first_claim" | "decision";
 export type Pace = "ordinary" | "slow";
@@ -146,9 +153,9 @@ export const RUNGS: { [rung: number]: Rung } = {
 export const HEALTH_DAYS = [10, 30];
 
 /** One cell's experiment: the town at a stake level and a pace, `days` after the fork on `seeds`, each fork limited. */
-export function stakesRun(o: { name: string; stake: Stake; pace: Pace; days: number; seeds: number[]; forkUsd: number; scripted?: boolean; situation?: "off" | "on" }): ExperimentSpec {
+export function stakesRun(o: { name: string; stake: Stake; pace: Pace; days: number; seeds: number[]; forkUsd: number; scripted?: boolean | "reference"; situation?: "off" | "on" }): ExperimentSpec {
   const total = o.scripted ? 0 : o.forkUsd * o.seeds.length;
-  const spec = build({ name: o.name, days: o.days, seeds: o.scripted ? o.seeds.slice(0, 1) : o.seeds, reviewDays: 14, arms: o.scripted ? SCRIPTED_ARMS : ARMS,
+  const spec = build({ name: o.name, days: o.days, seeds: o.scripted === true ? o.seeds.slice(0, 1) : o.seeds, reviewDays: 14, arms: o.scripted === "reference" ? REFERENCE_ARMS : o.scripted ? SCRIPTED_ARMS : ARMS,
     budget: { experiment_usd: total, arm_usd: o.scripted ? {} : { [MODEL_ARM.name]: total } },
     offices: [...OFFICES, RATES_POST], cohort: { by: "hand", every: 3, only: true, difficulty: true }, holdLevels: "run", depth: "matter", wants: true, obstacles: 2,
     dateOfEffect: o.stake, clientPost: o.pace, openingArrears: true, ...(o.situation === "on" ? { clientSituation: "on" as const } : {}) });
@@ -159,7 +166,8 @@ export function stakesRun(o: { name: string; stake: Stake; pace: Pace; days: num
     days: HEALTH_DAYS,
     async check(a) {
       const f = await readFork(a.log, ...forkFiles(a.dir), spec.forkDay, a.ended);
-      const bad = f.seats.filter((s) => s.model).map((s) => ({ post: s.post, v: verdict(s, a.ended) })).filter((x) => x.v.fail.length);
+      // (The platform's faults stop a fork; what the seat does is flagged and recorded: funnel.ts `healthOf`.)
+      const bad = f.seats.filter((s) => s.model).map((s) => ({ post: s.post, v: healthOf(verdict(s, a.ended)) })).filter((x) => x.v.fail.length);
       return { ok: !bad.length, text: `${bad.length ? `FAIL: ${bad.map((x) => `${x.post}: ${x.v.fail.join("; ")}`).join(" | ")}\n` : "healthy\n"}${funnelText(f, `${spec.name}, ${a.arm}, seed ${a.seed}, day ${a.day}`)}` };
     },
   };
@@ -174,7 +182,8 @@ function forkFiles(dir: string): [any, { [participant: string]: { capacity: stri
 const rung = Number(process.env.OIKOS_RUNG ?? 0);
 const stake = process.env.OIKOS_STAKE as Stake;
 const pace = process.env.OIKOS_PACE as Pace;
-const scripted = process.env.OIKOS_SCRIPTED === "1";
+// (`1`: the detection check, first seed; `reference`: the references alone, every seed.)
+const scripted: boolean | "reference" = process.env.OIKOS_SCRIPTED === "reference" ? "reference" : process.env.OIKOS_SCRIPTED === "1";
 const situation = process.env.OIKOS_SITUATION ?? "off";
 if (situation !== "off" && situation !== "on") throw new Error("stakes-run.ts: OIKOS_SITUATION is on or off (the header)");
 const r = RUNGS[rung];
@@ -183,4 +192,4 @@ if (!r.cells.includes(cell(stake, pace, situation as Situation))) throw new Erro
 
 // (The scripted check calls no model and has no model arm: one check serves every model, under its own name.)
 const base = `scope-stakes-r${rung}-${stake}-${pace}${situation === "on" ? "-situation" : ""}`;
-export default stakesRun({ name: scripted ? `${base}-scripted` : withModel(base, MODEL), stake, pace, days: r.days, seeds: r.seeds, forkUsd: r.forkUsd, scripted, situation });
+export default stakesRun({ name: scripted === "reference" ? `${base}-reference` : scripted ? `${base}-scripted` : withModel(base, MODEL), stake, pace, days: r.days, seeds: r.seeds, forkUsd: r.forkUsd, scripted, situation });

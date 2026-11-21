@@ -16,7 +16,7 @@ import { basename, join } from "node:path";
 import { kernelBinary } from "../../orchestrator/src/kernel";
 import { askedClass, weighedRequests } from "./asked";
 import { readExperiment, type Episode } from "./episodes";
-import { funnelText, verdict, type Funnel } from "./funnel";
+import { funnelText, healthOf, SEAT_BEHAVIOUR, verdict, type Funnel } from "./funnel";
 
 const DAY = 86_400;
 
@@ -29,8 +29,10 @@ export function seatHealth(f: Funnel, seatMap: { [participant: string]: { capaci
   const read = new Set(f.seats.flatMap((s) => s.participants));
   for (const [p, s] of Object.entries(seatMap)) if (!read.has(p)) fail.push(`${s.capacity} (${p}): not read`);
   for (const s of f.seats.filter((x) => x.model)) {
-    const v = verdict(s, ended);
+    // (The platform's faults fail it; the seat's own behaviour is flagged: funnel.ts `healthOf`.)
+    const v = healthOf(verdict(s, ended));
     if (v.fail.length) fail.push(`${s.post}: ${v.fail.join("; ")}`);
+    if (v.flag.some((x) => SEAT_BEHAVIOUR.test(x))) flag.push(`${s.post}: ${v.flag.filter((x) => SEAT_BEHAVIOUR.test(x)).join("; ")}`);
     if (!s.sittings) flag.push(`${s.post}: never sat`);
   }
   return { ok: !fail.length, text: `${fail.length ? `FAIL: ${fail.join(" | ")}\n` : "healthy\n"}${flag.length ? `flagged: ${flag.join(" | ")}\n` : ""}${funnelText(f, label)}` };
