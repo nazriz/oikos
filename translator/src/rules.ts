@@ -265,7 +265,9 @@ const leftEmpty = (request: string, field: string): boolean =>
   // (Or that there is none of it: "nothing declined", "none refunded", "no trade". Rung 1, 2026-11-14: "nothing
   // declined" was drawn as declined=unpaid, then overdue. Only an optional blank is left empty so; a required one is
   // asked back, as before.)
-  || new RegExp(`\\b(nothing|none|no)\\s+(was\\s+|is\\s+)?${spoken(field)}(ed|d|s)?\\b`, "i").test(request);
+  // (Not "no authority from them", "no authority for provider-a-desk": a sentence about the thing, not a word for the
+  // blank. The check run e and rung 3, 2026-11-20: asks for a client's authority drawn with the body dropped.)
+  || new RegExp(`\\b(nothing|none|no)\\s+(was\\s+|is\\s+)?${spoken(field)}(ed|d|s)?\\b(?!\\s+(?:from|for|with|yet|recorded)\\b)`, "i").test(request);
 
 /** Whether the request asks for a paper to be sent as it was signed off (not for one to be drafted for sign-off). */
 const SEND_AS_SIGNED = /\bas (?:it was |they were )?signed\b|\bsend[- ]signed\b|\bthe signed (?:copy|paper|[a-z]+ (?:request|application|note|invoice|claim|notice|return))\b/i;
@@ -432,7 +434,12 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
   // (And "Question to <whom>", the form's own words for the act, redraws only a paper of another kind or nothing: a
   // letter so asked stays a letter, as seats confirmed five in the r2 runs; scored both ways, 2026-11-17.)
   const drewQuestion = "lines" in p && p.lines.some((l) => (l.call.fn === "form" && argText(l.call.args.form) === "question_to_client") || (l.call.fn === "message" && /^\s*(?:please\s+)?question\s+to\b/i.test(request)));
-  if (asked && qForm && !drewQuestion && mayRedraw("question", true, "question_to_client")) {
+  // (Nor an ask for the client's authority with a body that names the service agreement it is under, "Ask c0352 for
+  // their authority to outside: … under agreement rec.1377": the scope request it is, which the model drew. The check
+  // run e, 2026-11-20. Without the agreement named, the scope request cannot be filled from the request, and stays a
+  // question: rung 3's five, scored.)
+  const asksAuthority = /\bfor\s+(?:their|your|his|her|its)\s+authority\b/i.test(request) && /\bagreement\s+rec\.[0-9]+/i.test(request);
+  if (asked && qForm && !drewQuestion && !asksAuthority && mayRedraw("question", true, "question_to_client")) {
     const namedRefs = [...new Set(named.filter((x) => k.referrals.has(x)))];
     const open = [...k.referrals.keys()].filter((id) => !k.answeredReferrals?.has(id));
     const referral = namedRefs.length === 1 ? namedRefs[0] : !namedRefs.length && open.length === 1 ? open[0] : undefined;
@@ -657,6 +664,8 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       // 2026-11-19, eight scope requests drawn with the client or the desk as the body, four confirmed and answered
       // "not lodged".)
       const g2 = g ?? new RegExp(`\\bgive\\s+(?:the\\s+)?([A-Za-z][A-Za-z0-9 &.-]{0,60}?)(?:\\s*\\(([a-z][a-z0-9_-]*[a-z0-9])\\))?'s\\s+${spoken(field)}\\b`, "i").exec(request)
+        // ("Ask c0352 for their authority to outside": the check run e, 2026-11-20, four asks.)
+        ?? new RegExp(`\\bfor\\s+(?:their|your|his|her|its)\\s+${spoken(field)}\\s+(?:to|with)\\s+(?:the\\s+)?([A-Za-z][A-Za-z0-9 &.-]{0,60}?)(?:\\s*\\(([a-z][a-z0-9_-]*[a-z0-9])\\))?(?=[\\s,.;:]|$)`, "i").exec(request)
         ?? new RegExp(`\\bgive\\s+(?:their\\s+|your\\s+)?${spoken(field)}\\s+(?:to|for)\\s+[a-z0-9-]+\\s+to\\s+act\\s+for\\s+(?:them|you|him|her)\\s+with\\s+(?:the\\s+)?([A-Za-z][A-Za-z0-9 &.-]{0,60}?)(?:\\s*\\(([a-z][a-z0-9_-]*[a-z0-9])\\))?(?=[\\s,.;:]|$)`, "i").exec(request);
       const said = g2?.[1]?.trim().toLowerCase();
       const whom = g2?.[2] ?? (said ? [...(k.names ?? new Map<string, string>())].find(([e, n]) => n.toLowerCase() === said || e === said)?.[0] ?? (k.held.has(said) ? said : undefined) : undefined)

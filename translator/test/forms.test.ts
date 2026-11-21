@@ -517,4 +517,10 @@ test("the body a scope request names, and a list of numbers named by its blank (
   expect(ruled(tr("c0100"), "Draft the tribunal response for c0100: application rec.5; ages: 62; people: 1.")).toBe(tr('["62"]'));
   expect(ruled(tr('["30, 3"]'), "Draft the tribunal response for c0100: application rec.5. Ages: 30, 3.")).toBe(tr('["30","3"]'));
   expect(ruled(tr("c0100"), 'Fill in the tribunal response. Its blank "ages" is filled in with the client. Application rec.5.')).toBe(tr("c0100"));
+  // (2026-11-20.) "Ask <client> for their authority to <body>: under agreement …" is the scope request with the body,
+  // even "no authority from them" in it; a question about a paper stays a question.
+  const kq = { ...k, forms: [...k.forms, { id: "form-desk-question", data: { form: "question_to_client", office: "desk", fields: { referral: field("record", true), client: field("entity", true), about: { type: "choice", required: true, options: ["balance", "document", "party", "detail", "other"] }, paper: field("record"), words: field("text", true) } } }] };
+  const ruledQ = (program: string, request: string) => calls.programText(formRules(calls.parseProgram(program), request, kq as any));
+  expect(ruledQ(scope("c0100"), "Ask c0100 for their authority to bank: under agreement rec.6, to write to bank naming desk, on rec.5; bank returned it saying it had no authority from them.")).toBe(scope("bank"));
+  expect(ruledQ('message(text="is rec.6 yours?", to=c0100)', "Ask c0100 whether rec.6 is their paper, on rec.5.")).toContain("form=question_to_client");
 });
