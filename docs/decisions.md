@@ -15473,3 +15473,21 @@ The last Haiku check (`runs/scope-stakes-r1-decision-slow-situation-d`) before t
 - **What a body needs on a paper, asked before it is drawn** (`translator/src/resolver.ts` `shortOfRequired`; `Knowledge.requires`; `worlds/generator/generate.ts` OBSTACLE_ITEMS). c0485's review request went to the support office without `about` twice and came back to the client; the desk never learned. The form's `about` is optional because the same form asks a landlord to repair, where there is no paper; the support office sends back one that names no decision (`nothing_to_review`) but never published that it needs it. Now it publishes it ("A review request must give the decision to look at again, by its reference"), and a paper drawn to a body, sent or in a draft for sign-off, that leaves empty a blank that body publishes it needs is asked back before anything is drawn, whichever resolver drew it. Only where the body says so: a landlord's needs nothing.
 - **The desk's scaled items not read** (`participants/src/llm/debrief.ts` 0.7.4). Haiku gave them as an object in a fence of its own, then a paragraph on what it gave; the reader took only a bare object or a fence with nothing after it. Now the object is read and the words after it kept as the step's answer, unless they bear on publication or ending.
 - **Revisit if** a desk is handed a matter of several papers (then a client signs a batch, as an office does), or a body sends back for a blank it does not publish.
+
+## 2026-11-20 · An ask for a client's authority is a scope request; a paper for a client to a body goes to the body
+
+- **The measure:** check runs d and e (`scope-stakes-r1-decision-slow-situation-d`, `-e`, Haiku, main 2a727754) added:
+  `~/oikos/runs/regress/requests-2026-11-20.json.gz` (5,480 requests, 38 arms) and `scored-set-2026-11-20.json.gz`.
+  Main: 4,211 of 4,782; with five keyed (below), 4,206.
+- **Keyed:** run e's four "Ask <client> for their authority to <body>: under agreement rec.…" as scope requests with the
+  body (the model drew the scope request; the `question` rule redrew it as a question about the client's own sign-off);
+  run e's evidence "for c0014 to outside" with outside as its office.
+- **Changes:** the `question` rule leaves an ask for the client's authority that names its service agreement to the
+  scope request; `authorityGiven` reads "for their authority to/with <body>"; `leftEmpty` no longer reads "no authority
+  from/for/with …" as leave-empty. Without the agreement named (rung 3's five, "Ask c0411 for their authority with
+  bank …") the scope request would go with the matter as its agreement, so those stay questions, as confirmed.
+  4,206 to 4,205 before the set is rebuilt on the nine explained here: run e's four keyed asks, and rung 3
+  first_claim-slow-situation seed 8's five scope requests confirmed with the authority blank dropped where the seat
+  wrote "authority: Millbrook Savings Bank (bank)" (now kept). With the set rebuilt: 4,210 of 4,782, nothing lost.
+- **Not done:** the evidence's office (keyed, no rule: a miss); the review request's particulars "could not be
+  verified" are the model's own draw, not a rule overwriting the seat's words.
