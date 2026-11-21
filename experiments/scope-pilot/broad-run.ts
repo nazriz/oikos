@@ -64,7 +64,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Arm, ExperimentSpec } from "../../orchestrator/src/experiment";
 import { PERSONS, SEATS } from "./broad";
-import { build, OVERSTEP_ARMS, seatedAs } from "./build";
+import { build, OVERSTEP_ARMS, seatedAs, seedList } from "./build";
 import { readFork } from "./funnel";
 import { seatHealth as health } from "./broad-report";
 import { DEFAULT_MODEL, modelArm, withModel } from "./model-arm";
@@ -115,4 +115,6 @@ if (situation !== "off" && situation !== "on") throw new Error("broad-run.ts: OI
 const rung = RUNGS[rungN];
 if (!rung) throw new Error("broad-run.ts: set OIKOS_RUNG to 1, 2 or 3 (the header)");
 const base = `scope-broad-r${rungN}${situation === "on" ? "-situation" : ""}`;
-export default broadRun({ name: scripted ? `${base}-scripted` : withModel(base, MODEL), rung, scripted, situation: situation as "off" | "on" });
+// (Named seeds only, `OIKOS_SEED_LIST`: build.ts `seedList`; the name says so.)
+const only = seedList(rung.seeds, process.env.OIKOS_SEED_LIST);
+export default broadRun({ name: scripted ? `${base}-scripted${only.suffix}` : withModel(`${base}${only.suffix}`, MODEL), rung: { ...rung, seeds: only.seeds }, scripted, situation: situation as "off" | "on" });

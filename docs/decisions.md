@@ -15550,3 +15550,15 @@ last two tests; kernel/crates/actors/src/delegation/beyond.rs, `a_paper_sent_aga
   it. The printer could print a value that is no whole id (an empty one) bare, which never reads back; now such a value
   prints as text, and a call the world still cannot read is noted (`call_unread`, with its text) and the seat asked
   again in the world's words. Revisit when the next note shows what was drawn.
+
+## 2026-11-21 · Cut-short forks re-run for named seeds, read in place of the first attempt
+
+A finished experiment is never taken up again (experiment.ts: results.json is training data), so decision-slow-
+situation's seed 9 (crashed at day 65) and seed 10 (stopped by the old health check at day 40) cannot be resumed in
+place. `OIKOS_SEED_LIST=9,10` (build.ts `seedList`; stakes-run.ts, broad-run.ts) runs a rung for those seeds only,
+into an experiment named apart (`...-seeds-9-10`). results.ts (`withReruns`) reads a setting's `<dir>-seeds-*`
+folders beside it: for each seed there, the model arm from the later folder; the code arm too unless its end state
+hash matches the original's (then the original); the reference from `<dir>-reference` as before (the same town to the
+fork); the header says which seed comes from which folder and why, and that the first attempt is kept, not counted.
+report.ts still reads each folder as its own experiment (it does not pool a setting's folders). Revisit if a seed is
+re-run twice (the later folder by name wins) or a re-run's town differs from the original's before the fork.

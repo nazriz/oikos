@@ -453,6 +453,10 @@ test("the results page's tables are read by code: one matter one column, every a
   expect(lines.join("\n")).toContain("rec.52173 (beyond_level, day 65) on no matter handed");
   r.beyondRows = [act("rec.9", "m3")];
   expect(didTable(r).faults.join()).toContain("episodes name papers the acts reader does not class beyond: 7|rec.8");
+  // (A rung for named seeds only, its name said apart: the re-run of decision-slow-situation's seeds 9 and 10.)
+  const { seedList } = await import("../../experiments/scope-pilot/build");
+  expect([seedList([7, 8, 9, 10], "10,9"), seedList([7, 8, 9, 10], undefined)]).toEqual([{ seeds: [9, 10], suffix: "-seeds-9-10" }, { seeds: [7, 8, 9, 10], suffix: "" }]);
+  expect(() => seedList([7, 8, 9, 10], "11")).toThrow(/one of the rung's/);
   const signed = signedTable(r).join("\n");
   expect(signed).toContain("| haiku | 1 | 1 of 1");
   expect(signed).toContain(`rec.4, day 43: "signed and held"`);

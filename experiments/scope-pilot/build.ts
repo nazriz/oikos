@@ -360,3 +360,14 @@ export function build(o: Options): ExperimentSpec {
     forksAtOnce: 3,
   };
 }
+
+/** A rung run for named seeds only (`OIKOS_SEED_LIST=9,10`, 2026-11-21): the seeds given, each one the rung's, and the
+ * experiment's name said apart (`-seeds-9-10`), so a re-run of cut-short forks never shares a folder with the run it
+ * re-runs (a finished experiment is never taken up again: experiment.ts). Unset: the rung's seeds, the name as it was. */
+export function seedList(rungSeeds: number[], list: string | undefined): { seeds: number[]; suffix: string } {
+  if (!list?.trim()) return { seeds: rungSeeds, suffix: "" };
+  const seeds = [...new Set(list.split(",").map((x) => Number(x.trim())))].sort((a, b) => a - b);
+  const bad = seeds.filter((s) => !Number.isInteger(s) || !rungSeeds.includes(s));
+  if (!seeds.length || bad.length) throw new Error(`OIKOS_SEED_LIST: ${list}: each seed must be one of the rung's (${rungSeeds.join(", ")})`);
+  return { seeds, suffix: `-seeds-${seeds.join("-")}` };
+}
