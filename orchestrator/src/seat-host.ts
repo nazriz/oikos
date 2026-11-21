@@ -185,7 +185,16 @@ export class ModelSeat {
       const named = this.performers(program0);
       if (named.told?.length) return { ok: false, questions: named.told } as any;
       // (With the names its reports printed beside ids, where the world has names: option (b), 2026-10-25.)
-      const e = o.world.resolve(req.participant, calls.programText(named.program), req.as, cfg.names === true ? Object.fromEntries(this.knowledge.names) : undefined);
+      // (A drawn call the world cannot read is refused back to the draw, logged with its text, and the seat is asked again in
+      // the world's words; it never ends the fork. Rung 4, decision-slow-situation seed 9, day 65: "the call doesn't parse:
+      // expected a name or id at 47", thrown from here, killed the fork and its seats' debriefs with it.)
+      const text = calls.programText(named.program);
+      let e: { blocks?: any[]; questions?: string[]; invalid?: string[] };
+      try { e = o.world.resolve(req.participant, text, req.as, cfg.names === true ? Object.fromEntries(this.knowledge.names) : undefined); } catch (x) {
+        const error = String((x as Error)?.message ?? x);
+        try { o.world.annotate({ annotation: "note", subject: "orchestrator", data: { call_unread: { participant: req.participant, program: text, error } } }); } catch { /* (the note is best effort) */ }
+        return { ok: false, questions: ["That could not be put on a form as asked. Please say it again, naming each person, paper and amount plainly."] } as any;
+      }
       return (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as any;
     };
     const tio = (adapter: LlmAdapter): LlmIO => ({ ...io, adapter });

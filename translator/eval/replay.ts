@@ -109,10 +109,14 @@ if (regress) {
 const { run } = runOf(argv[0]!);
 const totals = new Map<string, { offered: number; accepted: number; first: number; firstAccepted: number; low: number; high: number; firstLow: number; firstHigh: number }>();
 const wrong: string[] = [];
-const classes: { arm: string; ref: string; class: "still_wrong" | "changed" | "right" }[] = [];
+// (Keyed by seed too: a request's reference restarts in every seed, so arm and reference alone collide. Rung 4,
+// decision-slow-situation, 2026-11-21: 336 references repeated, each matter took the class of the last seed read.)
+const classes: { arm: string; seed?: number; ref: string; class: "still_wrong" | "changed" | "right" }[] = [];
 const changed: string[] = [];
 for (const a of await arms([argv[0]!])) {
   const arm = a.arm;
+  const seedOf = /-seed-([0-9]+)$/.exec(a.run)?.[1];
+  const seed = seedOf !== undefined ? { seed: Number(seedOf) } : {};
   for (const [r, k] of withKnowledge(a)) {
     const who = `${arm}: ${a.model[r.seat] ?? r.seat}`;
     const t = totals.get(who) ?? { offered: 0, accepted: 0, first: 0, firstAccepted: 0, low: 0, high: 0, firstLow: 0, firstHigh: 0 };
@@ -126,8 +130,8 @@ for (const a of await arms([argv[0]!])) {
     if (r.call) t.offered++;
     if (first) t.first++;
     if (r.decision === "accept") { t.accepted++; if (first) t.firstAccepted++; }
-    if (r.decision === "accept" && same) { t.low++; if (first) t.firstLow++; t.high++; if (first) t.firstHigh++; classes.push({ arm, ref: r.ref, class: "right" }); continue; }
-    classes.push({ arm, ref: r.ref, class: same ? "still_wrong" : "changed" });
+    if (r.decision === "accept" && same) { t.low++; if (first) t.firstLow++; t.high++; if (first) t.firstHigh++; classes.push({ arm, ...seed, ref: r.ref, class: "right" }); continue; }
+    classes.push({ arm, ...seed, ref: r.ref, class: same ? "still_wrong" : "changed" });
     if (!same) {
       t.high++; if (first) t.firstHigh++;
       changed.push(`${who} ${r.ref}${first ? "" : " (restated)"}: ${r.decision === "accept" ? "accepted" : r.decision === "reject" ? `declined ("${cut(r.note ?? "", 110)}")` : `asked back ("${cut(r.failure ?? "", 110)}")`}\n    logged: ${cut(logged, 160)}\n    now:    ${cut(now, 160)}${newLines(r.summary ?? "", preview).map((x) => `\n    shown:  ${cut(x, 220)}`).join("")}`);

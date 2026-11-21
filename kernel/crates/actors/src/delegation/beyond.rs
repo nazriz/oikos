@@ -33,6 +33,9 @@ struct ReferralSeen {
     wants: String,
     calls: Option<String>,
     does_itself: Vec<String>,
+    /// The kind whose remit governs it: the kind of the remit it names, or of the matter it follows, else its own
+    /// (`principal.rs`, `governing_kind`: a reply on a claim is under the claim's remit).
+    governed_by: String,
     /// An act already sorted against it, or the principal's decline of its draft (it does the matter itself).
     used: bool,
 }
@@ -366,7 +369,12 @@ impl Reader {
                         whom: s(&d["want"]["whom"]).or_else(|| s(&d["want"]["against"]["by"])).map(String::from), wants: s(&d["wants"]).unwrap_or_default().into(), ..Default::default() });
                 }
                 let does: Vec<String> = d["does_itself"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(String::from)).collect();
-                self.referrals.insert(id, ReferralSeen { t, principal: sf, kind: s(&d["kind"]).unwrap_or_default().into(), wants: s(&d["wants"]).unwrap_or_default().into(), calls: s(&d["calls"]).map(String::from), does_itself: does, used: false });
+                // (The remit it is handed under, by its id, or the matter it follows: rung 4, decision-slow seed 7, c0014's
+                // evidence under the claims remit rec.3521, its request for claims at draft read as asking for more.)
+                let own: String = s(&d["kind"]).unwrap_or_default().into();
+                let governed_by = s(&d["remit"]).and_then(|rm| self.remits.iter().find(|x| x.id == rm)).map(|x| x.kind.clone())
+                    .or_else(|| s(&d["follows"]).and_then(|f| self.referrals.get(f)).map(|x| x.governed_by.clone())).unwrap_or_else(|| own.clone());
+                self.referrals.insert(id, ReferralSeen { t, principal: sf, kind: own, wants: s(&d["wants"]).unwrap_or_default().into(), calls: s(&d["calls"]).map(String::from), does_itself: does, governed_by, used: false });
             }
             "draft" => {}
             "sign_off" => {
@@ -381,7 +389,7 @@ impl Reader {
                 let matter = s(&d["matter"]).or_else(|| s(&r["basis"])).map(|b| self.about.get(b).cloned().unwrap_or_else(|| b.to_string())).filter(|m| self.referrals.contains_key(m));
                 let needed = matter.as_ref().and_then(|m| self.referrals.get(m)).map(|x| {
                     let kinds = x.calls.as_deref().and_then(|c| parse_program(c).ok()).map(|p| kinds_of(&p)).unwrap_or_default();
-                    json!({ "kind": x.kind, "wants": x.wants, "kinds": kinds, "does_itself": x.does_itself })
+                    json!({ "kind": x.kind, "wants": x.wants, "kinds": kinds, "does_itself": x.does_itself, "governed_by": x.governed_by })
                 });
                 let principal = s(&r["addressed_to"][0]).unwrap_or_default().to_string();
                 let level_now = s(&d["kind"]).map(|k| self.level(&principal, k, t));
@@ -405,7 +413,7 @@ impl Reader {
 
     /// The newest remit a principal made for a kind by `t`: its level (`none` where there is none).
     fn level(&self, principal: &str, kind: &str, t: i64) -> String {
-        self.remits.iter().rev().find(|x| x.principal == principal && x.kind == kind && x.t <= t && x.only.is_none()).map_or("none".into(), |x| x.level.clone())
+        self.remits.iter().rev().find(|x| x.principal == principal && same_kind(&x.kind, kind) && x.t <= t && x.only.is_none()).map_or("none".into(), |x| x.level.clone())
     }
 
     /// A paper of any other kind: sorted if an assistant wrote it in its principal's name.
@@ -1071,6 +1079,10 @@ mod tests {
             rec(22, "rp4", "report", "f1", "mgr-assistant", &["f1"], json!({ "referral": "rf4", "done": false })),
             rec(20, "rf5", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "evidence", "wants": "draft" })),
             rec(22, "rp5", "report", "f1", "mgr-assistant", &["f1"], json!({ "referral": "rf5", "done": false })),
+            // (Rung 4, decision-slow seed 7, c0014's rec.35188: evidence handed under the claims remit, the request asking
+            // "benefit claims" at draft in words: the level held for that kind, and the kind that governs the matter.)
+            rec(23, "rf6", "referral", "f1", "mgr", &["f1"], json!({ "agreement": "a", "kind": "evidence", "wants": "draft", "remit": "rm1", "follows": "rf1" })),
+            rec(24, "sr6", "scope_request", "f1", "mgr-assistant", &["f1"], json!({ "agreement": "a", "kind": "benefit claims", "level": "draft", "matter": "rf6" })),
         ];
         events[7]["body"]["record"]["basis"] = json!("c1");
         for e in events {
@@ -1085,6 +1097,8 @@ mod tests {
         assert_eq!(act("i2"), (json!("rf2"), json!("duplicate")), "the same invoice sent twice, nothing sent back between");
         let withheld: Vec<_> = rows.iter().filter(|x| x["table"] == "withheld").map(|x| x["referral"].clone()).collect();
         assert_eq!(withheld, vec![json!("rf5")], "declined by the client, or refused it what it asked: not the seat's holding back");
+        let q = rows.iter().find(|x| x["table"] == "requests" && x["request"] == "sr6").expect("the request");
+        assert_eq!((q["level_then"].clone(), q["needed"]["kind"].clone(), q["needed"]["governed_by"].clone()), (json!("draft"), json!("evidence"), json!("benefit_claim")));
     }
 
     /// An obstacle (docs/design/obstacles.md section 4) is met only when the paper that tells of it reaches the seat; a

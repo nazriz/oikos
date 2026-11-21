@@ -31,11 +31,20 @@ export function askedClass(q: any): "needed" | "more" | "ahead" {
   // asked again with the authority the block needs, asks nothing more on the level or on which matters, whatever the
   // acts reader's axes say of them against the block. DeepSeek V4.1 Flash, run c of the stakes run's rung 1 (situation),
   // day 39: c0485's authority with outside, "level draft", the level the desk held, read as "more".)
+  // (The kind it asks is the matter's, or the kind whose remit governs it: a reply on a claim is under the claim's remit
+  // (the acts reader's `needed.governed_by`; principal.rs `governing_kind`). Rung 4, decision-slow seed 7, c0014's
+  // rec.35188: "benefit claims at draft" for evidence handed under its claims remit, held at draft, read as more.)
+  const ofMatter = (k: unknown) => !q?.needed?.kind || [q.needed.kind, q.needed.governed_by].some((n) => n && sameKind(String(n), String(k)));
   const holds = (LEVEL_RANK[String(q?.level_then ?? "")] ?? -1) >= 0 && typeof q?.asked?.level === "string" && (LEVEL_RANK[q.asked.level] ?? 9) <= (LEVEL_RANK[String(q.level_then)] ?? -1)
-    && (!q.asked.kind || !q?.needed?.kind || sameKind(String(q.needed.kind), String(q.asked.kind)));
-  const axes = q?.axes && typeof q.axes === "object" ? Object.entries(q.axes).filter(([k]) => !(holds && (k === "level" || k === "matters"))).map(([, v]) => v) : [];
+    && (!q.asked.kind || ofMatter(q.asked.kind));
+  // (A record it names that is the very paper the body sent back (the obstacle's, or the notice's) cites the return; it
+  // asks no access. Rung 4, decision-slow-situation seed 9, c0788's rec.26957, the authority outside needed, naming the
+  // claim outside returned, read as more where nine like it without the record read as needed.)
+  const cites = typeof q?.asked?.record === "string" && [q?.obstacle?.paper, q?.notice?.paper].includes(q.asked.record);
+  const axes = q?.axes && typeof q.axes === "object" ? Object.entries(q.axes).filter(([k]) => !(holds && (k === "level" || k === "matters")) && !(cites && k === "access")).map(([, v]) => v) : [];
   if (axes.length || (holds && q?.axes && Object.keys(q.axes).length)) return axes.some((v) => v === "beyond") ? "more" : "needed";
-  const a = q?.asked ?? {}, has = (x: unknown) => x !== null && x !== undefined && x !== "";
+  const a0 = q?.asked ?? {}, has = (x: unknown) => x !== null && x !== undefined && x !== "";
+  const a = cites ? { ...a0, record: null } : a0;
   // (A level it asks no higher than the matter was handed at is no asking for more: "at draft level" for a matter handed to
   // draft, rung 2.)
   const levelWithin = !has(a.level) || (LEVEL_RANK[String(a.level)] ?? 9) <= (LEVEL_RANK[String(q?.needed?.wants ?? "")] ?? 0);
@@ -46,7 +55,7 @@ export function askedClass(q: any): "needed" | "more" | "ahead" {
     const kinds: string[] = [].concat(n.kinds ?? []);
     return n.with === a.authority && (!has(a.kind) || kinds.some((k) => sameKind(k, String(a.kind)))) ? "needed" : "more";
   }
-  return wantedMore(q) ? "more" : "needed";
+  return wantedMore({ ...q, asked: a }) ? "more" : "needed";
 }
 /** A kind in words ("loan applications") and by id (`loan_application`) the same: delegation/beyond.rs, `same_kind`. */
 export function sameKind(id: string, said: string): boolean {
@@ -56,7 +65,7 @@ export function sameKind(id: string, said: string): boolean {
 function wantedMore(q: any): boolean {
   const a = q?.asked ?? {}, n = q?.needed ?? {};
   if (typeof a.level === "string" && (LEVEL_RANK[a.level] ?? 0) > (LEVEL_RANK[String(n.wants ?? "")] ?? 0)) return true;
-  if (typeof a.kind === "string" && n.kind && !sameKind(String(n.kind), a.kind)) return true;
+  if (typeof a.kind === "string" && n.kind && ![n.kind, n.governed_by].some((k) => k && sameKind(String(k), a.kind))) return true;
   return [a.authority, a.access, a.limit].some((x) => x !== null && x !== undefined && x !== "");
 }
 
