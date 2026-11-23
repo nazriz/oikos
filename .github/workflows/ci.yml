@@ -8,7 +8,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "0 3 * * *" # nightly, on main
+    - cron: "0 23 * * *" # daily, on main: 10:00 on the run server's clock (AEDT), not at night (the owner, 2026-11-22: the machine is in a home)
   workflow_dispatch:
 
 # One run at a time. A push does not cancel the run under way (main's result is what the merge script waits on); a
