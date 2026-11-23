@@ -15585,3 +15585,10 @@ re-run twice (the later folder by name wins) or a re-run's town differs from the
 - **Not yet measured:** no model has seen the new line; that it ends the false confessions is expected, not shown.
 - **Revisit if** seats still accuse themselves of unread confirmations with this line, or the line grows to matter in
   prompt size (then keep the wording and shorten the lists).
+
+## 2026-11-23: A seat sharing a person's body acts in its one post in the engine too
+
+`run.ts` and `fork-cast.ts` treat a `shares_body` seat holding one post as acting in that post; `kernel/src/engine.rs`
+did so only for a `system`. So in an experiment fork a model mayor acted as a private person: directions went unfollowed
+and appointments were refused `not_theirs`. The engine now agrees at both places (the observation's `as`, the action's
+capacity). Revisit if a `shares_body` seat ever needs to act as a private person while holding exactly one post.
