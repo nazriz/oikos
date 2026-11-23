@@ -335,7 +335,7 @@ export function supersede(messages: LlmMessage[]): LlmMessage[] {
       changed = true;
       // (The list is one paragraph; what follows it in the same result, a line said of the use, stays.)
       const more = p.indexOf("\n\n");
-      return `${k === WAITING_HEAD ? SET_OUT_AGAIN(k, p, split(slots[li]!.get())[lj]) : SET_OUT_AGAIN(k)}${more >= 0 ? p.slice(more) : ""}`;
+      return `${k === WAITING_HEAD ? SET_OUT_AGAIN(k, more >= 0 ? p.slice(0, more) : p, split(slots[li]!.get())[lj]?.split("\n\n")[0]) : SET_OUT_AGAIN(k)}${more >= 0 ? p.slice(more) : ""}`;
     });
     if (changed) sl.set(out.join("\n\n"));
   });
