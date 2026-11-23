@@ -313,6 +313,8 @@ export interface TownSpec {
   nature?: boolean;
   /** When the first election falls (days from the start; the profile's term after it). Default: a year in. */
   first_election_days?: number;
+  /** Days between elections (default: the profile's `elections.term_years * 365`). Opt-in for multi-term studies. */
+  election_term_days?: number;
   /** Days after an election result is declared before the declared winner takes office (default: 0, immediate). */
   takes_office_days?: number;
   /** Emit `law-elections` from `schedule-elections` with its council amendment form, read dynamically by the electoral
@@ -324,6 +326,8 @@ export interface TownSpec {
   appointments_procedure?: boolean;
   /** Pre-election newspaper approval and candidate polls plus accountability coverage of directions and audits (opt-in). */
   newspaper_polls?: boolean;
+  /** Opt-in Phase 2 institutional desks, editorial procedure, and newspaper poll forms for model-held editor, auditor-officer, and swing councillor seats. */
+  oversight_desks?: boolean;
   /** Optional policy platforms resident candidates may stand on (opt-in; enacted by city.mayor_code if elected). */
   rival_platforms?: { summary: string; values?: string[]; budgets?: { [line: string]: number }; directions?: { [form: string]: { [field: string]: string } } }[];
   /** The clinic and the school, where the profile describes health and education (world-expansion 4). Default: yes;
@@ -1262,12 +1266,14 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   for (const p of parcels) if (!titleOf.has(p.id)) own(p.id, "city");
   // ---- elections: the electors enrolled at the start, and the law that has them elect the mayor (world-expansion 3) ----
   const E = V.elections && spec.elections !== false ? V.elections : undefined;
-  if (E) {
+  const electionTermDays = E ? (spec.election_term_days ?? E.term_years * 365) : undefined;
+  if (E && electionTermDays !== undefined) {
+    const termPhrase = spec.election_term_days !== undefined ? `every ${spec.election_term_days} days` : `every ${E.term_years} years`;
     if (spec.election_law) {
       const es = electionSchedule.records[0] as unknown as { id: string; data: LawSchedule };
       const drafted = draftLaw(es.id, es.data, {
         first_poll_day: spec.first_election_days ?? 365,
-        term_days: E.term_years * 365 * DAY,
+        term_days: electionTermDays * DAY,
         nominations_open_days: ELECTION_NOMINATIONS_OPEN_DAYS * DAY,
         nominations_close_days: ELECTION_NOMINATIONS_CLOSE_DAYS * DAY,
         voting_days: ELECTION_VOTING_DAYS * DAY,
@@ -1276,13 +1282,13 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       records.push(es, amendmentForm(es), {
         id: "law-elections", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
         ...drafted,
-        text: `The town's electors elect the mayor every ${E.term_years} years, by ${E.method === "preferential" ? "preferential" : "first-past-the-post"} vote, run by the electoral office. Every adult resident ${E.compulsory_voting ? "must" : "may"} enrol and vote. ${drafted.text}`,
+        text: `The town's electors elect the mayor ${termPhrase}, by ${E.method === "preferential" ? "preferential" : "first-past-the-post"} vote, run by the electoral office. Every adult resident ${E.compulsory_voting ? "must" : "may"} enrol and vote. ${drafted.text}`,
         data: { ...drafted.data, method: E.method, compulsory_voting: E.compulsory_voting },
       });
     } else {
       records.push({ id: "law-elections", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
-        text: `The town's electors elect the mayor every ${E.term_years} years, by ${E.method === "preferential" ? "preferential" : "first-past-the-post"} vote, run by the electoral office. Every adult resident ${E.compulsory_voting ? "must" : "may"} enrol and vote.`,
-        adico: { attribute: "the town's adult residents", deontic: E.compulsory_voting ? "must" : "may", aim: "enrol and vote", condition: `at each election of the mayor, every ${E.term_years} years` } });
+        text: `The town's electors elect the mayor ${termPhrase}, by ${E.method === "preferential" ? "preferential" : "first-past-the-post"} vote, run by the electoral office. Every adult resident ${E.compulsory_voting ? "must" : "may"} enrol and vote.`,
+        adico: { attribute: "the town's adult residents", deontic: E.compulsory_voting ? "must" : "may", aim: "enrol and vote", condition: `at each election of the mayor, ${termPhrase}` } });
     }
   }
   // ---- nature: the landscape around the town, where the profile describes one (docs/design/world-expansion.md 2) ----
@@ -3067,12 +3073,28 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // (Those gone from the roll: the registry's entries of deaths, sent to it as of right, and departures told to it.)
       K.mine("gone", ["death_registration", "departure"]),
       votes],
-      code("city.electoral_office", { office: "mayor", office_title: `Mayor of ${spec.name}`, term_days: E.term_years * 365, first_poll_day: spec.first_election_days ?? 365, ...(spec.takes_office_days ? { takes_office_days: spec.takes_office_days } : {}), method: E.method, seats: false }));
+      code("city.electoral_office", { office: "mayor", office_title: `Mayor of ${spec.name}`, term_days: electionTermDays!, first_poll_day: spec.first_election_days ?? 365, ...(spec.takes_office_days ? { takes_office_days: spec.takes_office_days } : {}), method: E.method, seats: false }));
     office("editor", "paper", "Editor", undefined, [
       civic("record", ["petition", "environment_report", "budget", "law", "ballot_result", "election_notice", "nomination", "permit_decision",
         ...(spec.newspaper_polls ? ["petition_response", "audit_report", "direction"] : [])]),
       ...(spec.newspaper_polls ? [K.mine("poll_replies", ["poll_reply"])] : []),
-    ], code("firm.newspaper", { town: "city", ...(spec.newspaper_polls ? { poll_every_days: NEWSPAPER_POLL_EVERY_DAYS } : {}) }));
+    ], code("firm.newspaper", { town: "city", ...(spec.newspaper_polls ? { poll_every_days: NEWSPAPER_POLL_EVERY_DAYS } : {}) }),
+      spec.oversight_desks
+        ? { desk: [K.published("laws", ["charter", "procedure", "law"], { title: "The charter, the town's procedures, and the town's laws" }), { ...forms, title: "Forms on file" }], desk_standing: ["laws", "forms"] }
+        : {});
+    if (spec.oversight_desks) {
+      records.push({
+        id: "proc-newspaper",
+        record: "statement",
+        author: "genesis",
+        at: 0,
+        visible_to: "public",
+        speaks_for: "paper",
+        kind: "procedure",
+        basis: "law-charter",
+        text: `Editorial procedure of The ${spec.name} Times. The editor reports public records of the town on the news item form (news_item), stating the headline, the source record, its kind, the edition number, whether it is about an office up for election (about_office), and its tone (-1, 0, or 1).${spec.newspaper_polls ? " Before an election, the editor may invite voluntary private poll replies from readers using the poll question form (poll_question) and publish the tallied results using the poll form (poll), reporting respondent count and approval in integer basis points with about_office set to false." : ""}`,
+      });
+    }
   }
   // (The environment office's own habitat map: the district's cover as its scientists last mapped it, and the ground
   // that was built on then. Its own paper, not a sight of the district: it is as old as the day it was made.)
@@ -3258,7 +3280,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   COUNCIL_LEANINGS.forEach((leaning, i) => office(`councillor-${i + 1}`, "city", `Councillor ${i + 1}`, "councillor", [civic("ballots", ["ballot"])], code("city.councillor", { leaning }),
     { desk: [councilRules, { ...forms, title: "Forms on file" }, K.mine("council", ["proposal", "ballot"], { title: "The council's business: proposals put to it and its ballots" }), councilTable,
       // (A council's votes are its own record, and public: a councillor reads its own vote on file there.)
-      { ...votes, title: "Votes cast on the council's ballots: the council's own record" }], desk_standing: ["laws", "forms"], ballot_count: "member" }));
+      { ...votes, title: "Votes cast on the council's ballots: the council's own record" },
+      ...(spec.oversight_desks ? [K.published("oversight", ["news", "audit_report", "direction", "election_notice", "nomination"], { title: "The local paper, audit reports, public directions and election notices" })] : [])], desk_standing: ["laws", "forms"], ballot_count: "member" }));
   // The payments procedure's figure, as the town writes its money.
   const approvalOver = asWritten(V.town_finance.payment_approval_over);
   // The town tells its bank who may instruct payments from its account: the finance officer (the position, whoever holds it).
@@ -4040,7 +4063,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   }
   // The audit office (docs/behaviour/auditor.md): a code office like the ombudsman's, staffed by residents. Its papers are the answers addressed to it; it reads the laws
   // it works under (the audit law, the support law it decides again under, the tax law that a payment reckoned on pay needs); its reports are public.
-  if (AUDL && AUDIT_BODIES.length) office("auditor-officer", AUDITOR, "Audit officer", "audit_officer", [mine("auditor-business"), K.mine("audit", ["audit_answer"]), lawBook], code("office.auditor", {}));
+  if (AUDL && AUDIT_BODIES.length) office("auditor-officer", AUDITOR, "Audit officer", "audit_officer", [mine("auditor-business"), K.mine("audit", ["audit_answer"]), lawBook], code("office.auditor", {}),
+    spec.oversight_desks
+      ? { desk: [K.published("procedures", ["charter", "procedure"], { title: "The charter and the town's procedures" }), { ...forms, title: "Forms on file" }, K.published("civic", ["budget", "direction", "ballot_result", "petition", "news"], { title: "Public budgets, directions, election results, petitions and the paper" })], desk_standing: ["laws", "procedures", "forms"] }
+      : {});
   // The retirement fund's trustee (docs/behaviour/firm-ownership.md): takes in what the fund's holdings pay, pays its
   // costs (its administrator is outside the town), and pays its retired members their pensions.
   if (FUND) office("fund-trustee", FUND, "Trustee", undefined,
@@ -4378,6 +4404,47 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // (The possession order form offers what this place's law has, and nothing another place's has.)
       const tailored = x.form === "possession_order" && POSS ? possessionOrderFor(planLaw(POSS), POSS.plan_months) : withLines;
       records.push(stationeryForm(pos.id, pos.entity, tailored, own, pos.title));
+    }
+    if (spec.oversight_desks && spec.newspaper_polls && pos.id === "editor") {
+      const editorPollForms: Issued[] = [
+        {
+          form: "poll_question",
+          title: "A pre-election reader poll invitation",
+          does: "Publishes a public invitation asking readers to send a private poll reply with their approval and first-preference candidate.",
+          fields: {
+            headline: { type: "text", description: "What the poll invitation says.", required: true },
+            edition: { type: "count", description: "The edition it is in.", required: true },
+            poll_at: { type: "count", description: "Polling day timestamp in seconds.", required: true },
+          },
+          writes: {
+            kind: "news",
+            text: "{headline}",
+            visible: "public",
+            assertion: { that: "=headline", about: ["@town"] },
+            data: { kind: "poll_question", edition: "=edition", about_office: false, poll_at: "=poll_at" },
+          },
+        },
+        {
+          form: "poll",
+          title: "A pre-election poll report",
+          does: "Publishes the tallied results of private reader poll replies: respondent count and average government approval in basis points.",
+          fields: {
+            headline: { type: "text", description: "The poll report text with approval and candidate shares.", required: true },
+            edition: { type: "count", description: "The edition it is in.", required: true },
+            poll_at: { type: "count", description: "Polling day timestamp in seconds.", required: true },
+            respondents: { type: "count", description: "Number of private replies tallied.", required: true },
+            approval_bps: { type: "text", description: "Mean government approval in integer basis points (may be negative).", required: true },
+          },
+          writes: {
+            kind: "news",
+            text: "{headline}",
+            visible: "public",
+            assertion: { that: "=headline", about: ["@town"] },
+            data: { kind: "poll", edition: "=edition", about_office: false, poll_at: "=poll_at", respondents: "=respondents", approval_bps: "#approval_bps" },
+          },
+        },
+      ];
+      for (const pf of editorPollForms) records.push(stationeryForm(pos.id, pos.entity, pf, own, pos.title));
     }
     pos.channels.push(K.mine("stationery", ["form"], { title: "The office's own forms" }));
     part.controller.params.standing = [...part.controller.params.standing, "stationery"];
