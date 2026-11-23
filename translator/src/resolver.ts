@@ -940,7 +940,7 @@ class Resolver {
       const where = [...new Set(elsewhere.map((x) => Knowledge.formOf(x)))];
       throw new Ask(`The ${name.replace(/_/g, " ")} form isn't one ${to} takes: it goes to ${where.join(" or ")}.`);
     }
-    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } }; writes?: forms.FormWrites; copies?: string; batch?: string };
+    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; visible?: "public"; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } }; writes?: forms.FormWrites; copies?: string; batch?: string };
     const data: { [k: string]: unknown } = {};
     const missing: string[] = [];
     for (const [field, t] of Object.entries(spec.fields)) {
@@ -1053,7 +1053,7 @@ class Resolver {
       return typeof x === "string" ? x : JSON.stringify(x);
     };
     const summary = Object.entries(data).map(([k, x]) => `${k.replace(/_/g, " ")} ${words(k, x)}`).join(", ");
-    return [{ block: "publish", kind: spec.submit_as, speaks_for: this.id(c, "for") ?? this.me, addressed_to: spec.submit_to, basis: f.id, text: `${spec.form.replace(/_/g, " ")}: ${summary}.`.slice(0, 16384), data, ...(bind ? { ref: bind } : {}) }];
+    return [{ block: "publish", kind: spec.submit_as, speaks_for: this.id(c, "for") ?? this.me, addressed_to: spec.submit_to, basis: f.id, text: `${spec.form.replace(/_/g, " ")}: ${summary}.`.slice(0, 16384), data, ...(spec.visible ? { visible_to: spec.visible } : {}), ...(bind ? { ref: bind } : {}) }];
   }
 
   /** A date as written ("year 1, day 12"), as the moment that day begins. */

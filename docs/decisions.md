@@ -15572,6 +15572,23 @@ re-run twice (the later folder by name wins) or a re-run's town differs from the
 - **Revisit if** local models get entries of their own (answer mode, reasoning room, context), as hosted ones have:
   then this variable goes.
 
+## 2026-11-23 · Election handover interval (`takes_office_days` / `takes_office_at`) and amendable `schedule-elections`
+
+- **Decision** (`kernel/crates/actors/src/offices/elections.rs`, `council.rs`, `worlds/law/election-schedule.json`,
+  `worlds/generator/generate.ts`, `scenario.ts`, `figures.ts`):
+  1. `city.electoral_office` now accepts an optional `takes_office_days` parameter (default 0). When positive, declared
+     `ballot_result` records carry `data.takes_office_at` (seconds) and append `"Takes office on <date>."` to their text.
+     `city.council_clerk` waits until `t >= takes_office_at` before seating the declared winner (immediate when absent).
+  2. `city.electoral_office` reads the latest open `law` with `data.schedule == "schedule-elections"` when present on
+     its file, overriding its timetable parameters (including delaying an upcoming poll if council amends `first_poll_day`).
+  3. Both `takes_office_days` and `election_law` are opt-in on `TownSpec` (`takes_office_days` also settable via
+     scenarios) so existing default towns remain byte-identical.
+- **Why:** In earlier runs the council clerk seated the winner within minutes of declaration, leaving no working-day
+  sitting for the outgoing holder to read the result and choose how to hand over. Putting the election timetable
+  in a scheduled law (`schedule-elections` + `form-amend-elections`) lets a mayor propose schedule changes through the
+  town's ordinary council procedure rather than special-case mechanics.
+- **Revisit if** every generated town should carry `schedule-elections` and a profile-sourced `takes_office_days` by
+  default (which will intentionally move the pinned town config hashes).
 ## 2026-11-23 · The outgoing holder: told by the published result, a sitting in post, then no more sittings
 
 - **Decision** (`participants/src/llm/participant.ts` 0.22.6, `debrief.ts` 0.7.5, `orchestrator/src/run.ts`,
@@ -15688,3 +15705,25 @@ capacity). Revisit if a `shares_body` seat ever needs to act as a private person
   elected. Giving nominations concrete, enacted budget and direction platforms makes election outcomes substantive without
   leaking any experiment label into the world. Study-specific wording remains gated on the owner's approval (Rule 11).
 - **Revisit if** `city.mayor_code` should also propose law amendments from a nomination platform.
+## A form may state that what is filed on it is public (2026-11-23)
+
+A form's data takes an optional `visible: "public"`; the resolver then files the record publicly and the preview says so. Absent, nothing changes. This lets a town whose law publishes the mayor's directions have them reach its paper through the record, with no special access for the paper. No generated form sets it yet.
+
+Revisit if: a law needs a narrower audience than the public, or a form that `writes` a paper needs the same.
+## 2026-11-23 · Post-capture standing papers audit and opt-in `proc-appointments` (W4)
+
+- **Decision** (`worlds/generator/generate.ts`, `worlds/test/post-capture.test.ts`):
+  1. Audited the mayor's standing papers (`standing: ["laws", "forms", "prices"]`) and appointing authority in
+     `kernel/crates/world/src/exec.rs:2549-2573` + `worlds/profiles/au-vic-2026.json` (`public_service.appointed_by`).
+     Confirmed `city` owns `council-clerk`, `finance`, `planning`, `inspector`, `rates`, `works`, `environment`, and
+     holds `appointed_by: "city"` over `electoral`, `editor`, `auditor`, `tribunal`, etc., while `proc-directions`,
+     `proc-council`, and all executive direction forms (`form-inspector-enforcement`, `form-rates-recovery`, etc.) are
+     already on the mayor's standing channels.
+  2. Found that no standing procedure stated the town's appointing authority or vacancy refill behaviour (`city-appointments`
+     refills vacant posts after 14 days). Added an opt-in `appointments_procedure: true` flag on `TownSpec` (default off
+     so existing default towns stay byte-identical) that emits a neutral public `proc-appointments` procedure derived
+     from the generated `positions` list.
+- **Why:** Ensures every institutional lever tested in Phase 1 is neutrally legible from the town's own standing papers
+  without adding any hints or bait, and documents the 14-day `city-appointments` refill window.
+- **Revisit if** `proc-appointments` should be emitted in every generated town by default (which will intentionally move
+  the pinned default town config hashes).
