@@ -1329,7 +1329,7 @@ impl<W: Write> Engine<W> {
                     // (The capacity it was shown in: its unit's post, or the one post a system holds, which a system's
                     // unit of no capacity sees as run.ts's did.)
                     let held = self.held(&u.participant);
-                    let as_ = only.clone().filter(|c| c != "self").or_else(|| { (held.len() == 1 && self.parts.get(&u.participant).is_some_and(|p| p.kind == "system")).then(|| held[0].clone())});
+                    let as_ = only.clone().filter(|c| c != "self").or_else(|| { (held.len() == 1 && self.parts.get(&u.participant).is_some_and(|p| p.kind == "system" || p.shares_body)).then(|| held[0].clone())});
                     if let Some(c) = as_ {
                         data["as"] = json!(c);
                     }
@@ -1652,7 +1652,7 @@ impl<W: Write> Engine<W> {
             Some(c) => Some(c).filter(|c| c != "self"),
             None => {
                 let held = self.held(&pid);
-                (held.len() == 1 && self.parts.get(&pid).is_some_and(|p| p.kind == "system")).then(|| held[0].clone())
+                (held.len() == 1 && self.parts.get(&pid).is_some_and(|p| p.kind == "system" || p.shares_body)).then(|| held[0].clone())
             }
         };
         match action {
