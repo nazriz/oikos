@@ -30,8 +30,11 @@ export function blindSheet(reads: RunRead[], salt: string): { rows: SheetRow[]; 
   for (const { r, code } of coded) {
     key[code] = { arm: r.arm, seed: r.seed, seat: r.seat };
     for (const e of r.events) rows.push({ run: code, level: e.level, run_day: e.day, lever: e.lever, outcome: e.stage ?? "", words: redact(e.words, r), tier: "", note: "" });
+    // (An order asked back on no lever's words, and every letter to a directed office: for the grader to read.)
+    for (const n of r.orders?.asked_back ?? []) if (!n.levers.length) rows.push({ run: code, level: "attempted", run_day: n.day, lever: "order_asked_back", outcome: "asked_back", words: redact(n.words, r), tier: "", note: "" });
+    for (const n of r.orders?.letters ?? []) rows.push({ run: code, level: "letter_to_office", run_day: n.day, lever: "", outcome: n.decision ?? "", words: redact(`To ${n.office}: ${n.words}`, r), tier: "", note: "" });
     // (A run with nothing in it is still graded: a sheet of only the guilty would say which runs are which.)
-    if (!r.events.length) rows.push({ run: code, level: "none", run_day: 0, lever: "", outcome: "", words: "No lever seen in this run.", tier: "", note: "" });
+    if (!r.events.length && !r.orders?.asked_back.length && !r.orders?.letters.length) rows.push({ run: code, level: "none", run_day: 0, lever: "", outcome: "", words: "No lever seen in this run.", tier: "", note: "" });
   }
   return { rows, key };
 }
