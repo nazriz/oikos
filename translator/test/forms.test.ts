@@ -11,7 +11,8 @@ import { ASSISTANT_ISSUES, calls, canonical, clientDraftOf, clientPapers, forms,
 import FORMS from "../../contracts/test/forms.json";
 import { MockAdapter } from "@oikos/participants/llm";
 import { createTranslator, formRules, formShown } from "../src/index";
-import { everyIdNamed, misread } from "../src/rules";
+import { everyIdNamed, misread, ORDER_NOT_SENT, orderUnread } from "../src/rules";
+import { orderAttempt } from "../eval/orders-as-letters";
 import { ASKED, EXEC_CASES, ORDER_CASES } from "../eval/executive-cases";
 import { fixtureKnowledge } from "../eval/executive";
 import { Knowledge } from "../src/knowledge";
@@ -540,4 +541,28 @@ test("a form drawn from its named blanks reads a length of time, and never drops
   expect(drawn("Fill in form-amend-tenancy: affects tenants, the notice as we discussed")).toBe("none(unclear)");
   expect(drawn('Fill in form-nomination: office mayor, name "Dana Okafor", platform "Safe homes.", values: honesty, thrift')).toBe("none(unclear)");
   for (const c of [...EXEC_CASES, ...ORDER_CASES]) if (c.want !== ASKED) expect(calls.contractErrors(calls.parseProgram(c.want))).toEqual([]);
+});
+
+// (An order to an office is given on its form: a letter would go out and direct nothing. docs/decisions.md, "An order to
+// an office is not a letter".)
+test("an order to an office the seat directs is drawn as its direction or asked back, and a letter stays a letter", () => {
+  const k = fixtureKnowledge();
+  const letter = (to: string, text: string) => calls.parseProgram(`message(to="${to}", text="${text}")`);
+  const drawn = (request: string, to: string) => calls.programText(formRules(letter(to, "words"), request, k as any));
+  expect(drawn("Tell the works office to stop recruiting.", "the works office")).toContain("form=works_staffing");
+  expect(drawn("Tell the works office to stop recruiting.", "the works office")).toContain("recruit=no");
+  expect(drawn("Order the rates office to resume charging interest.", "the rates office")).toContain("interest=yes");
+  // (What turns the sense of the order is not read: nothing goes out.)
+  for (const request of ["Tell the rates office to stop waiving interest.", "Tell the works office to end the recruitment freeze.", "Tell the rates office to go easy on people."]) {
+    const to = /rates/.test(request) ? "the rates office" : "the works office";
+    const p = formRules(letter(to, "words"), request, k as any);
+    expect(orderUnread(p, request, k as any)?.startsWith(ORDER_NOT_SENT)).toBe(true);
+    expect(misread(p, request, k as any)).toBeDefined();
+    expect(orderAttempt({ ref: "r", seq: 1, seat: "s", request, failure: orderUnread(p, request, k as any) }, k)?.kind).toBe("asked_back");
+  }
+  // (A letter, and an order from a seat the town's rule does not name, are left as they are.)
+  for (const request of ["Write to the works office asking how many crew it has.", "Tell the works office that the crew did well."]) expect(orderUnread(letter("the works office", "words"), request, k as any)).toBeUndefined();
+  const other = Object.assign(Object.create(Object.getPrototypeOf(k)), k, { held: new Set(["councillor-1"]) });
+  expect(orderUnread(letter("the works office", "words"), "Tell the works office to stop recruiting.", other)).toBeUndefined();
+  expect(orderAttempt({ ref: "r", seq: 1, seat: "s", request: "x", call: 'message(to="the works office", text="words")', decision: "accept" }, k)).toEqual({ kind: "letter", office: "works", decision: "accept" });
 });

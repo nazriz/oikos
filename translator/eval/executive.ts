@@ -82,7 +82,7 @@ export function fixtureKnowledge(): Knowledge {
       const options = type.includes("/") ? type.split("/") : undefined;
       return [name, { type: options ? "choice" : type, ...(options ? { options } : {}), ...(req ? { required: true } : {}) }];
     }));
-    return { id: `form-${form.replace(/_/g, "-")}`, record: "statement", kind: "form", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", text: form.replace(/_/g, " "), data: { form, office, fields, ...(form.startsWith("amend_") ? { amends: `schedule-${form.slice(6).replace(/_/g, "-")}` } : {}) } };
+    return { id: `form-${form.replace(/_/g, "-")}`, record: "statement", kind: "form", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", text: form.replace(/_/g, " "), data: { form, office, ...(["works", "environment", "inspector", "rates"].includes(office) ? { submit_as: "direction", submit_to: ["city"] } : {}), fields, ...(form.startsWith("amend_") ? { amends: `schedule-${form.slice(6).replace(/_/g, "-")}` } : {}) } };
   });
   const papers = Object.entries(FIXTURE.records).map(([id, kind]) => ({ id, record: "statement", kind, author: "mayor", at: 1, visible_to: "public", speaks_for: "city", text: `${kind} on file` }));
   const directions = { id: "proc-directions", record: "statement", kind: "procedure", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", text: "The town's offices take written directions on their own forms.", data: { directions: { by: FIXTURE.directions } } };

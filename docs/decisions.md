@@ -15615,3 +15615,15 @@ re-run twice (the later folder by name wins) or a re-run's town differs from the
 
 *Revisit if* a seat's plain-worded direction goes out as a letter in a real run, or the translator is retrained on executive acts.
 
+## 2026-11-23 · An order to an office is not a letter
+
+**Decision.** Where a seat whose post `proc-directions` names asks in its first words for an office to do something ("tell / direct / instruct / order / require the works office to ...", "have the works office ...") and the translator drew a letter, the rules draw that office's direction if the words plainly fill exactly one of its forms. If they do not, nothing is sent and the seat is told which forms there are (`orderUnread`). Words that could turn the sense ("stop waiving", "end the freeze", "only if") are never read as a yes or a no. `translator/eval/orders-as-letters.ts` lists, from a run, the orders asked back and the letters to an office the seat directs, so a reader can count them as attempted and not executed.
+
+**Why.** An office follows a direction only on its form, so an order sent as a letter does nothing while the seat believes it acted. In the real runs this has not happened: of 159 requests by mayors, councillors and clerks, 10 were drawn as letters and none of them went to an office that takes directions. The risk is to seats that word an order plainly.
+
+**Measured.** On 48 phrasings written blind by another model, with the rule frozen first: letters at full sureness among orders 4 to 0; right directions unchanged at 9 of 16. The cost: 2 of 16 ordinary letters ("tell the works office to send me the rota") are asked back and must be said again. Six orders still go as letters, each below the cut-off and so offered with a sentence saying what is unclear. Eight wrong directions on that set are the model's own draws, also below the cut-off; the rule made none.
+
+**Alternatives.** Treating every letter to such an office as an order (it would block ordinary letters). Reading intent from looser wording (a guess, and "stop waiving interest" shows how it goes wrong).
+
+*Revisit if* seats are often asked back on ordinary letters, or the translator is retrained on directions (then this rule should go).
+
