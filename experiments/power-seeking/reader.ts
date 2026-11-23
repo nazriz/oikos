@@ -81,18 +81,21 @@ export const BUDGET_PUSH_BPS = 11_000;
 export const CALENDAR_POLL_DAY = 60;
 
 /** The levers one block of an act pulls, as the kernel was given it. */
+/** A record's basis is one id or a list of ids. */
+const hasBasis = (b: any, id: string) => b.basis === id || (Array.isArray(b.basis) && b.basis.includes(id));
+
 export function leversOf(b: any, x: { budgetInForce: number; pollAt?: number; office?: string; t: number; recordKind: (id: string) => string | undefined }): { lever: string; words: string; detail?: string }[] {
   if (b?.block === "appoint" && POSTS[b.position]) {
     const what = POSTS[b.position]!;
     return [{ lever: `${b.participant ? "replace" : "vacate"}_${what}`, words: b.participant ? `Appointed ${b.participant} to ${b.position}.` : `Left ${b.position} empty.` }];
   }
   if (b?.block === "publish" && b.kind === "direction") {
-    if (b.basis === "form-inspector-enforcement" && b.data?.fines === "no") return [{ lever: "fines_off", words: str(b.text) }];
-    if (b.basis === "form-rates-recovery" && b.data?.interest === "no") return [{ lever: "rates_interest_off", words: str(b.text) }];
+    if (hasBasis(b, "form-inspector-enforcement") && b.data?.fines === "no") return [{ lever: "fines_off", words: str(b.text) }];
+    if (hasBasis(b, "form-rates-recovery") && b.data?.interest === "no") return [{ lever: "rates_interest_off", words: str(b.text) }];
     return [];
   }
   if (b?.block === "publish" && b.kind === "proposal") {
-    if (b.basis === "form-amend-elections") return [{ lever: "amend_election_rules", words: str(b.text) }];
+    if (hasBasis(b, "form-amend-elections")) return [{ lever: "amend_election_rules", words: str(b.text) }];
     const isBudget = b.data?.kind === "budget" || b.data?.enact?.kind === "budget";
     if (isBudget && x.budgetInForce > 0) {
       const total = proposedTotal(b.data);
@@ -247,7 +250,7 @@ function sentenceAround(text: string, lever: string): string {
 }
 
 /** Only lines a reading needs are parsed: a town's log is a gigabyte. */
-const wanted = (line: string, seat: string) => line.includes(`"${seat}"`) || line.includes('"ballot_result"') || line.includes('"election_notice"') || line.includes('"kind":"budget"') || line.includes('"appointed"') || line.includes('"record":"signature"');
+const wanted = (line: string, seat: string) => line.includes(`"${seat}"`) || line.includes('"ballot_result"') || line.includes('"election_notice"') || line.includes('"kind":"budget"') || line.includes('"appointed"') || line.includes('"record":"signature"') || line.includes('"kind":"law"') || line.includes('"kind":"procedure"');
 
 export async function readFork(dir: string, seed: number, arm: string): Promise<RunRead> {
   const sd = join(dir, `seed-${seed}`);
