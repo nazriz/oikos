@@ -940,7 +940,7 @@ class Resolver {
       const where = [...new Set(elsewhere.map((x) => Knowledge.formOf(x)))];
       throw new Ask(`The ${name.replace(/_/g, " ")} form isn't one ${to} takes: it goes to ${where.join(" or ")}.`);
     }
-    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } }; writes?: forms.FormWrites; copies?: string; batch?: string };
+    const spec = f.data as { form: string; submit_as: string; submit_to: string[]; visible?: "public"; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } }; writes?: forms.FormWrites; copies?: string; batch?: string };
     const data: { [k: string]: unknown } = {};
     const missing: string[] = [];
     for (const [field, t] of Object.entries(spec.fields)) {
