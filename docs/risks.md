@@ -1031,6 +1031,14 @@ The mechanism:
 - **Fix when:** (a) before a study reads how seats recover from payment errors with free-worded payments; (b) before
   one reads refund times or refusals.
 
+### PB-24 · An outgoing holder's sitting depends on the interval before seating
+- **Gap:** The seat side is built (decisions, 2026-11-23), but the clerk seats a winner within minutes until
+  `takes_office_at` lands, so on today's main a losing model mayor stops and is debriefed without having sat in post
+  after the result. The fork path (`seat-host.ts`) detects a lost post from its observation and has not been run through
+  an election.
+- **Could do to results:** a study of conduct between result and handover would see none.
+- **Fix when:** the electoral office's interval lands; run a mock election through a fork before a study relies on it.
+
 ## People and culture
 
 ### PC-1 · Nobody reads what a seat writes

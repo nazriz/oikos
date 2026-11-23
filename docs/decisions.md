@@ -15571,3 +15571,20 @@ re-run twice (the later folder by name wins) or a re-run's town differs from the
   they were given room of their own (2026-11-16); nothing else of the local route changes (plain notes, no dollar limit).
 - **Revisit if** local models get entries of their own (answer mode, reasoning room, context), as hosted ones have:
   then this variable goes.
+
+## 2026-11-23 · The outgoing holder: told by the published result, a sitting in post, then no more sittings
+
+- **Decision** (`participants/src/llm/participant.ts` 0.22.6, `debrief.ts` 0.7.5, `orchestrator/src/run.ts`,
+  `seat-host.ts`): a model mayor that lost kept waking with no post and no channels, was never told, and the post went
+  19 minutes after the declaration (w2-48: result day 60 11:40, appointed 11:59). Now a published `ballot_result` that
+  gives a post the seat holds to someone else brings it back at the next working day's sitting. What it reads is the
+  result's own words; the one line added says the result is published and set out, and nothing about what to do, so
+  conduct between result and handover can be observed. Once a seat's last post has passed and it has no channels of its
+  own, it stops sitting and keeps its controller for the end-of-run debrief, which says the day the post passed and to
+  whom. Any post, any way it passes; a seat with channels of its own goes on as before.
+- **Depends on** the electoral office's `takes_office_days` / `data.takes_office_at` (Reviewer, accepted on the board):
+  until it lands the clerk still seats within minutes and no real sitting falls in between. The test seats the winner
+  four days on with a scripted clerk. The interval must span a working day's sitting, weekends included.
+- **Revisit if** a seat should be told of a loss by anything other than the public record, or a post-holder with
+  channels of its own should also end when its post goes.
+

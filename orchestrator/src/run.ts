@@ -467,6 +467,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
 
   const units = new Units();
   const debriefs = new Map<string, { part: Part; controller: LlmController }>();
+  /** Model seats whose last post passed from them, and it: with no channels of their own they have nothing to sit for
+   * and stop waking; their controller stays for the debrief. (A person's own life is another participant's.) */
+  const passedOn = new Map<string, { t: number; post: string; title?: string; to?: string }>();
   const used: { [name: string]: { version: string; sha256?: string } } = {};
   const bindings: { [participant: string]: object } = {};
   const hashSource = async (module: BehaviourModule) => {
@@ -594,8 +597,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const syncUnits = async (pid: string, wakeAt?: number) => {
     const p = parts.get(pid);
     if (!p) return;
-    const want = !p.ended && isLlm(p);
     const posts = held(pid).map((x) => x.id).sort().join(",");
+    const postGone = !posts && passedOn.has(pid) && !personalChannels(p).length;
+    const want = !p.ended && isLlm(p) && !postGone;
+    if (postGone && units.has(pid)) {
+      const pass = passedOn.get(pid)!;
+      for (const d of (units.get(pid) as Unit).llm?.drafts ?? []) await k.request({ op: "annotate", annotation: { annotation: "note", subject: pid, data: { draft_unanswered: { draft: d.draft.id, why: "the seat's post passed before it sat again" } } } });
+      await k.request({ op: "annotate", annotation: { annotation: "note", subject: pid, data: { seat_post_passed: { post: pass.post, ...(pass.to ? { to: pass.to } : {}), day: Math.floor(pass.t / DAY) + 1 } } } });
+    }
     if (want && units.has(pid) && (units.get(pid) as Unit).posts !== posts) {
       // (Its posts changed: its unit is made again for them. What its controller held goes with the old unit, as a new
       // holder starts from the office's files.)
@@ -746,8 +755,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           const x = positions.get(e.position);
           if (!x) break;
           if (x.holder) changed.add(x.holder);
+          const was = x.holder;
           x.holder = e.holder;
           if (e.holder) changed.add(e.holder);
+          if (e.holder) passedOn.delete(e.holder);
+          if (was && was !== e.holder && !held(was).length) passedOn.set(was, { t, post: x.id, ...(x.title ? { title: x.title } : {}), ...(e.holder ? { to: e.holder } : {}) });
           break;
         }
         case "participant_ended": {
@@ -1514,9 +1526,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const p = parts.get(pid);
       const posts = held(pid);
       const post = as ? positions.get(as) : posts.length === 1 ? posts[0] : undefined;
-      return [...new Set([...(post ? [post.id, post.entity] : []), ...(p?.person ? [p.person] : []), ...(p?.owner ? [p.owner] : []), pid])];
+      const past = passedOn.get(pid) ? positions.get(passedOn.get(pid)!.post) : undefined;
+      return [...new Set([...(post ? [post.id, post.entity] : []), ...(past ? [past.id, past.entity] : []), ...(p?.person ? [p.person] : []), ...(p?.owner ? [p.owner] : []), pid])];
     };
-    const seatList = [...debriefs.values()].map((d) => ({ id: d.part.id, known: idsOf(d.part.id), direct: [d.part.id, ...held(d.part.id).map((x) => x.id)] }));
+    const passedWords = (x: { t: number; post: string; title?: string; to?: string }) => ({ day: Math.floor(x.t / DAY) + 1, post: x.title ?? x.post, ...(x.to ? { to: whoIs(x.to)?.name ?? x.to } : {}) });
+    const seatList = [...debriefs.values()].map((d) => ({ id: d.part.id, known: idsOf(d.part.id), direct: [d.part.id, ...held(d.part.id).map((x) => x.id), ...(passedOn.has(d.part.id) ? [passedOn.get(d.part.id)!.post] : [])] }));
     const atEnd = await readForEnd(logPath, seatList, idsOf, accountsN > 0);
     const day = endDay(t), of = Math.floor(runEnd / DAY);
     const how: DebriefInput["ended"]["how"] = stoppedBy === "SpendingLimitReached" ? "spending_limit" : stopped ? "stopped" : t >= runEnd ? "last_day" : "length_set";
@@ -1528,7 +1542,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const decisions = r.left ? [] : largest(r).map((c) => ({ day: Math.floor(c.t / DAY) + 1, fact: `"${c.preview.replace(/\s+/g, " ").trim().slice(0, 600)}"`, ids: besideOf(c) }));
       const after = d.part.on_opt_out && typeof d.part.on_opt_out === "object" ? "After you left, the routine work of your seat was carried on by code" : "After you left, your seat stood empty";
       const input: DebriefInput = { wording, town: String(cfg.meta?.name ?? o.runId), ended: { how, day, of }, others: { models: debriefs.size - 1, ...(composerCfg ? { composer: true } : {}) },
-        ...(r.left ? { left: { day: Math.floor(r.left.t / DAY) + 1, statement: r.left.statement, after } } : {}), summary: renderSummary(r, currency), decisions, ...(leftAlone(r) ? { leftAlone: leftAlone(r)! } : {}) };
+        ...(r.left ? { left: { day: Math.floor(r.left.t / DAY) + 1, statement: r.left.statement, after } } : {}), ...(passedOn.has(d.part.id) && !personalChannels(d.part).length ? { passed: passedWords(passedOn.get(d.part.id)!) } : {}), summary: renderSummary(r, currency), decisions, ...(leftAlone(r) ? { leftAlone: leftAlone(r)! } : {}) };
       try {
         debriefed[d.part.id] = (await d.controller.debrief(input)).ended;
       } catch (e) {
