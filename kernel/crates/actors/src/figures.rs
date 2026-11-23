@@ -45,3 +45,18 @@ pub const KEPT_IN_NAME: usize = 40;
 /// convention: how many of the payments that came in to it a principal keeps to hand, the newest (a bound on what it
 /// holds, from which it says what regular payment it has coming in; docs/design/stakes.md, the client's situation).
 pub const KEPT_INCOMING: usize = 48;
+
+/// placeholder: days a pre-election newspaper poll invitation stays open for voluntary resident replies before tallying.
+pub const POLL_WINDOW_DAYS: i64 = 3;
+
+/// placeholder: share of news-reading adult residents (in basis points) who reply to a pre-election newspaper poll.
+pub const POLL_REPLY_BPS: i64 = 5_000;
+
+/// placeholder: news-value weight assigned by firm.newspaper to accountability items (executive directions and audits).
+pub const NEWS_ACCOUNTABILITY_WEIGHT: i64 = 3;
+
+/// convention: maximum characters copied from an accountability record into a newspaper headline.
+pub const NEWS_HEADLINE_CHARS: usize = 200;
+
+/// convention: half a percentage point in basis points, used for integer rounding from bps to whole percent.
+pub const HALF_PERCENT_BPS: i64 = 50;

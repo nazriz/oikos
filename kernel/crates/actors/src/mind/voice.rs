@@ -406,6 +406,14 @@ impl CitizenMind {
 
     // -------------------------------------------------------------- civic life (citizen.ts `civic`)
 
+    /// Score a candidate nomination for this citizen: used identically for pre-election polls and ballots.
+    fn score_nomination(&self, cand: &str, nom: Option<&oikos_core::Frozen>) -> i64 {
+        let incumbent = nom.and_then(|n| n.get("incumbent")).map_or(false, common::truthy);
+        let values: Vec<Value> = nom.and_then(|n| n.get("values")).and_then(|x| x.as_array()).map_or(vec![], |vs| vs.iter().filter_map(|v| v.as_str().and_then(Value::from_name)).collect());
+        let fit = if values.is_empty() { 0.0 } else { values.iter().map(|v| self.z_value(*v)).sum::<f64>() / values.len() as f64 };
+        (if incumbent { self.s.approval } else { round(fit * self.p.civic.platform_weight_bps as f64) }) + if cand == self.p.participant { 100_000 } else { 0 }
+    }
+
     pub fn civic(&mut self, cx: &mut Cx, pic: &Picture, book: &Book, life: &Life, t: i64, out: &mut Planned) {
         let Some(town) = self.p.electoral_town.clone() else { return };
         if !self.adult(life) {
@@ -459,7 +467,65 @@ impl CitizenMind {
             for r in items {
                 let RecordBody::Statement { data, .. } = &r.body else { continue };
                 let d = data.clone().unwrap_or((Json::Null).into());
-                if self.s.read_items.contains(r.id.as_str()) || r.speaks_for.as_deref() != Some(paper.as_str()) || d.get("about_office").and_then(|x| x.as_bool()) != Some(true) {
+                if r.speaks_for.as_deref() != Some(paper.as_str()) {
+                    continue;
+                }
+                // Pre-election newspaper poll invitation (no-god-view: voluntary reply addressed to the paper).
+                if d.get("kind").and_then(|x| x.as_str()) == Some("poll_question") && !self.s.replied_polls.contains(r.id.as_str()) {
+                    self.s.replied_polls.insert(r.id.to_string());
+                    let closes = d.get("closes_at").and_then(|x| x.as_i64()).unwrap_or(0);
+                    if (closes == 0 || t < closes) && (cx.rng(&format!("poll-{}", r.id)).below(10_000) as i64) < crate::figures::POLL_REPLY_BPS {
+                        let office = d.get("office").and_then(|x| x.as_str()).unwrap_or_default();
+                        let notice_at = d.get("notice_at").and_then(|x| x.as_i64()).unwrap_or(0);
+                        let mut by_author: std::collections::BTreeMap<String, std::sync::Arc<oikos_sight::Record>> = std::collections::BTreeMap::new();
+                        for n in book.open("nomination") {
+                            let RecordBody::Statement { data: Some(nd), .. } = &n.body else { continue };
+                            if n.at >= notice_at && nd.get("office").and_then(|x| x.as_str()) == Some(office) {
+                                by_author.insert(n.author.to_string(), n.clone());
+                            }
+                        }
+                        let mut scores: Vec<(String, String, bool, i64)> = by_author
+                            .into_iter()
+                            .map(|(cand, n)| {
+                                let RecordBody::Statement { data: Some(nd), .. } = &n.body else {
+                                    return (cand.clone(), cand, false, 0);
+                                };
+                                let name = nd.get("name").and_then(|x| x.as_str()).map(String::from).or_else(|| n.speaks_for.map(|x| x.to_string())).unwrap_or_else(|| cand.clone());
+                                let incumbent = nd.get("incumbent").map_or(false, common::truthy);
+                                let score = self.score_nomination(&cand, Some(nd));
+                                (cand, name, incumbent, score)
+                            })
+                            .collect();
+                        scores.sort_by(|x, y| y.3.cmp(&x.3).then(x.0.cmp(&y.0)));
+                        let mut rd = json!({ "poll": r.id, "approval": self.s.approval });
+                        let reply_text = if let Some((cand, name, incumbent, _)) = scores.first() {
+                            rd["first_choice"] = json!(cand);
+                            rd["choice_name"] = json!(name);
+                            if *incumbent {
+                                rd["incumbent"] = json!(true);
+                            }
+                            format!("Poll reply: approval {}, first choice {name}.", self.s.approval)
+                        } else {
+                            format!("Poll reply: approval {}.", self.s.approval)
+                        };
+                        out.steps.push(because(
+                            "Answering the paper's pre-election poll.",
+                            vec![steps::say(
+                                "poll_reply",
+                                &reply_text,
+                                Say {
+                                    to: Some(vec![paper.clone()]),
+                                    visible: Some(Visible::Only(vec![me.clone(), paper.clone()])),
+                                    basis: Some(r.id.to_string()),
+                                    data: Some(rd),
+                                    ..Default::default()
+                                },
+                            )],
+                        ));
+                    }
+                    continue;
+                }
+                if self.s.read_items.contains(r.id.as_str()) || d.get("about_office").and_then(|x| x.as_bool()) != Some(true) {
                     continue;
                 }
                 self.s.read_items.insert(r.id.to_string());
@@ -549,10 +615,7 @@ impl CitizenMind {
                         RecordBody::Statement { data, .. } => data.clone(),
                         _ => None,
                     });
-                    let incumbent = nom.as_ref().and_then(|n| n.get("incumbent")).map_or(false, common::truthy);
-                    let values: Vec<Value> = nom.as_ref().and_then(|n| n.get("values")).and_then(|x| x.as_array()).map_or(vec![], |vs| vs.iter().filter_map(|v| v.as_str().and_then(Value::from_name)).collect());
-                    let fit = if values.is_empty() { 0.0 } else { values.iter().map(|v| self.z_value(*v)).sum::<f64>() / values.len() as f64 };
-                    let score = (if incumbent { self.s.approval } else { round(fit * self.p.civic.platform_weight_bps as f64) }) + if cand == self.p.participant { 100_000 } else { 0 };
+                    let score = self.score_nomination(&cand, nom.as_ref());
                     (cand, number, score)
                 })
                 .collect();

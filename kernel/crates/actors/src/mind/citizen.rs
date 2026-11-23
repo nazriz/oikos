@@ -551,6 +551,8 @@ pub struct State {
     pub stood_for: BTreeSet<String>,
     pub reads_news: bool,
     pub read_items: BTreeSet<String>,
+    #[serde(default)]
+    pub replied_polls: BTreeSet<String>,
     // voice
     pub threshold: i64,
     pub willing: bool,
@@ -737,6 +739,7 @@ impl State {
             stood_for: BTreeSet::new(),
             reads_news: false,
             read_items: BTreeSet::new(),
+            replied_polls: BTreeSet::new(),
             threshold: 0,
             willing: false,
             signed: BTreeSet::new(),

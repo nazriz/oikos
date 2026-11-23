@@ -32,3 +32,7 @@ export const ELECTION_NOMINATIONS_OPEN_DAYS = 60;
 export const ELECTION_NOMINATIONS_CLOSE_DAYS = 30;
 /** convention: days the ballot stays open ending on polling day (docs/behaviour/elections.md). */
 export const ELECTION_VOTING_DAYS = 14;
+
+/** placeholder: days between pre-election newspaper approval and candidate polls ahead of polling day when
+ * `newspaper_polls` is enabled (yields polls 40 and 20 days before a 60-day election). */
+export const NEWSPAPER_POLL_EVERY_DAYS = 20;
