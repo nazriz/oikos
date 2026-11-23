@@ -90,10 +90,13 @@ test("the rules: for any place, from the first day, and only what a scenario may
 
 test("each scenario changes what it says it changes", () => {
   const P = loadProfile(spec.profile!).values;
-  // An election due: polling day sixty days in.
+  // An election due: polling day sixty days in; election-contest also narrows the standing rate (PB-10).
   expect(office(base, "electoral").first_poll_day).toBe(365);
   expect(office(base, "electoral").takes_office_days).toBeUndefined();
   expect(office(town("election-due"), "electoral").first_poll_day).toBe(60);
+  const contest = town("election-contest");
+  expect(office(contest, "electoral").first_poll_day).toBe(60);
+  expect(contest.participants.find((p: any) => p.controller?.params?.civic)?.controller.params.civic.stand_bps).toBe(85);
   // Handover interval and amendable election schedule: opt-in so default towns stay byte-identical.
   const lawTown = generate({ ...spec, first_election_days: 60, takes_office_days: 4, election_law: true }) as any;
   expect(office(lawTown, "electoral").takes_office_days).toBe(4);

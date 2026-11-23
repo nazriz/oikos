@@ -34,11 +34,22 @@ import { chooseModel, priceTable } from "./models";
 import { ModelSeat, waitingAdapter } from "./seat-host";
 import type { ExperimentSpec, SeatFactories, SeatFactory } from "./experiment";
 
+/** The translator of an experiment's seats. `fallback` (off unless named; docs/decisions.md, "The translator on a mayor's
+ * powers"): under `alone`, the seats named here have this model behind ours, as `then` has, for what ours declines or
+ * is unsure of. Which model drew up each request is on its route, and the run's report gives the share by act. */
+export interface TranslatorSpec { first?: string; behind?: string; arrangement?: "then" | "beside" | "alone"; fallback?: { model: string; seats: string[] } }
+
+/** How one seat's requests are translated, from the spec: `behind` undefined is ours alone. */
+export function translatorFor(t: TranslatorSpec | undefined, seat: string, seatModel: string): { alone: boolean; behind?: string; arrangement?: "then" | "beside" | "alone" } {
+  if (t?.arrangement === "alone") return t.fallback?.seats.includes(seat) ? { alone: false, behind: t.fallback.model, arrangement: "then" } : { alone: true, arrangement: "alone" };
+  return { alone: false, behind: t?.behind ?? seatModel, ...(t?.first ? { arrangement: t.arrangement ?? "then" } : {}) };
+}
+
 export interface SeatsSpec {
   /** The translator: ours first (`decide/<model>`), the general one behind (a seat model's name). Absent: the arm's model
    * alone. `alone`: ours (`first`) with no model behind it, for every arm (arrangement.ts, `createAlone`; the study's
    * arms, Naz, 2026-11-10). */
-  translator?: { first?: string; behind?: string; arrangement?: "then" | "beside" | "alone" };
+  translator?: TranslatorSpec;
   /** What the seats are told of what the town is (default `unstated`); an arm may name its own. */
   framing?: FramingSpec;
   budget?: {
@@ -109,6 +120,8 @@ export function modelProblems(spec: ExperimentSpec): string[] {
   }
   check("seats.translator.first", spec.seats?.translator?.first, true);
   check("seats.translator.behind", spec.seats?.translator?.behind);
+  check("seats.translator.fallback", spec.seats?.translator?.fallback?.model);
+  if (spec.seats?.translator?.fallback && spec.seats.translator.arrangement !== "alone") out.push("seats.translator.fallback is for a translator that is otherwise ours alone: set arrangement alone (or name behind, for every seat)");
   if (spec.seats?.translator?.first && !spec.seats.translator.first.startsWith("decide/")) out.push(`seats.translator.first is our own trained translator (decide/<model>), not ${spec.seats.translator.first}`);
   if (spec.seats?.translator?.arrangement === "alone" && (!spec.seats.translator.first || spec.seats.translator.behind)) out.push("seats.translator alone is our own (first: decide/<model>) with nobody behind it: name first, and no behind");
   return out;
@@ -265,8 +278,9 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
     const seatAdapter = dry ? mockFor(a.model) : served(wait(rec.wrap(adapterFor(a.model, false, atOnce, answer), a.model)));
     prices[`${seatAdapter.provider}/${seatAdapter.model}`] = priceOf(a.model);
     const t = spec.seats?.translator;
-    const alone = t?.arrangement === "alone";
-    const behindName = t?.behind ?? a.model;
+    const how = translatorFor(t, a.seat, a.model);
+    const alone = how.alone;
+    const behindName = how.behind ?? a.model;
     // (Ours alone: nobody behind it, so no adapter for one.)
     const behind = alone ? undefined : served(dry ? rec.wrap(mockFor(behindName), behindName) : wait(rec.wrap(adapterFor(behindName, false, atOnce), behindName)));
     if (behind) prices[`${behind.provider}/${behind.model}`] = priceOf(behindName);
@@ -281,7 +295,7 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
     if (!existsSync(a.dir)) mkdirSync(a.dir, { recursive: true });
     const seat = new ModelSeat({
       world: a.world, config, seat: a.seat, post: a.post, seed: a.seed, model: a.model, adapter: seatAdapter,
-      translator: { ...(behind ? { behind } : {}), ...(first ? { first, arrangement: t?.arrangement ?? "then" } : {}) }, prices,
+      translator: { ...(behind ? { behind } : {}), ...(first ? { first, arrangement: how.arrangement ?? "then" } : {}) }, prices,
       ...(fork.budget ? { budget: fork.budget } : {}),
       framing: steward.framing ?? spec.seats?.framing ?? "unstated", ...(a.effort ? { effort: a.effort } : {}), ...(typeof steward.params?.max_tokens === "number" ? { maxTokens: steward.params.max_tokens } : {}),
       ...(a.brain ? { brain: a.brain } : {}), ...(dry ? { record: (x: LlmAdapter) => served(rec.wrap(x, a.model)) } : {}), debriefsFile, untilT: spec.untilDay * 86_400, ...(a.cast ? { cast: a.cast } : {}),

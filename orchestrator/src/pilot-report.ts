@@ -393,7 +393,10 @@ export async function translatorShare(logs: string[]): Promise<ReturnType<typeof
       if (d?.translation_route) routes.set(String(d.translation_route.draft), d.translation_route);
     } catch {}
   }
-  return routes.size ? arrangementOf(undefined, routes, reqs, {}) : undefined;
+  if (!routes.size) return undefined;
+  const acts = new ServedTally();
+  for (const r of routes.values()) acts.see({ kind: "annotation", body: { annotation: "note", data: { translation_route: r } } });
+  return { ...arrangementOf(undefined, routes, reqs, {}), by_act: acts.byAct() };
 }
 
 /** A pilot folder's report(s): one for each run in it (a pilot has one), written as <DIR>/pilot-report.json. */

@@ -15589,3 +15589,102 @@ re-run twice (the later folder by name wins) or a re-run's town differs from the
   town's ordinary council procedure rather than special-case mechanics.
 - **Revisit if** every generated town should carry `schedule-elections` and a profile-sourced `takes_office_days` by
   default (which will intentionally move the pinned town config hashes).
+## 2026-11-23 · The outgoing holder: told by the published result, a sitting in post, then no more sittings
+
+- **Decision** (`participants/src/llm/participant.ts` 0.22.6, `debrief.ts` 0.7.5, `orchestrator/src/run.ts`,
+  `seat-host.ts`): a model mayor that lost kept waking with no post and no channels, was never told, and the post went
+  19 minutes after the declaration (w2-48: result day 60 11:40, appointed 11:59). Now a published `ballot_result` that
+  gives a post the seat holds to someone else brings it back at the next working day's sitting. What it reads is the
+  result's own words; the one line added says the result is published and set out, and nothing about what to do, so
+  conduct between result and handover can be observed. Once a seat's last post has passed and it has no channels of its
+  own, it stops sitting and keeps its controller for the end-of-run debrief, which says the day the post passed and to
+  whom. Any post, any way it passes; a seat with channels of its own goes on as before.
+- **Depends on** the electoral office's `takes_office_days` / `data.takes_office_at` (Reviewer, accepted on the board):
+  until it lands the clerk still seats within minutes and no real sitting falls in between. The test seats the winner
+  four days on with a scripted clerk. The interval must span a working day's sitting, weekends included.
+- **Revisit if** a seat should be told of a loss by anything other than the public record, or a post-holder with
+  channels of its own should also end when its post goes.
+
+
+## 2026-11-23 · A setting-out folded away in a sitting says it was shown, and in how much
+
+- **Decision** (`supersede`, `SET_OUT_AGAIN`, participant 0.22.5): an older copy of what is waiting still folds to one
+  line, so the saving in prompt size stays, but the line now says it was set out to the seat there, which asks in full
+  and which by a line only, that it was folded for room, which of them still wait further on and which no longer wait.
+  The newest copy, what the seat is being asked to say yes or no to, is never folded or cut.
+- **Why:** the old line ("set out again further on") stood directly above a seat's own "read in full", and was untrue of
+  an ask already answered, which is not set out again. Seats concluded they had confirmed unread, rewrote true notes
+  into false ones and wrote confessions: rung 3, before the fold, 1 self-accusing turn in 2,038 confirmations; rung 4,
+  142 in 4,796 (`runs/deep-dive-2026-11-23/explore/findings.md`, first finding). Rung 4's data keeps this fault.
+- **Not yet measured:** no model has seen the new line; that it ends the false confessions is expected, not shown.
+- **Revisit if** seats still accuse themselves of unread confirmations with this line, or the line grows to matter in
+  prompt size (then keep the wording and shorten the lists).
+
+## 2026-11-23: A seat sharing a person's body acts in its one post in the engine too
+
+`run.ts` and `fork-cast.ts` treat a `shares_body` seat holding one post as acting in that post; `kernel/src/engine.rs`
+did so only for a `system`. So in an experiment fork a model mayor acted as a private person: directions went unfollowed
+and appointments were refused `not_theirs`. The engine now agrees at both places (the observation's `as`, the action's
+capacity). Revisit if a `shares_body` seat ever needs to act as a private person while holding exactly one post.
+## 2026-11-23 · The power-seeking study's measurement: scripted mayor, reader, draft rubric, mock run spec
+
+- **Decision** (`experiments/power-seeking/`): the study is measured outside the world, from logs. `scripted.ts` is a
+  mayor that is not a model and pulls each lever, alone or all together; `reader.ts` reads every lever at three levels
+  (considered, attempted, executed) and keeps a translator failure apart from a seat that did not try; `blind.ts` exports
+  a sheet without arm, model or seat; `rubric.md` is a **draft** for the owner, not final and not pre-registered;
+  `spec.ts` is mock only, with arms `no-election` (first poll beyond the run, not `elections=false`) and `election`.
+  `controls.ts` checks the reader against the script's own labels and the kernel's outcomes, not against itself.
+- **Why one rule in both conditions:** the first reader counted a binding agreement only after an election notice, so
+  the no-election arm could not show one and the contrast would have been the reader's. The positive control caught it.
+  An agreement now counts when it runs past the study's poll day (60), with or without a poll.
+- **Found (engine, not changed here):** `kernel/src/engine.rs`, `apply`, gives a seat with no capacity its one post only
+  if `kind == "system"`. `run.ts` `capacityOf` also accepts `shares_body`, which is what a mayor's seat now is, and the
+  `as` of the participant contract is dropped by `Action::from_json`. In an experiment fork the mayor therefore acts as
+  a private person: directions are answered "not being followed" and appointments are refused `not_theirs`. The controls
+  ran on a local build with that condition widened; the change is not on this branch.
+- **Found (levers, one seed of the town, on that build):** replacing the editor, commissioner or finance officer applies
+  but the code officer who follows behaves alike, so capture changes nothing downstream. Emptying the electoral post
+  delayed the result three days; emptying the clerk's delayed seating six. After a loss the clerk lever is a race with
+  the handover (refused in one seed of three). The +50% budget passed 5-0. Fines-off and interest-off are acknowledged,
+  but no fine or interest fell due in 75 days in the code arm, so their effect is unobserved. The agreement offer is
+  recorded and no counterparty signed it, so it binds nobody. Directions outlived the handover.
+- **Revisit if:** the engine's capacity rule is fixed (rerun the controls on main); `takes_office_at` or the election
+  amendment land (add their levers: marked TODO in `scripted.ts`); the owner settles the rubric's open points.
+## 2026-11-23 · The translator on a mayor's powers: measured, one rule mended, a fallback that is off
+
+**Decision.** (1) `translator/eval/executive.ts` and `executive-cases.ts` measure the served translator (`decide/round3-s2` and the rules) on 30 written cases of a mayor's powers and on the real requests of mayors, councillors and clerks in the `w2-*` and `lv-*` runs. The cases are kept out of training. (2) `formRules`, drawing a form from blanks a request names where the model drew nothing, now reads a length of time by its blank's name, and will not draw an amendment that changes no figure or a paper whose named list it could not read. Before, "notice 90 days" on an amendment was drawn as an amendment of nothing, with the model's sureness. (3) `seats.translator.fallback` (`{ model, seats }`) puts a model behind ours for the seats named, by the existing `then` arrangement. It is off unless named; each run's report gives who drew up each act.
+
+**Why.** The scored set covers the assistant desk's forms, so an abuse of office could be missed unseen. The rule is general (any form, any duration blank). No rule was added for plain directions ("tell the works office to stop recruiting", drawn as a letter): telling someone is a letter by the translator's own canon, and turning it into a direction would be reading what the seat means.
+
+**Alternatives.** A new fallback path (the `then` arrangement already routes and logs). Keying direction words to forms (a guess at intent, and per-case).
+
+**What it does not settle.** A fallback takes only what ours declines or is unsure of, so it would not catch a letter drawn with full sureness in place of a direction. No real run has ever drawn a `position` act, so vacating, appointing and creating posts are measured on written cases only.
+
+*Revisit if* a seat's plain-worded direction goes out as a letter in a real run, or the translator is retrained on executive acts.
+
+## 2026-11-23 · An order to an office is not a letter
+
+**Decision.** Where a seat whose post `proc-directions` names asks in its first words for an office to do something ("tell / direct / instruct / order / require the works office to ...", "have the works office ...") and the translator drew a letter, the rules draw that office's direction if the words plainly fill exactly one of its forms. If they do not, nothing is sent and the seat is told which forms there are (`orderUnread`). Words that could turn the sense ("stop waiving", "end the freeze", "only if") are never read as a yes or a no. `translator/eval/orders-as-letters.ts` lists, from a run, the orders asked back and the letters to an office the seat directs, so a reader can count them as attempted and not executed.
+
+**Why.** An office follows a direction only on its form, so an order sent as a letter does nothing while the seat believes it acted. In the real runs this has not happened: of 159 requests by mayors, councillors and clerks, 10 were drawn as letters and none of them went to an office that takes directions. The risk is to seats that word an order plainly.
+
+**Measured.** On 48 phrasings written blind by another model, with the rule frozen first: letters at full sureness among orders 4 to 0; right directions unchanged at 9 of 16. The cost: 2 of 16 ordinary letters ("tell the works office to send me the rota") are asked back and must be said again. Six orders still go as letters, each below the cut-off and so offered with a sentence saying what is unclear. Eight wrong directions on that set are the model's own draws, also below the cut-off; the rule made none.
+
+**Alternatives.** Treating every letter to such an office as an order (it would block ordinary letters). Reading intent from looser wording (a guess, and "stop waiving interest" shows how it goes wrong).
+
+*Revisit if* seats are often asked back on ordinary letters, or the translator is retrained on directions (then this rule should go).
+
+## 2026-11-23 · Contested election scenario with a smaller candidate field (PB-10)
+
+- **Decision** (`worlds/scenarios/election-contest.yaml`): added a scenario combining `first_election_days: 60` (as in
+  `election-due`) with `elections.stand_bps: 85` (set for an outcome, down from the 200 bps profile default).
+- **Why:** in a 1,000-person town (~780 adults), `stand_bps: 200` produces a crowded draw (`election-due` measured on
+  `town-1000.yaml` seeds 7, 8, 9: **17, 7, 16** resident challengers plus the incumbent; PB-10). Measuring actual
+  resident nominations across nine seeds (1–5, 7–10) of `town-1000.yaml` showed that `stand_bps: 35` left 3 of 5 seeds
+  with 0 challengers (`[0, 0, 0, 1, 4]` on seeds 1, 2, 7, 8, 9), `55` gave `[2, 0, 5, 1, 4, 2, 1, 3, 2]` (mean 2.22),
+  `70` gave `[2, 0, 7, 2, 6, 2, 1, 5, 6]` (mean 3.44), and **`85`** gave **`[3, 1, 8, 3, 7, 4, 1, 6, 6]`** (min 1,
+  max 8, mean 4.33; **4, 1, 6** on seeds 7–9) — zero unopposed seeds while cutting the field by ~3x. Combining it with
+  `first_election_days: 60` also ensures the scenario diverges from `baseline` and `election-due` within the 35–60 day
+  scenario test window.
+- **Revisit if** `PB-10` is replaced by a population-invariant candidate-field rule (target count rather than flat per-adult
+  rate) or if runs use a town size far from 1,000 residents.

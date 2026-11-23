@@ -8,7 +8,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AnthropicAdapter, CreditExhausted, SpendingLimitReached, UsageLimitReached, type LlmAdapter } from "@oikos/participants/llm";
-import { atMost, callRecorder, forkLimits, budgetProblems, modelProblems } from "../src/experiment-seats";
+import { atMost, callRecorder, forkLimits, budgetProblems, modelProblems, translatorFor } from "../src/experiment-seats";
+import { byActText, ServedTally } from "../src/served";
 import { toldOf, waitingAdapter } from "../src/seat-host";
 import { Cast } from "../src/fork-cast";
 import { loadSpec, runArm, runExperiment, validate, type ExperimentSpec } from "../src/experiment";
@@ -341,3 +342,20 @@ test.skipIf(!have)("in a fork, a model seat's thinking takes world time where th
   expect(r.results.find((x) => x.arm === "sonnet")!.accounts).toBeDefined();
   rmSync(out, { recursive: true, force: true });
 }, 600_000);
+
+// (The logged fallback, off unless named: docs/decisions.md, "The translator on a mayor's powers".)
+test("a fallback translator stands behind only the seats named, and the report counts who drew up each act", () => {
+  const arm = (model: string) => spec({ arms: [{ name: "m", steward: { kind: "model", model } }], seats: { budget: { fork_usd: 5 } } });
+  const t = { first: "decide/pod", arrangement: "alone" as const };
+  expect(translatorFor(t, "mayor", "codex/gpt-6-luna")).toEqual({ alone: true, arrangement: "alone" });
+  const on = { ...t, fallback: { model: "claude-code/claude-sonnet-5-5", seats: ["mayor"] } };
+  expect(translatorFor(on, "mayor", "codex/gpt-6-luna")).toEqual({ alone: false, behind: "claude-code/claude-sonnet-5-5", arrangement: "then" });
+  expect(translatorFor(on, "finance", "codex/gpt-6-luna").alone).toBe(true);
+  expect(modelProblems({ ...arm("codex/gpt-6-luna"), seats: { translator: { first: "decide/pod", fallback: on.fallback } } }).join()).toMatch(/otherwise ours alone/);
+  const tally = new ServedTally();
+  const route = (draft: string, used: string, call: string) => tally.see({ kind: "annotation", body: { annotation: "note", data: { translation_route: { draft, arrangement: "then", used, first: { model: "decide/pod", call }, ...(used === "behind" ? { behind: { model: "claude-code/claude-sonnet-5-5", call } } : {}) } } } });
+  route("draft.mayor.1", "first", "position(vacate=works)");
+  route("draft.mayor.2", "behind", "position(vacate=finance)");
+  expect(tally.byAct()).toEqual({ "position:vacate": { "decide/pod": 1, "claude-code/claude-sonnet-5-5": 1 } });
+  expect(byActText(tally.byAct())).toContain("position:vacate 1/2");
+});

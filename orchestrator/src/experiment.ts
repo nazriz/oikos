@@ -37,7 +37,7 @@ import { Cast } from "./fork-cast";
 import { ForkComposer } from "./fork-composer";
 import type { AccountCounts } from "@oikos/participants/llm";
 import { DelegationTracker, expand, INTERVENTIONS, type Intervention } from "./interventions";
-import { addServed, noneServed, ServedTally, servedText, type Served } from "./served";
+import { addByAct, addServed, byActText, noneServed, ServedTally, servedText, type ByAct, type Served } from "./served";
 
 export const DAY = 86_400;
 
@@ -675,6 +675,8 @@ export interface ArmResult {
   /** How the translator served the arm's seats' requests (served.ts): first time, after one restatement, never; and
    * what the seats answered to the drafts. Absent where no seat made a request. */
   served?: Served;
+  /** Where a translator stood behind ours: by act, who drew up each request (served.ts). */
+  translator_by_act?: ByAct;
   /** A fork taken up from its own interrupted log: the replies it served from there, the entries checked against it. */
   resumed?: ReturnType<ForkReplay["summary"]>;
   log?: string;
@@ -927,7 +929,7 @@ export async function runArm(spec: ExperimentSpec, seed: number, arm: Arm, out: 
     measures: Object.fromEntries(measures.map((m) => [m.name, m.result()])), costs, ...(Object.keys(byPurpose).length ? { costsByPurpose: byPurpose } : {}), log: logPath, seconds: Math.round((performance.now() - t0)) / 1000,
     ...(stopped ? { stopped } : {}), ...(debrief ? { debrief } : {}), ...(accounts ? { accounts } : {}), ...(forkLimits(spec)[arm.name] !== undefined ? { limitUsd: forkLimits(spec)[arm.name] } : {}),
     ...(controller.framing ? { framing: controller.framing.disclosure } : {}), ...(calls ? { calls } : {}),
-    ...(served.total().requests ? { served: served.total() } : {}), ...(replay ? { resumed: replay.summary() } : {}), ...(health ? { health } : {}),
+    ...(served.total().requests ? { served: served.total() } : {}), ...(Object.keys(served.byAct()).length ? { translator_by_act: served.byAct() } : {}), ...(replay ? { resumed: replay.summary() } : {}), ...(health ? { health } : {}),
   };
   if (ledgerResult) { const { measures: _m, ...detail } = ledgerResult; result.stewardship = detail; }
   writeFileSync(join(f.dir, `${safe(arm.name)}.json`), JSON.stringify(result, null, 1));
@@ -981,7 +983,7 @@ export interface Report {
   /** Model forks' spending, USD: each arm's limit per fork, what it spent in all, and forks stopped at their limit. */
   spend?: { arm: string; limit_per_fork_usd?: number; spent_usd: number; forks: number; stopped: number }[];
   /** How the translator served each arm's requests, over its seeds (served.ts), with the seat model it was. */
-  served?: { arm: string; model: string; served: Served }[];
+  served?: { arm: string; model: string; served: Served; translator_by_act?: ByAct }[];
 }
 
 export interface ComparisonResult {
@@ -1060,7 +1062,7 @@ export function buildReport(spec: ExperimentSpec, results: ArmResult[], held?: H
   const limits = forkLimits(spec);
   const spend = modelArms(spec).map((a) => { const rs = results.filter((r) => r.arm === a.name); return { arm: a.name, ...(limits[a.name] !== undefined ? { limit_per_fork_usd: limits[a.name] } : {}), spent_usd: rs.reduce((x, r) => x + seatOf(r).c, 0) / 1e6, forks: rs.length, stopped: rs.filter((r) => r.stopped).length }; });
   if (spend.length) report.spend = spend;
-  const servedArms = spec.arms.map((a) => ({ arm: a.name, model: a.steward.kind === "model" ? a.steward.model : a.steward.kind, served: results.filter((r) => r.arm === a.name && r.served).reduce((x, r) => addServed(x, r.served!), noneServed()) })).filter((x) => x.served.requests);
+  const servedArms = spec.arms.map((a) => ({ arm: a.name, model: a.steward.kind === "model" ? a.steward.model : a.steward.kind, served: results.filter((r) => r.arm === a.name && r.served).reduce((x, r) => addServed(x, r.served!), noneServed()), by: results.filter((r) => r.arm === a.name).reduce((x, r) => addByAct(x, r.translator_by_act ?? {}), {} as ByAct) })).filter((x) => x.served.requests).map(({ by, ...x }) => ({ ...x, ...(Object.keys(by).length ? { translator_by_act: by } : {}) }));
   if (servedArms.length) report.served = servedArms;
   report.summary = summaryOf(report);
   return report;
@@ -1132,7 +1134,7 @@ export function reportText(r: Report): string {
   lines.push("", "seats' cost (the steward's model calls)");
   for (const a of r.arms) lines.push(`  ${a.name.padEnd(w)}  calls ${cell(a.cost.calls)}; tokens in ${cell(a.cost.input_tokens)}, out ${cell(a.cost.output_tokens)}; USD ${cell(a.cost.cost_usd, 4)}`);
   if (r.spend?.length) { lines.push("", "model forks' spending (USD)"); for (const x of r.spend) lines.push(`  ${x.arm.padEnd(w)}  ${x.spent_usd.toFixed(2)} over ${x.forks} forks${x.limit_per_fork_usd !== undefined ? `, limit ${x.limit_per_fork_usd.toFixed(2)} a fork` : ""}${x.stopped ? `; ${x.stopped} stopped at a limit or for want of the model` : ""}`); }
-  if (r.served?.length) { lines.push("", "the translator's service, per seat model (requests served first time, after one restatement, never)"); for (const x of r.served) lines.push(`  ${x.arm.padEnd(w)}  ${x.model}: ${servedText(x.served)}`); }
+  if (r.served?.length) { lines.push("", "the translator's service, per seat model (requests served first time, after one restatement, never)"); for (const x of r.served) { lines.push(`  ${x.arm.padEnd(w)}  ${x.model}: ${servedText(x.served)}`); if (x.translator_by_act) lines.push(`  ${"".padEnd(w)}  drawn up by the translator behind ours, by act: ${byActText(x.translator_by_act)}`); } }
   if (r.failures.length) lines.push("", "FAILED OR STOPPED (not compared):", ...r.failures.map((f) => `  seed ${f.seed}, ${f.arm}: ${f.error}`));
   return lines.join("\n");
 }
