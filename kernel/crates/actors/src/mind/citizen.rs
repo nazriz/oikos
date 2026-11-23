@@ -109,6 +109,17 @@ impl Default for Sway {
     }
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RivalPlatform {
+    pub summary: String,
+    #[serde(default)]
+    pub values: Vec<String>,
+    #[serde(default)]
+    pub budgets: BTreeMap<String, i64>,
+    #[serde(default)]
+    pub directions: BTreeMap<String, BTreeMap<String, String>>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Civic {
@@ -118,10 +129,11 @@ pub struct Civic {
     pub approval_memory_weeks: i64,
     pub news_weight_bps: i64,
     pub platform_weight_bps: i64,
+    pub platforms: Vec<RivalPlatform>,
 }
 impl Default for Civic {
     fn default() -> Self {
-        Civic { turnout_bps: 9_000, stand_bps: 30, reads_news_bps: 5_000, approval_memory_weeks: 26, news_weight_bps: 1_500, platform_weight_bps: 2_500 }
+        Civic { turnout_bps: 9_000, stand_bps: 30, reads_news_bps: 5_000, approval_memory_weeks: 26, news_weight_bps: 1_500, platform_weight_bps: 2_500, platforms: Vec::new() }
     }
 }
 

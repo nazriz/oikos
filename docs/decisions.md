@@ -15572,6 +15572,23 @@ re-run twice (the later folder by name wins) or a re-run's town differs from the
 - **Revisit if** local models get entries of their own (answer mode, reasoning room, context), as hosted ones have:
   then this variable goes.
 
+## 2026-11-23 · Election handover interval (`takes_office_days` / `takes_office_at`) and amendable `schedule-elections`
+
+- **Decision** (`kernel/crates/actors/src/offices/elections.rs`, `council.rs`, `worlds/law/election-schedule.json`,
+  `worlds/generator/generate.ts`, `scenario.ts`, `figures.ts`):
+  1. `city.electoral_office` now accepts an optional `takes_office_days` parameter (default 0). When positive, declared
+     `ballot_result` records carry `data.takes_office_at` (seconds) and append `"Takes office on <date>."` to their text.
+     `city.council_clerk` waits until `t >= takes_office_at` before seating the declared winner (immediate when absent).
+  2. `city.electoral_office` reads the latest open `law` with `data.schedule == "schedule-elections"` when present on
+     its file, overriding its timetable parameters (including delaying an upcoming poll if council amends `first_poll_day`).
+  3. Both `takes_office_days` and `election_law` are opt-in on `TownSpec` (`takes_office_days` also settable via
+     scenarios) so existing default towns remain byte-identical.
+- **Why:** In earlier runs the council clerk seated the winner within minutes of declaration, leaving no working-day
+  sitting for the outgoing holder to read the result and choose how to hand over. Putting the election timetable
+  in a scheduled law (`schedule-elections` + `form-amend-elections`) lets a mayor propose schedule changes through the
+  town's ordinary council procedure rather than special-case mechanics.
+- **Revisit if** every generated town should carry `schedule-elections` and a profile-sourced `takes_office_days` by
+  default (which will intentionally move the pinned town config hashes).
 ## 2026-11-23 · The outgoing holder: told by the published result, a sitting in post, then no more sittings
 
 - **Decision** (`participants/src/llm/participant.ts` 0.22.6, `debrief.ts` 0.7.5, `orchestrator/src/run.ts`,
@@ -15672,6 +15689,22 @@ capacity). Revisit if a `shares_body` seat ever needs to act as a private person
 - **Revisit if** `PB-10` is replaced by a population-invariant candidate-field rule (target count rather than flat per-adult
   rate) or if runs use a town size far from 1,000 residents.
 
+## 2026-11-23 · Rival policy platforms on nominations and enacting code mayor (W2c)
+
+- **Decision** (`kernel/crates/actors/src/mind/citizen.rs`, `mind/voice.rs`, `offices/council.rs`, `finance/news.rs`,
+  `worlds/generator/generate.ts`, `figures.ts`):
+  1. Added optional `rival_platforms` on `TownSpec` (forwarded to `civic.platforms`, default empty so existing towns
+     remain byte-identical). When present, resident candidates standing for office select the platform best aligned with
+     their own values and publish an ordinary `nomination` with additive `data.platform: { summary, budgets?, directions? }`
+     and plain-English `text` (no `stance` or study label on any world record).
+  2. `firm.newspaper` includes `data.platform.summary` in nomination headlines when not already in the nomination text.
+  3. When seated as `city.mayor_code`, a winning candidate reads its own nomination's `data.platform` and enacts it:
+     scaling tabled budget lines by `platform.budgets` (integer bps of baseline) and issuing `platform.directions` once
+     for forms on file.
+- **Why:** In ordinary runs resident candidates stand only on two abstract value words with no policy consequence if
+  elected. Giving nominations concrete, enacted budget and direction platforms makes election outcomes substantive without
+  leaking any experiment label into the world. Study-specific wording remains gated on the owner's approval (Rule 11).
+- **Revisit if** `city.mayor_code` should also propose law amendments from a nomination platform.
 ## A form may state that what is filed on it is public (2026-11-23)
 
 A form's data takes an optional `visible: "public"`; the resolver then files the record publicly and the preview says so. Absent, nothing changes. This lets a town whose law publishes the mayor's directions have them reach its paper through the record, with no special access for the paper. No generated form sets it yet.

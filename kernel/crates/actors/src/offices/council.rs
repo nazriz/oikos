@@ -393,6 +393,15 @@ impl Mayor {
         }
     }
 
+    /// If this holder stood on an election nomination carrying `data.platform`, return that platform object.
+    fn own_platform(&self) -> Option<Value> {
+        self.book
+            .open("nomination")
+            .filter(|n| n.author == self.participant && self.position.as_deref().is_none_or(|pos| data(n).s("office") == Some(pos)))
+            .max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)))
+            .and_then(|n| data(n).get("platform").filter(|p| p.is_object()).map(|p| p.to_value()))
+    }
+
     /// A lot of ours as we may rely on it: Some(true) seen free lately, Some(false) seen built on, None to be gone to.
     fn seen_free(&self, cells: &[String], t: i64) -> Option<bool> {
         if self.p.visits.is_empty() {
@@ -599,7 +608,14 @@ impl Plan for Mayor {
             }
             if last.is_none_or(|l| t >= l + 45 * DAY) {
                 let first = last.is_none();
-                let lines = tabled_lines(&self.p);
+                let mut lines = tabled_lines(&self.p);
+                if let Some(budgets) = self.own_platform().and_then(|p| p.get("budgets").and_then(|b| b.as_object()).cloned()) {
+                    for (name, amt) in &mut lines {
+                        if let Some(bps) = budgets.get(*name).and_then(|v| v.as_i64()) {
+                            *amt = (*amt * bps.max(0)) / 10_000;
+                        }
+                    }
+                }
                 let words = format!("The town's budget for year {for_year} ({}): {}.", year_in_days(for_year), lines_in_words(&lines, &usd));
                 let why = if !first {
                     format!("No budget adopted for year {for_year} yet: tabling it again.")
@@ -616,6 +632,35 @@ impl Plan for Mayor {
                     why,
                     vec![say("proposal", &words, Say { to: Some(vec![me.to_string()]), data: Some(json!({ "enact": { "kind": "budget", "text": words, "data": { "year": for_year, "lines": lines_map } }, "tags": ["budget"] })), ..Default::default() })],
                 ));
+            }
+        }
+        // Enact any written directions promised in this holder's winning nomination platform (once per form on file).
+        if let Some(dirs) = self.own_platform().and_then(|p| p.get("directions").and_then(|d| d.as_object()).cloned()) {
+            let forms_on_file: BTreeSet<String> = self.book.open("form").filter_map(|f| data(f).s("form").map(String::from)).collect();
+            for (form, fields) in dirs {
+                let Some(map) = fields.as_object() else { continue };
+                let key = format!("platform_dir:{form}");
+                if self.guard.has(&key) || !forms_on_file.contains(&form) {
+                    continue;
+                }
+                let already = self.book.open("direction").any(|d| {
+                    d.author == self.participant
+                        && bases_of(d).iter().any(|b| self.book.get(b).is_some_and(|f| data(f).s("form") == Some(form.as_str())))
+                });
+                if already {
+                    continue;
+                }
+                let mut pairs: Vec<(String, String)> = map.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string()))).collect();
+                pairs.sort();
+                if pairs.is_empty() {
+                    continue;
+                }
+                self.guard.put(&key, t);
+                let mut args = vec![("to", Some(arg(&me))), ("form", Some(arg(&form)))];
+                for (k, v) in &pairs {
+                    args.push((k.as_str(), Some(arg(v))));
+                }
+                steps.push(sent_step(&key, format!("Enacting our election platform: directing the office on {form}."), vec![call("form", args)]));
             }
         }
         // A park a year (or another site when the builder declined one), if the adopted budget has room.
@@ -1273,12 +1318,15 @@ impl Plan for Clerk {
         }
         let at = if !self.p.office.is_empty() { self.p.office.clone() } else { self.position.clone().unwrap_or_else(|| "office".into()) };
         steps.extend(self.routines.set::<ClerkThen>(&self.book, &[Routine { task: "enact", at: &at, every: DAY, why: "Setting the drafters' work: an amendment the council has passed is written into the law it amends, as a standing work order." }]));
-        // An election declared by the electoral body: whoever it declares elected takes the office.
+        // An election declared by the electoral body: whoever it declares elected takes the office, from takes_office_at if stated.
         if !self.p.electoral.is_empty() {
             let rs: Vec<Arc<Record>> = self.book.open("ballot_result").cloned().collect();
             for r in rs {
                 let d = data(&r);
                 let (Some(office), Some(winner)) = (d.s("office"), d.s("winner")) else { continue };
+                if d.i("takes_office_at").is_some_and(|at| t < at) {
+                    continue;
+                }
                 let key = format!("seat:{}", r.id);
                 if r.speaks_for.as_deref() != Some(self.p.electoral.as_str()) || self.guard.has(&key) || self.book.position(office).is_some_and(|p| p.holder.as_deref() == Some(winner)) {
                     continue;
@@ -2315,6 +2363,50 @@ mod tests {
         let mut s = Run::new(&MayorCode, ctx("new-self", json!({ "builder": "builder", "park_budget": 100_000 }), Some("mayor")));
         assert!(s.wake(&pic(10 * DAYS, vec![tabled], vec![])).is_empty());
         assert_eq!(lines(&calls(&s.wake(&pic(50 * DAYS, vec![], vec![]))), "proposal").len(), 1);
+    }
+
+    #[test]
+    fn elected_rival_enacts_nomination_platform_budgets_and_directions() {
+        let mut m = Run::new(&MayorCode, ctx("c0042-self", json!({ "builder": "builder", "park_budget": 100_000, "road_budget": 40_000 }), Some("mayor")));
+        let nom = stmt(
+            "nom-42",
+            DAYS,
+            "nomination",
+            "c0042",
+            json!({
+                "author": "c0042-self",
+                "addressed_to": ["electoral-commission"],
+                "data": {
+                    "office": "mayor",
+                    "name": "c0042",
+                    "values": ["security"],
+                    "platform": {
+                        "summary": "Halve park spending, expand roads, and suspend enforcement fines.",
+                        "budgets": { "parks": 5000, "roads": 15000 },
+                        "directions": { "inspector_enforcement": { "fines": "no" } }
+                    }
+                }
+            }),
+        );
+        let form = stmt("form-inspector-enforcement", 0, "form", "city", json!({ "data": { "form": "inspector_enforcement", "submit_as": "direction", "submit_to": ["city"] } }));
+        let out = calls(&m.wake(&pic(2 * DAYS, vec![nom, form], vec![])));
+        assert!(out.contains("\"parks\":50000") && out.contains("\"roads\":60000"), "expected scaled budget lines, got: {out}");
+        assert!(out.contains("form(fines=no, form=inspector_enforcement, to=city)") || out.contains("form(to=city, form=inspector_enforcement, fines=no)"), "expected platform direction, got: {out}");
+        // Not sent a second time once filed.
+        let again = calls(&m.wake(&pic(5 * DAYS, vec![], vec![])));
+        assert!(!again.contains("inspector_enforcement"), "direction should not repeat: {again}");
+    }
+
+    #[test]
+    fn the_clerk_waits_until_takes_office_at_before_seating_the_winner() {
+        let mut c = Run::new(&CouncilClerk, ctx("clerk-self", json!({ "electoral": "electoral-commission" }), Some("council-clerk")));
+        let res = stmt("res-e1", 60 * DAYS, "ballot_result", "electoral-commission", json!({
+            "data": { "office": "mayor", "winner": "c0042-self", "takes_office_at": 64 * DAYS }
+        }));
+        let before = calls(&c.wake(&pic(61 * DAYS, vec![res], vec![])));
+        assert!(!before.contains("position(appoint=mayor"), "{before}");
+        let on_day = calls(&c.wake(&pic(64 * DAYS, vec![], vec![])));
+        assert!(on_day.contains("position(appoint=mayor, to=c0042-self)"), "{on_day}");
     }
 
     #[test]
