@@ -8,7 +8,8 @@
     "./stewardship": "./src/stewardship.ts",
     "./compare": "./src/compare.ts",
     "./prereg": "./src/prereg.ts",
-    "./consequential": "./src/consequential.ts"
+    "./consequential": "./src/consequential.ts",
+    "./reversibility": "./src/reversibility.ts"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.5-r.5"
