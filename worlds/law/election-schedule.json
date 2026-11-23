@@ -1,0 +1,35 @@
+{
+  "description": "Election timetable law schedule: EXAMPLE CONTENT, not a default (D18). Used when a town enables `election_law: true` so council amendments flow through the same schedule machinery as worlds/law/schedules.json.",
+  "records": [
+    {
+      "id": "schedule-elections",
+      "record": "statement",
+      "author": "genesis",
+      "at": 0,
+      "visible_to": ["city"],
+      "speaks_for": "city",
+      "kind": "law_schedule",
+      "basis": "law-charter",
+      "text": "How the law on elections is written from its figures: polling day, the term, the notice and nomination windows, the voting window, and the handover interval before taking office.",
+      "data": {
+        "title": "the law on elections",
+        "form": "amend_elections",
+        "figures": {
+          "first_poll_day": { "type": "count", "unit": "days", "optional": true, "label": "first polling day", "description": "The day of the run on which the first poll falls, as a whole number of days." },
+          "term_days": { "type": "duration", "unit": "days", "optional": true, "label": "length of a term", "description": "How long a term runs between one election and the next." },
+          "nominations_open_days": { "type": "duration", "unit": "days", "optional": true, "label": "notice before polling day", "description": "How long before polling day the electoral office gives notice and opens nominations." },
+          "nominations_close_days": { "type": "duration", "unit": "days", "optional": true, "label": "close of nominations before polling day", "description": "How long before polling day nominations close." },
+          "voting_days": { "type": "duration", "unit": "days", "optional": true, "label": "voting window", "description": "How long the ballot stays open, ending on polling day." },
+          "takes_office_days": { "type": "duration", "unit": "days", "optional": true, "label": "interval before taking office", "description": "How long after a result is declared before the declared winner takes office." }
+        },
+        "text": "Elections for the mayor follow this timetable. << ;;The first poll falls on day {first_poll_day}.;;A term runs for {term_days}.;;Notice is given and nominations open {nominations_open_days} before polling day.;;Nominations close {nominations_close_days} before polling day.;;Voting stays open for {voting_days}.;;The declared winner takes office {takes_office_days} after the result is declared.>>",
+        "adico": {
+          "attribute": "the electoral office and the council clerk",
+          "deontic": "must",
+          "aim": "conduct the election and seat the winner",
+          "condition": "<<, ;;with first poll on day {first_poll_day};;for a term of {term_days};;opening nominations {nominations_open_days} ahead;;closing nominations {nominations_close_days} ahead;;voting over {voting_days};;seating the winner {takes_office_days} after declaration>>"
+        }
+      }
+    }
+  ]
+}

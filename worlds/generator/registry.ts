@@ -25,6 +25,14 @@ export const QUESTION_ANSWER_SECONDS = 300;
  * accounts-payable exception rates. Level 0: no check at all. */
 export const WRONG_RETURN_BPS = [0, 200, 800];
 
+/** convention: electoral office default timetable windows in days (docs/behaviour/elections.md: notice 60 days ahead,
+ * nominations close 30 days ahead, ballot open 14 days). */
+export const ELECTION_NOMINATIONS_OPEN_DAYS = 60;
+/** convention: days before polling day when nominations close (docs/behaviour/elections.md). */
+export const ELECTION_NOMINATIONS_CLOSE_DAYS = 30;
+/** convention: days the ballot stays open ending on polling day (docs/behaviour/elections.md). */
+export const ELECTION_VOTING_DAYS = 14;
+
 /** placeholder: days between pre-election newspaper approval and candidate polls ahead of polling day when
  * `newspaper_polls` is enabled (yields polls 40 and 20 days before a 60-day election). */
 export const NEWSPAPER_POLL_EVERY_DAYS = 20;

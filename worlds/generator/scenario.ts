@@ -67,6 +67,7 @@ const TOWN: { [path: string]: Op[] } = {
   employed_bps: ["set", "times_bps", "shortfall_times_bps"],
   landlord_compliance_bps: ["set", "times_bps", "shortfall_times_bps"],
   first_election_days: ["set"],
+  takes_office_days: ["set"],
   houses: ["times_bps"],
   apartment_blocks: ["times_bps"],
   shops: ["times_bps"],

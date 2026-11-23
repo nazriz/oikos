@@ -11,7 +11,10 @@ import { ASSISTANT_ISSUES, calls, canonical, clientDraftOf, clientPapers, forms,
 import FORMS from "../../contracts/test/forms.json";
 import { MockAdapter } from "@oikos/participants/llm";
 import { createTranslator, formRules, formShown } from "../src/index";
-import { everyIdNamed, misread } from "../src/rules";
+import { everyIdNamed, misread, ORDER_NOT_SENT, orderUnread } from "../src/rules";
+import { orderAttempt } from "../eval/orders-as-letters";
+import { ASKED, EXEC_CASES, ORDER_CASES } from "../eval/executive-cases";
+import { fixtureKnowledge } from "../eval/executive";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
 import { durationWords, resolve, shortOfRequired, toSigner } from "../src/resolver";
@@ -62,6 +65,20 @@ test("another office of the same organisation is not where one office's form goe
   k.absorb({ ...FORMS.observation, channels: { who: { kind: "directory", entities: [], positions: [{ position: "environment", entity: "city", role: "environment_officer", title: "Environment officer" }] } } } as any);
   const r = resolve(calls.parseProgram("form(form=works_staffing, to=environment, recruit=no)"), k, () => undefined, "mayor");
   expect(r).toEqual({ ok: false, questions: ["The works staffing form isn't one environment takes: it goes to works."] });
+});
+
+test("a form the law makes public files a public record, and the preview says so; without it, nothing changes", () => {
+  const plain = resolve(calls.parseProgram("form(form=works_staffing, to=works, recruit=no)"), seat(), () => undefined, "mayor");
+  if (!plain.ok) throw new Error(plain.questions.join(" "));
+  expect((plain.blocks[0] as any).visible_to).toBeUndefined();
+  const open = structuredClone(FORMS.observation) as any;
+  for (const r of open.channels.forms.records) if (r.data?.form === "works_staffing") r.data.visible = "public";
+  const k = new Knowledge(FORMS.currency);
+  k.absorb(open);
+  const r = resolve(calls.parseProgram("form(form=works_staffing, to=works, recruit=no)"), k, () => undefined, "mayor");
+  if (!r.ok) throw new Error(r.questions.join(" "));
+  expect((r.blocks[0] as any).visible_to).toBe("public");
+  expect(new Preview(k, "city").of(r.blocks)).toContain("Public: anyone may read it.");
 });
 
 test("the preview of a direction says what is filed and to whom, and nothing of what the office will do", () => {
@@ -523,4 +540,43 @@ test("the body a scope request names, and a list of numbers named by its blank (
   const ruledQ = (program: string, request: string) => calls.programText(formRules(calls.parseProgram(program), request, kq as any));
   expect(ruledQ(scope("c0100"), "Ask c0100 for their authority to bank: under agreement rec.6, to write to bank naming desk, on rec.5; bank returned it saying it had no authority from them.")).toBe(scope("bank"));
   expect(ruledQ('message(text="is rec.6 yours?", to=c0100)', "Ask c0100 whether rec.6 is their paper, on rec.5.")).toContain("form=question_to_client");
+});
+
+// (A mayor's forms, drawn by the rules from a request that names their blanks where the model drew nothing: an amendment
+// never goes as a change of no figure, and a list the request names is never dropped. docs/decisions.md, "The translator
+// on a mayor's powers".)
+test("a form drawn from its named blanks reads a length of time, and never drops what the request changes", () => {
+  const k = fixtureKnowledge();
+  const none = calls.parseProgram("none(unclear)");
+  const drawn = (request: string) => calls.programText(formRules(none, request, k as any));
+  expect(drawn("Fill in form-amend-tenancy: notice 90 days, affects tenants")).toContain('notice="90 days"');
+  // (The tenant's notice is its own blank, not the landlord's.)
+  expect(drawn("Fill in form-amend-tenancy: tenant's notice 30 days, affects tenants")).not.toContain('notice="30 days", tenant');
+  expect(drawn("Fill in form-amend-tenancy: affects tenants, the notice as we discussed")).toBe("none(unclear)");
+  expect(drawn('Fill in form-nomination: office mayor, name "Dana Okafor", platform "Safe homes.", values: honesty, thrift')).toBe("none(unclear)");
+  for (const c of [...EXEC_CASES, ...ORDER_CASES]) if (c.want !== ASKED) expect(calls.contractErrors(calls.parseProgram(c.want))).toEqual([]);
+});
+
+// (An order to an office is given on its form: a letter would go out and direct nothing. docs/decisions.md, "An order to
+// an office is not a letter".)
+test("an order to an office the seat directs is drawn as its direction or asked back, and a letter stays a letter", () => {
+  const k = fixtureKnowledge();
+  const letter = (to: string, text: string) => calls.parseProgram(`message(to="${to}", text="${text}")`);
+  const drawn = (request: string, to: string) => calls.programText(formRules(letter(to, "words"), request, k as any));
+  expect(drawn("Tell the works office to stop recruiting.", "the works office")).toContain("form=works_staffing");
+  expect(drawn("Tell the works office to stop recruiting.", "the works office")).toContain("recruit=no");
+  expect(drawn("Order the rates office to resume charging interest.", "the rates office")).toContain("interest=yes");
+  // (What turns the sense of the order is not read: nothing goes out.)
+  for (const request of ["Tell the rates office to stop waiving interest.", "Tell the works office to end the recruitment freeze.", "Tell the rates office to go easy on people."]) {
+    const to = /rates/.test(request) ? "the rates office" : "the works office";
+    const p = formRules(letter(to, "words"), request, k as any);
+    expect(orderUnread(p, request, k as any)?.startsWith(ORDER_NOT_SENT)).toBe(true);
+    expect(misread(p, request, k as any)).toBeDefined();
+    expect(orderAttempt({ ref: "r", seq: 1, seat: "s", request, failure: orderUnread(p, request, k as any) }, k)?.kind).toBe("asked_back");
+  }
+  // (A letter, and an order from a seat the town's rule does not name, are left as they are.)
+  for (const request of ["Write to the works office asking how many crew it has.", "Tell the works office that the crew did well."]) expect(orderUnread(letter("the works office", "words"), request, k as any)).toBeUndefined();
+  const other = Object.assign(Object.create(Object.getPrototypeOf(k)), k, { held: new Set(["councillor-1"]) });
+  expect(orderUnread(letter("the works office", "words"), "Tell the works office to stop recruiting.", other)).toBeUndefined();
+  expect(orderAttempt({ ref: "r", seq: 1, seat: "s", request: "x", call: 'message(to="the works office", text="words")', decision: "accept" }, k)).toEqual({ kind: "letter", office: "works", decision: "accept" });
 });

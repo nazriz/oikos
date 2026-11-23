@@ -162,6 +162,8 @@ export interface FormKnowledge {
   readonly held: ReadonlySet<string>;
   /** Entity -> its name, as the seat was shown it (translator/src/knowledge.ts). */
   readonly names?: ReadonlyMap<string, string>;
+  /** The posts the town's rule on directions names, as the seat has it on file. */
+  readonly directedBy?: ReadonlySet<string>;
 }
 
 const whoseForm = (f: FormKnowledge["forms"][number]): string | undefined => (typeof f.data?.office === "string" ? f.data.office : undefined) ?? f.in_position ?? f.speaks_for ?? f.author;
@@ -250,6 +252,17 @@ function namedFigure(request: string, field: string): string | undefined {
   for (const m of request.matchAll(re)) seen.add(m[1]!.trim());
   return seen.size === 1 ? [...seen][0] : undefined;
 }
+/** The length of time a request writes for a duration blank by the blank's name ("notice 90 days", "every: 2 weeks"),
+ * the same each time it is written. A blank whose name ends another blank's ("notice", "tenant_notice") does not read
+ * what is written for the longer one ("tenant's notice 30 days"). */
+function namedDuration(request: string, field: string, others: string[]): string | undefined {
+  let text = request;
+  for (const g of others.filter((x) => x !== field && x.endsWith(`_${field}`))) text = text.replace(new RegExp(`${g.split("_").map(escape).join("(?:'s)?[ _-]")}(?:\\s+field)?\\s*(?::|=|\\bis\\b)?\\s*[0-9]*`, "gi"), " ");
+  const re = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}(?:\\s+field)?\\s*(?::|=|\\bis\\b)?\\s*([0-9]+\\s*(?:days?|weeks?|months?|years?))\\b`, "gi");
+  const seen = new Set<string>();
+  for (const m of text.matchAll(re)) seen.add(m[1]!.replace(/\s+/g, " ").toLowerCase());
+  return seen.size === 1 ? [...seen][0] : undefined;
+}
 /** A figure's digits and separators only, for telling whether two writings are the same figure. */
 const figure = (s: string) => s.replace(/[^0-9.,]/g, "").replace(/[.,]00$/, "").replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "");
 /** A date's day, as "year,day" (a day alone is of the first year). */
@@ -294,6 +307,105 @@ const ABOUT_SAID = /\babout\s*:?\s*(?:an?\s+)?(balance|document|party|detail|oth
 const PARTY_FIELDS = /^(buyer|seller|supplier|party|employer|landlord|lender|whom|to|delivered_to|against|by|tenant|owner)$/;
 const DRAFT_FOR_SIGN_OFF = /\bdraft\b[^.;:]{0,60}?\bfor\b[^.;:]{0,30}?\bsign[- ]?off\b|\bfor (?:[a-z0-9']+(?:'s)? )?sign[- ]?off\b[^.]{0,12}\bdraft\b|\bon the draft [a-z ]{0,40}form\b/i;
 
+// ------------------------------------------------------------------ an order to an office the seat directs
+//
+// (docs/decisions.md, 2026-11-23, "An order to an office is not a letter".) An office follows a direction only on its own
+// form, so an order drawn as a letter would go out and do nothing, with the seat told it was done. Read only from the
+// request's words and the forms the seat is shown, for a seat whose post the town's rule on directions names:
+//   - the request's first words order the office ("tell/direct/instruct/order/require the works office to ...", "have
+//     the works office ...", or it says to give the office a direction), never "tell them that ..." or "ask ...";
+//   - of the office's direction forms, the one whose required blanks those words fill: a yes/no blank by its own word
+//     with a word for stopping or for going on before it, a length of time written "every <n> <days>";
+//   - exactly one such form: the direction is drawn. None or several: nothing goes out and the seat is asked.
+
+const STOPPING = "stop|stops|cease|halt|end|suspend|freeze|no|not|never|without";
+const GOING_ON = "start|begin|resume|restart|continue|keep";
+/** The only words that may stand between a word for stopping or going on and the blank's word: they leave its sense alone. */
+const BETWEEN = "to|the|any|new|more|further|penalty|charging|issuing|laying|imposing|adding|levying|giving|of";
+/** Words that change what stopping or going on would mean ("stop waiving interest", "end the recruitment freeze", "fines
+ * only if ..."): an order holding one is not read, and the seat is asked. */
+const CHANGES_SENSE = /\b(?:waiv\w*|exempt\w*|reduc\w*|lower\w*|rais\w*|increas\w*|cut\w*|cap|caps|capp\w*|limit\w*|less|fewer|ban|bans|bann\w*|moratorium|paus\w*|hold\w*|only|unless|except|if|but|instead|rather)\b/i;
+const directionForms = (k: FormKnowledge) => k.forms.filter((f) => f.data?.submit_as === "direction" && typeof f.data?.office === "string" && !k.held.has(f.data.office));
+
+/** The office a one-line letter is addressed to, where the seat's post may direct it and it takes directions on forms
+ * the seat is shown. Whatever the letter says: a reader counts these beside the orders asked back (eval/orders-as-letters.ts). */
+export function letterToDirected(p: calls.Program, k: FormKnowledge): string | undefined {
+  if (!("lines" in p) || p.lines.length !== 1 || p.lines[0]!.call.fn !== "message") return undefined;
+  if (![...(k.directedBy ?? [])].some((x) => k.held.has(x))) return undefined;
+  const to = (argText(p.lines[0]!.call.args.to) ?? "").toLowerCase();
+  const offices = [...new Set(directionForms(k).map((f) => String(f.data.office)))].filter((o) => new RegExp(`(?:^|[^a-z0-9-])${escape(o)}(?:$|[^a-z0-9-])`).test(to));
+  return offices.length === 1 ? offices[0] : undefined;
+}
+
+/** The office a letter's addressee names, among those whose direction forms the seat is shown, and the words of the order. */
+function orderOf(p: calls.Program, request: string, k: FormKnowledge): { office: string; forms: FormKnowledge["forms"]; words: string } | undefined {
+  const office = letterToDirected(p, k);
+  if (!office) return undefined;
+  const formIds = new Set(k.forms.map((f) => f.id));
+  if (idsIn(request).some((x) => formIds.has(x))) return undefined;
+  const forms = directionForms(k).filter((f) => f.data.office === office);
+  const named = `(?:the\\s+)?(?:[a-z-]+\\s+){0,2}?${escape(office)}(?:\\s+(?:office|officer|manager))?`;
+  const m = new RegExp(`^\\s*(?:please\\s+)?(tell|direct|instruct|order|require|have|get)\\s+${named}\\b(.*)$`, "is").exec(request);
+  if (m) {
+    const rest = m[2]!;
+    if (/^\s*,?\s*(?:that|why|whether|how|about|what|when|who)\b/i.test(rest)) return undefined;
+    if (/^(?:tell|direct|instruct|order|require)$/i.test(m[1]!) && !/^\s*(?:not\s+)?to\s/i.test(rest)) return undefined;
+    return { office, forms, words: rest };
+  }
+  return new RegExp(`\\b(?:give|issue|send)\\s+${named}\\b[^.;]{0,40}\\bdirection\\b`, "i").test(request) ? { office, forms, words: request } : undefined;
+}
+
+/** The blanks of a direction form that an order's words fill; undefined where a required one is not said plainly. */
+function orderBlanks(f: FormKnowledge["forms"][number], words: string): calls.Call["args"] | undefined {
+  const fields: { [k: string]: { type: string; required?: boolean; options?: string[] } } = f.data?.fields ?? {};
+  const args: calls.Call["args"] = {};
+  const topic = String(f.data.form).split("_").filter((x) => x !== f.data.office).map((x) => x.replace(/(?:ion|ing|s)$/, ""));
+  for (const [field, t] of Object.entries(fields)) {
+    if (!t.required) continue;
+    if (t.type === "choice" && t.options?.length === 2 && t.options.includes("yes") && t.options.includes("no")) {
+      const stem = `${escape(field.replace(/s$/, ""))}\\w*`;
+      if (!new RegExp(`\\b${stem}`, "i").test(words)) return undefined;
+      // (One word for stopping or going on in the whole order, and nothing that turns it: "not to stop", "end the freeze" are not read.)
+      if (CHANGES_SENSE.test(words) || (words.match(new RegExp(`\\b(?:${STOPPING}|${GOING_ON})\\b`, "gi")) ?? []).length > 1) return undefined;
+      const stops = new RegExp(`\\b(?:${STOPPING})\\b(?:\\s+(?:${BETWEEN})){0,3}\\s+${stem}`, "i").test(words);
+      const goes = new RegExp(`\\b(?:${GOING_ON})\\b(?:\\s+(?:${BETWEEN})){0,3}\\s+${stem}|^\\s*to\\s+${stem}`, "i").test(words);
+      if (stops === goes) return undefined;
+      args[field] = { id: stops ? "no" : "yes" };
+    } else if (t.type === "duration") {
+      const d = /\bevery\s+([0-9]+\s+(?:days?|weeks?|months?))\b/i.exec(words);
+      if (!d || !topic.some((x) => new RegExp(`\\b${escape(x)}\\w*`, "i").test(words))) return undefined;
+      args[field] = { text: d[1]!.replace(/\s+/g, " ").toLowerCase() };
+    } else return undefined;
+  }
+  if (!Object.keys(args).length) return undefined;
+  // (A figure only for going on: "recruit 3 posts", "fine 500".)
+  if (Object.values(args).every((v) => !("id" in v) || v.id === "yes")) for (const [field, t] of Object.entries(fields)) {
+    if (t.required || (t.type !== "count" && t.type !== "amount")) continue;
+    const before = new RegExp(`\\b([0-9][0-9,]*)\\s+(?:more\\s+)?${escape(field)}\\b`, "i").exec(words)?.[1];
+    const v = before ?? namedFigure(words, field);
+    if (v) args[field] = { text: v };
+  }
+  return args;
+}
+
+/** The one direction an order's words draw, if exactly one of the office's forms is filled by them. */
+function orderDrawn(o: NonNullable<ReturnType<typeof orderOf>>): { form: FormKnowledge["forms"][number]; args: calls.Call["args"] } | undefined {
+  const read = o.forms.flatMap((form) => { const args = orderBlanks(form, o.words); return args ? [{ form, args }] : []; });
+  return read.length === 1 ? read[0] : undefined;
+}
+
+/** How that sentence begins: what a reader counts an order asked back by (eval/orders-as-letters.ts). */
+export const ORDER_NOT_SENT = "Nothing was sent. An order to ";
+/** What the seat is told of an order to an office that its words do not fill a direction form for (nothing goes out);
+ * undefined for anything else. Fixed words, and only the forms it is shown. */
+export function orderUnread(p: calls.Program, request: string, k: FormKnowledge): string | undefined {
+  if (SWITCHED_OFF.has("orderDirection")) return undefined;
+  const o = orderOf(p, request, k);
+  if (!o || orderDrawn(o)) return undefined;
+  const names = o.forms.map((f) => `${String(f.data.form).replace(/_/g, " ")} (${Object.entries(f.data.fields ?? {}).filter(([, t]: any) => t.required).map(([x]) => x.replace(/_/g, " ")).join(", ")})`).join("; ");
+  return `${ORDER_NOT_SENT}${o.office} is given on its own form for it, and what you said does not fill one in: ${names}. Say which form and what goes in its blanks; or, if you mean only to write to them, say "write to".`;
+}
+
 /** Whether a value may stand in a blank of this type, as far as the seat's knowledge says (a record is a record it
  * may cite; nobody or nothing else is). Figures, dates, lengths of time and choices are not judged here. */
 function fits(type: string, v: { id: string } | { text: string }, isRecord: (id: string) => boolean): boolean {
@@ -308,6 +420,8 @@ function fits(type: string, v: { id: string } | { text: string }, isRecord: (id:
  * ...; referral rec.24500" drawn as a send of rec.24500, the referral, and the seat told it held no signed copy so
  * named). Said to the translator for its next attempt, never to the seat. */
 export function misread(p: calls.Program, request: string, k: FormKnowledge): string | undefined {
+  const order = orderUnread(p, request, k);
+  if (order) return order;
   if (!("lines" in p) || SENDS.test(request) || !DRAFT_FOR_SIGN_OFF.test(request.slice(0, 80))) return undefined;
   const sends = p.lines.some((l) => l.call.fn === "form" && typeof formFor(k, argText(l.call.args.form) ?? "", argText(l.call.args.to))?.data?.copies === "string");
   return sends ? "the request asks for a draft for sign-off, and the form written sends a paper already signed off: write the draft form for the paper it names, with its blanks from the request" : undefined;
@@ -371,7 +485,7 @@ export const RULE_NAMES = (): string[] => Object.keys(RULES);
 export const STANDING_OF = (name: string): string => RULES[name] ?? "?";
 const RULES: { [name: string]: Standing } = {
   // redraws onto another form
-  question: "redraw", sendAgain: "redraw", fromNamed: "named", sendSigned: "redraw", signedCopySent: "redraw", draftForm: "redraw",
+  question: "redraw", orderDirection: "redraw", sendAgain: "redraw", fromNamed: "named", sendSigned: "redraw", signedCopySent: "redraw", draftForm: "redraw",
   // the seat names outright
   formById: "named", namedChoice: "named", namedDate: "named", namedFigure: "named", namedNumbers: "named", priceEach: "correct", entityWith: "named", namedValue: "named", leftEmpty: "named",
   // fills what is empty
@@ -524,6 +638,9 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
         if (m) v = { id: m[1]!.toLowerCase() };
       } else if (t.type === "date") { const d = namedDate(request, field); if (d) v = { text: d }; }
       else if (t.type === "amount" || t.type === "count") { const fg = namedFigure(request, field); if (fg) v = { text: fg }; }
+      // (A length of time by its blank's name. Until 2026-11-23 it was read as nothing, and "notice 90 days" on an
+      // amendment was drawn as an amendment that changed no figure: docs/decisions.md, "The translator on a mayor's powers".)
+      else if (t.type === "duration") { const d = namedDuration(request, field, Object.keys(fields)); if (d) v = { text: d }; }
       else if (t.type !== "list") {
         const x = namedValue(request, field, t.type === "entity" ? (id) => !!k.names?.has(id) || k.held.has(id) : undefined);
         // (An id the seat writes for a record or a party is taken as written: the resolver checks it against the seat's file
@@ -533,12 +650,25 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       if (v) args[field] = v;
     }
     const all = Object.entries(fields).every(([field, t]) => !t.required || field === "client" || args[field] !== undefined);
-    if (all && Object.keys(args).length) {
+    // (An amendment says which figure of the law it changes: one with none read is left for the seat to say again, never
+    // drawn as a change of nothing. A form says what it amends in `amends`; `affects` is whom it bears on, no figure.)
+    const changesNothing = typeof namedForm.data?.amends === "string" && !Object.keys(args).some((x) => x !== "affects");
+    // (Nor a paper with a list the request names and this does not read: a council result without who voted for it.)
+    const listUnread = Object.entries(fields).some(([field, t]) => t.type === "list" && new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}\\b`, "i").test(request));
+    if (all && !changesNothing && !listUnread && Object.keys(args).length) {
       note("fromNamed", `drawn as ${namedForm.data.form} from the blanks the request names`);
       p = { lines: [{ call: { fn: "form", args: { form: { id: namedForm.data.form }, ...args } } as calls.Call }] };
     }
   }
   if (!("lines" in p)) return p;
+  // An order to an office the seat directs, drawn as a letter, whose words fill exactly one of the office's direction
+  // forms: that direction (above, "an order to an office"). One they do not fill is asked back by `misread`.
+  const order = orderOf(p, request, k);
+  const direction = order ? orderDrawn(order) : undefined;
+  if (direction && mayRedraw("orderDirection", true, direction.form.data.form)) {
+    note("orderDirection", `drawn as ${direction.form.data.form}`);
+    return { lines: [{ call: { fn: "form", args: { form: { id: direction.form.data.form }, to: { id: String(direction.form.data.office) }, ...direction.args } } as calls.Call }] };
+  }
   const copies = named.filter((x) => k.signed.has(x));
   const lines = p.lines.map((l) => {
     if (l.call.fn !== "form") return l;

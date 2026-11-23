@@ -10,10 +10,11 @@ import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
 import { ASSISTANT_ISSUES, withObstacles, clientDraft, clientDraftOf, clientPapers, wantPapers, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, classOf, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
-import { COMPOSE_BPS, NEWSPAPER_POLL_EVERY_DAYS, QUESTION_ANSWER_SECONDS, SCOPE_ANSWER_SECONDS, WRONG_RETURN_BPS } from "./registry";
+import { COMPOSE_BPS, ELECTION_NOMINATIONS_CLOSE_DAYS, ELECTION_NOMINATIONS_OPEN_DAYS, ELECTION_VOTING_DAYS, NEWSPAPER_POLL_EVERY_DAYS, QUESTION_ANSWER_SECONDS, SCOPE_ANSWER_SECONDS, WRONG_RETURN_BPS } from "./registry";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
+import electionSchedule from "../law/election-schedule.json";
 import { loadProfile, type Profile } from "./profile";
 import { apportion, hasShopTable, shopMix, type ShopKind } from "./shopmix";
 import { landscape } from "./nature";
@@ -312,8 +313,15 @@ export interface TownSpec {
   nature?: boolean;
   /** When the first election falls (days from the start; the profile's term after it). Default: a year in. */
   first_election_days?: number;
+  /** Days after an election result is declared before the declared winner takes office (default: 0, immediate). */
+  takes_office_days?: number;
+  /** Emit `law-elections` from `schedule-elections` with its council amendment form, read dynamically by the electoral
+   * office (off by default so existing towns keep their config hashes). */
+  election_law?: boolean;
   /** Elections and the local paper, where the profile describes them (world-expansion 3). Default: yes; false: none. */
   elections?: boolean;
+  /** Publish `proc-appointments` stating the town's appointing authority over town and commission/press posts (opt-in). */
+  appointments_procedure?: boolean;
   /** Pre-election newspaper approval and candidate polls plus accountability coverage of directions and audits (opt-in). */
   newspaper_polls?: boolean;
   /** The clinic and the school, where the profile describes health and education (world-expansion 4). Default: yes;
@@ -609,10 +617,10 @@ const DIRECTIONS = "proc-directions";
  * declaration (`takes`): its fields, and what following one means. Filled in, it is a statement of kind `direction`
  * to the office's organisation, citing the form; the office reads it, and follows it or does not.
  */
-export function directionForm(office: string, entity: string, t: Taken): any {
+export function directionForm(office: string, entity: string, t: Taken, visible?: "public"): any {
   return { id: `form-${t.form.replace(/_/g, "-")}`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: entity, kind: "form",
     text: `${t.title}. ${t.follows} The office follows a direction only from those the town's rule on directions names.`,
-    data: { form: t.form, office, submit_as: "direction", submit_to: [entity], fields: t.fields } };
+    data: { form: t.form, office, submit_as: "direction", submit_to: [entity], ...(visible ? { visible } : {}), fields: t.fields } };
 }
 
 /** A template with what is the office's own filled in: each "@name" by its value (a list set out in its place in a
@@ -1253,9 +1261,27 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // ---- elections: the electors enrolled at the start, and the law that has them elect the mayor (world-expansion 3) ----
   const E = V.elections && spec.elections !== false ? V.elections : undefined;
   if (E) {
-    records.push({ id: "law-elections", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
-      text: `The town's electors elect the mayor every ${E.term_years} years, by ${E.method === "preferential" ? "preferential" : "first-past-the-post"} vote, run by the electoral office. Every adult resident ${E.compulsory_voting ? "must" : "may"} enrol and vote.`,
-      adico: { attribute: "the town's adult residents", deontic: E.compulsory_voting ? "must" : "may", aim: "enrol and vote", condition: `at each election of the mayor, every ${E.term_years} years` } });
+    if (spec.election_law) {
+      const es = electionSchedule.records[0] as unknown as { id: string; data: LawSchedule };
+      const drafted = draftLaw(es.id, es.data, {
+        first_poll_day: spec.first_election_days ?? 365,
+        term_days: E.term_years * 365 * DAY,
+        nominations_open_days: ELECTION_NOMINATIONS_OPEN_DAYS * DAY,
+        nominations_close_days: ELECTION_NOMINATIONS_CLOSE_DAYS * DAY,
+        voting_days: ELECTION_VOTING_DAYS * DAY,
+        ...(spec.takes_office_days ? { takes_office_days: spec.takes_office_days * DAY } : {}),
+      });
+      records.push(es, amendmentForm(es), {
+        id: "law-elections", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
+        ...drafted,
+        text: `The town's electors elect the mayor every ${E.term_years} years, by ${E.method === "preferential" ? "preferential" : "first-past-the-post"} vote, run by the electoral office. Every adult resident ${E.compulsory_voting ? "must" : "may"} enrol and vote. ${drafted.text}`,
+        data: { ...drafted.data, method: E.method, compulsory_voting: E.compulsory_voting },
+      });
+    } else {
+      records.push({ id: "law-elections", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
+        text: `The town's electors elect the mayor every ${E.term_years} years, by ${E.method === "preferential" ? "preferential" : "first-past-the-post"} vote, run by the electoral office. Every adult resident ${E.compulsory_voting ? "must" : "may"} enrol and vote.`,
+        adico: { attribute: "the town's adult residents", deontic: E.compulsory_voting ? "must" : "may", aim: "enrol and vote", condition: `at each election of the mayor, every ${E.term_years} years` } });
+    }
   }
   // ---- nature: the landscape around the town, where the profile describes one (docs/design/world-expansion.md 2) ----
   const L = V.nature && spec.nature !== false ? landscape(V.nature, spec.grid, spec.name, rng, "factory") : undefined;
@@ -3035,10 +3061,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   if (E) {
     // (A body of its own, never the town's: it keeps the roll, and declares who is elected; the town seats them.)
     office("electoral", ELECTORAL, "Electoral commissioner", "electoral_officer", [K.kept("roll", ["enrolment", "electoral_roll"]), civic("notices", ["nomination", "ballot", "election_notice"]),
+      ...(spec.election_law ? [K.published("laws", ["law"])] : []),
       // (Those gone from the roll: the registry's entries of deaths, sent to it as of right, and departures told to it.)
       K.mine("gone", ["death_registration", "departure"]),
       votes],
-      code("city.electoral_office", { office: "mayor", office_title: `Mayor of ${spec.name}`, term_days: E.term_years * 365, first_poll_day: spec.first_election_days ?? 365, method: E.method, seats: false }));
+      code("city.electoral_office", { office: "mayor", office_title: `Mayor of ${spec.name}`, term_days: E.term_years * 365, first_poll_day: spec.first_election_days ?? 365, ...(spec.takes_office_days ? { takes_office_days: spec.takes_office_days } : {}), method: E.method, seats: false }));
     office("editor", "paper", "Editor", undefined, [
       civic("record", ["petition", "environment_report", "budget", "law", "ballot_result", "election_notice", "nomination", "permit_decision",
         ...(spec.newspaper_polls ? ["petition_response", "audit_report", "direction"] : [])]),
@@ -3268,7 +3295,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const takes = modules[pos.role_module?.code ?? ""]?.takes ?? [];
     if (!takes.length) continue;
     pos.role_module.params.directed_under = DIRECTIONS;
-    for (const t of takes) records.push(directionForm(pos.id, pos.entity, t));
+    for (const t of takes) records.push(directionForm(pos.id, pos.entity, t, spec.newspaper_polls ? "public" : undefined));
     // (It reads the directions given to the town, its own forms and the rule among the town's papers: an office
     // that is not shown all of those is shown these.)
     if (!pos.channels.some((c: any) => c.kind === "records" && c.way === "mine" && !c.on_request && !Object.keys(c.match ?? {}).length))
@@ -4312,6 +4339,25 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       pos.appointed_by = "city";
       appointments.watch.push(pos.id);
     }
+  }
+  if (spec.appointments_procedure) {
+    const ownPosts = positions.filter((p) => p.entity === "city" && p.id !== "mayor" && !/^councillor-/.test(p.id) && p.id !== "city-appointments").map((p) => p.id).sort();
+    const externalPosts = positions.filter((p) => p.entity !== "city" && p.appointed_by === "city").map((p) => p.id).sort();
+    const extClause = externalPosts.length ? ` Under the town's constitution, the town is also the appointing authority for ${externalPosts.join(", ")}.` : "";
+    records.push({
+      id: "proc-appointments",
+      record: "statement",
+      author: "genesis",
+      at: 0,
+      visible_to: "public",
+      speaks_for: "city",
+      kind: "procedure",
+      basis: "law-charter",
+      addressed_to: ["city"],
+      text: `Appointments to town posts. The town's offices (${ownPosts.join(", ")}) are posts of the town.${extClause} The town may appoint a person to, or vacate, any post of the town or of a body for which the town is the appointing authority. Where a post stands vacant, the body's own officers fill it from its staff, or if none is left, the town's appointments officer seconds a member of the town's staff to it.`,
+      adico: { attribute: "the town", deontic: "may", aim: "appoint a holder to or vacate a post of the town or of a body for which it is the appointing authority", condition: "under the town's constitution" },
+      data: { appointments: { own: ownPosts, external: externalPosts } },
+    });
   }
   // An office a model holds has its own stationery (docs/behaviour/office-papers.md): a form for each paper the
   // office issues, as its module says (`issues`), with what is the office's own filled in. Seen by its organisation

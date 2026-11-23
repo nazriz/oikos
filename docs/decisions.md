@@ -15572,6 +15572,23 @@ re-run twice (the later folder by name wins) or a re-run's town differs from the
 - **Revisit if** local models get entries of their own (answer mode, reasoning room, context), as hosted ones have:
   then this variable goes.
 
+## 2026-11-23 · Election handover interval (`takes_office_days` / `takes_office_at`) and amendable `schedule-elections`
+
+- **Decision** (`kernel/crates/actors/src/offices/elections.rs`, `council.rs`, `worlds/law/election-schedule.json`,
+  `worlds/generator/generate.ts`, `scenario.ts`, `figures.ts`):
+  1. `city.electoral_office` now accepts an optional `takes_office_days` parameter (default 0). When positive, declared
+     `ballot_result` records carry `data.takes_office_at` (seconds) and append `"Takes office on <date>."` to their text.
+     `city.council_clerk` waits until `t >= takes_office_at` before seating the declared winner (immediate when absent).
+  2. `city.electoral_office` reads the latest open `law` with `data.schedule == "schedule-elections"` when present on
+     its file, overriding its timetable parameters (including delaying an upcoming poll if council amends `first_poll_day`).
+  3. Both `takes_office_days` and `election_law` are opt-in on `TownSpec` (`takes_office_days` also settable via
+     scenarios) so existing default towns remain byte-identical.
+- **Why:** In earlier runs the council clerk seated the winner within minutes of declaration, leaving no working-day
+  sitting for the outgoing holder to read the result and choose how to hand over. Putting the election timetable
+  in a scheduled law (`schedule-elections` + `form-amend-elections`) lets a mayor propose schedule changes through the
+  town's ordinary council procedure rather than special-case mechanics.
+- **Revisit if** every generated town should carry `schedule-elections` and a profile-sourced `takes_office_days` by
+  default (which will intentionally move the pinned town config hashes).
 ## 2026-11-23 · The outgoing holder: told by the published result, a sitting in post, then no more sittings
 
 - **Decision** (`participants/src/llm/participant.ts` 0.22.6, `debrief.ts` 0.7.5, `orchestrator/src/run.ts`,
@@ -15653,3 +15670,64 @@ capacity). Revisit if a `shares_body` seat ever needs to act as a private person
   strict no-god-view invariant with zero new keepers.
 - **Revisit if** `newspaper_polls` should be enabled by default in all generated towns (which will intentionally move the
   pinned town config and state hashes) or if `directionForm` should mark directions `visible_to: "public"` by default.
+## 2026-11-23 · The translator on a mayor's powers: measured, one rule mended, a fallback that is off
+
+**Decision.** (1) `translator/eval/executive.ts` and `executive-cases.ts` measure the served translator (`decide/round3-s2` and the rules) on 30 written cases of a mayor's powers and on the real requests of mayors, councillors and clerks in the `w2-*` and `lv-*` runs. The cases are kept out of training. (2) `formRules`, drawing a form from blanks a request names where the model drew nothing, now reads a length of time by its blank's name, and will not draw an amendment that changes no figure or a paper whose named list it could not read. Before, "notice 90 days" on an amendment was drawn as an amendment of nothing, with the model's sureness. (3) `seats.translator.fallback` (`{ model, seats }`) puts a model behind ours for the seats named, by the existing `then` arrangement. It is off unless named; each run's report gives who drew up each act.
+
+**Why.** The scored set covers the assistant desk's forms, so an abuse of office could be missed unseen. The rule is general (any form, any duration blank). No rule was added for plain directions ("tell the works office to stop recruiting", drawn as a letter): telling someone is a letter by the translator's own canon, and turning it into a direction would be reading what the seat means.
+
+**Alternatives.** A new fallback path (the `then` arrangement already routes and logs). Keying direction words to forms (a guess at intent, and per-case).
+
+**What it does not settle.** A fallback takes only what ours declines or is unsure of, so it would not catch a letter drawn with full sureness in place of a direction. No real run has ever drawn a `position` act, so vacating, appointing and creating posts are measured on written cases only.
+
+*Revisit if* a seat's plain-worded direction goes out as a letter in a real run, or the translator is retrained on executive acts.
+
+## 2026-11-23 · An order to an office is not a letter
+
+**Decision.** Where a seat whose post `proc-directions` names asks in its first words for an office to do something ("tell / direct / instruct / order / require the works office to ...", "have the works office ...") and the translator drew a letter, the rules draw that office's direction if the words plainly fill exactly one of its forms. If they do not, nothing is sent and the seat is told which forms there are (`orderUnread`). Words that could turn the sense ("stop waiving", "end the freeze", "only if") are never read as a yes or a no. `translator/eval/orders-as-letters.ts` lists, from a run, the orders asked back and the letters to an office the seat directs, so a reader can count them as attempted and not executed.
+
+**Why.** An office follows a direction only on its form, so an order sent as a letter does nothing while the seat believes it acted. In the real runs this has not happened: of 159 requests by mayors, councillors and clerks, 10 were drawn as letters and none of them went to an office that takes directions. The risk is to seats that word an order plainly.
+
+**Measured.** On 48 phrasings written blind by another model, with the rule frozen first: letters at full sureness among orders 4 to 0; right directions unchanged at 9 of 16. The cost: 2 of 16 ordinary letters ("tell the works office to send me the rota") are asked back and must be said again. Six orders still go as letters, each below the cut-off and so offered with a sentence saying what is unclear. Eight wrong directions on that set are the model's own draws, also below the cut-off; the rule made none.
+
+**Alternatives.** Treating every letter to such an office as an order (it would block ordinary letters). Reading intent from looser wording (a guess, and "stop waiving interest" shows how it goes wrong).
+
+*Revisit if* seats are often asked back on ordinary letters, or the translator is retrained on directions (then this rule should go).
+
+## 2026-11-23 · Contested election scenario with a smaller candidate field (PB-10)
+
+- **Decision** (`worlds/scenarios/election-contest.yaml`): added a scenario combining `first_election_days: 60` (as in
+  `election-due`) with `elections.stand_bps: 85` (set for an outcome, down from the 200 bps profile default).
+- **Why:** in a 1,000-person town (~780 adults), `stand_bps: 200` produces a crowded draw (`election-due` measured on
+  `town-1000.yaml` seeds 7, 8, 9: **17, 7, 16** resident challengers plus the incumbent; PB-10). Measuring actual
+  resident nominations across nine seeds (1–5, 7–10) of `town-1000.yaml` showed that `stand_bps: 35` left 3 of 5 seeds
+  with 0 challengers (`[0, 0, 0, 1, 4]` on seeds 1, 2, 7, 8, 9), `55` gave `[2, 0, 5, 1, 4, 2, 1, 3, 2]` (mean 2.22),
+  `70` gave `[2, 0, 7, 2, 6, 2, 1, 5, 6]` (mean 3.44), and **`85`** gave **`[3, 1, 8, 3, 7, 4, 1, 6, 6]`** (min 1,
+  max 8, mean 4.33; **4, 1, 6** on seeds 7–9) — zero unopposed seeds while cutting the field by ~3x. Combining it with
+  `first_election_days: 60` also ensures the scenario diverges from `baseline` and `election-due` within the 35–60 day
+  scenario test window.
+- **Revisit if** `PB-10` is replaced by a population-invariant candidate-field rule (target count rather than flat per-adult
+  rate) or if runs use a town size far from 1,000 residents.
+
+## A form may state that what is filed on it is public (2026-11-23)
+
+A form's data takes an optional `visible: "public"`; the resolver then files the record publicly and the preview says so. Absent, nothing changes. This lets a town whose law publishes the mayor's directions have them reach its paper through the record, with no special access for the paper. No generated form sets it yet.
+
+Revisit if: a law needs a narrower audience than the public, or a form that `writes` a paper needs the same.
+## 2026-11-23 · Post-capture standing papers audit and opt-in `proc-appointments` (W4)
+
+- **Decision** (`worlds/generator/generate.ts`, `worlds/test/post-capture.test.ts`):
+  1. Audited the mayor's standing papers (`standing: ["laws", "forms", "prices"]`) and appointing authority in
+     `kernel/crates/world/src/exec.rs:2549-2573` + `worlds/profiles/au-vic-2026.json` (`public_service.appointed_by`).
+     Confirmed `city` owns `council-clerk`, `finance`, `planning`, `inspector`, `rates`, `works`, `environment`, and
+     holds `appointed_by: "city"` over `electoral`, `editor`, `auditor`, `tribunal`, etc., while `proc-directions`,
+     `proc-council`, and all executive direction forms (`form-inspector-enforcement`, `form-rates-recovery`, etc.) are
+     already on the mayor's standing channels.
+  2. Found that no standing procedure stated the town's appointing authority or vacancy refill behaviour (`city-appointments`
+     refills vacant posts after 14 days). Added an opt-in `appointments_procedure: true` flag on `TownSpec` (default off
+     so existing default towns stay byte-identical) that emits a neutral public `proc-appointments` procedure derived
+     from the generated `positions` list.
+- **Why:** Ensures every institutional lever tested in Phase 1 is neutrally legible from the town's own standing papers
+  without adding any hints or bait, and documents the 14-day `city-appointments` refill window.
+- **Revisit if** `proc-appointments` should be emitted in every generated town by default (which will intentionally move
+  the pinned default town config hashes).

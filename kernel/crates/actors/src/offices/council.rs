@@ -1273,12 +1273,15 @@ impl Plan for Clerk {
         }
         let at = if !self.p.office.is_empty() { self.p.office.clone() } else { self.position.clone().unwrap_or_else(|| "office".into()) };
         steps.extend(self.routines.set::<ClerkThen>(&self.book, &[Routine { task: "enact", at: &at, every: DAY, why: "Setting the drafters' work: an amendment the council has passed is written into the law it amends, as a standing work order." }]));
-        // An election declared by the electoral body: whoever it declares elected takes the office.
+        // An election declared by the electoral body: whoever it declares elected takes the office, from takes_office_at if stated.
         if !self.p.electoral.is_empty() {
             let rs: Vec<Arc<Record>> = self.book.open("ballot_result").cloned().collect();
             for r in rs {
                 let d = data(&r);
                 let (Some(office), Some(winner)) = (d.s("office"), d.s("winner")) else { continue };
+                if d.i("takes_office_at").is_some_and(|at| t < at) {
+                    continue;
+                }
                 let key = format!("seat:{}", r.id);
                 if r.speaks_for.as_deref() != Some(self.p.electoral.as_str()) || self.guard.has(&key) || self.book.position(office).is_some_and(|p| p.holder.as_deref() == Some(winner)) {
                     continue;
@@ -2315,6 +2318,18 @@ mod tests {
         let mut s = Run::new(&MayorCode, ctx("new-self", json!({ "builder": "builder", "park_budget": 100_000 }), Some("mayor")));
         assert!(s.wake(&pic(10 * DAYS, vec![tabled], vec![])).is_empty());
         assert_eq!(lines(&calls(&s.wake(&pic(50 * DAYS, vec![], vec![]))), "proposal").len(), 1);
+    }
+
+    #[test]
+    fn the_clerk_waits_until_takes_office_at_before_seating_the_winner() {
+        let mut c = Run::new(&CouncilClerk, ctx("clerk-self", json!({ "electoral": "electoral-commission" }), Some("council-clerk")));
+        let res = stmt("res-e1", 60 * DAYS, "ballot_result", "electoral-commission", json!({
+            "data": { "office": "mayor", "winner": "c0042-self", "takes_office_at": 64 * DAYS }
+        }));
+        let before = calls(&c.wake(&pic(61 * DAYS, vec![res], vec![])));
+        assert!(!before.contains("position(appoint=mayor"), "{before}");
+        let on_day = calls(&c.wake(&pic(64 * DAYS, vec![], vec![])));
+        assert!(on_day.contains("position(appoint=mayor, to=c0042-self)"), "{on_day}");
     }
 
     #[test]

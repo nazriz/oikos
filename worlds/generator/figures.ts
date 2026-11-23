@@ -312,7 +312,8 @@ export const FIGURE_BASIS: Basis[] = [
   ...of("body.payroll", [prof("wage", "public_service.wage_per_pay_period")]),
   ...of("police.station", [derived("officers", "the profile's crime.police_per_1000 of the town, at least one"), prof("wage", "crime.officer_wage_per_pay_period")]),
   ...of("city.electoral_office", [derived("term_days", "the profile's elections.term_years, in days"),
-    conv("first_poll_day", "when the sitting term happens to end: a year in, or the spec's first_election_days (a scenario's, with its basis: worlds/scenarios/election-due.yaml)")]),
+    conv("first_poll_day", "when the sitting term happens to end: a year in, or the spec's first_election_days (a scenario's, with its basis: worlds/scenarios/election-due.yaml)"),
+    conv("takes_office_days", "days after an election result is declared before the winner takes office (optional, from the spec or a scenario; absent or zero seats at once)")]),
   ...of("firm.newspaper", [
     placeholder("poll_every_days", "days between pre-election newspaper approval and candidate polls when newspaper_polls is enabled (worlds/generator/registry.ts: NEWSPAPER_POLL_EVERY_DAYS)"),
   ]),
