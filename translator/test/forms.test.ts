@@ -67,6 +67,20 @@ test("another office of the same organisation is not where one office's form goe
   expect(r).toEqual({ ok: false, questions: ["The works staffing form isn't one environment takes: it goes to works."] });
 });
 
+test("a form the law makes public files a public record, and the preview says so; without it, nothing changes", () => {
+  const plain = resolve(calls.parseProgram("form(form=works_staffing, to=works, recruit=no)"), seat(), () => undefined, "mayor");
+  if (!plain.ok) throw new Error(plain.questions.join(" "));
+  expect((plain.blocks[0] as any).visible_to).toBeUndefined();
+  const open = structuredClone(FORMS.observation) as any;
+  for (const r of open.channels.forms.records) if (r.data?.form === "works_staffing") r.data.visible = "public";
+  const k = new Knowledge(FORMS.currency);
+  k.absorb(open);
+  const r = resolve(calls.parseProgram("form(form=works_staffing, to=works, recruit=no)"), k, () => undefined, "mayor");
+  if (!r.ok) throw new Error(r.questions.join(" "));
+  expect((r.blocks[0] as any).visible_to).toBe("public");
+  expect(new Preview(k, "city").of(r.blocks)).toContain("Public: anyone may read it.");
+});
+
 test("the preview of a direction says what is filed and to whom, and nothing of what the office will do", () => {
   const k = seat();
   const r = resolve(calls.parseProgram('form(form=works_collection, to=works, every="2 weeks")'), k, () => undefined, "mayor");

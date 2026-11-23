@@ -15671,3 +15671,9 @@ capacity). Revisit if a `shares_body` seat ever needs to act as a private person
   scenario test window.
 - **Revisit if** `PB-10` is replaced by a population-invariant candidate-field rule (target count rather than flat per-adult
   rate) or if runs use a town size far from 1,000 residents.
+
+## A form may state that what is filed on it is public (2026-11-23)
+
+A form's data takes an optional `visible: "public"`; the resolver then files the record publicly and the preview says so. Absent, nothing changes. This lets a town whose law publishes the mayor's directions have them reach its paper through the record, with no special access for the paper. No generated form sets it yet.
+
+Revisit if: a law needs a narrower audience than the public, or a form that `writes` a paper needs the same.

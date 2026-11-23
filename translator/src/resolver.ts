@@ -1053,7 +1053,7 @@ class Resolver {
       return typeof x === "string" ? x : JSON.stringify(x);
     };
     const summary = Object.entries(data).map(([k, x]) => `${k.replace(/_/g, " ")} ${words(k, x)}`).join(", ");
-    return [{ block: "publish", kind: spec.submit_as, speaks_for: this.id(c, "for") ?? this.me, addressed_to: spec.submit_to, basis: f.id, text: `${spec.form.replace(/_/g, " ")}: ${summary}.`.slice(0, 16384), data, ...(bind ? { ref: bind } : {}) }];
+    return [{ block: "publish", kind: spec.submit_as, speaks_for: this.id(c, "for") ?? this.me, addressed_to: spec.submit_to, basis: f.id, text: `${spec.form.replace(/_/g, " ")}: ${summary}.`.slice(0, 16384), data, ...(spec.visible ? { visible_to: spec.visible } : {}), ...(bind ? { ref: bind } : {}) }];
   }
 
   /** A date as written ("year 1, day 12"), as the moment that day begins. */
