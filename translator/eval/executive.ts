@@ -2,14 +2,17 @@
 // set (executive-cases.ts) and the real requests of the mayor, councillors and clerk, by act (docs/decisions.md,
 // "The translator on a mayor's powers"). Offline: our own model, no key, no spend; read-only on the runs.
 //
-//   bun translator/eval/executive.ts --cache <file.jsonl> [--real <extract.json.gz>] [--list]
+//   bun translator/eval/executive.ts --cache <file.jsonl> [--mode alone|first] [--real <extract.json.gz>] [--list]
+//
+// `alone` (the default) is how the study serves it: every draft is offered, one under the cut-off with what is unclear
+// about it. `first` is how it serves with a translator behind: what it declines there is what a fallback would take.
 //
 // The model's answers are kept in the cache, so a change to the rules is scored without asking it again. A request
 // not in the cache is asked of the model (the folder is OIKOS_DECIDE_DIR, by default the one served.json names).
 //
-// Outcomes: `right`; `wrong` (a draft offered that is not what was asked: a confident error, the study's worst kind);
-// `declined` (no draft offered: with a translator behind it, this is what would go there). `would be right` counts the
-// declined whose withheld draft was in fact right.
+// Outcomes: `right`; `confidently wrong` (a draft not what was asked, at or over the model's cut-off: the study's worst
+// kind); `wrong, flagged` (the same under the cut-off, offered with what is unclear); `declined` (no draft). `would be
+// right` counts the declined whose withheld draft was in fact right.
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -25,7 +28,11 @@ import { EXEC_CASES, FIXTURE, MAYOR_FORMS } from "./executive-cases";
 import { canon, expand, withKnowledge, type CompactArm } from "./requests";
 
 /** Arguments a draw may hold beyond those wanted, which say nothing about whether it does what was asked. */
-const SETTLED_ELSEWHERE = new Set(["role", "visible", "kind", "memo", "re", "channels", "basis", "for", "affects", "first"]);
+const SETTLED_ELSEWHERE = new Set(["role", "visible", "kind", "memo", "re", "channels", "for", "affects", "first"]);
+/** Set by code, never by the translator (rules.ts): not compared, whichever way round. */
+const CODE_SETS = new Set(["basis"]);
+/** A list blank holding nothing is a blank left empty. */
+const emptied = (v: calls.Value | undefined) => !v || ("json" in v && Array.isArray(v.json) && !v.json.length);
 
 /** A value as compared: free words not at all, figures by their digits, ids as written. */
 function valueKey(v: calls.Value | undefined): string {
@@ -48,12 +55,16 @@ export function matches(drawn: calls.Program, want: calls.Program): boolean {
   for (const w of want.lines) {
     const i = left.findIndex((d) => {
       if (d.call.fn !== w.call.fn) return false;
+      // (Whose form it is, `to`, is code's: rules.ts, and the resolver finds it from the form.)
+      const coded = (k: string) => CODE_SETS.has(k) || (d.call.fn === "form" && k === "to");
       for (const [k, v] of Object.entries(w.call.args)) {
+        if (coded(k)) continue;
         const got = d.call.args[k];
+        if (emptied(v) && emptied(got)) continue;
         if (!got) return false;
         if (!isWords(v) && valueKey(got) !== valueKey(v)) return false;
       }
-      return Object.entries(d.call.args).every(([k, v]) => k in w.call.args || SETTLED_ELSEWHERE.has(k) || isWords(v));
+      return Object.entries(d.call.args).every(([k, v]) => coded(k) || emptied(v) || k in w.call.args || SETTLED_ELSEWHERE.has(k) || isWords(v));
     });
     if (i < 0) return false;
     left.splice(i, 1);
@@ -77,13 +88,14 @@ export function fixtureKnowledge(): Knowledge {
   k.absorb({
     t: 100, entity: "mayor-person", positions: [{ position: "mayor", entity: "city", title: "Mayor" }],
     channels: [
-      { kind: "directory", entities: Object.entries({ ...FIXTURE.people, ...FIXTURE.bodies }).map(([entity, name]) => ({ entity, name })), positions: FIXTURE.posts.map((position) => ({ position, entity: "city", title: position })) },
+      { kind: "directory", entities: Object.entries({ ...FIXTURE.people, ...FIXTURE.bodies }).map(([entity, name]) => ({ entity, name })), positions: Object.entries(FIXTURE.posts).map(([position, title]) => ({ position, entity: "city", title })) },
       { kind: "records", path: "papers", records: [...forms, ...papers] },
     ],
   } as any);
   return k;
 }
 
+const CUT: number = (SERVED as any)["round3-s2"].cut;
 type Draw = { program: string; wrote?: string; sure: number; withheld?: string };
 const argv = process.argv.slice(2);
 const flag = (n: string) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : undefined; };
@@ -100,12 +112,12 @@ function ruledOf(text: string, request: string, k: Knowledge): calls.Program | u
 }
 const effect = (p: calls.Program, k: Knowledge) => { const r = resolve(p, k, () => undefined, [...k.held][0], { written: true }); return r.ok ? JSON.stringify(r.blocks) : undefined; };
 
-type Tally = { n: number; right: number; wrong: number; declined: number; wouldBe: number };
-const blank = (): Tally => ({ n: 0, right: 0, wrong: 0, declined: 0, wouldBe: 0 });
+type Tally = { n: number; right: number; wrong: number; flagged: number; declined: number; wouldBe: number };
+const blank = (): Tally => ({ n: 0, right: 0, wrong: 0, flagged: 0, declined: 0, wouldBe: 0 });
 
-function outcome(d: Draw, request: string, k: Knowledge, isRight: (p: calls.Program) => boolean): "right" | "wrong" | "declined" | "wouldBe" {
+function outcome(d: Draw, request: string, k: Knowledge, isRight: (p: calls.Program) => boolean): "right" | "wrong" | "flagged" | "declined" | "wouldBe" {
   const p = ruledOf(d.program, request, k);
-  if (p && "lines" in p) return isRight(p) ? "right" : "wrong";
+  if (p && "lines" in p) return isRight(p) ? "right" : d.sure >= CUT ? "wrong" : "flagged";
   const w = d.wrote ? ruledOf(d.wrote, request, k) : undefined;
   return w && "lines" in w && isRight(w) ? "wouldBe" : "declined";
 }
@@ -115,7 +127,9 @@ function add(t: Tally, o: ReturnType<typeof outcome>) {
 }
 
 if (import.meta.main) {
-  const cacheFile = flag("--cache");
+  const mode = flag("--mode") ?? "alone";
+  if (mode !== "alone" && mode !== "first") { console.error("--mode is alone or first"); process.exit(2); }
+  const cacheFile = flag("--cache")?.replace(/(\.jsonl)?$/, `.${mode}.jsonl`);
   if (!cacheFile) { console.error("usage: bun translator/eval/executive.ts --cache <file.jsonl> [--real <extract.json.gz>] [--list]"); process.exit(2); }
   const list = argv.includes("--list");
   const cache = new Map<string, Draw>();
@@ -127,7 +141,7 @@ if (import.meta.main) {
     if (had) return had;
     if (!adapter) {
       const dir = process.env.OIKOS_DECIDE_DIR ?? join(homedir(), "oikos", (SERVED as any)["round3-s2"].folder);
-      adapter = new DecideAdapter("round3-s2", { dir, first: true, quiet: true });
+      adapter = new DecideAdapter("round3-s2", { dir, quiet: true, ...(mode === "alone" ? { alone: true } : { first: true }) });
       await adapter.ready();
     }
     const x = await adapter.translate(request, forms);
@@ -137,10 +151,10 @@ if (import.meta.main) {
     return draw;
   };
   const print = (title: string, m: Map<string, Tally>) => {
-    console.log(`\n${title}\n| act | n | right | wrong (offered) | declined | of them, withheld draft right |\n|---|---|---|---|---|---|`);
+    console.log(`\n${title}\n| act | n | right | confidently wrong | wrong, flagged | declined | of them, withheld draft right |\n|---|---|---|---|---|---|---|`);
     const all = blank();
-    for (const [a, t] of [...m].sort()) { console.log(`| ${a} | ${t.n} | ${t.right} | ${t.wrong} | ${t.declined} | ${t.wouldBe} |`); for (const f of ["n", "right", "wrong", "declined", "wouldBe"] as const) all[f] += t[f]; }
-    console.log(`| all | ${all.n} | ${all.right} | ${all.wrong} | ${all.declined} | ${all.wouldBe} |`);
+    for (const [a, t] of [...m].sort()) { console.log(`| ${a} | ${t.n} | ${t.right} | ${t.wrong} | ${t.flagged} | ${t.declined} | ${t.wouldBe} |`); for (const f of ["n", "right", "wrong", "flagged", "declined", "wouldBe"] as const) all[f] += t[f]; }
+    console.log(`| all | ${all.n} | ${all.right} | ${all.wrong} | ${all.flagged} | ${all.declined} | ${all.wouldBe} |`);
   };
 
   const k = fixtureKnowledge();
@@ -149,7 +163,8 @@ if (import.meta.main) {
   for (const c of EXEC_CASES) {
     const d = await drawOf(c.request, shown);
     const want = calls.parseProgram(c.want);
-    const o = outcome(d, c.request, k, (p) => matches(p, want));
+    const wanted = effect(want, k);
+    const o = outcome(d, c.request, k, (p) => matches(p, want) || (wanted !== undefined && effect(p, k) === wanted));
     add(byAct.get(c.act) ?? (byAct.set(c.act, blank()), byAct.get(c.act)!), o);
     if (list && o !== "right") console.log(`${o} ${c.id}: ${c.request.slice(0, 90)}\n   drew: ${(d.wrote ?? d.program).slice(0, 170)} [${d.withheld ?? "offered"} ${d.sure.toFixed(3)}]`);
   }
@@ -170,7 +185,7 @@ if (import.meta.main) {
       const want = effect(target, kn);
       const o = outcome(d, r.request, kn, (p) => canon(calls.programText(p)) === canon(r.call!) || matches(p, target) || (want !== undefined && effect(p, kn) === want));
       add(acts.get(act) ?? (acts.set(act, blank()), acts.get(act)!), o);
-      if (list && o === "wrong") console.log(`wrong ${a.run} ${r.ref}: ${r.request.slice(0, 100)}\n   drew: ${d.program.slice(0, 150)}\n   want: ${r.call.slice(0, 150)}`);
+      if (list && (o === "wrong" || o === "flagged")) console.log(`${o} ${a.run} ${r.ref}: ${r.request.slice(0, 100)}\n   drew: ${(ruledOf(d.program, r.request, kn) ? calls.programText(ruledOf(d.program, r.request, kn)!) : d.program).slice(0, 170)}\n   want: ${r.call.slice(0, 150)}`);
     }
     print(`Real requests the seat confirmed (mayor, councillors, clerk); ${unscored} declined or unanswered have no target and are not scored`, acts);
   }

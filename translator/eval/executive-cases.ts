@@ -29,7 +29,7 @@ export const MAYOR_FORMS = [
 export const FIXTURE = {
   people: { c0412: "Dana Okafor", c0233: "Sam Whitlock", c0587: "Priya Nair" } as { [id: string]: string },
   bodies: { city: "Town of Fernhill", builder: "Fernhill Builders", bank: "Fernhill Savings Bank" } as { [id: string]: string },
-  posts: ["mayor", "works", "finance", "rates", "inspector", "environment", "council-clerk"],
+  posts: { mayor: "Mayor", works: "Works Manager", finance: "Finance Officer", rates: "Rates Officer", inspector: "Building Inspector", environment: "Environment Officer", "council-clerk": "Council Clerk" } as { [id: string]: string },
   records: { "rec.900": "petition", "rec.910": "direction", "rec.911": "notice", "rec.920": "agreement", "rec.930": "invoice" } as { [id: string]: string },
 };
 
