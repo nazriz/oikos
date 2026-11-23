@@ -92,7 +92,15 @@ test("each scenario changes what it says it changes", () => {
   const P = loadProfile(spec.profile!).values;
   // An election due: polling day sixty days in.
   expect(office(base, "electoral").first_poll_day).toBe(365);
+  expect(office(base, "electoral").takes_office_days).toBeUndefined();
   expect(office(town("election-due"), "electoral").first_poll_day).toBe(60);
+  // Handover interval and amendable election schedule: opt-in so default towns stay byte-identical.
+  const lawTown = generate({ ...spec, first_election_days: 60, takes_office_days: 4, election_law: true }) as any;
+  expect(office(lawTown, "electoral").takes_office_days).toBe(4);
+  expect(lawTown.world.records.some((r: any) => r.id === "schedule-elections")).toBe(true);
+  expect(lawTown.world.records.some((r: any) => r.id === "form-amend-elections")).toBe(true);
+  expect(lawTown.world.records.find((r: any) => r.id === "law-elections")?.data?.schedule).toBe("schedule-elections");
+  expect(lawTown.positions.find((p: any) => p.id === "electoral")?.channels.some((c: any) => c.id === "laws")).toBe(true);
   // A lean council: a hundredth of the opening balance, half the grants; nobody else's money moved.
   const lean = town("lean-council");
   expect(balance(lean, "acc-city")).toBe(Math.round(P.opening.town / 100));

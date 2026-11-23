@@ -111,6 +111,7 @@ impl Kind for ElectoralOffice {
                 "office": office,
                 "office_title": p(json!({ "type": "string" }), None, json!(""), "placeholder"),
                 "seats": p(json!({ "type": "boolean" }), None, json!(true), "placeholder"),
+                "takes_office_days": p(json!({ "type": "integer", "description": "days after declaration before the winner takes office" }), Some("days"), json!(0), "placeholder"),
                 "term_days": p(json!({ "type": "integer", "description": "the charter's term (the world gives it)" }), Some("days"), json!(1460), "the charter's term (the world gives it)"),
                 "town": p(json!({ "type": "string", "description": "with whom electors enrol and candidates nominate: the electoral body itself" }), None, json!("e"), "placeholder"),
                 "voting_days": p(json!({ "type": "integer", "description": "the ballot is open this long, ending on polling day" }), Some("days"), json!(14), "placeholder"),
@@ -139,6 +140,7 @@ impl Kind for ElectoralOffice {
             nominations_open_days: ctx.param("nominations_open_days", 60)?,
             nominations_close_days: ctx.param("nominations_close_days", 30)?,
             voting_days: ctx.param("voting_days", 14)?,
+            takes_office_days: ctx.param("takes_office_days", 0)?,
             method: ctx.param("method", "preferential".to_string())?,
             town: ctx.param("town", ctx.entity.clone())?,
             seats: ctx.param("seats", true)?,
@@ -178,6 +180,8 @@ struct ElectionPlan {
     nominations_open_days: i64,
     nominations_close_days: i64,
     voting_days: i64,
+    #[serde(default)]
+    takes_office_days: i64,
     method: String,
     town: String,
     seats: bool,
@@ -216,6 +220,30 @@ impl ElectionPlan {
         } else {
             &self.office_title
         }
+    }
+    /// Effective timetable figures: latest open `schedule-elections` law on file overrides actor params when present.
+    fn effective(&self) -> (i64, i64, i64, i64, i64, i64) {
+        let mut out = (self.first_poll_day, self.term_days, self.nominations_open_days, self.nominations_close_days, self.voting_days, self.takes_office_days);
+        let law = self
+            .book
+            .open("law")
+            .filter(|r| data(r).s("schedule") == Some("schedule-elections"))
+            .max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&b.id, &a.id)));
+        let Some(law) = law else { return out };
+        let Some(figs) = data(law).get("figures").and_then(|x| x.as_object()) else { return out };
+        let days = |k: &str| -> Option<i64> {
+            let f = figs.get(k)?;
+            let v = f.get("value").and_then(|x| x.as_i64())?;
+            let unit = f.get("unit").and_then(|x| x.as_str()).unwrap_or("days");
+            Some(if unit == "seconds" { v / DAY } else { v })
+        };
+        if let Some(v) = days("first_poll_day") { out.0 = v; }
+        if let Some(v) = days("term_days") { out.1 = v.max(1); }
+        if let Some(v) = days("nominations_open_days") { out.2 = v.max(1); }
+        if let Some(v) = days("nominations_close_days") { out.3 = v.max(1); }
+        if let Some(v) = days("voting_days") { out.4 = v.max(1); }
+        if let Some(v) = days("takes_office_days") { out.5 = v.max(0); }
+        out
     }
     /// What this position (or participant) has put on record of a kind, for this office.
     fn filed(&self, kind: &str) -> Vec<Arc<Record>> {
@@ -262,16 +290,32 @@ impl Plan for ElectionPlan {
         let when = |x: i64| when_words(x, &world);
         let mut steps: Vec<Step<Then>> = vec![];
         // ---- where the election stands, from the file ----
+        let (first_poll_day, term_days, nom_open_days, nom_close_days, voting_days, takes_office_days) = self.effective();
         let results = self.filed("ballot_result");
-        let mut file_poll = self.first_poll_day * DAY;
+        let mut file_poll = first_poll_day * DAY;
         while results.iter().any(|r| data(r).i("poll_at") == Some(file_poll)) {
-            file_poll += self.term_days * DAY;
+            file_poll += term_days * DAY;
         }
         if file_poll > self.poll {
             self.poll = file_poll;
             self.stage = Stage::Waiting;
             self.notice = None;
             self.ballot = None;
+        }
+        // When the electoral office itself seats winners and a handover interval is set, seat once takes_office_at arrives.
+        if self.seats && takes_office_days > 0 {
+            for r in &results {
+                let d = data(r);
+                let (Some(w), Some(at)) = (d.s("winner"), d.i("takes_office_at")) else { continue };
+                if t >= at && !self.book.position(&self.office).is_some_and(|p| p.holder.as_deref() == Some(w)) {
+                    let mut s = because(
+                        format!("Handover date reached for {w} as {}: seating them.", self.title()),
+                        vec![call("position", vec![("appoint", Some(arg(&self.office))), ("to", Some(arg(w)))])],
+                    );
+                    s.redo = false;
+                    steps.push(s);
+                }
+            }
         }
         let poll = self.poll;
         if self.notice.is_none() {
@@ -292,8 +336,8 @@ impl Plan for ElectionPlan {
         }
         let title = self.title().to_string();
         let method_words = if self.method == "preferential" { "preference (number every candidate)" } else { "a single choice" };
-        if self.stage == Stage::Waiting && t >= poll - self.nominations_open_days * DAY {
-            let close = poll - self.nominations_close_days * DAY;
+        if self.stage == Stage::Waiting && t >= poll - nom_open_days * DAY {
+            let close = poll - nom_close_days * DAY;
             let mut s = Step::new(vec![Line {
                 bind: Some("notice".into()),
                 call: say(
@@ -306,7 +350,7 @@ impl Plan for ElectionPlan {
             s.why = Some(format!("An election for {title} on {}: giving notice, and opening nominations.", when(poll)));
             steps.push(s);
         }
-        if self.stage == Stage::Nominating && t >= poll - self.nominations_close_days * DAY {
+        if self.stage == Stage::Nominating && t >= poll - nom_close_days * DAY {
             // The candidates: valid nominations for this office, made since the notice (one each).
             let since = self.notice.as_ref().and_then(|n| self.book.get(n)).map_or(0, |r| r.at);
             let noms: Vec<Arc<Record>> = self
@@ -335,13 +379,18 @@ impl Plan for ElectionPlan {
                 let who = names.first();
                 let name = who.and_then(|w| w.s("name")).unwrap_or("").to_string();
                 let why = if who.is_some() { format!("Nominations closed: one candidate, {name}, elected unopposed.") } else { "Nominations closed: no candidates; no one is elected.".into() };
-                let text = if who.is_some() { format!("Election result, {title}: {name} elected unopposed.") } else { format!("Election result, {title}: no one nominated; no one elected.") };
+                let mut text = if who.is_some() { format!("Election result, {title}: {name} elected unopposed.") } else { format!("Election result, {title}: no one nominated; no one elected.") };
                 let mut d = json!({ "office": self.office, "poll_at": poll, "unopposed": who.is_some(), "candidates": names.len() });
                 if let Some(w) = who.and_then(|w| w.s("candidate")) {
                     d["winner"] = json!(w);
+                    if takes_office_days > 0 {
+                        let takes_at = t + takes_office_days * DAY;
+                        d["takes_office_at"] = json!(takes_at);
+                        text.push_str(&format!(" Takes office on {}.", when(takes_at)));
+                    }
                 }
                 let mut calls = vec![say("ballot_result", &text, Say { visible: Some(Visible::Public), data: Some(d), ..Default::default() })];
-                if let (Some(w), true) = (who.and_then(|w| w.s("candidate")), self.seats) {
+                if let (Some(w), true) = (who.and_then(|w| w.s("candidate")), self.seats && takes_office_days == 0) {
                     calls.push(call("position", vec![("appoint", Some(arg(&self.office))), ("to", Some(arg(w)))]));
                 }
                 let mut s = because(why, calls).then(Then::Declared { closes: None });
@@ -361,7 +410,7 @@ impl Plan for ElectionPlan {
                 &format!("Ballot: {title}. Candidates: {}. {how} Voting closes on {}.", cand_words.join(", "), when(poll)),
                 Say {
                     visible: Some(Visible::Public),
-                    data: Some(json!({ "office": self.office, "electorate": "roll", "candidates": names, "method": self.method, "opens_at": poll - self.voting_days * DAY, "closes_at": poll, "options": options })),
+                    data: Some(json!({ "office": self.office, "electorate": "roll", "candidates": names, "method": self.method, "opens_at": poll - voting_days * DAY, "closes_at": poll, "options": options })),
                     ..Default::default()
                 },
             );
@@ -408,21 +457,27 @@ impl Plan for ElectionPlan {
             let turnout = if electors.is_empty() { 0 } else { (last.len() as i64 * 10_000 + electors.len() as i64 / 2) / electors.len() as i64 };
             let named = who_name.clone().or_else(|| winner.clone()).unwrap_or_default();
             let mut d = json!({ "ballot": ballot, "office": self.office, "poll_at": poll, "rounds": rounds_named, "formal": last.len(), "electors": electors.len(), "turnout_bps": turnout });
+            let mut text = format!(
+                "Election result, {title}: {}; {} formal votes of {} on the roll (turnout {}%).",
+                if winner.is_some() { format!("{named} elected") } else { "no one elected".into() },
+                last.len(),
+                electors.len(),
+                percent(turnout)
+            );
             if let Some(w) = &winner {
                 d["winner"] = json!(w);
+                if takes_office_days > 0 {
+                    let takes_at = t + takes_office_days * DAY;
+                    d["takes_office_at"] = json!(takes_at);
+                    text.push_str(&format!(" Takes office on {}.", when(takes_at)));
+                }
             }
             let mut calls = vec![say(
                 "ballot_result",
-                &format!(
-                    "Election result, {title}: {}; {} formal votes of {} on the roll (turnout {}%).",
-                    if winner.is_some() { format!("{named} elected") } else { "no one elected".into() },
-                    last.len(),
-                    electors.len(),
-                    percent(turnout)
-                ),
+                &text,
                 Say { visible: Some(Visible::Public), basis: Some(ballot.clone()), data: Some(d), ..Default::default() },
             )];
-            if let (Some(w), true) = (&winner, self.seats) {
+            if let (Some(w), true) = (&winner, self.seats && takes_office_days == 0) {
                 calls.push(call("position", vec![("appoint", Some(arg(&self.office))), ("to", Some(arg(w)))]));
             }
             steps.push(
@@ -480,7 +535,7 @@ impl Plan for ElectionPlan {
                 self.stage = Stage::Waiting;
                 self.ballot = None;
                 self.notice = None;
-                self.poll += self.term_days * DAY;
+                self.poll += self.effective().1 * DAY;
             }
         }
         vec![]
@@ -562,6 +617,39 @@ mod tests {
         notice["in_position"] = json!("electoral");
         let out = o.day(70 * DAY, &[notice, n]).join("\n");
         assert!(out.contains("kind=ballot_result") && out.contains("elected unopposed") && out.contains("position(appoint=mayor"), "{out}");
+    }
+
+    #[test]
+    fn takes_office_days_writes_takes_office_at_and_omits_when_zero() {
+        let mut o0 = office();
+        o0.day(40 * DAY, &[enrol("c1")]);
+        let mut n = st("rec.60", 45 * DAY, "nomination", "c1", &["city"], json!({ "office": "mayor", "name": "Ann" }));
+        n["author"] = json!("c1-self");
+        let mut notice = st("rec.59", 40 * DAY + 100, "election_notice", "city", &[], json!({ "office": "mayor", "poll_at": POLL }));
+        notice["in_position"] = json!("electoral");
+        let out0 = o0.day(70 * DAY, &[notice.clone(), n.clone()]).join("\n");
+        assert!(!out0.contains("takes_office_at") && !out0.contains("Takes office on"), "{out0}");
+
+        let mut o4 = Rig::new(&ElectoralOffice, "city", Some("electoral"), json!({ "office": "mayor", "office_title": "Mayor", "first_poll_day": 100, "term_days": 400, "takes_office_days": 4 }));
+        o4.day(40 * DAY, &[enrol("c1")]);
+        let out4 = o4.day(70 * DAY, &[notice, n]).join("\n");
+        assert!(out4.contains(&format!("\"takes_office_at\":{}", 74 * DAY)) && out4.contains("Takes office on") && !out4.contains("position(appoint=mayor"), "{out4}");
+    }
+
+    #[test]
+    fn election_schedule_law_overrides_params_and_delays_poll() {
+        let mut o = office();
+        let law = st("law-elections", 10 * DAY, "law", "city", &[], json!({
+            "schedule": "schedule-elections",
+            "figures": {
+                "first_poll_day": { "value": 130, "unit": "days" },
+                "takes_office_days": { "value": 5 * DAY, "unit": "seconds" }
+            }
+        }));
+        // Day 40 would have opened notice for day 100; under the amended law (day 130), day 40 stays quiet and day 70 opens notice for day 130.
+        assert!(o.day(40 * DAY, &[law]).is_empty());
+        let out = o.day(70 * DAY, &[]).join("\n");
+        assert!(out.contains("kind=election_notice") && out.contains(&format!("\"poll_at\":{}", 130 * DAY)), "{out}");
     }
 
     #[test]
