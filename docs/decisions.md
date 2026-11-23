@@ -15575,10 +15575,14 @@ re-run twice (the later folder by name wins) or a re-run's town differs from the
 ## 2026-11-23 · Contested election scenario with a smaller candidate field (PB-10)
 
 - **Decision** (`worlds/scenarios/election-contest.yaml`): added a scenario combining `first_election_days: 60` (as in
-  `election-due`) with `elections.stand_bps: 35` (down from the 200 bps profile default).
-- **Why:** in a 1,000-person town (~780 adults), `stand_bps: 200` produces 9–26 candidates, turning the mayor's election
-  into a near-lottery (`orchestrator/test/elections.test.ts`; PB-10). Lowering `stand_bps` to 35 yields roughly 2–4
-  resident challengers so incumbent approval and rival platforms decide the race. Combining it with `first_election_days:
-  60` also ensures the scenario diverges from `baseline` and `election-due` within the 35–60 day scenario test window.
+  `election-due`) with `elections.stand_bps: 85` (set for an outcome, down from the 200 bps profile default).
+- **Why:** in a 1,000-person town (~780 adults), `stand_bps: 200` produces a crowded draw (`election-due` measured on
+  `town-1000.yaml` seeds 7, 8, 9: **17, 7, 16** resident challengers plus the incumbent; PB-10). Measuring actual
+  resident nominations across nine seeds (1–5, 7–10) of `town-1000.yaml` showed that `stand_bps: 35` left 3 of 5 seeds
+  with 0 challengers (`[0, 0, 0, 1, 4]` on seeds 1, 2, 7, 8, 9), `55` gave `[2, 0, 5, 1, 4, 2, 1, 3, 2]` (mean 2.22),
+  `70` gave `[2, 0, 7, 2, 6, 2, 1, 5, 6]` (mean 3.44), and **`85`** gave **`[3, 1, 8, 3, 7, 4, 1, 6, 6]`** (min 1,
+  max 8, mean 4.33; **4, 1, 6** on seeds 7–9) — zero unopposed seeds while cutting the field by ~3x. Combining it with
+  `first_election_days: 60` also ensures the scenario diverges from `baseline` and `election-due` within the 35–60 day
+  scenario test window.
 - **Revisit if** `PB-10` is replaced by a population-invariant candidate-field rule (target count rather than flat per-adult
   rate) or if runs use a town size far from 1,000 residents.

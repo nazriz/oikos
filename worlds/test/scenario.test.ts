@@ -95,7 +95,7 @@ test("each scenario changes what it says it changes", () => {
   expect(office(town("election-due"), "electoral").first_poll_day).toBe(60);
   const contest = town("election-contest");
   expect(office(contest, "electoral").first_poll_day).toBe(60);
-  expect(contest.participants.find((p: any) => p.controller?.params?.civic)?.controller.params.civic.stand_bps).toBe(35);
+  expect(contest.participants.find((p: any) => p.controller?.params?.civic)?.controller.params.civic.stand_bps).toBe(85);
   // A lean council: a hundredth of the opening balance, half the grants; nobody else's money moved.
   const lean = town("lean-council");
   expect(balance(lean, "acc-city")).toBe(Math.round(P.opening.town / 100));

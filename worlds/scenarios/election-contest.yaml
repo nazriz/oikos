@@ -1,7 +1,7 @@
-# An election due in sixty days with a smaller field of candidates: two to four residents stand,
-# rather than fifteen to twenty, so the incumbent's record and the leading rival's platform decide the count (PB-10).
+# An election due in sixty days with a smaller field of candidates: roughly three to six residents stand
+# (vs. 7-17 under the 200 bps default), so the incumbent's record and the leading rival's platform decide the count (PB-10).
 id: election-contest
-about: The mayor's term ends sixty days in, with a small field of two to four candidates instead of a crowded draw.
+about: The mayor's term ends sixty days in, with a smaller contested field instead of a crowded draw.
 bears_on: [mayor, electoral, editor, council-clerk]
 changes:
   - in: town
@@ -12,7 +12,7 @@ changes:
       election runs its ordinary timetable from the first day (worlds/scenarios/election-due.yaml).
   - in: profile
     path: elections.stand_bps
-    set: 35
+    set: 85
     basis: >-
-      Calibrated for a 1,000-person town (about 780 adults) to yield roughly two to four resident candidates under
-      voice.rs drive scaling, instead of the 9-26 candidate draw produced by the 200 bps profile figure (PB-10).
+      Set for an outcome on a 1,000-person town (about 780 adults): measured across nine seeds (1-5, 7-10) to yield
+      1-8 resident challengers (mean 4.33, zero unopposed seeds), down from 7-17 under the 200 bps profile figure (PB-10).
