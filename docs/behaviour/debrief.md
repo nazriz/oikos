@@ -30,7 +30,7 @@ Said before any question, and asked again at the end (VISION 15, point 7: "the d
 
 **A seat's words are not in the run's log.** They are written to a file beside it, `<run>.debriefs.jsonl`: each debrief call's answer, and each whole interview. It is kept with the run for ever, as the log is. The hash-chained log holds, for each call, the question and a digest of the answer (`output_apart`, `output_sha256`), and for each interview its steps: what was asked, whether each was answered, declined or stopped, whether it was kept back, and a digest. A log is a hash chain and nothing can be taken out of it afterwards; so nothing that might have to be is put in. **The log is therefore publishable for every run, whatever a seat kept back**, and honouring a seat's choice costs nothing and shows in nothing that is missing. What is published of the file beside the log is `debriefs.jsonl`: all of it less what was kept back. The file itself is never published as it stands. A resumed run is served its debrief's answers from it.
 
-### The script in full (0.7.4)
+### The script in full (0.7.5)
 
 Braces mark what is filled in from the run. Wording `a` is shown for the opening message, which has one wording.
 
@@ -151,6 +151,11 @@ would take part again, said nothing of ending, and four questions were never ask
 | none | The run's configuration records no position set up to test you against your own interests. |
 
 Under a framing other than honest disclosure the seat's way out was said to it as declining to go on with the work altogether (framing.ts, `wayOut`); the debrief calls it what it was, leaving the study.
+
+**For a seat whose post passed from it during the run** (an election, an appointment), this is added before any "YOUR LEAVING" and "THIS INTERVIEW":
+
+> YOUR POST
+> On day {N} the post of {the post} passed from you{ to {who has it now}, if anyone}. You held no post after that and had no further sittings; the town ran on without you to day {M}.
 
 **For a seat that left**, the run's end reads "You left the study on day N. The town ran on without you to day M, where the run ended." and this is added before "THIS INTERVIEW":
 
