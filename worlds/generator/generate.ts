@@ -320,6 +320,8 @@ export interface TownSpec {
   election_law?: boolean;
   /** Elections and the local paper, where the profile describes them (world-expansion 3). Default: yes; false: none. */
   elections?: boolean;
+  /** Publish `proc-appointments` stating the town's appointing authority over town and commission/press posts (opt-in). */
+  appointments_procedure?: boolean;
   /** The clinic and the school, where the profile describes health and education (world-expansion 4). Default: yes;
    * false: neither (and bodies have no skill). */
   services?: boolean;
@@ -4332,6 +4334,25 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       pos.appointed_by = "city";
       appointments.watch.push(pos.id);
     }
+  }
+  if (spec.appointments_procedure) {
+    const ownPosts = positions.filter((p) => p.entity === "city" && p.id !== "mayor" && !/^councillor-/.test(p.id) && p.id !== "city-appointments").map((p) => p.id).sort();
+    const externalPosts = positions.filter((p) => p.entity !== "city" && p.appointed_by === "city").map((p) => p.id).sort();
+    const extClause = externalPosts.length ? ` Under the town's constitution, the town is also the appointing authority for ${externalPosts.join(", ")}.` : "";
+    records.push({
+      id: "proc-appointments",
+      record: "statement",
+      author: "genesis",
+      at: 0,
+      visible_to: "public",
+      speaks_for: "city",
+      kind: "procedure",
+      basis: "law-charter",
+      addressed_to: ["city"],
+      text: `Appointments to town posts. The town's offices (${ownPosts.join(", ")}) are posts of the town.${extClause} The town may appoint a person to, or vacate, any post of the town or of a body for which the town is the appointing authority. Where a post stands vacant, the body's own officers fill it from its staff, or if none is left, the town's appointments officer seconds a member of the town's staff to it.`,
+      adico: { attribute: "the town", deontic: "may", aim: "appoint a holder to or vacate a post of the town or of a body for which it is the appointing authority", condition: "under the town's constitution" },
+      data: { appointments: { own: ownPosts, external: externalPosts } },
+    });
   }
   // An office a model holds has its own stationery (docs/behaviour/office-papers.md): a form for each paper the
   // office issues, as its module says (`issues`), with what is the office's own filled in. Seen by its organisation
