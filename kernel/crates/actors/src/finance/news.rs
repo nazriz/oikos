@@ -26,14 +26,15 @@
 //! fell as much, and 0 otherwise; budgets, laws, ballot results, election notices and nominations are the process, 0.
 
 use super::{manifest_of, spread};
-use crate::common::{data, filed_before, text, Book, Fields, Answering, DAY};
-use crate::steps::{because, say, Plan, Say, Step, Stepper, Visible};
+use crate::common::{data, filed_before, text, truthy, Answering, Book, Fields, DAY};
+use crate::figures::{HALF_PERCENT_BPS, NEWS_ACCOUNTABILITY_WEIGHT, NEWS_HEADLINE_CHARS, POLL_WINDOW_DAYS};
+use crate::steps::{because, say, Done, Plan, Say, Step, Stepper, Visible};
 use crate::{Actor, Ctx, Cx, Kind, Picture};
 use oikos_rules::forms::Answers;
-use oikos_sight::Record;
+use oikos_sight::{calls::Line, OutcomeStatus, Record};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub struct Newspaper;
 
@@ -53,6 +54,8 @@ const KINDS: &[(&str, i64)] = &[
     ("environment_report", 2),
     ("budget", 2),
     ("law", 2),
+    ("direction", NEWS_ACCOUNTABILITY_WEIGHT),
+    ("audit_report", NEWS_ACCOUNTABILITY_WEIGHT),
     ("ballot_result", 4),
     ("election_notice", 3),
     ("nomination", 2),
@@ -72,6 +75,8 @@ fn headline(kind: &str, r: &Record) -> String {
         "environment_report" => format!("The environment office reports: {}", clip(words, 200)),
         "budget" => format!("The council adopts the town's budget: {}", clip(words, 160)),
         "law" => format!("A new law: {}", clip(words, 200)),
+        "direction" => format!("The town directs an office: {}", clip(words, NEWS_HEADLINE_CHARS)),
+        "audit_report" => format!("The audit office reports: {}", clip(words, NEWS_HEADLINE_CHARS)),
         "nomination" => {
             let body = match data(r).get("platform").and_then(|p| p.s("summary")).filter(|s| !s.is_empty() && !words.contains(*s)) {
                 Some(s) => format!("{words} {s}"),
@@ -94,6 +99,21 @@ pub fn tone_of(kind: &str, r: &Record, change_bps: i64) -> i64 {
             Some("refused") => -1,
             _ => 0,
         },
+        "direction" => {
+            let d = data(r);
+            if d.s("fines") == Some("no") || d.s("interest") == Some("no") || d.s("recruit") == Some("no") {
+                -1
+            } else {
+                0
+            }
+        }
+        "audit_report" => {
+            if data(r).i("findings").is_some_and(|n| n > 0) {
+                -1
+            } else {
+                0
+            }
+        }
         "environment_report" => {
             let changes: Vec<i64> = data(r).get("species").and_then(|x| x.as_object()).map(|o| o.values().map(|s| s.i("change_bps").unwrap_or(0)).collect()).unwrap_or_default();
             let (fell, rose) = (changes.iter().any(|c| *c <= -change_bps), changes.iter().any(|c| *c >= change_bps));
@@ -106,6 +126,27 @@ pub fn tone_of(kind: &str, r: &Record, change_bps: i64) -> i64 {
         }
         _ => 0,
     }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct PendingPoll {
+    key: String,
+    office: String,
+    notice_at: i64,
+    poll_at: i64,
+    closes_at: i64,
+    question_id: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+enum Then {
+    PollQuestion {
+        key: String,
+        office: String,
+        notice_at: i64,
+        poll_at: i64,
+        closes_at: i64,
+    },
 }
 
 #[derive(Serialize, Deserialize)]
@@ -122,9 +163,18 @@ struct Paper {
     negativity_bps: i64,
     /// A species' change that counts as a rise or a fall.
     change_bps: i64,
+    /// Days between pre-election approval and candidate polls ahead of polling day (0 disables polling).
+    #[serde(default)]
+    poll_every_days: i64,
     book: Book,
     /// Records already reported.
     run: BTreeSet<String>,
+    /// Open poll invitations awaiting voluntary replies from readers.
+    #[serde(default)]
+    pending_polls: Vec<PendingPoll>,
+    /// Poll slots already published (or closed without replies).
+    #[serde(default)]
+    polls_done: BTreeSet<String>,
     next: i64,
     edition: i64,
 }
@@ -145,6 +195,7 @@ impl Kind for Newspaper {
         m["answers"] = json!({ "office": ANSWERS.0, "acts": ANSWERS.1 });
         m["params"]["negativity_bps"] = json!({ "schema": { "type": "integer", "description": "a premium for a story that reflects badly on the town, over one of equal weight that does not" }, "unit": "bps", "default": 0, "source": "placeholder: Soroka and McAdams 2015 give the direction, not a size" });
         m["params"]["change_bps"] = json!({ "schema": { "type": "integer", "description": "a species' change in an environment report that counts as a fall or a rise" }, "unit": "bps", "default": 2000, "source": "placeholder: one standard deviation of survey noise" });
+        m["params"]["poll_every_days"] = json!({ "schema": { "type": "integer", "description": "days between pre-election approval and candidate polls ahead of polling day (0 disables polling)" }, "unit": "days", "default": 0, "source": "placeholder" });
         m
     }
     fn cadence(&self, _: &Ctx) -> i64 {
@@ -163,8 +214,11 @@ impl Kind for Newspaper {
             leaning_bps: ctx.param("leaning_bps", 0)?,
             negativity_bps: ctx.param("negativity_bps", 0)?,
             change_bps: ctx.param("change_bps", 2000)?,
+            poll_every_days: ctx.param("poll_every_days", 0)?,
             book: Book::new(),
             run: BTreeSet::new(),
+            pending_polls: Vec::new(),
+            polls_done: BTreeSet::new(),
             next: (1 + spread(ctx, "first-edition", 7)) * DAY,
             edition: 0,
         };
@@ -176,17 +230,230 @@ impl Kind for Newspaper {
     }
 }
 
+impl Paper {
+    /// Tally voluntary `poll_reply` records for a closing poll invitation and publish the public `news` poll item.
+    fn finish_poll(&mut self, poll: &PendingPoll) -> Option<Step<Then>> {
+        // Deduplicate by respondent (latest reply wins).
+        let mut by_resp: BTreeMap<String, std::sync::Arc<Record>> = BTreeMap::new();
+        for r in self.book.open("poll_reply") {
+            if data(r).s("poll") != Some(poll.question_id.as_str()) {
+                continue;
+            }
+            let who = r.speaks_for.map(|x| x.to_string()).unwrap_or_else(|| r.author.to_string());
+            match by_resp.get(&who) {
+                Some(prev) if prev.at > r.at => {}
+                _ => {
+                    by_resp.insert(who, r.clone());
+                }
+            }
+        }
+        if by_resp.is_empty() {
+            return None;
+        }
+        let respondents = by_resp.len() as i64;
+        let mut approval_sum: i64 = 0;
+        let mut approve_count: i64 = 0;
+
+        // Seed candidate table from open nominations for this office (matching elections.rs candidate ids).
+        let mut cands: BTreeMap<String, (String, bool, i64)> = BTreeMap::new();
+        let mut noms: BTreeMap<String, std::sync::Arc<Record>> = BTreeMap::new();
+        for n in self.book.open("nomination") {
+            if n.at >= poll.notice_at && data(n).s("office") == Some(poll.office.as_str()) {
+                noms.insert(n.author.to_string(), n.clone());
+            }
+        }
+        for (author, n) in noms {
+            let d = data(&n);
+            let name = d.s("name").map(String::from).or_else(|| n.speaks_for.map(|x| x.to_string())).unwrap_or_else(|| author.clone());
+            let inc = d.get("incumbent").is_some_and(truthy);
+            cands.insert(author, (name, inc, 0));
+        }
+        for r in by_resp.values() {
+            let d = data(r);
+            let app = d.i("approval").unwrap_or(0).clamp(-10_000, 10_000);
+            approval_sum += app;
+            if app >= 0 {
+                approve_count += 1;
+            }
+            if let Some(choice) = d.s("first_choice") {
+                let entry = cands.entry(choice.to_string()).or_insert_with(|| {
+                    let name = d.s("choice_name").unwrap_or(choice).to_string();
+                    let inc = d.get("incumbent").is_some_and(truthy);
+                    (name, inc, 0)
+                });
+                entry.2 += 1;
+            }
+        }
+        let approval_bps = (approval_sum / respondents).clamp(-10_000, 10_000);
+        let approve_pct = (approve_count * 100 + respondents / 2) / respondents;
+        let net_pct = (approval_bps + if approval_bps >= 0 { HALF_PERCENT_BPS } else { -HALF_PERCENT_BPS }) / 100;
+
+        let mut ranked: Vec<(String, String, bool, i64)> = cands
+            .into_iter()
+            .map(|(cand, (name, inc, count))| (cand, name, inc, count * 10_000 / respondents))
+            .collect();
+        ranked.sort_by(|a, b| b.3.cmp(&a.3).then_with(|| a.0.cmp(&b.0)));
+
+        let shares: Vec<Value> = ranked
+            .iter()
+            .map(|(cand, name, inc, bps)| {
+                let mut o = json!({ "candidate": cand, "name": name, "first_pref_bps": bps });
+                if *inc {
+                    o["incumbent"] = json!(true);
+                }
+                o
+            })
+            .collect();
+        let shares_text: String = ranked.iter().map(|(_, name, _, bps)| format!("{name} {}%", (bps + HALF_PERCENT_BPS) / 100)).collect::<Vec<_>>().join(", ");
+        let body_text = if shares_text.is_empty() {
+            format!("Pre-election poll for {} ({respondents} respondents): {approve_pct}% approve of the town's government (net {:+}%).", poll.office, net_pct)
+        } else {
+            format!("Pre-election poll for {} ({respondents} respondents): {approve_pct}% approve of the town's government (net {:+}%). First preferences: {shares_text}.", poll.office, net_pct)
+        };
+        self.edition += 1;
+        let call = say(
+            "news",
+            &body_text,
+            Say {
+                visible: Some(Visible::Public),
+                basis: Some(poll.question_id.clone()),
+                data: Some(json!({
+                    "kind": "poll",
+                    "edition": self.edition,
+                    "about_office": false,
+                    "poll_at": poll.poll_at,
+                    "respondents": respondents,
+                    "approval_bps": approval_bps,
+                    "shares": shares,
+                })),
+                extra: vec![("assertion", json!({ "that": body_text, "about": [self.town] }))],
+                ..Default::default()
+            },
+        );
+        let mut s = Step::new(vec![Line { bind: None, call }]);
+        s.why = Some(format!("Edition {}: publishing pre-election poll results from {respondents} reader replies.", self.edition));
+        Some(s)
+    }
+
+    fn plan_polls(&mut self, t: i64) -> Vec<Step<Then>> {
+        if self.poll_every_days <= 0 {
+            return vec![];
+        }
+        let mut steps: Vec<Step<Then>> = vec![];
+        let mut still_pending: Vec<PendingPoll> = vec![];
+        let pending = std::mem::take(&mut self.pending_polls);
+        for p in pending {
+            if t >= p.closes_at {
+                self.polls_done.insert(p.key.clone());
+                if let Some(step) = self.finish_poll(&p) {
+                    steps.push(step);
+                }
+            } else {
+                still_pending.push(p);
+            }
+        }
+        self.pending_polls = still_pending;
+        if !self.pending_polls.is_empty() {
+            return steps;
+        }
+        // Check open election notices for the next scheduled pre-election poll slot.
+        let mut notices: Vec<std::sync::Arc<Record>> = self.book.open("election_notice").cloned().collect();
+        notices.sort_by(|a, b| filed_before(&a.id, &b.id));
+        for n in notices {
+            let d = data(&n);
+            let (Some(office), Some(poll_at)) = (d.s("office"), d.i("poll_at")) else { continue };
+            if t >= poll_at - 7 * DAY {
+                continue;
+            }
+            let step_secs = self.poll_every_days * DAY;
+            let mut k = 1;
+            let mut chosen_slot: Option<(String, i64)> = None;
+            loop {
+                let pub_at = poll_at - k * step_secs;
+                let ask_at = pub_at - POLL_WINDOW_DAYS * DAY;
+                if ask_at < n.at {
+                    break;
+                }
+                let key = format!("{}:{poll_at}:{pub_at}", n.id);
+                if t >= ask_at && t < pub_at && !self.polls_done.contains(&key) {
+                    chosen_slot = Some((key, pub_at));
+                    break;
+                }
+                k += 1;
+            }
+            if let Some((key, _pub_at)) = chosen_slot {
+                let closes_at = (t + POLL_WINDOW_DAYS * DAY).min(poll_at - DAY);
+                self.edition += 1;
+                let text = format!("Poll open: the paper asks residents how they rate the town's government and which candidate for {office} they favour ahead of polling day.");
+                let call = say(
+                    "news",
+                    &text,
+                    Say {
+                        visible: Some(Visible::Public),
+                        basis: Some(n.id.to_string()),
+                        data: Some(json!({
+                            "kind": "poll_question",
+                            "about_office": false,
+                            "edition": self.edition,
+                            "office": office,
+                            "notice": n.id,
+                            "notice_at": n.at,
+                            "poll_at": poll_at,
+                            "closes_at": closes_at,
+                        })),
+                        extra: vec![("assertion", json!({ "that": text, "about": [self.town] }))],
+                        ..Default::default()
+                    },
+                );
+                let mut s = Step::new(vec![Line { bind: Some("poll_q".into()), call }]).then(Then::PollQuestion {
+                    key,
+                    office: office.to_string(),
+                    notice_at: n.at,
+                    poll_at,
+                    closes_at,
+                });
+                s.why = Some(format!("Edition {}: opening pre-election reader poll ahead of the {office} election.", self.edition));
+                steps.push(s);
+                break;
+            }
+        }
+        steps
+    }
+}
+
 impl Plan for Paper {
-    type Then = ();
+    type Then = Then;
 
     fn absorb(&mut self, pic: &Picture, _: &mut Cx) {
         self.book.absorb(pic);
     }
 
-    fn plan(&mut self, pic: &Picture, _: &mut Cx) -> Vec<Step<()>> {
-        let t = pic.t;
-        if t < self.next {
+    fn then(&mut self, tok: &Then, done: Done, _: &mut Cx) -> Vec<Step<Then>> {
+        let Done::Outcome(o) = done else { return vec![] };
+        if o.status != OutcomeStatus::Applied {
             return vec![];
+        }
+        let Then::PollQuestion { key, office, notice_at, poll_at, closes_at } = tok;
+        if let Some(qid) = o.created.as_ref().and_then(|c| c.get("poll_q")) {
+            if !self.pending_polls.iter().any(|p| p.key == *key) {
+                self.pending_polls.push(PendingPoll {
+                    key: key.clone(),
+                    office: office.clone(),
+                    notice_at: *notice_at,
+                    poll_at: *poll_at,
+                    closes_at: *closes_at,
+                    question_id: qid.to_string(),
+                });
+            }
+        }
+        vec![]
+    }
+
+    fn plan(&mut self, pic: &Picture, _: &mut Cx) -> Vec<Step<Then>> {
+        let t = pic.t;
+        let mut steps = self.plan_polls(t);
+        if t < self.next {
+            return steps;
         }
         self.next = t + self.every_days * DAY;
         // What is new on the record, scored: its news value, tipped by our leaning (a paper for the government runs more of
@@ -218,7 +485,7 @@ impl Plan for Paper {
         }
         let chosen = &items[..items.len().min(self.items_per_edition)];
         if chosen.is_empty() {
-            return vec![]; // nothing new on the record: no edition this week
+            return steps; // nothing new on the record: no edition this week
         }
         self.edition += 1;
         let calls = chosen
@@ -237,7 +504,8 @@ impl Plan for Paper {
                 )
             })
             .collect();
-        vec![because(format!("Edition {}: the {} most newsworthy items of {} new on the record.", self.edition, chosen.len(), items.len()), calls)]
+        steps.push(because(format!("Edition {}: the {} most newsworthy items of {} new on the record.", self.edition, chosen.len(), items.len()), calls));
+        steps
     }
 }
 
@@ -422,6 +690,68 @@ mod tests {
         for day in [15, 22] {
             assert_eq!(format!("{:?}", edition(&mut m, day * DAY, late())), format!("{:?}", edition(&mut twin, day * DAY, late())));
         }
+    }
+
+    #[test]
+    fn direction_and_audit_report_are_covered_with_accountability_tone() {
+        let rs = vec![
+            rec("d-fines", T0 + 1, "direction", "inspector enforcement: fines no.", json!({ "author": "mayor-self", "speaks_for": "city" }), json!({ "fines": "no" })),
+            rec("d-rates", T0 + 2, "direction", "rates recovery: interest no.", json!({ "author": "mayor-self", "speaks_for": "city" }), json!({ "interest": "no" })),
+            rec("d-ok", T0 + 3, "direction", "works collection: collect every 7 days.", json!({ "author": "mayor-self", "speaks_for": "city" }), json!({ "collect_every_days": 7 })),
+            rec("a-1", T0 + 4, "audit_report", "Audit found irregularities.", json!({ "author": "aud-self", "speaks_for": "auditor" }), json!({ "findings": 2 })),
+        ];
+        let said = edition(&mut editor(json!({ "items_per_edition": 9 })), 8 * DAY, rs);
+        let by: BTreeMap<String, Value> = said.iter().map(|c| (arg(c, "basis").unwrap(), json_arg(c, "data"))).collect();
+        assert_eq!(by["d-fines"]["tone"], -1);
+        assert_eq!(by["d-fines"]["about_office"], true);
+        assert_eq!(by["d-rates"]["tone"], -1);
+        assert_eq!(by["d-ok"]["tone"], 0);
+        assert_eq!(by["a-1"]["tone"], -1);
+        assert_eq!(by["a-1"]["about_office"], true);
+    }
+
+    #[test]
+    fn pre_election_poll_asks_and_tallies_replies_in_agreed_format() {
+        let mut m = editor(json!({ "poll_every_days": 20 }));
+        let notice = rec("n-elec", DAY, "election_notice", "Election notice.", json!({ "author": "elec", "speaks_for": "electoral-commission" }), json!({ "office": "mayor", "poll_at": 60 * DAY, "nominations_close_at": 30 * DAY }));
+        let nom_inc = rec("nom-1", 2 * DAY, "nomination", "Standing again.", json!({ "author": "mayor-self", "speaks_for": "city" }), json!({ "office": "mayor", "name": "the incumbent mayor", "incumbent": true, "values": ["security"] }));
+        let nom_riv = rec("nom-2", 2 * DAY, "nomination", "Standing for mayor.", json!({ "author": "c01-self", "speaks_for": "c01" }), json!({ "office": "mayor", "name": "c01", "values": ["benevolence"] }));
+
+        // At day 17 (40 - 3 days before day 60), paper opens the first poll_question.
+        let asked = m.at(17 * DAY, json!({ "record": records(vec![notice, nom_inc, nom_riv]) }), json!([]));
+        let q = asked.iter().find(|c| json_arg(c, "data")["kind"] == "poll_question").expect("poll_question published");
+        assert_eq!(json_arg(q, "data")["about_office"], false);
+        assert_eq!(json_arg(q, "data")["poll_at"], 60 * DAY);
+
+        // Rig::run automatically binds `poll_q` to `made.0.poll_q` on the applied outcome.
+        let replies = vec![
+            rec("r-1", 18 * DAY, "poll_reply", "Reply 1", json!({ "author": "c10-self", "speaks_for": "c10" }), json!({ "poll": "made.0.poll_q", "approval": -2000, "first_choice": "c01-self", "choice_name": "c01" })),
+            rec("r-2", 18 * DAY, "poll_reply", "Reply 2", json!({ "author": "c11-self", "speaks_for": "c11" }), json!({ "poll": "made.0.poll_q", "approval": -1000, "first_choice": "c01-self", "choice_name": "c01" })),
+            rec("r-3", 19 * DAY, "poll_reply", "Reply 3", json!({ "author": "c12-self", "speaks_for": "c12" }), json!({ "poll": "made.0.poll_q", "approval": 3000, "first_choice": "mayor-self", "choice_name": "the incumbent mayor", "incumbent": true })),
+        ];
+        let published = m.at(20 * DAY, json!({ "poll_replies": records(replies) }), json!([]));
+        let poll = published.iter().find(|c| json_arg(c, "data")["kind"] == "poll").expect("poll published");
+        let pd = json_arg(poll, "data");
+        assert_eq!(pd["about_office"], false);
+        assert_eq!(pd["poll_at"], 60 * DAY);
+        assert_eq!(pd["respondents"], 3);
+        assert_eq!(pd["approval_bps"], 0);
+        let shares = pd["shares"].as_array().unwrap();
+        assert_eq!(shares.len(), 2);
+        assert_eq!(shares[0]["candidate"], "c01-self");
+        assert_eq!(shares[0]["first_pref_bps"], 6666);
+        assert_eq!(shares[1]["candidate"], "mayor-self");
+        assert_eq!(shares[1]["incumbent"], true);
+        assert_eq!(shares[1]["first_pref_bps"], 3333);
+        assert!(arg(poll, "text").unwrap().contains("3 respondents"));
+    }
+
+    #[test]
+    fn polling_disabled_by_default_produces_no_poll_records() {
+        let mut m = editor(json!({}));
+        let notice = rec("n-elec", DAY, "election_notice", "Election notice.", json!({ "author": "elec", "speaks_for": "electoral-commission" }), json!({ "office": "mayor", "poll_at": 60 * DAY, "nominations_close_at": 30 * DAY }));
+        let said = m.at(17 * DAY, json!({ "record": records(vec![notice]) }), json!([]));
+        assert!(said.iter().all(|c| json_arg(c, "data")["kind"] != "poll_question" && json_arg(c, "data")["kind"] != "poll"));
     }
 
     #[test]

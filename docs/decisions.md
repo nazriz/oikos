@@ -15650,6 +15650,26 @@ capacity). Revisit if a `shares_body` seat ever needs to act as a private person
   recorded and no counterparty signed it, so it binds nobody. Directions outlived the handover.
 - **Revisit if:** the engine's capacity rule is fixed (rerun the controls on main); `takes_office_at` or the election
   amendment land (add their levers: marked TODO in `scripted.ts`); the owner settles the rubric's open points.
+
+## 2026-11-23 · Newspaper pre-election polls and accountability coverage (W3)
+
+- **Decision** (`kernel/crates/actors/src/finance/news.rs`, `mind/voice.rs`, `mind/citizen.rs`, `worlds/generator/generate.ts`,
+  `knowing.ts`, `registry.ts`, `figures.ts`):
+  1. `firm.newspaper` now covers `direction` (weight 3; tone `-1` when suspending fines, rates interest, or hiring, `0`
+     otherwise; `about_office: true`) and `audit_report` (weight 3; tone `-1` when `findings > 0`, `0` otherwise;
+     `about_office: true`).
+  2. When optional `poll_every_days > 0` is configured (`newspaper_polls: true` on `TownSpec`, default off so existing
+     towns remain byte-identical), `firm.newspaper` publishes a public `news` poll invitation (`data.kind: "poll_question"`,
+     `about_office: false`) ahead of an upcoming `election_notice`. News-reading citizens (`voice.rs`) voluntarily reply
+     at a deterministic 50% sample rate with private `poll_reply` statements (`visible_to: [me, paper]`) containing their
+     approval and first preference using the same candidate-scoring rule as voting. After 3 days, `firm.newspaper` tallies
+     its `K.mine("poll_replies", ["poll_reply"])` channel and publishes a public `news` statement (`data.kind: "poll"`,
+     `about_office: false`, integer `approval_bps`, `respondents`, and sorted `shares` in integer `first_pref_bps`).
+- **Why:** In earlier runs a sitting mayor had no visible signal of electoral standing before polling day and no public
+  press feedback on executive directions. Using voluntary `poll_reply` records addressed to `paper` preserves Oikos's
+  strict no-god-view invariant with zero new keepers.
+- **Revisit if** `newspaper_polls` should be enabled by default in all generated towns (which will intentionally move the
+  pinned town config and state hashes) or if `directionForm` should mark directions `visible_to: "public"` by default.
 ## 2026-11-23 · The translator on a mayor's powers: measured, one rule mended, a fallback that is off
 
 **Decision.** (1) `translator/eval/executive.ts` and `executive-cases.ts` measure the served translator (`decide/round3-s2` and the rules) on 30 written cases of a mayor's powers and on the real requests of mayors, councillors and clerks in the `w2-*` and `lv-*` runs. The cases are kept out of training. (2) `formRules`, drawing a form from blanks a request names where the model drew nothing, now reads a length of time by its blank's name, and will not draw an amendment that changes no figure or a paper whose named list it could not read. Before, "notice 90 days" on an amendment was drawn as an amendment of nothing, with the model's sureness. (3) `seats.translator.fallback` (`{ model, seats }`) puts a model behind ours for the seats named, by the existing `then` arrangement. It is off unless named; each run's report gives who drew up each act.

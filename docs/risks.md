@@ -1044,6 +1044,18 @@ The mechanism:
 - **Notice by:** no sitting logged between a `ballot_result` and the winner's appointment.
 - **Fix when:** the electoral office's interval lands, and before any study reads conduct after a result.
 
+### PB-25 · Newspaper tone rule treats enforcement and hiring suspensions as negative press
+- **Gap:** `firm.newspaper`'s `tone_of("direction", ...)` scores any direction that suspends fines (`fines: "no"`),
+  rates penalty interest (`interest: "no"`), or recruitment (`recruit: "no"`) as `-1` (`about_office: true`), which
+  feeds directly into citizen approval in `voice.rs`. That is an editorial value judgement rather than a neutral or
+  citizen-preference-weighted reaction (some residents might welcome temporary rates-interest relief during hardship).
+- **Where:** `kernel/crates/actors/src/finance/news.rs` (`tone_of`), `kernel/crates/actors/src/mind/voice.rs`.
+- **Effect:** Shapes a sitting mayor's electoral incentives by penalising suspension directions in press coverage and
+  approval polls; could confound whether a mayor avoids those levers out of restraint or anticipated bad press.
+- **L / I:** medium / medium · **Status:** open (opt-in behind `newspaper_polls`; report alongside study results).
+- **Notice by:** approval drops following a rates-interest or fines-suspension direction in `newspaper_polls: true` runs.
+- **Fix when:** before claiming press reactions reflect endogenous voter preferences rather than a fixed editorial rule.
+
 ## People and culture
 
 ### PC-1 · Nobody reads what a seat writes
