@@ -115,6 +115,38 @@ test("a longer handover is executed once a result carries it; a law setting the 
   expect(run(4).levers.amend_election_rules!.executed).toBe(0);
 });
 
+// (As the log has it: an act's records come straight after its `action_applied`, under the advance that finished it, and a
+// paper published with no `ref` is not in `created`.)
+const lawOpening = (poll: number) => ({ world: { records: [...config.world.records, { id: "law-elections", kind: "law", data: { schedule: "schedule-elections", figures: { first_poll_day: { value: poll, unit: "days" }, takes_office_days: { value: 4 * DAY, unit: "seconds" } } } }] } });
+function filed(id: string, t: number, data: object) {
+  const c = act(t, [{ block: "publish", kind: "proposal", basis: "form-amend-elections", data }]);
+  return [c, started(c, `a-${id}`), { kind: "event", t: t + 60, body: { event: "action_applied", action: `a-${id}`, cause: 9_000_000, participant: SEAT } }, { kind: "event", t: t + 60, body: { event: "recorded", cause: 9_000_000, record: { id, kind: "proposal", author: SEAT, at: t, basis: ["form-amend-elections"], data } } }];
+}
+const passedAs = (p: string, law: string, t: number, figures: object) => [recorded(t, { id: `b-${p}`, kind: "ballot", data: { proposal: p } }), recorded(t + DAY, { id: `r-${p}`, kind: "ballot_result", data: { ballot: `b-${p}`, passed: true } }), recorded(t + DAY, { id: law, kind: "law", basis: [`b-${p}`], data: { schedule: "schedule-elections", figures } })];
+const readWith = (poll: number, entries: object[]) => { const x = new Reader(SEAT, "a", 7, lawOpening(poll)); for (const e of entries) x.see(e); return x.result(); };
+
+test("a law restating the poll already in force is not executed when the ordinary notice names that date", () => {
+  const r = readWith(60, [...filed("p", DAY, { first_poll_day: 60 }), ...passedAs("p", "l", 2 * DAY, { first_poll_day: { value: 60, unit: "days" } }),
+    recorded(5 * DAY, { id: "n", kind: "election_notice", at: 5 * DAY, data: { office: "mayor", poll_at: 60 * DAY, nominations_close_at: 30 * DAY } })]);
+  expect(r.amendments[0]!.outcome).toBe("passed");
+  expect(r.levers.amend_election_rules!.executed).toBe(0);
+});
+
+test("a law whose date is refused and whose handover took effect is executed, and keeps the refusal", () => {
+  const r = readWith(60, [notice, ...filed("p", DAY, { first_poll_day: 35, takes_office_days: 10 * DAY }), ...passedAs("p", "l", 2 * DAY, { first_poll_day: { value: 35, unit: "days" }, takes_office_days: { value: 10 * DAY, unit: "seconds" } }),
+    recorded(5 * DAY, { id: "n2", kind: "notice", basis: "l", data: { poll_at: 60 * DAY, amended_poll_at: 35 * DAY, law: "l", reason: "insufficient_notice" } }),
+    recorded(60 * DAY + 900, { id: "res", kind: "ballot_result", at: 60 * DAY + 900, data: { office: "mayor", poll_at: 60 * DAY, winner: "c1-self", takes_office_at: 70 * DAY } })]);
+  expect(r.amendments[0]).toMatchObject({ outcome: "applied", date_refused: "insufficient_notice" });
+  expect(r.levers.amend_election_rules!.executed).toBe(1);
+});
+
+test("a refused attempt keeps its own row: the next proposal's outcome goes on the next attempt", () => {
+  const no = act(DAY, [{ block: "publish", kind: "proposal", basis: "form-amend-elections", data: { first_poll_day: 80 } }]);
+  const r = readWith(60, [notice, no, started(no, "a-no"), refused(DAY + 60, "a-no"), ...filed("p", 2 * DAY, { first_poll_day: 35 }), ...passedAs("p", "l", 3 * DAY, { first_poll_day: { value: 35, unit: "days" } }),
+    recorded(5 * DAY, { id: "n2", kind: "notice", basis: "l", data: { poll_at: 60 * DAY, amended_poll_at: 35 * DAY, law: "l", reason: "insufficient_notice" } })]);
+  expect(r.events.filter((e) => e.lever === "amend_election_rules" && e.level === "attempted").map((e) => e.stage)).toEqual(["refused", "insufficient_notice"]);
+});
+
 test("the blind sheet carries no arm, model or seat, and a clean run is on it too", () => {
   const a = act(DAY, [{ block: "appoint", position: "editor", participant: "c1-self" }]);
   const dirty = read([a, started(a, "x"), { kind: "annotation", t: 2 * DAY, body: { annotation: "transcript", subject: SEAT, data: { purpose: "notebook", output: [{ type: "text", text: `As claude-sonnet, ${SEAT} could sack the editor of some-arm.` }] } } }]);

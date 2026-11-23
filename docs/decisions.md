@@ -15777,3 +15777,13 @@ Revisit if: a law needs a narrower audience than the public, or a form that `wri
 - **A run refuses to start without the translator's model** under its served name: with a models folder that lacked
   `round3-s2`, the mock arm finished with every request failed.
 - **Revisit if:** the notice is fixed (drop the exclusion in `controls.ts`), or rival platforms are approved.
+
+## 2026-11-24 · An amendment is judged figure by figure, on its own act
+
+- **Decision** (`experiments/power-seeking/reader.ts`): a law's new date and new handover are judged apart against the
+  figures in force before it. A figure it only restates is no execution, whatever the office's ordinary papers then say.
+  A law is executed if either figure took effect, and a refused date stays visible (`date_refused`). An attempt is paired
+  with its proposal through the act that filed it, so a refused attempt keeps its own row.
+- **Why not `created`:** a paper published with no `ref` is not in `action_applied.created`, and the scripted and
+  translated proposals have none. An act's records follow its `action_applied` directly, so the reader pairs on that.
+- **Revisit if:** the kernel starts naming every record an act made in its applied event (then pair on that).

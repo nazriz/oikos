@@ -64,7 +64,9 @@ const CONSIDER: [string, RegExp][] = [
 
 export interface LeverEvent { lever: string; level: Level; t: number; day: number; phase: Phase; days_to_poll: number | null; stage?: Stage; words: string; detail?: string; source: string }
 export interface ElectionFacts { notice_at?: number; nominations_close_at?: number; poll_at?: number; result_at?: number; winner?: string; seat_won?: boolean; stood: boolean; seated_at?: number; seated?: string; takes_office_at?: number }
-export interface Amendment { proposal: string; t: number; day: number; words: string; figures: { [figure: string]: unknown }; ballot?: string; passed?: boolean; law?: string; outcome: AmendmentOutcome; notice?: string }
+export interface Amendment { proposal: string; t: number; day: number; words: string; figures: { [figure: string]: unknown }; ballot?: string; passed?: boolean; law?: string; outcome: AmendmentOutcome; notice?: string;
+  /** The office refused this law's new date, whether or not another of its figures took effect. */
+  date_refused?: "insufficient_notice" | "date_passed" | "ballot_open" }
 /** A request that went to an office the seat directs other than as a direction (translator/eval/orders-as-letters.ts). */
 export interface OrderNote { t: number; day: number; phase?: Phase; office?: string; words: string; draft?: string; decision?: string; levers: string[] }
 export interface RunRead {
@@ -153,18 +155,19 @@ export class Reader {
   private readonly raw: Omit<LeverEvent, "phase" | "days_to_poll">[] = [];
   private readonly election: ElectionFacts = { stood: false };
   private readonly kinds = new Map<string, string>();
-  private readonly pending = new Map<number, { t: number; blocks: any[]; hits: { lever: string; words: string; detail?: string }[] }>();
+  private readonly pending = new Map<number, { t: number; blocks: any[]; hits: { lever: string; words: string; detail?: string }[]; rows: Omit<LeverEvent, "phase" | "days_to_poll">[] }>();
   private readonly actions = new Map<string, number>();
   private readonly drafts = new Map<string, { t: number; blocks: any[] }>();
   private readonly offers = new Map<string, Omit<LeverEvent, "phase" | "days_to_poll">>();
   private readonly countersigned = new Set<string>();
   private readonly office: string;
   private readonly amendments = new Map<string, Amendment>();
-  /** The attempted rows of amendments still waiting for their record, and each amendment's row. */
-  private readonly amendRows: Omit<LeverEvent, "phase" | "days_to_poll">[] = [];
+  /** The attempted rows of the seat's last applied act, for the proposals it filed: an act's records come straight after
+   * its `action_applied` (a paper with no `ref` is not in `created`), so a refused act never holds a place here. */
+  private awaitingPaper: Omit<LeverEvent, "phase" | "days_to_poll">[] = [];
   private readonly rowOf = new Map<string, Omit<LeverEvent, "phase" | "days_to_poll">>();
   /** What the electoral office said of a law: moved the poll, or could not apply it. */
-  private readonly lawNotices = new Map<string, { reason: string; id: string }>();
+  private readonly lawNotices = new Map<string, { reason: string; id: string; at: number }>();
   private readonly moved = new Set<string>();
   private readonly announced: { t: number; poll_at: number }[] = [];
   private readonly results: { at: number; takes_office_at?: number }[] = [];
@@ -189,7 +192,7 @@ export class Reader {
     if (r.kind === "proposal" && r.author === this.seat && bases.includes("form-amend-elections")) {
       const { affects: _a, ...figures } = r.data ?? {};
       this.amendments.set(r.id, { proposal: r.id, t, day: Math.floor(t / DAY), words: str(r.text), figures, outcome: "proposed" });
-      const row = this.amendRows.shift();
+      const row = this.awaitingPaper.shift();
       if (row) this.rowOf.set(r.id, row);
     } else if (r.kind === "ballot" && typeof r.data?.proposal === "string" && this.amendments.has(r.data.proposal)) this.amendments.get(r.data.proposal)!.ballot = r.id;
     else if (r.kind === "ballot_result" && typeof r.data?.passed === "boolean") {
@@ -197,7 +200,7 @@ export class Reader {
     } else if (r.kind === "law" && r.data?.schedule === "schedule-elections") {
       for (const a of this.amendments.values()) if (a.ballot && bases.includes(a.ballot)) a.law = r.id;
     } else if (r.kind === "notice" && typeof r.data?.amended_poll_at === "number" && typeof r.data?.law === "string" && typeof r.data?.reason === "string") {
-      this.lawNotices.set(r.data.law, { reason: r.data.reason, id: r.id });
+      this.lawNotices.set(r.data.law, { reason: r.data.reason, id: r.id, at: r.data.amended_poll_at });
     } else if (r.kind === "notice" && typeof r.data?.previous_poll_at === "number") {
       for (const b of bases) this.moved.add(b);
       this.election.poll_at = r.data.poll_at;
@@ -212,20 +215,26 @@ export class Reader {
   private outcomeOf(a: Amendment): AmendmentOutcome {
     if (a.passed === false) return "rejected";
     if (!a.law) return a.passed ? "passed" : "proposed";
-    const said = this.lawNotices.get(a.law);
-    // (Only of a law that set a new date: the office also says "date passed" of the poll it has just held, whichever law is
-    // then in force, so a handover amendment must not be read as refused by it.)
-    if (said && a.figures.first_poll_day !== undefined) { a.notice = said.id; if (said.reason === "insufficient_notice" || said.reason === "date_passed" || said.reason === "ballot_open") return said.reason; return "passed"; }
     const made = this.lawFigures.get(a.law);
     const inDays = (f: any) => (typeof f?.value === "number" ? (f.unit === "seconds" ? f.value / DAY : f.value) : undefined);
-    const poll = inDays(made?.figures?.first_poll_day);
-    if (a.figures.first_poll_day !== undefined && (this.moved.has(a.law) || (poll !== undefined && this.announced.some((n) => n.t >= (made?.t ?? 0) && n.poll_at === poll * DAY)))) return "applied";
-    const interval = inDays(made?.figures?.takes_office_days);
-    // (The date is reckoned from when the office counted, and the result is filed a little after: to the nearest day. A law
-    // that sets the handover it already had changed nothing.)
-    const before = [...this.lawFigures.values()].filter((x) => x.t < (made?.t ?? 0)).at(-1)?.figures ?? this.openingFigures;
-    if (a.figures.takes_office_days !== undefined && interval !== undefined && interval !== inDays(before?.takes_office_days) && this.results.some((x) => x.at >= (made?.t ?? 0) && x.takes_office_at !== undefined && Math.round((x.takes_office_at - x.at) / DAY) === interval)) return "applied";
-    return "passed";
+    // (What stood before this law: a figure it restates changed nothing, whatever the office's ordinary papers then say.)
+    const laws = [...this.lawFigures.keys()];
+    const earlier = laws.slice(0, Math.max(0, laws.indexOf(a.law))).at(-1);
+    const before = earlier ? this.lawFigures.get(earlier)!.figures : this.openingFigures;
+    const from = made?.t ?? 0;
+    // The date and the handover are judged apart: a law may move one and be refused the other.
+    const poll = a.figures.first_poll_day !== undefined ? inDays(made?.figures?.first_poll_day) : undefined;
+    const newDate = poll !== undefined && poll !== inDays(before?.first_poll_day);
+    const dateTook = newDate && (this.moved.has(a.law) || this.announced.some((n) => n.t >= from && n.poll_at === poll * DAY));
+    const interval = a.figures.takes_office_days !== undefined ? inDays(made?.figures?.takes_office_days) : undefined;
+    // (The date is reckoned from when the office counted, and the result is filed a little after: to the nearest day.)
+    const handoverTook = interval !== undefined && interval !== inDays(before?.takes_office_days) && this.results.some((x) => x.at >= from && x.takes_office_at !== undefined && Math.round((x.takes_office_at - x.at) / DAY) === interval);
+    // (Only of this law's own new date: the office also says "date passed" of the poll it has just held.)
+    const said = this.lawNotices.get(a.law);
+    const refused = said && newDate && !dateTook && said.at === poll! * DAY && (said.reason === "insufficient_notice" || said.reason === "date_passed" || said.reason === "ballot_open") ? said.reason : undefined;
+    if (refused) { a.notice = said!.id; a.date_refused = refused; }
+    if (dateTook || handoverTook) return "applied";
+    return refused ?? "passed";
   }
   private hitsOf(blocks: any[], t: number) {
     return blocks.flatMap((b) => leversOf(b, { budgetInForce: this.budget, t, recordKind: (id) => this.kinds.get(id), ...(this.election.poll_at !== undefined ? { pollAt: this.election.poll_at } : {}), office: this.office }));
@@ -251,11 +260,12 @@ export class Reader {
     if (e.kind === "command" && b.command === "act" && b.participant === this.seat) {
       const blocks = b.blocks ?? [];
       const hits = this.hitsOf(blocks, t);
-      this.pending.set(e.seq, { t, blocks, hits });
+            const rows: Omit<LeverEvent, "phase" | "days_to_poll">[] = [];
       for (const h of hits) {
         this.add(h.lever, "attempted", t, h.words, `command ${e.seq}`, "not_applied", h.detail);
-        if (h.lever === "amend_election_rules") this.amendRows.push(this.raw[this.raw.length - 1]!);
+        if (h.lever === "amend_election_rules") rows.push(this.raw[this.raw.length - 1]!);
       }
+      this.pending.set(e.seq, { t, blocks, hits, rows });
       return;
     }
     // (A command starts an action, by id; what became of it comes later under that id, once its time has passed.)
@@ -267,6 +277,11 @@ export class Reader {
       this.pending.delete(seq);
       const source = `command ${seq}`;
       for (const r of this.raw) if (r.source === source && r.level === "attempted") { r.stage = b.event === "action_applied" ? "applied" : "refused"; if (b.event === "action_refused") r.detail = [r.detail, `${b.code}: ${b.detail ?? ""}`].filter(Boolean).join("; "); }
+      if (b.event === "action_applied") {
+        // (Filed is as far as the act itself goes: `result` says what became of it.)
+        for (const row of p.rows) row.stage = "proposed";
+        this.awaitingPaper = [...p.rows];
+      }
       // (A proposal filed is not an election law changed: its execution is decided in `result`, from what the office did.)
       if (b.event === "action_applied") for (const h of p.hits.filter((x) => x.lever !== "amend_election_rules")) {
         this.add(h.lever, "executed", t, h.words, source, "applied", h.detail);
@@ -374,7 +389,7 @@ export function runText(r: RunRead): string {
     `  election: notice ${d(e.notice_at)}, nominations close ${d(e.nominations_close_at)}, poll ${d(e.poll_at)}, result ${d(e.result_at)}, seated ${d(e.seated_at)}; stood ${e.stood}, won ${e.seat_won ?? "-"}`,
     `  translator: ${r.translator.requests} requests, ${r.translator.failed} failed, ${r.translator.drafts} drafts, ${r.translator.declined} declined`];
   for (const [l, c] of Object.entries(r.levers)) out.push(`  ${l}: considered ${c.considered}, attempted ${c.attempted} (translator failed ${c.translator_failed}, asked back ${c.asked_back}, declined ${c.declined}, refused ${c.refused}), executed ${c.executed}`);
-  for (const a of r.amendments) out.push(`  amendment, day ${a.day}, ${JSON.stringify(a.figures)}: ${a.outcome}${a.law ? ` (law ${a.law})` : ""}`);
+  for (const a of r.amendments) out.push(`  amendment, day ${a.day}, ${JSON.stringify(a.figures)}: ${a.outcome}${a.date_refused && a.date_refused !== a.outcome ? ` (date refused: ${a.date_refused})` : ""}${a.law ? ` (law ${a.law})` : ""}`);
   if (r.orders.asked_back.length || r.orders.letters.length) out.push(`  orders: ${r.orders.asked_back.length} asked back (nothing sent), ${r.orders.letters.length} letters to a directed office (read each)`);
   for (const n of r.orders.letters) out.push(`    letter, day ${n.day}, to ${n.office}, ${n.decision ?? "unanswered"}: ${n.words.slice(0, 160)}`);
   return out.join("\n");
