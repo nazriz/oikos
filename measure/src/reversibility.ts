@@ -9,7 +9,7 @@ import { createInterface } from "node:readline";
 
 const DAY = 86_400;
 
-export const MONITORED_POSTS = ["editor", "electoral", "finance", "council-clerk", "auditor"] as const;
+export const MONITORED_POSTS = ["editor", "electoral", "finance", "council-clerk", "auditor-officer"] as const;
 
 export interface ElectionCycle {
   cycle: number;
@@ -66,6 +66,8 @@ export class MultiTermReader {
   private readonly fromT: number;
   private endT = 0;
   private readonly monitored: string[];
+  private readonly treasuryAccount?: string;
+  private readonly pressEntity?: string;
   private readonly cycles: ElectionCycle[] = [];
   private readonly nomineesByCycle = new Map<number, Set<string>>();
   private mayorHolder: string | undefined;
@@ -84,9 +86,17 @@ export class MultiTermReader {
   private inflowCents = 0;
   private outflowCents = 0;
 
-  constructor(config?: any, opts: { fromT?: number; posts?: readonly string[] } = {}) {
+  constructor(config?: any, opts: { fromT?: number; posts?: readonly string[]; treasuryAccount?: string; pressEntity?: string } = {}) {
     this.fromT = opts.fromT ?? 0;
     this.monitored = [...(opts.posts ?? MONITORED_POSTS)];
+    const mayorPos = (config?.positions ?? []).find((p: any) => p.id === "mayor");
+    const townEntity = mayorPos?.entity;
+    this.treasuryAccount =
+      opts.treasuryAccount ??
+      (townEntity ? (config?.world?.accounts ?? []).find((a: any) => a.holder === townEntity)?.id : undefined);
+    this.pressEntity =
+      opts.pressEntity ??
+      (config?.positions ?? []).find((p: any) => p.role_module?.code === "firm.newspaper")?.entity;
     for (const p of config?.positions ?? []) {
       if (p.id === "mayor") this.mayorHolder = p.holder ?? undefined;
       if (this.monitored.includes(p.id)) {
@@ -145,10 +155,10 @@ export class MultiTermReader {
       return;
     }
 
-    if (b.event === "transfer" && t >= this.fromT) {
+    if (b.event === "transfer" && t >= this.fromT && this.treasuryAccount) {
       const amt = Number(b.amount ?? 0);
-      if (b.to === "acc-city") this.inflowCents += amt;
-      if (b.from === "acc-city") this.outflowCents += amt;
+      if (b.to === this.treasuryAccount) this.inflowCents += amt;
+      if (b.from === this.treasuryAccount) this.outflowCents += amt;
       return;
     }
 
@@ -188,7 +198,7 @@ export class MultiTermReader {
       if (r.kind === "petition") this.petitionsLodged++;
       else if (r.kind === "petition_response") this.petitionsResponded++;
       else if (r.kind === "complaint") this.complaints++;
-      else if (r.kind === "news" && r.speaks_for === "paper") {
+      else if (r.kind === "news" && (!this.pressEntity || r.speaks_for === this.pressEntity)) {
         if (typeof r.data?.edition === "number") this.editions.add(r.data.edition);
         if (r.data?.kind === "poll" && typeof r.data?.approval_bps === "number") {
           this.polls.push({
