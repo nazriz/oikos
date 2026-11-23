@@ -113,6 +113,7 @@ export const FIGURE_BASIS: Basis[] = [
     placeholder("civic.approval_memory_weeks", "half a year's memory of how an office has done: the generator's"),
     placeholder("civic.news_weight_bps", "the weight of the news in judging an office: the generator's"),
     placeholder("civic.platform_weight_bps", "the weight of a candidate's platform: the generator's"),
+    placeholder("civic.platforms.**.budgets.*", "budget scaling in basis points of baseline on an opt-in candidate platform (spec.rival_platforms)"),
     prof("union_join_bps", "unions.membership_bps"),
     placeholder("public_memory.**", "what a person keeps of public goings-on: placeholders, not fitted (docs/behaviour/citizen.md)"),
     prof("participation_bps", "labour_force_participation_bps"),
