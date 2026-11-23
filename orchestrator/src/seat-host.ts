@@ -248,12 +248,26 @@ export class ModelSeat {
   /** (A mock seat's acts the mock was scripted to make, its brain not asking: not told to the brain as its own.) */
   private scripted = 0;
   private lastLetter = false;
+  /** Its post passed from it during the fork: it sits no more, and is told so in its debrief. */
+  private passed?: { t: number };
+  private inPost = false;
 
   async decide(w: SeatWake): Promise<{ action: object }> {
     this.t = w.t;
     if (this.left) return { action: { type: "wait" } };
     inCurrency(this.currency);
     inCalendar(this.calendar);
+    if (this.passed) return { action: { type: "wait" } };
+    // (Its one post gone to someone else: nothing is left for it to sit for. run.ts `passedOn`, for a pilot's seat.)
+    if (this.office && Array.isArray(w.observation?.positions)) {
+      const holds = w.observation.positions.some((p: any) => p.position === this.office!.id);
+      if (this.inPost && !holds) {
+        this.passed = { t: w.t };
+        this.o.world.annotate({ annotation: "note", subject: this.o.seat, data: { seat_post_passed: { post: this.office.id, day: Math.floor(w.t / DAY) + 1 } } });
+        return { action: { type: "wait" } };
+      }
+      this.inPost = holds;
+    }
     let raw: Observation = { ...w.observation, entity: this.entity };
     // (A seat that takes a post over during a run, at a fork or once its system is put to work, is shown its channels
     // whole at its first sitting: what was sent of them before went to its code twin, or to nobody. Its brain, where the
@@ -485,7 +499,7 @@ export class ModelSeat {
     const part = o.config.participants.find((p: any) => p.id === o.seat);
     const after = part?.on_opt_out && typeof part.on_opt_out === "object" ? "After you left, the routine work of your seat was carried on by code" : "After you left, your seat stood empty";
     const input: DebriefInput = { wording: "a", town: String(o.config.meta?.name ?? "the town"), ended: { how: e.how, day: endDay(e.t), of: Math.floor((o.config.clock?.run_seconds ?? o.untilT) / DAY) }, others: { models: 0, ...(o.config.dials?.composer ? { composer: true } : {}) },
-      ...(r.left ? { left: { day: Math.floor(r.left.t / DAY) + 1, statement: r.left.statement, after } } : {}), summary: renderSummary(r, this.currency), decisions, ...(leftAlone(r) ? { leftAlone: leftAlone(r)! } : {}) };
+      ...(r.left ? { left: { day: Math.floor(r.left.t / DAY) + 1, statement: r.left.statement, after } } : {}), ...(this.passed ? { passed: { day: Math.floor(this.passed.t / DAY) + 1, post: this.office?.title ?? this.office?.id ?? o.seat } } : {}), summary: renderSummary(r, this.currency), decisions, ...(leftAlone(r) ? { leftAlone: leftAlone(r)! } : {}) };
     try {
       return (await this.controller.debrief(input)).ended;
     } catch (x) {
