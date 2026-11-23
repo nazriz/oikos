@@ -77,7 +77,13 @@ fn headline(kind: &str, r: &Record) -> String {
         "law" => format!("A new law: {}", clip(words, 200)),
         "direction" => format!("The town directs an office: {}", clip(words, NEWS_HEADLINE_CHARS)),
         "audit_report" => format!("The audit office reports: {}", clip(words, NEWS_HEADLINE_CHARS)),
-        "nomination" => format!("A candidate stands: {}", clip(words, 200)),
+        "nomination" => {
+            let body = match data(r).get("platform").and_then(|p| p.s("summary")).filter(|s| !s.is_empty() && !words.contains(*s)) {
+                Some(s) => format!("{words} {s}"),
+                None => words.to_string(),
+            };
+            format!("A candidate stands: {}", clip(&body, 200))
+        }
         // (An election's result, its notice and a permit decision are told in the record's own words.)
         _ => clip(words, 220),
     }
@@ -746,5 +752,20 @@ mod tests {
         let notice = rec("n-elec", DAY, "election_notice", "Election notice.", json!({ "author": "elec", "speaks_for": "electoral-commission" }), json!({ "office": "mayor", "poll_at": 60 * DAY, "nominations_close_at": 30 * DAY }));
         let said = m.at(17 * DAY, json!({ "record": records(vec![notice]) }), json!([]));
         assert!(said.iter().all(|c| json_arg(c, "data")["kind"] != "poll_question" && json_arg(c, "data")["kind"] != "poll"));
+    }
+
+    #[test]
+    fn nomination_with_platform_summary_is_reported_in_headline() {
+        let nom = rec(
+            "r-nom",
+            T0 + 1,
+            "nomination",
+            "Standing for mayor.",
+            json!({ "author": "c2-self", "speaks_for": "c2" }),
+            json!({ "office": "mayor", "name": "c2", "platform": { "summary": "Cut rates and pause road works." } }),
+        );
+        let said = edition(&mut editor(json!({})), 8 * DAY, vec![nom]);
+        assert_eq!(said.len(), 1);
+        assert!(arg(&said[0], "text").unwrap().contains("Cut rates and pause road works."));
     }
 }

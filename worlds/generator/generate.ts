@@ -324,6 +324,8 @@ export interface TownSpec {
   appointments_procedure?: boolean;
   /** Pre-election newspaper approval and candidate polls plus accountability coverage of directions and audits (opt-in). */
   newspaper_polls?: boolean;
+  /** Optional policy platforms resident candidates may stand on (opt-in; enacted by city.mayor_code if elected). */
+  rival_platforms?: { summary: string; values?: string[]; budgets?: { [line: string]: number }; directions?: { [form: string]: { [field: string]: string } } }[];
   /** The clinic and the school, where the profile describes health and education (world-expansion 4). Default: yes;
    * false: neither (and bodies have no skill). */
   services?: boolean;
@@ -3557,7 +3559,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       ...(RD.commute && RDS ? { commute: { time_bps: RD.commute.time_bps, drive_per_hour: RD.commute.vehicle_cost_per_km * RDS.speed_kmh } } : {}) } } : {}),
     ...(JU ? { tribunal: { entity: "tribunal", challenge_bps: JU.challenge_bps, apply_bps: JU.apply_bps, apply_after_days: JU.apply_after_days } } : {}),
     // (Where they enrol and vote; and the local paper, whose news they read: the paper made above, with the elections.)
-    ...(E ? { electoral_town: "city", electoral_body: ELECTORAL, paper: "paper", civic: { turnout_bps: E.turnout_bps, stand_bps: E.stand_bps, reads_news_bps: E.news_readers_bps, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 } } : {}),
+    ...(E ? { electoral_town: "city", electoral_body: ELECTORAL, paper: "paper", civic: { turnout_bps: E.turnout_bps, stand_bps: E.stand_bps, reads_news_bps: E.news_readers_bps, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500, ...(spec.rival_platforms?.length ? { platforms: spec.rival_platforms } : {}) } } : {}),
     union: "union", union_join_bps: V.unions.membership_bps,
     // (What a person keeps of what is published as it comes: what they saw in the last month, what touched them, and of
     // the rest still standing the most recent few of each kind. Placeholders, not fitted: limited attention and
