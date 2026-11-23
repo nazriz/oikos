@@ -90,9 +90,12 @@ test("the rules: for any place, from the first day, and only what a scenario may
 
 test("each scenario changes what it says it changes", () => {
   const P = loadProfile(spec.profile!).values;
-  // An election due: polling day sixty days in.
+  // An election due: polling day sixty days in; election-contest also narrows the standing rate (PB-10).
   expect(office(base, "electoral").first_poll_day).toBe(365);
   expect(office(town("election-due"), "electoral").first_poll_day).toBe(60);
+  const contest = town("election-contest");
+  expect(office(contest, "electoral").first_poll_day).toBe(60);
+  expect(contest.participants.find((p: any) => p.controller?.params?.civic)?.controller.params.civic.stand_bps).toBe(85);
   // A lean council: a hundredth of the opening balance, half the grants; nobody else's money moved.
   const lean = town("lean-council");
   expect(balance(lean, "acc-city")).toBe(Math.round(P.opening.town / 100));
