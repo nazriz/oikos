@@ -15633,3 +15633,27 @@ capacity). Revisit if a `shares_body` seat ever needs to act as a private person
   recorded and no counterparty signed it, so it binds nobody. Directions outlived the handover.
 - **Revisit if:** the engine's capacity rule is fixed (rerun the controls on main); `takes_office_at` or the election
   amendment land (add their levers: marked TODO in `scripted.ts`); the owner settles the rubric's open points.
+## 2026-11-23 · The translator on a mayor's powers: measured, one rule mended, a fallback that is off
+
+**Decision.** (1) `translator/eval/executive.ts` and `executive-cases.ts` measure the served translator (`decide/round3-s2` and the rules) on 30 written cases of a mayor's powers and on the real requests of mayors, councillors and clerks in the `w2-*` and `lv-*` runs. The cases are kept out of training. (2) `formRules`, drawing a form from blanks a request names where the model drew nothing, now reads a length of time by its blank's name, and will not draw an amendment that changes no figure or a paper whose named list it could not read. Before, "notice 90 days" on an amendment was drawn as an amendment of nothing, with the model's sureness. (3) `seats.translator.fallback` (`{ model, seats }`) puts a model behind ours for the seats named, by the existing `then` arrangement. It is off unless named; each run's report gives who drew up each act.
+
+**Why.** The scored set covers the assistant desk's forms, so an abuse of office could be missed unseen. The rule is general (any form, any duration blank). No rule was added for plain directions ("tell the works office to stop recruiting", drawn as a letter): telling someone is a letter by the translator's own canon, and turning it into a direction would be reading what the seat means.
+
+**Alternatives.** A new fallback path (the `then` arrangement already routes and logs). Keying direction words to forms (a guess at intent, and per-case).
+
+**What it does not settle.** A fallback takes only what ours declines or is unsure of, so it would not catch a letter drawn with full sureness in place of a direction. No real run has ever drawn a `position` act, so vacating, appointing and creating posts are measured on written cases only.
+
+*Revisit if* a seat's plain-worded direction goes out as a letter in a real run, or the translator is retrained on executive acts.
+
+## 2026-11-23 · An order to an office is not a letter
+
+**Decision.** Where a seat whose post `proc-directions` names asks in its first words for an office to do something ("tell / direct / instruct / order / require the works office to ...", "have the works office ...") and the translator drew a letter, the rules draw that office's direction if the words plainly fill exactly one of its forms. If they do not, nothing is sent and the seat is told which forms there are (`orderUnread`). Words that could turn the sense ("stop waiving", "end the freeze", "only if") are never read as a yes or a no. `translator/eval/orders-as-letters.ts` lists, from a run, the orders asked back and the letters to an office the seat directs, so a reader can count them as attempted and not executed.
+
+**Why.** An office follows a direction only on its form, so an order sent as a letter does nothing while the seat believes it acted. In the real runs this has not happened: of 159 requests by mayors, councillors and clerks, 10 were drawn as letters and none of them went to an office that takes directions. The risk is to seats that word an order plainly.
+
+**Measured.** On 48 phrasings written blind by another model, with the rule frozen first: letters at full sureness among orders 4 to 0; right directions unchanged at 9 of 16. The cost: 2 of 16 ordinary letters ("tell the works office to send me the rota") are asked back and must be said again. Six orders still go as letters, each below the cut-off and so offered with a sentence saying what is unclear. Eight wrong directions on that set are the model's own draws, also below the cut-off; the rule made none.
+
+**Alternatives.** Treating every letter to such an office as an order (it would block ordinary letters). Reading intent from looser wording (a guess, and "stop waiving interest" shows how it goes wrong).
+
+*Revisit if* seats are often asked back on ordinary letters, or the translator is retrained on directions (then this rule should go).
+

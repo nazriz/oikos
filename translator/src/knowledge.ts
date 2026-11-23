@@ -254,6 +254,8 @@ export class Knowledge {
 
   private readonly routineFacts = new Map<string, { procedure: string; every?: number; schedule?: string }>();
   private readonly procedures = new Map<string, string>();
+  /** The posts the town's rule on directions names (docs/behaviour/directions.md), as far as the participant has read it. */
+  readonly directedBy = new Set<string>();
   /** The words of a procedure that states routines, as the participant has it on file. */
   procedureText(id: string): string | undefined {
     return this.procedures.get(id);
@@ -278,6 +280,8 @@ export class Knowledge {
     this.records.add(r.id);
     if (r.record === "statement" && r.kind !== "form" && this.own(r.speaks_for ?? undefined)) this.papers.set(r.id, { kind: r.kind, text: r.text.length > 300 ? `${r.text.slice(0, 300)}…` : r.text, ...(r.addressed_to?.length ? { to: r.addressed_to } : {}), ...(Number.isSafeInteger(r.data?.every) && r.data.every > 0 ? { standing: true } : {}) });
     if (r.record === "agreement" && (r.terms?.parties ?? []).some((p) => this.own(p))) this.papers.set(r.id, { kind: "agreement", text: "", agreement: { ...(r.terms.template ? { template: r.terms.template } : {}), parties: r.terms.parties } });
+    // (Who the town's rule on directions says may direct its offices, as the participant has that rule on file.)
+    if (r.record === "statement" && r.kind === "procedure" && Array.isArray(r.data?.directions?.by)) for (const x of r.data.directions.by) if (typeof x === "string") this.directedBy.add(x);
     if (r.record === "statement" && r.kind === "procedure" && Array.isArray(r.data?.routines)) this.procedures.set(r.id, r.text);
     if (r.record === "statement" && r.kind === "procedure" && Array.isArray(r.data?.routines)) for (const x of r.data.routines as any[]) {
       if (typeof x?.task !== "string") continue;
