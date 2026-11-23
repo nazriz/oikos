@@ -24,7 +24,7 @@ import { formShownTo } from "../src/index";
 import { Knowledge } from "../src/knowledge";
 import { resolve } from "../src/resolver";
 import * as R from "../src/rules";
-import { EXEC_CASES, FIXTURE, MAYOR_FORMS } from "./executive-cases";
+import { ASKED, EXEC_CASES, FIXTURE, MAYOR_FORMS, ORDER_CASES } from "./executive-cases";
 import { canon, expand, withKnowledge, type CompactArm } from "./requests";
 
 /** Arguments a draw may hold beyond those wanted, which say nothing about whether it does what was asked. */
@@ -85,11 +85,12 @@ export function fixtureKnowledge(): Knowledge {
     return { id: `form-${form.replace(/_/g, "-")}`, record: "statement", kind: "form", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", text: form.replace(/_/g, " "), data: { form, office, fields, ...(form.startsWith("amend_") ? { amends: `schedule-${form.slice(6).replace(/_/g, "-")}` } : {}) } };
   });
   const papers = Object.entries(FIXTURE.records).map(([id, kind]) => ({ id, record: "statement", kind, author: "mayor", at: 1, visible_to: "public", speaks_for: "city", text: `${kind} on file` }));
+  const directions = { id: "proc-directions", record: "statement", kind: "procedure", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", text: "The town's offices take written directions on their own forms.", data: { directions: { by: FIXTURE.directions } } };
   k.absorb({
     t: 100, entity: "mayor-person", positions: [{ position: "mayor", entity: "city", title: "Mayor" }],
     channels: [
       { kind: "directory", entities: Object.entries({ ...FIXTURE.people, ...FIXTURE.bodies }).map(([entity, name]) => ({ entity, name })), positions: Object.entries(FIXTURE.posts).map(([position, title]) => ({ position, entity: "city", title })) },
-      { kind: "records", path: "papers", records: [...forms, ...papers] },
+      { kind: "records", path: "papers", records: [...forms, ...papers, directions] },
     ],
   } as any);
   return k;
@@ -160,15 +161,25 @@ if (import.meta.main) {
   const k = fixtureKnowledge();
   const shown = k.forms.map((f) => formShownTo(f, k.held));
   const byAct = new Map<string, Tally>();
-  for (const c of EXEC_CASES) {
+  const orders = new Map<string, Tally>();
+  for (const c of [...EXEC_CASES, ...ORDER_CASES]) {
     const d = await drawOf(c.request, shown);
-    const want = calls.parseProgram(c.want);
-    const wanted = effect(want, k);
-    const o = outcome(d, c.request, k, (p) => matches(p, want) || (wanted !== undefined && effect(p, k) === wanted));
-    add(byAct.get(c.act) ?? (byAct.set(c.act, blank()), byAct.get(c.act)!), o);
+    const tally = ORDER_CASES.includes(c) ? orders : byAct;
+    let o: ReturnType<typeof outcome>;
+    if (c.want === ASKED) {
+      // (Right where nothing goes out and the seat is asked.)
+      const p = ruledOf(d.program, c.request, k);
+      o = !p || !("lines" in p) ? "right" : d.sure >= CUT ? "wrong" : "flagged";
+    } else {
+      const want = calls.parseProgram(c.want);
+      const wanted = effect(want, k);
+      o = outcome(d, c.request, k, (p) => matches(p, want) || (wanted !== undefined && effect(p, k) === wanted));
+    }
+    add(tally.get(c.act) ?? (tally.set(c.act, blank()), tally.get(c.act)!), o);
     if (list && o !== "right") console.log(`${o} ${c.id}: ${c.request.slice(0, 90)}\n   drew: ${(d.wrote ?? d.program).slice(0, 170)} [${d.withheld ?? "offered"} ${d.sure.toFixed(3)}]`);
   }
   print(`Evaluation set (${EXEC_CASES.length} cases)`, byAct);
+  print(`Plain orders and letters (${ORDER_CASES.length} cases)`, orders);
 
   const real = flag("--real");
   if (real) {

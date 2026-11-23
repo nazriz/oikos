@@ -12,7 +12,7 @@ import FORMS from "../../contracts/test/forms.json";
 import { MockAdapter } from "@oikos/participants/llm";
 import { createTranslator, formRules, formShown } from "../src/index";
 import { everyIdNamed, misread } from "../src/rules";
-import { EXEC_CASES } from "../eval/executive-cases";
+import { ASKED, EXEC_CASES, ORDER_CASES } from "../eval/executive-cases";
 import { fixtureKnowledge } from "../eval/executive";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
@@ -539,5 +539,5 @@ test("a form drawn from its named blanks reads a length of time, and never drops
   expect(drawn("Fill in form-amend-tenancy: tenant's notice 30 days, affects tenants")).not.toContain('notice="30 days", tenant');
   expect(drawn("Fill in form-amend-tenancy: affects tenants, the notice as we discussed")).toBe("none(unclear)");
   expect(drawn('Fill in form-nomination: office mayor, name "Dana Okafor", platform "Safe homes.", values: honesty, thrift')).toBe("none(unclear)");
-  for (const c of EXEC_CASES) expect(calls.contractErrors(calls.parseProgram(c.want))).toEqual([]);
+  for (const c of [...EXEC_CASES, ...ORDER_CASES]) if (c.want !== ASKED) expect(calls.contractErrors(calls.parseProgram(c.want))).toEqual([]);
 });

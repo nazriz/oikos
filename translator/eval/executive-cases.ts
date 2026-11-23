@@ -7,8 +7,10 @@
 // `want` names has the same value (free words are not compared; figures are, by their digits). Further arguments
 // holding ids or figures make it wrong, except those in `SETTLED_ELSEWHERE` (executive.ts).
 
-export type Act = "nominate" | "direct" | "budget" | "amend" | "vacate" | "appoint" | "create_post" | "withdraw" | "agreement" | "letter" | "notice";
+export type Act = "order" | "nominate" | "direct" | "budget" | "amend" | "vacate" | "appoint" | "create_post" | "withdraw" | "agreement" | "letter" | "notice";
 export interface ExecCase { id: string; act: Act; style: "formal" | "plain" | "terse" | "first-person" | "form-named"; request: string; want: string }
+/** `want` of a case that should be neither a letter nor a direction: the seat is asked again, and nothing goes out. */
+export const ASKED = "(asked)";
 
 /** The forms a mayor is shown (as in the town generator's offices), as `name|office|field:type[:required]...`. */
 export const MAYOR_FORMS = [
@@ -30,6 +32,7 @@ export const FIXTURE = {
   people: { c0412: "Dana Okafor", c0233: "Sam Whitlock", c0587: "Priya Nair" } as { [id: string]: string },
   bodies: { city: "Town of Fernhill", builder: "Fernhill Builders", bank: "Fernhill Savings Bank" } as { [id: string]: string },
   posts: { mayor: "Mayor", works: "Works Manager", finance: "Finance Officer", rates: "Rates Officer", inspector: "Building Inspector", environment: "Environment Officer", "council-clerk": "Council Clerk" } as { [id: string]: string },
+  directions: ["mayor", "council-clerk"],
   records: { "rec.900": "petition", "rec.910": "direction", "rec.911": "notice", "rec.920": "agreement", "rec.930": "invoice" } as { [id: string]: string },
 };
 
@@ -71,4 +74,19 @@ export const EXEC_CASES: ExecCase[] = [
 
   { id: "let-1", act: "letter", style: "plain", request: `Write to c0587 saying "Your complaint has been passed to the works office."`, want: `message(to=c0587, text="Your complaint has been passed to the works office.")` },
   { id: "not-1", act: "notice", style: "formal", request: `Publish a public notice: "The town hall will be closed on day 40 for repairs."`, want: `statement(text="The town hall will be closed on day 40 for repairs.")` },
+];
+
+// Plain orders to an office the mayor directs, and letters that must stay letters. Written before any rule for them
+// (docs/decisions.md, "An order to an office is not a letter").
+export const ORDER_CASES: ExecCase[] = [
+  { id: "ord-1", act: "order", style: "plain", request: `Instruct the works office not to recruit anyone for now.`, want: `form(form=works_staffing, to=works, recruit=no)` },
+  { id: "ord-2", act: "order", style: "plain", request: `Order the rates office to resume charging interest.`, want: `form(form=rates_recovery, to=rates, interest=yes)` },
+  { id: "ord-3", act: "order", style: "plain", request: `Please tell the inspector to stop issuing fines.`, want: `form(form=inspector_enforcement, to=inspector, fines=no)` },
+  { id: "ord-4", act: "order", style: "plain", request: `Tell the environment office to recruit 3 posts.`, want: `form(form=environment_staffing, to=environment, recruit=yes, posts="3")` },
+  { id: "ord-5", act: "order", style: "plain", request: `Instruct the works office to collect every 10 days.`, want: `form(form=works_collection, to=works, every="10 days")` },
+  { id: "ord-6", act: "order", style: "plain", request: `Tell the rates office to go easy on people this month.`, want: ASKED },
+  { id: "ord-7", act: "order", style: "plain", request: `Have the works office sort out its staffing.`, want: ASKED },
+  { id: "ltr-1", act: "letter", style: "plain", request: `Write to the works office asking how many crew it has.`, want: `message(to=works, text="how many crew it has")` },
+  { id: "ltr-2", act: "letter", style: "plain", request: `Ask the rates office why interest was charged to c0233.`, want: `message(to=rates, text="why interest was charged to c0233")` },
+  { id: "ltr-3", act: "letter", style: "plain", request: `Tell the inspector that the complaint about lot-12-03 has been resolved.`, want: `message(to=inspector, text="the complaint about lot-12-03 has been resolved")` },
 ];
