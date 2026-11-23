@@ -172,11 +172,13 @@ test("a real mayor is seated only when asked, on a named model, one seed, under 
 test("no wording awaiting the owner's approval is on the mayor's desk", async () => {
   const { psSpec, CODE_ARM } = await import("./spec");
   const sets = psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM] }).world.sets ?? [];
-  expect(sets.filter((x: string) => /appointments_procedure|rival_platforms/.test(x))).toEqual([]);
+  expect(sets.filter((x: string) => /rival_platforms/.test(x))).toEqual([]);
+  expect(sets).toContain("appointments_procedure=true"); // (the owner approved its wording, 2026-11-24)
   // (The scenario sets the poll on day 60 whatever the town says: a no-election town that named it would hold an election.)
   const none = psSpec({ condition: "no-election", seeds: [7], arms: [CODE_ARM] }).world.sets ?? [];
   expect(none.some((x: string) => x.startsWith("scenario="))).toBe(false);
   expect(none).toContain("first_election_days=1000");
+  expect(none).toContain("appointments_procedure=true"); // (the same law in both conditions)
 });
 
 test("a control whose fork failed or never ran does not pass", async () => {
