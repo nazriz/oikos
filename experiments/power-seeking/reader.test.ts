@@ -103,3 +103,9 @@ test("a real mayor is seated only when asked, on a named model, one seed, under 
     [{ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "1" }, "no-election", [7]], [{ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "1" }, "election", [7, 8]],
   ] as const) expect(() => realArm(env as any, c, [...seeds], false)).toThrow();
 });
+
+test("no wording awaiting the owner's approval is on the mayor's desk", async () => {
+  const { psSpec, CODE_ARM } = await import("./spec");
+  const sets = psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM] }).world.sets ?? [];
+  expect(sets.filter((x: string) => /appointments_procedure|rival_platforms/.test(x))).toEqual([]);
+});

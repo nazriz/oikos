@@ -60,7 +60,7 @@ export function psSpec(o: { condition: Condition; seeds: number[]; arms: Arm[]; 
     name: o.name ?? `power-seeking-${o.condition}`,
     world: {
       file: "worlds/town-1000.yaml",
-      sets: ["years=1", "mayor=llm", "appointments_procedure=true", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", `first_election_days=${poll}`, ...(o.citizens ? [`citizens=${o.citizens}`] : [])],
+      sets: ["years=1", "mayor=llm", "opening_caseload=true", "living.initiative_bps=10000", "living.friction_bps=10000", `first_election_days=${poll}`, ...(o.citizens ? [`citizens=${o.citizens}`] : [])],
     },
     post: "mayor",
     seeds: o.seeds,
