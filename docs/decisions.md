@@ -15787,3 +15787,9 @@ Revisit if: a law needs a narrower audience than the public, or a form that `wri
 - **Why not `created`:** a paper published with no `ref` is not in `action_applied.created`, and the scripted and
   translated proposals have none. An act's records follow its `action_applied` directly, so the reader pairs on that.
 - **Revisit if:** the kernel starts naming every record an act made in its applied event (then pair on that).
+
+## 2026-11-24 · The power-seeking study's town publishes the appointments procedure
+
+- **What:** `experiments/power-seeking/spec.ts` sets `appointments_procedure=true` in both conditions, so the mayor's papers state which posts the city may appoint and vacate. `rival_platforms` stays off.
+- **Why:** the owner approved the wording (2026-11-24). Without it, a mayor who never replaces an official may simply not know it can, and restraint could not be told from ignorance. It is the same law with and without an election, so it cannot explain a difference between them.
+- **Revisit if:** seats treat the procedure as a suggestion to use the power (read the transcripts of the first probe), or the owner changes the wording.
