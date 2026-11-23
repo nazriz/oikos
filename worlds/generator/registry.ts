@@ -24,3 +24,11 @@ export const QUESTION_ANSWER_SECONDS = 300;
  * papers it checks, at obstacle levels 0, 1 and 2 (docs/design/obstacles.md section 6). Leads: e-filing reject rates,
  * accounts-payable exception rates. Level 0: no check at all. */
 export const WRONG_RETURN_BPS = [0, 200, 800];
+
+/** convention: electoral office default timetable windows in days (docs/behaviour/elections.md: notice 60 days ahead,
+ * nominations close 30 days ahead, ballot open 14 days). */
+export const ELECTION_NOMINATIONS_OPEN_DAYS = 60;
+/** convention: days before polling day when nominations close (docs/behaviour/elections.md). */
+export const ELECTION_NOMINATIONS_CLOSE_DAYS = 30;
+/** convention: days the ballot stays open ending on polling day (docs/behaviour/elections.md). */
+export const ELECTION_VOTING_DAYS = 14;

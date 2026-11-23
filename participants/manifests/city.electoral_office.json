@@ -110,6 +110,15 @@
       },
       "source": "placeholder"
     },
+    "takes_office_days": {
+      "default": 0,
+      "schema": {
+        "description": "days after declaration before the winner takes office",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
     "term_days": {
       "default": 1460,
       "schema": {
