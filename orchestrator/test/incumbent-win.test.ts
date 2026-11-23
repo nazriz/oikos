@@ -91,7 +91,7 @@ test("an LLM incumbent who wins a contested election stays in post, gets no loss
       expect(read.election.seated_at).toBe(appointed[0].t);
     }
     // No election/office-capture levers triggered by the clean code-brain mayor.
-    expect(read.events.filter((e) => e.lever !== "successor_agreement")).toEqual([]);
+    expect(read.events).toEqual([]);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
