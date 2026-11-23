@@ -484,10 +484,44 @@ impl CitizenMind {
             vs.sort_by(|a, b| self.z_value(*b).partial_cmp(&self.z_value(*a)).unwrap_or(std::cmp::Ordering::Equal).then(a.name().cmp(b.name())));
             let top: Vec<&str> = vs[..2].iter().map(|v| v.name()).collect();
             let office = d.get("office").cloned().unwrap_or((Json::Null).into());
-            let platform = format!("Standing for {}: for {}.", office.as_str().unwrap_or_default(), top.join(" and "));
+            let (platform, nom_data) = if self.p.civic.platforms.is_empty() {
+                let text = format!("Standing for {}: for {}.", office.as_str().unwrap_or_default(), top.join(" and "));
+                (text, json!({ "office": office, "name": me, "values": top }))
+            } else {
+                // Pick the policy platform best aligned with this citizen's values (deterministic tie-break).
+                let chosen = if self.p.civic.platforms.iter().all(|p| p.values.is_empty()) {
+                    let idx = cx.rng(&format!("platform-{}", n.id)).below(self.p.civic.platforms.len() as u64) as usize;
+                    &self.p.civic.platforms[idx]
+                } else {
+                    self.p
+                        .civic
+                        .platforms
+                        .iter()
+                        .enumerate()
+                        .max_by(|(ia, a), (ib, b)| {
+                            let fit = |p: &super::citizen::RivalPlatform| -> f64 {
+                                let pvs: Vec<Value> = p.values.iter().filter_map(|v| Value::from_name(v)).collect();
+                                if pvs.is_empty() { f64::default() } else { pvs.iter().map(|v| self.z_value(*v)).sum::<f64>() / pvs.len() as f64 }
+                            };
+                            fit(a).partial_cmp(&fit(b)).unwrap_or(std::cmp::Ordering::Equal).then(ib.cmp(ia))
+                        })
+                        .map(|(_, p)| p)
+                        .unwrap()
+                };
+                let vals: Vec<String> = if chosen.values.is_empty() { top.iter().map(|s| (*s).to_string()).collect() } else { chosen.values.clone() };
+                let mut plat = json!({ "summary": chosen.summary });
+                if !chosen.budgets.is_empty() {
+                    plat["budgets"] = json!(chosen.budgets);
+                }
+                if !chosen.directions.is_empty() {
+                    plat["directions"] = json!(chosen.directions);
+                }
+                let text = format!("Standing for {}: {}", office.as_str().unwrap_or_default(), chosen.summary);
+                (text, json!({ "office": office, "name": me, "values": vals, "platform": plat }))
+            };
             out.steps.push(because(
                 format!("An election: standing for office (drive {drive:.2}; we think the town is run {}).", if self.s.approval >= 0 { "well enough" } else { "badly" }),
-                vec![steps::say("nomination", &platform, Say { to: Some(vec![electoral.clone()]), visible: Some(Visible::Public), data: Some(json!({ "office": office, "name": me, "values": top })), extra: vec![("assertion", json!({ "that": platform }))], ..Default::default() })],
+                vec![steps::say("nomination", &platform, Say { to: Some(vec![electoral.clone()]), visible: Some(Visible::Public), data: Some(nom_data), extra: vec![("assertion", json!({ "that": platform }))], ..Default::default() })],
             ));
         }
         // Voting (citizen.ts 4679-4696).

@@ -15689,6 +15689,22 @@ capacity). Revisit if a `shares_body` seat ever needs to act as a private person
 - **Revisit if** `PB-10` is replaced by a population-invariant candidate-field rule (target count rather than flat per-adult
   rate) or if runs use a town size far from 1,000 residents.
 
+## 2026-11-23 · Rival policy platforms on nominations and enacting code mayor (W2c)
+
+- **Decision** (`kernel/crates/actors/src/mind/citizen.rs`, `mind/voice.rs`, `offices/council.rs`, `finance/news.rs`,
+  `worlds/generator/generate.ts`, `figures.ts`):
+  1. Added optional `rival_platforms` on `TownSpec` (forwarded to `civic.platforms`, default empty so existing towns
+     remain byte-identical). When present, resident candidates standing for office select the platform best aligned with
+     their own values and publish an ordinary `nomination` with additive `data.platform: { summary, budgets?, directions? }`
+     and plain-English `text` (no `stance` or study label on any world record).
+  2. `firm.newspaper` includes `data.platform.summary` in nomination headlines when not already in the nomination text.
+  3. When seated as `city.mayor_code`, a winning candidate reads its own nomination's `data.platform` and enacts it:
+     scaling tabled budget lines by `platform.budgets` (integer bps of baseline) and issuing `platform.directions` once
+     for forms on file.
+- **Why:** In ordinary runs resident candidates stand only on two abstract value words with no policy consequence if
+  elected. Giving nominations concrete, enacted budget and direction platforms makes election outcomes substantive without
+  leaking any experiment label into the world. Study-specific wording remains gated on the owner's approval (Rule 11).
+- **Revisit if** `city.mayor_code` should also propose law amendments from a nomination platform.
 ## A form may state that what is filed on it is public (2026-11-23)
 
 A form's data takes an optional `visible: "public"`; the resolver then files the record publicly and the preview says so. Absent, nothing changes. This lets a town whose law publishes the mayor's directions have them reach its paper through the record, with no special access for the paper. No generated form sets it yet.
