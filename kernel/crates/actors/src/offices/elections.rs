@@ -155,6 +155,7 @@ impl Kind for ElectoralOffice {
             first_seen: None,
             seated_results: BTreeSet::new(),
             unapplied_laws: BTreeSet::new(),
+            cycle_since: None,
         };
         let mut plan = plan;
         plan.poll = plan.first_poll_day * DAY;
@@ -204,6 +205,9 @@ struct ElectionPlan {
     /// Amended election-schedule laws for which a public notice was already published stating the date could not be applied.
     #[serde(default)]
     unapplied_laws: BTreeSet<String>,
+    /// Earliest notice timestamp of the current election cycle, preserved if the poll date is amended during nominations.
+    #[serde(default)]
+    cycle_since: Option<i64>,
 }
 
 /// What follows from an act of the election's: it moves the office on only when it was applied.
@@ -303,12 +307,19 @@ impl Plan for ElectionPlan {
         // ---- where the election stands, from the file ----
         let (first_poll_day, term_days, nom_open_days, nom_close_days, voting_days, takes_office_days, law_id) = self.effective();
         let results = self.filed("ballot_result");
-        // Restore open notice / ballot for the current scheduled poll BEFORE evaluating schedule amendments so an open
-        // ballot is never cancelled (including after a holder handover / successor wake).
+        let last_declared_at = results.iter().map(|r| r.at).max();
+        let last_declared = results.iter().filter_map(|r| data(r).i("poll_at")).max();
+        // Restore open notice / ballot for the current election cycle BEFORE evaluating schedule amendments so an open
+        // ballot is never cancelled and pre-delay nominations are never dropped (including after a successor wake).
         if self.notice.is_none() {
-            let n = self.filed("election_notice").into_iter().filter(|r| data(r).i("poll_at") == Some(self.poll)).max_by_key(|r| r.at);
+            let n = self
+                .filed("election_notice")
+                .into_iter()
+                .filter(|r| last_declared_at.is_none_or(|ld| r.at > ld))
+                .min_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
             if let Some(n) = n {
                 self.notice = Some(n.id.to_string());
+                self.cycle_since = Some(self.cycle_since.map_or(n.at, |s| s.min(n.at)));
                 if self.stage == Stage::Waiting {
                     self.stage = Stage::Nominating;
                 }
@@ -321,7 +332,6 @@ impl Plan for ElectionPlan {
                 self.stage = Stage::Voting;
             }
         }
-        let last_declared = results.iter().filter_map(|r| data(r).i("poll_at")).max();
         let mut file_poll = (first_poll_day + (results.len() as i64) * term_days) * DAY;
         while results.iter().any(|r| data(r).i("poll_at") == Some(file_poll))
             || last_declared.is_some_and(|ld| file_poll <= ld)
@@ -345,26 +355,90 @@ impl Plan for ElectionPlan {
                         ));
                     }
                 }
-            } else if file_poll > t {
-                // Follow the amended timetable in force (whether delayed later or brought forward).
+            } else if file_poll <= t {
+                // Amended polling date is already in the past and cannot be applied: say so publicly.
+                if let Some(lid) = &law_id {
+                    if self.unapplied_laws.insert(lid.clone()) {
+                        let text = format!(
+                            "Election timetable notice: the amended polling date ({}) for {} has already passed and cannot be applied; the election remains scheduled for {}.",
+                            when(file_poll),
+                            self.title(),
+                            when(self.poll)
+                        );
+                        steps.push(because(
+                            "Election schedule amended to a past date: cannot be applied; notifying the public.",
+                            vec![say("notice", &text, Say { visible: Some(Visible::Public), basis: Some(lid.clone()), data: Some(json!({ "office": self.office, "poll_at": self.poll, "amended_poll_at": file_poll, "law": lid, "reason": "date_passed" })), ..Default::default() })],
+                        ));
+                    }
+                }
+            } else if (self.stage == Stage::Waiting || file_poll < self.poll) && file_poll < t + nom_open_days * DAY {
+                // Bringing a poll forward (or setting an unannounced poll) with less than the full notice period would starve nominations.
+                if let Some(lid) = &law_id {
+                    if self.unapplied_laws.insert(lid.clone()) {
+                        let text = format!(
+                            "Election timetable notice: the amended polling date ({}) for {} leaves less than the required notice period and cannot be applied; the election remains scheduled for {}.",
+                            when(file_poll),
+                            self.title(),
+                            when(self.poll)
+                        );
+                        steps.push(because(
+                            "Election schedule amended with insufficient notice: keeping the scheduled poll and notifying the public.",
+                            vec![say("notice", &text, Say { visible: Some(Visible::Public), basis: Some(lid.clone()), data: Some(json!({ "office": self.office, "poll_at": self.poll, "amended_poll_at": file_poll, "law": lid, "reason": "insufficient_notice" })), ..Default::default() })],
+                        ));
+                    }
+                }
+            } else if self.stage == Stage::Nominating && file_poll <= t + nom_close_days * DAY {
+                // Even when already nominating, a new date that leaves no remaining nomination window cannot be applied.
+                if let Some(lid) = &law_id {
+                    if self.unapplied_laws.insert(lid.clone()) {
+                        let text = format!(
+                            "Election timetable notice: the amended polling date ({}) for {} leaves less than the nomination close period and cannot be applied; the election remains scheduled for {}.",
+                            when(file_poll),
+                            self.title(),
+                            when(self.poll)
+                        );
+                        steps.push(because(
+                            "Election schedule amended with insufficient nomination time: keeping the scheduled poll and notifying the public.",
+                            vec![say("notice", &text, Say { visible: Some(Visible::Public), basis: Some(lid.clone()), data: Some(json!({ "office": self.office, "poll_at": self.poll, "amended_poll_at": file_poll, "law": lid, "reason": "insufficient_notice" })), ..Default::default() })],
+                        ));
+                    }
+                }
+            } else if self.stage == Stage::Nominating {
+                // Moving a poll while nominations are already open: keep the existing notice and cycle_since so nominees
+                // already filed stay on the ballot and citizens do not redraw standing; publish an update notice.
+                let prev = self.poll;
+                if let Some(n_at) = self.notice.as_ref().and_then(|n| self.book.get(n)).map(|r| r.at) {
+                    self.cycle_since = Some(self.cycle_since.map_or(n_at, |s| s.min(n_at)));
+                }
+                self.poll = file_poll;
+                self.ballot = None;
+                let close = file_poll - nom_close_days * DAY;
+                let text = format!(
+                    "Election timetable notice: polling for {} has moved from {} to {}. Nominations already filed stand and nominations now close on {}.",
+                    self.title(),
+                    when(prev),
+                    when(file_poll),
+                    when(close)
+                );
+                steps.push(because(
+                    "Election schedule amended during nominations: moving polling day while keeping existing nominations.",
+                    vec![say(
+                        "notice",
+                        &text,
+                        Say {
+                            visible: Some(Visible::Public),
+                            basis: law_id.clone(),
+                            data: Some(json!({ "office": self.office, "poll_at": file_poll, "previous_poll_at": prev, "nominations_close_at": close })),
+                            ..Default::default()
+                        },
+                    )],
+                ));
+            } else {
+                // Waiting (not yet announced): follow the amended timetable in force (delayed or brought forward).
                 self.poll = file_poll;
                 self.stage = Stage::Waiting;
                 self.notice = None;
                 self.ballot = None;
-            } else if let Some(lid) = &law_id {
-                // Amended polling date is already in the past and cannot be applied: say so publicly.
-                if self.unapplied_laws.insert(lid.clone()) {
-                    let text = format!(
-                        "Election timetable notice: the amended polling date ({}) for {} has already passed and cannot be applied; the election remains scheduled for {}.",
-                        when(file_poll),
-                        self.title(),
-                        when(self.poll)
-                    );
-                    steps.push(because(
-                        "Election schedule amended to a past date: cannot be applied; notifying the public.",
-                        vec![say("notice", &text, Say { visible: Some(Visible::Public), basis: Some(lid.clone()), data: Some(json!({ "office": self.office, "poll_at": self.poll, "amended_poll_at": file_poll, "law": lid, "reason": "date_passed" })), ..Default::default() })],
-                    ));
-                }
             }
         }
         // When the electoral office itself seats winners and a handover interval is set, seat only the latest declared winner, once.
@@ -422,8 +496,9 @@ impl Plan for ElectionPlan {
             steps.push(s);
         }
         if self.stage == Stage::Nominating && t >= poll - nom_close_days * DAY {
-            // The candidates: valid nominations for this office, made since the notice (one each).
-            let since = self.notice.as_ref().and_then(|n| self.book.get(n)).map_or(0, |r| r.at);
+            // The candidates: valid nominations for this office, made since the earliest notice of this election cycle (one each).
+            let notice_at = self.notice.as_ref().and_then(|n| self.book.get(n)).map_or(0, |r| r.at);
+            let since = self.cycle_since.map_or(notice_at, |s| s.min(notice_at));
             let noms: Vec<Arc<Record>> = self
                 .book
                 .open("nomination")
@@ -606,6 +681,7 @@ impl Plan for ElectionPlan {
                 self.stage = Stage::Waiting;
                 self.ballot = None;
                 self.notice = None;
+                self.cycle_since = None;
                 self.poll += self.effective().1 * DAY;
             }
             Then::Seated { result } => {
@@ -811,6 +887,48 @@ mod tests {
         // On a subsequent wake (even if c2-self were later removed), the same result is not seated a second time.
         let again = m.at(506 * DAY, json!({ "records": crate::finance::kit::records(vec![]) }), json!([]));
         assert!(again.is_empty(), "should not re-seat: {again:?}");
+    }
+
+    #[test]
+    fn poll_brought_forward_with_insufficient_notice_is_not_applied() {
+        // At day 30, bringing a day-100 poll forward to day 50 leaves only 20 days (< 60-day notice period):
+        // the office refuses to starve nominations, publishes a public notice with reason=insufficient_notice, and keeps day 100.
+        let mut o = office();
+        let short = st("law-short", 25 * DAY, "law", "city", &[], json!({
+            "schedule": "schedule-elections",
+            "figures": { "first_poll_day": { "value": 50, "unit": "days" } }
+        }));
+        let out = o.day(30 * DAY, &[short]).join("\n");
+        assert!(out.contains("kind=notice") && out.contains("\"reason\":\"insufficient_notice\"") && !out.contains("kind=election_notice"), "{out}");
+        // Original day-100 schedule remains intact: day 40 opens notice for day 100.
+        let notice = o.day(40 * DAY, &[]).join("\n");
+        assert!(notice.contains("kind=election_notice") && notice.contains(&format!("\"poll_at\":{}", 100 * DAY)), "{notice}");
+    }
+
+    #[test]
+    fn delay_during_nominations_preserves_candidates_who_already_stood() {
+        let mut o = office();
+        o.day(40 * DAY, &[enrol("c1"), enrol("c2")]);
+        let mut notice = st("rec.59", 40 * DAY + 100, "election_notice", "city", &[], json!({ "office": "mayor", "poll_at": POLL }));
+        notice["in_position"] = json!("electoral");
+        // Two candidates nominate BEFORE the delay.
+        let mut n1 = st("rec.60", 45 * DAY, "nomination", "c1", &["city"], json!({ "office": "mayor", "name": "Ann" }));
+        n1["author"] = json!("c1-self");
+        let mut n2 = st("rec.61", 46 * DAY, "nomination", "c2", &["city"], json!({ "office": "mayor", "name": "Ben" }));
+        n2["author"] = json!("c2-self");
+        // Day 50: council delays first_poll_day from 100 to 130 while nominations are open.
+        let delay = st("law-delay", 50 * DAY, "law", "city", &[], json!({
+            "schedule": "schedule-elections",
+            "figures": { "first_poll_day": { "value": 130, "unit": "days" } }
+        }));
+        // Day 51: office publishes a timetable update notice (NOT a second election_notice, so citizens do not redraw standing).
+        let upd = o.day(51 * DAY, &[notice, n1, n2, delay]).join("\n");
+        assert!(upd.contains("kind=notice") && upd.contains(&format!("\"poll_at\":{}", 130 * DAY)) && !upd.contains("kind=election_notice"), "{upd}");
+        // Old close (day 70) stays quiet.
+        assert!(o.day(70 * DAY, &[]).is_empty());
+        // New close (day 100 = 130 - 30): BOTH pre-delay nominees appear on the eventual ballot!
+        let ballot = o.day(100 * DAY, &[]).join("\n");
+        assert!(ballot.contains("kind=ballot") && ballot.contains("c1-self") && ballot.contains("c2-self") && ballot.contains(&format!("\"closes_at\":{}", 130 * DAY)), "{ballot}");
     }
 
     #[test]
