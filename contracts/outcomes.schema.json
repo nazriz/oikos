@@ -149,6 +149,7 @@
         "copies": { "description": "For a form that sends a signed copy as it stands (an assistant's `send_signed`): \"=name\", the field naming a sign-off that carries the paper signed (`data.paper`: kind, text, to, visible, data, basis). The paper is published exactly as signed, in the name of whoever it is made for; nothing of it is written from the fields. Both resolvers, held to contracts/test/forms.json.", "type": "string", "pattern": "^=[a-z_][a-z0-9_]{0,31}$" },
         "submit_as": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label" },
         "submit_to": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Id" } },
+        "visible": { "description": "Where the law makes what is filed on this form a public record: \"public\". Absent, it is seen by its author and those it is addressed to. Not for a form that `writes` a paper, which says its own.", "const": "public" },
         "fields": {
           "type": "object",
           "propertyNames": { "pattern": "^[a-z_][a-z0-9_]{0,31}$" },

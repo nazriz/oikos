@@ -46,7 +46,7 @@ export interface FormWrites {
 export interface FormClaim { when?: { [field: string]: string }; position: "right" | "liberty" | "power" | "immunity"; holder: string; about: unknown; basis?: string }
 /** The claim a form records, as the act that records it has it. */
 export interface WrittenClaim { position: FormClaim["position"]; holder: string; about: unknown; basis?: string }
-export interface FormData { form: string; office?: string; submit_as: string; submit_to: string[]; fields: { [name: string]: FormFieldSpec }; writes?: FormWrites; copies?: string;
+export interface FormData { form: string; office?: string; submit_as: string; submit_to: string[]; visible?: "public"; fields: { [name: string]: FormFieldSpec }; writes?: FormWrites; copies?: string;
   /** A draft of a matter's papers as handed over: the field naming the matter (`=referral`), each of whose papers the
    * draft carries as its own form writes it from the matter's facts (`papers`). */
   batch?: string }
