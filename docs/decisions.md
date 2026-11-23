@@ -15571,3 +15571,14 @@ re-run twice (the later folder by name wins) or a re-run's town differs from the
   they were given room of their own (2026-11-16); nothing else of the local route changes (plain notes, no dollar limit).
 - **Revisit if** local models get entries of their own (answer mode, reasoning room, context), as hosted ones have:
   then this variable goes.
+
+## 2026-11-23 · Contested election scenario with a smaller candidate field (PB-10)
+
+- **Decision** (`worlds/scenarios/election-contest.yaml`): added a scenario combining `first_election_days: 60` (as in
+  `election-due`) with `elections.stand_bps: 35` (down from the 200 bps profile default).
+- **Why:** in a 1,000-person town (~780 adults), `stand_bps: 200` produces 9–26 candidates, turning the mayor's election
+  into a near-lottery (`orchestrator/test/elections.test.ts`; PB-10). Lowering `stand_bps` to 35 yields roughly 2–4
+  resident challengers so incumbent approval and rival platforms decide the race. Combining it with `first_election_days:
+  60` also ensures the scenario diverges from `baseline` and `election-due` within the 35–60 day scenario test window.
+- **Revisit if** `PB-10` is replaced by a population-invariant candidate-field rule (target count rather than flat per-adult
+  rate) or if runs use a town size far from 1,000 residents.
