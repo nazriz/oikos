@@ -272,7 +272,14 @@ test("a whole prompt has a ceiling: the oldest of what was looked up is left out
     { role: "user", content: [{ type: "tool_result", tool_use_id: "a", content: `About ask-1.\n\n${waiting(1)}` }, { type: "tool_result", tool_use_id: "b", content: `About ask-2.\n\n${waiting(2)}` }] }];
   const once = supersede(turn);
   const said = (once[2]!.content as any[]).map((b) => b.content);
-  expect(said[0]).toBe(`About ask-1.\n\n${SET_OUT_AGAIN(WAITING_HEAD)}`);
+  expect(said[0]).toBe(`About ask-1.\n\n${SET_OUT_AGAIN(WAITING_HEAD, waiting(1), waiting(2))}`);
+  expect(said[0]).toContain("set out to you here, in full for ask-1.");
+  // A folded setting-out says what the seat was shown, and never that an ask since answered is set out again (rung 4's
+  // false confessions, 2026-11-23: seats that had read in full took the old line to mean they had not).
+  const answered = SET_OUT_AGAIN(WAITING_HEAD, `${waiting(3)}\nAlso waiting, one more:\n- ask-4: a rates notice.`, `${WAITING_HEAD}\n${WAITING_SAYS}\nask-3: a rates notice, set out.\n- ask-4: a rates notice.`);
+  expect(answered).toContain("in full for ask-1 to ask-3, and by a line only for ask-4.");
+  expect(answered).toContain("Still waiting, as it stands now further on: ask-3, ask-4.");
+  expect(answered).toContain("No longer waiting: ask-1, ask-2.");
   expect(said[1]).toBe(`About ask-2.\n\n${waiting(2)}`);
   expect(supersede(once)).toEqual(once);
   const pile = fitPrompt("system", [{ role: "user", content: `Your notebook: mine\n\n${waiting(2)}\n\n## Treasury\n${"z".repeat(30_000)}` }], 20_000, new Set());
