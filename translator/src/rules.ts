@@ -250,6 +250,17 @@ function namedFigure(request: string, field: string): string | undefined {
   for (const m of request.matchAll(re)) seen.add(m[1]!.trim());
   return seen.size === 1 ? [...seen][0] : undefined;
 }
+/** The length of time a request writes for a duration blank by the blank's name ("notice 90 days", "every: 2 weeks"),
+ * the same each time it is written. A blank whose name ends another blank's ("notice", "tenant_notice") does not read
+ * what is written for the longer one ("tenant's notice 30 days"). */
+function namedDuration(request: string, field: string, others: string[]): string | undefined {
+  let text = request;
+  for (const g of others.filter((x) => x !== field && x.endsWith(`_${field}`))) text = text.replace(new RegExp(`${g.split("_").map(escape).join("(?:'s)?[ _-]")}(?:\\s+field)?\\s*(?::|=|\\bis\\b)?\\s*[0-9]*`, "gi"), " ");
+  const re = new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}(?:\\s+field)?\\s*(?::|=|\\bis\\b)?\\s*([0-9]+\\s*(?:days?|weeks?|months?|years?))\\b`, "gi");
+  const seen = new Set<string>();
+  for (const m of text.matchAll(re)) seen.add(m[1]!.replace(/\s+/g, " ").toLowerCase());
+  return seen.size === 1 ? [...seen][0] : undefined;
+}
 /** A figure's digits and separators only, for telling whether two writings are the same figure. */
 const figure = (s: string) => s.replace(/[^0-9.,]/g, "").replace(/[.,]00$/, "").replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "");
 /** A date's day, as "year,day" (a day alone is of the first year). */
@@ -524,6 +535,9 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
         if (m) v = { id: m[1]!.toLowerCase() };
       } else if (t.type === "date") { const d = namedDate(request, field); if (d) v = { text: d }; }
       else if (t.type === "amount" || t.type === "count") { const fg = namedFigure(request, field); if (fg) v = { text: fg }; }
+      // (A length of time by its blank's name. Until 2026-11-23 it was read as nothing, and "notice 90 days" on an
+      // amendment was drawn as an amendment that changed no figure: docs/decisions.md, "The translator on a mayor's powers".)
+      else if (t.type === "duration") { const d = namedDuration(request, field, Object.keys(fields)); if (d) v = { text: d }; }
       else if (t.type !== "list") {
         const x = namedValue(request, field, t.type === "entity" ? (id) => !!k.names?.has(id) || k.held.has(id) : undefined);
         // (An id the seat writes for a record or a party is taken as written: the resolver checks it against the seat's file
@@ -533,7 +547,12 @@ export function formRules(p: calls.Program, request: string, k: FormKnowledge, i
       if (v) args[field] = v;
     }
     const all = Object.entries(fields).every(([field, t]) => !t.required || field === "client" || args[field] !== undefined);
-    if (all && Object.keys(args).length) {
+    // (An amendment says which figure of the law it changes: one with none read is left for the seat to say again, never
+    // drawn as a change of nothing. A form says what it amends in `amends`; `affects` is whom it bears on, no figure.)
+    const changesNothing = typeof namedForm.data?.amends === "string" && !Object.keys(args).some((x) => x !== "affects");
+    // (Nor a paper with a list the request names and this does not read: a council result without who voted for it.)
+    const listUnread = Object.entries(fields).some(([field, t]) => t.type === "list" && new RegExp(`(?:^|[^a-z0-9_-])${spoken(field)}\\b`, "i").test(request));
+    if (all && !changesNothing && !listUnread && Object.keys(args).length) {
       note("fromNamed", `drawn as ${namedForm.data.form} from the blanks the request names`);
       p = { lines: [{ call: { fn: "form", args: { form: { id: namedForm.data.form }, ...args } } as calls.Call }] };
     }

@@ -82,7 +82,7 @@ export function fixtureKnowledge(): Knowledge {
       const options = type.includes("/") ? type.split("/") : undefined;
       return [name, { type: options ? "choice" : type, ...(options ? { options } : {}), ...(req ? { required: true } : {}) }];
     }));
-    return { id: `form-${form.replace(/_/g, "-")}`, record: "statement", kind: "form", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", text: form.replace(/_/g, " "), data: { form, office, fields } };
+    return { id: `form-${form.replace(/_/g, "-")}`, record: "statement", kind: "form", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", text: form.replace(/_/g, " "), data: { form, office, fields, ...(form.startsWith("amend_") ? { amends: `schedule-${form.slice(6).replace(/_/g, "-")}` } : {}) } };
   });
   const papers = Object.entries(FIXTURE.records).map(([id, kind]) => ({ id, record: "statement", kind, author: "mayor", at: 1, visible_to: "public", speaks_for: "city", text: `${kind} on file` }));
   k.absorb({

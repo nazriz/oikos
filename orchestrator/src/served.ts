@@ -34,6 +34,33 @@ export function addServed(into: Served, x: Served): Served {
 
 const DRAFT_ID = /^draft\.(.+)\.(\d+)$/;
 
+/** What a call does, in a word or two, for counting by act: a form by its name, the acts of a post, a withdrawal. */
+export function actOfCall(call: string | undefined): string {
+  const c = (call ?? "").trim().replace(/^[a-z0-9_]+ = /, "");
+  const fn = /^([a-z_]+)\(/.exec(c)?.[1];
+  if (!fn) return "none";
+  if (fn === "none") return `none:${/^none\((\w+)/.exec(c)?.[1] ?? "?"}`;
+  if (fn === "form") return `form:${/\bform="?([\w.-]+)/.exec(c)?.[1] ?? "?"}`;
+  if (fn === "position") return /\bvacate=/.test(c) ? "position:vacate" : /\bappoint=/.test(c) ? "position:appoint" : "position:create";
+  if (fn === "statement" && /\bwithdraw=/.test(c)) return "statement:withdraw";
+  if (fn === "agreement") return /\bsign=/.test(c) ? "agreement:sign" : /\bnotice=/.test(c) ? "agreement:notice" : "agreement:offer";
+  return fn;
+}
+
+/** Of a run's requests with a translator behind ours: by act, how many each translator drew up. */
+export type ByAct = { [act: string]: { [translator: string]: number } };
+export function addByAct(into: ByAct, x: ByAct): ByAct {
+  for (const [act, by] of Object.entries(x)) for (const [m, n] of Object.entries(by)) (into[act] ??= {})[m] = (into[act]![m] ?? 0) + n;
+  return into;
+}
+/** One line for it: each act with the share the translator behind ours drew up. */
+export const byActText = (x: ByAct, ours: (model: string) => boolean = (m) => m.startsWith("decide/")): string =>
+  Object.entries(x).sort(([a], [b]) => a.localeCompare(b)).map(([act, by]) => {
+    const all = Object.values(by).reduce((n, v) => n + v, 0);
+    const behind = Object.entries(by).filter(([m]) => !ours(m));
+    return `${act} ${behind.reduce((n, [, v]) => n + v, 0)}/${all}${behind.length ? ` (${behind.map(([m, v]) => `${m} ${v}`).join(", ")})` : ""}`;
+  }).join("; ");
+
 /** A run's requests, seen one log entry at a time (`see`: a log line parsed, or an engine event: { kind, body }). */
 export class ServedTally {
   private readonly seats = new Map<string, Served>();
@@ -43,6 +70,8 @@ export class ServedTally {
   /** Drafts offered: the seat's, and whether answered. */
   private readonly drafts = new Map<string, { seat: string; answered?: "accept" | "reject" }>();
   private readonly settled = new Set<string>();
+  /** Requests with a translator behind ours, by act and by who drew them up (`then`: each route says). */
+  private readonly acts: ByAct = {};
 
   private of(seat: string): Served {
     let s = this.seats.get(seat);
@@ -78,6 +107,12 @@ export class ServedTally {
     else if (b.annotation === "note" && b.data?.translation_route) {
       const r = b.data.translation_route;
       this.stage.set(String(r.draft), { ...(r.stage ? { stage: r.stage } : {}), ...(r.unsure_offered ? { unsure: true } : {}) });
+      if (r.arrangement === "then") {
+        const side = r.used === "behind" ? r.behind : r.first;
+        const act = actOfCall(side?.call ?? r.first?.wrote ?? r.first?.call);
+        const who = String(side?.model ?? "?");
+        (this.acts[act] ??= {})[who] = (this.acts[act]![who] ?? 0) + 1;
+      }
     } else if (b.annotation === "draft" && b.draft?.id) {
       const seat = String(b.draft.participant ?? DRAFT_ID.exec(b.draft.id)?.[1] ?? "?");
       this.request(String(b.draft.id), seat, true);
@@ -107,6 +142,11 @@ export class ServedTally {
     const out: { [model: string]: Served } = {};
     for (const [seat, s] of Object.entries(this.bySeat())) addServed((out[model?.(seat) ?? this.model.get(seat) ?? "unknown"] ??= noneServed()), s);
     return out;
+  }
+
+  /** By act, who drew up each request, where a translator stood behind ours; empty where none did. */
+  byAct(): ByAct {
+    return structuredClone(this.acts);
   }
 
   total(): Served {

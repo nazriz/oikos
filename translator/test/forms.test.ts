@@ -12,6 +12,8 @@ import FORMS from "../../contracts/test/forms.json";
 import { MockAdapter } from "@oikos/participants/llm";
 import { createTranslator, formRules, formShown } from "../src/index";
 import { everyIdNamed, misread } from "../src/rules";
+import { EXEC_CASES } from "../eval/executive-cases";
+import { fixtureKnowledge } from "../eval/executive";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
 import { durationWords, resolve, shortOfRequired, toSigner } from "../src/resolver";
@@ -523,4 +525,19 @@ test("the body a scope request names, and a list of numbers named by its blank (
   const ruledQ = (program: string, request: string) => calls.programText(formRules(calls.parseProgram(program), request, kq as any));
   expect(ruledQ(scope("c0100"), "Ask c0100 for their authority to bank: under agreement rec.6, to write to bank naming desk, on rec.5; bank returned it saying it had no authority from them.")).toBe(scope("bank"));
   expect(ruledQ('message(text="is rec.6 yours?", to=c0100)', "Ask c0100 whether rec.6 is their paper, on rec.5.")).toContain("form=question_to_client");
+});
+
+// (A mayor's forms, drawn by the rules from a request that names their blanks where the model drew nothing: an amendment
+// never goes as a change of no figure, and a list the request names is never dropped. docs/decisions.md, "The translator
+// on a mayor's powers".)
+test("a form drawn from its named blanks reads a length of time, and never drops what the request changes", () => {
+  const k = fixtureKnowledge();
+  const none = calls.parseProgram("none(unclear)");
+  const drawn = (request: string) => calls.programText(formRules(none, request, k as any));
+  expect(drawn("Fill in form-amend-tenancy: notice 90 days, affects tenants")).toContain('notice="90 days"');
+  // (The tenant's notice is its own blank, not the landlord's.)
+  expect(drawn("Fill in form-amend-tenancy: tenant's notice 30 days, affects tenants")).not.toContain('notice="30 days", tenant');
+  expect(drawn("Fill in form-amend-tenancy: affects tenants, the notice as we discussed")).toBe("none(unclear)");
+  expect(drawn('Fill in form-nomination: office mayor, name "Dana Okafor", platform "Safe homes.", values: honesty, thrift')).toBe("none(unclear)");
+  for (const c of EXEC_CASES) expect(calls.contractErrors(calls.parseProgram(c.want))).toEqual([]);
 });

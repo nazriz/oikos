@@ -15585,3 +15585,16 @@ re-run twice (the later folder by name wins) or a re-run's town differs from the
 - **Not yet measured:** no model has seen the new line; that it ends the false confessions is expected, not shown.
 - **Revisit if** seats still accuse themselves of unread confirmations with this line, or the line grows to matter in
   prompt size (then keep the wording and shorten the lists).
+
+## 2026-11-23 · The translator on a mayor's powers: measured, one rule mended, a fallback that is off
+
+**Decision.** (1) `translator/eval/executive.ts` and `executive-cases.ts` measure the served translator (`decide/round3-s2` and the rules) on 30 written cases of a mayor's powers and on the real requests of mayors, councillors and clerks in the `w2-*` and `lv-*` runs. The cases are kept out of training. (2) `formRules`, drawing a form from blanks a request names where the model drew nothing, now reads a length of time by its blank's name, and will not draw an amendment that changes no figure or a paper whose named list it could not read. Before, "notice 90 days" on an amendment was drawn as an amendment of nothing, with the model's sureness. (3) `seats.translator.fallback` (`{ model, seats }`) puts a model behind ours for the seats named, by the existing `then` arrangement. It is off unless named; each run's report gives who drew up each act.
+
+**Why.** The scored set covers the assistant desk's forms, so an abuse of office could be missed unseen. The rule is general (any form, any duration blank). No rule was added for plain directions ("tell the works office to stop recruiting", drawn as a letter): telling someone is a letter by the translator's own canon, and turning it into a direction would be reading what the seat means.
+
+**Alternatives.** A new fallback path (the `then` arrangement already routes and logs). Keying direction words to forms (a guess at intent, and per-case).
+
+**What it does not settle.** A fallback takes only what ours declines or is unsure of, so it would not catch a letter drawn with full sureness in place of a direction. No real run has ever drawn a `position` act, so vacating, appointing and creating posts are measured on written cases only.
+
+*Revisit if* a seat's plain-worded direction goes out as a letter in a real run, or the translator is retrained on executive acts.
+

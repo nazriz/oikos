@@ -24,7 +24,7 @@ import { basename, join, resolve } from "node:path";
 import { exportLogs, MEASURE_VERSION } from "@oikos/measure";
 import { costReport } from "./cost";
 import { servedOfLogs, shareText, translatorShare } from "./pilot-report";
-import { servedText } from "./served";
+import { byActText, servedText } from "./served";
 import { chooseModel } from "./models";
 import { KernelDied, KernelLogFailed, kernelBinary, requireCurrentEngine } from "./kernel";
 import { MEASURE_FAILED_FILE } from "./pilot-state";
@@ -304,7 +304,7 @@ async function withShare<T extends { text: string; json: any }>(shown0: T, logs:
   try { a = await translatorShare(logs); } catch { return shown; }
   if (!a) return shown;
   const share = { first: a.first, behind: a.behind, requests: a.requests, answered_by_first: a.answered_by_first, handed_behind: a.handed_behind, behind_share: a.behind_share, drafts_behind_share: a.drafts_behind_share, handed_behind_why: a.handed_behind_why };
-  return { ...shown, text: `${shown.text}\nTranslator: drafted behind (${a.behind}): ${shareText(a)}; first ${a.first}.`, json: { ...shown.json, translator_share: share } };
+  return { ...shown, text: `${shown.text}\nTranslator: drafted behind (${a.behind}): ${shareText(a)}; first ${a.first}.${Object.keys(a.by_act ?? {}).length ? `\nDrawn up behind ours, by act: ${byActText(a.by_act)}.` : ""}`, json: { ...shown.json, translator_share: { ...share, ...(a.by_act ? { by_act: a.by_act } : {}) } } };
 }
 
 export async function afterResume(rec: RunRecord, o: { translatorModel?: string; measure?: boolean; compress?: boolean; log?: (line: string) => void } = {}): Promise<{ logPath: string; costText?: string; problems: string[] }> {
