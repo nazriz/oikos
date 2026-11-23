@@ -40,8 +40,8 @@ import type { ExperimentSpec, SeatFactories, SeatFactory } from "./experiment";
 export interface TranslatorSpec { first?: string; behind?: string; arrangement?: "then" | "beside" | "alone"; fallback?: { model: string; seats: string[] } }
 
 /** How one seat's requests are translated, from the spec: `behind` undefined is ours alone. */
-export function translatorFor(t: TranslatorSpec | undefined, seat: string, seatModel: string): { alone: boolean; behind?: string; arrangement?: "then" | "beside" | "alone" } {
-  if (t?.arrangement === "alone") return t.fallback?.seats.includes(seat) ? { alone: false, behind: t.fallback.model, arrangement: "then" } : { alone: true, arrangement: "alone" };
+export function translatorFor(t: TranslatorSpec | undefined, seat: string, seatModel: string, post?: string): { alone: boolean; behind?: string; arrangement?: "then" | "beside" | "alone" } {
+  if (t?.arrangement === "alone") return t.fallback?.seats.some((s) => s === seat || (post !== undefined && s === post)) ? { alone: false, behind: t.fallback.model, arrangement: "then" } : { alone: true, arrangement: "alone" };
   return { alone: false, behind: t?.behind ?? seatModel, ...(t?.first ? { arrangement: t.arrangement ?? "then" } : {}) };
 }
 
@@ -169,7 +169,7 @@ export function budgetProblems(spec: ExperimentSpec): string[] {
     const provider = m.split("/")[0]!;
     const priced = provider === "claude-code" ? prices[`anthropic/${m.split("/").slice(1).join("/").split("@")[0]}`] : prices[m];
     // (A flat-rate subscription's seat costs nothing a call, unless a priced translator drafts its requests.)
-    const behind = spec.seats?.translator?.behind;
+    const behind = spec.seats?.translator?.behind ?? spec.seats?.translator?.fallback?.model;
     const free = (provider === "codex" || LOCAL.has(provider)) && (!behind || behind.startsWith("codex/") || behind.startsWith("decide/") || LOCAL.has(behind.split("/")[0]!));
     if (provider !== "codex" && !LOCAL.has(provider) && !priced) out.push(`arm ${a.name}: no published price for ${m} (orchestrator/prices.json)`);
     if (!free && limits[a.name] === undefined) out.push(`arm ${a.name}: ${m} costs money and has no spending limit (seats.budget: fork_usd, arm_usd or experiment_usd)`);
@@ -278,7 +278,7 @@ export function modelSeatFactories(spec: ExperimentSpec): SeatFactories {
     const seatAdapter = dry ? mockFor(a.model) : served(wait(rec.wrap(adapterFor(a.model, false, atOnce, answer), a.model)));
     prices[`${seatAdapter.provider}/${seatAdapter.model}`] = priceOf(a.model);
     const t = spec.seats?.translator;
-    const how = translatorFor(t, a.seat, a.model);
+    const how = translatorFor(t, a.seat, a.model, a.post);
     const alone = how.alone;
     const behindName = how.behind ?? a.model;
     // (Ours alone: nobody behind it, so no adapter for one.)
