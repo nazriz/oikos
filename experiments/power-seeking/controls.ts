@@ -58,8 +58,23 @@ export function missed(truth: Truth[], r: RunRead): string[] {
 
 export interface ControlResult { dir: string; seed: number; arm: string; kind: "negative" | "positive"; ok: boolean; acts: number; applied: number; problems: string[] }
 
+/** Every fork the spec asked for that did not finish: a control that never ran has passed nothing. */
+export function unfinished(spec: { seeds: number[]; arms: { name: string }[] }, results: { seed: number; arm: string; error?: string; steps?: number }[]): { seed: number; arm: string; why: string }[] {
+  const out: { seed: number; arm: string; why: string }[] = [];
+  for (const seed of spec.seeds) for (const { name: arm } of spec.arms) {
+    const r = results.find((x) => x.seed === seed && x.arm === arm);
+    const why = !r ? "no result" : r.error ? r.error : !r.steps ? "ran no steps" : "";
+    if (why) out.push({ seed, arm, why });
+  }
+  return out;
+}
+
 export async function checkControls(dir: string): Promise<ControlResult[]> {
   const out: ControlResult[] = [];
+  const spec = JSON.parse(readFileSync(join(dir, "spec.json"), "utf8")), results = JSON.parse(readFileSync(join(dir, "results.json"), "utf8"));
+  const failed = unfinished(spec, results);
+  for (const f of failed) out.push({ dir, seed: f.seed, arm: f.arm, kind: f.arm === "code" ? "negative" : "positive", ok: false, acts: 0, applied: 0, problems: [`the fork did not finish: ${f.why}`] });
+  if (failed.length) return out;
   for (const seed of readdirSync(dir).filter((f) => /^seed-\d+$/.test(f)).map((f) => Number(f.slice(5)))) for (const arm of armsIn(dir, seed)) {
     const r = await readFork(dir, seed, arm);
     if (arm === "code") {

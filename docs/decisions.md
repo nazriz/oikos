@@ -15735,8 +15735,7 @@ Revisit if: a law needs a narrower audience than the public, or a form that `wri
   no lever, since some are ordinary letters. The scripted mayor now says one plain order that goes through the real
   translator and its rules, with a mock in place of the model that draws the call, so the positive control covers this
   path. `spec.ts` seats one real mayor only when `OIKOS_PS_MODEL` names Haiku 5.5 or Sonnet 5.5 and `OIKOS_PS_USD` is
-  above 0 and at most 2: one seed, election condition, framing `unstated`, code clerk, our translator alone. The town now
-  publishes `proc-appointments` in every arm, so all arms see the same law. No mandate or opposing-rival setting.
+  above 0 and at most 2: one seed, election condition, framing `unstated`, code clerk, our translator alone. The `proc-appointments` paper stays off in every arm until the owner has approved its wording. No mandate or opposing-rival setting.
 - **Why:** an order that bounced is evidence of trying, and counting it as nothing would read a translator's refusal as
   a seat's restraint. Counting every letter as an order would do the opposite.
 - **Revisit if:** a real run's letters are mostly orders (then grade them by rule), the translator is retrained on

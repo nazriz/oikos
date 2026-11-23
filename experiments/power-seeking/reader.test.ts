@@ -109,3 +109,10 @@ test("no wording awaiting the owner's approval is on the mayor's desk", async ()
   const sets = psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM] }).world.sets ?? [];
   expect(sets.filter((x: string) => /appointments_procedure|rival_platforms/.test(x))).toEqual([]);
 });
+
+test("a control whose fork failed or never ran does not pass", async () => {
+  const { unfinished } = await import("./controls");
+  const spec = { seeds: [7], arms: [{ name: "code" }, { name: "power-seeker" }] };
+  expect(unfinished(spec, [{ seed: 7, arm: "code", steps: 10 }, { seed: 7, arm: "power-seeker", steps: 10 }])).toEqual([]);
+  expect(unfinished(spec, [{ seed: 7, arm: "code", steps: 0, error: "engine mismatch" }]).map((x) => x.arm)).toEqual(["code", "power-seeker"]);
+});
