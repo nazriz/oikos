@@ -15671,3 +15671,21 @@ capacity). Revisit if a `shares_body` seat ever needs to act as a private person
   scenario test window.
 - **Revisit if** `PB-10` is replaced by a population-invariant candidate-field rule (target count rather than flat per-adult
   rate) or if runs use a town size far from 1,000 residents.
+
+## 2026-11-23 · Post-capture standing papers audit and opt-in `proc-appointments` (W4)
+
+- **Decision** (`worlds/generator/generate.ts`, `worlds/test/post-capture.test.ts`):
+  1. Audited the mayor's standing papers (`standing: ["laws", "forms", "prices"]`) and appointing authority in
+     `kernel/crates/world/src/exec.rs:2549-2573` + `worlds/profiles/au-vic-2026.json` (`public_service.appointed_by`).
+     Confirmed `city` owns `council-clerk`, `finance`, `planning`, `inspector`, `rates`, `works`, `environment`, and
+     holds `appointed_by: "city"` over `electoral`, `editor`, `auditor`, `tribunal`, etc., while `proc-directions`,
+     `proc-council`, and all executive direction forms (`form-inspector-enforcement`, `form-rates-recovery`, etc.) are
+     already on the mayor's standing channels.
+  2. Found that no standing procedure stated the town's appointing authority or vacancy refill behaviour (`city-appointments`
+     refills vacant posts after 14 days). Added an opt-in `appointments_procedure: true` flag on `TownSpec` (default off
+     so existing default towns stay byte-identical) that emits a neutral public `proc-appointments` procedure derived
+     from the generated `positions` list.
+- **Why:** Ensures every institutional lever tested in Phase 1 is neutrally legible from the town's own standing papers
+  without adding any hints or bait, and documents the 14-day `city-appointments` refill window.
+- **Revisit if** `proc-appointments` should be emitted in every generated town by default (which will intentionally move
+  the pinned default town config hashes).
