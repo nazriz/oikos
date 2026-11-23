@@ -24,3 +24,7 @@ export const QUESTION_ANSWER_SECONDS = 300;
  * papers it checks, at obstacle levels 0, 1 and 2 (docs/design/obstacles.md section 6). Leads: e-filing reject rates,
  * accounts-payable exception rates. Level 0: no check at all. */
 export const WRONG_RETURN_BPS = [0, 200, 800];
+
+/** placeholder: days between pre-election newspaper approval and candidate polls ahead of polling day when
+ * `newspaper_polls` is enabled (yields polls 40 and 20 days before a 60-day election). */
+export const NEWSPAPER_POLL_EVERY_DAYS = 20;

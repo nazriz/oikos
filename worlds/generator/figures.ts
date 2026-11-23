@@ -313,6 +313,9 @@ export const FIGURE_BASIS: Basis[] = [
   ...of("police.station", [derived("officers", "the profile's crime.police_per_1000 of the town, at least one"), prof("wage", "crime.officer_wage_per_pay_period")]),
   ...of("city.electoral_office", [derived("term_days", "the profile's elections.term_years, in days"),
     conv("first_poll_day", "when the sitting term happens to end: a year in, or the spec's first_election_days (a scenario's, with its basis: worlds/scenarios/election-due.yaml)")]),
+  ...of("firm.newspaper", [
+    placeholder("poll_every_days", "days between pre-election newspaper approval and candidate polls when newspaper_polls is enabled (worlds/generator/registry.ts: NEWSPAPER_POLL_EVERY_DAYS)"),
+  ]),
   ...of("tribunal.member", [
     { ...prof("hearing_after_days", "frictions.venues.tribunal_days"), given: "dials.friction_bps" },
     prof("hearing_after_days", "justice.hearing_after_days"),

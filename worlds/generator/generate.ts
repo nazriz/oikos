@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { townNetwork } from "./network";
 import { ASSISTANT_ISSUES, withObstacles, clientDraft, clientDraftOf, clientPapers, wantPapers, draftOf, particularsOf, DECISION_KIND, returnsOf, BOOKS, drawValues, raisedValues, UPBRINGING, formatMoney, inCurrency, POSSESSION_ANSWER, CLAIM_EVIDENCE, CONFIRMATION_ANSWER, REVIEW_REQUEST, TAX_CREDIT_CLAIM, TAX_ACCOUNT_REQUEST, forms as formWords, modules, classOf, reference, votedWords, Randomness, tabledLines, yearInDays, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type DecisionLaw, type Taken } from "@oikos/participants";
 import { fitShared, normCdf, normInv, ranks, savingsRank, shared, unit } from "./joint";
-import { COMPOSE_BPS, QUESTION_ANSWER_SECONDS, SCOPE_ANSWER_SECONDS, WRONG_RETURN_BPS } from "./registry";
+import { COMPOSE_BPS, NEWSPAPER_POLL_EVERY_DAYS, QUESTION_ANSWER_SECONDS, SCOPE_ANSWER_SECONDS, WRONG_RETURN_BPS } from "./registry";
 import { bedroomsNeeded, chargesInWords, dayPayPeriod, decisionsInWords, declarationFor, draftLaw, drawSavings, drawTown, forAge, forOutOfWork, linesInWords, paymentsInWords, planLaw, returnsInWords, withholdingInWords, planLawWords, possessionOrderFor, stopsWorkAt, withholding } from "./rules";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
@@ -314,6 +314,8 @@ export interface TownSpec {
   first_election_days?: number;
   /** Elections and the local paper, where the profile describes them (world-expansion 3). Default: yes; false: none. */
   elections?: boolean;
+  /** Pre-election newspaper approval and candidate polls plus accountability coverage of directions and audits (opt-in). */
+  newspaper_polls?: boolean;
   /** The clinic and the school, where the profile describes health and education (world-expansion 4). Default: yes;
    * false: neither (and bodies have no skill). */
   services?: boolean;
@@ -3037,8 +3039,11 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       K.mine("gone", ["death_registration", "departure"]),
       votes],
       code("city.electoral_office", { office: "mayor", office_title: `Mayor of ${spec.name}`, term_days: E.term_years * 365, first_poll_day: spec.first_election_days ?? 365, method: E.method, seats: false }));
-    office("editor", "paper", "Editor", undefined, [civic("record", ["petition", "environment_report", "budget", "law", "ballot_result", "election_notice", "nomination", "permit_decision"])],
-      code("firm.newspaper", { town: "city" }));
+    office("editor", "paper", "Editor", undefined, [
+      civic("record", ["petition", "environment_report", "budget", "law", "ballot_result", "election_notice", "nomination", "permit_decision",
+        ...(spec.newspaper_polls ? ["petition_response", "audit_report", "direction"] : [])]),
+      ...(spec.newspaper_polls ? [K.mine("poll_replies", ["poll_reply"])] : []),
+    ], code("firm.newspaper", { town: "city", ...(spec.newspaper_polls ? { poll_every_days: NEWSPAPER_POLL_EVERY_DAYS } : {}) }));
   }
   // (The environment office's own habitat map: the district's cover as its scientists last mapped it, and the ground
   // that was built on then. Its own paper, not a sight of the district: it is as old as the day it was made.)
@@ -4537,7 +4542,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // (Heat makes illness likelier where the body is: docs/behaviour/weather.md.)
     ...(spec.life === false ? {} : { life: W && CL && L ? { ...life, illness: { ...(life.illness as object), fields: [...((life.illness as any).fields ?? []), { field: "heat", bps_per_unit: CL.heat_illness_bps_per_unit }] } } : life }),
     caps: { max_created_entities: 50 },
-    knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}), ...(AS ? { services: true } : {}), ...(OB ? { obstacles: true } : {}) }),
+    knowing: K.knowing(positions, { holderSearch: [], dealings: 20, ...(V.knowing ? { visit_seconds: V.knowing.visit_seconds } : {}), ...(FR ? { hearings: true } : {}), ...(FND ? { founding: true } : {}), ...(AS ? { services: true } : {}), ...(OB ? { obstacles: true } : {}), ...(spec.newspaper_polls ? { publicDirections: true } : {}) }),
     // (Work is done in a workplace: a person named to do an act's work must be in one. `by` is F3's; the generator names none yet.)
     orchestration: { thinking_time: "free", performers_in: "workplace", act_time: {
       ...WORK_TIME, person: { ...WORK_TIME.person, ...V.work_time?.person, ...(AS ? DELEGATION_TIME.person : {}), ...composeRows }, ...(V.work_time?.system ? { system: { ...V.work_time.system } } : {}),

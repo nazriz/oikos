@@ -114,6 +114,15 @@
       "source": "placeholder: Soroka and McAdams 2015 give the direction, not a size",
       "unit": "bps"
     },
+    "poll_every_days": {
+      "default": 0,
+      "schema": {
+        "description": "days between pre-election approval and candidate polls ahead of polling day (0 disables polling)",
+        "type": "integer"
+      },
+      "source": "placeholder",
+      "unit": "days"
+    },
     "town": {
       "default": "",
       "required": true,
