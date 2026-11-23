@@ -15588,3 +15588,17 @@ re-run twice (the later folder by name wins) or a re-run's town differs from the
 - **Revisit if** a seat should be told of a loss by anything other than the public record, or a post-holder with
   channels of its own should also end when its post goes.
 
+
+## 2026-11-23 · A setting-out folded away in a sitting says it was shown, and in how much
+
+- **Decision** (`supersede`, `SET_OUT_AGAIN`, participant 0.22.5): an older copy of what is waiting still folds to one
+  line, so the saving in prompt size stays, but the line now says it was set out to the seat there, which asks in full
+  and which by a line only, that it was folded for room, which of them still wait further on and which no longer wait.
+  The newest copy, what the seat is being asked to say yes or no to, is never folded or cut.
+- **Why:** the old line ("set out again further on") stood directly above a seat's own "read in full", and was untrue of
+  an ask already answered, which is not set out again. Seats concluded they had confirmed unread, rewrote true notes
+  into false ones and wrote confessions: rung 3, before the fold, 1 self-accusing turn in 2,038 confirmations; rung 4,
+  142 in 4,796 (`runs/deep-dive-2026-11-23/explore/findings.md`, first finding). Rung 4's data keeps this fault.
+- **Not yet measured:** no model has seen the new line; that it ends the false confessions is expected, not shown.
+- **Revisit if** seats still accuse themselves of unread confirmations with this line, or the line grows to matter in
+  prompt size (then keep the wording and shorten the lists).
