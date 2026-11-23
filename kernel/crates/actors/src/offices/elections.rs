@@ -156,6 +156,7 @@ impl Kind for ElectoralOffice {
             seated_results: BTreeSet::new(),
             unapplied_laws: BTreeSet::new(),
             cycle_since: None,
+            last_declared_poll: None,
         };
         let mut plan = plan;
         plan.poll = plan.first_poll_day * DAY;
@@ -208,6 +209,10 @@ struct ElectionPlan {
     /// Earliest notice timestamp of the current election cycle, preserved if the poll date is amended during nominations.
     #[serde(default)]
     cycle_since: Option<i64>,
+    /// Most recent polling timestamp declared by this office (remembered immediately on `Then::Declared` before the
+    /// newly filed `ballot_result` arrives in the office's observation book).
+    #[serde(default)]
+    last_declared_poll: Option<i64>,
 }
 
 /// What follows from an act of the election's: it moves the office on only when it was applied.
@@ -308,14 +313,21 @@ impl Plan for ElectionPlan {
         let (first_poll_day, term_days, nom_open_days, nom_close_days, voting_days, takes_office_days, law_id) = self.effective();
         let results = self.filed("ballot_result");
         let last_declared_at = results.iter().map(|r| r.at).max();
-        let last_declared = results.iter().filter_map(|r| data(r).i("poll_at")).max();
+        let last_declared = results
+            .iter()
+            .filter_map(|r| data(r).i("poll_at"))
+            .chain(self.last_declared_poll)
+            .max();
         // Restore open notice / ballot for the current election cycle BEFORE evaluating schedule amendments so an open
         // ballot is never cancelled and pre-delay nominations are never dropped (including after a successor wake).
         if self.notice.is_none() {
             let n = self
                 .filed("election_notice")
                 .into_iter()
-                .filter(|r| last_declared_at.is_none_or(|ld| r.at > ld))
+                .filter(|r| {
+                    last_declared_at.is_none_or(|ld| r.at > ld)
+                        && last_declared.is_none_or(|lp| data(r).i("poll_at").is_none_or(|p| p > lp))
+                })
                 .min_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)));
             if let Some(n) = n {
                 self.notice = Some(n.id.to_string());
@@ -678,6 +690,7 @@ impl Plan for ElectionPlan {
                 self.ballot = (o.created.as_ref().and_then(|c| c.get("ballot").cloned())).map(|x| x.to_string());
             }
             Then::Declared { .. } => {
+                self.last_declared_poll = Some(self.last_declared_poll.map_or(self.poll, |p| p.max(self.poll)));
                 self.stage = Stage::Waiting;
                 self.ballot = None;
                 self.notice = None;
@@ -929,6 +942,33 @@ mod tests {
         // New close (day 100 = 130 - 30): BOTH pre-delay nominees appear on the eventual ballot!
         let ballot = o.day(100 * DAY, &[]).join("\n");
         assert!(ballot.contains("kind=ballot") && ballot.contains("c1-self") && ballot.contains("c2-self") && ballot.contains(&format!("\"closes_at\":{}", 130 * DAY)), "{ballot}");
+    }
+
+    #[test]
+    fn declaring_a_result_with_law_on_file_emits_no_false_date_passed_notice() {
+        // Use finance::kit::Rig so Applied flows back to `Then::Declared`, matching the live engine.
+        let mut m = crate::finance::kit::Rig::new(
+            &ElectoralOffice,
+            "city",
+            "electoral",
+            json!({ "office": "mayor", "office_title": "Mayor", "first_poll_day": 100, "term_days": 400 }),
+        );
+        let law = st("law-elections", 0, "law", "city", &[], json!({
+            "schedule": "schedule-elections",
+            "figures": { "first_poll_day": { "value": 100, "unit": "days" }, "term_days": { "value": 400, "unit": "days" } }
+        }));
+        // Day 40: notice opens with law-elections on file (`Then::Notice` moves to Nominating).
+        let n = format!("{:?}", m.at(40 * DAY, json!({ "laws": crate::finance::kit::records(vec![law]), "records": crate::finance::kit::records(vec![enrol("c1"), enrol("c2")]) }), json!([])));
+        assert!(n.contains("election_notice"), "{n}");
+        let mut notice = st("rec.40", 40 * DAY + 60, "election_notice", "city", &[], json!({ "office": "mayor", "poll_at": POLL }));
+        notice["in_position"] = json!("city-office");
+        // Day 70: unopposed declaration (`Then::Declared` advances poll to day 500 and remembers `last_declared_poll`).
+        let decl = format!("{:?}", m.at(70 * DAY, json!({ "records": crate::finance::kit::records(vec![notice]) }), json!([])));
+        assert!(decl.contains("ballot_result"), "{decl}");
+        // Next wake (still before the newly filed ballot_result arrives in the office's observation book):
+        // must NOT emit a spurious `reason: "date_passed"` notice for the poll just declared or restore the old notice.
+        let after = m.at(100 * DAY + 3600, json!({}), json!([]));
+        assert!(after.is_empty(), "expected no spurious notice after declaring result, got: {after:?}");
     }
 
     #[test]
