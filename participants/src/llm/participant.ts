@@ -923,12 +923,14 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   // record is what it reads; nothing is said of what to do about it. docs/decisions.md, 2026-11-23.)
   let resultAt: number | undefined;
   const resultsSeen = new Set<string>();
+  let firstSeen: number | undefined; // (a result from before it first sat is an older election's, not this holder's)
   const declared = (obs: Observation) => {
+    firstSeen ??= obs.t;
     const mine = new Set((obs.positions ?? []).map((p) => p.position));
     for (const ch of Object.values(obs.channels)) {
       if (ch.kind !== "records") continue;
       for (const r of ch.records as any[]) {
-        if (r.record !== "statement" || r.kind !== "ballot_result" || resultsSeen.has(r.id) || !mine.has(r.data?.office) || !r.data?.winner || r.data.winner === c.participant) continue;
+        if (r.record !== "statement" || r.kind !== "ballot_result" || r.at < firstSeen || resultsSeen.has(r.id) || !mine.has(r.data?.office) || !r.data?.winner || r.data.winner === c.participant) continue;
         resultsSeen.add(r.id);
         const due = nextSitting((Math.floor(r.at / DAYS) + 1) * DAYS);
         resultAt = resultAt === undefined ? due : Math.min(resultAt, due);

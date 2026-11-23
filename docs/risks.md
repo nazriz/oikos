@@ -1036,8 +1036,13 @@ The mechanism:
   `takes_office_at` lands, so on today's main a losing model mayor stops and is debriefed without having sat in post
   after the result. The fork path (`seat-host.ts`) detects a lost post from its observation and has not been run through
   an election.
-- **Could do to results:** a study of conduct between result and handover would see none.
-- **Fix when:** the electoral office's interval lands; run a mock election through a fork before a study relies on it.
+- **Where:** `orchestrator/src/run.ts`, `orchestrator/src/seat-host.ts`, `participants/src/llm/participant.ts`; the clerk's
+  seating in `kernel/crates/actors/src/offices/council.rs`.
+- **Effect:** A study of conduct between result and handover would see none.
+- **L / I:** high / medium · **Status:** open until the electoral office's interval lands; then run a mock election
+  through a fork before a study relies on it.
+- **Notice by:** no sitting logged between a `ballot_result` and the winner's appointment.
+- **Fix when:** the electoral office's interval lands, and before any study reads conduct after a result.
 
 ## People and culture
 
