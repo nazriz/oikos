@@ -432,11 +432,11 @@ impl Plan for ElectionPlan {
                 self.ballot = None;
                 let close = file_poll - nom_close_days * DAY;
                 let text = format!(
-                    "Election timetable notice: polling for {} has moved from {} to {}. Nominations already filed stand and nominations now close on {}.",
+                    "Election timetable notice: polling for {} has moved from {} to {}. Nominations already filed stand and nominations now close at the end of {}.",
                     self.title(),
                     when(prev),
                     when(file_poll),
-                    when(close)
+                    when(close - 1)
                 );
                 steps.push(because(
                     "Election schedule amended during nominations: moving polling day while keeping existing nominations.",
@@ -501,11 +501,13 @@ impl Plan for ElectionPlan {
         let method_words = if self.method == "preferential" { "preference (number every candidate)" } else { "a single choice" };
         if self.stage == Stage::Waiting && t >= poll - nom_open_days * DAY {
             let close = poll - nom_close_days * DAY;
+            // (Nominations are cut off at `close`, the first moment of a day: the notice names the day before it, the last
+            // on which one counts. `nominations_close_at` in the data stays the moment itself.)
             let mut s = Step::new(vec![Line {
                 bind: Some("notice".into()),
                 call: say(
                     "election_notice",
-                    &format!("Election notice: the office of {title} falls vacant on {}. Nominations close on {}; voting is by {method_words}, and compulsory for those on the roll. Nominate with a statement of kind nomination to the town.", when(poll), when(close)),
+                    &format!("Election notice: the office of {title} falls vacant on {}. Nominations close at the end of {}; voting is by {method_words}, and compulsory for those on the roll. Nominate with a statement of kind nomination to the town.", when(poll), when(close - 1)),
                     Say { visible: Some(Visible::Public), data: Some(json!({ "office": self.office, "poll_at": poll, "nominations_close_at": close, "method": self.method })), ..Default::default() },
                 ),
             }])
@@ -751,6 +753,17 @@ mod tests {
         let mut filed = st("rec.40", 40 * DAY + 60, "election_notice", "city", &[], json!({ "office": "mayor", "poll_at": POLL }));
         filed["in_position"] = json!("electoral");
         assert!(o.day(41 * DAY, &[filed]).is_empty(), "once the notice is on file");
+    }
+
+    #[test]
+    fn the_notice_names_the_last_day_a_nomination_counts() {
+        // Nominations close at the start of day 71 (t = 70 days): the last whole day to nominate is day 70, and the
+        // notice must say that day, never the day whose first moment is already too late (the 2026-11-24 pilot's mayor
+        // read "close on day 151" and nominated on day 151).
+        let mut o = office();
+        let out = o.day(40 * DAY, &[]).join("\n");
+        assert!(out.contains(&format!("\"nominations_close_at\":{}", 70 * DAY)), "{out}");
+        assert!(out.contains("at the end of year 1, day 70") && !out.contains("year 1, day 71"), "{out}");
     }
 
     #[test]
