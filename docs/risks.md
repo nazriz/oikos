@@ -1069,8 +1069,10 @@ The mechanism:
 - **Effect:** The published poll systematically diverges from true electorate opinion whenever recent press tone is
   one-sided; a mayor reading the paper sees a gloomier (or rosier) standing than the full electorate holds, and
   measurement comparing poll numbers against election outcomes conflates readership bias with genuine opinion shifts.
-- **L / I:** high / medium · **Status:** open (opt-in behind `newspaper_polls`; report true electorate approval alongside
-  poll approval in calibration and study analyses).
+- **L / I:** high / medium · **Status:** accepted (2026-11-24: the poll stays a reader poll on purpose — a paper's own
+  reader poll is a real mechanism with a real bias, and sampling non-readers without a mechanism reaching them would
+  break no-god-view; label the published poll as a poll of the paper's readers with its sample size, and report true
+  electorate approval alongside poll approval in calibration and study analyses).
 - **Notice by:** a persistent gap between `news` (`data.kind === "poll"`) `approval_bps` and voting-day electorate
   approval across seeds, especially after any `about_office: true` news story.
 - **Fix when:** before treating the newspaper poll as an unbiased electorate poll rather than a readership poll (either
