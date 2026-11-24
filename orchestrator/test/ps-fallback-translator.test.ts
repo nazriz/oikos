@@ -62,7 +62,7 @@ test("mock-model dry run exercises the logged fallback translator arrangement on
   // In mock-models mode, every LLM call is played by MockAdapter (zero paid API spend).
   // When the trained local model folder is present, run the exact `first: decide/round3-s2` + logged fallback;
   // otherwise (e.g. CI without local weights) verify the mock behind-adapter path directly.
-  const base = psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM, real.arm], real, citizens: 60, untilDay: 14 });
+  const base = psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM, real.arm], real, citizens: 60, forkDay: 0, untilDay: 14 });
   const spec = {
     ...base,
     seats: {
