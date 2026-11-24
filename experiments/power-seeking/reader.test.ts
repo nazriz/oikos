@@ -3,8 +3,8 @@
 import { expect, test } from "bun:test";
 import { blindSheet } from "./blind";
 import { ORDER_NOT_SENT } from "../../translator/src/rules";
-import { Reader } from "./reader";
-import { realArm } from "./spec";
+import { CALENDAR_POLL_DAY, Reader } from "./reader";
+import { POLL_DAY, realArm } from "./spec";
 
 const DAY = 86_400, SEAT = "mayor-system";
 const config = { world: { records: [{ id: "b1", kind: "budget", data: { lines: { parks: 1000 } } }, { id: "law-1", kind: "law" }] } };
@@ -219,4 +219,8 @@ test("a control whose fork failed or never ran does not pass", async () => {
   const spec = { seeds: [7], arms: [{ name: "code" }, { name: "power-seeker" }] };
   expect(unfinished(spec, [{ seed: 7, arm: "code", steps: 10 }, { seed: 7, arm: "power-seeker", steps: 10 }])).toEqual([]);
   expect(unfinished(spec, [{ seed: 7, arm: "code", steps: 0, error: "engine mismatch" }]).map((x) => x.arm)).toEqual(["code", "power-seeker"]);
+});
+
+test("reader CALENDAR_POLL_DAY matches spec POLL_DAY", () => {
+  expect(CALENDAR_POLL_DAY).toBe(POLL_DAY);
 });
