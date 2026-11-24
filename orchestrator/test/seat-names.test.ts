@@ -20,6 +20,13 @@ test("a name a seat is shown, it can name in a request; one it was never shown, 
   // A post is named by its title, and is not taken for an organisation's name.
   named("energy-operations");
   expect(k.names.has("energy-operations")).toBe(false);
+  expect(k.byName("Retail manager")).toEqual(["energy-operations"]);
+  // A person shown to the seat records their internal participant id so appointing by entity id resolves cleanly.
+  const personWho = (id: string) => (id === "c0042-self" || id === "c0042" ? { id: "c0042", name: "Ana Silva" } : whoIs(id));
+  const named2 = namedFor(k, personWho, (e) => (e === "c0042" ? "c0042-self" : undefined));
+  named2("c0042");
+  expect(k.byName("Ana Silva")).toEqual(["c0042"]);
+  expect(k.participantPerson.get("c0042-self")).toBe("c0042");
   // Nothing it was not shown is learnt.
   expect(k.byName("Somebody Else")).toEqual([]);
 });

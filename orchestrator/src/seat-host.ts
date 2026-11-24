@@ -138,7 +138,8 @@ export class ModelSeat {
     this.whoIs = this.cast.whoIs;
     const twin = false;
     this.knowledge = new Knowledge(this.currency, cfg.names === true);
-    const made = seatConfig({ cfg, part: framed, personal: framed.channels ?? [], mine, positions, mods: modules, whoIs: namedFor(this.knowledge, this.whoIs), ctxFor, twin, draftText, sorted: (v) => v });
+    const participantOf = (entity: string) => [...this.cast.parts.values()].find((p) => p.kind === "person" && !p.ended && p.person === entity)?.id;
+    const made = seatConfig({ cfg, part: framed, personal: framed.channels ?? [], mine, positions, mods: modules, whoIs: namedFor(this.knowledge, this.whoIs, participantOf), ctxFor, twin, draftText, sorted: (v) => v });
     this.entity = made.entity;
     this.knowledge.ownHolder = made.config.ownHolder ?? null;
     this.office = made.office;

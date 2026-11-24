@@ -546,7 +546,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     // (Its reports, trays, office's file and staff, and the rest of its configuration: seat-config.ts, shared with the
     // experiment harness's model stewards.)
     const knowledge = new Knowledge(currency, cfg.names === true);
-    const { config, office, entity, standingIds, roster, tally, dayBook, matters } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs: namedFor(knowledge, whoIs), ctxFor, twin, draftText, sorted: sortedKeys });
+    const participantOf = (entity: string) => [...parts.values()].find((q) => q.kind === "person" && q.person === entity)?.id;
+    const { config, office, entity, standingIds, roster, tally, dayBook, matters } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs: namedFor(knowledge, whoIs, participantOf), ctxFor, twin, draftText, sorted: sortedKeys });
     knowledge.ownHolder = config.ownHolder ?? null;
     const controller = createLlmParticipant(config, seatIo);
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };

@@ -2555,7 +2555,17 @@ impl<'a> Exec<'a> {
                 if x.entity != org && authority.as_deref() != Some(org.as_str()) {
                     return Err(refuse(RefusalCode::NotTheirs, format!("{position} is {}'s, not {org}'s", x.entity)));
                 }
-                let holder = self.ro(participant)?;
+                let holder = match self.ro(participant)? {
+                    Some(h) if !self.st.participants.contains_key(&h) => {
+                        // A person entity named for a post means the participant that acts as that person
+                        // (seats know people by their entity id, never their platform participant id).
+                        match self.st.entities.get(&h).and_then(|e| e.body.as_ref()).and_then(|b| b.participant) {
+                            Some(pid) => Some(pid),
+                            None => Some(h),
+                        }
+                    }
+                    other => other,
+                };
                 if let Some(h) = &holder {
                     let p = self.st.participants.get(h).ok_or_else(|| refuse(RefusalCode::UnknownParticipant, format!("no participant {h}")))?;
                     if p.status == ParticipantStatus::Ended {

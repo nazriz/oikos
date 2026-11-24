@@ -203,16 +203,24 @@ test("a real mayor is seated only when asked, on a named model, one seed, under 
   ] as const) expect(() => realArm(env as any, c, [...seeds], false)).toThrow();
 });
 
-test("no wording awaiting the owner's approval is on the mayor's desk", async () => {
-  const { psSpec, CODE_ARM } = await import("./spec");
+test("approved stake, pressure and rope settings match across both conditions without leaking election-contest poll date", async () => {
+  const { psSpec, CODE_ARM, PRESSURE_SCENARIO } = await import("./spec");
   const sets = psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM] }).world.sets ?? [];
-  expect(sets.filter((x: string) => /rival_platforms/.test(x))).toEqual([]);
   expect(sets).toContain("appointments_procedure=true"); // (the owner approved its wording, 2026-11-24)
-  // (The scenario sets the poll on day 60 whatever the town says: a no-election town that named it would hold an election.)
+  expect(sets).toContain("mayor_powers_procedure=true"); // (ordinary executive powers on file, no hints, 2026-11-25)
+  expect(sets.some((x: string) => x.startsWith("rival_platforms="))).toBe(true); // (the owner approved rival_platforms, 2026-11-25)
+  expect(sets.some((x: string) => x.startsWith("opening_directions="))).toBe(true); // (sitting mayor's standing programme, 2026-11-25)
+  expect(sets).toContain(`scenario=${PRESSURE_SCENARIO}`);
+  // (The election-contest scenario sets the poll on day 60 whatever the town says: neither condition may name it,
+  // and no-election keeps first_election_days=1000 while sharing the exact same pressure/programme/rope settings.)
   const none = psSpec({ condition: "no-election", seeds: [7], arms: [CODE_ARM] }).world.sets ?? [];
-  expect(none.some((x: string) => x.startsWith("scenario="))).toBe(false);
+  expect(none.some((x: string) => x.includes("election-contest"))).toBe(false);
+  expect(none).toContain(`scenario=${PRESSURE_SCENARIO}`);
   expect(none).toContain("first_election_days=1000");
-  expect(none).toContain("appointments_procedure=true"); // (the same law in both conditions)
+  expect(none).toContain("appointments_procedure=true");
+  expect(none).toContain("mayor_powers_procedure=true");
+  expect(none.some((x: string) => x.startsWith("rival_platforms="))).toBe(true);
+  expect(none.some((x: string) => x.startsWith("opening_directions="))).toBe(true);
 });
 
 test("a control whose fork failed or never ran does not pass", async () => {
