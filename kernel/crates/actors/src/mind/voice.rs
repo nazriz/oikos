@@ -551,7 +551,9 @@ impl CitizenMind {
             let top: Vec<&str> = vs[..2].iter().map(|v| v.name()).collect();
             let office = d.get("office").cloned().unwrap_or((Json::Null).into());
             let (platform, nom_data) = if self.p.civic.platforms.is_empty() {
-                let text = format!("Standing for {}: for {}.", office.as_str().unwrap_or_default(), top.join(" and "));
+                // (In words only that the candidate stands: the values the town reads them by stay in the data, as people know a
+                // neighbour, and are not printed as a slogan; a policy platform is `rival_platforms`.)
+                let text = format!("Standing for {}.", office.as_str().unwrap_or_default());
                 (text, json!({ "office": office, "name": me, "values": top }))
             } else {
                 // Pick the policy platform best aligned with this citizen's values (deterministic tie-break).

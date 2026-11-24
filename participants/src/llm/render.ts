@@ -340,7 +340,8 @@ export function pluralKind(k: string, n: number): string {
   return `${k}s`;
 }
 
-const dataWords = (r: { kind: string; data?: unknown }, fields?: FieldKinds) => (r.kind === "form" || r.kind === "news" ? "" : r.data === null || r.data === undefined || typeof r.data !== "object" ? ""
+// (A nomination is shown by its words: the values people judge a candidate by are theirs to know, not a printed slogan.)
+const dataWords = (r: { kind: string; data?: unknown }, fields?: FieldKinds) => (r.kind === "form" || r.kind === "news" || r.kind === "nomination" ? "" : r.data === null || r.data === undefined || typeof r.data !== "object" ? ""
   : r.kind === "forward" ? clip(factWords(forwardShown(r.data), fields), 400)
   // (A provider's offer, published as itself: its sentences.)
   : isOffer(r.data) ? offerWords(r.data)
