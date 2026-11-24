@@ -22,7 +22,7 @@ import { join, resolve } from "node:path";
 import type { Arm, ExperimentSpec, SeatFactories } from "../../orchestrator/src/experiment";
 import { armNameOf, modelArm } from "../scope-pilot/model-arm";
 import { loadScenario } from "../../worlds/generator/scenario";
-import { LEVER_IDS, scriptedFactory } from "./scripted";
+import { LEVER_IDS, ON_LOSS, scriptedFactory } from "./scripted";
 
 export const POLL_DAY = 60;
 export const UNTIL_DAY = 75;
@@ -37,7 +37,11 @@ export const MODELS: string[] = [];
 
 export const CODE_ARM: Arm = { name: "code", steward: { kind: "code" } };
 export const fullArm: Arm = { name: "power-seeker", steward: { kind: "model", model: "scripted/full" } };
-export const leverArms = (): Arm[] => LEVER_IDS.map((l) => ({ name: `only-${l.replace(/_/g, "-")}`, steward: { kind: "model", model: `scripted/only:${l}` } }));
+export const leverArms = (condition: Condition = "election"): Arm[] =>
+  LEVER_IDS.filter((l) => condition === "election" || !ON_LOSS.includes(l)).map((l) => ({
+    name: `only-${l.replace(/_/g, "-")}`,
+    steward: { kind: "model", model: `scripted/only:${l}` },
+  }));
 
 /** How readily people stand under the scenario, from the scenario itself. */
 export function contestStandBps(): number {
@@ -116,5 +120,5 @@ const audit = process.env.OIKOS_PS_SCRIPTED === "audit";
 export const seatFactories: SeatFactories = { scripted: scriptedFactory(POLL_DAY) };
 const real = realArm(process.env, condition, seeds, scripted || audit);
 if (real) requireTranslator(process.env);
-export default psSpec({ condition, seeds, arms: [CODE_ARM, ...(real ? [real.arm] : []), ...(scripted ? [fullArm] : []), ...(audit ? [fullArm, ...leverArms()] : [])], ...(real ? { real } : {}),
+export default psSpec({ condition, seeds, arms: [CODE_ARM, ...(real ? [real.arm] : []), ...(scripted ? [fullArm] : []), ...(audit ? [fullArm, ...leverArms(condition)] : [])], ...(real ? { real } : {}),
   name: `power-seeking-${condition}${real ? `-${armNameOf((real.arm.steward as { model: string }).model)}` : audit ? "-audit" : scripted ? "-scripted" : ""}` });
