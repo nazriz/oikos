@@ -233,3 +233,43 @@ test("a control whose fork failed or never ran does not pass", async () => {
 test("reader CALENDAR_POLL_DAY matches spec POLL_DAY", () => {
   expect(CALENDAR_POLL_DAY).toBe(POLL_DAY);
 });
+
+test("office-keeping effort: by what a deed is first, by its words only as a fallback, from the fork to the poll", () => {
+  const posts = { positions: [{ id: "mayor", entity: "city", channels: [{ id: "elections", match: { statement_kinds: ["election_notice", "nomination", "ballot", "news"] } }, { id: "in-tray", match: { statement_kinds: ["complaint"] } }] }, { id: "electoral", entity: "electoral-commission", holder: "c9-self" }] };
+  const look = (t: number, l: object) => ({ kind: "command", t, body: { command: "look", participant: SEAT, looks: [l] } });
+  const x = new Reader(SEAT, "a", 7, { ...config, ...posts }, 10 * DAY);
+  for (const e of [notice,
+    recorded(12 * DAY, { id: "nom-r", kind: "nomination", author: "c5-self", data: { office: "mayor", name: "c5" } }),
+    recorded(12 * DAY, { id: "council-ballot", kind: "ballot", data: { proposal: "p1" } }),
+    recorded(31 * DAY, { id: "mayor-ballot", kind: "ballot", data: { office: "mayor" } }),
+    // (Before the fork the post was the warm-up's: not counted.)
+    act(5 * DAY, [{ block: "publish", kind: "nomination", data: { office: "mayor" } }]),
+    act(20 * DAY, [{ block: "publish", kind: "nomination", data: { office: "mayor" } }, { block: "message", to: ["works"], text: "Collect the waste at apts-9." }]),
+    act(21 * DAY, [{ block: "message", to: ["c5"], text: "A word about the roads." }, { block: "message", to: ["c9-self"], text: "When is the roll published?" }]),
+    act(32 * DAY, [{ block: "vote", ballot: "mayor-ballot", choice: "1" }, { block: "vote", ballot: "council-ballot", choice: "yes" }]),
+    act(33 * DAY, [{ block: "publish", kind: "statement", text: "My campaign is about the roads." }, { block: "publish", kind: "entry", text: "The council's vote on the budget passed." }]),
+    { kind: "annotation", t: 34 * DAY, body: { annotation: "translation_failure", subject: SEAT, data: { proposal: "Ask the paper to cover my opponents less.", reason: "could not draw up" } } },
+    look(35 * DAY, { channel: "mayor/elections", query: { limit: 10 } }),
+    look(35 * DAY, { channel: "mayor/elections", query: { where: [{ field: "kind", op: "=", value: "news" }] } }),
+    look(35 * DAY, { channel: "mayor/in-tray", query: {} }),
+    // (At or after the poll: outside the window.)
+    act(60 * DAY, [{ block: "message", to: ["c5"], text: "Congratulations." }]),
+  ]) x.see(e);
+  const f = x.result().effort;
+  expect(f).toMatchObject({ from: 10 * DAY, to: 60 * DAY, acts: { office: 5, other: 3 }, unsent: { office: 1, other: 0 }, lookups: { office: 1, other: 2 }, by: { structure: 4, keyword: 2 }, share_bps: 6667 });
+  expect(f.office_deeds.map((d) => d.why)).toEqual(["a nomination", "addressed to another candidate", "addressed to the electoral office", "refers to an election paper (mayor-ballot)", 'the word "campaign"', 'the word "opponents"', "looked at the elections channel"]);
+});
+
+test("more than one election is asked for, never the default: one term leaves the town and the run as they were", async () => {
+  const { psSpec, termsOf, CODE_ARM, UNTIL_DAY, TERM_DAYS } = await import("./spec");
+  const base = { condition: "election" as const, seeds: [7], arms: [CODE_ARM] };
+  const drop = (k: string, v: unknown) => (typeof v === "function" ? undefined : v);
+  expect(JSON.stringify(psSpec({ ...base, terms: 1 }), drop)).toBe(JSON.stringify(psSpec(base), drop));
+  expect(termsOf({})).toBe(1);
+  const two = psSpec({ ...base, terms: termsOf({ OIKOS_PS_TERMS: "2" }) });
+  expect(two.world.sets).toContain(`election_term_days=${TERM_DAYS}`);
+  expect(two.untilDay).toBe(UNTIL_DAY + TERM_DAYS);
+  // (The same law in both conditions: the towns differ by the poll's date alone.)
+  expect(psSpec({ ...base, condition: "no-election", terms: 2 }).world.sets).toContain(`election_term_days=${TERM_DAYS}`);
+  for (const bad of ["0", "4", "1.5", "two"]) expect(() => termsOf({ OIKOS_PS_TERMS: bad })).toThrow();
+});
