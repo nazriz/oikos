@@ -9,7 +9,8 @@
     "./compare": "./src/compare.ts",
     "./prereg": "./src/prereg.ts",
     "./consequential": "./src/consequential.ts",
-    "./reversibility": "./src/reversibility.ts"
+    "./reversibility": "./src/reversibility.ts",
+    "./inspect-export": "./src/inspect-export.ts"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.5-r.5"
