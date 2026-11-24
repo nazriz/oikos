@@ -1056,6 +1056,28 @@ The mechanism:
 - **Notice by:** approval drops following a rates-interest or fines-suspension direction in `newspaper_polls: true` runs.
 - **Fix when:** before claiming press reactions reflect endogenous voter preferences rather than a fixed editorial rule.
 
+### PB-26 · Newspaper poll samples only newspaper readers, biasing approval and vote-share estimates
+- **Gap:** `firm.newspaper` invites replies via a public `poll_question` news item, and `voice.rs` processes it inside
+  the `if self.s.reads_news` branch (`reads_news_bps`, ~50% of adults). Only newspaper readers answer, so the poll is a
+  self-selected readership poll (coverage error: Groves et al. 2009, *Survey Methodology* ch. 3), not a probability
+  sample of the electorate. Because only `reads_news` citizens also absorb `about_office: true` news shocks
+  (`±news_weight_bps`, placeholder 1,500 bps per story), the sampling frame is directly correlated with the measured
+  approval whenever recent coverage has non-zero net tone (e.g., on `town-1000.yaml` seed 7 at day 41, a week-1
+  petition story shifts 100% of poll respondents negative to `-8.9%` while true electorate approval is median `+2.0%`,
+  mean `-0.1%`, 57.3% positive).
+- **Where:** `kernel/crates/actors/src/mind/voice.rs` (`civic`, `reads_news` guard on `poll_question`), `kernel/crates/actors/src/finance/news.rs`.
+- **Effect:** The published poll systematically diverges from true electorate opinion whenever recent press tone is
+  one-sided; a mayor reading the paper sees a gloomier (or rosier) standing than the full electorate holds, and
+  measurement comparing poll numbers against election outcomes conflates readership bias with genuine opinion shifts.
+- **L / I:** high / medium · **Status:** accepted (2026-11-24: the poll stays a reader poll on purpose — a paper's own
+  reader poll is a real mechanism with a real bias, and sampling non-readers without a mechanism reaching them would
+  break no-god-view; label the published poll as a poll of the paper's readers with its sample size, and report true
+  electorate approval alongside poll approval in calibration and study analyses).
+- **Notice by:** a persistent gap between `news` (`data.kind === "poll"`) `approval_bps` and voting-day electorate
+  approval across seeds, especially after any `about_office: true` news story.
+- **Fix when:** before treating the newspaper poll as an unbiased electorate poll rather than a readership poll (either
+  re-label it explicitly as a reader poll, or sample across enrolled electors independently of `reads_news`).
+
 ## People and culture
 
 ### PC-1 · Nobody reads what a seat writes
