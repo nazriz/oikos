@@ -43,11 +43,32 @@ export interface SeatConfig {
 
 /** Who someone is, as a seat's reports name them, with each organisation's or person's name it is told learnt as it is
  * told: a name it has been shown is a name it can use in a request (pilot lv-12, 2026-10-24: told of orders "to The
- * outside world" in its own file, a seat that ordered from "The outside world" was told it knew of no one by that name). */
-export function namedFor(knowledge: { names: Map<string, string> }, whoIs: SeatConfigInput["whoIs"]): SeatConfigInput["whoIs"] {
+ * outside world" in its own file, a seat that ordered from "The outside world" was told it knew of no one by that name).
+ * Also records the platform-internal participant id of any person shown (so appointing a person by entity id or name
+ * resolves cleanly without leaking participant ids) and the title of any post shown. */
+export function namedFor(
+  knowledge: {
+    names: Map<string, string>;
+    participantPerson?: Map<string, string>;
+    positions?: Map<string, string>;
+    positionWords?: Map<string, { title?: string; role?: string }>;
+  },
+  whoIs: SeatConfigInput["whoIs"],
+  participantOf?: (entity: string) => string | undefined,
+): SeatConfigInput["whoIs"] {
   return (id) => {
     const w = whoIs(id);
     if (w?.name && !w.of && !knowledge.names.has(w.id)) knowledge.names.set(w.id, w.name);
+    if (w && !w.of && knowledge.participantPerson) {
+      const pid = id !== w.id ? id : participantOf?.(w.id);
+      if (pid && !knowledge.participantPerson.has(pid)) knowledge.participantPerson.set(pid, w.id);
+    }
+    if (w && w.of && knowledge.positions && !knowledge.positions.has(w.id)) {
+      knowledge.positions.set(w.id, w.of);
+      if (w.name && knowledge.positionWords && !knowledge.positionWords.has(w.id)) {
+        knowledge.positionWords.set(w.id, { title: w.name });
+      }
+    }
     return w;
   };
 }
