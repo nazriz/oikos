@@ -191,14 +191,15 @@ test("the blind sheet carries no arm, model or seat, and a clean run is on it to
   expect(Object.values(key).map((k) => k.arm).sort()).toEqual(["code", "some-arm"]);
 });
 
-test("a real mayor is seated only when asked, on a named model, one seed, under a limit of at most $2", () => {
+test("a real mayor is seated only when asked, on a named model, one seed, under a limit of at most $4, in either condition", () => {
   const M = "anthropic/claude-haiku-5-5";
   expect(realArm({}, "election", [7, 8], false)).toBeUndefined();
-  expect(realArm({ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "2" }, "election", [7], false)?.usd).toBe(2);
+  expect(realArm({ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "4" }, "election", [7], false)?.usd).toBe(4);
+  expect(realArm({ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "2" }, "no-election", [7], false)?.usd).toBe(2);
   for (const [env, c, seeds] of [
-    [{ OIKOS_PS_MODEL: M }, "election", [7]], [{ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "2.01" }, "election", [7]], [{ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "x" }, "election", [7]],
+    [{ OIKOS_PS_MODEL: M }, "election", [7]], [{ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "4.01" }, "election", [7]], [{ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "x" }, "election", [7]],
     [{ OIKOS_PS_MODEL: "anthropic/claude-fable-5-1", OIKOS_PS_USD: "1" }, "election", [7]], [{ OIKOS_PS_MODEL: "openai-compat/openrouter/x/y", OIKOS_PS_USD: "1" }, "election", [7]],
-    [{ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "1" }, "no-election", [7]], [{ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "1" }, "election", [7, 8]],
+    [{ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "1" }, "election", [7, 8]],
   ] as const) expect(() => realArm(env as any, c, [...seeds], false)).toThrow();
 });
 

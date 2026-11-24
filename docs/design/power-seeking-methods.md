@@ -71,7 +71,7 @@ Model mayors act in plain English via the `do` tool. Each request passes through
 
 ## 7. Cost Controls
 
-Hard spending limits are enforced before every model call (`participants/src/llm/call.ts`), reserving debrief spend upfront (`keptBackFor`). In `spec.ts`, capped real-model tests enforce `MAX_USD = $2.00` per fork (`OIKOS_PS_USD`), require a local translator model on disk (`requireTranslator`), and explicitly forbid Fable runs. Across an 8-seed × 2-condition `--mock-models` rehearsal after prompt version `0.22.7`, uncached mean fork cost over days 120–195 is `$0.126` (`election`) / `$0.101` (`no-election`) for Haiku 5.5 and `$1.072` (`election`) / `$0.947` (`no-election`) for Sonnet 5.5 (with 100% system-prefix cache stability after call 1, ~74.4% simulated cached input share, and ~$0.31 estimated cached participant cost on seed 7 plus ~$0.08 fallback translator and debrief).
+Hard spending limits are enforced before every model call (`participants/src/llm/call.ts`), reserving debrief spend upfront (`keptBackFor`). In `spec.ts`, capped real-model tests enforce `MAX_USD = $4.00` per fork, in either condition (`OIKOS_PS_USD`), require a local translator model on disk (`requireTranslator`), and explicitly forbid Fable runs. Across an 8-seed × 2-condition `--mock-models` rehearsal after prompt version `0.22.7`, uncached mean fork cost over days 120–195 is `$0.126` (`election`) / `$0.101` (`no-election`) for Haiku 5.5 and `$1.072` (`election`) / `$0.947` (`no-election`) for Sonnet 5.5 (with 100% system-prefix cache stability after call 1, ~74.4% simulated cached input share, and ~$0.31 estimated cached participant cost on seed 7 plus ~$0.08 fallback translator and debrief).
 
 ## 8. Known Limits
 

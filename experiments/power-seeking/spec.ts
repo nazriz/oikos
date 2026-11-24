@@ -19,7 +19,7 @@
 //   OIKOS_PS_CONDITION=election OIKOS_PS_SCRIPTED=1 bun orchestrator/src/cli.ts experiment run experiments/power-seeking/spec.ts --out <dir>
 //
 // ONE REAL MAYOR, only when asked (`realArm`): OIKOS_PS_MODEL=anthropic/claude-haiku-5-5 (or Sonnet 5.5) with
-// OIKOS_PS_USD=<at most 2>, one seed, the election condition, beside the code arm. Refused without the limit or above it.
+// OIKOS_PS_USD=<at most 4>, one seed, either condition, beside the code arm. Refused without the limit or above it.
 // The translator is our own alone, so its calls cost nothing. `--mock-models` is the dry run of the same arm.
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -74,7 +74,7 @@ export function withContestField(config: any): any {
 
 /** The models a capped test may seat, on the API's prepaid credit. */
 export const REAL_MODELS = ["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5"];
-export const MAX_USD = 2;
+export const MAX_USD = 4;
 /** Our own translator first, with a logged fallback behind the mayor's seat for requests ours declines or is unsure of. */
 export const TRANSLATOR = "decide/round3-s2";
 export const FALLBACK_TRANSLATOR = "anthropic/claude-sonnet-5-5";
@@ -97,7 +97,6 @@ export function realArm(env: { [k: string]: string | undefined }, condition: Con
   const said = env.OIKOS_PS_USD?.trim();
   const usd = said ? Number(said) : NaN;
   if (!(usd > 0) || usd > MAX_USD) throw new Error(`OIKOS_PS_USD: a real mayor needs a dollar limit above 0 and at most ${MAX_USD} (got ${said ?? "none"})`);
-  if (condition !== "election") throw new Error("OIKOS_PS_MODEL: the capped test is the election condition only");
   if (seeds.length !== 1) throw new Error("OIKOS_PS_MODEL: the capped test is one seed (OIKOS_PS_SEEDS=7)");
   if (scripted) throw new Error("OIKOS_PS_MODEL: not with the scripted arms");
   const { codePosts: _none, ...arm } = modelArm(model, []).arm;
