@@ -442,3 +442,104 @@ test("on file shows only what stands: not a law withdrawn, nor one an amended la
   expect(systems[2]).not.toContain("On file:");
   expect(systems[2]).not.toContain("Seventy-five days");
 });
+
+test("renderStanding deduplicates records present in more than one standing channel", () => {
+  const form = { id: "form-amend-elections", at: 0, author: "genesis", record: "statement", kind: "form", speaks_for: "city", text: "Amendment of the law on elections.", data: { fields: { term_days: { type: "duration", unit: "days", description: "Term length." } } } };
+  const law = { id: "law-charter", at: 0, author: "genesis", record: "statement", kind: "law", speaks_for: "city", text: "Charter of Millbrook." };
+  const o = obs({
+    forms: { kind: "records", records: [form] },
+    "mayor/forms": { kind: "records", records: [form] },
+    laws: { kind: "records", records: [law, law] },
+  });
+  const onFile = renderStanding(o, new Set(["forms", "mayor/forms", "laws"]));
+  expect(onFile.match(/\[form-amend-elections\]/g)?.length).toBe(1);
+  expect(onFile.match(/\[law-charter\]/g)?.length).toBe(1);
+});
+
+test("renderer fixes news/mass-noun plurals, preserves record text verbatim, and generated law-audit has no doubled article", async () => {
+  const { generate } = await import("../../worlds/generator/generate");
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const town = generate(Bun.YAML.parse(readFileSync(join(import.meta.dir, "../../worlds/town.yaml"), "utf8")) as any);
+  const auditLaw = town.world.records.find((r: any) => r.id === "law-audit");
+  expect(auditLaw?.text).toContain("Audit. The audit office examines");
+  expect(auditLaw?.text).toContain("by the audit office must answer");
+  expect(auditLaw?.text).toContain("The audit office publishes");
+  expect(auditLaw?.text).not.toMatch(/\b[Tt]he the\b/);
+
+  // Record text itself is rendered verbatim (even if someone wrote repeated words).
+  const verbatim = { id: "rec.v", at: 86_400, author: "c1-self", record: "statement", kind: "complaint", speaks_for: "c1", text: "The the pipe burst." };
+  expect(renderObservation(obs({ inbox: { kind: "records", records: [verbatim] } }))).toContain("The the pipe burst.");
+
+  const newsItems = [1, 2, 3, 4, 5, 6].map((i) => ({
+    id: `rec.${i}`, at: i * 86_400, author: "editor-system", record: "statement", kind: "news", speaks_for: "paper",
+    text: `Story ${i}.`,
+    data: { kind: "law", tone: 0, about_office: true, edition: 1 },
+  }));
+  const ballot1 = { id: "b1", at: 0, author: "genesis", record: "statement", kind: "ballot", speaks_for: "city", text: "Budget ballot." };
+  const ballot2 = { id: "b2", at: 0, author: "genesis", record: "statement", kind: "ballot", speaks_for: "city", text: "Second ballot." };
+  const books = [1, 2].map((i) => ({ id: `bk.${i}`, at: i * 86_400, author: "mayor-system", record: "statement", kind: "office_books", speaks_for: "city", text: `Books ${i}.` }));
+  const rendered = renderObservation(obs({
+    paper: { kind: "records", records: [ballot1, ...newsItems] },
+    desk: { kind: "records", records: [ballot2, ...books] },
+  }));
+  expect(rendered).toContain("(What came: 1 ballot, 6 news items.)");
+  expect(rendered).not.toContain("newss");
+  expect(rendered).toContain("(What came: 1 ballot, 2 office books.)");
+  expect(rendered).not.toContain("office bookss");
+});
+
+test("newspaper internal scoring and editorial metadata are hidden from seats", () => {
+  const story = {
+    id: "rec.2124", at: 5 * 86_400, author: "editor-system", record: "statement", kind: "news", speaks_for: "paper", basis: "rec.652",
+    text: "Residents petition the town: landlords must give tenants longer notice.",
+    data: { kind: "petition", tone: -1, about_office: true, edition: 1 },
+  };
+  const poll = {
+    id: "rec.9999", at: 160 * 86_400, author: "editor-system", record: "statement", kind: "news", speaks_for: "paper", basis: "rec.9900",
+    text: "Pre-election reader poll for mayor (120 of the paper's readers replied): 54% approve of the town's government (net +5%). First preferences: c0368 25%, c0740 22%.",
+    data: { kind: "poll", edition: 4, about_office: false, sample: "readers", respondents: 120, approval_bps: 517, shares: [{ candidate: "c0368-self", name: "c0368", first_pref_bps: 2500, incumbent: true }] },
+  };
+  const rendered = renderObservation(obs({ paper: { kind: "records", records: [story, poll] } }));
+  expect(rendered).toContain("Residents petition the town: landlords must give tenants longer notice.");
+  expect(rendered).toContain("citing rec.652");
+  expect(rendered).toContain("Pre-election reader poll for mayor (120 of the paper's readers replied): 54% approve");
+  for (const forbidden of ["tone:", "about office:", "edition:", "kind: petition", "kind: poll", "approval bps", "first pref bps"]) {
+    expect(rendered).not.toContain(forbidden);
+  }
+  // Full-paper look also omits internal news data fields.
+  const full = renderObservation(obs({ paper: { kind: "records", search: true, records: [poll] } }), { looked: new Map([["paper", { paper: "rec.9999" }]]) });
+  expect(full).toContain("Pre-election reader poll for mayor");
+  expect(full).not.toContain("approval bps");
+  expect(full).not.toContain("about office");
+});
+
+test("changing standing records (price lists) stay out of system prompt so prompt caching holds across sittings", async () => {
+  const { createLlmParticipant } = await import("../src/llm/participant");
+  const seen: { system: string; user: string }[] = [];
+  const adapter = { provider: "mock", model: "mock", complete: async (req: any) => {
+    const u = req.messages.map((m: any) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content))).join("\n");
+    seen.push({ system: req.system, user: u });
+    return { content: [{ type: "tool_use", id: `end-${seen.length}`, name: "done_for_now", input: {} }], usage: { input_tokens: 1, output_tokens: 1 } };
+  } };
+  const seat = createLlmParticipant({ participant: "mayor-system", entity: "city", title: "Mayor", framing: { disclosure: "simulation", reason: "test" }, standing: ["laws", "prices"], titles: new Map(), cadenceDays: 7, draftText: () => "" } as any,
+    { adapter, annotate: async () => {}, now: () => 0 } as any);
+  const ctx = { world: { currency: PROFILE.values.currency } } as any;
+  const law = { id: "law-1", at: 0, author: "genesis", record: "statement", kind: "law", speaks_for: "city", text: "Charter." };
+  const p1 = { id: "rec.100", at: 10 * 86_400, author: "builder-system", record: "statement", kind: "price_list", speaks_for: "builder", text: "Prices: park $100,000." };
+  const p2 = { id: "rec.200", at: 40 * 86_400, author: "builder-system", record: "statement", kind: "price_list", speaks_for: "builder", text: "Prices: park $120,000.", data: { replaces: "rec.100" } };
+  const at = (t: number, prices: any[]) => obs({ laws: { kind: "records", records: [law] }, prices: { kind: "records", records: prices } }, { t, positions: [{ position: "mayor", entity: "city", title: "Mayor" }] });
+  await seat.step(at(10 * 86_400, [p1]), ctx);
+  await seat.step(at(40 * 86_400, [p1, p2]), ctx);
+  expect(seen.length).toBe(2);
+  // System prompt stays byte-identical across the price update (prompt cache holds).
+  expect(seen[0]!.system).toBe(seen[1]!.system);
+  expect(seen[0]!.system).toContain("[law-1]");
+  expect(seen[0]!.system).not.toContain("price list");
+  expect(seen[1]!.system).not.toContain("price list");
+  expect(seen[1]!.system).not.toContain("rec.200");
+  // The seat still sees the current price list in each sitting's message.
+  expect(seen[0]!.user).toContain("[rec.100] price list of builder");
+  expect(seen[1]!.user).toContain("[rec.200] price list of builder");
+  expect(seen[1]!.user).not.toContain("[rec.100]");
+});

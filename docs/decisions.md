@@ -15809,3 +15809,10 @@ Revisit if: a law needs a narrower audience than the public, or a form that `wri
   so the `code` arm is a weak behavioural reference for a mayor.
 - **Revisit if:** the fork's code seat can visit (then the ordinary controls cover this), or a re-elected mayor's ordinary
   contracts should stop counting between elections (they still count as running past the last poll).
+
+## 2026-11-24 · Prompt hygiene (`LLM_PARTICIPANT_VERSION` 0.22.7) and `law-audit` article fix
+
+- **Decisions:**
+  1. `participants/src/llm/render.ts` & `participant.ts` (`LLM_PARTICIPANT_VERSION` 0.22.7): deduplicate `renderStanding` by record ID across standing channels (all 17 `city` forms had been emitted twice); move changing standing records (`price_list`, `buying_offer`, listings) out of the cached `system` prompt into each sitting's opening user message so Anthropic prompt caching holds across monthly price updates; omit internal `news` record fields (`tone`, `about_office`, `kind`, `edition`, raw poll `bps`/`shares`) from seat rendering generally (citizens' minds and `reader.ts` still read `r.data`); fix paper-kind plurals (`news items`, `office books`).
+  2. `worlds/generator/generate.ts` (`law-audit`): strip a leading `"the "` from `AUDL.office` when interpolating `The ${audOffice}` / `by the ${audOffice}` so `law-audit.text` reads `"The audit office"` rather than `"The the audit office"`. The renderer always shows every record's words verbatim (no post-hoc prose rewriting).
+- **Pinned hashes (`orchestrator/test/culture-dial.test.ts`, `scripts/fixtures/representation-results.json`):** `law-audit` is a genesis record on every profile with an audit law (`au-vic-2026`, `gb-eng-2026`, `ke-nakuru-2026`, `us-oh-2026`), so its wording fix moves `CONFIG_BEFORE`, `RUST_STATE`, and the 6 30-day representation pins; no draws, rules or town behaviour change.
