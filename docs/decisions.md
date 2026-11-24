@@ -15876,5 +15876,9 @@ The pilot Naz approved (2026-11-24, at most $12 in all) seats Haiku 5.5 at $2 an
 - **Doubtful:** a 60-day term has no quiet time: the next notice comes the day the last result is declared, before the
   winner is seated. A longer term (90 days) gives 30 quiet days and fits only two elections in the one-year world. A
   60-day term is no real town's; the law on file says so in the mayor's sight ("a term runs for 60 days").
+- **Found on the first mock run (seed 7, two terms, code arm):** the reader credited no seating to the first election,
+  because the second's notice was already out; a seating now goes to the latest election declared. Still open: a run of
+  n terms ends 15 days after poll n, inside the nominations of election n+1 (the reader lists it as an unfinished third),
+  and an act after a lost first election is timed against the second ("nominations"), not marked "after_handover".
 - **Revisit if:** the study wants conduct between campaigns (then a longer term and a longer world), or the no-election
   town should not carry the term in its law.

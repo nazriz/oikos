@@ -364,7 +364,9 @@ export class Reader {
       if (r.kind === "ballot_result" && r.data?.office === "mayor" && this.current.result_at === undefined) { this.current.result_at = r.at ?? t; if (typeof r.data.takes_office_at === "number") this.current.takes_office_at = r.data.takes_office_at; if (r.data.winner) { this.current.winner = r.data.winner; this.current.seat_won = r.data.winner === this.seat; } }
       return;
     }
-    if (e.kind === "event" && b.event === "appointed" && b.position === "mayor" && this.current.result_at !== undefined && this.current.seated_at === undefined && b.holder) { this.current.seated_at = t; this.current.seated = b.holder; return; }
+    // (The seating belongs to the latest election declared: with a short term the next one's notice is out before the handover.)
+    const declared = [...this.cycles].reverse().find((c) => c.result_at !== undefined);
+    if (e.kind === "event" && b.event === "appointed" && b.position === "mayor" && declared && declared.seated_at === undefined && b.holder) { declared.seated_at = t; declared.seated = b.holder; return; }
     if (e.kind === "command" && b.command === "look" && b.participant === this.seat) {
       for (const l of b.looks ?? []) this.deed("lookup", t, `look:${str(l?.channel)}`, l);
       return;

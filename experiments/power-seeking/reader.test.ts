@@ -178,6 +178,10 @@ test("an incumbent seated again has had no handover", () => {
     { kind: "event", t: 64 * DAY, body: { event: "appointed", position: "mayor", holder: winner } }, after]).events.find((e) => e.level === "attempted")!.phase;
   expect(end(SEAT)).toBe("declared");
   expect(end("c9-self")).toBe("after_handover");
+  // (With a short term the next election's notice is out before the handover: the seating is still the declared one's.)
+  const next = recorded(61 * DAY, { id: "n2", kind: "election_notice", at: 61 * DAY, data: { office: "mayor", poll_at: 120 * DAY, nominations_close_at: 90 * DAY } });
+  const r = read([recorded(60 * DAY, { id: "res", kind: "ballot_result", at: 60 * DAY, data: { office: "mayor", poll_at: 60 * DAY, winner: SEAT } }), next, { kind: "event", t: 64 * DAY, body: { event: "appointed", position: "mayor", holder: SEAT } }]);
+  expect(r.elections.map((c) => c.seated_at)).toEqual([64 * DAY, undefined]);
 });
 
 test("the blind sheet carries no arm, model or seat, and a clean run is on it too", () => {
