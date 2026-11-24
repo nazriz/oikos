@@ -58,6 +58,9 @@ export interface RunOptions {
   log?: (msg: string) => void;
   /** The model behind every language-model participant and the translator. Default: the mock. */
   adapter?: LlmAdapter;
+  /** Optional per-seat adapters (keyed by participant id or position id), for multi-AI scalable-oversight runs
+   * pairing a stronger operator model with weaker oversight models. Omitted: every seat uses `adapter` (or mock). */
+  seatAdapters?: { [seatOrPost: string]: LlmAdapter };
   /** With the mock (no `adapter`): a change to what the mock participant does, given the mock's own policy for a seat
    * (a measuring script plays a reader in a seat and leaves the office's code to act: scripts/member-sittings.ts). */
   mockParticipant?: (inner: MockPolicy) => MockPolicy;
@@ -532,23 +535,25 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const llmUnit = async (p: Part, wakeAt?: number): Promise<Unit> => {
     const c = p.controller;
     const pp = c.params ?? {};
+    const cadence = (pp.cadence_days ?? 7) * DAY;
+    const mine = held(p.id);
+    const seatOverride = o.seatAdapters?.[p.id] ?? mine.map((x) => o.seatAdapters?.[x.id]).find(Boolean);
+    const seatIo = seatOverride ? { ...io, adapter: watched(seatOverride) } : io;
     // A mock seat that sits as its code twin does (mock.twin, docs/design/foundations.md section 4): no office hours of its own, back when its
     // brain's module would be, woken by what wakes a code unit of its post. What a steward does differently from its code twin is then the
     // steward's decisions only, never when it sits (the world is the same, but for what the seat does).
-    const twin = !o.adapter && !!pp.mock?.twin && !!pp.mock?.brain;
-    const cadence = (pp.cadence_days ?? 7) * DAY;
-    const mine = held(p.id);
+    const twin = !o.adapter && !seatOverride && !!pp.mock?.twin && !!pp.mock?.brain;
     // (Its reports, trays, office's file and staff, and the rest of its configuration: seat-config.ts, shared with the
     // experiment harness's model stewards.)
     const knowledge = new Knowledge(currency, cfg.names === true);
     const { config, office, entity, standingIds, roster, tally, dayBook, matters } = seatConfig({ cfg, part: p, personal: personalChannels(p), mine, positions, mods, whoIs: namedFor(knowledge, whoIs), ctxFor, twin, draftText, sorted: sortedKeys });
     knowledge.ownHolder = config.ownHolder ?? null;
-    const controller = createLlmParticipant(config, io);
+    const controller = createLlmParticipant(config, seatIo);
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };
     const ctx = ctxFor(p.id, office?.id ?? "self", entity, {});
     debriefs.set(p.id, { part: p, controller });
-    bindings[p.id] = { configured: `${c.impl ?? "?"}/${c.model ?? "?"}`, adapter: `${io.adapter.provider}/${io.adapter.model}`, ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(pp.wake_on_papers === false ? { wake_on_papers: false } : {}) };
-    if (!o.adapter) {
+    bindings[p.id] = { configured: `${c.impl ?? "?"}/${c.model ?? "?"}`, adapter: `${seatIo.adapter.provider}/${seatIo.adapter.model}`, ...(typeof pp.effort === "string" && pp.effort ? { effort: pp.effort } : {}), ...(pp.wake_on_papers === false ? { wake_on_papers: false } : {}) };
+    if (!o.adapter && !seatOverride) {
       // The mock's code brain: the module the world names for it, run in its one capacity (or none: it just waits).
       const b = pp.mock?.brain;
       const brainModule = b ? mods[b] : undefined;
@@ -730,7 +735,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // What code ran this world is part of the record (D30).
   await k.request({ op: "annotate", annotation: { annotation: "orchestrator", subject: "orchestrator", data: {
     version: ORCHESTRATOR_VERSION, modules: used, thinking_time: cfg.orchestration.thinking_time, confirm,
-    ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_PARTICIPANT_VERSION, translator: translator.id, ...(arranged ? { translator_arrangement: { arrangement: arranged.arrangement, first: arranged.first, behind: arranged.behind, stands: arranged.stands } } : {}), translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(io.prices!).filter(([key]) => key === `${io.adapter.provider}/${io.adapter.model}` || key === translator.id.model || key === arranged?.first.model || key === arranged?.behind.model || key === "mock/mock").map(([key, price]) => ({ model: key, ...price })), participants: bindings, ...(o.budget ? { spending_limit_microusd: o.budget.limitMicroUsd } : {}) } } : {}),
+    ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_PARTICIPANT_VERSION, translator: translator.id, ...(arranged ? { translator_arrangement: { arrangement: arranged.arrangement, first: arranged.first, behind: arranged.behind, stands: arranged.stands } } : {}), translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(io.prices!).filter(([key]) => key === `${io.adapter.provider}/${io.adapter.model}` || Object.values(bindings).some((b: any) => b.adapter === key) || key === translator.id.model || key === arranged?.first.model || key === arranged?.behind.model || key === "mock/mock").map(([key, price]) => ({ model: key, ...price })), participants: bindings, ...(o.budget ? { spending_limit_microusd: o.budget.limitMicroUsd } : {}) } } : {}),
   } } });
 
   const unitsOf = (pid: string) => units.of(pid);

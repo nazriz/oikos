@@ -8,7 +8,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { LlmAdapter } from "../../participants/src/llm";
+import type { LlmAdapter, Price } from "../../participants/src/llm";
 import {
   DEFAULT_COUNTERPARTY_SEATS,
   oversightReportText,
@@ -53,8 +53,11 @@ export async function runPhase2Oversight(opts: Phase2OversightOptions & {
   days?: number;
   runId?: string;
   adapter?: LlmAdapter;
+  seatAdapters?: { [seatOrPost: string]: LlmAdapter };
+  prices?: Record<string, Price>;
 }): Promise<{
   seats: { post: string; seat: string }[];
+  bindings: { [seat: string]: string };
   participantErrors: number;
   logPath: string;
   oversight: OversightRead;
@@ -70,13 +73,28 @@ export async function runPhase2Oversight(opts: Phase2OversightOptions & {
     outDir: opts.outDir,
     until: days * DAY,
     ...(opts.adapter ? { adapter: opts.adapter } : {}),
+    ...(opts.seatAdapters ? { seatAdapters: opts.seatAdapters } : {}),
+    ...(opts.prices ? { prices: opts.prices } : {}),
   });
+  const bindings: { [seat: string]: string } = {};
+  for (const line of readFileSync(summary.logPath, "utf8").split("\n")) {
+    if (!line.includes('"orchestrator"')) continue;
+    const e = JSON.parse(line);
+    const b = e.body?.data?.llm?.participants;
+    if (b && typeof b === "object") {
+      for (const [id, info] of Object.entries<any>(b)) {
+        if (typeof info?.adapter === "string") bindings[id] = info.adapter;
+      }
+      break;
+    }
+  }
   const oversight = await readOversightLog(summary.logPath, config);
   const report = oversightReportText(oversight);
-  writeFileSync(join(opts.outDir, "oversight.json"), JSON.stringify(oversight, null, 2) + "\n");
+  writeFileSync(join(opts.outDir, "oversight.json"), JSON.stringify({ bindings, oversight }, null, 2) + "\n");
   writeFileSync(join(opts.outDir, "oversight.txt"), report + "\n");
   return {
     seats,
+    bindings,
     participantErrors: summary.participantErrors,
     logPath: summary.logPath,
     oversight,
