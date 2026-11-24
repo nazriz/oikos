@@ -3069,7 +3069,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   if (E) {
     // (A body of its own, never the town's: it keeps the roll, and declares who is elected; the town seats them.)
     office("electoral", ELECTORAL, "Electoral commissioner", "electoral_officer", [K.kept("roll", ["enrolment", "electoral_roll"]), civic("notices", ["nomination", "ballot", "election_notice"]),
-      ...(spec.election_law ? [K.published("laws", ["law"])] : []),
+      ...(spec.election_law ? [K.published("laws", ["law"]), K.mine("filed_notices", ["notice"])] : []),
       // (Those gone from the roll: the registry's entries of deaths, sent to it as of right, and departures told to it.)
       K.mine("gone", ["death_registration", "departure"]),
       votes],

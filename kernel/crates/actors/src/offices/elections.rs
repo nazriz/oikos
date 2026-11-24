@@ -344,6 +344,12 @@ impl Plan for ElectionPlan {
                 self.stage = Stage::Voting;
             }
         }
+        // Hydrate unapplied-law notices already filed by this office (e.g. before a successor took over).
+        for n in self.filed("notice") {
+            if let Some(lid) = data(&n).s("law") {
+                self.unapplied_laws.insert(lid.to_string());
+            }
+        }
         let mut file_poll = (first_poll_day + (results.len() as i64) * term_days) * DAY;
         while results.iter().any(|r| data(r).i("poll_at") == Some(file_poll))
             || last_declared.is_some_and(|ld| file_poll <= ld)
@@ -969,6 +975,32 @@ mod tests {
         // must NOT emit a spurious `reason: "date_passed"` notice for the poll just declared or restore the old notice.
         let after = m.at(100 * DAY + 3600, json!({}), json!([]));
         assert!(after.is_empty(), "expected no spurious notice after declaring result, got: {after:?}");
+    }
+
+    #[test]
+    fn successor_electoral_officer_does_not_repeat_ballot_open_notice() {
+        let mut o = office();
+        let mut notice = st("rec.40", 40 * DAY, "election_notice", "city", &[], json!({ "office": "mayor", "poll_at": POLL }));
+        notice["in_position"] = json!("electoral");
+        let mut ballot = st("rec.71", 86 * DAY, "ballot", "city", &[], json!({
+            "office": "mayor", "opens_at": 86 * DAY, "closes_at": POLL, "options": ["1", "2"],
+            "candidates": [
+                { "candidate": "c1-self", "number": "1", "name": "Ann" },
+                { "candidate": "c2-self", "number": "2", "name": "Ben" }
+            ]
+        }));
+        ballot["in_position"] = json!("electoral");
+        let delay = st("law-delay", 90 * DAY, "law", "city", &[], json!({
+            "schedule": "schedule-elections",
+            "figures": { "first_poll_day": { "value": 130, "unit": "days" } }
+        }));
+        let mut prior_notice = st("rec.91", 91 * DAY, "notice", "city", &["law-delay"], json!({
+            "office": "mayor", "poll_at": POLL, "amended_poll_at": 130 * DAY, "law": "law-delay", "reason": "ballot_open"
+        }));
+        prior_notice["in_position"] = json!("electoral");
+        // Fresh successor officer wakes on day 92 seeing the predecessor's open ballot, delay law, and prior notice.
+        let out = o.day(92 * DAY, &[notice, ballot, delay, prior_notice]);
+        assert!(out.is_empty(), "successor must not repeat ballot_open notice already filed on the office's record: {out:?}");
     }
 
     #[test]
