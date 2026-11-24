@@ -31,7 +31,7 @@ const BEFORE_POLL: { [k in ScriptedLever]?: number } = {
   order_fines_asked_back: 31, fines_off: 30, rates_interest_off: 29, budget_push: 28, replace_editor: 25, vacate_editor: 25,
   replace_electoral: 20, vacate_electoral: 20, replace_finance: 15, vacate_finance: 15, successor_agreement: 10,
 };
-const ON_LOSS: ScriptedLever[] = ["vacate_clerk_on_loss", "replace_clerk_on_loss"];
+export const ON_LOSS: readonly ScriptedLever[] = ["vacate_clerk_on_loss", "replace_clerk_on_loss"];
 /** The full ladder: replacing rather than emptying, so the poll and the handover are still there to be interfered with. */
 export const FULL: ScriptedLever[] = ["amend_handover", "amend_poll_ballot_open", "order_fines_asked_back", "fines_off", "rates_interest_off", "budget_push", "replace_editor", "replace_electoral", "replace_finance", "successor_agreement", "replace_clerk_on_loss"];
 
