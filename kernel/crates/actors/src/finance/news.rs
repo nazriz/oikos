@@ -306,9 +306,9 @@ impl Paper {
             .collect();
         let shares_text: String = ranked.iter().map(|(_, name, _, bps)| format!("{name} {}%", (bps + HALF_PERCENT_BPS) / 100)).collect::<Vec<_>>().join(", ");
         let body_text = if shares_text.is_empty() {
-            format!("Pre-election poll for {} ({respondents} respondents): {approve_pct}% approve of the town's government (net {:+}%).", poll.office, net_pct)
+            format!("Pre-election reader poll for {} ({respondents} of the paper's readers replied): {approve_pct}% approve of the town's government (net {:+}%).", poll.office, net_pct)
         } else {
-            format!("Pre-election poll for {} ({respondents} respondents): {approve_pct}% approve of the town's government (net {:+}%). First preferences: {shares_text}.", poll.office, net_pct)
+            format!("Pre-election reader poll for {} ({respondents} of the paper's readers replied): {approve_pct}% approve of the town's government (net {:+}%). First preferences: {shares_text}.", poll.office, net_pct)
         };
         self.edition += 1;
         let call = say(
@@ -322,6 +322,7 @@ impl Paper {
                     "edition": self.edition,
                     "about_office": false,
                     "poll_at": poll.poll_at,
+                    "sample": "readers",
                     "respondents": respondents,
                     "approval_bps": approval_bps,
                     "shares": shares,
@@ -384,7 +385,7 @@ impl Paper {
             if let Some((key, _pub_at)) = chosen_slot {
                 let closes_at = (t + POLL_WINDOW_DAYS * DAY).min(poll_at - DAY);
                 self.edition += 1;
-                let text = format!("Poll open: the paper asks residents how they rate the town's government and which candidate for {office} they favour ahead of polling day.");
+                let text = format!("Poll open: the paper asks its readers how they rate the town's government and which candidate for {office} they favour ahead of polling day.");
                 let call = say(
                     "news",
                     &text,
@@ -722,6 +723,7 @@ mod tests {
         let q = asked.iter().find(|c| json_arg(c, "data")["kind"] == "poll_question").expect("poll_question published");
         assert_eq!(json_arg(q, "data")["about_office"], false);
         assert_eq!(json_arg(q, "data")["poll_at"], 60 * DAY);
+        assert!(arg(q, "text").unwrap().contains("asks its readers"));
 
         // Rig::run automatically binds `poll_q` to `made.0.poll_q` on the applied outcome.
         let replies = vec![
@@ -734,6 +736,7 @@ mod tests {
         let pd = json_arg(poll, "data");
         assert_eq!(pd["about_office"], false);
         assert_eq!(pd["poll_at"], 60 * DAY);
+        assert_eq!(pd["sample"], "readers");
         assert_eq!(pd["respondents"], 3);
         assert_eq!(pd["approval_bps"], 0);
         let shares = pd["shares"].as_array().unwrap();
@@ -743,7 +746,9 @@ mod tests {
         assert_eq!(shares[1]["candidate"], "mayor-self");
         assert_eq!(shares[1]["incumbent"], true);
         assert_eq!(shares[1]["first_pref_bps"], 3333);
-        assert!(arg(poll, "text").unwrap().contains("3 respondents"));
+        let poll_text = arg(poll, "text").unwrap();
+        assert!(poll_text.contains("reader poll"), "{poll_text}");
+        assert!(poll_text.contains("3 of the paper's readers replied"), "{poll_text}");
     }
 
     #[test]
