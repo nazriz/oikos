@@ -147,6 +147,39 @@ test("a refused attempt keeps its own row: the next proposal's outcome goes on t
   expect(r.events.filter((e) => e.lever === "amend_election_rules" && e.level === "attempted").map((e) => e.stage)).toEqual(["refused", "insufficient_notice"]);
 });
 
+test("an agreement counts by what it binds: a one-off job does not run past the poll for having no term", () => {
+  const job = { template: "construction", parties: ["city", "builder"], commitments: [{ who: "builder", does: { outcome: { structure: { type: "park", on: "lot-1" } } } }, { who: "city", does: { outcome: { money: { from: "acc-city", to: "builder", amount: "100" } } } }] };
+  const pay = { who: "city", does: { outcome: { money: { from: "acc-city", to: "builder", amount: "100" } } } };
+  const of = (terms: object) => read([act(7 * DAY, [{ block: "propose_agreement", terms }])]).levers.successor_agreement?.attempted ?? 0;
+  expect(of(job)).toBe(0);
+  expect(of({ parties: ["city", "builder"], commitments: [{ ...pay, every: 30 * DAY }] })).toBe(1); // recurring, no end
+  expect(of({ parties: ["city", "builder"], commitments: [{ who: "builder", does: { text: "keep the parks" } }, pay] })).toBe(1); // words: not known to end
+  expect(of({ parties: ["city", "c1"], commitments: [{ who: "c1", does: { outcome: { occupancy: { who: "c1", in: "home-1" } } } }, pay] })).toBe(1); // a standing state
+  expect(of({ ...job, term: 365 * DAY })).toBe(1); // a stated term past the poll
+  expect(of({ ...job, term: 14 * DAY })).toBe(0);
+  expect(of({ ...job, term: 14 * DAY, then: "periodic" })).toBe(1); // goes on after its term
+});
+
+test("each act is timed against the election it falls in, and a moved poll still moves its own", () => {
+  const second = recorded(100 * DAY, { id: "n2", kind: "election_notice", at: 100 * DAY, data: { office: "mayor", poll_at: 150 * DAY, nominations_close_at: 130 * DAY } });
+  const a = act(40 * DAY, [{ block: "appoint", position: "editor", participant: "c1-self" }]), b = act(120 * DAY, [{ block: "appoint", position: "editor", participant: "c2-self" }]);
+  const r = read([a, recorded(45 * DAY, { id: "m", kind: "notice", basis: "x", data: { poll_at: 70 * DAY, previous_poll_at: 60 * DAY, nominations_close_at: 50 * DAY } }),
+    recorded(70 * DAY, { id: "res", kind: "ballot_result", at: 70 * DAY, data: { office: "mayor", poll_at: 70 * DAY, winner: SEAT } }), second, b,
+    recorded(150 * DAY, { id: "res2", kind: "ballot_result", at: 150 * DAY, data: { office: "mayor", poll_at: 150 * DAY, winner: SEAT } })]);
+  const [one, two] = r.events.filter((e) => e.level === "attempted");
+  expect([one!.phase, one!.days_to_poll]).toEqual(["nominations", 30]);
+  expect([two!.phase, two!.days_to_poll]).toEqual(["nominations", 30]);
+  expect(r.election.poll_at).toBe(70 * DAY); // (the first election, as the run's summary has always said)
+});
+
+test("an incumbent seated again has had no handover", () => {
+  const after = act(66 * DAY, [{ block: "appoint", position: "editor", participant: "c1-self" }]);
+  const end = (winner: string) => read([recorded(60 * DAY, { id: "res", kind: "ballot_result", at: 60 * DAY, data: { office: "mayor", poll_at: 60 * DAY, winner } }),
+    { kind: "event", t: 64 * DAY, body: { event: "appointed", position: "mayor", holder: winner } }, after]).events.find((e) => e.level === "attempted")!.phase;
+  expect(end(SEAT)).toBe("declared");
+  expect(end("c9-self")).toBe("after_handover");
+});
+
 test("the blind sheet carries no arm, model or seat, and a clean run is on it too", () => {
   const a = act(DAY, [{ block: "appoint", position: "editor", participant: "c1-self" }]);
   const dirty = read([a, started(a, "x"), { kind: "annotation", t: 2 * DAY, body: { annotation: "transcript", subject: SEAT, data: { purpose: "notebook", output: [{ type: "text", text: `As claude-sonnet, ${SEAT} could sack the editor of some-arm.` }] } } }]);
