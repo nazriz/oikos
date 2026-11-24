@@ -330,7 +330,17 @@ function forwardShown(d: any): unknown {
   return { from: d?.by, kind: d?.kind, paper: d?.paper, ...(typeof d?.paper === "string" ? { held: `a copy of ${d.paper}, yours to cite as ${d.paper}` } : {}), ...(d?.matter ? { matter: d.matter } : {}), ...rest };
 }
 
-const dataWords = (r: { kind: string; data?: unknown }, fields?: FieldKinds) => (r.kind === "form" ? "" : r.data === null || r.data === undefined || typeof r.data !== "object" ? ""
+/** Count a paper kind in plain English: "1 news item" / "6 news items", avoiding doubled plurals ("newss", "office bookss"). */
+export function pluralKind(k: string, n: number): string {
+  if (k === "news") return n === 1 ? "news item" : "news items";
+  if (n === 1) return k;
+  if (/(?:books|signatories|minutes|premises|rates|prices|goods|proceeds|terms)$/.test(k)) return k;
+  if (/(?:ss|ch|sh|x|z)$/.test(k)) return `${k}es`;
+  if (/[^aeiou]y$/.test(k)) return `${k.slice(0, -1)}ies`;
+  return `${k}s`;
+}
+
+const dataWords = (r: { kind: string; data?: unknown }, fields?: FieldKinds) => (r.kind === "form" || r.kind === "news" ? "" : r.data === null || r.data === undefined || typeof r.data !== "object" ? ""
   : r.kind === "forward" ? clip(factWords(forwardShown(r.data), fields), 400)
   // (A provider's offer, published as itself: its sentences.)
   : isOffer(r.data) ? offerWords(r.data)
@@ -773,7 +783,7 @@ function paperInFull(r: Record, asked: Looked, readings?: { [id: string]: Readin
     inFull = false;
   }
   const narrowed = asked.words !== undefined || (asked.fromEntry ?? 1) > 1;
-  const lists: [string, unknown[]][] = r.record === "statement" && r.data !== null && typeof r.data === "object" ? Object.entries(r.data as object).filter((e): e is [string, unknown[]] => Array.isArray(e[1]) && e[1].length > 1) : [];
+  const lists: [string, unknown[]][] = r.record === "statement" && r.kind !== "news" && r.data !== null && typeof r.data === "object" ? Object.entries(r.data as object).filter((e): e is [string, unknown[]] => Array.isArray(e[1]) && e[1].length > 1) : [];
   if (all.length <= PAPER_MAX && !(narrowed && lists.length)) return [`- ${all}`];
   if (r.record !== "statement" || !lists.length) return [`- ${all.slice(0, PAPER_MAX)}…`, `(Cut short at ${num(PAPER_MAX)} of its ${num(all.length)} characters.)`];
   // (An office's books paper: its words are the day's list of cases, set out whole; the list below takes its own room.)
@@ -1115,14 +1125,14 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
       if (atCounter.length) {
         const byKind = new Map<string, number>();
         for (const r of atCounter) byKind.set(paperKind(r), (byKind.get(paperKind(r)) ?? 0) + 1);
-        out.push(`Answered at your counter under your standing order (${num(atCounter.length)}): ${[...byKind].sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${num(n)} ${k}${n === 1 ? "" : "s"}`).join(", ")}. A sample:`,
+        out.push(`Answered at your counter under your standing order (${num(atCounter.length)}): ${[...byKind].sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${num(n)} ${pluralKind(k, n)}`).join(", ")}. A sample:`,
           ...recordLines(atCounter.slice(-3), obs.readings, true).map((l) => `- ${l}`));
         if (here.length) out.push(`For you (${num(here.length)}):`);
       }
       // What has come, by kind, where there is more than a line or two: a heading names a folder, not what is in it.
       const by = new Map<string, number>();
       for (const r of here) by.set(paperKind(r), (by.get(paperKind(r)) ?? 0) + 1);
-      if (here.length > 2) out.push(`(What came: ${[...by].sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${num(n)} ${k}${n === 1 ? "" : "s"}`).join(", ")}.)`);
+      if (here.length > 2) out.push(`(What came: ${[...by].sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${num(n)} ${pluralKind(k, n)}`).join(", ")}.)`);
       if (lines.length > max) out.push(`(${lines.length - max} earlier ${lines.length - max === 1 ? "item" : "items"} not listed.)`);
       for (const l of lines.slice(-max)) out.push(`- ${l}`);
       if (lines.length > max || cuts > before) out.push(...look(id, `Not everything here is set out in full. To see the rest, say what to find, or go through it a part at a time (from_entry: 1, then as each answer says)`));
@@ -1224,13 +1234,21 @@ export function papersWith(matters: Record[], kept: Map<string, Record>, o: Rend
   return ["## What the matters above come under: the remits and briefs they name", ...recordLines(out, undefined, true).map((l) => `- ${l}`)].join("\n");
 }
 
+/** Standing record kinds that change regularly during a run (market price lists and posted listings): kept out of the
+ * cached system prompt and set out with each sitting instead so prompt caching holds across sittings. */
+export const CHANGING_STANDING_KINDS: ReadonlySet<string> = new Set([
+  "price_list", "buying_offer", "rental_listing", "premises_listing", "property_for_sale", "job_posting",
+]);
+
 /**
  * Standing documents (laws, charters, procedures) from the given reports, in full: those that stand. One that has been
  * withdrawn (by its own author, or whoever it speaks for) isn't on file any more; nor is one that a later document of
  * the same kind, from whoever it speaks for, says it replaces (an amended law names the law it replaces), whether or
  * not the withdrawal is among what's shown. The same reading as a code participant's book (`Book`, behaviour/common.ts).
+ * A document carried by more than one standing channel is set out once.
  */
-export function renderStanding(obs: Observation, standing: Set<string>, who?: WhoIs, fieldsOf?: Map<string, FieldKinds>): string {
+export function renderStanding(obs: Observation, standing: Set<string>, who?: WhoIs, fieldsOf?: Map<string, FieldKinds>,
+  o?: { excludeKinds?: ReadonlySet<string>; onlyKinds?: ReadonlySet<string> }): string {
   whoIs = who;
   formFields = fieldsOf ?? formFieldsIn(Object.values(obs.channels).flatMap((ch) => (ch.kind === "records" ? ch.records : [])));
   const out: string[] = [];
@@ -1247,10 +1265,13 @@ export function renderStanding(obs: Observation, standing: Set<string>, who?: Wh
     const sameVoice = !!old.speaks_for && old.speaks_for === r.speaks_for;
     if (r.record === "withdrawal" ? sameVoice || old.author === r.author : sameVoice && r.record === "statement" && old.kind === r.kind) down.add(old.id);
   }
+  const seen = new Set<string>();
   for (const [id, ch] of Object.entries(obs.channels)) {
     if (!standing.has(id) || ch.kind !== "records") continue;
     for (const r of ch.records) {
-      if (r.record !== "statement" || down.has(r.id) || othersStationery(r)) continue;
+      if (r.record !== "statement" || down.has(r.id) || seen.has(r.id) || othersStationery(r)) continue;
+      if (o?.excludeKinds?.has(r.kind) || (o?.onlyKinds && !o.onlyKinds.has(r.kind))) continue;
+      seen.add(r.id);
       const d = r.data ? dataWords(r, formFields?.get(r.kind)) : "";
       out.push(r.kind === "form" ? formWords(r, `- [${r.id}] form${r.speaks_for ? ` of ${r.speaks_for}` : ""}`) + (ruleWords(r) ? ` ${ruleWords(r)}` : "")
         : `- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${d ? ` (${d})` : ""}${ruleWords(r) ? ` ${ruleWords(r)}` : ""}`);
