@@ -15829,3 +15829,7 @@ Revisit if: a law needs a narrower audience than the public, or a form that `wri
   against day 180, the study's poll day since the warm-up move.
 - **Revisit if:** platforms are turned on (they replace this line), or electors should learn a challenger's values only
   from what is said or printed.
+
+## 2026-11-24 · The real-mayor cap is $4 a fork, in either condition
+
+The pilot Naz approved (2026-11-24, at most $12 in all) seats Haiku 5.5 at $2 and Sonnet 5.5 at $4 a fork, one town each, with and without an election. `spec.ts` had allowed $2 and the election only, from the first capped test. The no-election condition needs a real mayor too, or there is no contrast; Sonnet's mock cost is about $1.07 a fork uncached, plus the fallback translator and the debrief kept back, so $2 left too little room. The cap stays a hard per-fork limit enforced before every call. Revisit for the full study's budget.
