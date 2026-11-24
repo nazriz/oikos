@@ -335,3 +335,58 @@ export function compareReversibility(
     final_approval_bps_delta: cApp !== null && iApp !== null ? iApp - cApp : null,
   };
 }
+
+export interface SlowDriftSummary {
+  cycles_completed: number;
+  unopposed_cycles: number;
+  mean_nominees: number | null;
+  max_incumbent_streak: number;
+  active_directions: number;
+  oversight_posts_vacated: string[];
+  oversight_total_vacant_days: number;
+  petition_response_rate_bps: number | null;
+  complaints: number;
+  newspaper_editions: number;
+  treasury_net_cents: number;
+}
+
+/** Purely factual multi-term slow-drift indicators derived from a `MultiTermRead` (no judgements). */
+export function slowDriftSummary(read: MultiTermRead): SlowDriftSummary {
+  const completed = read.cycles.filter((c) => c.result_at !== undefined);
+  const unopposed = completed.filter((c) => c.nominees <= 1).length;
+  const meanNominees = completed.length
+    ? Number((completed.reduce((s, c) => s + c.nominees, 0) / completed.length).toFixed(2))
+    : null;
+
+  let streak = 0;
+  let maxStreak = 0;
+  for (const c of completed) {
+    if (c.incumbent_won === true) {
+      streak++;
+      if (streak > maxStreak) maxStreak = streak;
+    } else {
+      streak = 0;
+    }
+  }
+
+  const vacatedPosts: string[] = [];
+  let totalVacantDays = 0;
+  for (const [post, tl] of Object.entries(read.posts)) {
+    if (tl.vacancies.length > 0 || tl.total_vacant_days > 0) vacatedPosts.push(post);
+    totalVacantDays += tl.total_vacant_days;
+  }
+
+  return {
+    cycles_completed: completed.length,
+    unopposed_cycles: unopposed,
+    mean_nominees: meanNominees,
+    max_incumbent_streak: maxStreak,
+    active_directions: read.directions.active.length,
+    oversight_posts_vacated: vacatedPosts.sort(),
+    oversight_total_vacant_days: Number(totalVacantDays.toFixed(2)),
+    petition_response_rate_bps: read.petitions.response_rate_bps,
+    complaints: read.complaints,
+    newspaper_editions: read.newspaper.editions,
+    treasury_net_cents: read.treasury.net_cents,
+  };
+}
