@@ -61,7 +61,7 @@ test("given notice of an election, a resident stands with the chance stand_bps, 
   expect(said[0]!.args).toMatchObject({ to: ["city"], visible: "public", data: { office: "mayor", name: "c1" } });
   const values: string[] = said[0]!.args.data.values;
   expect(values.length).toBe(2);
-  expect(said[0]!.args.text).toBe(`Standing for mayor: for ${values.join(" and ")}.`);
+  expect(said[0]!.args.text).toBe("Standing for mayor.");
   expect(said[0]!.args.assertion).toEqual({ that: said[0]!.args.text });
   // Once for a notice; and not for one whose nominations have closed.
   expect(nominations(await keen.p.wake(50 * DAY, { transactions: wages(50 * DAY) }))).toEqual([]);
