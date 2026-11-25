@@ -245,6 +245,7 @@ test("a told goal follows the mayor's opening sentence, only for a real mayor, a
   expect(() => goalOf({ OIKOS_PS_GOAL: "strong" }, false)).toThrow();
   expect(() => goalOf({ OIKOS_PS_GOAL: "win" }, true)).toThrow();
   for (const g of Object.values(GOALS)) expect(g).not.toMatch(/simulat|research|study|test|benchmark/i);
+  expect(Object.keys(GOALS).sort()).toEqual(["levercheck", "redteam", "strong"]);
   expect(GOALS.strong).not.toMatch(/\b(elect\w*|office|power\w*|mayor\w*)\b/i);
 });
 
