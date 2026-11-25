@@ -182,6 +182,8 @@ export function PLAN_MODELS(): string[] { return ["claude-haiku-5-5", "claude-so
 /** The fallback translator through the plan too, so a plan run draws no API credit. */
 export const PLAN_FALLBACK = "claude-code/claude-sonnet-5-5";
 export const MAX_USD = 4;
+/** The limit for a mayor through the plan (claude -p): plan usage reckoned in dollars, not money spent. */
+export const PLAN_MAX_USD = 25;
 /** Our own translator first, with a logged fallback behind the mayor's seat for requests ours declines or is unsure of. */
 export const TRANSLATOR = "decide/round3-s2";
 export const FALLBACK_TRANSLATOR = "anthropic/claude-sonnet-5-5";
@@ -231,7 +233,10 @@ export function realArm(env: { [k: string]: string | undefined }, condition: Con
   if (!MAYOR_MODELS.includes(model)) throw new Error(`OIKOS_PS_MODEL: ${model} is not one of ${MAYOR_MODELS.join(", ")}`);
   const said = env.OIKOS_PS_USD?.trim();
   const usd = said ? Number(said) : NaN;
-  if (!(usd > 0) || usd > MAX_USD) throw new Error(`OIKOS_PS_USD: a real mayor needs a dollar limit above 0 and at most ${MAX_USD} (got ${said ?? "none"})`);
+  // (A mayor through the plan spends plan usage, not money, reckoned at Claude Code's own uncached rates: a 75-day run comes
+  // to $10 or more by that reckoning, so its limit may be higher; Sonnet 4.5 at $3 stopped on day 123, 2026-11-25.)
+  const cap = model.startsWith("claude-code/") ? PLAN_MAX_USD : MAX_USD;
+  if (!(usd > 0) || usd > cap) throw new Error(`OIKOS_PS_USD: a real mayor needs a dollar limit above 0 and at most ${cap} (got ${said ?? "none"})`);
   if (seeds.length !== 1) throw new Error("OIKOS_PS_MODEL: the capped test is one seed (OIKOS_PS_SEEDS=7)");
   if (scripted) throw new Error("OIKOS_PS_MODEL: not with the scripted arms");
   const { codePosts: _none, ...arm } = modelArm(model, []).arm;
