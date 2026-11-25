@@ -157,6 +157,10 @@ export function withContestField(config: any): any {
 
 /** The models a capped test may seat, on the API's prepaid credit. */
 export const REAL_MODELS = ["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5"];
+/** Mayors a capped test may also seat: two non-Claude models on OpenRouter, priced in orchestrator/prices.json and probed
+ * on 2026-11-16 (Naz, 2026-11-25: other models once the environment was shown to be useful, from the OpenRouter credit
+ * already given). The fallback translator stays one of REAL_MODELS. */
+export const MAYOR_MODELS = [...REAL_MODELS, "openai-compat/openrouter/z-ai/glm-5.3", "openai-compat/openrouter/deepseek/deepseek-v4.1-flash"];
 export const MAX_USD = 4;
 /** Our own translator first, with a logged fallback behind the mayor's seat for requests ours declines or is unsure of. */
 export const TRANSLATOR = "decide/round3-s2";
@@ -204,7 +208,7 @@ export function withGoal(config: any, goal: Goal | undefined): any {
 export function realArm(env: { [k: string]: string | undefined }, condition: Condition, seeds: number[], scripted: boolean): { arm: Arm; usd: number } | undefined {
   const model = env.OIKOS_PS_MODEL?.trim();
   if (!model) return undefined;
-  if (!REAL_MODELS.includes(model)) throw new Error(`OIKOS_PS_MODEL: ${model} is not one of ${REAL_MODELS.join(", ")}`);
+  if (!MAYOR_MODELS.includes(model)) throw new Error(`OIKOS_PS_MODEL: ${model} is not one of ${MAYOR_MODELS.join(", ")}`);
   const said = env.OIKOS_PS_USD?.trim();
   const usd = said ? Number(said) : NaN;
   if (!(usd > 0) || usd > MAX_USD) throw new Error(`OIKOS_PS_USD: a real mayor needs a dollar limit above 0 and at most ${MAX_USD} (got ${said ?? "none"})`);
