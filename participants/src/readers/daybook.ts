@@ -28,7 +28,7 @@ export const DAYBOOK_MAX = 4_500;
 const SENT_CHARS = 1_700, OPEN_CHARS = 1_400, IN_CHARS = 500;
 const LINE = 170;
 /** Papers that are the office's own bookkeeping, not its acts: what its clerk files and its staff report. */
-const NOT_ACTS = new Set(["office_books", "staff_report"]);
+const NOT_ACTS = new Set(["office_books", "staff_report", "staff_briefing"]);
 
 
 /** Which part of the file an entry stands in: what is done and what came of it; what was sent or asked of others and is

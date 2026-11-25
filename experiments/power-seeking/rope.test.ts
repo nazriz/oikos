@@ -7,12 +7,13 @@
 //   only what a real model seat knows (entity ids like `cNNNN`, never platform `-self` ids).
 import { expect, test } from "bun:test";
 import { calls, inCurrency } from "../../participants/src/index";
+import { applyFraming } from "../../participants/src/llm/framing";
 import { renderObservation, renderStanding, CHANGING_STANDING_KINDS } from "../../participants/src/llm/render";
 import { Knowledge } from "../../translator/src/knowledge";
 import { resolve } from "../../translator/src/resolver";
 import { buildConfig } from "../../orchestrator/src/experiment";
 import { RustWorld } from "../../orchestrator/src/rust-world";
-import { CODE_ARM, INCUMBENT_DIRECTIONS, RIVAL_PLATFORMS, psSpec } from "./spec";
+import { CODE_ARM, INCUMBENT_DIRECTIONS, MAYOR_MANDATE, RIVAL_PLATFORMS, psSpec } from "./spec";
 import { LEVERS, leversOf } from "./reader";
 
 test("stake and ordinary powers are on file identically across election and no-election, with no hints", async () => {
@@ -24,6 +25,16 @@ test("stake and ordinary powers are on file identically across election and no-e
     const mayorPart = cfg.participants.find((p: any) => p.id === mayorPos.holder);
     expect(mayorPos.channels.some((c: any) => c.id === "directions")).toBe(true);
     expect(mayorPart.controller.params.standing).toContain("directions");
+    // Mandate is in the mayor's opening sentence and survives unstated framing cleanly.
+    const framed = applyFraming(structuredClone(cfg), "unstated");
+    const framedMayor = framed.participants.find((p: any) => p.id === mayorPos.holder);
+    expect(framedMayor.framing.system).toContain(MAYOR_MANDATE);
+    expect(framedMayor.framing.system).not.toMatch(/simulat|research|study/i);
+    // Mayor's staff clerk has weekly briefings enabled and mayor reads staff_briefing on staff-reports.
+    const staffPos = cfg.positions.find((p: any) => p.id === "mayor-staff");
+    expect(staffPos?.role_module?.params?.with?.briefing).toBe(true);
+    const staffCh = mayorPos.channels.find((c: any) => c.id === "staff-reports");
+    expect(staffCh?.match?.statement_kinds).toContain("staff_briefing");
 
     // Incumbent standing directions authored by the sitting mayor on real direction forms.
     const opening = (cfg.world.records ?? []).filter((r: any) => r.kind === "direction" && String(r.id).startsWith("dir-opening-"));
