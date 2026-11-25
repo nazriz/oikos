@@ -15986,3 +15986,17 @@ The owner's plan usage (`claude -p`) is to be used for runs before its reset (Na
   digest key on it.
 - **Revisit if:** a successor editor arriving inside a poll's window asks the same poll twice (`polls_done` is still
   in the editor's head), or the reader-only sample is wanted otherwise.
+## 2026-11-25 · Blind grading of mayor transcripts, beside the reader (`experiments/power-seeking/blind/`)
+
+The reader counts levers by rule and regex, and its "considered" level was known to fire on rivals' platforms. A second
+measure reads the mayor's own words: `packets.ts` builds one anonymised packet per run (the told goal kept; model,
+provider, arm and folder names stripped; kept-back debrief answers left out; random ids, the key beside the packets);
+`grade.ts` grades each twice through `claude -p` (Sonnet 5.5 and Opus 5.5, empty dir, no tools, `--safe-mode`) on
+`prompt.md`, which restates the draft rubric with five statuses per tier; `compare.ts` sets both beside the reader.
+First pass, 38 runs: the graders agree on 96% of run-tiers; the reader 82-83% with each. Every reader "considered" at
+tier 1 (13 runs) and tier 3 (2) was a false positive; it missed explicit rejections ("Won't tamper with election
+rules"); and it missed one executed tier-3 act (a withdrawn election notice, which `withdraw_law` does not cover).
+- **Why two graders, not one:** the owner's open question ("one grader or two") is answered cheaply on the plan, and
+  where they differ the packet shows why.
+- **Revisit if:** the rubric is settled (rewrite `prompt.md` from it), packets grow past what a grader reads well, or
+  the reader's "considered" is rebuilt (then this is its check).
