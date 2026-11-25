@@ -105,6 +105,8 @@ impl Kind for ElectoralOffice {
             "name": self.name(), "version": self.version(), "doc": self.doc(),
             "params": {
                 "first_poll_day": p(json!({ "type": "integer", "description": "the first polling day (the world gives it)" }), None, json!(365), "the first polling day (the world gives it)"),
+                "fixed": p(json!({ "type": "array", "items": { "type": "string" }, "description": "figures of the election timetable a law above the town fixes: a council's amendment of them is not applied (the world gives it, from the profile)" }), None, json!([]), "the profile's elections.timetable_fixed_by.figures"),
+                "fixed_by": p(json!({ "type": "string", "description": "the law above the town that fixes them, in words (the world gives it, from the profile)" }), None, json!(""), "the profile's elections.timetable_fixed_by.law"),
                 "method": p(json!({ "type": "string" }), None, json!("preferential"), "placeholder"),
                 "nominations_close_days": p(json!({ "type": "integer" }), Some("days"), json!(30), "placeholder"),
                 "nominations_open_days": p(json!({ "type": "integer", "description": "before polling day" }), Some("days"), json!(60), "placeholder"),
@@ -137,6 +139,8 @@ impl Kind for ElectoralOffice {
             office_title: ctx.param("office_title", String::new())?,
             term_days: ctx.param("term_days", 4 * 365)?,
             first_poll_day: ctx.param("first_poll_day", 365)?,
+            fixed: ctx.param("fixed", Vec::<String>::new())?,
+            fixed_by: ctx.param("fixed_by", String::new())?,
             nominations_open_days: ctx.param("nominations_open_days", 60)?,
             nominations_close_days: ctx.param("nominations_close_days", 30)?,
             voting_days: ctx.param("voting_days", 14)?,
@@ -181,6 +185,14 @@ struct ElectionPlan {
     office_title: String,
     term_days: i64,
     first_poll_day: i64,
+    /// Figures of the timetable a law above the town fixes (the poll's date, the term): a law on file that changes one
+    /// is not followed for it, and the office says so in public, once (docs/behaviour/elections.md, "Who sets the
+    /// timetable"). Empty: the town's own law sets every figure.
+    #[serde(default)]
+    fixed: Vec<String>,
+    /// That law, in words.
+    #[serde(default)]
+    fixed_by: String,
     nominations_open_days: i64,
     nominations_close_days: i64,
     voting_days: i64,
@@ -252,6 +264,9 @@ impl ElectionPlan {
         out.6 = Some(law.id.to_string());
         let Some(figs) = data(law).get("figures").and_then(|x| x.as_object()) else { return out };
         let days = |k: &str| -> Option<i64> {
+            if self.fixed.iter().any(|x| x == k) {
+                return None;
+            }
             let f = figs.get(k)?;
             let v = f.get("value").and_then(|x| x.as_i64())?;
             let unit = f.get("unit").and_then(|x| x.as_str()).unwrap_or("days");
@@ -264,6 +279,38 @@ impl ElectionPlan {
         if let Some(v) = days("voting_days") { out.4 = v.max(1); }
         if let Some(v) = days("takes_office_days") { out.5 = v.max(0); }
         out
+    }
+    /// The figures of the latest election law on file that a law above the town fixes and that it would change, each
+    /// with the value it gives (in days): what the office does not follow. Empty when nothing is fixed.
+    fn overreach(&self) -> Option<(String, Vec<(String, i64)>)> {
+        if self.fixed.is_empty() {
+            return None;
+        }
+        let law = self
+            .book
+            .open("law")
+            .filter(|r| data(r).s("schedule") == Some("schedule-elections"))
+            .max_by(|a, b| a.at.cmp(&b.at).then_with(|| filed_before(&a.id, &b.id)))?;
+        let figs = data(law).get("figures").and_then(|x| x.as_object())?;
+        let mut v = vec![];
+        for k in &self.fixed {
+            let Some(f) = figs.get(k.as_str()) else { continue };
+            let Some(x) = f.get("value").and_then(|x| x.as_i64()) else { continue };
+            let x = if f.get("unit").and_then(|u| u.as_str()) == Some("seconds") { x / DAY } else { x };
+            let held = match k.as_str() {
+                "first_poll_day" => self.first_poll_day,
+                "term_days" => self.term_days,
+                "nominations_open_days" => self.nominations_open_days,
+                "nominations_close_days" => self.nominations_close_days,
+                "voting_days" => self.voting_days,
+                "takes_office_days" => self.takes_office_days,
+                _ => continue,
+            };
+            if x != held {
+                v.push((k.clone(), x));
+            }
+        }
+        (!v.is_empty()).then(|| (law.id.to_string(), v))
     }
     /// What this position (or participant) has put on record of a kind, for this office.
     fn filed(&self, kind: &str) -> Vec<Arc<Record>> {
@@ -347,7 +394,32 @@ impl Plan for ElectionPlan {
         // Hydrate unapplied-law notices already filed by this office (e.g. before a successor took over).
         for n in self.filed("notice") {
             if let Some(lid) = data(&n).s("law") {
-                self.unapplied_laws.insert(lid.to_string());
+                let fixed = data(&n).s("reason") == Some("fixed_by_law");
+                self.unapplied_laws.insert(if fixed { format!("{lid}#fixed") } else { lid.to_string() });
+            }
+        }
+        // A law on file that changes what a law above the town fixes: not followed for those figures, said in public once.
+        if let Some((lid, over)) = self.overreach() {
+            if self.unapplied_laws.insert(format!("{lid}#fixed")) {
+                let what = over
+                    .iter()
+                    .map(|(k, v)| match k.as_str() {
+                        "first_poll_day" => format!("move the first poll to {}", when(v * DAY)),
+                        "term_days" => format!("make a term {v} days"),
+                        _ => format!("set {} to {v} days", k.replace('_', " ")),
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" and ");
+                let by = if self.fixed_by.is_empty() { "a law above the town".to_string() } else { self.fixed_by.clone() };
+                let text = format!(
+                    "Election timetable notice: {lid} would {what}. These are fixed by {by}, which the town's council has no power to change, so the electoral office does not apply them; the election for {} stays as the law fixes it ({}).",
+                    self.title(),
+                    when(self.poll)
+                );
+                steps.push(because(
+                    "An election law on file changes the timetable a law above the town fixes: not applying it, and saying so in public.",
+                    vec![say("notice", &text, Say { visible: Some(Visible::Public), basis: Some(lid.clone()), data: Some(json!({ "office": self.office, "poll_at": self.poll, "law": lid, "reason": "fixed_by_law", "figures": over.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>() })), ..Default::default() })],
+                ));
             }
         }
         let mut file_poll = (first_poll_day + (results.len() as i64) * term_days) * DAY;
@@ -919,6 +991,27 @@ mod tests {
         // On a subsequent wake (even if c2-self were later removed), the same result is not seated a second time.
         let again = m.at(506 * DAY, json!({ "records": crate::finance::kit::records(vec![]) }), json!([]));
         assert!(again.is_empty(), "should not re-seat: {again:?}");
+    }
+
+    #[test]
+    fn a_council_cannot_move_a_poll_or_lengthen_a_term_a_law_above_it_fixes() {
+        // Where a law above the town fixes polling day and the term (docs/behaviour/elections.md, "Who sets the
+        // timetable"), a council's amendment of them is not followed, and the office says so in public, once. Unfixed,
+        // the same law moves the poll (the amendable law's own tests above).
+        let mut o = Rig::new(&ElectoralOffice, "city", Some("electoral"), json!({ "office": "mayor", "office_title": "Mayor", "first_poll_day": 100, "term_days": 400, "fixed": ["first_poll_day", "term_days"], "fixed_by": "the State's Local Government Act" }));
+        let law = st("law-cancel", 10 * DAY, "law", "city", &[], json!({
+            "schedule": "schedule-elections",
+            "figures": {
+                "first_poll_day": { "value": 5000, "unit": "days" },
+                "term_days": { "value": 5000 * DAY, "unit": "seconds" }
+            }
+        }));
+        let out = o.day(11 * DAY, &[law]).join("\n");
+        assert!(out.contains("kind=notice") && out.contains("\"reason\":\"fixed_by_law\"") && out.contains("Local Government Act") && out.contains(&format!("\"poll_at\":{}", POLL)), "{out}");
+        assert!(o.day(12 * DAY, &[]).is_empty(), "said once");
+        // The poll stands on day 100: notice on day 40, as the fixed timetable has it.
+        let notice = o.day(40 * DAY, &[]).join("\n");
+        assert!(notice.contains("kind=election_notice") && notice.contains(&format!("\"poll_at\":{}", POLL)), "{notice}");
     }
 
     #[test]

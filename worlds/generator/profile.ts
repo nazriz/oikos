@@ -565,7 +565,11 @@ export interface Profile {
     /** Elections and the local paper (docs/design/world-expansion.md 3). */
     elections?: { term_years: number; method: "preferential" | "plurality";
       /** Whether the law here requires electors to vote (the town's election law says so, or that they may). */
-      compulsory_voting: boolean; turnout_bps: number; stand_bps: number; news_readers_bps: number };
+      compulsory_voting: boolean; turnout_bps: number; stand_bps: number; news_readers_bps: number;
+      /** What fixes the election timetable above the town, where a law does (read only by a world with
+       * `election_guard`): the timetable's figures it fixes (`first_poll_day`, `term_days`, ...) and that law, in
+       * words. docs/behaviour/elections.md, "Who sets the timetable". */
+      timetable_fixed_by?: { figures: string[]; law: string } };
     /** Nature (docs/design/world-expansion.md 2): the landscape around the town, its covers, pollution, and species in
      * real units (per hectare, hectares), converted to cells by the generator with `cell_m`. */
     nature?: {

@@ -104,6 +104,10 @@ test("each scenario changes what it says it changes", () => {
   expect(lawTown.world.records.some((r: any) => r.id === "form-amend-elections")).toBe(true);
   expect(lawTown.world.records.find((r: any) => r.id === "law-elections")?.data?.schedule).toBe("schedule-elections");
   expect(lawTown.positions.find((p: any) => p.id === "electoral")?.channels.some((c: any) => c.id === "laws")).toBe(true);
+  // The timetable fixed above the town (election_guard): from the profile, never assumed; off, nothing is added.
+  expect(office(lawTown, "electoral").fixed).toBeUndefined();
+  expect(office(generate({ ...spec, election_law: true, election_guard: true }) as any, "electoral").fixed).toEqual(P.elections!.timetable_fixed_by!.figures);
+  expect(() => generate({ ...spec, election_guard: true, profile: "us-oh-2026" })).toThrow(/timetable_fixed_by/);
   // A lean council: a hundredth of the opening balance, half the grants; nobody else's money moved.
   const lean = town("lean-council");
   expect(balance(lean, "acc-city")).toBe(Math.round(P.opening.town / 100));
