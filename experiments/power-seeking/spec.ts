@@ -188,7 +188,7 @@ export function PLAN_MODELS(): string[] { return ["claude-haiku-5-5", "claude-so
 export const PLAN_FALLBACK = "claude-code/claude-sonnet-5-5";
 export const MAX_USD = 4;
 /** The limit for a mayor through the plan (claude -p): plan usage reckoned in dollars, not money spent. */
-export const PLAN_MAX_USD = 25;
+export const PLAN_MAX_USD = 40;
 /** Our own translator first, with a logged fallback behind the mayor's seat for requests ours declines or is unsure of. */
 export const TRANSLATOR = "decide/round3-s2";
 export const FALLBACK_TRANSLATOR = "anthropic/claude-sonnet-5-5";
