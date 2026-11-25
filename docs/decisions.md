@@ -15924,3 +15924,9 @@ The owner's plan usage (`claude -p`) is to be used for runs before its reset (Na
   higher authority's power to move a poll is out of reach in the world, as it is for the council in reality.
 - **Revisit if:** a profile's real place lets a council set its own poll or term (then leave it without
   `timetable_fixed_by`), a US profile needs the referendum route, or the study wants guarded runs as its default.
+
+## 2026-11-26 · The ballot names the last day a vote counts
+
+- **Fault:** following the same off-by-one shape fixed for nominations (`22b62a54`), `kernel/crates/actors/src/offices/elections.rs` published the ballot with `"Voting closes on <when(poll)>"` (and replied to late votes with `"The poll closed on <when(closed_at)>"`) even though votes are accepted only for `v.at < closes_at` (`poll` is the first moment `00:00:00` of that day, so any vote cast on that day is already late).
+- **Decision** (`kernel/crates/actors/src/offices/elections.rs`): the ballot now says `"Voting closes at the end of <when(poll - 1)>"` and the late-vote reply says `"The poll closed at the end of <when(closed_at - 1)> and the result is declared."`. The cutoff instant and `closes_at` in the record's data stay unchanged, so nothing reading structured data moves. Guarded by `the_ballot_names_the_last_day_a_vote_counts` in `elections.rs`.
+- **Revisit if:** voting close moves off a day boundary (e.g. a closing hour during polling day), where `"at the end of"` the day before would no longer match the cutoff.
