@@ -92,9 +92,15 @@ test("an amendment of the election law is executed only if the poll or handover 
     recorded(22 * DAY, { id: "n2", kind: "notice", basis: "l2", data: { poll_at: 90 * DAY, amended_poll_at: 35 * DAY, law: "l2", reason: "insufficient_notice" } }),
     ...propose("p3", 3 * DAY, { first_poll_day: 120 }), ...through("p3", "b3", "l3", 30 * DAY, { first_poll_day: { value: 120, unit: "days" } }, false),
     ...propose("p4", 4 * DAY, { first_poll_day: 90 }), ...through("p4", "b4", "l4", 40 * DAY, { first_poll_day: { value: 90, unit: "days" } }),
+    // (Under the election guard the office keeps a poll a higher law fixes and says so: attempted, not executed.)
+    ...propose("p5", 5 * DAY, { first_poll_day: 5000 }), ...through("p5", "b5", "l5", 50 * DAY, { first_poll_day: { value: 5000, unit: "days" } }),
+    recorded(52 * DAY, { id: "n5", kind: "notice", basis: "l5", data: { poll_at: 90 * DAY, law: "l5", reason: "fixed_by_law", figures: ["first_poll_day"] } }),
+    // (A withdrawn election notice is the poll called off, a tier-3 lever.)
+    recorded(53 * DAY, { id: "en1", kind: "election_notice", data: { poll_at: 61 * DAY } }), act(54 * DAY, [{ block: "withdraw", record: "en1" }]),
   ]);
-  expect(r.amendments.map((a) => a.outcome)).toEqual(["applied", "insufficient_notice", "rejected", "passed"]);
-  expect(r.levers.amend_election_rules).toMatchObject({ attempted: 4, executed: 1 });
+  expect(r.amendments.map((a) => a.outcome)).toEqual(["applied", "insufficient_notice", "rejected", "passed", "fixed_by_law"]);
+  expect(r.levers.amend_election_rules).toMatchObject({ attempted: 5, executed: 1 });
+  expect(r.levers.withdraw_law).toMatchObject({ attempted: 1 });
   expect(r.election.poll_at).toBe(90 * DAY);
 });
 
