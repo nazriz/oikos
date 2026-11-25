@@ -571,9 +571,11 @@ impl Plan for ElectionPlan {
             // (The roll is the office's own: it is kept here and votes are checked against it. Nobody is sent it; an
             // elector knows they are on it by having enrolled.)
             let roll_call = say("electoral_roll", &format!("The electoral roll for the election on {}: {} electors.", when(poll), roll.len()), Say { visible: Some(Visible::Only(vec![self.town.clone()])), data: Some(json!({ "electors": roll, "poll_at": poll })), ..Default::default() });
+            // (Voting is cut off at `poll`, the first moment of a day: the ballot names the day before it, the last
+            // on which a vote counts. `closes_at` in the data stays the moment itself.)
             let ballot_call = say(
                 "ballot",
-                &format!("Ballot: {title}. Candidates: {}. {how} Voting closes on {}.", cand_words.join(", "), when(poll)),
+                &format!("Ballot: {title}. Candidates: {}. {how} Voting closes at the end of {}.", cand_words.join(", "), when((poll - 1).max(0))),
                 Say {
                     visible: Some(Visible::Public),
                     data: Some(json!({ "office": self.office, "electorate": "roll", "candidates": names, "method": self.method, "opens_at": poll - voting_days * DAY, "closes_at": poll, "options": options })),
@@ -676,7 +678,7 @@ impl Plan for ElectionPlan {
             }
             steps.push(because(
                 format!("A vote on {ballot}, cast after the poll closed: not counted, and saying so."),
-                vec![message(std::slice::from_ref(&v.author.to_string()), &format!("From the electoral office: your vote on {ballot} is not counted. The poll closed on {} and the result is declared.", when(*closed_at)), Some(&v.id))],
+                vec![message(std::slice::from_ref(&v.author.to_string()), &format!("From the electoral office: your vote on {ballot} is not counted. The poll closed at the end of {} and the result is declared.", when((*closed_at - 1).max(0))), Some(&v.id))],
             ));
         }
         self.votes_read = votes_seen;
@@ -764,6 +766,46 @@ mod tests {
         let out = o.day(40 * DAY, &[]).join("\n");
         assert!(out.contains(&format!("\"nominations_close_at\":{}", 70 * DAY)), "{out}");
         assert!(out.contains("at the end of year 1, day 70") && !out.contains("year 1, day 71"), "{out}");
+    }
+
+    #[test]
+    fn the_ballot_names_the_last_day_a_vote_counts() {
+        // Voting closes at the start of day 101 (t = 100 days = POLL): the last whole day on which a vote counts is
+        // day 100, so the ballot (and any late-vote reply) must say "at the end of year 1, day 100", never day 101.
+        let mut o = office();
+        o.day(40 * DAY, &[enrol("c1"), enrol("c2"), enrol("v1"), enrol("v2")]);
+        let mut notice = st("rec.59", 40 * DAY + 100, "election_notice", "city", &[], json!({ "office": "mayor", "poll_at": POLL }));
+        notice["in_position"] = json!("electoral");
+        let mut n1 = st("rec.60", 45 * DAY, "nomination", "c1", &["city"], json!({ "office": "mayor", "name": "Ann" }));
+        n1["author"] = json!("c1-self");
+        let mut n2 = st("rec.61", 46 * DAY, "nomination", "c2", &["city"], json!({ "office": "mayor", "name": "Ben" }));
+        n2["author"] = json!("c2-self");
+        let out = o.day(70 * DAY, &[notice, n1, n2]).join("\n");
+        let ballot_line = out.lines().find(|l| l.contains("kind=ballot")).expect("ballot line");
+        assert!(ballot_line.contains(&format!("\"closes_at\":{POLL}")), "{ballot_line}");
+        assert!(ballot_line.contains("Voting closes at the end of year 1, day 100.") && !ballot_line.contains("Voting closes on") && !ballot_line.contains("year 1, day 101"), "{ballot_line}");
+
+        // Boundary check: a vote in the last second of day 100 (POLL - 1) counts; a vote at the first second of day 101 (POLL) does not, and its late-vote reply names the end of day 100.
+        let mut roll = st("rec.70", 70 * DAY + 10, "electoral_roll", "city", &[], json!({ "electors": ["c1", "c2", "v1", "v2"], "poll_at": POLL }));
+        roll["in_position"] = json!("electoral");
+        let mut ballot = st("rec.71", 70 * DAY + 10, "ballot", "city", &[], json!({
+            "office": "mayor", "electorate": "roll", "method": "preferential",
+            "opens_at": 86 * DAY, "closes_at": POLL, "options": ["1", "2"],
+            "candidates": [
+                { "candidate": "c1-self", "number": "1", "name": "Ann" },
+                { "candidate": "c2-self", "number": "2", "name": "Ben" }
+            ]
+        }));
+        ballot["in_position"] = json!("electoral");
+        let on_time = json!({ "id": "rec.80", "record": "vote", "author": "v1-self", "speaks_for": "v1", "at": POLL - 1, "visible_to": ["city"], "ballot": "rec.71", "choice": "1>2" });
+        let too_late = json!({ "id": "rec.81", "record": "vote", "author": "v2-self", "speaks_for": "v2", "at": POLL, "visible_to": ["city"], "ballot": "rec.71", "choice": "2>1" });
+        let res = o.day(POLL, &[roll, ballot, on_time]).join("\n");
+        assert!(res.contains("kind=ballot_result") && res.contains("\"formal\":1") && res.contains("\"winner\":\"c1-self\""), "{res}");
+
+        let mut result = st("rec.90", POLL + 60, "ballot_result", "city", &[], json!({ "ballot": "rec.71", "office": "mayor", "poll_at": POLL, "winner": "c1-self" }));
+        result["in_position"] = json!("electoral");
+        let late_msg = o.day(POLL + 120, &[result, too_late]).join("\n");
+        assert!(late_msg.contains("The poll closed at the end of year 1, day 100 and the result is declared."), "{late_msg}");
     }
 
     #[test]
