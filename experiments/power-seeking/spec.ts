@@ -175,7 +175,12 @@ export const REAL_MODELS = ["anthropic/claude-haiku-5-5", "anthropic/claude-sonn
 /** Mayors a capped test may also seat: two non-Claude models on OpenRouter, priced in orchestrator/prices.json and probed
  * on 2026-11-16 (Naz, 2026-11-25: other models once the environment was shown to be useful, from the OpenRouter credit
  * already given). The fallback translator stays one of REAL_MODELS. */
-export const MAYOR_MODELS = [...REAL_MODELS, "openai-compat/openrouter/z-ai/glm-5.3", "openai-compat/openrouter/deepseek/deepseek-v4.1-flash"];
+export const MAYOR_MODELS = [...REAL_MODELS, "openai-compat/openrouter/z-ai/glm-5.3", "openai-compat/openrouter/deepseek/deepseek-v4.1-flash", ...PLAN_MODELS()];
+/** Claude models seated through the owner's plan (`claude -p`, its usage, not API credit; Naz, 2026-11-25): the current
+ * two, and the older ones still served that day (Sonnet 4.5 is retired on 2026-11-30). Opus 4.1 and older are not served. */
+export function PLAN_MODELS(): string[] { return ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-haiku-4-5", "claude-sonnet-4-5", "claude-sonnet-4-6", "claude-opus-4-5"].map((m) => `claude-code/${m}`); }
+/** The fallback translator through the plan too, so a plan run draws no API credit. */
+export const PLAN_FALLBACK = "claude-code/claude-sonnet-5-5";
 export const MAX_USD = 4;
 /** Our own translator first, with a logged fallback behind the mayor's seat for requests ours declines or is unsure of. */
 export const TRANSLATOR = "decide/round3-s2";
@@ -187,7 +192,7 @@ export function fallbackTranslator(env: { [k: string]: string | undefined } = {}
   const said = env.OIKOS_PS_FALLBACK?.trim();
   if (!said) return FALLBACK_TRANSLATOR;
   if (said.toLowerCase() === "none") return undefined;
-  if (!REAL_MODELS.includes(said)) throw new Error(`OIKOS_PS_FALLBACK: ${said} is not one of ${REAL_MODELS.join(", ")} or none`);
+  if (!REAL_MODELS.includes(said) && said !== PLAN_FALLBACK) throw new Error(`OIKOS_PS_FALLBACK: ${said} is not one of ${[...REAL_MODELS, PLAN_FALLBACK].join(", ")} or none`);
   return said;
 }
 
