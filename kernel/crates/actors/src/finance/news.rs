@@ -184,7 +184,7 @@ impl Kind for Newspaper {
         "firm.newspaper"
     }
     fn version(&self) -> &'static str {
-        "0.2.0"
+        "0.2.1"
     }
     fn doc(&self) -> &'static str {
         "docs/behaviour/news.md"
@@ -457,6 +457,16 @@ impl Plan for Paper {
             return steps;
         }
         self.next = t + self.every_days * DAY;
+        // (The paper is whom the editor acts for: nothing of it is kept, so a town's saved state is as it was.)
+        // What the paper has run already, by its own back issues: an editor new to the chair has them on the paper's
+        // file, and neither prints a story again nor starts the editions over. (Kept in its head alone, a successor
+        // reprinted its predecessor's petitions, and every reader took the same bad news of the town twice.)
+        for n in self.book.open("news") {
+            if n.speaks_for.is_some_and(|x| x == pic.entity) {
+                self.run.extend(crate::common::bases_of(n).iter().map(|b| b.to_string()));
+                self.edition = self.edition.max(data(n).i("edition").unwrap_or(0));
+            }
+        }
         // What is new on the record, scored: its news value, tipped by our leaning (a paper for the government runs more of
         // what reflects well on it, and less of what does not) and by the premium on bad news.
         struct Item {
@@ -572,6 +582,22 @@ mod tests {
         assert_eq!(arg(&said[1], "text").unwrap(), "Residents petition the town: Petition: cap rent rises.");
         // The default edition: the five weightiest.
         assert_eq!(basis(&edition(&mut editor(json!({})), 8 * DAY, records_of_every_kind())), ["r-result", "r-petition", "r-notice", "r-env", "r-budget"].map(String::from));
+    }
+
+    #[test]
+    fn a_successor_editor_does_not_print_again_what_the_paper_has_run() {
+        // The paper's back issues are on its own file: an editor new to the chair (nothing in its head) finds the
+        // petition already run by its predecessor, prints only what is new, and numbers its edition after the last.
+        // (2026-11-25: a successor reprinted the first editor's petitions, and every reader took the bad news twice.)
+        let mut m = editor(json!({}));
+        let rs = vec![
+            rec("r-petition", T0, "petition", "Petition: cap rent rises.", json!({ "author": "c1-self", "speaks_for": "c1" }), json!({})),
+            rec("r-law", 20 * DAY, "law", "Sixty days' notice.", json!({}), json!({})),
+            rec("n-1", 7 * DAY, "news", "Residents petition the town: Petition: cap rent rises.", json!({ "author": "editor-before", "speaks_for": "paper", "basis": "r-petition" }), json!({ "kind": "petition", "tone": -1, "about_office": true, "edition": 3 })),
+        ];
+        let said = edition(&mut m, 22 * DAY, rs);
+        assert_eq!(basis(&said), ["r-law".to_string()]);
+        assert_eq!(json_arg(&said[0], "data")["edition"], 4);
     }
 
     #[test]

@@ -29,6 +29,14 @@ export class View {
   /** Each channel's current picture as a sorted list, rebuilt only when the channel changed. */
   private cache = new Map<string, unknown[] | { entities: unknown[]; positions: unknown[] }>();
 
+  /** The posts it held at its last look (a position's channels are `<position>/<channel>`). */
+  private posts = new Set<string>();
+
+  private forget(prefix: string): void {
+    for (const m of [this.accounts, this.holdings, this.flows, this.sites, this.visits, this.directories, this.kept, this.cache] as Map<string, unknown>[])
+      for (const id of [...m.keys()]) if (id.startsWith(prefix)) m.delete(id);
+  }
+
   /** `full`: records channels whose every record the participant should always see (standing documents); others show what's new. */
   constructor(private readonly full: Set<string> = new Set()) {}
 
@@ -39,6 +47,12 @@ export class View {
    * transactions); records as what's new, or everything for `full` channels.
    */
   apply(obs: Observation): Observation {
+    // A post it held and holds no longer: the pictures of that post's channels go with it (they were the post's, never
+    // its own; kept, the last holder went on being shown the office's accounts and who's who as they stood on its last
+    // day in post, as if current).
+    const posts = new Set((obs.positions ?? []).map((p) => p.position));
+    for (const was of this.posts) if (!posts.has(was)) this.forget(`${was}/`);
+    this.posts = posts;
     const channels: Observation["channels"] = {};
     for (const [id, ch] of Object.entries(obs.channels)) {
       if (ch.kind === "accounts") {

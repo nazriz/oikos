@@ -1043,6 +1043,11 @@ The mechanism:
   through a fork before a study relies on it.
 - **Notice by:** no sitting logged between a `ballot_result` and the winner's appointment.
 - **Fix when:** the electoral office's interval lands, and before any study reads conduct after a result.
+- **2026-11-25:** the fork path's detection never fired in pilot 2 (a holder of no post is sent no `positions`, and
+  the check read that as "cannot tell"): the beaten mayor sat on, shown the office as it had stood. Fixed (decisions,
+  2026-11-25), guarded by unit tests only. Still not run: a mock election lost through a fork, end to end. Still open:
+  a seat with channels of its own that loses its post is told of the office by its office file, staff list and
+  standing instructions.
 
 ### PB-25 · Newspaper tone rule treats enforcement and hiring suspensions as negative press
 - **Gap:** `firm.newspaper`'s `tone_of("direction", ...)` scores any direction that suspends fines (`fines: "no"`),

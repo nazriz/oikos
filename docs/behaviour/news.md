@@ -1,4 +1,4 @@
-# `firm.newspaper` (v0.2.0): the local paper
+# `firm.newspaper` (v0.2.1): the local paper
 
 **Source:** `participants/src/behaviour/news.ts`. The editor's position at the paper (a firm, `paper`), run by code
 here; a person or a model could hold it. Design: docs/design/world-expansion.md §3.2.
@@ -12,7 +12,7 @@ what to run and how to tell it, and that choice is where information can be shap
 | **Tone** (0.2.0) | Whether an item reflects badly on the town's government (−1), well (+1), or neither (0), **by what the record shows, one rule for every kind**. A petition is residents pressing the town and a complaint a service not delivered: −1. The answer to a petition that puts it to the council is the town delivering: +1; one that only says what the law already is, 0. A permit granted is a request met (+1), one refused a request turned down (−1). An environment report is −1 if a species fell by `change_bps` (20%) or more and none rose as much, +1 if one rose as much and none fell, else 0. The process (budget, law, ballot result, election notice, nomination) is 0. | Placeholders after news values: Harcup and O'Neill (2001, 2017) list "bad news" and "good news" both |
 | **Leaning** | `leaning_bps`, from −10,000 (against the government) to +10,000 (for it). It weights the items that reflect on the government up or down, so it changes what is chosen and in what order (slant by selection). **It no longer decides the tone of a neutral item with a chance of half its strength** (0.2.0: a draw of that kind is a coin flip with no cause). The generator gives none. | Media slant (Gentzkow and Shapiro 2010) |
 | **Negativity** (0.2.0) | `negativity_bps`: a premium for a story that reflects badly on the town over one of equal weight that does not. Nought unless the profile sources it: the direction is known, the size for a local paper is not. | Soroka and McAdams (2015); Trussler and Soroka (2014) **(to confirm)** |
-| **An edition** | Every `every_days` (7), the `items_per_edition` (5) highest-scoring items new since the last, each a public `news` statement put forward to be believed (an `assertion` about the town), with its kind, tone and edition number. No edition in a week with nothing new. | — |
+| **An edition** | Every `every_days` (7), the `items_per_edition` (5) highest-scoring items new since the last, each a public `news` statement put forward to be believed (an `assertion` about the town), with its kind, tone and edition number. No edition in a week with nothing new. What the paper has run is on its own file (its back issues, `back_issues`): an editor new to the chair prints nothing again and numbers editions on from the last. | — |
 
 Readers: a share of citizens (the profile's `news_readers_bps`, 40%) read each item about the government, and it moves
 their approval of the town by its tone (docs/behaviour/citizen.md, "Elections"). They read what is published in the

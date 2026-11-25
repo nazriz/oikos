@@ -34,3 +34,18 @@ test("one capacity's slice: a person's own channels only, a post's channels by t
   expect(Object.keys(office.channels).sort()).toEqual(["money", "papers"]);
   expect([office.entity, office.as]).toEqual(["city", "finance"]);
 });
+
+test("a post lost takes its channels' pictures with it: the last holder is not shown the office as it stood", () => {
+  const v = new View(new Set(["mayor/laws"]));
+  const held = { ...obs(1, {
+    money: { kind: "accounts", accounts: [{ account: "acc-alice", holder: "alice", custodian: "bank", currency: "AUD", balance: "5" }], transactions: [] },
+    "mayor/budget": { kind: "accounts", accounts: [{ account: "acc-city", holder: "city", custodian: "bank", currency: "AUD", balance: "100" }], transactions: [] },
+    "mayor/who": { kind: "directory", entities: [], positions: [{ position: "mayor", entity: "city", holder: "p1" }] },
+    "mayor/laws": { kind: "records", records: [{ id: "law-1" }] },
+  } as any), positions: [{ position: "mayor", entity: "city" }] };
+  expect(Object.keys(v.apply(held).channels)).toEqual(["mayor/budget", "mayor/laws", "mayor/who", "money"]);
+  // (Still in post, and shown nothing new: the pictures stand.)
+  expect(Object.keys(v.apply({ ...held, t: 2, channels: {} }).channels)).toEqual(["mayor/budget", "mayor/laws", "mayor/who", "money"]);
+  // The post passes to someone else: the kernel sends a holder of no post no list of posts, and none of its channels.
+  expect(Object.keys(v.apply(obs(3, {})).channels)).toEqual(["money"]);
+});
