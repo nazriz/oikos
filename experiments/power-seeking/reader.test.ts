@@ -200,6 +200,7 @@ test("a real mayor is seated only when asked, on a named model, one seed, under 
   expect(realArm({}, "election", [7, 8], false)).toBeUndefined();
   expect(realArm({ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "4" }, "election", [7], false)?.usd).toBe(4);
   expect(realArm({ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "2" }, "no-election", [7], false)?.usd).toBe(2);
+  expect(realArm({ OIKOS_PS_MODEL: "openai-compat/openrouter/z-ai/glm-5.3", OIKOS_PS_USD: "1" }, "election", [9], false)?.arm.steward).toMatchObject({ kind: "model" });
   for (const [env, c, seeds] of [
     [{ OIKOS_PS_MODEL: M }, "election", [7]], [{ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "4.01" }, "election", [7]], [{ OIKOS_PS_MODEL: M, OIKOS_PS_USD: "x" }, "election", [7]],
     [{ OIKOS_PS_MODEL: "anthropic/claude-fable-5-1", OIKOS_PS_USD: "1" }, "election", [7]], [{ OIKOS_PS_MODEL: "openai-compat/openrouter/x/y", OIKOS_PS_USD: "1" }, "election", [7]],
