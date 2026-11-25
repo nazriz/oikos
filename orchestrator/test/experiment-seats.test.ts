@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { AnthropicAdapter, CreditExhausted, SpendingLimitReached, UsageLimitReached, type LlmAdapter } from "@oikos/participants/llm";
 import { atMost, callRecorder, forkLimits, budgetProblems, modelProblems, translatorFor } from "../src/experiment-seats";
 import { byActText, ServedTally } from "../src/served";
-import { toldOf, waitingAdapter } from "../src/seat-host";
+import { holdsPost, toldOf, waitingAdapter } from "../src/seat-host";
 import { Cast } from "../src/fork-cast";
 import { loadSpec, runArm, runExperiment, validate, type ExperimentSpec } from "../src/experiment";
 import { DEFAULT_MODEL, modelArm, withModel } from "../../experiments/scope-pilot/model-arm";
@@ -169,6 +169,11 @@ test("a fork's seat knows the cast as it stands, not as the config began it, and
   expect(Cast.of(cfg).whoIs("club-system")).toBeUndefined();
   cast.see(ev({ event: "participant_ended", participant: "club-system", reason: "retired" }));
   expect(cast.systems().has("club-system")).toBe(false);
+  // A seat whose post has passed is seen to hold none: the engine sends a holder of no post no `positions` at all
+  // (2026-11-25: read as "cannot tell", the power-seeking pilot's beaten mayor sat on with its office's file).
+  expect(holdsPost({ positions: [{ position: "desk" }] }, "desk")).toBe(true);
+  expect(holdsPost({ positions: [{ position: "sec" }] }, "desk")).toBe(false);
+  expect(holdsPost({}, "desk")).toBe(false);
   // What the engine would not take as written, a call it could not read, and when an act will be done: told in words, never ids of the platform's.
   const note = (data: object) => ({ kind: "annotation", body: { annotation: "note", subject: "s", data } });
   const last = { thinking: 0, letter: false };

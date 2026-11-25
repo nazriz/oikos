@@ -23,6 +23,8 @@ test("direction forms stay non-public by default and become public when newspape
   const editor = polled.positions.find((p: any) => p.id === "editor");
   expect(editor?.role_module?.params?.poll_every_days).toBe(20);
   expect(editor?.channels?.some((c: any) => c.id === "poll_replies")).toBe(true);
+  // (And the paper's back issues, its own: a successor editor reads what it has run from them.)
+  expect(editor?.channels?.find((c: any) => c.id === "back_issues")).toMatchObject({ way: "mine", match: { statement_kinds: ["news"] } });
 });
 
 test("a direction filed on a public direction form reaches print in firm.newspaper", () => {

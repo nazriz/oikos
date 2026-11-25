@@ -65,7 +65,7 @@ export const newspaper: BehaviourModule = {
   answers: {"office": "the paper's editor", "acts": "The paper reports the public record. It prints no letters."},
   issues: P.EDITOR,
   issuesWith: (p) => ({ town: p.town }),
-  version: "0.2.0",
+  version: "0.2.1",
   doc: "docs/behaviour/news.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),

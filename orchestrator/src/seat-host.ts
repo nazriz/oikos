@@ -68,6 +68,13 @@ export interface ModelSeatOptions {
   cast?: Cast;
 }
 
+/** Whether an observation's participant holds `post`. The kernel leaves `positions` out of an observation when its
+ * participant holds none (perception/src/observe.rs), so no list is no post: read as "cannot tell", a seat that lost
+ * its only post was never seen to lose it and sat on (2026-11-25, the power-seeking pilot's seed 9). */
+export function holdsPost(observation: { positions?: { position: string }[] }, post: string): boolean {
+  return (observation.positions ?? []).some((p) => p.position === post);
+}
+
 /** What the fork's end was, as the debrief tells it. */
 export type ForkEnd = { how: "length_set" | "last_day" | "spending_limit" | "stopped" | "fault"; t: number };
 
@@ -260,8 +267,9 @@ export class ModelSeat {
     inCalendar(this.calendar);
     if (this.passed) return { action: { type: "wait" } };
     // (Its one post gone to someone else: nothing is left for it to sit for. run.ts `passedOn`, for a pilot's seat.)
-    if (this.office && Array.isArray(w.observation?.positions)) {
-      const holds = w.observation.positions.some((p: any) => p.position === this.office!.id);
+    // (A holder of no post is sent no list of posts at all: `holdsPost`.)
+    if (this.office && w.observation) {
+      const holds = holdsPost(w.observation, this.office.id);
       if (this.inPost && !holds) {
         this.passed = { t: w.t };
         this.o.world.annotate({ annotation: "note", subject: this.o.seat, data: { seat_post_passed: { post: this.office.id, day: Math.floor(w.t / DAY) + 1 } } });

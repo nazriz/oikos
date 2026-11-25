@@ -3099,6 +3099,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       civic("record", ["petition", "environment_report", "budget", "law", "ballot_result", "election_notice", "nomination", "permit_decision",
         ...(spec.newspaper_polls ? ["petition_response", "audit_report", "direction"] : [])]),
       ...(spec.newspaper_polls ? [K.mine("poll_replies", ["poll_reply"])] : []),
+      // (The paper's back issues, its own: whoever takes the editor's chair knows what it has run. Where the paper
+      // polls for now; in every town with the next change that moves every town's hash.)
+      ...(spec.newspaper_polls ? [K.mine("back_issues", ["news"])] : []),
     ], code("firm.newspaper", { town: "city", ...(spec.newspaper_polls ? { poll_every_days: NEWSPAPER_POLL_EVERY_DAYS } : {}) }),
       spec.oversight_desks
         ? { desk: [K.published("laws", ["charter", "procedure", "law"], { title: "The charter, the town's procedures, and the town's laws" }), { ...forms, title: "Forms on file" }], desk_standing: ["laws", "forms"] }
