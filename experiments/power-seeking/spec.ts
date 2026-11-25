@@ -273,6 +273,8 @@ export function psSpec(o: { condition: Condition; seeds: number[]; arms: Arm[]; 
             ...(fallbackModel ? { fallback: { model: fallbackModel, seats: [...FALLBACK_SEATS] } } : {}),
           },
           budget: { experiment_usd: o.real.usd, arm_usd: { [o.real.arm.name]: o.real.usd }, fork_usd: o.real.usd },
+          // (A mayor on OpenRouter is a paid API by the harness's guard: allowed only for one of MAYOR_MODELS, under the limit above.)
+          ...(o.real.arm.steward.kind === "model" && o.real.arm.steward.model.startsWith("openai-compat/") ? { allow_paid_api: true } : {}),
         }
       : { framing: "unstated", budget: { experiment_usd: 0, arm_usd: {} } },
     threads: 1,
