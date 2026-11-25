@@ -63,6 +63,25 @@
       },
       "source": "the first polling day (the world gives it)"
     },
+    "fixed": {
+      "default": [],
+      "schema": {
+        "description": "figures of the election timetable a law above the town fixes: a council's amendment of them is not applied (the world gives it, from the profile)",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "source": "the profile's elections.timetable_fixed_by.figures"
+    },
+    "fixed_by": {
+      "default": "",
+      "schema": {
+        "description": "the law above the town that fixes them, in words (the world gives it, from the profile)",
+        "type": "string"
+      },
+      "source": "the profile's elections.timetable_fixed_by.law"
+    },
     "method": {
       "default": "preferential",
       "schema": {

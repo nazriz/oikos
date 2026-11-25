@@ -320,6 +320,11 @@ export interface TownSpec {
   /** Emit `law-elections` from `schedule-elections` with its council amendment form, read dynamically by the electoral
    * office (off by default so existing towns keep their config hashes). */
   election_law?: boolean;
+  /** Where a law above the town fixes the election timetable (the profile's `elections.timetable_fixed_by`: the poll's
+   * date and the term), the electoral office follows that law, not a council amendment of those figures, and says so in
+   * public (docs/behaviour/elections.md, "Who sets the timetable"). Off by default so existing towns keep their config
+   * hashes; on, the profile must say what fixes it. */
+  election_guard?: boolean;
   /** Elections and the local paper, where the profile describes them (world-expansion 3). Default: yes; false: none. */
   elections?: boolean;
   /** Publish `proc-appointments` stating the town's appointing authority over town and commission/press posts (opt-in). */
@@ -1275,6 +1280,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // ---- elections: the electors enrolled at the start, and the law that has them elect the mayor (world-expansion 3) ----
   const E = V.elections && spec.elections !== false ? V.elections : undefined;
   const electionTermDays = E ? (spec.election_term_days ?? E.term_years * 365) : undefined;
+  // What fixes the timetable above the town, where the world asks for it (the profile must say; nothing else is assumed).
+  const fixedBy = spec.election_guard && E ? E.timetable_fixed_by : undefined;
+  if (spec.election_guard && E && !fixedBy) throw new Error(`election_guard: the profile ${spec.profile ?? ""} doesn't say what fixes the election timetable (elections.timetable_fixed_by)`);
+  const electionGuard = fixedBy ? { fixed: fixedBy.figures, fixed_by: fixedBy.law } : {};
   if (E && electionTermDays !== undefined) {
     const termPhrase = spec.election_term_days !== undefined ? `every ${spec.election_term_days} days` : `every ${E.term_years} years`;
     if (spec.election_law) {
@@ -1290,7 +1299,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       records.push(es, amendmentForm(es), {
         id: "law-elections", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
         ...drafted,
-        text: `The town's electors elect the mayor ${termPhrase}, by ${E.method === "preferential" ? "preferential" : "first-past-the-post"} vote, run by the electoral office. Every adult resident ${E.compulsory_voting ? "must" : "may"} enrol and vote. ${drafted.text}`,
+        text: `The town's electors elect the mayor ${termPhrase}, by ${E.method === "preferential" ? "preferential" : "first-past-the-post"} vote, run by the electoral office. Every adult resident ${E.compulsory_voting ? "must" : "may"} enrol and vote. ${drafted.text}${fixedBy ? ` The polling day and the term are those fixed by ${fixedBy.law}; the electoral office follows that law for them.` : ""}`,
         data: { ...drafted.data, method: E.method, compulsory_voting: E.compulsory_voting },
       });
     } else {
@@ -3085,7 +3094,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       // (Those gone from the roll: the registry's entries of deaths, sent to it as of right, and departures told to it.)
       K.mine("gone", ["death_registration", "departure"]),
       votes],
-      code("city.electoral_office", { office: "mayor", office_title: `Mayor of ${spec.name}`, term_days: electionTermDays!, first_poll_day: spec.first_election_days ?? 365, ...(spec.takes_office_days ? { takes_office_days: spec.takes_office_days } : {}), method: E.method, seats: false }));
+      code("city.electoral_office", { office: "mayor", office_title: `Mayor of ${spec.name}`, term_days: electionTermDays!, first_poll_day: spec.first_election_days ?? 365, ...(spec.takes_office_days ? { takes_office_days: spec.takes_office_days } : {}), method: E.method, seats: false, ...electionGuard }));
     office("editor", "paper", "Editor", undefined, [
       civic("record", ["petition", "environment_report", "budget", "law", "ballot_result", "election_notice", "nomination", "permit_decision",
         ...(spec.newspaper_polls ? ["petition_response", "audit_report", "direction"] : [])]),
