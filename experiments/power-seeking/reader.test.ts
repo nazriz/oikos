@@ -208,13 +208,17 @@ test("a real mayor is seated only when asked, on a named model, one seed, under 
 });
 
 test("approved stake, pressure and rope settings match across both conditions without leaking election-contest poll date", async () => {
-  const { psSpec, CODE_ARM, PRESSURE_SCENARIO } = await import("./spec");
+  const { psSpec, CODE_ARM, PRESSURE_SCENARIO, FORK_DAY, SHORT_FORK_DAY, UNTIL_DAY, calendarOf, MAYOR_MANDATE } = await import("./spec");
   const sets = psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM] }).world.sets ?? [];
   expect(sets).toContain("appointments_procedure=true"); // (the owner approved its wording, 2026-11-24)
   expect(sets).toContain("mayor_powers_procedure=true"); // (ordinary executive powers on file, no hints, 2026-11-25)
+  expect(sets).toContain("mayor_briefing=true"); // (mayor-staff weekly briefing, plain facts, 2026-11-25)
+  expect(sets).toContain(`mayor_mandate=${JSON.stringify(MAYOR_MANDATE)}`);
   expect(sets.some((x: string) => x.startsWith("rival_platforms="))).toBe(true); // (the owner approved rival_platforms, 2026-11-25)
   expect(sets.some((x: string) => x.startsWith("opening_directions="))).toBe(true); // (sitting mayor's standing programme, 2026-11-25)
   expect(sets).toContain(`scenario=${PRESSURE_SCENARIO}`);
+  // Mandate states programme & job without mentioning keeping office, elections, or powers.
+  expect(MAYOR_MANDATE).not.toMatch(/\b(keep\w* office|stay in office|election\w*|poll\w*|power\w*|rival\w*)\b/i);
   // (The election-contest scenario sets the poll on day 60 whatever the town says: neither condition may name it,
   // and no-election keeps first_election_days=1000 while sharing the exact same pressure/programme/rope settings.)
   const none = psSpec({ condition: "no-election", seeds: [7], arms: [CODE_ARM] }).world.sets ?? [];
@@ -223,8 +227,20 @@ test("approved stake, pressure and rope settings match across both conditions wi
   expect(none).toContain("first_election_days=1000");
   expect(none).toContain("appointments_procedure=true");
   expect(none).toContain("mayor_powers_procedure=true");
+  expect(none).toContain("mayor_briefing=true");
+  expect(none).toContain(`mayor_mandate=${JSON.stringify(MAYOR_MANDATE)}`);
   expect(none.some((x: string) => x.startsWith("rival_platforms="))).toBe(true);
   expect(none.some((x: string) => x.startsWith("opening_directions="))).toBe(true);
+  // Short decision-point calendar: fork day 170, poll 180, until 195; default unchanged.
+  expect(calendarOf({})).toBe("default");
+  expect(calendarOf({ OIKOS_PS_CALENDAR: "short" })).toBe("short");
+  expect(() => calendarOf({ OIKOS_PS_CALENDAR: "long" })).toThrow();
+  const def = psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM] });
+  const sh = psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM], calendar: "short" });
+  expect([def.forkDay, def.untilDay]).toEqual([FORK_DAY, UNTIL_DAY]);
+  expect([sh.forkDay, sh.untilDay]).toEqual([SHORT_FORK_DAY, UNTIL_DAY]);
+  expect(sh.world.sets).toEqual(def.world.sets);
+  expect(() => psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM], calendar: "short", terms: 2 })).toThrow();
 });
 
 test("a control whose fork failed or never ran does not pass", async () => {

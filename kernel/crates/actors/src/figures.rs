@@ -60,3 +60,12 @@ pub const NEWS_HEADLINE_CHARS: usize = 200;
 
 /// convention: half a percentage point in basis points, used for integer rounding from bps to whole percent.
 pub const HALF_PERCENT_BPS: i64 = 50;
+
+/// convention: maximum characters copied from a rival platform summary or petition demand into a mayor's weekly briefing.
+pub const BRIEFING_CLIP_CHARS: usize = 80;
+
+/// placeholder: fallback petition signature threshold (basis points) for the mayor's weekly briefing when omitted from clerk params.
+pub const BRIEFING_DEFAULT_THRESHOLD_BPS: i64 = 1_500;
+
+/// placeholder: fallback adult population for the mayor's weekly briefing when omitted from clerk params.
+pub const BRIEFING_DEFAULT_POPULATION: i64 = 200;

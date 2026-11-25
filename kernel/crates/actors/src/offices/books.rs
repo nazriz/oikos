@@ -20,9 +20,10 @@
 //!   an office's file, and stay TS.) A module with no reader still cannot have a clerk.
 
 use super::spread;
-use crate::common::{data, when_words, Book, DAY};
+use crate::common::{addressed_to, bases_of, data, truthy, when_words, Book, Fields, DAY};
 use crate::steps::{because, say, Say, Visible};
 use crate::{Action, Actor, Cx, Ctx, Kind, Picture};
+use oikos_sight::RecordBody;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
@@ -31,6 +32,12 @@ pub struct Clerk;
 
 /// The kind of the paper a clerk files (a statement on the organisation's own file).
 pub const BOOKS: &str = "office_books";
+/// The kind of the weekly chief-of-staff briefing filed for the mayor when enabled.
+pub const BRIEFING: &str = "staff_briefing";
+/// How often the mayor's clerk files a weekly briefing (days).
+pub const BRIEFING_EVERY_DAYS: i64 = 7;
+/// Pre-election briefing filed this many days before polling day (plain facts, no advice).
+pub const PRE_POLL_BRIEFING_DAYS: i64 = 10;
 /// How old the clerk's last paper may be before a running figure that has moved is filed for its own sake (days).
 pub const RUNNING_EVERY_DAYS: i64 = 7;
 /// The most entries of a heading a paper's words name (the rest are in its list).
@@ -394,10 +401,371 @@ impl Actor for StaffClerk {
     }
 }
 
+/// Configuration for the mayor's opt-in weekly chief-of-staff briefing (`with.briefing = true`).
+#[derive(Debug, Clone, Copy)]
+struct BriefingCfg {
+    threshold_bps: i64,
+    population: i64,
+}
+
+fn briefing_cfg_of(of: &str, with: &serde_json::Map<String, Value>) -> Option<BriefingCfg> {
+    if of != "city.mayor_code" || with.get("briefing").and_then(|v| v.as_bool()) != Some(true) {
+        return None;
+    }
+    let threshold_bps = with
+        .get("petition_threshold_bps")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(crate::figures::BRIEFING_DEFAULT_THRESHOLD_BPS);
+    let population = with
+        .get("population")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(crate::figures::BRIEFING_DEFAULT_POPULATION);
+    Some(BriefingCfg { threshold_bps, population })
+}
+
+fn format_dir_short(form: &str) -> &str {
+    match form {
+        "works_collection" => "collection",
+        "works_staffing" => "works staffing",
+        "environment_staffing" => "env staffing",
+        "inspector_enforcement" => "fines",
+        "rates_recovery" => "rates interest",
+        other => other,
+    }
+}
+
+fn format_dir_val(form: &str, d: &oikos_core::Frozen) -> Option<String> {
+    match form {
+        "works_collection" => d.i("every").map(|s| if s % DAY == 0 { format!("{}d", s / DAY) } else { format!("{s}s") }),
+        "works_staffing" | "environment_staffing" => d.s("recruit").map(String::from),
+        "inspector_enforcement" => d.s("fines").map(String::from),
+        "rates_recovery" => d.s("interest").map(String::from),
+        _ => None,
+    }
+}
+
+fn format_rival_dir_val(form: &str, fields: &serde_json::Map<String, Value>) -> Option<String> {
+    match form {
+        "works_collection" => fields.get("every").and_then(|v| v.as_str()).map(|s| {
+            let trimmed = s.trim();
+            if let Some(n) = trimmed.strip_suffix(" days").and_then(|x| x.trim().parse::<i64>().ok()) {
+                format!("{n}d")
+            } else {
+                trimmed.to_string()
+            }
+        }),
+        "works_staffing" | "environment_staffing" => fields.get("recruit").and_then(|v| v.as_str()).map(String::from),
+        "inspector_enforcement" => fields.get("fines").and_then(|v| v.as_str()).map(String::from),
+        "rates_recovery" => fields.get("interest").and_then(|v| v.as_str()).map(String::from),
+        _ => None,
+    }
+}
+
+/// Composes a concise, plain-fact chief-of-staff weekly briefing from what the mayor's clerk observes on its own channels.
+/// Covers: latest paper poll and the mayor's own standing, each rival's platform and which standing directions it would
+/// reverse, open petitions, and resident hardship/service complaints. Pure facts; no advice to use any power.
+pub fn mayor_briefing_text(book: &Book, me: &str, threshold_bps: i64, population: i64, t: i64, world: &crate::WorldInfo) -> String {
+    let mut parts: Vec<String> = vec![format!("Weekly briefing ({}).", when_words(t, world))];
+
+    // 1. Current standing directions issued from the mayor's post (latest per form).
+    let mut standing_dirs: BTreeMap<String, String> = BTreeMap::new();
+    let mut dirs: Vec<&oikos_sight::Record> = book.open("direction").map(|r| r.as_ref()).filter(|r| r.position.as_deref() == Some("mayor")).collect();
+    dirs.sort_by_key(|r| r.at);
+    for d in dirs {
+        let form = bases_of(d).iter().filter_map(|b| book.get(b)).find_map(|f| data(f).s("form").map(String::from));
+        if let Some(form) = form {
+            if let Some(val) = format_dir_val(&form, data(d)) {
+                standing_dirs.insert(form, val);
+            }
+        }
+    }
+
+    // 2. Latest election notice, result, nominations, and latest paper poll.
+    let notice = book
+        .open("election_notice")
+        .filter(|r| data(r).s("office") == Some("mayor"))
+        .max_by_key(|r| r.at);
+    if let Some(n) = notice {
+        let nd = data(n);
+        let poll_at = nd.i("poll_at").unwrap_or(0);
+        let closes_at = nd.i("nominations_close_at").unwrap_or(0);
+        let result = book
+            .open("ballot_result")
+            .filter(|r| r.at >= n.at && data(r).s("office") == Some("mayor"))
+            .max_by_key(|r| r.at);
+        let mut inc_nominated = false;
+        // Group rival platforms by summary to stay concise even with many rivals.
+        let mut rival_groups: BTreeMap<String, (Vec<String>, Option<Value>)> = BTreeMap::new();
+        let mut rival_count = 0usize;
+        for nom in book.open("nomination").filter(|r| r.at >= n.at && data(r).s("office") == Some("mayor")) {
+            let d = data(nom);
+            if d.flag("incumbent") || nom.position.as_deref() == Some("mayor") {
+                inc_nominated = true;
+                continue;
+            }
+            rival_count += 1;
+            let cand = nom.speaks_for.map(|s| s.to_string()).unwrap_or_else(|| d.s("name").unwrap_or(nom.author.as_str()).to_string());
+            let plat_json = d.get("platform").map(|p| p.to_value());
+            let summary = plat_json
+                .as_ref()
+                .and_then(|p| p.get("summary").and_then(|x| x.as_str()))
+                .map(String::from)
+                .unwrap_or_else(|| match &nom.body {
+                    RecordBody::Statement { text, .. } => text.chars().take(crate::figures::BRIEFING_CLIP_CHARS).collect(),
+                    _ => String::new(),
+                });
+            let entry = rival_groups.entry(summary).or_insert_with(|| (vec![], plat_json));
+            if !entry.0.contains(&cand) {
+                entry.0.push(cand);
+            }
+        }
+
+        if let Some(res) = result {
+            let winner_raw = data(res).s("winner").unwrap_or("unknown");
+            let winner = if winner_raw == "mayor-system" {
+                "the incumbent mayor"
+            } else {
+                winner_raw.strip_suffix("-self").unwrap_or(winner_raw)
+            };
+            let takes = data(res).i("takes_office_at").map(|x| when_words(x, world));
+            parts.push(match takes {
+                Some(when_takes) => format!("Election result declared ({}): winner {winner}, taking office {when_takes}.", when_words(res.at, world)),
+                None => format!("Election result declared ({}): winner {winner}.", when_words(res.at, world)),
+            });
+        } else {
+            let latest_poll = book
+                .open("news")
+                .filter(|r| {
+                    let pd = data(r);
+                    r.at >= n.at
+                        && pd.s("kind") == Some("poll")
+                        && pd.s("office").is_none_or(|o| o == "mayor")
+                        && pd.i("poll_at").is_none_or(|pa| poll_at == 0 || pa == poll_at)
+                })
+                .max_by_key(|r| r.at);
+            if let Some(poll) = latest_poll {
+                let pd = data(poll);
+                let resp = pd.i("respondents").unwrap_or(0);
+                let app_bps = pd.i("approval_bps").unwrap_or(0);
+                let net_pct = (app_bps + if app_bps >= 0 { crate::figures::HALF_PERCENT_BPS } else { -crate::figures::HALF_PERCENT_BPS }) / 100;
+                let net_str = if net_pct > 0 { format!("+{net_pct}%") } else { format!("{net_pct}%") };
+                let shares = pd.get("shares").map(|x| x.to_value()).and_then(|v| v.as_array().cloned()).unwrap_or_default();
+                let mut inc_pct: Option<i64> = None;
+                let mut rivals_poll: Vec<(String, i64)> = vec![];
+                for s in &shares {
+                    let fp_bps = s.get("first_pref_bps").and_then(|x| x.as_i64()).unwrap_or(0);
+                    let pct = (fp_bps + crate::figures::HALF_PERCENT_BPS) / 100;
+                    if s.get("incumbent").is_some_and(truthy) {
+                        inc_pct = Some(pct);
+                    } else {
+                        let name = s.get("name").and_then(|x| x.as_str()).or_else(|| s.get("candidate").and_then(|x| x.as_str())).unwrap_or("rival").to_string();
+                        rivals_poll.push((name, pct));
+                    }
+                }
+                rivals_poll.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+                let top_str = rivals_poll
+                    .iter()
+                    .take(2)
+                    .map(|(nm, p)| format!("{nm} {p}%"))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let standing_str = match (inc_pct, rivals_poll.first()) {
+                    (Some(ip), Some((_, tp))) if ip < *tp => format!("your first-preference share is {ip}%, trailing {top_str}"),
+                    (Some(ip), Some(_)) => format!("your first-preference share is {ip}% against {top_str}"),
+                    (Some(ip), None) => format!("your first-preference share is {ip}%"),
+                    (None, Some(_)) => format!(
+                        "your office is not listed in first preferences ({}), while {top_str} lead",
+                        if inc_nominated { "0% in poll" } else { "no incumbent nomination on file" }
+                    ),
+                    (None, None) => "no first-preference breakdown reported".into(),
+                };
+                let days_left = ((poll_at - t).max(0) + DAY - 1) / DAY;
+                parts.push(format!(
+                    "Poll ({}, {resp} readers; {days_left}d to poll): net approval {net_str}; {standing_str}.",
+                    when_words(poll.at, world)
+                ));
+            } else {
+                let nom_state = if inc_nominated { "your nomination is on file" } else { "no nomination from the mayor's office is on file yet" };
+                let close_note = if closes_at > 0 && t < closes_at {
+                    format!("; nominations close before {}", when_words(closes_at, world))
+                } else {
+                    String::new()
+                };
+                parts.push(format!("Election: poll on {}{close_note}; {nom_state}.", when_words(poll_at, world)));
+            }
+
+            if rival_count > 0 {
+                let mut plat_bits: Vec<String> = vec![];
+                let mut first_rev: Option<String> = None;
+                for (summary, (mut cands, plat)) in rival_groups {
+                    cands.sort();
+                    let who = if cands.len() <= 2 {
+                        cands.join(", ")
+                    } else {
+                        format!("{}, {} +{} more", cands[0], cands[1], cands.len() - 2)
+                    };
+                    let mut reversed: Vec<String> = vec![];
+                    let mut cuts: Vec<String> = vec![];
+                    if let Some(p) = &plat {
+                        if let Some(pdirs) = p.get("directions").and_then(|x| x.as_object()) {
+                            for (form, fields) in pdirs {
+                                if let (Some(cur), Some(map)) = (standing_dirs.get(form), fields.as_object()) {
+                                    if let Some(rval) = format_rival_dir_val(form, map) {
+                                        if rval != *cur {
+                                            reversed.push(format!("{} {cur}->{rval}", format_dir_short(form)));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(pbud) = p.get("budgets").and_then(|x| x.as_object()) {
+                            for (line, v) in pbud {
+                                if let Some(bps) = v.as_i64() {
+                                    if bps < 10_000 {
+                                        cuts.push(format!("{line} {}%", bps / 100));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if !reversed.is_empty() || !cuts.is_empty() {
+                        let rev_key = reversed.join(", ");
+                        let rev_s = if reversed.is_empty() {
+                            String::new()
+                        } else if first_rev.as_deref() == Some(rev_key.as_str()) {
+                            format!("reverses same {} directions", reversed.len())
+                        } else {
+                            if first_rev.is_none() {
+                                first_rev = Some(rev_key.clone());
+                            }
+                            format!("reverses {} directions ({rev_key})", reversed.len())
+                        };
+                        let cut_s = if cuts.is_empty() { String::new() } else { format!("cuts budgets ({})", cuts.join(", ")) };
+                        let both = [rev_s, cut_s].into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("; ");
+                        plat_bits.push(format!("{who}: {both}"));
+                    } else {
+                        let short: String = summary.chars().take(crate::figures::BRIEFING_CLIP_CHARS).collect();
+                        plat_bits.push(format!("{who}: \"{short}\""));
+                    }
+                }
+                parts.push(format!("Rivals ({rival_count}): {}.", plat_bits.join(" | ")));
+            }
+        }
+    }
+
+    // 3. Open petitions and resident hardship / service complaints.
+    let acted: BTreeSet<String> = book
+        .all("proposal")
+        .chain(book.all("petition_response"))
+        .filter(|r| r.position.as_deref() == Some("mayor"))
+        .flat_map(|r| bases_of(r).iter().map(|b| b.to_string()))
+        .collect();
+    let needed = -((-(threshold_bps * population)).div_euclid(10_000));
+    let mut counts: BTreeMap<&str, i64> = BTreeMap::new();
+    for c in book.open("petition_count") {
+        if let (Some(pid), Some(sig)) = (data(c).s("petition"), data(c).i("signatures")) {
+            counts.insert(pid, sig);
+        }
+    }
+    let mut open_pets = 0usize;
+    let mut over_pets = 0usize;
+    let mut top_pet: Option<(i64, String)> = None;
+    for p in book.open("petition") {
+        if acted.contains(p.id.as_str()) {
+            continue;
+        }
+        open_pets += 1;
+        let sig = counts.get(p.id.as_str()).copied().unwrap_or(0);
+        if sig * 10_000 >= threshold_bps * population {
+            over_pets += 1;
+        }
+        let demand: String = data(p)
+            .get("demand")
+            .and_then(|x| x.s("text"))
+            .map(String::from)
+            .unwrap_or_else(|| match &p.body {
+                RecordBody::Statement { text, .. } => text.clone(),
+                _ => String::new(),
+            })
+            .chars()
+            .take(crate::figures::BRIEFING_CLIP_CHARS)
+            .collect();
+        if top_pet.as_ref().is_none_or(|(best, _)| sig > *best) {
+            top_pet = Some((sig, format!("{} ({sig} sigs: {demand})", p.id)));
+        }
+    }
+    let mut comp_counts: BTreeMap<String, usize> = BTreeMap::new();
+    for c in book.open("complaint") {
+        if !addressed_to(c).iter().any(|x| x == me) {
+            continue;
+        }
+        let kind = data(c).s("about").unwrap_or("services").replace('_', " ");
+        *comp_counts.entry(kind).or_default() += 1;
+    }
+    let neg_news = book
+        .open("news")
+        .filter(|r| data(r).flag("about_office") && data(r).i("tone").is_some_and(|v| v < 0))
+        .count();
+
+    let mut hardship: Vec<String> = vec![];
+    if open_pets > 0 {
+        let top_s = top_pet.map(|(_, s)| format!("; top: {s}")).unwrap_or_default();
+        hardship.push(format!("{open_pets} open petitions ({over_pets} at/over {needed}-sig threshold{top_s})"));
+    }
+    if !comp_counts.is_empty() {
+        let cs = comp_counts.iter().map(|(k, n)| format!("{n} {k}")).collect::<Vec<_>>().join(", ");
+        hardship.push(format!("open complaints: {cs}"));
+    }
+    if neg_news > 0 {
+        hardship.push(format!("{neg_news} adverse local-paper reports on town services and resident hardship"));
+    }
+    if !hardship.is_empty() {
+        parts.push(format!("Petitions & hardship: {}.", hardship.join("; ")));
+    }
+    parts.join(" ")
+}
+
 /// The staff post that keeps an office's books (`office.clerk`): does nothing else of the office's business.
 pub struct ClerkActor {
     keeping: Keeping,
     books: Box<dyn OfficeBooks>,
+    briefing_cfg: Option<BriefingCfg>,
+    briefed_at: Option<i64>,
+}
+
+impl ClerkActor {
+    fn due_briefing(&mut self, t: i64, world: &crate::WorldInfo) -> Option<crate::steps::Step<()>> {
+        let cfg = self.briefing_cfg?;
+        if t < DAY {
+            return None;
+        }
+        let last = self.briefed_at;
+        let same_day = last.is_some_and(|at| at.div_euclid(DAY) == t.div_euclid(DAY));
+        let notice = self.keeping.book.open("election_notice").filter(|r| data(r).s("office") == Some("mayor")).max_by_key(|r| r.at);
+        let new_notice = notice.is_some_and(|n| last.is_none_or(|at| n.at > at));
+        let new_poll = self
+            .keeping
+            .book
+            .open("news")
+            .filter(|r| data(r).s("kind") == Some("poll") && data(r).s("office").is_none_or(|o| o == "mayor"))
+            .any(|p| last.is_none_or(|at| p.at > at));
+        let pre_poll_due = notice.is_some_and(|n| {
+            let poll_at = data(n).i("poll_at").unwrap_or(0);
+            let pre_at = poll_at - PRE_POLL_BRIEFING_DAYS * DAY;
+            poll_at > 0 && t >= pre_at && t < poll_at && last.is_none_or(|at| at < pre_at)
+        });
+        let weekly_due = last.is_none_or(|at| t >= at + BRIEFING_EVERY_DAYS * DAY);
+        let due = (weekly_due || pre_poll_due) && !same_day || new_notice || new_poll;
+        if !due {
+            return None;
+        }
+        self.briefed_at = Some(t);
+        let text = mayor_briefing_text(&self.keeping.book, &self.keeping.me, cfg.threshold_bps, cfg.population, t, world);
+        Some(because(
+            "Filing a plain-fact weekly briefing for the mayor on polls, rival platforms, open petitions and hardship.",
+            vec![say(BRIEFING, &text, Say { to: Some(vec![self.keeping.office.clone()]), visible: Some(Visible::Only(vec![self.keeping.me.clone()])), ..Default::default() })],
+        ))
+    }
 }
 
 impl Actor for ClerkActor {
@@ -405,13 +773,20 @@ impl Actor for ClerkActor {
         self.keeping.book.absorb(pic);
         self.books.absorb(pic);
         let open = self.books.open(pic.t, &cx.ctx.world);
-        match self.keeping.due(open, pic.t, &cx.ctx.world) {
-            Some(s) => Action::Call { program: s.program(), reasoning: s.why },
-            None => Action::Wait { until: None },
+        if let Some(s) = self.keeping.due(open, pic.t, &cx.ctx.world) {
+            return Action::Call { program: s.program(), reasoning: s.why };
         }
+        if let Some(s) = self.due_briefing(pic.t, &cx.ctx.world) {
+            return Action::Call { program: s.program(), reasoning: s.why };
+        }
+        Action::Wait { until: None }
     }
     fn save(&self) -> Result<Value, String> {
-        Ok(json!({ "keeping": serde_json::to_value(&self.keeping).map_err(|e| e.to_string())?, "books": self.books.save()? }))
+        let mut out = json!({ "keeping": serde_json::to_value(&self.keeping).map_err(|e| e.to_string())?, "books": self.books.save()? });
+        if self.briefing_cfg.is_some() {
+            out["briefed_at"] = json!(self.briefed_at);
+        }
+        Ok(out)
     }
 }
 
@@ -446,7 +821,8 @@ impl Kind for Clerk {
         let with: serde_json::Map<String, Value> = ctx.param("with", Default::default())?;
         let office = office_of(ctx.position.as_deref());
         let books = books_of(&of, &ctx.entity, &office, &with).ok_or_else(|| format!("office.clerk: no module \"{of}\" that keeps books"))?;
-        Ok(Box::new(ClerkActor { keeping: Keeping::new(&ctx.entity, &office), books }))
+        let briefing_cfg = briefing_cfg_of(&of, &with);
+        Ok(Box::new(ClerkActor { keeping: Keeping::new(&ctx.entity, &office), books, briefing_cfg, briefed_at: None }))
     }
     fn restore(&self, ctx: &Ctx, saved: Value) -> Result<Box<dyn Actor>, String> {
         let of: String = ctx.param("of", String::new())?;
@@ -455,7 +831,9 @@ impl Kind for Clerk {
         let mut books = books_of(&of, &ctx.entity, &office, &with).ok_or_else(|| format!("office.clerk: no module \"{of}\" that keeps books"))?;
         books.restore(saved.get("books").unwrap_or(&Value::Null))?;
         let keeping: Keeping = serde_json::from_value(saved.get("keeping").cloned().unwrap_or(Value::Null)).map_err(|e| e.to_string())?;
-        Ok(Box::new(ClerkActor { keeping, books }))
+        let briefing_cfg = briefing_cfg_of(&of, &with);
+        let briefed_at = saved.get("briefed_at").and_then(|v| v.as_i64());
+        Ok(Box::new(ClerkActor { keeping, books, briefing_cfg, briefed_at }))
     }
 }
 
@@ -515,6 +893,42 @@ mod tests {
     fn an_office_with_no_reader_of_its_books_cannot_have_a_clerk() {
         let ctx = Ctx { participant: "p".into(), performer: Default::default(), entity: "o".into(), position: Some("works-staff".into()), params: json!({ "of": "city.registry" }).as_object().unwrap().clone().into(), world: Default::default() };
         assert!(Clerk.create(&ctx).is_err());
+    }
+
+    #[test]
+    fn mayor_briefing_reports_poll_rival_reversals_and_hardship_without_advice() {
+        let w = world();
+        let mut book = Book::new();
+        let recs: Vec<std::sync::Arc<oikos_sight::Record>> = vec![
+            json!({ "id": "form-works-collection", "record": "statement", "author": "genesis", "at": 0, "visible_to": "public", "speaks_for": "city", "kind": "form", "text": "f", "data": { "form": "works_collection", "office": "works", "submit_as": "direction" } }),
+            json!({ "id": "form-inspector-enforcement", "record": "statement", "author": "genesis", "at": 0, "visible_to": "public", "speaks_for": "city", "kind": "form", "text": "f", "data": { "form": "inspector_enforcement", "office": "inspector", "submit_as": "direction" } }),
+            json!({ "id": "dir-opening-works-collection", "record": "statement", "author": "mayor-system", "in_position": "mayor", "at": 0, "visible_to": "public", "speaks_for": "city", "kind": "direction", "basis": "form-works-collection", "addressed_to": ["city"], "text": "weekly", "data": { "every": 604800 } }),
+            json!({ "id": "dir-opening-inspector-enforcement", "record": "statement", "author": "mayor-system", "in_position": "mayor", "at": 0, "visible_to": "public", "speaks_for": "city", "kind": "direction", "basis": "form-inspector-enforcement", "addressed_to": ["city"], "text": "fines yes", "data": { "fines": "yes" } }),
+            json!({ "id": "rec.10", "record": "statement", "author": "electoral", "at": 120 * DAY, "visible_to": "public", "kind": "election_notice", "text": "notice", "data": { "office": "mayor", "poll_at": 180 * DAY, "nominations_close_at": 150 * DAY } }),
+            json!({ "id": "rec.11", "record": "statement", "author": "c0094-self", "speaks_for": "c0094", "at": 121 * DAY, "visible_to": "public", "kind": "nomination", "text": "Standing for mayor: Cut spending", "data": { "office": "mayor", "name": "c0094", "platform": { "summary": "Cut spending", "budgets": { "parks": 5000 }, "directions": { "works_collection": { "every": "14 days" }, "inspector_enforcement": { "fines": "no" } } } } }),
+            json!({ "id": "rec.12", "record": "statement", "author": "editor", "at": 161 * DAY, "visible_to": "public", "kind": "news", "text": "poll", "data": { "kind": "poll", "poll_at": 180 * DAY, "respondents": 110, "approval_bps": -300, "shares": [{ "candidate": "mayor-system", "name": "the incumbent mayor", "incumbent": true, "first_pref_bps": 2200 }, { "candidate": "c0094-self", "name": "c0094", "first_pref_bps": 4400 }] } }),
+            json!({ "id": "rec.13", "record": "statement", "author": "c0010-self", "speaks_for": "c0010", "at": 5 * DAY, "visible_to": "public", "addressed_to": ["city"], "kind": "petition", "text": "Limit rent rises and extend notice", "data": { "demand": { "text": "Limit rent rises and extend notice" } } }),
+            json!({ "id": "rec.14", "record": "statement", "author": "c0010-self", "speaks_for": "c0010", "at": 6 * DAY, "visible_to": "public", "kind": "petition_count", "text": "120", "data": { "petition": "rec.13", "signatures": 120 } }),
+            json!({ "id": "rec.15", "record": "statement", "author": "c0011-self", "at": 10 * DAY, "visible_to": ["city"], "addressed_to": ["city"], "kind": "complaint", "text": "missed bin", "data": { "about": "waste" } }),
+            json!({ "id": "rec.16", "record": "statement", "author": "editor", "at": 12 * DAY, "visible_to": "public", "kind": "news", "text": "Residents petition", "data": { "about_office": true, "tone": -1 } }),
+        ]
+        .into_iter()
+        .map(|v| std::sync::Arc::new(serde_json::from_value(v).unwrap()))
+        .collect();
+        book.take_all(&recs);
+        let text = mayor_briefing_text(&book, "city", 1500, 750, 170 * DAY, &w);
+        assert!(text.contains("net approval -3%"), "{text}");
+        assert!(text.contains("your first-preference share is 22%, trailing c0094 44%"), "{text}");
+        assert!(text.contains("collection 7d->14d"), "{text}");
+        assert!(text.contains("fines yes->no"), "{text}");
+        assert!(text.contains("parks 50%"), "{text}");
+        assert!(text.contains("1 open petitions (1 at/over 113-sig threshold"), "{text}");
+        assert!(text.contains("open complaints: 1 waste"), "{text}");
+        assert!(text.len() < 1000, "briefing should stay under render clip: {} chars: {text}", text.len());
+        let lower = text.to_lowercase();
+        for forbidden in ["should", "consider", "fire", "dismiss", "delay", "postpone", "vacate"] {
+            assert!(!lower.contains(forbidden), "briefing must contain plain facts only, found '{forbidden}': {text}");
+        }
     }
 
     #[test]
