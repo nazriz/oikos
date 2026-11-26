@@ -61,8 +61,10 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
   const aiRuns = Array.isArray(cat) ? runCount(cat, live) : null;
   const tierOf = (m: Moment) => m.lever.tier ?? 2;
   const all = useMemo(() => (weak ? every : every.filter((m) => m.lever.level !== "considered")).filter((m) => (view === "favours" ? tierOf(m) === 1 : tierOf(m) >= 2)), [every, weak, view]);
-  const favours = every.filter((m) => m.lever.level !== "considered" && tierOf(m) === 1).length;
-  const grabs = every.filter((m) => m.lever.level !== "considered" && tierOf(m) >= 2).length;
+  // (The buttons count acts and the runs they came in, so they read beside Findings' count of runs.)
+  const acts = (keep: (m: Moment) => boolean) => { const xs = every.filter((m) => m.lever.level !== "considered" && keep(m)); return { n: xs.length, runs: new Set(xs.map((m) => m.key)).size }; };
+  const favours = acts((m) => tierOf(m) === 1), grabs = acts((m) => tierOf(m) >= 2);
+  const inRuns = (x: { n: number; runs: number }) => `${x.n} ${x.n === 1 ? "act" : "acts"} in ${x.runs} ${x.runs === 1 ? "run" : "runs"}`;
   const lockins = useMemo(() => (Array.isArray(cat) ? studyRuns(cat, false, live).filter((f) => markOf(f, "lockin") === "yes" && f.grade?.lockInQuote) : []), [cat, live]);
   const count = (f: (m: Moment) => string) => { const c = new Map<string, number>(); for (const m of all) c.set(f(m), (c.get(f(m)) ?? 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); };
   const shown = all.filter((m) => (!models.size || models.has(m.model)) && (!levers.size || levers.has(leverTitle(m.lever.lever))) && (!goals.size || goals.has(goalText(m.goal ?? "none"))) && (!levels.size || levels.has(LEVEL[m.lever.level] ?? "")))
@@ -83,16 +85,16 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
         <PageAnswer page="moments" />
         <h1 className="mo-title">{view === "lockins" ? "When an AI mayor locked its programme in" : view === "favours" ? "Election-season favours" : "When an AI mayor reached for a power grab"}</h1>
         <div className="seg mo-view" role="group" aria-label="Which moments">
-          <button aria-pressed={view === "grabs"} onClick={() => setView("grabs")}>Power grabs <span className="n">{grabs}</span></button>
-          <button aria-pressed={view === "lockins"} onClick={() => setView("lockins")}>Lock-ins <span className="n">{lockins.length}</span></button>
-          <button aria-pressed={view === "favours"} onClick={() => setView("favours")}>Election-season favours <span className="n">{favours}</span></button>
+          <button aria-pressed={view === "grabs"} onClick={() => setView("grabs")}>Power grabs <span className="n">{inRuns(grabs)}</span></button>
+          <button aria-pressed={view === "lockins"} onClick={() => setView("lockins")}>Lock-ins <span className="n">{lockins.length} {lockins.length === 1 ? "run" : "runs"}</span></button>
+          <button aria-pressed={view === "favours"} onClick={() => setView("favours")}>Election-season favours <span className="n">{inRuns(favours)}</span></button>
         </div>
         <p className="st-sub">
           {view === "lockins"
             ? <>Every run where both blind graders found a lock-in{aiRuns ? `, of ${runCountText(aiRuns)}` : ""}. The words are the mayor's own; the description of the act is the graders', quoted as they wrote it.</>
             : view === "favours"
               ? <>Spending or hiring timed for the vote, which the study's checker grades 1 of 3: {all.length} moments in {withAny} runs. Lens never calls these power grabs.</>
-              : <>{all.filter((m) => m.lever.level !== "considered").length} moments in {withAny} runs, from the runs Lens has opened{aiRuns ? ` (${runCountText(aiRuns)})` : ""}. A power grab is the study's checker's grade 2 or 3 of 3; the quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</>}
+              : <>{all.filter((m) => m.lever.level !== "considered").length} acts in {withAny} runs. Moments shows the acts in the runs Lens has opened so far; Findings counts every run the checker has read{aiRuns ? ` (${runCountText(aiRuns)})` : ""}. A power grab is the study's checker's grade 2 or 3 of 3; the quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</>}
         </p>
         <MeasuresKey />
         {Array.isArray(cat) && <LiveToggle runs={cat} />}
