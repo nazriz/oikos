@@ -81,12 +81,14 @@ export function Panel({ twin, open0, overlays, setOverlays, counts, kinds, city,
               {gone > 0 && <div className="lc-row muted"><span className="lc-sw" /><span>Left or died</span><span className="lc-num">{n0(gone)}</span></div>}
             </div>
           </Section>
-          <Section on={overlays.acts} toggle={() => tog("acts")} title="The seat's acts" note="Arcs from the town hall to what each act reached, over the last 7 days; the arc fades with age. Rose: refused.">
+          {city.town.seats.length > 0 && (
+            <Section on={overlays.acts} toggle={() => tog("acts")} title="The seat's acts" note="Arcs from the town hall to what each act reached, over the last 7 days; the arc fades with age. Rose: refused.">
             <div className="lc-legend">
               <div className="lc-row"><span className="lc-sw line" style={{ background: `linear-gradient(90deg, ${PAL.seat}, #ffe2a6)` }} /><span>Acts in the last 7 days</span><span className="lc-num">{recentActs}</span></div>
               <div className="lc-row muted"><span className="lc-sw" /><span>Places reached</span><span className="lc-num">{arcs}</span></div>
             </div>
           </Section>
+          )}
           <div className="lc-section">
             <div className="lc-sec-head"><span className="lc-sec-title">Buildings</span>
               <div className="lc-seg">

@@ -125,6 +125,7 @@ const PLACEABLE_FIRST = ["civic", "commercial", "industrial", "health", "educati
 
 export function townFold(): Fold {
   let b: TownBundle | undefined;
+  const persons = new Set<string>();
   const sIndex = new Map<string, number>();
   const seatSet = new Set<string>();
   /** command seq → act index; action id → act index. */
@@ -218,7 +219,7 @@ export function townFold(): Fold {
       b.wildlife.cells.push(xy[0], xy[1], i, p.count ?? 1);
     }
     // Entities, positions, and where each organisation is.
-    for (const e of w.entities ?? []) if (e.kind !== "person") b.entities[e.id] = { kind: e.kind, name: e.name ?? e.id };
+    for (const e of w.entities ?? []) { if (e.kind !== "person") b.entities[e.id] = { kind: e.kind, name: e.name ?? e.id }; else persons.add(e.id); }
     for (const p of cfg.positions ?? []) b.positions[p.id] = { entity: p.entity, title: p.title ?? p.id, holder: p.holder };
     placeEntities();
     // Seats: a model in the chair, or a person-kind participant that is no citizen's own (a code twin of the chair).
@@ -273,7 +274,8 @@ export function townFold(): Fold {
     if (!atCell.size) b!.structures.forEach((s, i) => { if (s.category !== "transport") atCell.set(`${s.x},${s.y}`, i); });
     return atCell.get(`${x},${y}`);
   };
-  const personish = (v: unknown) => typeof v === "string" && !b!.entities[v] && !b!.positions[v] && !sIndex.has(v);
+  /** A person of the town (the header's, and any created during the run). */
+  const personish = (v: unknown): v is string => typeof v === "string" && persons.has(v);
   function placePaper(r: any): { s?: number; p?: string[] } {
     const d = r.data ?? {};
     for (const k of ["structure", "about", "premises"]) { const i = typeof d[k] === "string" ? sIndex.get(d[k]) : undefined; if (i !== undefined) return { s: i }; }
@@ -284,8 +286,9 @@ export function townFold(): Fold {
     const people: string[] = [];
     for (const k of ["deceased", "missing", "tenant", "applicant", "name"]) if (personish(d[k])) people.push(d[k]);
     for (const k of ["household", "members"]) if (Array.isArray(d[k])) for (const x of d[k]) if (personish(x)) people.push(x);
-    if (!people.length && personish(r.speaks_for)) people.push(r.speaks_for);
+    // Whom it is addressed to first (a decision concerns its addressee), else who wrote it (a claim, a complaint).
     if (!people.length) for (const x of r.addressed_to ?? []) if (personish(x)) people.push(x);
+    if (!people.length && personish(r.speaks_for)) people.push(r.speaks_for);
     return people.length ? { p: [...new Set(people)].slice(0, 8) } : {};
   }
   function record(t: number, r: any) {
@@ -335,7 +338,7 @@ export function townFold(): Fold {
 
   return {
     name: "town",
-    version: 2,
+    version: 3,
     line(l: LogLine) {
       if (l.t > tMax) tMax = l.t;
       if (l.kind === "header") return header(l.body);
@@ -377,6 +380,7 @@ export function townFold(): Fold {
             if (p) p.holder = body.holder;
             return;
           }
+          case "person_created": persons.add(body.person); return;
           case "entity_created":
             b.entities[body.entity] = { kind: body.kind ?? "entity", name: body.name ?? body.entity };
             return;

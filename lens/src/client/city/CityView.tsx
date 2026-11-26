@@ -704,7 +704,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       updateTriggers: { getRadius: [Math.floor(t / 300), hiKey], getLineColor: [Math.floor(t / 300), hiKey], getLineWidth: hiKey },
     }),
     // The seat's hall: a quiet amber ring when it acted lately.
-    town.hall !== undefined && overlays.acts && new ScatterplotLayer({
+    town.hall !== undefined && overlays.acts && town.seats.length > 0 && new ScatterplotLayer({
       id: "hall", data: [town.hall], getPosition: (i: number) => [B.shapes[i]!.cx, B.shapes[i]!.cy, 0.6], getRadius: 22, radiusUnits: "meters", billboard: false,
       stroked: true, filled: true, getFillColor: hex(PAL.seat, 26), getLineColor: hex(PAL.seat, 150), getLineWidth: 1.2, lineWidthUnits: "pixels",
     }),
@@ -826,6 +826,12 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     select(s);
   }, [city, select]);
 
+  // The panel only changes with the clock (by the minute), the overlays and the run: not on every camera frame.
+  const canTour = steps.length > 0 && (town.acts.length > 0 || town.elections.some((e) => e.result));
+  const panel = useMemo(() => (
+    <Panel twin={!!twin} open0={layersOpen} ev={ev} candCol={candCol} papersShown={papersShown} onTour={canTour ? () => setTour(0) : undefined} overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />
+  ), [twin, layersOpen, ev, candCol, papersShown, canTour, overlays, ver, Math.floor(t / 60), arcs.length, city, home]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div ref={wrap} className={`lc-wrap${dark ? "" : " light"}`} style={{ background: `rgb(${sky.backdrop.join(",")})` }}>
       <DeckGL
@@ -849,7 +855,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       {diff && diff.ended !== undefined && <div className="lc-diff"><b>Difference from the other arm</b><span>An arm ended on day {Math.floor(diff.ended / DAY) + 1}: nothing to compare after it.</span></div>}
       {diff && diff.ended === undefined && <div className="lc-diff"><b>Difference from the other arm</b><span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people elsewhere now</span><span><i className="sw dot" />{diff.onlyHere.length} papers only here (7 d)</span><span><i className="sw ring" />{diff.onlyThere.length} only there</span></div>}
       <Minimap B={B} town={town} view={view} size={size} setView={setView} />
-      {!bare && <Panel twin={!!twin} open0={layersOpen} ev={ev} candCol={candCol} papersShown={papersShown} onTour={steps.length ? () => setTour(0) : undefined} overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />}
+      {!bare && panel}
       {tip && <Tooltip tip={tip} city={city} t={t} name={(i) => structureName(city, i)} />}
       {!bare && tour !== null && <Tour steps={steps} at={tour} setAt={setTour} onExit={() => setTour(null)} />}
       {card && tour === null && <Card city={city} t={t} selection={selection} name={(i) => structureName(city, i)} onClose={() => select(null)} />}

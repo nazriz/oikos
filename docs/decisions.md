@@ -16200,3 +16200,18 @@ whenever the server starts.
   ground the camera sees: the screen's corners cast onto z = 0 and clamped near the horizon. Clicking or dragging on
   it moves the camera.
 - The loader waits on `/status` when a bundle answers 409, as story's does.
+
+## 2026-11-26 Lens city: robustness (wave 5)
+
+- **The city test needs no kernel and no run slot.** It folds a small log written by hand in the kernel's line shapes:
+  3 houses, a workplace, a hall, 6 people over 3 days, a house built mid-run, one act of the seat, a ballot with 4 votes,
+  a complaint and a benefit decision. It checks the folds' invariants, the whereabouts engine against a plain replay,
+  and where the election and papers are placed. It runs in about 20 ms. The mock run it replaced waited on run slots
+  and could wedge the merge gate.
+- **Papers are placed at a known person,** not at anything that is not an entity. A decision goes to its addressee
+  first, then its author. The town fold is now version 3.
+- **Other runs.** Tried on a plain 3,000-person run with no seat (living-pilot-7 twinA: 1,713 structures, 476k
+  moves) and on an older 1,000-person run whose seats never acted (w2-01-council). Both draw. With no seat, the seat's
+  layer and the hall ring are hidden, and the tour shows only when there is something to tour. Measured in GPU
+  Chrome at 3,000 people: panning 16.7 ms/frame (p95 17.1), playing 16.6 ms. Panning had a 25 ms p95 until the panel
+  stopped re-rendering on camera frames.

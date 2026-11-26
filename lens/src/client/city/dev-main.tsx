@@ -21,7 +21,7 @@ function Dev() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    st.setRun("dev");
+    st.setRun(q.get("run") ?? "dev");
     st.setT(((num("day") ?? 121) - 1) * DAY + (num("hour") ?? 9.5) * 3600);
     if (q.get("play")) st.setPlaying(true);
     if (num("speed")) st.setSpeed(num("speed")!);
