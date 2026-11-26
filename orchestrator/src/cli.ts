@@ -237,7 +237,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | flags <DIR> [--json] | figures <world> [--json] [--most N] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | pilot-view <DIR | experiment-dir | seed-dir> [--arm NAME] [--out file.html | folder] [--twin DIR | --no-twin] | experiment run <spec.json|yaml|ts> --out DIR [--parallel P] [--no-slots] [--mock-models] [--resume] | experiment report <DIR> [--rebuild] | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | view <log.jsonl[.zst]> <seq> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
+const usage = "usage: oikos run <world> [--seeds N (runs of one town)] [--towns T (different towns, each run --seeds times)] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--translator-first decide/NAME [--translator-arrangement then|beside]] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | flags <DIR> [--json] | figures <world> [--json] [--most N] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios [--all] | pilot-report <DIR>... [--no-write] | lens [--runs DIR] [--port 4322] [--dev] | lens list | lens index <key> | pilot-view <DIR | experiment-dir | seed-dir> [--arm NAME] [--out file.html | folder] [--twin DIR | --no-twin] | experiment run <spec.json|yaml|ts> --out DIR [--parallel P] [--no-slots] [--mock-models] [--resume] | experiment report <DIR> [--rebuild] | explore <DIR> [--port N] [--prefix /explore] | explore --all [--runs DIR] | explore index <DIR> | debriefs <DIR|log>... [--json] | replay <log.jsonl> | view <log.jsonl[.zst]> <seq> | story <log.jsonl> [participant] | record <log.jsonl[.zst]> <entity|participant> [--at S]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -319,6 +319,11 @@ try {
     // (log.observations; docs/reliability.md, "Observations in the log"). The pilot viewer and the explorer read it so.
     const p = Bun.spawnSync([kernelBinary(), "view", positional()[0]!, positional()[1]!], { stdout: "inherit", stderr: "inherit" });
     process.exitCode = p.exitCode ?? 1;
+  } else if (cmd === "lens") {
+    // Lens, the instrument for runs (lens/, docs/design/lens.md): every run under runs/, a run's town, its seat's
+    // sittings and the timeline, served on 127.0.0.1. Read-only: its own files go to runs/views/lens.
+    const { runLens } = await import("../../lens/src/server/cli");
+    await runLens(process.argv.slice(3));
   } else if (cmd === "pilot-view" && positional()[0]) {
     // A finished pilot as one self-contained HTML page (pilot-view/, docs/pilot-view.md). The run is only read.
     const { runPilotView } = await import("../../pilot-view/src/cli");

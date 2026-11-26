@@ -16021,6 +16021,23 @@ seat's sittings as much as the town. One streaming pass with pluggable folds to 
 on Bun's full-stack server; read-only like the explorer. **Revisit if** a 1,000-person fork takes over a minute to
 index (move folds to Rust), or deck.gl can't hold a 10,000-person town (instance by building).
 
+## 2026-11-26 Lens core: the bulk lines unparsed, the study reader in the same pass, slots not imports
+
+**Decided** (core builder): (1) the ingest leaves the bulk lines unparsed: observe commands, observation events and
+advance_to_news, about half a fork's 4.6 M lines. It counts them from their opening characters, and a fold that wants
+them names their marker (`Fold.bulk`). The full meta pass over the ds7 fork, kernel export and the study reader
+included, takes 15 s. (2) The power-seeking reader (`experiments/power-seeking/reader.ts`) runs on the same stream
+through its own `wanted` filter, now exported. Its copy goes to stdout, not to a temporary file: a fork's export is
+1.9 GB. Results go to `runs/views/lens/readings.json`, keyed by the log's size and mtime and by a hash of reader.ts and
+tally.ts. A background loop reads the forks the library has no result for, one at a time, each in its own process
+(`lens/src/server/read-one.ts`), and waits while a bundle is being made. In the server's own process, its batches had
+slowed the catalogue's answer from 0.2 s to 10 s. (3) Views fill the Run page's slots through a registry (`lens/src/client/views.ts`) and never import each
+other, so city and story land on their own. (4) Debrief annotations are dropped before any fold or the reader sees a
+line (VISION §15). (5) `ForkResultMeta.error` is added to tally.ts's type: the code already read it, and its absence
+broke typechecks that pull in tally.ts.
+**Revisit if** a view needs the bulk lines for every run (then parse them once in Rust), or reader.ts starts to need
+lines its `wanted` filter drops.
+
 ## 2026-11-26 Lens city: the town and people folds, and the map
 
 The map's data comes from two folds: `town` and `people` (lens/src/folds). **Decided:**
@@ -16062,3 +16079,44 @@ lever ↔ act), which the shapes carry.
 - **Revisit if:** the orchestrator starts a sitting other than at turn 1 (then sittings would split or merge wrongly);
   the reader gains its own sitting/act ids (use them instead of the `command <seq>` source); or a prompt stops using
   `## ` sections (then "What it saw" shows one block).
+
+## 2026-11-26 Lens: a seat as an Inspect AI log
+
+**Decided.** `lens/src/server/inspect-export.ts` writes a fork's seat as an Inspect AI eval log (format version 2) in
+`runs/views/lens/inspect/`, named as Inspect names its own so `inspect view --log-dir` lists it. One sample per run: the
+standing instructions as system messages (again where they change), each sitting's prompt as a user message headed
+with its day, each call as an assistant message (words, reasoning, tool calls), what came back as tool messages, and
+after each sitting an `operator` message saying what became of its acts (marked as not shown to the seat). Scores are
+the study reader's (`reader_tier`, `levers`, `election`), labelled as that reader's. Checked with inspect_ai 0.3.292's
+own `read_eval_log` and `list_eval_logs`, and in `inspect view`, run through `uvx` (nothing installed in the repo).
+A run is one sample, not a sitting each, because a researcher in Inspect wants the run as one transcript beside other
+runs; the sitting is in each message's metadata.
+- **Revisit if:** Inspect's log version moves past 2, or someone wants per-sitting samples to score sittings apart.
+
+## 2026-11-26 Lens: the compare view and the `daily` fold
+
+**Decided.** `#/compare/<keyA>/<keyB>` (`lens/src/client/compare/ComparePage.tsx`) sets two arms of one seed side by
+side: a table of the seat's and the town's counts after the fork (A, B, A − B), the seat's sittings day by day beside the
+twin's acts, and small multiples of the town's day-by-day counts (cumulative since the fork, or per day), with the
+record kinds and refusal codes where the arms differ most. The counts come from a new fold, `daily`
+(`lens/src/folds/daily.ts`): records by kind, refusals by code, acts, payments and cents, the town account's net flow,
+people leaving, dying, falling ill. Core dropped its planned `pulse` fold for it. **Counts are compared only over the
+days both arms ran**: a fork stopped early (glm-redteam-s7 at day 161 against its twin's 195) would otherwise look
+like a quieter town, so the page says where it clips. A fork the orchestrator ends at its set length ends "aborted" in
+the log like one stopped early, so the seat fold now reads the spec's `untilDay` (`ended`: finished, stopped, unknown).
+- **Revisit if:** compare is wanted across seeds or across more than two arms (then a matrix, not a pair), or the
+  multiples need a measure that is not a count (a stock, such as households without a home, needs its own fold).
+
+## 2026-11-26 Lens: Moments, the cross-run gallery of levers
+
+**Decided.** `#/moments` (`lens/src/client/story/Moments.tsx`) shows every lever the study's reader found attempted or
+executed in every indexed run, one quote card per lever and act (its events folded together at the furthest level).
+The quote is the seat's own words: what it asked the translator for (the draft's request), or the request the
+translator could not draw up; then what it said on signing and the reason it gave with the act. The reader's words
+(the act as the kernel took it) are not the quote, since they are the platform's paraphrase. Cards carry model, goal,
+seed, day, days to the poll (as the poll then stood) and phase, what became of the act, and how the run's election went;
+"cite" copies a one-line citation. `considered` is off by default and muted when shown. A fork indexed under two keys is
+shown once. The seat fold's version is 2 (its output gained `ended`, `translator_usage`, draft labels), so older
+bundles are made again.
+- **Revisit if:** the gallery is slow with hundreds of runs (then a server-side aggregate of each bundle's levers), or
+  the blind graders' verdicts become available per lever (show them beside the reader's).

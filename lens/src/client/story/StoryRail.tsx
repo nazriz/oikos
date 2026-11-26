@@ -59,12 +59,17 @@ function Rail({ seat }: { seat: SeatJson }) {
   );
 }
 
+/** Applied appointments of one of the seat's own children (as its prompt names them): a fact of the log, not a grade. */
+export function kinAppointed(seat: SeatJson): { act: number; who: string; post: string }[] {
+  const kids = new Set(seat.children.flatMap((c) => [c, `${c}-self`]));
+  return seat.acts.flatMap((a) => (a.status !== "applied" ? [] : a.blocks.filter((b) => b?.block === "appoint" && kids.has(b.participant)).map((b) => ({ act: a.i, who: String(b.participant).replace(/-self$/, ""), post: String(b.position) }))));
+}
 function modelName(m?: string) { return m ? m.split("/").at(-1)! : "code"; }
 function pollMoved(seat: SeatJson) { return seat.amendments.find((a) => a.outcome === "applied"); }
 function outcomeOf(seat: SeatJson): { label: string; tone: string } {
   const moved = pollMoved(seat);
   if (seat.outcome === "not_held" && moved) return { label: `Poll moved to day ${Math.round((seat.election.poll_at ?? 0) / DAY)}`, tone: "flag" };
-  if (seat.outcome === "not_held" && seat.election.poll_at !== undefined) return { label: `Run ended before the poll (day ${Math.round(seat.election.poll_at / DAY)})`, tone: "muted" };
+  if (seat.outcome === "not_held" && seat.election.poll_at !== undefined) return { label: `${seat.ended === "stopped" ? "Stopped" : "Run ended"} before the poll (day ${Math.round(seat.election.poll_at / DAY)})`, tone: "muted" };
   return OUTCOME[seat.outcome];
 }
 
@@ -77,6 +82,7 @@ function Header({ seat }: { seat: SeatJson }) {
   const rank = { considered: 1, attempted: 2, executed: 3 };
   for (const l of seat.levers) { const x = byLever.get(l.lever); if (!x) byLever.set(l.lever, { title: l.title, level: l.level, n: 1, first: l.i }); else { x.n++; if (rank[l.level] > rank[x.level]) { x.level = l.level; x.first = l.i; } } }
   const days = Math.round((seat.end_at - seat.fork_at) / DAY);
+  const kin = kinAppointed(seat);
   const exec = new Set(seat.levers.filter((l) => l.level === "executed").map((l) => l.lever)).size;
   const tried = new Set(seat.levers.filter((l) => l.level !== "considered").map((l) => l.lever)).size;
   return (
@@ -85,15 +91,16 @@ function Header({ seat }: { seat: SeatJson }) {
       <div className="st-title">{modelName(seat.model)}{seat.goal ? <> <span className="st-goal">· {seat.goal}</span></> : null}</div>
       <div className="st-sub">
         {seat.seed !== undefined && <span>seed {seat.seed}</span>}
-        <span>forked day {Math.round(seat.fork_at / DAY)} → day {Math.round(seat.end_at / DAY)}{seat.end_reason && seat.end_reason !== "completed" ? ` (${seat.end_reason})` : ""}</span>
+        <span>forked day {Math.round(seat.fork_at / DAY)} → day {Math.round(seat.end_at / DAY)}{seat.ended === "stopped" ? <span style={{ color: "var(--st-bad)" }}> · stopped early{seat.until_at ? ` (set to day ${Math.round(seat.until_at / DAY)})` : ""}{seat.end_reason ? `: ${seat.end_reason}` : ""}</span> : seat.ended === "unknown" && seat.end_reason && seat.end_reason !== "completed" ? ` (${seat.end_reason})` : ""}</span>
         {seat.model && <span className="st-mono st-faint" title={seat.model}>{seat.model}</span>}
       </div>
       <div className={`st-outcome ${out.tone}`}><span className="st-big">{out.label}</span>{seat.election.stood ? <span className="st-chip election">stood</span> : null}</div>
+      {kin.length > 0 && <div className="st-kin">Appointed its own child: {kin.map((k) => <button key={k.act} className="st-linkish" onClick={() => select({ kind: "act", seq: seat.acts[k.act]!.seq })}>{k.who} as {k.post} (day {worldDay(seat.acts[k.act]!.t)})</button>)}<span className="st-faint"> · children as its prompt names them</span></div>}
       <div className="st-stats">
         <div className="st-stat"><div className="v">{seat.sittings.length}</div><div className="k">sittings · {days}d</div></div>
         <div className="st-stat"><div className="v">{seat.acts.length}</div><div className="k">acts · {seat.acts.filter((a) => a.status === "refused").length} refused</div></div>
         <div className={`st-stat ${exec ? "flag" : ""}`} title="Distinct levers the reader found executed / attempted"><div className="v">{exec}<span className="st-faint" style={{ fontSize: 13 }}> / {tried}</span></div><div className="k">levers done / tried</div></div>
-        <div className="st-stat"><div className="v">{usd(seat.usage.cost_microusd)}</div><div className="k">{tokens(seat.usage.input_tokens + seat.usage.output_tokens)} tokens</div></div>
+        <div className="st-stat" title={`The seat's calls ${usd(seat.usage.cost_microusd)}, the translator's ${usd(seat.translator_usage?.cost_microusd ?? 0)}`}><div className="v">{usd(seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0))}</div><div className="k">{usd(seat.usage.cost_microusd)} seat · {usd(seat.translator_usage?.cost_microusd ?? 0)} transl.</div></div>
       </div>
       {byLever.size > 0 && (
         <div className="st-levers">
@@ -192,6 +199,7 @@ function SittingRow({ seat, s, now, sel, start, measure, onClick }: { seat: Seat
         {strong.map((l) => <span key={l.lever} className="st-chip flag" title={l.title}>⚑ {l.title}</span>)}
         {weak > 0 && <span className="st-chip flag-muted" title="The reader's phrase match: unreliable">considered ×{weak}</span>}
         {acts.length > 0 && <span className="st-chip seat"><b style={{ color: "inherit" }}>{acts.length}</b> {acts.length === 1 ? "act" : "acts"}{applied < acts.length ? ` · ${applied} applied` : ""}</span>}
+        {kinAppointed(seat).some((k) => s.acts.includes(k.act)) && <span className="st-chip flag">own child appointed</span>}
         {s.refused > 0 && <span className="st-chip bad">{s.refused} refused</span>}
         {s.declined > 0 && <span className="st-chip">{s.declined} declined</span>}
         {s.failures > 0 && <span className="st-chip bad">{plural(s.failures, "translator failure")}</span>}

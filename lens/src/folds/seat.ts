@@ -76,8 +76,19 @@ export interface SeatLever extends LeverEvent {
 }
 export interface SeatJson {
   version: number; seat: string; run_id: string; arm?: string; seed?: number; goal?: string; model?: string;
-  fork_at: number; end_at: number; end_reason?: string;
+  fork_at: number; end_at: number;
+  /** The kernel's own words for the end (`end` line: reason, detail). The orchestrator stops a fork at its set length
+   * with "aborted" too, so read `ended` for what happened. */
+  end_reason?: string; end_detail?: string;
+  /** `finished`: the run reached its set length (the spec's untilDay); `stopped`: it ended before (a cap, an error);
+   * `unknown`: no set length to judge by. */
+  ended: "finished" | "stopped" | "unknown";
+  /** The set length, where the spec gives it. */
+  until_at?: number;
+  /** The seat's own calls (participant, notebook, debrief). */
   usage: SeatUsage;
+  /** The translator's calls, which the seat's requests caused (subject `translator`). */
+  translator_usage: SeatUsage;
   /** The seat's own children, as its prompt names them (an appointment of one is worth seeing). */
   children: string[];
   sittings: SittingSummary[]; acts: SeatAct[]; drafts: SeatDraft[]; failures: SeatFailure[];
@@ -152,12 +163,13 @@ function addUsage(u: SeatUsage, b: any) { u.calls++; u.cost_microusd += Number(b
 
 export class SeatFold implements Fold {
   readonly name = "seat";
-  readonly version = 1;
+  readonly version = 2; // 2: ended, until_at, end_detail, translator_usage, draft labels, reader_errors
   private seat = "mayor-system";
   private reader?: Reader;
   private runId = "";
   private model?: string;
-  private endAt = 0; private endReason?: string;
+  private endAt = 0; private endReason?: string; private endDetail?: string;
+  private readonly translatorUsage = zeroUsage();
   private firstModelT?: number;
   private readonly usage = zeroUsage();
   private readonly sittings: Building[] = [];
@@ -205,7 +217,7 @@ export class SeatFold implements Fold {
         if (b.command === "look" && this.current) this.current.summary.looks += (b.looks ?? []).length;
         return;
       case "event": return this.event(l, b, seat);
-      case "end": this.endReason = typeof b.reason === "string" ? b.reason : undefined; return;
+      case "end": this.endReason = typeof b.reason === "string" ? b.reason : undefined; this.endDetail = typeof b.detail === "string" ? b.detail : undefined; return;
     }
   }
 
@@ -237,6 +249,7 @@ export class SeatFold implements Fold {
       return;
     }
     if (a === "usage") {
+      if (b.subject === "translator") { addUsage(this.translatorUsage, b); return; }
       if (b.subject !== seat) return;
       addUsage(this.usage, b);
       if (!this.model && b.model) this.model = String(b.model);
@@ -420,12 +433,16 @@ export class SeatFold implements Fold {
 
     const e = read.election;
     const outcome: SeatJson["outcome"] = e.result_at !== undefined ? (e.seat_won ? "won" : "lost") : !e.stood && e.notice_at !== undefined ? "did_not_stand" : e.poll_at !== undefined && e.poll_at > this.endAt ? "not_held" : "no_result";
+    // (A fork the orchestrator stops at its set length ends "aborted" like one stopped early: the set length tells them apart.)
+    const untilAt = typeof ctx.spec?.untilDay === "number" ? ctx.spec.untilDay * DAY : undefined;
+    const ended: SeatJson["ended"] = this.endReason === "completed" || (untilAt !== undefined && this.endAt >= untilAt) ? "finished" : untilAt !== undefined || this.endReason === "error" ? "stopped" : "unknown";
     const seed = ctx.seed ?? seedOf(this.runId), goal = goalOf(String(ctx.spec?.name ?? this.runId));
     const json: SeatJson = {
       version: this.version, seat: this.seat, run_id: this.runId, ...(ctx.arm ? { arm: ctx.arm } : {}), ...(seed !== undefined ? { seed } : {}),
       ...(goal ? { goal } : {}), ...(this.model ? { model: this.model } : {}),
-      fork_at: forkAt, end_at: this.endAt, ...(this.endReason ? { end_reason: this.endReason } : {}),
-      usage: this.usage, children: [...this.children],
+      fork_at: forkAt, end_at: this.endAt, ...(this.endReason ? { end_reason: this.endReason } : {}), ...(this.endDetail ? { end_detail: this.endDetail } : {}),
+      ended, ...(untilAt !== undefined ? { until_at: untilAt } : {}),
+      usage: this.usage, translator_usage: this.translatorUsage, children: [...this.children],
       sittings: this.sittings.map((s) => s.summary), acts: this.acts, drafts: [...this.drafts.values()], failures: this.failures.map((f) => f.f),
       levers, lever_counts: counts, tier: { considered: top("considered"), attempted: top("attempted"), executed: top("executed") },
       election: e, elections: read.elections, amendments: read.amendments, translator: read.translator, outcome,

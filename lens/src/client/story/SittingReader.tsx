@@ -48,6 +48,8 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
     setHits(els.length);
     els.forEach((e, k) => e.classList.toggle("cur", k === hit));
     const cur = els[hit];
+    // (A hit inside a closed section or result is opened to be seen.)
+    for (let d = cur?.closest("details"); d; d = d.parentElement?.closest("details") ?? null) if (!d.open) d.open = true;
     if (cur) {
       const col = cur.closest<HTMLElement>(".st-col");
       const which = col?.dataset.col as typeof tab | undefined;

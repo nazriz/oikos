@@ -81,3 +81,28 @@ Each fold is registered with one line in `src/server/folds.ts`. Each view contri
 
 - A bundle takes over a minute for a 1,000-person 195-day fork: move the fold to Rust (`kernel/crates/explore`).
 - deck.gl can't hold 10,000 people at 60 fps: instance on the GPU by building (counts) rather than by person.
+
+## 7. Contracts between the builders (core, 2026-11-26)
+
+- **Fold** (`src/shared/fold.ts`). `ctx` carries `runId`, `arm`, `dir`, and, for an experiment fork, `forkAt`
+  (seconds), `seed` and `spec` (spec.json, parsed). The bulk lines (`"command":"observe"`, `"event":"observation"`,
+  `"command":"advance_to_news"`) reach only folds that list their marker in `bulk`. A `debrief` annotation reaches no
+  fold. Folds must not change the line objects they are handed: every fold gets the same object. The `meta` fold is
+  registered by the ingest itself, and every other fold goes in `src/server/folds.ts`.
+- **Bundle**. `runs/views/lens/bundles/<key>.<stamp>/`: `manifest.json` (fold versions, lines, seconds, errors, a
+  summary for the library), `<fold>.json` (+ `.gz`), `<fold>.<file>.bin` (+ `.gz` over 4 KB). A run is made again when
+  its log's size or mtime changes or any fold's `version` changes.
+- **Keys**. A log's path under runs/ without its extension, with `/` written `~`.
+- **Client**. `src/client/api.ts` has `useFold(name)`, `useMeta()`, `foldFile(key, fold, file)` and
+  `useIndexStatus(key)`. The slots are in `src/client/views.ts`: `views.map`, `views.rail`, `views.reader` (shown over the
+  map and rail when the selection is a sitting, a lever or an act), and `views.inspector[kind]` (the drawer's body),
+  each `ComponentType<{ run, meta, entry }>`.
+- **Theme tokens** (`src/client/theme.css`): `--ink --panel --panel-2 --panel-3 --line --line-2 --text --text-2 --muted
+  --faint --seat --citizen --inst --flag --election --good --bad --font-serif --font-sans --font-mono`. Light mode is
+  `<html data-theme="light">`, or `prefers-color-scheme` when no data-theme is set. A window `lens-theme` event fires on
+  the toggle.
+- **Timeline** (`src/client/timeline/Timeline.tsx`). Lanes come from `useLens().tracks`, sorted by id; marks with `t2`
+  draw as spans, marks with `select` select on click. Keys: space, ←/→ (shift: a day), `[ ]`, `, .` (previous or next
+  mark), Home/End, `?`. Core's own lane, `zz-reader`, holds the study reader's lever attempts and the poll.
+- **Server**. Development mode is off by default: deck.gl's shaders break under Bun's HMR bundling. `oikos lens list`
+  prints the catalogue, and `oikos lens index <key>` makes one bundle without a server.
