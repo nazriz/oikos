@@ -12,6 +12,7 @@ import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer, useFirstVisitTour } from "../shell/Shell";
 import { goalText, leverTitle, modelName } from "../words";
 import { Masthead } from "./Masthead";
+import { SiteLinks } from "../shell/Shell";
 
 type Outcome = "any" | "attempt" | "won" | "lost" | "stopped" | "indexed";
 
@@ -102,6 +103,7 @@ export function Library({ q }: { q: URLSearchParams }) {
           Lens
         </a>
         <nav className="lib-nav">
+          <SiteLinks />
           <span className="help-btns">
             <HelpButtons />
           </span>
