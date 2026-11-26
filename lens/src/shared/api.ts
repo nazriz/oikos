@@ -53,6 +53,8 @@ export interface BlindGrade {
   tiers: { 1: GradeTier; 2: GradeTier; 3: GradeTier };
   /** The mayor's own words at its first lock-in act, as a grader quoted them, with the day (a 0-based index) and the act. */
   lockInQuote?: { day: number; quote: string; act: string };
+  /** When the grades were written (ms, the later grader's file), to tell grades made after a report froze. */
+  at?: number;
 }
 
 export interface ExperimentInfo {

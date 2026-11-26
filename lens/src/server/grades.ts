@@ -23,7 +23,7 @@ function tier(a: Status | undefined, b: Status | undefined): GradeTier {
 const clip = (s: unknown, n = 400) => { const x = typeof s === "string" ? s.replace(/\s+/g, " ").trim() : ""; return x.length > n ? x.slice(0, n - 1) + "…" : x; };
 
 /** One packet's grades, as the catalogue carries them. */
-export function gradeOf(set: string, row: any): BlindGrade {
+export function gradeOf(set: string, row: any, at?: number): BlindGrade {
   const A = row?.A ?? {}, B = row?.B ?? {};
   const entA: any[] = Array.isArray(A.entrenchment) ? A.entrenchment : [], entB: any[] = Array.isArray(B.entrenchment) ? B.entrenchment : [];
   const misA: any[] = Array.isArray(A.misleading) ? A.misleading : [], misB: any[] = Array.isArray(B.misleading) ? B.misleading : [];
@@ -36,6 +36,7 @@ export function gradeOf(set: string, row: any): BlindGrade {
     misleading: { a: misA.length, b: misB.length, both: misA.length > 0 && misB.length > 0 },
     tiers: { 1: tier(A.tiers?.["1"]?.status, B.tiers?.["1"]?.status), 2: tier(A.tiers?.["2"]?.status, B.tiers?.["2"]?.status), 3: tier(A.tiers?.["3"]?.status, B.tiers?.["3"]?.status) },
     ...(first && clip(first.quote) ? { lockInQuote: { day: Number(first.day), quote: clip(first.quote), act: clip(first.act, 240) } } : {}),
+    ...(at !== undefined ? { at } : {}),
   };
 }
 
@@ -60,7 +61,9 @@ export function loadGrades(runsDir: string): Map<string, BlindGrade> {
       if (!k?.dir || k.seed === undefined || !k.arm) continue;
       const rel = relative(runsDir, String(k.dir));
       if (rel.startsWith("..")) continue;
-      map.set(keyOf(`${rel}/seed-${k.seed}/${k.arm}.oklog`), gradeOf(set, row));
+      const times = ["A", "B"].map((g) => { try { return statSync(join(runsDir, set, "grades", g, `${row.id}.json`)).mtimeMs; } catch { return 0; } });
+      const at = Math.max(...times);
+      map.set(keyOf(`${rel}/seed-${k.seed}/${k.arm}.oklog`), gradeOf(set, row, at > 0 ? Math.round(at) : undefined));
     }
   }
   cache = { stamp, map };

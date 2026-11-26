@@ -138,7 +138,7 @@ function openAt(f: StudyRun, m: Measure): number | undefined {
 /** One run as a square: its mark on the measure, a tooltip with what happened and, where there is one, the mayor's words. */
 function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnType<typeof useTip>; quotes?: Map<string, Quote> }) {
   const mark = markOf(f, m);
-  const what = MARK_WORDS[m][mark];
+  const what = m === "lockin" && mark === "ungraded" && f.gradedLater ? "Graded after the report froze, so not in its counts (include such runs below the design chart)" : MARK_WORDS[m][mark];
   let detail: string | undefined, words: string | undefined;
   if (m === "lockin" && f.grade?.lockInQuote && (mark === "yes" || mark === "split" || mark === "excluded")) {
     detail = `Day ${dayNo(f.grade.lockInQuote.day)}: ${f.grade.lockInQuote.act}`;

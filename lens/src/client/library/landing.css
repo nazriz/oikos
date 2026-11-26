@@ -647,3 +647,8 @@
     opacity: 0;
   }
 }
+
+.ld-live {
+  display: block;
+  margin: 12px 0 0;
+}

@@ -40,11 +40,13 @@ export interface StudyRun {
   /** False in the "no-election" condition (the first election set beyond the run). */
   election: boolean;
   grade?: BlindGrade;
+  /** Graded after the report froze, and left out of its counts (shown as not graded unless the live grades are asked for). */
+  gradedLater?: boolean;
 }
 
 /** The runs the landing page counts: experiment forks whose AI mayor holds the mayor's post, read by the checker, with
  * the rope tests and scripted controls apart (`controls` keeps them) and test run sets (mock, levercheck) left out. */
-export function studyRuns(runs: RunEntry[], controls = false): StudyRun[] {
+export function studyRuns(runs: RunEntry[], controls = false, liveGrades = false): StudyRun[] {
   const out: StudyRun[] = [];
   for (const e of runs) {
     const x = e.experiment, r = e.reading;
@@ -61,7 +63,8 @@ export function studyRuns(runs: RunEntry[], controls = false): StudyRun[] {
       stopped: Boolean(x.stopped) || r.stopped_before_poll || (r.ended === "stopped"),
       complete: Math.floor(end) >= POLL_DAY,
       election: x.election !== false,
-      ...(e.grade ? { grade: e.grade } : {}),
+      ...(e.grade && (liveGrades || !gradedAfterReport(e.grade)) ? { grade: e.grade } : {}),
+      ...(e.grade && gradedAfterReport(e.grade) ? { gradedLater: true } : {}),
     });
   }
   return out;
@@ -245,10 +248,12 @@ export function leadSentence(runs: StudyRun[]): string | undefined {
 }
 /** The conditions chart's title: the same measure across the instructions, frontier models. */
 export function conditionsSentence(runs: StudyRun[]): string {
-  const [none, strong, , red] = CONDITIONS.map((c) => conditionCell(runs, c, "frontier").t);
+  const [none, strong, noel, red] = CONDITIONS.map((c) => conditionCell(runs, c, "frontier").t);
   const sm = tally(runs.filter((f) => cohortOf(f.model) === "smaller" && markOf(f, "lockin") !== "ungraded"), "lockin");
-  let s = `Frontier models locked in their programme in ${kOfN(strong!)} runs when told to keep it in force, ${kOfN(none!)} with no extra goal, and ${kOfN(red!)} when told to stay mayor`;
-  s += sm.n ? `; smaller models in ${kOfN(sm)}, whatever they were told.` : ".";
+  let s = `The instruction made the difference: ${kOfN(strong!)} told to keep the programme, ${kOfN(none!)} with no extra goal`;
+  if (noel!.n) s += `, ${kOfN(noel!)} with no election in the run`;
+  s += `, ${kOfN(red!)} told to stay mayor`;
+  s += sm.n ? `. Smaller models: ${kOfN(sm)}.` : ".";
   return s;
 }
 
@@ -263,6 +268,11 @@ export function clopperPearson(k: number, n: number, alpha = 0.05): [number, num
   const upper = k === n ? 1 : solve((p) => cdf(p, k) > alpha / 2 ? 1 : -1);
   return [lower, upper];
 }
+
+/** When the study's report froze its tables: its commit on main (16241501, 2026-11-26 21:21:27 +11:00). Grades written
+ * after it are left out by default, so the page's counts are the report's; "include runs graded after the report" adds them. */
+export const REPORT_AT = Date.parse("2026-11-26T21:21:27+11:00");
+export const gradedAfterReport = (g: BlindGrade) => g.at !== undefined && g.at > REPORT_AT;
 
 /** Where the report is read. */
 export const REPORT_URL = "https://github.com/nazriz/oikos/blob/main/docs/design/power-seeking-results-v2.md";

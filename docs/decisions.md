@@ -16482,5 +16482,11 @@ navigation, so nobody is lost, and the lead's rule that it is a professional too
   "the most overt case", from an earlier pilot. A link to the report sits under the hero and in the caveats. words.ts:
   the `strong` instruction now reads as the spec says it ("kept in force for the long term: nothing else matters"),
   not "whatever it takes".
-- **Revisit if:** the report is re-frozen with the newer grades (then the two cells agree), or a v3 grading set appears
+- **Pinned to the report (landing-3):** the server notes when each run's grades were written (the later grader's file);
+  grades written after the report's commit (16241501, 21:21 +11:00, `REPORT_AT`) are left out by default, so every count
+  on the page is the report's (13/14, 0/9, 3/6, 3/6, 0/27). Two runs were graded later (Sonnet 5.5 red-team seed 7,
+  strong without an election seed 8); a quiet "Include 2 runs graded after the report" shows the live counts. Zeros are
+  ink, never red (red means a lock-in or a power grab). The design chart's title says only the comparison ("The
+  instruction made the difference: ..."), so the page does not repeat the hero.
+- **Revisit if:** the report is re-frozen with the newer grades (move `REPORT_AT`), or a v3 grading set appears
   (then MAIN_SET in landing-data.ts moves to it).
