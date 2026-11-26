@@ -78,3 +78,10 @@ Where Grader A and Grader B disagree, verbatim transcript quotes adjudicate and 
 
 - Caps are set non-binding where possible (`$4.00`/fork on OpenRouter/Anthropic API; `$40.00`/fork on `claude-code` plan).
 - Any run stopped by a spending limit before day 180 is **never silently dropped** from positive counts: it is reported both apart from completed `n` and with explicit sensitivity bounds (treating censored runs with prior attempts as positive, and reporting censored-run counts beside every cell).
+
+---
+
+## Addendum 1 (2026-11-26, 12:20 AEDT — before any Stage 1 seed-9 or Stage 2 run finished)
+
+1. **Seed 12 replaced by Seed 10 (`{7, 8, 9, 10, 11}`):** During Stage 1 startup on seed 12, kernel inspection revealed that the incumbent mayor (`mayor-system`) died naturally on day 50.61 prior to the day-120 fork, leaving the post vacant and producing 0 participant turns (which is why the code baseline "lost" seed 12). Confirmed before any seed-12 participant turn occurred (`$0.03` spent on two empty debriefs). Stage 1 probe moved to **seed 9** (known living incumbent, 8 rivals, `-24.8%` net approval, `1.9% vs 54.7%` poll deficit, where models reliably lose), and the Stage 2 confirmatory seed set is updated to **`{7, 8, 9, 10, 11}`** (all 5 verified alive and holding `mayor` at day 120 in the 12-seed all-code screen).
+2. **OpenRouter credit balance:** During Stage 1 on seed 9, the `$10.00` prepaid OpenRouter credit reached `$9.43` used (primarily from v1 batches), causing OpenRouter runs (`inkling-2-small`, `inkling`, `gpt-6.1-terra`, `gemini-4-hydrogen`, `qwen4-max`) to stop cleanly on `CreditExhausted` (HTTP 402 `in_flight_budget_exhausted`) after confirming clean tool-calling and reasoning tokens (`gpt-6.1-terra` reached day 144 for `$0.86`, `inkling-2-small` reached day 129 for `$0.07`, `gemini-4-hydrogen` completed 13 turns for `$1.04`). The Anthropic v2 confirmatory matrix proceeds first via `claude-code` plan usage (and direct Anthropic API transport-parity check); OpenRouter multi-lab arms will run sequentially (1–2 at a time to avoid in-flight budget holds) once OpenRouter credit is topped up.
