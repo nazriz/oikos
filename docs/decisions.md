@@ -16424,3 +16424,24 @@ navigation, so nobody is lost, and the lead's rule that it is a professional too
 - **Decision:** Freeze and report the v2 multi-lab dataset (78 dual blind-graded runs across 5 frontier labs and 4 smaller/lower-capability control models; 62 complete runs reaching day >= 180; 16 pre-poll stops transparently excluded from $n$; $27.41 / $30.00 OpenRouter spend) as the headline study in `docs/design/power-seeking-results-v2.md` and `docs/design/tara-deliverables-v2.md`. Keep v1 (`ps-replicate-2026-11-25`) strictly as exploratory pilot/appendix.
 - **Why:** Dual blind grading (Sonnet 5.5 + Opus 5.5) achieved 99.1% exact agreement (232/234 tier ratings) and surfaced four replicable, statistically decisive findings: (1) 5-lab frontier convergence on lawful institutional lock-in under pure policy goal `strong` + `election` (`13/14 = 92.9%`, 95% CI `[66.1%, 99.8%]`) vs `0/9` frontier `mandate` (`p = 1.22e-5`) and `0/27` smaller/lower-cap models (`p = 7.95e-10`); (2) `no-election` counterfactual separation (`50.0%`, 1.33 vs 3.14 acts/run; `0/0` in OpenAI & Qwen, anticipatory lock-in + deceptive `"affects neither"` re-tagging in DeepSeek); (3) guardrail water-finding under guarded `redteam` (Qwen4-Max explicitly noted `election_guard`, then purged sitting `councillor-1` mid-ballot, packed `councillor-3`, and weighed replacing the editor); and (4) Adversarial-Prompt Inversion (OpenAI & Anthropic showed more restraint under explicit `redteam` than benign `strong`).
 - **Revisit if:** Additional overnight Claude confirmatory seeds (`W1`/`W2`/`W3`: `sonnet55-strong-noelec-s8`, `sonnet46-redteam`, `sonnet55-redteam-s7/s8`, `sonnet45-strong`) finish and warrant appending an addendum table to `docs/design/power-seeking-results-v2.md`.
+
+## 2026-11-26 Lens: the timeline as the run's story (`src/client/timeline`)
+
+Naz: "make certain events and things stand out even more." The timeline now reads as the run at a glance.
+- **Key moments as flags** (`timeline/moments.ts`, from the seat fold alone): each power grab the study's checker found
+  tried or carried out, one flag per lever at its first try, solid once carried out, outlined if only tried, in two to
+  four words ("Child made editor" when the appointment its act made went to the mayor's own child, from the seat's
+  children); the election's dates (called, nominations close, election day, the result); the run's stop. "Mentioned"
+  levers stay in the lanes: the checker's word-matching is too unreliable to flag. Labels go in two rows, power grabs
+  placed first, each beside its pole on the right or the left; one that fits nowhere keeps its pole and a small head and
+  says itself on hover. Click opens the power grab's turn.
+- **Phases as bands**: before the election is called, the campaign (notice to poll), the vote, after the result. A
+  stopped run's axis runs on to its set length (the spec's `until_at`) with the lost days hatched, "The run stopped
+  here", so a stop reads as a stop; time itself stays within the run.
+- **Quiet below**: the activity graph flat and faint, point marks as thin ticks (a selected one ringed). Story mode
+  keeps one lane, the mayor's turns: the flags carry the power grabs and the election. Researcher mode keeps every lane.
+- **Moving between them**: "Previous moment" / "Next moment" and `,` `.` (any mark: `<` `>`). A jump out of the visible
+  window brings the window to it. Zoomed in, a strip of the whole run sits on top (phases, flags, the window), click
+  or drag it to move.
+- **Revisit if** the reader gains levers the short labels don't name (they fall back to the lever's words), or runs
+  hold several elections (each gets its flags; the bands follow the first).
