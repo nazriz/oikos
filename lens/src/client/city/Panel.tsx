@@ -62,11 +62,11 @@ export function Panel({ story, onPresent, onRecord, twin, open0, overlays, setOv
   return (
     <div className={`lc-panel ${open ? "" : "closed"}`} data-tour="city-layers" id="city-layers">
       <div className="lc-panel-head">
-        <button className="lc-ghost" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Hide layers" : "Layers"}</button>
+        <button className="lc-ghost" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Close" : "Layers"}</button>
         {onTour && <button className="lc-ghost" onClick={onTour} title="Play the run's key moments">Tour</button>}
         {open && onPresent && <button className="lc-ghost" onClick={onPresent} title="Full screen, a caption bar, the camera on its own (Esc to leave)">Present</button>}
-        {open && onRecord && <button className="lc-ghost" onClick={onRecord} title="Record the tour as a video (it downloads at the end)">Record</button>}
-        <button className="lc-ghost" onClick={onHome} title="Frame the town"><span className="lc-long">Frame town</span><span className="lc-short">Frame</span></button>
+        {open && onRecord && !story && <button className="lc-ghost" onClick={onRecord} title="Record the tour as a video (it downloads at the end)">Record</button>}
+        <button className="lc-ghost" onClick={onHome} title="Frame the town">Frame</button>
       </div>
       {open && (
         <div className="lc-panel-body">

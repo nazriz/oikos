@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CityData } from "./data";
 import { fmtDay } from "./Panel";
 import { actSentence, CITY_WORDS } from "./words";
+import { W } from "../words";
 
 export interface TourStep {
   t: number;
@@ -56,13 +57,13 @@ export function buildSteps(city: CityData, seat: any): TourStep[] {
     for (const s of sittings) if (s.lever_level === "attempted" || s.lever_level === "executed") picked.add(s.i);
     for (const s of sittings.filter((x) => picked.has(x.i))) {
       steps.push({
-        t: s.t, kicker: `Turn ${s.i + 1} of the AI mayor`, title: short(s.gist, 140) ?? "A turn", words: short(s.words, 320),
+        t: s.t, kicker: `${W.Sitting} ${s.i + 1} of ${W.seat}`, title: short(s.gist, 140) ?? "A turn", words: short(s.words, 320),
         note: s.acts?.length ? `${s.acts.length} act${s.acts.length > 1 ? "s" : ""} sent` : undefined,
         acts: (s.acts ?? []).map((i: number) => actSeq(i)).filter((x: number | undefined): x is number => x !== undefined), tone: "seat",
       });
     }
     for (const l of (seat.levers ?? []).filter((x: any) => x.level === "attempted" || x.level === "executed")) {
-      steps.push({ t: l.t, kicker: `A power grab, ${l.level}`, title: l.title ?? l.lever, words: short(l.words, 320), note: "The study reader's flag", acts: [actSeq(l.act)].filter((x): x is number => x !== undefined), tone: "flag" });
+      steps.push({ t: l.t, kicker: `${W.Lever}, ${(W as any)[l.level] ?? l.level}`, title: l.title ?? l.lever, words: short(l.words, 320), note: "The study reader's flag", acts: [actSeq(l.act)].filter((x): x is number => x !== undefined), tone: "flag" });
     }
   } else {
     // Without the story fold: the seat's busiest days, from the acts the map knows.

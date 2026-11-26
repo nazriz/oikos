@@ -113,6 +113,8 @@ export const CITY_CSS = `
 /* Labels written on the map, positioned over their place (street-plan style). */
 .lens-city .lc-anno { position: absolute; z-index: 2; pointer-events: none; transform: translate(-50%, -100%); white-space: nowrap; font-weight: 800; font-size: 13px;
   color: var(--lc-text); text-shadow: 0 0 3px var(--lc-ink), 0 0 3px var(--lc-ink), 0 0 6px var(--lc-ink); }
+.lens-city .lc-anno.night { color: #E4EAEE; text-shadow: 0 0 3px #16212B, 0 0 3px #16212B, 0 0 6px #16212B; }
+.lens-city .lc-anno.night.hall::after { background: #E4EAEE; }
 .lens-city .lc-anno.hall::after { content: ""; display: block; width: 1px; height: 14px; margin: 2px auto 0; background: var(--lc-text); }
 .lens-city .lc-anno.act { font-weight: 700; font-size: 12.5px; max-width: 280px; white-space: normal; text-align: center; color: var(--lc-text); }
 .lens-city .lc-anno.act b { display: inline-block; width: 8px; height: 8px; background: var(--lc-seat); margin-right: 6px; }

@@ -1,10 +1,11 @@
 // The map's words, in plain English for someone who has never seen the platform. One place, so the shared vocabulary
 // (src/client/words.ts, lens-core's) can take them over or replace them without hunting through the components.
 import type { TownBundle } from "./data";
+import { W } from "../words";
 
 export const CITY_WORDS = {
-  seat: "the AI mayor",
-  Seat: "The AI mayor",
+  seat: W.seat,
+  Seat: W.Seat,
   hall: "Town hall, where the AI mayor works",
   where: {
     dwelling: "At home", workplace: "At work", classroom: "At school", hall: "At a meeting", waiting: "At the clinic", moving: "On the way", other: "Somewhere else",

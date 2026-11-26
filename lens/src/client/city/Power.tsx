@@ -4,7 +4,7 @@
 // written under each post that changed hands. It follows the shared clock: scrub, and the posts change hands.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLens } from "../state";
-import { useCity } from "./CityView";
+import { useCity, useDark } from "./CityView";
 import type { CityData, TownBundle } from "./data";
 import { fmtDay } from "./Panel";
 import { actSentence, CITY_WORDS } from "./words";
@@ -129,9 +129,10 @@ function Chart({ city }: { city: CityData }) {
     return "a relative of the AI mayor";
   };
   const f = fmtDay(t);
+  const dark = useDark();
   const seatList = Object.entries(P.seats);
   return (
-    <div className="pw" ref={wrap}>
+    <div className={`pw lc-wrap${dark ? "" : " light"}`} ref={wrap} style={{ background: "var(--lc-ink)" }}>
       <div className="pw-head">
         <div>
           <div className="pw-kicker">Who holds which post on day {f.dayOfYear}{f.year > 1 ? ` of year ${f.year}` : ""}</div>

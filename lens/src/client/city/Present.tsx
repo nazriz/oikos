@@ -5,6 +5,7 @@
 // browser offers it) of whatever plays, the tour included.
 import type { TownBundle } from "./data";
 import { fmtDay } from "./Panel";
+import { W } from "../words";
 
 export interface Caption { kicker: string; title: string; words?: string; tone: "seat" | "flag" | "election" | "town" }
 
@@ -17,12 +18,12 @@ export function captionAt(t: number, seat: any, town: TownBundle): Caption {
   const f = fmtDay(t);
   const when = `day ${f.dayOfYear} at ${f.clock}`;
   const lever = (seat?.levers ?? []).filter((l: any) => (l.level === "attempted" || l.level === "executed") && l.t <= t && t - l.t < 12 * H).at(-1);
-  if (lever) return { kicker: `A power grab, ${lever.level}, ${when}`, title: lever.title ?? lever.lever, words: short(lever.words, 260), tone: "flag" };
+  if (lever) return { kicker: `${W.Lever}, ${(W as any)[lever.level] ?? lever.level}, ${when}`, title: lever.title ?? lever.lever, words: short(lever.words, 260), tone: "flag" };
   for (const e of town.elections) if (e.result && e.result.t <= t && t - e.result.t < DAY) return { kicker: `The election, ${when}`, title: short(e.result.text, 200) ?? "The result", tone: "election" };
   const sittings: any[] = seat?.sittings ?? [];
   let s: any;
   for (const x of sittings) if (x.t <= t) s = x;
-  if (s && t - s.t < 1.5 * DAY) return { kicker: `Turn ${s.i + 1} of the AI mayor, ${when}`, title: short(s.gist, 160) ?? "The seat sits", words: short(s.words, 260), tone: "seat" };
+  if (s && t - s.t < 1.5 * DAY) return { kicker: `${W.Sitting} ${s.i + 1} of ${W.seat}, ${when}`, title: short(s.gist, 160) ?? "The seat sits", words: short(s.words, 260), tone: "seat" };
   return { kicker: when, title: `${town.name ?? "The town"}, ${f.clock < "06:00" || f.clock >= "21:00" ? "at night" : f.clock < "12:00" ? "in the morning" : f.clock < "18:00" ? "in the afternoon" : "in the evening"}`, tone: "town" };
 }
 

@@ -19,6 +19,7 @@ import { Tour, useSeat, useTourSteps } from "./Tour";
 import { captionAt, download, makeRecorder, PresentBar, PRESENT_CSS, type Caption } from "./Present";
 import { Minimap } from "./Minimap";
 import { actSentence, CITY_WORDS } from "./words";
+import { useMode } from "../mode";
 
 const DAY = 86_400;
 /** A gap between leaving one place and entering the next longer than this is not a walk: they are away. */
@@ -47,7 +48,10 @@ export interface CityViewProps {
   camera?: Partial<{ zoom: number; rotationX: number; rotationOrbit: number; target: [number, number, number] }>;
 }
 
-export function CityView({ runKey, run: runProp, base, camera, card = true, layers = false, tour, overlays, present, story }: CityViewProps) {
+export function CityView({ runKey, run: runProp, base, camera, card = true, layers = false, tour, overlays, present, story: storyProp }: CityViewProps) {
+  // Story mode unless told otherwise: the shell's mode (src/client/mode.ts), or the prop when the host sets it.
+  const modeStory = useMode((s) => s.mode === "story");
+  const story = storyProp ?? modeStory;
   const open = useLens((s) => s.run);
   const key = runKey ?? runProp ?? open;
   const url = base ?? (key ? `/api/run/${encodeURIComponent(key)}` : null);
@@ -965,8 +969,8 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       {!present && selP >= 0 && <button className={`lc-follow ${follow ? "on" : ""}`} onClick={() => setFollow(!follow)}>{follow ? <>Stop following {city.people.people[selP]![1]}</> : <>Follow {city.people.people[selP]![1]}</>}</button>}
       {label && <div className={`lc-pane-label${bare ? " bare" : ""}`}>{label}</div>}
       {!bare && !present && <Clock t={t} sky={sky} town={town} />}
-      {hallAt && !present && <div className="lc-anno hall" data-tour="city-town-hall" id="city-town-hall" style={{ left: hallAt[0], top: hallAt[1] }}>{story ? CITY_WORDS.hall : "Town hall"}</div>}
-      {actNotes.map((n) => { const p = n.at ? onScreen(n.at[0], n.at[1], n.at[2] + 10) : null; return p && <div key={n.seq} className={`lc-anno act ${n.refused ? "refused" : ""}`} style={{ left: p[0], top: p[1], opacity: 1 - n.age * 0.7 }}><b />{n.text}</div>; })}
+      {hallAt && !present && <div className={`lc-anno hall${inkLight ? "" : " night"}`} data-tour="city-town-hall" id="city-town-hall" style={{ left: Math.min(size.w - 130, Math.max(130, hallAt[0])), top: hallAt[1] }}>{story ? CITY_WORDS.hall : "Town hall"}</div>}
+      {actNotes.map((n) => { const p = n.at ? onScreen(n.at[0], n.at[1], n.at[2] + 10) : null; return p && <div key={n.seq} className={`lc-anno act ${n.refused ? "refused" : ""}${inkLight ? "" : " night"}`} style={{ left: Math.min(size.w - 150, Math.max(150, p[0])), top: p[1], opacity: 1 - n.age * 0.7 }}><b />{n.text}</div>; })}
       {hint && !present && !bare && <div className="lc-hint" onMouseEnter={dropHint}>{CITY_WORDS.hint} <button className="lc-ghost" onClick={dropHint}>Got it</button></div>}
       {diff && diff.ended !== undefined && <div className="lc-diff"><b>Difference from the other arm</b><span>An arm ended on day {Math.floor(diff.ended / DAY) + 1}: nothing to compare after it.</span></div>}
       {diff && diff.ended === undefined && <div className="lc-diff"><b>Difference from the other arm</b><span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people elsewhere now</span><span><i className="sw dot" />{diff.onlyHere.length} papers only here (7 d)</span><span><i className="sw ring" />{diff.onlyThere.length} only there</span></div>}
@@ -1028,7 +1032,7 @@ function personXY(c: CityData, B: Built, q: number, t: number): [number, number]
 }
 
 /** Dark unless the shell says light (<html data-theme="light">, or the system prefers light and no theme is set). */
-function useDark(): boolean {
+export function useDark(): boolean {
   const read = () => {
     if (typeof document === "undefined") return true;
     const th = document.documentElement.dataset.theme;
