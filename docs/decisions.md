@@ -16363,3 +16363,4 @@ navigation, so nobody is lost, and the lead's rule that it is a professional too
   what the thing is in words.ts's `KIND_WORDS` ("Building", "Organisation", "Resident"), never the log's "structure". On
   a phone the inspector and the turn reader fill the screen below the run bar (its visible bottom, measured into
   `--run-bar-h`), so the trail and Other mayors stay in reach.
+- The hour comes from the shell's one light clock (src/client/light.ts, lens-smooth's), so the map and the town hold and let go together.

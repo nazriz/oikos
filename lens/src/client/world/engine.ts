@@ -13,6 +13,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { useLens, type Selection } from "../state";
+import { LightClock } from "../light";
 import { tripOf, placeAt, type CityData } from "../city/data";
 import type { WorldBundle } from "../../folds/world";
 import { at as along, drivePoint, h01, hashStr, Plan, type Route } from "./layout";
@@ -923,15 +924,14 @@ export class WorldEngine {
   /** The hour the town is lit by: the clock's, except that while time races (more than a few hours a second) the
    * light holds, and once time slows it takes the true hour at once (as lens-smooth's LightClock: easing a lone jump
    * re-lit the town every frame for a second), so day and night never strobe. */
-  private lightHour(t: number, tWas: number, dt: number): number {
-    const target = (((t % DAY) + DAY) % DAY) / 3600;
-    if (this.shownHour < 0) return (this.shownHour = target);
-    const rate = dt > 0 ? Math.abs(t - tWas) / dt : 0;
-    if (rate > 4 * 3600) return this.shownHour;
-    if (Math.abs(target - this.shownHour) > 0.01) this.dirty = true;
-    return (this.shownHour = target);
+  private lightHour(t: number, _tWas: number, _dt: number): number {
+    // The shell's one light clock (src/client/light.ts), so the map and the town hold and let go together.
+    const h = this.lightClock.update(t, performance.now());
+    // While held, keep looking (drawing) until the light is let go.
+    if (this.lightClock.settling(t)) this.dirty = true;
+    return h;
   }
-  private shownHour = -1;
+  private lightClock = new LightClock();
   private lastT = NaN;
   private lastChange = 0;
   private lastCam = new Array<number>(16).fill(NaN);
