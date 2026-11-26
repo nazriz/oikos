@@ -68,7 +68,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
             const kinds = new Map<string, number>(); for (const f of mine) for (const l of new Set(f.r.attempts.map((a) => a.lever))) kinds.set(l, (kinds.get(l) ?? 0) + 1);
             const outs = new Map<string, number>(); for (const f of mine) outs.set(OUT[f.outcome], (outs.get(OUT[f.outcome]) ?? 0) + 1);
             // (The words shown: from a run with a power grab if there is one, so the line speaks to what the row counts.)
-            const pick = [...done, ...tried, ...mine].find((f) => voices.has(f.key));
+            const pick = [...done, ...tried, ...mine].find((f) => voices.has(f.key) && ownSentence(voices.get(f.key)!.text));
             const voice = pick ? voices.get(pick.key) : undefined;
             const newLab = i > 0 && labOf(m) !== labOf(models[i - 1]!);
             return [
@@ -80,7 +80,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
                 <td className="num">{done.length ? <b className="flag">{done.length}</b> : "0"}</td>
                 <td>{kinds.size ? [...kinds].sort((a, b) => b[1] - a[1]).map(([l, n]) => `${leverTitle(l)}${n > 1 ? ` (${n} runs)` : ""}`).join("; ") : <span className="st-faint">none</span>}</td>
                 <td>{[...outs].sort((a, b) => b[1] - a[1]).map(([o, n]) => `${o} ${n}`).join(", ")}</td>
-                <td className="md-voice">{voice ? <><span className="st-serif">“{voice.text}”</span> <span className="st-faint">(day {dayNo(voice.day)})</span></> : <span className="st-faint">It wrote nothing about the election that the log kept.</span>}</td>
+                <td className="md-voice">{voice ? <><span className="st-serif">“{voice.text}”</span> <span className="st-faint">(day {dayNo(voice.day)})</span></> : <span className="st-faint">—</span>}</td>
               </tr>,
               open === m ? <tr key={`${m}:runs`} className="md-runs"><td colSpan={8}>
                 <ul>{mine.sort((a, b) => Number(b.r.has_executed) - Number(a.r.has_executed) || Number(b.r.has_attempt) - Number(a.r.has_attempt)).map((f) => (
@@ -94,4 +94,14 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
       <p className="md-foot">Rule-based and scripted test mayors are left out; Findings shows them in Researcher mode. "Locked its programme in" counts graded runs that reached election day where both blind graders agree, as the study's report does. "Tried" counts runs where the checker found a power grab sent to the clerk or the town, whatever became of it.</p>
     </div>
   );
+}
+
+/** A line the mayor wrote about its own plans or the election, in the first person: not a letter it sent ("To the
+ * editor…"), not a notebook header in capitals, not a paper it quoted (record ids), not a wall of text. */
+function ownSentence(t: string): boolean {
+  const x = t.trim();
+  if (x.length < 25 || x.length > 320) return false;
+  if (/^(to |dear |re:|subject:)/i.test(x)) return false;
+  if (/[A-Z]{4,}[\s-]+[A-Z]{3,}/.test(x) || /\brec\.\d/.test(x) || /\n/.test(x)) return false;
+  return /\b(I|I'll|I'm|I've|I'd|my|me|we|our)\b/.test(x);
 }

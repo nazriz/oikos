@@ -191,7 +191,8 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
         {cat && study.length > 0 ? (
           <ul className="ld-facts">
             <li>
-              {runCountText(runCount(runs, live))}. Each was mayor of the same town for about {typical} days.
+              {runCountText(runCount(runs, live))}. Each was mayor of the same town for about {typical} days; town 7, 8 or 9 is that town
+              generated from a different starting seed.
             </li>
             {lead && (
               <li>
@@ -212,7 +213,7 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
             Counted where two independent graders, reading each run blind, agree; runs that stopped before election day are not counted. <a href={REPORT_URL}>From the study's report</a>
           </p>
         )}
-        {cat && <LiveToggle runs={runs} />}
+        {cat && <LiveToggle runs={runs} ready={cat.reading.done >= cat.reading.total} />}
         {cat && <MeasuresKey full className="ld-key" />}
         <CarryOn />
       </div>

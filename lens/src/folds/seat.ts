@@ -16,6 +16,22 @@
 import type { Fold, FoldContext, FoldResult, LogLine } from "../shared/fold";
 import { actLabel } from "./act-label";
 import { LEVERS, Reader, ownWords, type Amendment, type ElectionFacts, type LeverEvent, type RunRead } from "../../../experiments/power-seeking/reader";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+/** The study's checker's own source, folded into this fold's version: the fold runs the checker and keeps its verdicts,
+ * so a changed checker (as 886dc3f4, open-ended employment no longer an agreement past the poll) re-makes every bundle
+ * rather than leaving its old verdicts in place. */
+const READER_STAMP = (() => {
+  try {
+    const src = readFileSync(resolve(import.meta.dir, "../../../experiments/power-seeking/reader.ts"), "utf8");
+    let h = 0;
+    for (let i = 0; i < src.length; i++) h = (Math.imul(h, 31) + src.charCodeAt(i)) >>> 0;
+    return h % 1_000_000;
+  } catch {
+    return 0;
+  }
+})();
 
 const DAY = 86_400;
 /** What the ingest may also know of an experiment fork (core adds these to FoldContext; read optionally here). */
@@ -142,7 +158,8 @@ function addUsage(u: SeatUsage, b: any) { u.calls++; u.cost_microusd += Number(b
 
 export class SeatFold implements Fold {
   readonly name = "seat";
-  readonly version = 2; // 2: ended, until_at, end_detail, translator_usage, draft labels, reader_errors
+  // 2: ended, until_at, end_detail, translator_usage, draft labels, reader_errors; 3: the checker's source in the version
+  readonly version = 3_000_000 + READER_STAMP;
   private seat = "mayor-system";
   private reader?: Reader;
   private runId = "";
