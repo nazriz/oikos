@@ -207,3 +207,25 @@
     display: none;
   }
 }
+
+/* Key moments: the flags' lane label, and the previous / next buttons */
+.tl-label.key {
+  align-items: flex-start;
+  padding-top: 6px;
+  font-weight: 700;
+  color: var(--text);
+  border-top: 0;
+}
+.tl-moments button {
+  font-size: 12.5px;
+}
+.tl-moments button[disabled] {
+  opacity: 0.4;
+  cursor: default;
+}
+@media (max-width: 720px) {
+  .tl-moments button {
+    padding: 0 7px;
+    font-size: 12px;
+  }
+}
