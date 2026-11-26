@@ -6,6 +6,10 @@ import type { OrbitViewState } from "@deck.gl/core";
 import { useCity, CityPane } from "./CityView";
 import { DEFAULT_OVERLAYS, type Overlays } from "./Panel";
 import { CITY_CSS } from "./style";
+import { modelName } from "../words";
+
+/** A model id as people say it ("DeepSeek V4.1 Flash"); other names as given. */
+const nice = (n?: string) => (!n ? undefined : /[a-z0-9]-[a-z0-9]/.test(n) && !/\s/.test(n) ? modelName(n) : n);
 
 export function TwoTowns({ a, b, names }: { a: string; b: string; names?: [string, string] }) {
   const A = useCity(`/api/run/${encodeURIComponent(a)}`);
@@ -22,10 +26,10 @@ export function TwoTowns({ a, b, names }: { a: string; b: string; names?: [strin
   return (
     <div className="lc-two">
       <div className="lc-two-pane">
-        <CityPane city={A.city} card={false} layersOpen={false} base={`/api/run/${encodeURIComponent(a)}`} sharedView={shared} sharedOverlays={[overlays, setOverlays]} twin={B.city} label={names?.[0] ?? "A"} />
+        <CityPane city={A.city} card={false} layersOpen={false} base={`/api/run/${encodeURIComponent(a)}`} sharedView={shared} sharedOverlays={[overlays, setOverlays]} twin={B.city} label={nice(names?.[0]) ?? "This town"} />
       </div>
       <div className="lc-two-pane">
-        <CityPane city={B.city} card={false} layersOpen={false} base={`/api/run/${encodeURIComponent(b)}`} sharedView={shared} sharedOverlays={[{ ...overlays, diff: false }, setOverlays]} label={names?.[1] ?? "B"} bare />
+        <CityPane city={B.city} card={false} layersOpen={false} base={`/api/run/${encodeURIComponent(b)}`} sharedView={shared} sharedOverlays={[{ ...overlays, diff: false }, setOverlays]} label={nice(names?.[1]) ?? "The other town"} bare />
       </div>
       <style>{`
         .lc-two { position: relative; width: 100%; height: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: var(--line, #ffffff14); }

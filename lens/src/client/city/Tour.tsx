@@ -4,6 +4,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CityData } from "./data";
 import { fmtDay } from "./Panel";
+import { actSentence, CITY_WORDS } from "./words";
+import { W } from "../words";
 
 export interface TourStep {
   t: number;
@@ -55,13 +57,13 @@ export function buildSteps(city: CityData, seat: any): TourStep[] {
     for (const s of sittings) if (s.lever_level === "attempted" || s.lever_level === "executed") picked.add(s.i);
     for (const s of sittings.filter((x) => picked.has(x.i))) {
       steps.push({
-        t: s.t, kicker: `Sitting ${s.i + 1}`, title: short(s.gist, 140) ?? "A sitting", words: short(s.words, 320),
+        t: s.t, kicker: `${W.Sitting} ${s.i + 1} of ${W.seat}`, title: short(s.gist, 140) ?? "A turn", words: short(s.words, 320),
         note: s.acts?.length ? `${s.acts.length} act${s.acts.length > 1 ? "s" : ""} sent` : undefined,
         acts: (s.acts ?? []).map((i: number) => actSeq(i)).filter((x: number | undefined): x is number => x !== undefined), tone: "seat",
       });
     }
     for (const l of (seat.levers ?? []).filter((x: any) => x.level === "attempted" || x.level === "executed")) {
-      steps.push({ t: l.t, kicker: `Lever · ${l.level}`, title: l.title ?? l.lever, words: short(l.words, 320), note: "The study reader's flag", acts: [actSeq(l.act)].filter((x): x is number => x !== undefined), tone: "flag" });
+      steps.push({ t: l.t, kicker: `${W.Lever}, ${(W as any)[l.level] ?? l.level}`, title: l.title ?? l.lever, words: short(l.words, 320), note: "The study reader's flag", acts: [actSeq(l.act)].filter((x): x is number => x !== undefined), tone: "flag" });
     }
   } else {
     // Without the story fold: the seat's busiest days, from the acts the map knows.
@@ -70,7 +72,7 @@ export function buildSteps(city: CityData, seat: any): TourStep[] {
     const days = [...byDay.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 7);
     for (const [, acts] of days) {
       const a = acts[0]!;
-      steps.push({ t: a.t, kicker: `${acts.length} act${acts.length > 1 ? "s" : ""}`, title: a.blocks.map((b) => b.block + (b.kind ? ` · ${b.kind.replace(/_/g, " ")}` : "")).join(" + "), words: short(a.why ?? a.blocks[0]?.text, 320), acts: acts.map((x) => x.seq), tone: "seat" });
+      steps.push({ t: a.t, kicker: `${acts.length} act${acts.length > 1 ? "s" : ""}`, title: actSentence(town, a), words: short(a.why ?? a.blocks[0]?.text, 320), acts: acts.map((x) => x.seq), tone: "seat" });
     }
   }
   for (const e of town.elections) if (e.result) {
@@ -104,16 +106,16 @@ export function Tour({ steps, at, setAt, onExit, hidden }: { steps: TourStep[]; 
   const f = fmtDay(step.t);
   return (
     <div className={`lc-tour tone-${step.tone ?? "seat"}`} key={at}>
-      <div className="lc-tour-kicker"><span>{step.kicker}</span><span className="lc-dot" /><span>year {f.year}, day {f.dayOfYear} · {f.clock}</span></div>
+      <div className="lc-tour-kicker">{step.kicker}, day {f.dayOfYear} at {f.clock}</div>
       <div className="lc-tour-title">{step.title}</div>
       {step.words && <div className="lc-tour-words">“{step.words}”</div>}
       {step.note && <div className="lc-note">{step.note}</div>}
       <div className="lc-tour-bar">
         <div className="lc-tour-dots">{steps.map((s, i) => <button key={i} className={`${i === at ? "on" : ""} tone-${s.tone ?? "seat"}`} onClick={() => setAt(i)} aria-label={`Step ${i + 1}`} />)}</div>
         <div className="lc-tour-ctl">
-          <button onClick={() => setAt(Math.max(0, at - 1))} aria-label="Previous">‹</button>
-          <button onClick={() => setPaused(!paused)} aria-label={paused ? "Play" : "Pause"}>{paused ? "▶" : "❚❚"}</button>
-          <button onClick={() => setAt(Math.min(steps.length - 1, at + 1))} aria-label="Next">›</button>
+          <button onClick={() => setAt(Math.max(0, at - 1))} aria-label="Previous">Back</button>
+          <button onClick={() => setPaused(!paused)} aria-label={paused ? "Play" : "Pause"}>{paused ? "Play" : "Pause"}</button>
+          <button onClick={() => setAt(Math.min(steps.length - 1, at + 1))} aria-label="Next">Next</button>
           <button onClick={onExit} aria-label="End the tour">End</button>
         </div>
       </div>
