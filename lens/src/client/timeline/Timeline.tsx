@@ -481,7 +481,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
         </div>
         <div className="tl-now">
           <span className="tl-day serif num">Day {dayOf(t)}</span>
-          <span className="tl-clock mono num">{clock(t)}</span>
+          <span className="tl-clock num">{clock(t)}</span>
           <span className="tl-rel muted">
             {inFork !== undefined && inFork >= 0 ? `${spanWords(inFork)} after the AI mayor took office` : ""}
             {spanT[1] > t ? `${inFork !== undefined ? ", " : ""}${spanWords(spanT[1] - t)} to the end` : ", the end"}
@@ -489,7 +489,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
         </div>
         <div className="tl-right">
           {zoomed && (
-            <span className="tl-zoom mono muted">
+            <span className="tl-zoom muted">
               {spanText(v1 - v0)} of {spanText(total)}
             </span>
           )}
@@ -541,7 +541,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
             {hover.hit.track.label}
           </div>
           <b>{hover.hit.mark.label ?? "—"}</b>
-          <div className="mono faint" style={{ marginTop: 2 }}>
+          <div className="faint num" style={{ marginTop: 2 }}>
             day {dayOf(hover.hit.mark.t)} {clock(hover.hit.mark.t)}
             {hover.hit.mark.t2 !== undefined ? `, lasting ${spanText(hover.hit.mark.t2 - hover.hit.mark.t)}` : ""}
           </div>

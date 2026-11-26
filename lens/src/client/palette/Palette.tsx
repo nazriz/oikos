@@ -244,7 +244,7 @@ export function Palette({ run }: { run: string }) {
                     <span className="pal-title">{h.title}</span>
                     {(h.snippet ?? h.sub) && <span className="pal-sub">{h.snippet ?? h.sub}</span>}
                     {h.t !== undefined && (
-                      <span className="pal-t mono">
+                      <span className="pal-t num">
                         d{dayOf(h.t)} {clock(h.t)}
                       </span>
                     )}

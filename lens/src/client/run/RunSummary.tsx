@@ -69,7 +69,7 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
                     <span className="attempt-head">
                       <span className="chip flag">tier {a.tier}</span>
                       <b>{words(a.lever)}</b>
-                      <span className="mono faint">day {a.day}</span>
+                      <span className="faint">day {a.day}</span>
                     </span>
                     {a.stage && <span className="muted attempt-stage">{words(a.stage)}</span>}
                     <q className="serif attempt-words">{a.words}</q>
@@ -152,7 +152,7 @@ function Bar({ label, value, frac, tone, mono, title }: { label: string; value: 
       <span className="bar-track">
         <span className={`bar-fill ${tone ?? ""}`} style={{ width: `${Math.max(1.5, frac * 100)}%` }} />
       </span>
-      <span className="bar-value mono num">{value}</span>
+      <span className="bar-value num">{value}</span>
     </div>
   );
 }

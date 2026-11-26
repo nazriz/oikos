@@ -553,7 +553,12 @@
     flex-basis: 100%;
   }
   .run-actions {
+    flex: 1 1 100%;
     flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .run-actions .help-btn {
+    padding: 0 6px;
   }
   .run-actions .run-copy,
   .run-actions .run-search .label {

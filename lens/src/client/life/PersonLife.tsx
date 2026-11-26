@@ -327,7 +327,7 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
                 if (r.it?.seat && r.it.seq !== undefined) s.select({ kind: "act", seq: r.it.seq });
               }}
             >
-              <span className="life-when mono">
+              <span className="life-when num">
                 day {dayOf(r.t)} <span className="faint">{clock(r.t)}</span>
               </span>
               <span className="life-what">
