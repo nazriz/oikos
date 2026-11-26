@@ -32,6 +32,10 @@ function App() {
     const Digest = views.digest;
     return <Digest run={route.key} />;
   }
+  if (route.page === "power" && views.power) {
+    const Power = views.power;
+    return <Power run={route.key} />;
+  }
   if (route.page === "findings" && views.findings) {
     const Findings = views.findings;
     return <Findings />;

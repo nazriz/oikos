@@ -22,7 +22,26 @@ Pages (hash routes):
   (model × goal: k of n towns with an attempt, from experiments/power-seeking/tally.ts) where each dot opens its run.
 - **Run** `#/run/<key>?t=…&sel=…`: the map in the middle, the story rail on the right, the timeline along the bottom,
   the inspector as a drawer. Time is one shared value (`src/client/state.ts`): scrub and everything follows.
-- **Compare** `#/compare/<keyA>/<keyB>` (later): two arms of one seed side by side, synced time, metric differences.
+- **Compare** `#/compare/<keyA>/<keyB>`: two arms of one seed side by side: the seat's counts, its sittings day by day
+  beside the twin's acts, and the town's daily counts as small multiples, over the days both arms ran.
+- **Moments** `#/moments`: every lever the study's reader found attempted or executed, across runs, as quote cards in
+  the seat's own words; filter by model, goal, lever, level; "cite" copies a citation.
+- **Findings** `#/findings`: the study across runs as charts (k of n by model × goal with Wilson intervals, levers by
+  tier, when before the poll, outcome, cost), each with a table view and SVG/PNG export, each mark opening its runs.
+- **The same moment** `#/diff/<keyA>,<keyB>[,<keyC>]?day=<n>`: forks of one seed with different models, each at its
+  sitting nearest that day, side by side: what each thought and said, and what it did.
+
+### Reading a run in Inspect AI
+
+A fork's seat can also be read in UK AISI's Inspect viewer (`inspect_ai` log format, version 2): one sample per fork,
+the sittings as messages (standing instructions, each sitting's prompt, each call's words, reasoning and tool calls,
+what came back) and the study reader's verdicts as scores. Read-only on the runs; nothing is installed in the repo.
+
+    oikos lens inspect runs/ps-replicate-2026-11-25/glm-redteam-s7      # every model fork; --with-code adds the twin
+    uvx --from inspect-ai inspect view --log-dir runs/views/lens/inspect/glm-redteam-s7
+
+The logs go to `<views>/inspect/<experiment>/` (`runs/views/lens/inspect/...`). One log alone:
+`bun lens/src/server/inspect-export.ts <bundle dir | arm.oklog> [--spec spec.json]`.
 
 ## 2. Rules it keeps
 

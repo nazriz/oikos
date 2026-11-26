@@ -5,6 +5,7 @@ import type { CityData, TownBundle } from "./data";
 import { personRows, tripOf } from "./data";
 import { PAL, WHERE_LABEL } from "./scene";
 import type { Sky } from "./sky";
+import { PAPER_GROUPS, paperGroup, structureStory, type ElectionView } from "./civic";
 
 export interface Overlays {
   people: boolean;
@@ -13,8 +14,17 @@ export interface Overlays {
   networks: boolean;
   labels: boolean;
   colour: "kind" | "disrepair";
+  election: boolean;
+  papers: boolean;
+  /** Paper groups shown (indices into PAPER_GROUPS). */
+  paperGroups: number[];
+  /** Days back from now that papers are shown (0: everything so far). */
+  paperDays: number;
+  paperMode: "pins" | "heat";
+  /** Two towns: show where this arm differs from the other. */
+  diff: boolean;
 }
-export const DEFAULT_OVERLAYS: Overlays = { people: true, acts: true, wildlife: false, networks: false, labels: true, colour: "kind" };
+export const DEFAULT_OVERLAYS: Overlays = { people: true, acts: true, wildlife: false, networks: false, labels: true, colour: "kind", election: false, papers: false, paperGroups: PAPER_GROUPS.map((_, i) => i).filter((i) => !["money", "building"].includes(PAPER_GROUPS[i]!.id)), paperDays: 7, paperMode: "pins", diff: true };
 
 export interface HoverInfo { x: number; y: number; layer: string; object: any; index: number }
 
@@ -42,8 +52,9 @@ export function Clock({ t, sky, town }: { t: number; sky: Sky; town: TownBundle 
 
 const CAT_ORDER = ["residential", "commercial", "industrial", "civic", "education", "health", "utility", "green"];
 
-export function Panel({ open0, overlays, setOverlays, counts, kinds, city, t, arcs, onHome }: {
-  open0: boolean; overlays: Overlays; setOverlays: (o: Overlays) => void; counts: Record<string, number>; kinds: string[]; city: CityData; t: number; arcs: number; onHome: () => void;
+export function Panel({ onPresent, onRecord, twin, open0, overlays, setOverlays, counts, kinds, city, t, arcs, onHome, ev, candCol, papersShown, onTour }: {
+  onPresent?: () => void; onRecord?: () => void; twin?: boolean; open0: boolean; overlays: Overlays; setOverlays: (o: Overlays) => void; counts: Record<string, number>; kinds: string[]; city: CityData; t: number; arcs: number; onHome: () => void;
+  ev?: ElectionView; candCol: Record<string, string>; papersShown: number[]; onTour?: () => void;
 }) {
   const [open, setOpen] = useState(() => open0 && (typeof window === "undefined" || window.innerWidth > 640));
   const tog = (k: keyof Overlays) => setOverlays({ ...overlays, [k]: !overlays[k] });
@@ -56,7 +67,10 @@ export function Panel({ open0, overlays, setOverlays, counts, kinds, city, t, ar
     <div className={`lc-panel ${open ? "" : "closed"}`}>
       <div className="lc-panel-head">
         <button className="lc-ghost" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Layers" : "Layers"}<span className="lc-chev">{open ? "▾" : "▸"}</span></button>
-        <button className="lc-ghost" onClick={onHome} title="Frame the town">Frame town</button>
+        {onTour && <button className="lc-ghost" onClick={onTour} title="Play the run's key moments">Tour</button>}
+        {open && onPresent && <button className="lc-ghost" onClick={onPresent} title="Full screen, a caption bar, the camera on its own (Esc to leave)">Present</button>}
+        {open && onRecord && <button className="lc-ghost" onClick={onRecord} title="Record the tour as a video (it downloads at the end)">Record</button>}
+        <button className="lc-ghost" onClick={onHome} title="Frame the town"><span className="lc-long">Frame town</span><span className="lc-short">Frame</span></button>
       </div>
       {open && (
         <div className="lc-panel-body">
@@ -69,12 +83,14 @@ export function Panel({ open0, overlays, setOverlays, counts, kinds, city, t, ar
               {gone > 0 && <div className="lc-row muted"><span className="lc-sw" /><span>Left or died</span><span className="lc-num">{n0(gone)}</span></div>}
             </div>
           </Section>
-          <Section on={overlays.acts} toggle={() => tog("acts")} title="The seat's acts" note="Arcs from the town hall to what each act reached, over the last 7 days; the arc fades with age. Rose: refused.">
+          {city.town.seats.length > 0 && (
+            <Section on={overlays.acts} toggle={() => tog("acts")} title="The seat's acts" note="Arcs from the town hall to what each act reached, over the last 7 days; the arc fades with age. Rose: refused.">
             <div className="lc-legend">
               <div className="lc-row"><span className="lc-sw line" style={{ background: `linear-gradient(90deg, ${PAL.seat}, #ffe2a6)` }} /><span>Acts in the last 7 days</span><span className="lc-num">{recentActs}</span></div>
               <div className="lc-row muted"><span className="lc-sw" /><span>Places reached</span><span className="lc-num">{arcs}</span></div>
             </div>
           </Section>
+          )}
           <div className="lc-section">
             <div className="lc-sec-head"><span className="lc-sec-title">Buildings</span>
               <div className="lc-seg">
@@ -93,6 +109,33 @@ export function Panel({ open0, overlays, setOverlays, counts, kinds, city, t, ar
               </div>
             )}
           </div>
+          {twin && <Section on={overlays.diff} toggle={() => tog("diff")} title="Difference from the other arm" note="Violet arcs: a person is somewhere else in the other arm right now (from there to here). Filled marks: papers of the last 7 days only in this arm; rings: only in the other (matched by kind, place and day)."><div /></Section>}
+          {city.town.elections.length > 0 && (
+            <Section on={overlays.election} toggle={() => tog("election")} title="The election" note={ev ? electionNote(ev) : "No election in this run."}>
+              {ev && <ElectionLegend ev={ev} col={candCol} />}
+            </Section>
+          )}
+          <Section on={overlays.papers} toggle={() => tog("papers")} title="Papers" note="Each paper at the address it concerns (a person's: their home at the time). Raw counts, nothing judged.">
+            <div className="lc-sec-head" style={{ marginTop: 8 }}>
+              <div className="lc-seg">
+                {[[1, "1 d"], [7, "7 d"], [30, "30 d"], [0, "all"]].map(([d, l]) => <button key={d} className={overlays.paperDays === d ? "on" : ""} onClick={() => setOverlays({ ...overlays, paperDays: d as number })}>{l}</button>)}
+              </div>
+              <div className="lc-seg">
+                <button className={overlays.paperMode === "pins" ? "on" : ""} onClick={() => setOverlays({ ...overlays, paperMode: "pins" })}>Pins</button>
+                <button className={overlays.paperMode === "heat" ? "on" : ""} onClick={() => setOverlays({ ...overlays, paperMode: "heat" })}>Heat</button>
+              </div>
+            </div>
+            <div className="lc-legend">
+              {PAPER_GROUPS.map((g, i) => {
+                const on = overlays.paperGroups.includes(i);
+                return (
+                  <button key={g.id} className={`lc-row lc-rowbtn ${on ? "" : "off"}`} onClick={() => setOverlays({ ...overlays, paperGroups: on ? overlays.paperGroups.filter((x) => x !== i) : [...overlays.paperGroups, i] })}>
+                    <span className="lc-sw dot" style={{ background: on ? g.colour : "transparent", border: `1px solid ${g.colour}` }} /><span>{g.label}</span><span className="lc-num">{n0(papersShown[i] ?? 0)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Section>
           <Section on={overlays.wildlife} toggle={() => tog("wildlife")} title="Wildlife" note="Where each species was at the start; counts from the latest nature census.">
             <div className="lc-legend">
               {city.town.wildlife.species.map((s, i) => (
@@ -164,6 +207,7 @@ export function StructureBody({ c, i, t, name, full }: { c: CityData; i: number;
           {who.length > (full ? 40 : 8) && <span className="lc-chip muted">+{who.length - (full ? 40 : 8)}</span>}
         </div>
       )}
+      {full && <StructureStoryBody c={c} i={i} t={t} name={name} />}
     </>
   );
 }
@@ -223,6 +267,10 @@ export function Tooltip({ tip, city, t, name }: { tip: HoverInfo; city: CityData
   if (tip.layer === "buildings" || tip.layer === "parks" || tip.layer === "roofs" || tip.layer === "hips") body = <StructureBody c={city} i={typeof tip.object === "number" ? tip.object : tip.object.i} t={t} name={name} />;
   else if (tip.layer === "people") body = <PersonBody c={city} q={tip.index} t={t} name={name} />;
   else if (tip.layer === "acts" || tip.layer === "act-hits") body = <ActBody a={tip.object.act} target={tip.object.target} t={t} />;
+  else if (tip.layer === "papers") body = <PaperBody p={tip.object.p} />;
+  else if (tip.layer === "pies") body = <><div className="lc-tip-title">{name(tip.object.s)}</div><div className="lc-tip-sub">{tip.object.poll ? "opinion-poll answers from here" : "votes cast from here"}: {tip.object.total} · candidate {tip.object.n}: {tip.object.count}</div></>;
+  else if (tip.layer === "votes") body = <><div className="lc-tip-title">{tip.object.person}</div><div className="lc-tip-sub">voted · first preference: candidate {tip.object.n}</div></>;
+  else if (tip.layer === "cand-homes") body = <><div className="lc-tip-title">{tip.object.name}</div><div className="lc-tip-sub">candidate {tip.object.number}{tip.object.seat ? " · the seat's candidacy" : ""} · home</div></>;
   else if (tip.layer === "networks") body = <><div className="lc-tip-title">{tip.object.id}</div><div className="lc-tip-sub">{tip.object.mode}{tip.object.capacity ? ` · capacity ${n0(tip.object.capacity)}` : ""}</div></>;
   else if (tip.layer === "wildlife") {
     const c = city.town.wildlife.cells, i = tip.index;
@@ -258,6 +306,92 @@ export function Card({ city, t, selection, name, onClose }: { city: CityData; t:
     <div className="lc-card">
       <button className="lc-x" onClick={onClose} aria-label="Clear selection">×</button>
       {body}
+    </div>
+  );
+}
+
+function electionNote(ev: ElectionView): string {
+  const e = ev.e;
+  const poll = e.notice?.poll_at ? ` Poll day ${fmtDay(e.notice.poll_at).day}.` : "";
+  if (ev.phase === "before") return `Not yet called.${poll}`;
+  if (ev.phase === "campaign") return `The campaign: candidates' homes ringed; a pie on each home of its opinion-poll answers by first choice; petition signatures as violet dots.${poll}`;
+  return "A pie on each home: the votes cast from it, by first preference, sized by how many. Blocks are shaded only where turnout differs from the town's by 3 points or more (blue above, orange below; 8+ electors). The researcher's view: the ballot is secret in the world.";
+}
+
+function ElectionLegend({ ev, col }: { ev: ElectionView; col: Record<string, string> }) {
+  const r = ev.e.result;
+  const round = r?.rounds?.[r.rounds.length - 1];
+  return (
+    <div className="lc-legend">
+      {ev.e.candidates.map((c) => (
+        <div key={c.number} className="lc-row"><span className="lc-sw dot" style={{ background: col[c.number] }} /><span>{c.number}. {c.name}{ev.homes.find((h) => h.number === c.number)?.seat ? " (the seat)" : ""}</span>
+          <span className="lc-num">{ev.phase === "campaign" || ev.phase === "before" ? `${ev.polls.filter((p) => p.n === c.number).length} in polls` : `${ev.first[c.number] ?? 0} first`}</span></div>
+      ))}
+      <div className="lc-row muted"><span className="lc-sw" /><span>Votes cast / on the roll</span><span className="lc-num">{n0(ev.cast)} / {n0(ev.roll)}</span></div>
+      {ev.phase === "declared" && r && (
+        <div className="lc-row"><span className="lc-sw" /><span>Declared: {ev.e.candidates.find((c) => c.participant === r.winner)?.name ?? r.winner}</span><span className="lc-num">{r.turnout_bps !== undefined ? `${(r.turnout_bps / 100).toFixed(1)}%` : ""}</span></div>
+      )}
+      {ev.phase === "declared" && round && <div className="lc-note">Count{r!.rounds!.length > 1 ? ` (round ${r!.rounds!.length})` : ""}: {Object.entries(round).map(([k, v]) => `${ev.e.candidates.find((c) => c.participant === k)?.name ?? k} ${v}`).join(", ")}</div>}
+    </div>
+  );
+}
+
+export function PaperBody({ p }: { p: CityData["town"]["papers"][number] }) {
+  const g = PAPER_GROUPS[paperGroup(p.kind)]!;
+  const f = fmtDay(p.t);
+  return (
+    <>
+      <div className="lc-tip-title"><span style={{ color: g.colour }}>●</span> {p.kind.replace(/_/g, " ")}</div>
+      <div className="lc-tip-sub">{g.label} · year {f.year}, day {f.dayOfYear}, {f.clock}{p.by ? ` · from ${p.by}` : ""}<span className="lc-mono">{p.id}</span></div>
+      <div className="lc-quote">{p.text}</div>
+    </>
+  );
+}
+
+/** A building's whole story: who lived and worked there, papers about it, work done there. */
+export function StructureStoryBody({ c, i, t, name }: { c: CityData; i: number; t: number; name: (i: number) => string }) {
+  const st = structureStory(c, i);
+  const s = c.town.structures[i]!;
+  const days = (sec: number) => sec / DAY;
+  const lists = Object.entries(st.stays).sort((a, b) => b[1].size - a[1].size);
+  const work = c.town.work[i];
+  return (
+    <div className="lc-story">
+      {lists.map(([kind, m]) => {
+        const rows = [...m.entries()].sort((a, b) => b[1][0] - a[1][0]);
+        return (
+          <div key={kind}>
+            <div className="lc-sec-title" style={{ marginTop: 10 }}>{kind === "dwelling" ? "Lived here" : kind === "workplace" ? "Worked here" : `In its ${kind}s`} <span className="lc-num">{rows.length} people</span></div>
+            <div className="lc-today">
+              {rows.slice(0, kind === "dwelling" ? 12 : 8).map(([q, [tot, a, b]]) => (
+                <div key={q} className="lc-row"><span className="lc-sw dot" style={{ background: PAL.where[kind] ?? PAL.where.other }} /><span>{c.people.people[q]![1]}</span><span className="lc-num">day {fmtDay(a).day}–{fmtDay(b).day} · {days(tot) >= 1 ? `${days(tot).toFixed(0)} d` : `${(tot / 3600).toFixed(0)} h`}</span></div>
+              ))}
+              {rows.length > (kind === "dwelling" ? 12 : 8) && <div className="lc-note">and {rows.length - (kind === "dwelling" ? 12 : 8)} more</div>}
+            </div>
+          </div>
+        );
+      })}
+      {st.papers.length > 0 && (
+        <div>
+          <div className="lc-sec-title" style={{ marginTop: 10 }}>Papers about it <span className="lc-num">{st.papers.length}</span></div>
+          <div className="lc-today">
+            {st.papers.slice(-10).reverse().map((p) => (
+              <div key={p.id} className="lc-row" title={p.text}><span className="lc-sw dot" style={{ background: PAPER_GROUPS[paperGroup(p.kind)]!.colour, opacity: p.t <= t ? 1 : 0.35 }} /><span>{p.kind.replace(/_/g, " ")}</span><span className="lc-num">day {fmtDay(p.t).day}</span></div>
+            ))}
+          </div>
+        </div>
+      )}
+      {work && (
+        <div>
+          <div className="lc-sec-title" style={{ marginTop: 10 }}>Work done here</div>
+          <div className="lc-today">
+            {Object.entries(work).sort((a, b) => b[1][0] - a[1][0]).slice(0, 6).map(([task, [n, last]]) => (
+              <div key={task} className="lc-row"><span className="lc-sw" /><span>{task.replace(/_/g, " ")}</span><span className="lc-num">{n0(n)}× · last day {fmtDay(last).day}</span></div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="lc-note">Disrepair: {s.vars?.disrepair !== undefined ? `${n0(s.vars.disrepair)} at the start; the log carries no later reading of it.` : "not recorded for this kind."}</div>
     </div>
   );
 }
