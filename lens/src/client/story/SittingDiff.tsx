@@ -12,6 +12,7 @@ import { PageAnswer } from "../shell/Shell";
 import { goalText, modelName } from "../words";
 import "./story.css";
 import "./diff.css";
+import { dayNo, dayOf } from "../format";
 
 const DAY = 86_400;
 const modelOf = (s: SeatJson) => (s.model ? modelName(s.model) : "the rule-based mayor");
@@ -47,18 +48,18 @@ function Diff({ keys, seats, initial }: { keys: string[]; seats: SeatJson[]; ini
         <div>
           <PageAnswer page="diff" />
           <h1 className="df-title">Day {day}, {seats.length} AI mayors side by side</h1>
-          <p className="st-sub">{seeds.size === 1 ? `The same town (seed ${[...seeds][0]}) in every column.` : "These runs are not the same town."}{poll !== undefined ? ` Election day was due on day ${Math.floor(poll / DAY)}, ${Math.floor(poll / DAY) - day} days later.` : ""}</p>
+          <p className="st-sub">{seeds.size === 1 ? `The same town (seed ${[...seeds][0]}) in every column.` : "These runs are not the same town."}{poll !== undefined ? ` Election day was due on day ${dayOf(poll)}, ${Math.floor(poll / DAY) - day} days later.` : ""}</p>
         </div>
         <span style={{ flex: 1 }} />
         <div className="st-search"><span className="st-faint">⌕</span><input placeholder="Mark in every column" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
         <button className="st-btn" disabled={at <= 0} onClick={() => setDay(days[at - 1]!)}>Earlier day</button>
-        <select className="df-day" value={day} onChange={(e) => setDay(Number(e.target.value))}>{days.map((d) => <option key={d} value={d}>day {d}</option>)}</select>
+        <select className="df-day" value={day} onChange={(e) => setDay(Number(e.target.value))}>{days.map((d) => <option key={d} value={d}>day {dayNo(d)}</option>)}</select>
         <button className="st-btn" disabled={at < 0 || at >= days.length - 1} onClick={() => setDay(days[at + 1]!)}>Later day</button>
       </div>
       <div className="df-days">{days.map((d) => {
         const who = seats.filter((s) => s.sittings.some((x) => x.day === d && x.kind === "model")).length;
         const lev = seats.some((s) => s.sittings.some((x) => x.day === d && x.lever_level && x.lever_level !== "considered"));
-        return <button key={d} className={`df-tick ${d === day ? "on" : ""} ${lev ? "lev" : ""}`} style={{ opacity: 0.35 + (0.65 * who) / seats.length }} title={`day ${d}: ${who} of ${seats.length} seats sat${lev ? "; a lever" : ""}`} onClick={() => setDay(d)} />;
+        return <button key={d} className={`df-tick ${d === day ? "on" : ""} ${lev ? "lev" : ""}`} style={{ opacity: 0.35 + (0.65 * who) / seats.length }} title={`day ${dayNo(d)}: ${who} of ${seats.length} seats sat${lev ? "; a lever" : ""}`} onClick={() => setDay(d)} />;
       })}</div>
       <MarksContext.Provider value={marks}>
         <div className="df-cols" style={{ gridTemplateColumns: `repeat(${seats.length}, minmax(320px, 1fr))` }}>

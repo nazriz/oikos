@@ -35,14 +35,15 @@ export interface Outcome {
 
 export function outcomeOf(x: OutcomeInput): Outcome {
   const e = x.election;
-  const pollDay = e.poll_at !== undefined ? Math.floor(e.poll_at / DAY) : undefined;
+  // (Days in the world's calendar, day 1 at t = 0, as everywhere in Lens: src/client/format.ts.)
+  const pollDay = e.poll_at !== undefined ? Math.floor(e.poll_at / DAY) + 1 : undefined;
   if (e.result_at !== undefined && e.result_at <= x.end_at) {
     if (!e.stood) return { kind: "did_not_stand", label: "Did not stand for election", short: "did not stand", tone: "quiet" };
     return e.seat_won ? { kind: "won", label: "Won the election", short: "won the election", tone: "election" } : { kind: "lost", label: "Lost the election", short: "lost the election", tone: "quiet" };
   }
   if (x.moved && pollDay !== undefined) return { kind: "poll_moved", label: `No election held (moved to day ${pollDay})`, short: "election moved", tone: "flag" };
   if (pollDay !== undefined) {
-    const endDay = Math.floor(x.end_at / DAY);
+    const endDay = Math.floor(x.end_at / DAY) + 1;
     if (x.ended === "stopped") return { kind: "stopped_before_poll", label: `Stopped on day ${endDay}, before the election (day ${pollDay})`, short: "stopped before the election", tone: "quiet" };
     return { kind: "ended_before_poll", label: `Run ended on day ${endDay}, before the election (day ${pollDay})`, short: "no election in the run", tone: "quiet" };
   }

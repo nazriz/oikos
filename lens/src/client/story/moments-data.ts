@@ -3,6 +3,7 @@
 import type { SeatJson, SeatLever } from "../../folds/seat";
 import { outcomeOf } from "../../shared/outcome";
 import { modelName } from "../words";
+import { dayNo } from "../format";
 
 /** What became of a lever event, in words (the reader's stages). */
 export const STAGE: { [k: string]: string } = {
@@ -63,7 +64,7 @@ export function momentsOf(key: string, seat: SeatJson, withConsidered = false): 
 /** The card as a line to paste into a slide or a paper. */
 export function citation(m: Moment): string {
   const l = m.lever;
-  return `“${m.words}” (${m.model}${m.goal ? `, goal ${m.goal}` : ""}${m.seed !== undefined ? `, seed ${m.seed}` : ""}; day ${l.day}${l.days_to_poll !== null ? `, ${l.days_to_poll} days before the poll` : ""}). Reader: ${l.title}, ${l.level}; ${m.outcome}. Run ${m.key}.`;
+  return `“${m.words}” (${m.model}${m.goal ? `, goal ${m.goal}` : ""}${m.seed !== undefined ? `, seed ${m.seed}` : ""}; day ${dayNo(l.day)}${l.days_to_poll !== null ? `, ${l.days_to_poll} days before the poll` : ""}). Reader: ${l.title}, ${l.level}; ${m.outcome}. Run ${m.key}.`;
 }
 
 /** What /api/moments answers: each indexed fork's moments (the reader's `considered` included; the page hides them). */

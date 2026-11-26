@@ -11,6 +11,7 @@ import { loadSeat, useAsync, when, human, seatOutcome, STAGE, type SeatJson, typ
 import { firstPoll } from "./moments-data";
 import "./story.css";
 import "./evidence.css";
+import { dayNo, dayOf } from "../format";
 
 const DAY = 86_400;
 
@@ -149,11 +150,11 @@ function outcomeChain(seat: SeatJson): { title: string; steps: Step[]; note?: st
   steps.push({ label: "The AI mayor's nomination", text: nom ? <>It stood, filing on {when(nom.t)}.</> : <>It did not file a nomination.</>, ...(nom ? { raw: nom.id } : {}) });
   for (const a of seat.amendments) {
     const act = seat.acts.find((x) => x.records.some((r) => r.id === a.proposal));
-    steps.push({ label: "The election law was changed", text: <>The mayor proposed on day {a.day} {Object.entries(a.figures).map(([k, v]) => `${human(k).replace(/\bpoll\b/, "election")} ${typeof v === "number" && v >= DAY ? `${Math.round(v / DAY)} days` : v}`).join(", ")}; {a.outcome === "applied" ? "the council passed it and the election office moved the election" : human(a.outcome)}.</>, ...(act?.sitting !== null && act?.sitting !== undefined ? { sitting: act.sitting, t: act.t } : {}), raw: [a.proposal, a.ballot, a.law, a.notice].filter(Boolean).join(", ") });
+    steps.push({ label: "The election law was changed", text: <>The mayor proposed on day {dayNo(a.day)} {Object.entries(a.figures).map(([k, v]) => `${human(k).replace(/\bpoll\b/, "election")} ${typeof v === "number" && v >= DAY ? `${Math.round(v / DAY)} days` : v}`).join(", ")}; {a.outcome === "applied" ? "the council passed it and the election office moved the election" : human(a.outcome)}.</>, ...(act?.sitting !== null && act?.sitting !== undefined ? { sitting: act.sitting, t: act.t } : {}), raw: [a.proposal, a.ballot, a.law, a.notice].filter(Boolean).join(", ") });
   }
   const result = seat.records.find((r) => r.kind === "ballot_result" && r.data?.office === "mayor");
   if (result) steps.push({ label: "The result", text: <><span className="st-serif">{q(result.text, 240)}</span> ({when(result.t)}).</>, raw: `${result.id}\n${JSON.stringify(result.data?.rounds ?? {})}` });
-  else steps.push({ label: "The result", text: <>No result is in the log: {e.poll_at !== undefined && e.poll_at > seat.end_at ? `the election ${first !== e.poll_at ? `had been moved to day ${Math.floor(e.poll_at / DAY)}` : `was due on day ${Math.floor(e.poll_at / DAY)}`}, after the run ended on day ${Math.floor(seat.end_at / DAY)}` : "the run ended first"}.</> });
+  else steps.push({ label: "The result", text: <>No result is in the log: {e.poll_at !== undefined && e.poll_at > seat.end_at ? `the election ${first !== e.poll_at ? `had been moved to day ${dayOf(e.poll_at)}` : `was due on day ${dayOf(e.poll_at)}`}, after the run ended on day ${dayOf(seat.end_at)}` : "the run ended first"}.</> });
   if (e.seated_at !== undefined) steps.push({ label: "Who took office", text: <>{e.seated === seat.seat ? "The AI mayor" : e.seated}, on {when(e.seated_at)}.</> });
   return { title: "How the election went", steps, note: "Every step is a paper filed in the town; Lens reads them from the run's log." };
 }

@@ -12,6 +12,7 @@ import { Search } from "../icons";
 import { useLens, type Selection } from "../state";
 import { useDescribe } from "../people";
 import "./palette.css";
+import { dayNo } from "../format";
 
 type Group = "People" | "Households" | "Buildings" | "Organisations" | "Posts" | "Turns" | "Records" | "Transcripts";
 const ORDER: Group[] = ["People", "Households", "Posts", "Organisations", "Buildings", "Turns", "Records", "Transcripts"];
@@ -81,7 +82,7 @@ function useIndex(run: string, open: boolean) {
       push(l.records.map(([id, kind, t, author, text]) => ({ group: "Records", title: `${words(kind)} ${id}`, sub: text, name: lc(id), hay: lc(`${id} ${kind} ${author} ${text}`), t })));
     }, () => {});
     fetchFold<SeatJson>(run, "seat").then(async (seat) => {
-      push(seat.sittings.map((s) => ({ group: "Turns", title: `Day ${s.day}: ${s.gist}`, sub: s.words, name: lc(`day ${s.day}`), hay: lc(`day ${s.day} ${s.gist} ${s.words ?? ""} ${s.woke_for ?? ""}`), t: s.t, sel: { kind: "sitting", index: s.i } })));
+      push(seat.sittings.map((s) => ({ group: "Turns", title: `Day ${dayNo(s.day)}: ${s.gist}`, sub: s.words, name: lc(`day ${dayNo(s.day)}`), hay: lc(`day ${dayNo(s.day)} ${s.gist} ${s.words ?? ""} ${s.woke_for ?? ""}`), t: s.t, sel: { kind: "sitting", index: s.i } })));
       // The transcripts: fetched a few at a time, each sitting's words joined into one searchable text.
       const todo = seat.sittings.filter((s) => s.kind === "model");
       setTranscripts({ done: 0, total: todo.length, items: [] });
@@ -98,7 +99,7 @@ function useIndex(run: string, open: boolean) {
               if (turn.purpose === "participant") strings(turn.input, ws);
             }
             const text = ws.join("\n");
-            got.push({ group: "Transcripts", title: `Day ${s.day}, turn ${s.i + 1}`, name: "", hay: lc(text), t: s.t, sel: { kind: "sitting", index: s.i }, sub: text });
+            got.push({ group: "Transcripts", title: `Day ${dayNo(s.day)}, turn ${s.i + 1}`, name: "", hay: lc(text), t: s.t, sel: { kind: "sitting", index: s.i }, sub: text });
           } catch {}
           if (live) setTranscripts({ done: got.length, total: todo.length, items: [...got] });
         }

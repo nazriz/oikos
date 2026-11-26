@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { IndexStatus, Meta, RunEntry } from "../../shared/api";
 import { fetchFold, fetchRun, useIndexStatus, useMeta } from "../api";
-import { compact, dayOf, int, span as spanText, usd, when, words } from "../format";
+import { compact, dayNo, dayOf, int, span as spanText, usd, when, words } from "../format";
 import { Back, Close, Mark } from "../icons";
 import { parseSel, replaceQuery, runHref, selToken } from "../router";
 import { useLens, ViewActive } from "../state";
@@ -107,7 +107,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
         if (!seat?.sittings?.length) return setWeekDue(false);
         const first = seat.sittings[0];
         useLens.getState().setT(first.t);
-        setGuided({ t: first.t, label: `Day ${first.day}: the AI mayor's first turn in office.` });
+        setGuided({ t: first.t, label: `Day ${dayNo(first.day)}: the AI mayor's first turn in office.` });
         setWeekDue(true);
       },
       () => live && setWeekDue(false),
@@ -373,7 +373,7 @@ function Indexing({ entry, status, error }: { entry?: RunEntry; status?: IndexSt
   const s = status;
   const frac = s?.state === "indexing" ? s.fraction : null;
   const failed = s?.state === "failed" ? s.error : error;
-  const endDay = entry?.experiment?.t ? dayOf(entry.experiment.t) : entry?.experiment?.untilDay;
+  const endDay = entry?.experiment?.t ? dayOf(entry.experiment.t) : entry?.experiment?.untilDay !== undefined ? dayNo(entry.experiment.untilDay) : undefined;
   return (
     <div className="indexing">
       <div className="indexing-card">

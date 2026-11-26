@@ -6,7 +6,7 @@ import type { DailyJson } from "../../folds/daily";
 import type { PeopleBundle } from "../../folds/people";
 import type { Meta } from "../../shared/api";
 import { fetchFold } from "../api";
-import { DAY, compact, dayOf } from "../format";
+import { DAY, compact, dayIndex } from "../format";
 import { useLens } from "../state";
 import "./pulse.css";
 
@@ -66,7 +66,7 @@ export function Pulse({ run, meta }: { run: string; meta: Meta }) {
     // People in town: those at the start, plus those who came (born or arrived), less those who left or died, by day.
     const pop = new Array(days).fill(0) as number[];
     const delta = new Array(days + 1).fill(0) as number[];
-    for (const tt of Object.values(people?.joined ?? {})) delta[Math.min(days, dayOf(tt))]!++;
+    for (const tt of Object.values(people?.joined ?? {})) delta[Math.min(days, dayIndex(tt))]!++;
     for (let d = 0; d < days; d++) delta[d]! -= (s.left?.[d] ?? 0) + (s.died?.[d] ?? 0);
     let n = meta.people.initial;
     for (let d = 0; d < days; d++) pop[d] = n += delta[d]!;
@@ -81,7 +81,7 @@ export function Pulse({ run, meta }: { run: string; meta: Meta }) {
   }, [daily, people, meta]);
 
   // (The day, not the moment: while playing, the strip renders once a day, not every frame.)
-  const day = useLens((s) => dayOf(s.t));
+  const day = useLens((s) => dayIndex(s.t));
   const span = useLens((s) => s.span);
   // (While the daily fold loads, the strip stands at its full height with its labels: the map above it does not jump
   // when the numbers arrive.)

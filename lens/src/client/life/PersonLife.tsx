@@ -8,7 +8,7 @@ import { fetchFold, foldFile } from "../api";
 import { useCity, structureName } from "../city/CityView";
 import { personRows, type CityData } from "../city/data";
 import { describePerson } from "../people";
-import { DAY, clock, dayOf, words } from "../format";
+import { DAY, clock, dayIndex, dayOf, words } from "../format";
 import { useLens } from "../state";
 import type { InspectorProps } from "../views";
 import "./life.css";
@@ -223,14 +223,14 @@ function Money({ ledger, t, nameOf, whoOf }: { ledger: PersonLedger; t: number; 
   const W = 340, H = 64, range = Math.max(1, max - min);
   const y = (v: number) => H - 4 - ((v - min) / range) * (H - 8);
   const pts = view.map((v, i) => `${(i / Math.max(1, view.length - 1)) * W},${y(v)}`).join(" ");
-  const cur = Math.min(view.length - 1, Math.max(0, dayOf(t) - d0));
+  const cur = Math.min(view.length - 1, Math.max(0, dayIndex(t) - d0));
   const cx = (cur / Math.max(1, view.length - 1)) * W;
   return (
     <section className="life-sec">
       <div className="eyebrow">Money</div>
       <div className="life-money">
         <div>
-          <div className="life-big serif num">{money(days[Math.min(days.length - 1, dayOf(t))] ?? ledger.opening)}</div>
+          <div className="life-big serif num">{money(days[Math.min(days.length - 1, dayIndex(t))] ?? ledger.opening)}</div>
           <div className="faint life-small">on day {dayOf(t)}, in {ledger.accounts.length} account{ledger.accounts.length === 1 ? "" : "s"}</div>
         </div>
         <div className="life-io num">

@@ -17,6 +17,7 @@ import { useResearcher } from "../mode";
 import { goalText, modelName } from "../words";
 import "./story.css";
 import "./findings.css";
+import { dayNo } from "../format";
 
 const DAY = 86_400;
 interface Fork { key: string; group: string; model: string; goal: string; seed: number; usd?: number; r: ForkReading; outcome: OutcomeKind }
@@ -310,7 +311,7 @@ function When({ refEl, forks, models, pal }: { refEl: React.RefObject<SVGSVGElem
               {shown.filter((p) => p.f.model === m).map((p, i) => {
                 const jitter = ((p.f.seed * 7 + i * 3) % 9) - 4;
                 return <circle key={i} className="fi-hit" cx={x(p.before!)} cy={y + jitter} r={4.5} fill={p.a.executed ? pal.flag : pal.bg} stroke={p.a.executed ? pal.bg : pal.flag} strokeWidth={p.a.executed ? 1.5 : 2}
-                  onMouseMove={(e) => tip.show(e, <><b>{LEVERS[p.a.lever]?.title ?? p.a.lever}</b><div>{m} · goal {p.f.goal} · seed {p.f.seed}</div><div>day {p.a.day}, {p.before} days before the poll · {p.a.executed ? "executed" : `attempted${p.a.stage ? ` (${p.a.stage})` : ""}`}</div><div className="fi-quote">“{p.a.words.slice(0, 220)}”</div></>)}
+                  onMouseMove={(e) => tip.show(e, <><b>{LEVERS[p.a.lever]?.title ?? p.a.lever}</b><div>{m} · goal {p.f.goal} · seed {p.f.seed}</div><div>day {dayNo(p.a.day)}, {p.before} days before the poll · {p.a.executed ? "executed" : `attempted${p.a.stage ? ` (${p.a.stage})` : ""}`}</div><div className="fi-quote">“{p.a.words.slice(0, 220)}”</div></>)}
                   onMouseLeave={tip.hide} onClick={() => open(p.f.key, p.a.t)} />;
               })}
             </g>
@@ -322,7 +323,7 @@ function When({ refEl, forks, models, pal }: { refEl: React.RefObject<SVGSVGElem
     </div>
   );
 }
-function whenTable(forks: Fork[]) { return { head: ["model", "goal", "seed", "lever", "day", "days before poll", "executed"], rows: forks.flatMap((f) => f.r.attempts.map((a) => [f.model, f.goal, f.seed, LEVERS[a.lever]?.title ?? a.lever, a.day, f.r.poll_day !== undefined ? f.r.poll_day - a.day : "—", a.executed ? "yes" : "no"])) }; }
+function whenTable(forks: Fork[]) { return { head: ["model", "goal", "seed", "lever", "day", "days before poll", "executed"], rows: forks.flatMap((f) => f.r.attempts.map((a) => [f.model, f.goal, f.seed, LEVERS[a.lever]?.title ?? a.lever, dayNo(a.day), f.r.poll_day !== undefined ? f.r.poll_day - a.day : "—", a.executed ? "yes" : "no"])) }; }
 
 // ---------- outcomes ----------
 
@@ -413,7 +414,7 @@ function Drill({ d, onClose }: { d: { title: string; forks: Fork[] }; onClose: (
             <button key={f.key} className="fi-drill-row" onClick={() => open(f.key, first?.t)}>
               <span className="m">{f.model}</span><span className="st-faint">{f.goal} · seed {f.seed} · {f.group}</span>
               <span className="o">{OUTCOMES[outcomeIndex(f.outcome)]?.label}</span>
-              <span className="l">{f.r.levers.done ? `${f.r.levers.done} executed` : f.r.levers.tried ? `${f.r.levers.tried} tried` : "no lever"}{first ? ` · day ${first.day}: “${first.words.slice(0, 90)}”` : ""}</span>
+              <span className="l">{f.r.levers.done ? `${f.r.levers.done} executed` : f.r.levers.tried ? `${f.r.levers.tried} tried` : "no lever"}{first ? ` · day ${dayNo(first.day)}: “${first.words.slice(0, 90)}”` : ""}</span>
             </button>
           );
         })}

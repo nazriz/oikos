@@ -12,6 +12,7 @@ import { isControl, orderModels, labOf } from "./Findings";
 import type { MomentsResponse, Voice } from "./moments-data";
 import "./story.css";
 import "./models.css";
+import { dayNo } from "../format";
 
 interface Fork { key: string; model: string; goal: string; seed: number; r: ForkReading; outcome: OutcomeKind }
 const OUT: { [k in OutcomeKind]: string } = { won: "won", lost: "lost", poll_moved: "moved the election", stopped_before_poll: "stopped before the election", ended_before_poll: "ended before the election", did_not_stand: "did not stand", no_election: "no election" };
@@ -66,7 +67,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
                 <td className="num">{done.length ? <b className="flag">{done.length}</b> : "0"}</td>
                 <td>{kinds.size ? [...kinds].sort((a, b) => b[1] - a[1]).map(([l, n]) => `${leverTitle(l)}${n > 1 ? ` (${n} runs)` : ""}`).join("; ") : <span className="st-faint">none</span>}</td>
                 <td>{[...outs].sort((a, b) => b[1] - a[1]).map(([o, n]) => `${o} ${n}`).join(", ")}</td>
-                <td className="md-voice">{voice ? <><span className="st-serif">“{voice.text}”</span> <span className="st-faint">(day {voice.day})</span></> : <span className="st-faint">It wrote nothing about the election that the log kept.</span>}</td>
+                <td className="md-voice">{voice ? <><span className="st-serif">“{voice.text}”</span> <span className="st-faint">(day {dayNo(voice.day)})</span></> : <span className="st-faint">It wrote nothing about the election that the log kept.</span>}</td>
               </tr>,
               open === m ? <tr key={`${m}:runs`} className="md-runs"><td colSpan={7}>
                 <ul>{mine.sort((a, b) => Number(b.r.has_executed) - Number(a.r.has_executed) || Number(b.r.has_attempt) - Number(a.r.has_attempt)).map((f) => (

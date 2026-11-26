@@ -16,6 +16,7 @@ import "./compare.css";
 import { TwoTowns } from "../city/TwoTowns";
 import { useMeta } from "../api";
 import { views } from "../views";
+import { dayOf } from "../format";
 
 const DAY = 86_400;
 const dailyCache = new Map<string, Promise<DailyJson>>();
@@ -60,8 +61,8 @@ function Compare({ A, B }: { A: Arm; B: Arm }) {
         <div>
           <PageAnswer page="compare" />
           <h1 className="cp-title">{armName(A.seat)} and {armName(B.seat)} as mayor of the same town</h1>
-          <p className="st-sub">Both runs are the same town, seed {A.seat.seed ?? "?"}{sameSeed ? "" : ` and ${B.seat.seed ?? "?"} (not the same seed)`}, until day {Math.round(fork / DAY)}. After that only the mayor differs.{A.seat.goal ? ` The AI mayor was ${goalText(A.seat.goal).replace(/^Told/, "told").toLowerCase()}.` : ""} Differences are the first minus the second; neither is called better.</p>
-          {uneven && <div className="cp-uneven">The two runs ended on different days ({armName(A.seat)} to day {Math.floor(A.seat.end_at / DAY)}, {armName(B.seat)} to day {Math.floor(B.seat.end_at / DAY)}): the town's counts below are compared to day {until - 1}, where both had run.</div>}
+          <p className="st-sub">Both runs are the same town, seed {A.seat.seed ?? "?"}{sameSeed ? "" : ` and ${B.seat.seed ?? "?"} (not the same seed)`}, until day {dayOf(fork)}. After that only the mayor differs.{A.seat.goal ? ` The AI mayor was ${goalText(A.seat.goal).replace(/^Told/, "told").toLowerCase()}.` : ""} Differences are the first minus the second; neither is called better.</p>
+          {uneven && <div className="cp-uneven">The two runs ended on different days ({armName(A.seat)} to day {dayOf(A.seat.end_at)}, {armName(B.seat)} to day {dayOf(B.seat.end_at)}): the town's counts below are compared to day {until}, where both had run.</div>}
         </div>
       </div>
       <div className="cp-body">
@@ -90,7 +91,7 @@ function Glance({ A, B, until }: { A: Arm; B: Arm; until: number }) {
   const outcome = (s: SeatJson) => seatOutcome(s).label;
   const rows: [string, (x: Arm) => number | string, boolean?][] = [
     ["Election", (x) => outcome(x.seat)],
-    ["Ended", (x) => `day ${Math.round(x.seat.end_at / DAY)}${x.seat.ended === "stopped" ? " (stopped early)" : ""}`],
+    ["Ended", (x) => `day ${dayOf(x.seat.end_at)}${x.seat.ended === "stopped" ? " (stopped early)" : ""}`],
     ["Turns taken", (x) => x.seat.sittings.filter((s) => s.kind === "model").length, true],
     ["The mayor's acts", (x) => x.seat.acts.length, true],
     ["of which refused", (x) => x.seat.acts.filter((a) => a.status === "refused").length, true],

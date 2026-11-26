@@ -3,7 +3,7 @@
 // seat fold alone. Labels are a few words; the long form is for the hover card.
 import type { SeatJson } from "../../folds/seat";
 import type { Selection } from "../state";
-import { dayOf } from "../format";
+import { dayNo, dayOf } from "../format";
 import { W } from "../words";
 
 export interface KeyMoment {
@@ -71,7 +71,7 @@ export function keyMoments(seat: SeatJson): KeyMoment[] {
       t: first.t,
       kind: "grab",
       label,
-      long: `Day ${first.day}: ${done ? `${W.executed}` : `${W.attempted}, not carried out`}. ${first.title || label}.${first.tier ? ` How serious: ${first.tier} of 3.` : ""}`,
+      long: `Day ${dayNo(first.day)}: ${done ? `${W.executed}` : `${W.attempted}, not carried out`}. ${first.title || label}.${first.tier ? ` How serious: ${first.tier} of 3.` : ""}`,
       strong: !!done,
       select: { kind: "lever", index: (done ?? first).i },
     });
