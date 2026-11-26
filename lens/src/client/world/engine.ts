@@ -41,6 +41,8 @@ export interface WorldInput {
 export interface Info { hour: number; weather: Weather; walking: number; driving: number; fps: number; who?: { name: string; doing: string } }
 
 export interface EngineEvents {
+  /** The act's sentence for a floating caption ("The AI mayor wrote to the works manager"). */
+  caption?(seq: number): string | undefined;
   onMode?(m: Mode): void;
   onInfo?(s: Info): void;
 }
@@ -137,7 +139,7 @@ export class WorldEngine {
     this.city = input.city;
     this.world = input.world;
     this.pollAt = input.election?.poll_at;
-    this.phone = matchMedia("(pointer: coarse)").matches || Math.min(innerWidth, innerHeight) < 600;
+    this.phone = matchMedia("(pointer: coarse)").matches || Math.min(innerWidth, innerHeight) < 600 || /[?&]phone=1/.test(location.search);
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: !this.phone, powerPreference: "high-performance", alpha: false }));
     r.setPixelRatio(Math.min(devicePixelRatio, this.phone ? 1.5 : 2));
     r.outputColorSpace = THREE.SRGBColorSpace;
@@ -868,6 +870,7 @@ export class WorldEngine {
     this.updateSelection();
     this.updateTrees();
     this.updatePolling(t, st.speed);
+    this.updateCaptions(t, st.speed);
     if (this.composer) this.composer.render(); else this.renderer.render(this.scene, this.camera);
     this.updateLabels();
     if (now - this.lastInfo > 400) this.lastInfo = now, this.ev.onInfo?.({ hour, weather: this.weather, walking: counts.walking, driving: counts.driving, fps: this.fpsAcc.fps, who: this.whoInfo(st.selection, t) });
@@ -909,7 +912,7 @@ export class WorldEngine {
     this.uNight.value = L.night;
     this.uSky.value.copy(L.fog);
     this.lampHeads.emissiveIntensity = L.night * 3.2;
-    this.pools.opacity = L.night * 0.55;
+    this.pools.opacity = L.night * 0.38;
     const nightLabels = L.night > 0.5;
     if (nightLabels !== this.labelLayer.classList.contains("night")) this.labelLayer.classList.toggle("night", nightLabels);
     for (const d of this.dials) d.emissiveIntensity = L.night * 0.9;
@@ -1204,6 +1207,58 @@ export class WorldEngine {
     this.slips.instanceMatrix.needsUpdate = true;
   }
   private slipBase = 0;
+
+  /** Floating signs over what the mayor's latest acts reached, in words, for a little while after each. */
+  private captions: HTMLDivElement[] = [];
+  private updateCaptions(t: number, speed: number) {
+    const keep = Math.max(1800, Math.min(12 * 3600, speed * 6));
+    let lo = 0, hi = this.acts.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (this.acts[m]!.t <= t) lo = m + 1; else hi = m; }
+    const shown: { a: { t: number; to: number; refused: boolean; seq: number }; text: string }[] = [];
+    const seenTo = new Set<number>();
+    for (let i = lo - 1; i >= 0 && shown.length < 3 && t - this.acts[i]!.t < keep; i--) {
+      const a = this.acts[i]!;
+      if (seenTo.has(a.to)) continue;
+      const text = this.ev.caption?.(a.seq);
+      if (!text) continue;
+      seenTo.add(a.to);
+      shown.push({ a, text });
+    }
+    const w = this.renderer.domElement.clientWidth, h = this.renderer.domElement.clientHeight;
+    for (let k = 0; k < Math.max(shown.length, this.captions.length); k++) {
+      let el = this.captions[k];
+      if (!el) { el = document.createElement("div"); el.className = "lw-caption"; this.labelLayer.appendChild(el); this.captions.push(el); }
+      const c = shown[k];
+      if (!c) { el.style.display = "none"; continue; }
+      const L = this.plan.lots[c.a.to];
+      tmpV.set(this.model.centres[c.a.to * 2]!, (this.model.tops[c.a.to] ?? 6) + 6, this.model.centres[c.a.to * 2 + 1]!);
+      if (!L) { el.style.display = "none"; continue; }
+      tmpV.project(this.camera);
+      if (tmpV.z > 1 || Math.abs(tmpV.x) > 1.05 || Math.abs(tmpV.y) > 1.05) { el.style.display = "none"; continue; }
+      el.style.display = "";
+      if (el.textContent !== c.text) el.textContent = c.text;
+      el.classList.toggle("refused", c.a.refused);
+      el.style.transform = `translate(-50%, -100%) translate(${((tmpV.x + 1) / 2) * w}px, ${((1 - tmpV.y) / 2) * h - k * 2}px)`;
+    }
+  }
+
+  /** The tour: frame what a moment's acts reached (or the town hall, or the polling place), and turn slowly round it. */
+  tourTo(actSeqs: number[], election: boolean) {
+    const set = new Set(actSeqs);
+    const pts: THREE.Vector3[] = [];
+    const add = (i: number | undefined) => { if (i !== undefined && i >= 0 && this.plan.lots[i]) pts.push(new THREE.Vector3(this.model.centres[i * 2]!, 0, this.model.centres[i * 2 + 1]!)); };
+    for (const a of this.acts) if (set.has(a.seq)) add(a.to);
+    if (election && this.polling) add(this.polling.at);
+    if (!pts.length) add(this.hall);
+    if (!pts.length) return;
+    const c = pts.reduce((a, b) => a.add(b), new THREE.Vector3()).multiplyScalar(1 / pts.length);
+    const spread = Math.max(...pts.map((p) => p.distanceTo(c)));
+    if (this.mode !== "fly") this.setMode("fly");
+    this.flyTo(c.setY(4), Math.max(85, Math.min(900, spread * 2.2 + 60)), pts.length > 1 ? 0.55 : 0.4);
+    this.controls.autoRotate = true;
+    this.controls.autoRotateSpeed = 0.35;
+  }
+  endTour() { this.controls.autoRotate = false; }
 
   private updateLater(t: number) {
     for (const L of this.later) {

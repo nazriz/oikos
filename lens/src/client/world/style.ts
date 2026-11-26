@@ -32,7 +32,31 @@ export const WORLD_CSS = `
 .lens-world .lw-who { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); display: flex; gap: 10px; align-items: baseline; padding: 6px 12px 4px;
   background: var(--lw-panel); border: 1px solid var(--lw-rule); border-left: 3px solid #8C7B6B; border-radius: 2px; box-shadow: 0 2px 10px #1d2b3626; color: var(--lw-muted); white-space: nowrap; }
 .lens-world .lw-who b { color: var(--lw-ink); font-weight: 800; }
+.lens-world .lw-caption { position: absolute; left: 0; top: 0; max-width: 260px; white-space: normal; font-weight: 700; font-size: 12.5px; line-height: 1.35; color: #1D2B36;
+  background: #F8F9FA; border-left: 3px solid #E8B400; padding: 5px 8px 3px; box-shadow: 0 2px 10px #1d2b3633; will-change: transform; }
+.lens-world .lw-caption.refused { border-left-color: #C8102E; }
+.lens-world .lw-tourbtn { position: absolute; left: 14px; top: 58px; font: inherit; font-weight: 700; color: var(--lw-ink); background: var(--lw-panel);
+  border: 1px solid var(--lw-rule); border-radius: 2px; padding: 7px 12px 5px; cursor: pointer; box-shadow: 0 2px 10px #1d2b3626; }
+.lens-world .lc-tour { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(640px, calc(100% - 32px)); z-index: 4; padding: 14px 18px 10px;
+  background: var(--lw-panel); border: 1px solid var(--lw-rule); border-top: 3px solid #E8B400; border-radius: 2px; box-shadow: 0 2px 14px #1d2b3633; color: var(--lw-ink); }
+.lens-world .lc-tour.tone-flag { border-top-color: #C8102E; }
+.lens-world .lc-tour.tone-election { border-top-color: #1F5FAD; }
+.lens-world .lc-tour-kicker { color: var(--lw-muted); font-size: 12.5px; }
+.lens-world .lc-tour-title { font-size: 18px; font-weight: 800; line-height: 1.3; margin-top: 4px; }
+.lens-world .lc-tour-words { font-family: "Source Serif 4 Variable", "Source Serif 4", Georgia, serif; font-size: 15px; line-height: 1.5; margin-top: 8px; max-height: 7.5em; overflow: hidden; }
+.lens-world .lc-note { margin-top: 6px; color: var(--lw-muted); font-size: 12px; }
+.lens-world .lc-tour-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; }
+.lens-world .lc-tour-dots { display: flex; gap: 4px; flex-wrap: wrap; }
+.lens-world .lc-tour-dots button { width: 14px; height: 3px; border: 0; padding: 0; background: var(--lw-rule); cursor: pointer; }
+.lens-world .lc-tour-dots button.on { background: #E8B400; }
+.lens-world .lc-tour-dots button.tone-flag.on { background: #C8102E; }
+.lens-world .lc-tour-ctl { display: flex; gap: 4px; }
+.lens-world .lc-tour-ctl button { border: 1px solid var(--lw-rule); background: none; color: var(--lw-ink); font: inherit; font-size: 12px; border-radius: 2px; padding: 3px 10px; cursor: pointer; }
 @media (max-width: 640px) {
+  .lens-world .lc-tour { bottom: 8px; padding: 12px 14px 10px; }
+  .lens-world .lc-tour-title { font-size: 16px; }
+  .lens-world .lc-tour-words { font-size: 14px; max-height: 6em; }
+  .lens-world .lw-caption { max-width: 200px; font-size: 12px; }
   .lens-world .lw-who { top: 60px; max-width: calc(100% - 28px); overflow: hidden; text-overflow: ellipsis; }
   .lens-world .lw-modes button { padding: 10px 16px 8px; }
   .lens-world .lw-key { display: none; }
