@@ -3,6 +3,9 @@
 // reader's reading of the act, when (day, days to the poll, phase), what became of it, and which run. Filter by model,
 // lever, level and goal; each card opens its run at that sitting. The reader's `considered` level (a phrase match,
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
+import type { RunEntry as FullEntry } from "../../shared/api";
+import { Measures, MeasuresKey, runCount, runCountText } from "../measures";
+import { isControlModel } from "../library/landing-data";
 import { useEffect, useMemo, useState } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, useAsync, human, type SeatJson } from "./data";
@@ -23,11 +26,12 @@ export function Moments({ onOpen }: { onOpen?: (key: string, t: number, sel: str
   // (The server's /api/moments: each indexed fork's moments, made once per bundle. Where it is absent, from each seat.)
   const data = useAsync(async () => {
     const r = await fetch("/api/moments");
-    if (r.ok) { const x = (await r.json()) as MomentsResponse; return { all: dedupe(x.runs).flatMap((y) => y.moments), runs: x.indexed, note: x.indexed < x.forks ? `; ${x.forks - x.indexed} more runs have not been read yet (opening a run reads it)` : "" }; }
+    // (Rope tests and scripted controls are not AI mayors: left out, as everywhere.)
+    if (r.ok) { const x = (await r.json()) as MomentsResponse; return { all: dedupe(x.runs.filter((y) => !isControlModel(y.model ?? y.key.split("~").at(-1) ?? ""))).flatMap((y) => y.moments), runs: x.indexed, note: "" }; }
     const rs: RunEntry[] = await (await fetch("/api/runs")).json().then((c: any) => (Array.isArray(c) ? c : c.runs));
     const keep = rs.some((e) => e.indexed !== undefined) ? rs.filter((e) => e.indexed) : rs;
     const got = (await Promise.all(keep.map((e) => loadSeat(e.key).then((s) => ({ key: e.key, id: `${s.run_id}|${s.arm}`, moments: momentsOf(e.key, s, true) }), () => null)))).filter((x): x is NonNullable<typeof x> => x !== null);
-    return { all: dedupe(got).flatMap((y) => y.moments), runs: got.length, note: "" };
+    return { all: dedupe(got.filter((y) => !isControlModel(y.key.split("~").at(-1) ?? ""))).flatMap((y) => y.moments), runs: got.length, note: "" };
   }, []);
   if (data === undefined) return <div className="mo"><div className="st-empty">Reading every run's moments…</div></div>;
   if (data instanceof Error || data === null) return <div className="mo"><div className="st-empty">Could not read the moments{data instanceof Error ? `: ${data.message}` : ""}</div></div>;
@@ -43,6 +47,10 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
   const [goals, setGoals] = useState<Set<string>>(new Set());
   const [levels, setLevels] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<"poll" | "day" | "model">("poll");
+  // (Each card also gives the run's lock-in, which needs the catalogue's grades; the cards show without it until it comes.)
+  const cat = useAsync(async () => { const c = await (await fetch("/api/runs")).json(); return (Array.isArray(c) ? c : c.runs) as FullEntry[]; }, []);
+  const entries = useMemo(() => new Map((Array.isArray(cat) ? cat : []).map((e) => [e.key, e])), [cat]);
+  const aiRuns = Array.isArray(cat) ? runCount(cat) : null;
   const all = useMemo(() => (weak ? every : every.filter((m) => m.lever.level !== "considered")), [every, weak]);
   const count = (f: (m: Moment) => string) => { const c = new Map<string, number>(); for (const m of all) c.set(f(m), (c.get(f(m)) ?? 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); };
   const shown = all.filter((m) => (!models.size || models.has(m.model)) && (!levers.size || levers.has(leverTitle(m.lever.lever))) && (!goals.size || goals.has(goalText(m.goal ?? "none"))) && (!levels.size || levels.has(LEVEL[m.lever.level] ?? "")))
@@ -62,7 +70,8 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
       <div className="mo-head">
         <PageAnswer page="moments" />
         <h1 className="mo-title">When an AI mayor reached for a power grab</h1>
-        <p className="st-sub">{all.filter((m) => m.lever.level !== "considered").length} moments in {withAny} of {runs} runs read so far{note}. The study's checker decides what counts as a power grab; the quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</p>
+        <p className="st-sub">{all.filter((m) => m.lever.level !== "considered").length} moments in {withAny} runs{aiRuns ? `, from the runs Lens has opened (${runCountText(aiRuns)})` : ""}. The study's checker decides what counts as a power grab; the quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</p>
+        <MeasuresKey />
         <div className="mo-filters">
           <Facet label="Model" items={count((m) => m.model)} set={setModels} on={models} />
           <Facet label="Instructions" items={count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
@@ -76,14 +85,14 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
         </div>
       </div>
       <div className="mo-grid">
-        {shown.map((m) => <Card key={`${m.key}:${m.lever.i}`} m={m} onOpen={() => open(m)} />)}
+        {shown.map((m) => <Card key={`${m.key}:${m.lever.i}`} m={m} entry={entries.get(m.key)} onOpen={() => open(m)} />)}
         {!shown.length && <div className="st-empty">No moment matches.</div>}
       </div>
     </div>
   );
 }
 
-function Card({ m, onOpen }: { m: Moment; onOpen: () => void }) {
+function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: FullEntry }) {
   const l = m.lever, weak = l.level === "considered";
   const [more, setMore] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -94,10 +103,10 @@ function Card({ m, onOpen }: { m: Moment; onOpen: () => void }) {
       {m.note && <div className="mo-sub"><span className="k">on signing</span>“{m.note}”</div>}
       {m.reason && <div className="mo-sub"><span className="k">its reason</span>“{m.reason}”</div>}
       {more && <Around m={m} />}
-      <p className="mo-when">Day {dayNo(l.day)}{m.daysBefore !== undefined ? `, ${m.daysBefore} days before the election was due` : ""}.</p>
+      <p className="mo-when">Day {dayNo(l.day)}{m.daysBefore !== undefined ? (m.daysBefore >= 0 ? `, ${m.daysBefore} days before the election was due` : `, ${-m.daysBefore} days after the election was due`) : ""}.</p>
       <div className="mo-out"><span className={`st-pill ${m.outcomeTone}`}>{m.outcome}</span></div>
       <div className="mo-foot">
-        <span className="mo-who"><b>{m.model}</b>, {m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}{m.seed !== undefined ? `, town seed ${m.seed}` : ""}. <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span></span>
+        <span className="mo-who"><b>{m.model}</b>, {m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}{m.seed !== undefined ? `, town ${m.seed}` : ""}. <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>{entry && <> <Measures entry={entry} /></>}</span>
         <span style={{ flex: 1 }} />
         <button className="st-btn" title="Copy as a citation" onClick={() => { navigator.clipboard?.writeText(citation(m)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }, () => {}); }}>{copied ? "Copied" : "Copy as a citation"}</button>
         <HowDoWeKnow run={m.key} claim={{ kind: "lever", index: m.lever.i }} />

@@ -359,6 +359,7 @@ export function Activity({ runs, order, twinActs }: { runs: StudyRun[]; order: s
         <div ref={tip.box} className="ld-box">
           <svg width={W} height={H} role="img" aria-label="Acts the AI mayor sent per run, by model">
             {ticks.map((t) => <g key={t}><line x1={x(t)} x2={x(t)} y1={top - 6} y2={H - 22} className="act-grid" /><text x={x(t)} y={H - 6} className="cal-num" textAnchor="middle">{t}</text></g>)}
+            <text x={W - R} y={top - 12} className="cal-num" textAnchor="end">acts sent (square-root scale)</text>
             {twinActs !== undefined && <><line x1={x(twinActs)} x2={x(twinActs)} y1={top - 10} y2={H - 22} className="act-twin" /><text x={x(twinActs) + 5} y={top - 12} className="cal-small strong">rule-based mayor: {twinActs}</text></>}
             {models.map((m, mi) => {
               const y = top + mi * rowH + rowH / 2 + (narrow ? 12 : 0);

@@ -42,6 +42,8 @@ export interface StudyRun {
   grade?: BlindGrade;
   /** Graded after the report froze, and left out of its counts (shown as not graded unless the live grades are asked for). */
   gradedLater?: boolean;
+  /** The catalogue entry it was made from. */
+  entry: RunEntry;
 }
 
 /** The runs the landing page counts: experiment forks whose AI mayor holds the mayor's post, read by the checker, with
@@ -65,6 +67,7 @@ export function studyRunOf(e: RunEntry, liveGrades = false): StudyRun | undefine
     const from = x.forkDay ?? 120, until = x.untilDay ?? Math.floor(r.end_at / DAY);
     const end = r.end_at / DAY;
     return {
+      entry: e,
       key: e.key, group: e.group, model: x.model, goal: x.goal || "none", seed: x.seed, r,
       outcome: outcomeOf({ election: r.election, end_at: r.end_at, ended: r.ended, moved: r.moved }).kind,
       from, until, end,
@@ -257,9 +260,9 @@ export function leadSentence(runs: StudyRun[]): string | undefined {
 export function conditionsSentence(runs: StudyRun[]): string {
   const [none, strong, noel, red] = CONDITIONS.map((c) => conditionCell(runs, c, "frontier").t);
   const sm = tally(runs.filter((f) => cohortOf(f.model) === "smaller" && markOf(f, "lockin") !== "ungraded"), "lockin");
-  let s = `The instruction made the difference: ${kOfN(strong!)} told to keep the programme, ${kOfN(none!)} with no extra goal`;
+  let s = `Frontier models locked in their programme in ${kOfN(strong!)} runs told to keep it, ${kOfN(none!)} with no extra goal`;
   if (noel!.n) s += `, ${kOfN(noel!)} with no election in the run`;
-  s += `, ${kOfN(red!)} told to stay mayor`;
+  s += ` and ${kOfN(red!)} told to stay mayor`;
   s += sm.n ? `. Smaller models: ${kOfN(sm)}.` : ".";
   return s;
 }

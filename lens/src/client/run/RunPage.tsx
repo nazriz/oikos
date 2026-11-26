@@ -16,6 +16,7 @@ import { Timeline } from "../timeline/Timeline";
 import { views, type SlotProps } from "../views";
 import { RunSummary } from "./RunSummary";
 import { RunCharts, TurnStrip } from "./RunCharts";
+import { Measures } from "../measures";
 import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer } from "../shell/Shell";
@@ -274,7 +275,7 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
         </div>
         {reading && !x?.isCode && (
           <p className="run-result">
-            <span className={tried ? "flag-text" : "muted"}>{tried ? `Tried ${tried === 1 ? "a power grab" : `${tried} power grabs`}${done ? `, carried out ${done}` : ""}.` : "No power grab."}</span>{" "}
+            {entry ? <Measures entry={{ ...entry, reading }} /> : null}{" "}
             {out && <span className={out.kind === "won" ? "election-text" : out.kind === "poll_moved" ? "flag-text" : "muted"}>{out.label}.</span>}
             {entry && views.howDoWeKnow && (
               <span className="run-evidence">

@@ -16662,3 +16662,21 @@ A fresh-eyes review saw the run page sit on "Drawing the town" for ~50 s, and th
   A viewer's run already stops a bundle being made ahead.
 - **Measured once the stray server was stopped** (live server, load 31, a cold browser profile): the landing showed its
   runs at 0.6 s and a cached run's map was drawn at 1.0 s. Every API answer took 0-20 ms.
+## 2026-11-27 Lens: one story, two measures, one count (fresh-eyes fixes)
+
+- **Why:** a newcomer review found Lens contradicting itself. The landing said "locked in 13 of 14"; the first moment
+  opened a run headed "No power grab"; Models showed Sonnet 5.5 "0 of 35". Both were right, about different measures,
+  and nothing said so. The run counts differed page to page (149, 150, 152, 153, "12 of 272").
+- **Two measures, one component** (`lens/src/client/measures.tsx`): `lockInOf` (the blind graders, where both agree),
+  `grabOf` (the checker), `measuresText` and `<Measures>` ("Lock-in: yes, both graders. Power grab: none."), and
+  `<MeasuresKey>`, which explains each in a sentence with an example. They are used in the run bar, the landing's run
+  list, Other mayors, Models (a new lock-in column, counted as the report does: graded, v2, reached election day),
+  Moments cards and the digest; Findings carries the key.
+- **One count** (`runCount`): runs with an AI mayor (rope tests, scripted controls and test sets apart), the models,
+  and how many reached election day. The landing, Models, Moments and Findings (Story) count the same runs.
+- **Dates and words:** Moments and the digest say "N days after the election was due" where the act came after it;
+  "town seed N" is "town N"; the showcase opens the day its line names and quotes the words at the act it describes
+  (the Sonnet 4.5 moment quotes its own reason for holding back, not an unrelated firing). Controls ("Amend") are out
+  of Moments. Findings: the vendor sentence is gone; the "neither" bars are visible in dark mode.
+- **Fast first paint:** the landing draws at once from this browser's copy of the study's runs (forks only, in
+  localStorage), then from the server's answer (which took 6 to 15 s on the shared machine).
