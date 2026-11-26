@@ -121,6 +121,7 @@ export const CITY_CSS = `
 .lens-city .lc-anno { position: absolute; z-index: 2; pointer-events: none; transform: translate(-50%, -100%); white-space: nowrap; font-weight: 800; font-size: 13px;
   color: var(--lc-text); text-shadow: 0 0 3px var(--lc-ink), 0 0 3px var(--lc-ink), 0 0 6px var(--lc-ink); }
 .lens-city .lc-anno.place { font-weight: 700; font-size: 12px; }
+.lens-city .lc-anno.place.big { font-weight: 800; font-size: 16px; letter-spacing: -.005em; }
 .lens-city .lc-anno.night { color: #E4EAEE; text-shadow: 0 0 3px #16212B, 0 0 3px #16212B, 0 0 6px #16212B; }
 .lens-city .lc-anno.night.hall::after { background: #E4EAEE; }
 .lens-city .lc-anno.hall::after { content: ""; display: block; width: 1px; height: 14px; margin: 2px auto 0; background: var(--lc-text); }

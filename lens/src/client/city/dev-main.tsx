@@ -43,7 +43,7 @@ function Dev() {
   const acts = tracks.find((x) => x.id === "city.acts")?.marks ?? [];
   return (
     <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, minHeight: 0 }}>{q.get("power") ? <div style={{ position: "relative", width: "100%", height: "100%" }}><PowerView run={q.get("run") ?? "dev"} /></div> : cmp ? <TwoTowns a={cmp[0]!} b={cmp[1]!} names={cmp[2] ? [cmp[2], cmp[3] ?? cmp[1]!] : undefined} /> : <CityView camera={camera} layers={!q.get("pill")} tour={num("tour")} present={(q.get("present") as any) ?? undefined} story={q.get("mode") ? q.get("mode") === "story" : undefined} overlays={q.get("ov") ? JSON.parse(q.get("ov")!) : undefined} />}</div>
+      <div style={{ flex: 1, minHeight: 0 }}>{q.get("power") ? <div style={{ overflow: "auto", height: "100%" }}><PowerView run={q.get("run") ?? "dev"} /></div> : cmp ? <TwoTowns a={cmp[0]!} b={cmp[1]!} names={cmp[2] ? [cmp[2], cmp[3] ?? cmp[1]!] : undefined} /> : <CityView camera={camera} layers={!q.get("pill")} tour={num("tour")} present={(q.get("present") as any) ?? undefined} story={q.get("mode") ? q.get("mode") === "story" : undefined} overlays={q.get("ov") ? JSON.parse(q.get("ov")!) : undefined} />}</div>
       {!q.get("bare") && (
         <div style={{ height: 44, display: "flex", alignItems: "center", gap: 12, padding: "0 14px", background: "#111723", borderTop: "1px solid #ffffff14", font: "12px Inter Variable, system-ui" }}>
           <button onClick={() => st.setPlaying(!playing)} style={{ background: "#f2b44b", color: "#0b0f17", border: 0, borderRadius: 6, padding: "5px 12px", fontWeight: 600, cursor: "pointer" }}>{playing ? "Pause" : "Play"}</button>

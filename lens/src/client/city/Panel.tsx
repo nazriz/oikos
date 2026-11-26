@@ -7,6 +7,7 @@ import { PAL, WHERE_LABEL } from "./scene";
 import type { Sky } from "./sky";
 import { PAPER_GROUPS, paperGroup, structureStory, type ElectionView } from "./civic";
 import { actSentence, CITY_WORDS } from "./words";
+import { describePerson } from "../people";
 
 export interface Overlays {
   people: boolean;
@@ -112,7 +113,7 @@ export function Panel({ story, onPresent, onRecord, twin, open0, overlays, setOv
               </div>
             )}
           </div>
-          {twin && <Section on={overlays.diff} toggle={() => tog("diff")} title="Difference from the other arm" note="Violet arcs: a person is somewhere else in the other arm right now (from there to here). Filled marks: papers of the last 7 days only in this arm; rings: only in the other (matched by kind, place and day)."><div /></Section>}
+          {twin && <Section on={overlays.diff} toggle={() => tog("diff")} title="What differs from the other town" note="Green arcs: a person is somewhere else in the other town right now (from there to here). Filled marks: papers of the last 7 days only in this town; rings: only in the other (matched by kind, place and day)."><div /></Section>}
           {city.town.elections.length > 0 && (
             <Section on={overlays.election} toggle={() => tog("election")} title="The election" note={ev ? electionNote(ev) : "No election in this run."}>
               {ev && <ElectionLegend ev={ev} col={candCol} />}
@@ -230,7 +231,7 @@ export function PersonBody({ c, q, t, name, full }: { c: CityData; q: number; t:
   return (
     <>
       <div className="lc-tip-title">{p[1]}</div>
-      <div className="lc-tip-sub">{p[2] === "f" ? "A woman" : p[2] === "m" ? "A man" : "A person"}, {ageAt(c, q, t)} years old.</div>
+      <div className="lc-tip-sub">{p[2] === "f" ? "A woman" : p[2] === "m" ? "A man" : "A person"}, {ageAt(c, q, t)} years old{describePerson(c, p[0], t)?.replace(/^\d+,?\s*/, "") ? `, ${describePerson(c, p[0], t)!.replace(/^\d+,?\s*/, "")}` : ""}.</div>
       <dl className="lc-dl">
         <dt>Now</dt><dd>{where}</dd>
         {home >= 0 && <><dt>First home</dt><dd>{name(home)}</dd></>}

@@ -5,6 +5,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLens } from "../state";
 import { useCity, useDark } from "./CityView";
+import { describePerson } from "../people";
 import type { CityData, TownBundle } from "./data";
 import { fmtDay } from "./Panel";
 import { actSentence, CITY_WORDS } from "./words";
@@ -18,7 +19,7 @@ const CIVIC = ["government", "electoral_commission", "firm", "police", "tribunal
 export function PowerView({ run }: { run: string }) {
   const { city, error } = useCity(`/api/run/${encodeURIComponent(run)}`);
   return (
-    <div className="lens-city">
+    <div className="lens-city pw-root">
       <style>{CITY_CSS}{POWER_CSS}</style>
       {city ? <Chart city={city} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : <><div className="lc-spin" />Reading the town's offices</>}</div>}
     </div>
@@ -162,7 +163,7 @@ function Chart({ city }: { city: CityData }) {
                 <div key={p.id} className="pw-post">
                   <div className="pw-row">
                     <span className="pw-post-title" title={p.id}>{p.title}</span>
-                    {pp ? <button data-holder={pp} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => select({ kind: "person", id: pp })} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">×{now.holders.get(pp)!.length}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
+                    {pp ? <button data-holder={pp} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => select({ kind: "person", id: pp })} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">×{now.holders.get(pp)!.length}</span>}{describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
                   </div>
                   {kin && <div className="pw-kin">{seatKinLabel(pp!)}</div>}
                   {!kin && focus && pp && focus !== pp && relation(P, pp, focus) && <div className="pw-kin muted">{relation(P, pp, focus)} {name(focus)}</div>}
@@ -184,7 +185,9 @@ function Chart({ city }: { city: CityData }) {
 }
 
 const POWER_CSS = `
-.lens-city .pw { position: absolute; inset: 0; overflow: auto; padding: 22px 24px 40px; }
+/* The page flows with its content (the shell gives it no sized box): never a zero-height absolute layer. */
+.lens-city.pw-root { height: auto; min-height: 100vh; overflow: visible; }
+.lens-city .pw { position: relative; min-height: 100vh; padding: 22px 24px 40px; }
 .lens-city .pw-head { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 18px; position: relative; z-index: 2; }
 .lens-city .pw-kicker { color: var(--lc-muted); font-size: 13px; }
 .lens-city .pw-title { font-weight: 800; font-size: 26px; letter-spacing: -.01em; margin: 4px 0 6px; }
@@ -206,6 +209,7 @@ const POWER_CSS = `
 .lens-city .pw-chip.seat { color: var(--lc-seat-text); border-bottom: 3px solid var(--lc-seat); }
 .lens-city .pw-chip.kin { color: var(--lc-flag); border-bottom: 3px solid var(--lc-flag); }
 .lens-city .pw-chip.vacant { color: var(--lc-muted); font-weight: 400; font-style: italic; cursor: default; }
+.lens-city .pw-desc { display: block; font-weight: 400; color: var(--lc-muted); font-size: 11.5px; text-align: right; }
 .lens-city .pw-n { margin-left: 5px; color: var(--lc-muted); font-size: 11.5px; font-weight: 400; }
 .lens-city .pw-by { color: var(--lc-muted); font-size: 12px; margin-top: 2px; }
 .lens-city .pw-kin { color: var(--lc-flag); font-size: 12px; font-weight: 700; margin-top: 2px; text-align: right; }
