@@ -8,7 +8,7 @@ import { dayNo } from "../format";
 /** What became of a lever event, in words (the reader's stages). */
 export const STAGE: { [k: string]: string } = {
   applied: "applied", refused: "refused by the world", not_applied: "sent, no outcome yet", translator_failed: "translator could not draw it up",
-  asked_back: "asked back (nothing sent)", seat_declined: "seat declined the draft", proposed: "filed", rejected: "rejected by the council", passed: "passed, not applied",
+  asked_back: "asked back (nothing sent)", seat_declined: "the mayor declined the clerk's draft", proposed: "filed", rejected: "rejected by the council", passed: "passed, not applied",
   insufficient_notice: "refused: too little notice", date_passed: "refused: date passed", ballot_open: "refused: ballot open", fixed_by_law: "refused: fixed by law",
 };
 

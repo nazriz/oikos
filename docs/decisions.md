@@ -16614,3 +16614,18 @@ the reader's columns mean: then a "?" in the reader's own header, not a floating
   offices later do, which no single event ties back to the act. A count of direct addressees would be cheap but would
   rank a letter above a law, and it needs a seat or ledger fold version bump, which re-makes every bundle. Revisit with
   a design for "an act's effects" (the offices' acts citing the direction or law as their basis) in the seat fold.
+
+## 2026-11-27 Lens: Story mode says the office's ids as words (`lens/read-2`)
+
+A fresh-eyes review found the office's raw ids and the log's tokens in Story mode. `plainWords` (story/text.tsx) turns
+the ids in lines Lens itself says into words: "form-council-proposal" becomes "the council proposal form",
+"councillor-1" becomes "Councillor 1", "ask-2" becomes "the clerk's draft", "eating_out" becomes "eating out", and
+"standing direction" becomes "standing order to a town office". It is applied to tool-call lines, act titles, the
+clerk's write-ups, a resident's feed and the clerk's failure reasons ("You don't know of anyone or anything called X"
+becomes "the mayor named X, which the office has no record of"). It is never applied to the mayor's quoted words, the
+prompt document or anything in Researcher mode, where the ids are the evidence. Other changes:
+- Token counts, costs and character counts are shown in Researcher mode only.
+- "town seed 7" is written "town 7", and the goal key ("redteam") is written as its sentence.
+- A law in a story card ends at a sentence boundary, never mid-word.
+- "How do we know?" chains no longer sit inside a `<p>`, which made the HTML invalid.
+- **Revisit if:** the office's id shapes change (then extend `plainWords`), or Naz wants the ids visible in Story mode.

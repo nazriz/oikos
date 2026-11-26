@@ -67,8 +67,8 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
           <article key={b.t.i} data-turns={String(b.t.i)} data-peek={`sitting:${b.t.i}`} className={`sm-card ${b.t.levers.length ? "grab" : ""}`} data-tour={k === 0 ? "turn" : undefined}>
             <h3>Day {b.t.day}</h3>
             {b.t.sentences.map((x, i) => <p key={i} className={i === 0 ? "sm-lead" : undefined}>{x}</p>)}
-            {b.t.votes.length > 0 && run && <p className="sm-ev"><HowDoWeKnow run={run} claim={{ kind: "vote", proposal: b.t.votes[0]! }} label={b.t.votes.length > 1 ? "How the first vote went" : "How the vote went"} /></p>}
-            {b.t.levers.length > 0 && <p className="sm-grab">The study counts this as a {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}. {run && <HowDoWeKnow run={run} claim={{ kind: "lever", index: (b.t.levers.find((l) => l.level === "executed") ?? b.t.levers[0]!).i }} />}</p>}
+            {b.t.votes.length > 0 && run && <div className="sm-ev"><HowDoWeKnow run={run} claim={{ kind: "vote", proposal: b.t.votes[0]! }} label={b.t.votes.length > 1 ? "How the first vote went" : "How the vote went"} /></div>}
+            {b.t.levers.length > 0 && <div className="sm-grab">The study counts this as a {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}. {run && <HowDoWeKnow run={run} claim={{ kind: "lever", index: (b.t.levers.find((l) => l.level === "executed") ?? b.t.levers[0]!).i }} />}</div>}
             {b.t.quote && <blockquote className="sm-quote"><Hi text={`“${b.t.quote.length > 280 ? b.t.quote.slice(0, 279) + "…" : b.t.quote}”`} /></blockquote>}
             <button className="st-btn" onClick={() => open(b.t)}>Read this turn in full</button>
           </article>
@@ -112,9 +112,9 @@ function OneMinute({ seat, run, model, turns }: { seat: SeatJson; run: string; m
       <button className="sm-minute-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>This run in one minute{open ? "" : " (show)"}</button>
       {open && <>
         <p>An AI model, {model}, held the office of mayor from day {dayOf(seat.fork_at)} {end}. {seat.goal ? `${goalText(seat.goal)}.` : ""}</p>
-        <p>{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${dayNo(first.day)}` : ""}. </> : lv.tried ? <>It tried {kinds(tried).join("; ")}, but did not carry it out. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
-          {first && <HowDoWeKnow run={run} claim={{ kind: "lever", index: first.i }} />}</p>
-        <p className={`sm-out ${out.css}`}>{out.label}. <HowDoWeKnow run={run} claim={{ kind: "outcome" }} /></p>
+        <div className="sm-p">{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${dayNo(first.day)}` : ""}. </> : lv.tried ? <>It tried {kinds(tried).join("; ")}, but did not carry it out. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
+          {first && <HowDoWeKnow run={run} claim={{ kind: "lever", index: first.i }} />}</div>
+        <div className={`sm-p sm-out ${out.css}`}>{out.label}. <HowDoWeKnow run={run} claim={{ kind: "outcome" }} /></div>
         {twinSeat && <p>In the same town with a rule-based mayor: {seatOutcome(twinSeat).label.charAt(0).toLowerCase() + seatOutcome(twinSeat).label.slice(1)}, after {twinSeat.acts.filter((a) => a.t >= twinSeat.fork_at).length} acts to this mayor's {seat.acts.filter((a) => a.t >= seat.fork_at).length}.</p>}
       </>}
     </section>

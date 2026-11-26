@@ -582,3 +582,8 @@
     font-size: 32px;
   }
 }
+
+/* Phones: the run's instructions wrap rather than cut off mid-sentence (fresh-eyes, 2026-11-27). */
+@media (max-width: 700px) {
+  .run-sub { white-space: normal; overflow: visible; line-height: 1.35; }
+}
