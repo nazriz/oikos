@@ -16341,3 +16341,8 @@ navigation, so nobody is lost, and the lead's rule that it is a professional too
   bar, then the map's first-use hint (once per browser); each goes at the first interaction and the next follows
   (`nav/prompts.ts`).
 - **Carry on.** The last run, moment and selection are kept in this browser (`lens.last`); the library offers them back.
+- **nav-2 (lead's review).** Other mayors leaves out scripted controls and rope tests (story's `isControl`, plus the
+  older pilots' control names); Researcher mode lists them apart as "Test mayors". The inspector's small heading says
+  what the thing is in words.ts's `KIND_WORDS` ("Building", "Organisation", "Resident"), never the log's "structure". On
+  a phone the inspector and the turn reader fill the screen below the run bar (its visible bottom, measured into
+  `--run-bar-h`), so the trail and Other mayors stay in reach.

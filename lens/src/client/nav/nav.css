@@ -302,6 +302,15 @@ button.crumb:hover {
     font-size: 13.5px;
     flex-basis: 100%;
   }
+  .crumbs {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .switcher-pop {
+    left: 8px;
+    width: calc(100vw - 16px);
+    max-width: none;
+  }
   .crumbs > .crumb:first-child,
   .crumbs > .crumb:first-child + .crumb-sep {
     display: none;
@@ -359,8 +368,24 @@ button.crumb:hover {
   height: 14px;
   flex: none;
 }
+.drawer-kind {
+  align-self: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+}
 .drawer-id {
   font-size: 13px;
+  font-weight: 400;
   color: var(--muted);
-  align-self: center;
+}
+
+/* On a phone the inspector and the turn reader fill the screen below the run bar, not over it: the trail and "Other
+   mayors" stay in reach (the bar's height is measured into --run-bar-h). */
+@media (max-width: 760px) {
+  .run-page .drawer,
+  .run-page .drawer.wide,
+  .run-page .run-reader {
+    top: var(--run-bar-h, 0px);
+  }
 }

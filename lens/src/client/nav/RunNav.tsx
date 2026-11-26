@@ -9,6 +9,8 @@ import { runHref, selToken } from "../router";
 import { useLens } from "../state";
 import { goalText, modelName } from "../words";
 import { goTo, isMoment, runLabel, useNames, useNav } from "./nav";
+import { useMode } from "../mode";
+import { isControl } from "../story/Findings";
 import "./nav.css";
 
 /** "Library > GLM 5.3, town 7 > Day 121, turn 1 > Ada Brook": where you are, each step a way back. */
@@ -77,9 +79,9 @@ interface Peer {
 
 /** Runs of the same town (same seed, same day the AI took office): other models with the same instructions, the rule-based
  * mayor, and this model under other instructions. One per model: the finished, most recent run. */
-export function peersOf(runs: RunEntry[], me: RunEntry): { same: Peer[]; other: Peer[] } {
+export function peersOf(runs: RunEntry[], me: RunEntry): { same: Peer[]; other: Peer[]; controls: Peer[] } {
   const x = me.experiment;
-  if (!x) return { same: [], other: [] };
+  if (!x) return { same: [], other: [], controls: [] };
   // (Rehearsals and mock runs are tests of the machinery, not mayors.)
   const town = runs.filter((r) => r.key !== me.key && !/rehearsal|mock/.test(r.group) && r.experiment && r.experiment.seed === x.seed && r.experiment.forkDay === x.forkDay && r.experiment.post === x.post);
   const rank = (r: RunEntry) => (r.experiment!.stopped ? 0 : 4) + (r.group === me.group ? 2 : 0) + (r.indexed ? 1 : 0);
@@ -101,15 +103,20 @@ export function peersOf(runs: RunEntry[], me: RunEntry): { same: Peer[]; other: 
   const peer = (r: RunEntry, label: string): Peer => ({ key: r.key, name: label, note: note(r), isCode: r.experiment!.isCode });
   // The rule-based mayor: this run's own twin first.
   const twin = (x.twin && runs.find((r) => r.key === x.twin)) || (x.isCode ? undefined : best(town.filter((r) => r.experiment!.isCode && r.experiment!.goal === x.goal), () => "code")[0]);
-  const models = best(
-    town.filter((r) => !r.experiment!.isCode && r.experiment!.goal === x.goal && r.experiment!.model !== x.model && !/^(scripted|diligent|skip|delay|overstep|nobody|rubber|amend)/i.test(r.experiment!.model)),
-    (r) => r.experiment!.model,
-  ).sort((a, b) => modelName(a.experiment!.model).localeCompare(modelName(b.experiment!.model)));
+  // (Scripted controls and rope tests are not mayors: story's rule, plus the older pilots' control names.)
+  const control = (m: string) => isControl(m) || /^(diligent|skip|delay|overstep|nobody|rubber)/i.test(m);
+  const peersBy = (keep: (m: string) => boolean) =>
+    best(
+      town.filter((r) => !r.experiment!.isCode && r.experiment!.goal === x.goal && r.experiment!.model !== x.model && keep(r.experiment!.model)),
+      (r) => r.experiment!.model,
+    ).sort((a, b) => modelName(a.experiment!.model).localeCompare(modelName(b.experiment!.model)));
+  const models = peersBy((m) => !control(m));
+  const controls = peersBy(control).map((r) => peer(r, modelName(r.experiment!.model)));
   const same = [...models.map((r) => peer(r, modelName(r.experiment!.model))), ...(twin && twin.key !== me.key ? [peer(twin, "The rule-based mayor")] : [])];
   const other = x.isCode
     ? []
     : best(town.filter((r) => !r.experiment!.isCode && r.experiment!.model === x.model && r.experiment!.goal !== x.goal), (r) => r.experiment!.goal).map((r) => peer(r, goalText(r.experiment!.goal)));
-  return { same, other };
+  return { same, other, controls };
 }
 
 /** "Same town, other mayors": opens the same day (and the same person or building) in another run. */
@@ -120,7 +127,8 @@ function Switcher({ run, entry }: { run: string; entry?: RunEntry }) {
   useEffect(() => {
     if (entry?.experiment) getCatalogue().then((c) => setRuns(c.runs), () => {});
   }, [entry]);
-  const peers = useMemo(() => (runs && entry ? peersOf(runs, entry) : { same: [], other: [] }), [runs, entry]);
+  const peers = useMemo(() => (runs && entry ? peersOf(runs, entry) : { same: [], other: [], controls: [] }), [runs, entry]);
+  const researcher = useMode((m) => m.mode === "researcher");
   useEffect(() => {
     if (!open) return;
     const off = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
@@ -137,7 +145,7 @@ function Switcher({ run, entry }: { run: string; entry?: RunEntry }) {
       window.removeEventListener("keydown", key, true);
     };
   }, [open]);
-  const n = peers.same.length + peers.other.length;
+  const n = peers.same.length + peers.other.length + (researcher ? peers.controls.length : 0);
   if (!entry?.experiment || !n) return null;
   // The same moment there: the time, and a person, building or organisation (the towns share them); a turn is this run's own.
   const href = (key: string) => {
@@ -162,38 +170,30 @@ function Switcher({ run, entry }: { run: string; entry?: RunEntry }) {
       {open && (
         <div className="switcher-pop" role="menu" data-esc-own="">
           <p className="switcher-lead">Open the same day in this town under another mayor.</p>
-          {peers.same.length > 0 && (
-            <>
-              <h3 className="switcher-h">Same town, same instructions</h3>
-              <ul>
-                {peers.same.map((p) => (
-                  <li key={p.key}>
-                    <a role="menuitem" href={href(p.key)} onClick={(e) => go(e, p.key)}>
-                      <b>{p.name}</b>
-                      {p.note && <span>{p.note}</span>}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          {peers.other.length > 0 && (
-            <>
-              <h3 className="switcher-h">{modelName(entry.experiment.model)}, other instructions</h3>
-              <ul>
-                {peers.other.map((p) => (
-                  <li key={p.key}>
-                    <a role="menuitem" href={href(p.key)} onClick={(e) => go(e, p.key)}>
-                      <b>{p.name}</b>
-                      {p.note && <span>{p.note}</span>}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          <PeerList title="Same town, same instructions" peers={peers.same} href={href} go={go} />
+          <PeerList title={`${modelName(entry.experiment.model)}, other instructions`} peers={peers.other} href={href} go={go} />
+          {researcher && <PeerList title="Test mayors (scripted controls, not AI models)" peers={peers.controls} href={href} go={go} />}
         </div>
       )}
     </div>
+  );
+}
+
+function PeerList({ title, peers, href, go }: { title: string; peers: Peer[]; href: (k: string) => string; go: (e: React.MouseEvent<HTMLAnchorElement>, k: string) => void }) {
+  if (!peers.length) return null;
+  return (
+    <>
+      <h3 className="switcher-h">{title}</h3>
+      <ul>
+        {peers.map((p) => (
+          <li key={p.key}>
+            <a role="menuitem" href={href(p.key)} onClick={(e) => go(e, p.key)}>
+              <b>{p.name}</b>
+              {p.note && <span>{p.note}</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

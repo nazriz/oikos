@@ -18,7 +18,7 @@ import { RunSummary } from "./RunSummary";
 import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer } from "../shell/Shell";
-import { goalText, leverTitle, modelName } from "../words";
+import { goalText, KIND_WORDS, leverTitle, modelName } from "../words";
 import { Crumbs } from "../nav/RunNav";
 import { About } from "../nav/About";
 import { goTo, useNames, useNav, useRunHistory, useSeat } from "../nav/nav";
@@ -213,8 +213,28 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
   const out = readingOutcome(reading);
   const tried = reading?.levers?.tried ?? 0, done = reading?.levers?.done ?? 0;
   const name = x ? (x.isCode ? "The rule-based mayor" : modelName(x.model)) : (entry?.title.split("/").at(-1) ?? "");
+  // (Its height, for what fills the screen below it on a phone: src/client/nav/nav.css.)
+  const bar = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = bar.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    // (Where its bottom is on screen now: 0 once the page has scrolled it away.)
+    let raf = 0;
+    const measure = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => document.documentElement.style.setProperty("--run-bar-h", `${Math.max(0, Math.round(el.getBoundingClientRect().bottom))}px`));
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener("scroll", measure, { capture: true, passive: true });
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", measure, { capture: true });
+    };
+  }, []);
   return (
-    <header className="run-bar">
+    <header className="run-bar" ref={bar}>
       <div className="run-bar-top">
         <a className="run-home head" href="#/" title="Back to all runs">
           Lens
@@ -401,7 +421,10 @@ function Inspector(props: SlotProps) {
             Back to {name(from).replace(/^Power grab: /, "the power grab: ")}
           </button>
         ) : (
-          <span className="drawer-id">{researcher && selection.kind !== "person" ? (selection as { id?: string }).id : ""}</span>
+          <span className="drawer-kind">
+            {KIND_WORDS[selection.kind]}
+            {researcher && selection.kind !== "person" && <span className="drawer-id"> {(selection as { id?: string }).id}</span>}
+          </span>
         )}
         <button className="btn ghost icon" aria-label="Close" title="Close (Esc)" onClick={() => useLens.getState().select(null)}>
           <Close />
