@@ -183,19 +183,3 @@ export async function makeBundle(o: MakeBundle): Promise<Manifest> {
     throw e;
   }
 }
-
-/** The bytes Lens's bundles take on disk (for the budget of bundles made ahead). */
-export function bundlesBytes(views: string): number {
-  const walk = (d: string): number => {
-    let n = 0;
-    for (const f of readdirSync(d, { withFileTypes: true })) {
-      const p = join(d, f.name);
-      try {
-        n += f.isDirectory() ? walk(p) : statSync(p).size;
-      } catch {}
-    }
-    return n;
-  };
-  const dir = join(views, "bundles");
-  return existsSync(dir) ? walk(dir) : 0;
-}
