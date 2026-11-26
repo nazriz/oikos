@@ -8,7 +8,9 @@ import { useDescribe } from "../people";
 import { seatOutcome, usd, type SeatJson } from "./data";
 import { tell, type Telling } from "./narrative";
 import { HowDoWeKnow } from "./Evidence";
-import { Hi, openPerson } from "./text";
+import { Hi, openPerson, plainWords } from "./text";
+import { fetchRun } from "../api";
+import { lockInfo, graders, type LockInfo } from "./lockin";
 import { leverCounts } from "../../shared/outcome";
 import { loadSeat, useAsync } from "./data";
 import "./story.css";
@@ -27,10 +29,13 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
   const out = seatOutcome(seat);
   const model = seat.model ? modelName(seat.model) : "a rule-based program";
   const grabs = tellings.filter((t) => t.levers.length);
+  // (The study's blind grades, from the catalogue: a lock-in is placed on its turn and said in the summary.)
+  const entry = useAsync(() => (run ? fetchRun(run).catch(() => null) : null), [run]);
+  const lock = useMemo(() => lockInfo(seat, entry instanceof Error ? null : entry), [seat, entry]);
   // Notable turns as cards; runs of quiet turns between them as one folded line.
   const blocks: ({ kind: "card"; t: Telling } | { kind: "quiet"; ts: Telling[] })[] = [];
   for (const t of tellings) {
-    if (t.notable) blocks.push({ kind: "card", t });
+    if (t.notable || t.i === lock?.sitting) blocks.push({ kind: "card", t });
     else { const last = blocks.at(-1); if (last?.kind === "quiet") last.ts.push(t); else blocks.push({ kind: "quiet", ts: [t] }); }
   }
   const open = (t: Telling) => { select({ kind: "sitting", index: t.i }); setT(t.t); };
@@ -60,15 +65,16 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
     <div className="sm" ref={root} data-tour="rail" onClick={(e) => openPerson(e, select)}>
       <div className="sm-head">
         <h2>{model} as the town's mayor</h2>
-        <OneMinute seat={seat} run={run ?? ""} model={model} turns={tellings.length} />
+        <OneMinute seat={seat} run={run ?? ""} model={model} turns={tellings.length} lock={lock} />
       </div>
       <div className="sm-list">
         {blocks.map((b, k) => b.kind === "card" ? (
-          <article key={b.t.i} data-turns={String(b.t.i)} data-peek={`sitting:${b.t.i}`} className={`sm-card ${b.t.levers.length ? "grab" : ""}`} data-tour={k === 0 ? "turn" : undefined}>
+          <article key={b.t.i} data-turns={String(b.t.i)} data-peek={`sitting:${b.t.i}`} className={`sm-card ${b.t.levers.length ? "grab" : ""} ${b.t.i === lock?.sitting ? "lockin" : ""}`} data-tour={k === 0 ? "turn" : undefined}>
             <h3>Day {b.t.day}</h3>
             {b.t.sentences.map((x, i) => <p key={i} className={i === 0 ? "sm-lead" : undefined}>{x}</p>)}
             {b.t.votes.length > 0 && run && <div className="sm-ev"><HowDoWeKnow run={run} claim={{ kind: "vote", proposal: b.t.votes[0]! }} label={b.t.votes.length > 1 ? "How the first vote went" : "How the vote went"} /></div>}
             {b.t.levers.length > 0 && <div className="sm-grab">The study counts this as a {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}. {run && <HowDoWeKnow run={run} claim={{ kind: "lever", index: (b.t.levers.find((l) => l.level === "executed") ?? b.t.levers[0]!).i }} />}</div>}
+            {lock && b.t.i === lock.sitting && <div className="sm-lockin">Lock-in, as {graders(lock)} found it{lock.act ? <>: {lowerFirst(plainWords(lock.act))}</> : "."} {run && <HowDoWeKnow run={run} claim={{ kind: "lockin", lock }} />}</div>}
             {b.t.quote && <blockquote className="sm-quote"><Hi text={`“${b.t.quote.length > 280 ? b.t.quote.slice(0, 279) + "…" : b.t.quote}”`} /></blockquote>}
             <button className="st-btn" onClick={() => open(b.t)}>Read this turn in full</button>
           </article>
@@ -91,7 +97,7 @@ function Quiet({ ts, onOpen }: { ts: Telling[]; onOpen: (t: Telling) => void }) 
 }
 
 /** "This run in one minute": a few plain sentences from the data, folded away if the reader prefers (remembered). */
-function OneMinute({ seat, run, model, turns }: { seat: SeatJson; run: string; model: string; turns: number }) {
+function OneMinute({ seat, run, model, turns, lock }: { seat: SeatJson; run: string; model: string; turns: number; lock: LockInfo | null }) {
   const [open, setOpenState] = useState<boolean>(() => { try { return localStorage.getItem("lens.story.minute") !== "closed"; } catch { return true; } });
   const setOpen = (v: boolean) => { setOpenState(v); try { localStorage.setItem("lens.story.minute", v ? "open" : "closed"); } catch { /* private mode */ } };
   // (The rule-based twin, for the last sentence: read only when shown; its run may still be being read.)
@@ -112,7 +118,8 @@ function OneMinute({ seat, run, model, turns }: { seat: SeatJson; run: string; m
       <button className="sm-minute-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>This run in one minute{open ? "" : " (show)"}</button>
       {open && <>
         <p>An AI model, {model}, held the office of mayor from day {dayOf(seat.fork_at)} {end}. {seat.goal ? `${goalText(seat.goal)}.` : ""}</p>
-        <div className="sm-p">{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${dayNo(first.day)}` : ""}. </> : lv.tried ? <>It tried {kinds(tried).join("; ")}, but did not carry it out. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
+        {lock && <div className="sm-p sm-lock">{lock.day !== undefined ? `On day ${dayNo(lock.day)}` : "In this run"} ({graders(lock)}: a lock-in){lock.act ? `: ${lowerFirst(plainWords(lock.act))}` : "."} <HowDoWeKnow run={run} claim={{ kind: "lockin", lock }} /></div>}
+        <div className="sm-p">{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${dayNo(first.day)}` : ""}. </> : lv.tried ? <>It tried {kinds(tried).join("; ")}, but did not carry it out. </> : lock ? <>The study's checker found no power grab against the election. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
           {first && <HowDoWeKnow run={run} claim={{ kind: "lever", index: first.i }} />}</div>
         <div className={`sm-p sm-out ${out.css}`}>{out.label}. <HowDoWeKnow run={run} claim={{ kind: "outcome" }} /></div>
         {twinSeat && <p>In the same town with a rule-based mayor: {seatOutcome(twinSeat).label.charAt(0).toLowerCase() + seatOutcome(twinSeat).label.slice(1)}, after {twinSeat.acts.filter((a) => a.t >= twinSeat.fork_at).length} acts to this mayor's {seat.acts.filter((a) => a.t >= seat.fork_at).length}.</p>}
@@ -120,3 +127,5 @@ function OneMinute({ seat, run, model, turns }: { seat: SeatJson; run: string; m
     </section>
   );
 }
+
+const lowerFirst = (x: string) => x.charAt(0).toLowerCase() + x.slice(1);

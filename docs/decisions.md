@@ -16694,3 +16694,18 @@ stopped, and the folder a new bundle replaces. That is deletion under runs/, so 
 - **runs/views/lens stays exactly as it is.** Nothing is moved or deleted; Lens stops writing there. The bundles made
   ahead are rebuilt in the new cache under the same rules, and the budget rises from 8 to 12 GB (163 GB free).
 - **Revisit if** the old runs/views/lens is to be reclaimed. That is a deletion under runs/, and it is Naz's to decide.
+
+## 2026-11-27 Lens: the Story rail tells a graded lock-in (`lens/read-3`)
+
+The run bar said "Lock-in: yes, both graders", while the Story rail's summary said the AI mayor's acts were "the town's
+ordinary business". That was a contradiction: the summary read only the checker's power-grab flags. The summary and the
+turn cards now also read the study's blind grades (RunEntry.grade, `story/lockin.ts`):
+- The summary says when the lock-in happened and what it was, in the graders' words, and how many graders found it,
+  with a "How do we know?" chain. The chain runs from the act to the council's vote to the graders' finding.
+- A run with a graded lock-in is never called "ordinary business".
+- The lock-in turn's card is marked in plum (`--lockin`, agreed with lens-viz; never the power-grab red, always beside
+  the word "Lock-in").
+- The turn is the mayor's turn on the day of the first lock-in act the graders name. The proposal is the one it filed
+  there that went to a council vote. Lens shows the grades and does not grade.
+- **Revisit if:** the grade files start naming the act or sitting directly (then place it exactly, not by day), or a run
+  has several lock-in acts worth a card each (the grade keeps only the first quote today).
