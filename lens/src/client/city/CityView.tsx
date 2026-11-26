@@ -622,12 +622,12 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     }),
     new PathLayer({
       id: "roads-edge", data: B.roads.segments, getPath: ((d: any) => [[d.a[0], d.a[1], 0.25], [d.b[0], d.b[1], 0.25]]) as any,
-      getColor: (dark ? mix(hex("#4a4e55"), hex("#1d2129"), sky.night) : mix(hex("#8E9BA6"), hex("#1d2129"), sky.night)) as any, getWidth: cell * 0.44, widthUnits: "meters", capRounded: true,
+      getColor: (dark ? mix(hex("#4a4e55"), hex("#1d2129"), sky.night) : mix(hex("#B9B3A6"), hex("#1d2129"), sky.night)) as any, getWidth: cell * 0.42, widthUnits: "meters", capRounded: true,
       updateTriggers: { getColor: [sky.night, dark] },
     }),
     new PathLayer({
       id: "roads", data: B.roads.segments, getPath: ((d: any) => [[d.a[0], d.a[1], 0.3], [d.b[0], d.b[1], 0.3]]) as any,
-      getColor: (dark ? mix(hex("#8f9296"), hex("#33373f"), sky.night) : mix(hex("#FFFFFF"), hex("#3A4652"), sky.night)) as any, getWidth: cell * 0.36, widthUnits: "meters", capRounded: true,
+      getColor: (dark ? mix(hex("#8f9296"), hex("#33373f"), sky.night) : mix(hex("#E4DFD5"), hex("#3A4652"), sky.night)) as any, getWidth: cell * 0.37, widthUnits: "meters", capRounded: true,
       updateTriggers: { getColor: [sky.night, dark] },
     }),
     new PathLayer({
@@ -719,10 +719,11 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     overlays.acts && arcs.length > 0 && new ArcLayer({
       id: "acts", data: arcs, getSourcePosition: (d: any) => d.from, getTargetPosition: (d: any) => d.to,
       // One act picked (here or in the story): it stands out, the others step back.
-      getSourceColor: (d: any) => hex(d.refused ? PAL.flag : PAL.seat, hi.has(d.act.seq) ? 255 : 235 * (1 - d.age * 0.8) * (hi.size ? 0.25 : 1)),
-      getTargetColor: (d: any) => hex(d.refused ? PAL.flag : "#ffe2a6", hi.has(d.act.seq) ? 255 : 220 * (1 - d.age * 0.85) * (hi.size ? 0.25 : 1)),
+      // Road-marking yellow at night; by day the darker ochre, which reads on paper.
+      getSourceColor: (d: any) => hex(d.refused ? PAL.flag : inkLight ? "#8A6A00" : PAL.seat, hi.has(d.act.seq) ? 255 : 235 * (1 - d.age * 0.8) * (hi.size ? 0.25 : 1)),
+      getTargetColor: (d: any) => hex(d.refused ? PAL.flag : inkLight ? "#B08A10" : "#ffe2a6", hi.has(d.act.seq) ? 255 : 220 * (1 - d.age * 0.85) * (hi.size ? 0.25 : 1)),
       getWidth: (d: any) => (hi.has(d.act.seq) ? 4.5 : 1.6 + 1.6 * (1 - d.age)), getHeight: 0.45, greatCircle: false, pickable: true,
-      updateTriggers: { getSourceColor: [hiKey], getTargetColor: [hiKey], getWidth: [hiKey] },
+      updateTriggers: { getSourceColor: [hiKey, inkLight], getTargetColor: [hiKey, inkLight], getWidth: [hiKey] },
     }),
     overlays.acts && new ScatterplotLayer({
       id: "act-hits", data: arcs.filter((d) => t - d.act.t < 12 * 3600 || hi.has(d.act.seq)),
@@ -833,7 +834,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       updateTriggers: { getPosition: t },
     }),
     overlays.labels && new TextLayer({
-      id: "labels", data: (view.zoom as number) > 0.9 ? (story ? staticLayers.labels1NoHall : staticLayers.labels1) : staticLayers.labels0, getPosition: (l: any) => l.pos, getText: (l: any) => l.text, getSize: (l: any) => l.size,
+      id: "labels", data: staticLayers.labels0, getPosition: (l: any) => l.pos, getText: (l: any) => l.text, getSize: (l: any) => l.size,
       // Written on the plan like a street map: drafting navy on paper by day, pale on slate at night.
       getColor: (l: any) => (inkLight ? [29, 43, 54, l.tier === 0 ? 230 : 255] : [228, 234, 238, l.tier === 0 ? 200 : 235]), fontFamily: "Overpass Variable, Overpass, system-ui, sans-serif", fontWeight: 700,
       characterSet: "auto", billboard: true, getTextAnchor: "middle", getAlignmentBaseline: "bottom", fontSettings: { sdf: true, fontSize: 64, buffer: 6 },
@@ -867,6 +868,21 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       return { seq: a.seq, text: actSentence(town, a), refused: a.status === "refused", age: (t - a.t) / (8 * 3600), at: arc ? arc.to : null };
     });
   }, [story, town, arcs, Math.floor(t / 300)]);
+  // Building names written on the plan when zoomed in, skipping any that would overlap one already placed.
+  const placeLabels = (() => {
+    if (!overlays.labels || (view.zoom as number) <= 0.9 || present) return [];
+    const out: { x: number; y: number; text: string; w: number }[] = [];
+    const sorted = [...B.labels].filter((l) => l.tier === 1 && l.text !== "Town hall").sort((a, b) => b.prio - a.prio);
+    for (const l of sorted) {
+      const p = onScreen(l.pos[0], l.pos[1], l.pos[2]);
+      if (!p) continue;
+      const w = l.text.length * 6.6 + 8;
+      if (hallAt && Math.abs(p[0] - hallAt[0]) < (w + 220) / 2 && Math.abs(p[1] - hallAt[1]) < 22) continue;
+      if (out.some((o) => Math.abs(o.x - p[0]) < (o.w + w) / 2 && Math.abs(o.y - p[1]) < 18)) continue;
+      out.push({ x: p[0], y: p[1], text: l.text, w });
+    }
+    return out;
+  })();
   // A first hint, once per browser.
   const [hint, setHint] = useState(() => { try { return !localStorage.getItem("lens.city.hinted"); } catch { return false; } });
   const dropHint = () => { if (!hint) return; setHint(false); try { localStorage.setItem("lens.city.hinted", "1"); } catch { /* private mode */ } };
@@ -970,6 +986,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       {label && <div className={`lc-pane-label${bare ? " bare" : ""}`}>{label}</div>}
       {!bare && !present && <Clock t={t} sky={sky} town={town} />}
       {hallAt && !present && <div className={`lc-anno hall${inkLight ? "" : " night"}`} data-tour="city-town-hall" id="city-town-hall" style={{ left: Math.min(size.w - 130, Math.max(130, hallAt[0])), top: hallAt[1] }}>{story ? CITY_WORDS.hall : "Town hall"}</div>}
+      {placeLabels.map((l) => <div key={l.text} className={`lc-anno place${inkLight ? "" : " night"}`} style={{ left: l.x, top: l.y }}>{l.text}</div>)}
       {actNotes.map((n) => { const p = n.at ? onScreen(n.at[0], n.at[1], n.at[2] + 10) : null; return p && <div key={n.seq} className={`lc-anno act ${n.refused ? "refused" : ""}${inkLight ? "" : " night"}`} style={{ left: Math.min(size.w - 150, Math.max(150, p[0])), top: p[1], opacity: 1 - n.age * 0.7 }}><b />{n.text}</div>; })}
       {hint && !present && !bare && <div className="lc-hint" onMouseEnter={dropHint}>{CITY_WORDS.hint} <button className="lc-ghost" onClick={dropHint}>Got it</button></div>}
       {diff && diff.ended !== undefined && <div className="lc-diff"><b>Difference from the other arm</b><span>An arm ended on day {Math.floor(diff.ended / DAY) + 1}: nothing to compare after it.</span></div>}

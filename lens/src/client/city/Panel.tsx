@@ -52,6 +52,7 @@ export function Panel({ story, onPresent, onRecord, twin, open0, overlays, setOv
   story?: boolean; onPresent?: () => void; onRecord?: () => void; twin?: boolean; open0: boolean; overlays: Overlays; setOverlays: (o: Overlays) => void; counts: Record<string, number>; kinds: string[]; city: CityData; t: number; arcs: number; onHome: () => void;
   ev?: ElectionView; candCol: Record<string, string>; papersShown: number[]; onTour?: () => void;
 }) {
+  const [menu, setMenu] = useState(false);
   const [open, setOpen] = useState(() => open0 && (typeof window === "undefined" || window.innerWidth > 640));
   const tog = (k: keyof Overlays) => setOverlays({ ...overlays, [k]: !overlays[k] });
   const cats = CAT_ORDER.filter((c) => city.town.structures.some((s) => s.category === c));
@@ -63,9 +64,12 @@ export function Panel({ story, onPresent, onRecord, twin, open0, overlays, setOv
     <div className={`lc-panel ${open ? "" : "closed"}`} data-tour="city-layers" id="city-layers">
       <div className="lc-panel-head">
         <button className="lc-ghost" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Close" : "Layers"}</button>
-        {onTour && <button className="lc-ghost" onClick={onTour} title="Play the run's key moments">Tour</button>}
-        {open && onPresent && <button className="lc-ghost" onClick={onPresent} title="Full screen, a caption bar, the camera on its own (Esc to leave)">Present</button>}
-        {open && onRecord && !story && <button className="lc-ghost" onClick={onRecord} title="Record the tour as a video (it downloads at the end)">Record</button>}
+        {(onTour || onPresent) && <span className="lc-menuwrap"><button className="lc-ghost" onClick={() => setMenu(!menu)} aria-expanded={menu}>Play</button>
+          {menu && <div className="lc-menu" onMouseLeave={() => setMenu(false)}>
+            {onTour && <button onClick={() => { setMenu(false); onTour(); }}>Play the story<span>The run's key moments, one by one</span></button>}
+            {onPresent && <button onClick={() => { setMenu(false); onPresent(); }}>Present<span>Full screen, captions, the camera on its own</span></button>}
+            {onRecord && !story && <button onClick={() => { setMenu(false); onRecord(); }}>Record a video<span>The story as a video file, saved at the end</span></button>}
+          </div>}</span>}
         <button className="lc-ghost" onClick={onHome} title="Frame the town">Frame</button>
       </div>
       {open && (
@@ -83,7 +87,7 @@ export function Panel({ story, onPresent, onRecord, twin, open0, overlays, setOv
           {city.town.seats.length > 0 && (
             <Section on={overlays.acts} toggle={() => tog("acts")} title={CITY_WORDS.actsTitle} note={`${CITY_WORDS.actsLegend} ${CITY_WORDS.actsRefused}`}>
             <div className="lc-legend">
-              <div className="lc-row"><span className="lc-sw line" style={{ background: `linear-gradient(90deg, ${PAL.seat}, #ffe2a6)` }} /><span>Actions in the last 7 days</span><span className="lc-num">{recentActs}</span></div>
+              <div className="lc-row"><span className="lc-sw line" style={{ background: "var(--lc-seat-text)" }} /><span>Actions in the last 7 days</span><span className="lc-num">{recentActs}</span></div>
               <div className="lc-row muted"><span className="lc-sw" /><span>Places they reached</span><span className="lc-num">{arcs}</span></div>
             </div>
           </Section>

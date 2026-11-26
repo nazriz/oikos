@@ -85,6 +85,13 @@ export const CITY_CSS = `
 .lens-city .lc-quote { margin-top: 8px; padding-left: 10px; border-left: 2px solid var(--lc-seat); font-family: var(--lc-serif); font-size: 13.5px; line-height: 1.45; white-space: pre-line; max-height: 9em; overflow: hidden; }
 
 .lens-city .lc-short { display: none; }
+.lens-city .lc-ghost { white-space: nowrap; }
+.lens-city .lc-menuwrap { position: relative; }
+.lens-city .lc-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 8; width: 250px; background: var(--lc-panel); border: 1px solid var(--lc-hair); border-radius: 2px; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.lens-city .lc-menu button { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--lc-hair); background: none; color: var(--lc-text); font: inherit; font-weight: 700; padding: 8px 12px; cursor: pointer; }
+.lens-city .lc-menu button:last-child { border-bottom: 0; }
+.lens-city .lc-menu button:hover { background: color-mix(in srgb, var(--lc-text) 6%, transparent); }
+.lens-city .lc-menu button span { display: block; font-weight: 400; font-size: 12px; color: var(--lc-muted); margin-top: 2px; }
 .lens-city .lc-rowbtn { width: 100%; border: 0; background: none; font: inherit; text-align: left; padding: 1px 0; cursor: pointer; }
 .lens-city .lc-rowbtn.off { color: var(--lc-muted); }
 .lens-city .lc-tour { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(640px, calc(100% - 32px)); z-index: 4; padding: 14px 18px 10px; border-top: 3px solid var(--lc-seat); }
@@ -113,6 +120,7 @@ export const CITY_CSS = `
 /* Labels written on the map, positioned over their place (street-plan style). */
 .lens-city .lc-anno { position: absolute; z-index: 2; pointer-events: none; transform: translate(-50%, -100%); white-space: nowrap; font-weight: 800; font-size: 13px;
   color: var(--lc-text); text-shadow: 0 0 3px var(--lc-ink), 0 0 3px var(--lc-ink), 0 0 6px var(--lc-ink); }
+.lens-city .lc-anno.place { font-weight: 700; font-size: 12px; }
 .lens-city .lc-anno.night { color: #E4EAEE; text-shadow: 0 0 3px #16212B, 0 0 3px #16212B, 0 0 6px #16212B; }
 .lens-city .lc-anno.night.hall::after { background: #E4EAEE; }
 .lens-city .lc-anno.hall::after { content: ""; display: block; width: 1px; height: 14px; margin: 2px auto 0; background: var(--lc-text); }

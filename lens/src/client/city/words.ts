@@ -14,7 +14,7 @@ export const CITY_WORDS = {
   whereAway: "Out of town, or between places",
   whereGone: "Moved away or died",
   actsTitle: "What the AI mayor does",
-  actsLegend: "A gold arc runs from the town hall to whoever the AI mayor's action reached, and fades over a week. Hover one to read it.",
+  actsLegend: "An ochre arc (yellow at night) runs from the town hall to whoever the AI mayor's action reached, and fades over a week. Hover one to read it.",
   actsRefused: "A red arc: the town refused the action.",
   hint: "Hover a building or a dot to see who is there. Click one to follow it. Drag to move, scroll to zoom.",
   moreInResearcher: "More layers (elections, papers, networks) are in Researcher mode.",
