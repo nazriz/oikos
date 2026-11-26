@@ -16037,3 +16037,24 @@ line (VISION §15). (5) `ForkResultMeta.error` is added to tally.ts's type: the 
 broke typechecks that pull in tally.ts.
 **Revisit if** a view needs the bulk lines for every run (then parse them once in Rust), or reader.ts starts to need
 lines its `wanted` filter drops.
+
+## 2026-11-26 Lens: the seat's story (the `seat` fold, the story rail, the sitting reader)
+
+**Decided.** A *sitting* is one wake of the seat in which it was asked to answer: it begins at the seat's model call of
+turn 1 and holds every call, draft, sign-off, act and note until the next turn 1. A code seat makes no calls, so its
+acts are gathered one sitting a day, and the two arms read alike. The study's reader (`experiments/power-seeking/reader.ts`
+`Reader`) runs inside the fold on the very same lines (fed every line the ingest parses, a superset of what `readFork`
+filters to: it ignores the rest), so the lever flags in Lens are that reader's, not a second reading; its events before
+the fork (the warm-up's post-holder) are dropped, and its `considered` level is shown muted and labelled as a phrase
+match, since blind grading found it unreliable. "What it saw" is the turn-1 prompt as the seat read it, cut at its
+`## ` headings, not the raw observation (that is the kernel's, up to 880 KB, and the prompt is what reached the model).
+Heavy text goes to bundle files (`seat/sitting-<i>`, `seat/system-<sha>`), fetched when a sitting opens; `seat.json` is
+~300 KB for a 75-day fork. Debriefs: the `debrief` annotation and any transcript of purpose `debrief` are dropped
+unread (a second lock behind the ingest); their usage is counted in the run's cost, never shown apart. The fold over a
+4.6 M-line fork takes ~5 s of parsing (dev harness, `lens/src/client/story/dev.ts`).
+The test is a hand-made log in the kernel's shapes (lens/test/story.test.ts, 60 ms), not a mock pilot: a mock mayor
+makes no levers and takes minutes, and what the test guards is the linking (sitting ↔ calls, act ↔ draft ↔ outcome,
+lever ↔ act), which the shapes carry.
+- **Revisit if:** the orchestrator starts a sitting other than at turn 1 (then sittings would split or merge wrongly);
+  the reader gains its own sitting/act ids (use them instead of the `command <seq>` source); or a prompt stops using
+  `## ` sections (then "What it saw" shows one block).

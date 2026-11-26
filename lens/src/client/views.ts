@@ -4,6 +4,8 @@
 import type { ComponentType } from "react";
 import type { Meta, RunEntry } from "../shared/api";
 import type { Selection } from "./state";
+import { SittingReader } from "./story/SittingReader";
+import { StoryRail } from "./story/StoryRail";
 
 export interface SlotProps {
   /** The open run's key. */
@@ -31,4 +33,7 @@ export interface Views {
 }
 
 // Registered views (one line each, by their owners):
-export const views: Views = {};
+export const views: Views = {
+  rail: StoryRail,
+  reader: SittingReader,
+};
