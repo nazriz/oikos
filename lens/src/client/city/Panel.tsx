@@ -220,7 +220,7 @@ function Today({ c, q, t, name }: { c: CityData; q: number; t: number; name: (i:
 
 export function Tooltip({ tip, city, t, name }: { tip: HoverInfo; city: CityData; t: number; name: (i: number) => string }) {
   let body: any = null;
-  if (tip.layer === "buildings" || tip.layer === "parks" || tip.layer === "roofs") body = <StructureBody c={city} i={tip.object as number} t={t} name={name} />;
+  if (tip.layer === "buildings" || tip.layer === "parks" || tip.layer === "roofs" || tip.layer === "hips") body = <StructureBody c={city} i={typeof tip.object === "number" ? tip.object : tip.object.i} t={t} name={name} />;
   else if (tip.layer === "people") body = <PersonBody c={city} q={tip.index} t={t} name={name} />;
   else if (tip.layer === "acts" || tip.layer === "act-hits") body = <ActBody a={tip.object.act} target={tip.object.target} t={t} />;
   else if (tip.layer === "networks") body = <><div className="lc-tip-title">{tip.object.id}</div><div className="lc-tip-sub">{tip.object.mode}{tip.object.capacity ? ` · capacity ${n0(tip.object.capacity)}` : ""}</div></>;

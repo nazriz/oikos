@@ -6,10 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DeckGL from "@deck.gl/react";
 import { AmbientLight, COORDINATE_SYSTEM, DirectionalLight, LightingEffect, LinearInterpolator, OrbitView } from "@deck.gl/core";
 import type { OrbitViewState, PickingInfo } from "@deck.gl/core";
+import { CollisionFilterExtension } from "@deck.gl/extensions";
 import { ArcLayer, BitmapLayer, ColumnLayer, LineLayer, PathLayer, ScatterplotLayer, SolidPolygonLayer, TextLayer } from "@deck.gl/layers";
 import { useLens } from "../state";
 import { hash01, loadCity, personRows, placeAt, strHash, tripOf, type CityData } from "./data";
-import { along, hex, mix, PAL, paintBeyond, paintGround, rect, Roads, shapeOf, treesOf, WHERE_LABEL, type RGBA, type Shape } from "./scene";
+import { along, hex, hipFaces, mix, PAL, paintBeyond, paintGround, rect, shadowOf, type Mass, Roads, shapeOf, treesOf, WHERE_LABEL, type RGBA, type Shape } from "./scene";
 import { skyAt } from "./sky";
 import { Panel, Tooltip, Clock, type Overlays, type HoverInfo, DEFAULT_OVERLAYS, Card } from "./Panel";
 import { CITY_CSS } from "./style";
@@ -59,7 +60,10 @@ interface Built {
   /** Per person: jitter inside their building (fractions of footprint). */
   jx: Float32Array; jy: Float32Array; jz: Float32Array;
   disrepairMax: number;
-  labels: { pos: [number, number, number]; text: string; size: number; tier: number }[];
+  labels: { pos: [number, number, number]; text: string; size: number; tier: number; prio: number }[];
+  masses: { i: number; m: Mass }[];
+  hips: { i: number; poly: [number, number, number][]; n: [number, number, number]; base: RGBA }[];
+  caps: { i: number; m: Mass }[];
 }
 
 function build(c: CityData): Built {
@@ -69,22 +73,33 @@ function build(c: CityData): Built {
   shapes.forEach((sh, i) => { if (sh.kind === "box") boxes.push(i); else if (sh.kind === "flat") parks.push(i); });
   // Windows: on each wall, a row per floor.
   const wp: number[] = [], wo: number[] = [], wh: number[] = [];
+  const masses: { i: number; m: Mass }[] = [];
   for (const i of boxes) {
-    const sh = shapes[i]!, s = town.structures[i]!;
+    const s = town.structures[i]!;
+    for (const m of shapes[i]!.masses) masses.push({ i, m });
     if (!["residential", "commercial", "civic", "health", "education"].includes(s.category)) continue;
-    const fl = sh.height / Math.max(1, sh.floors);
-    for (let f = 0; f < sh.floors; f++) {
-      const z = f * fl + fl * 0.55;
-      for (const [ax, ay, len, nx, ny] of [[1, 0, sh.fw, 0, -1], [1, 0, sh.fw, 0, 1], [0, 1, sh.fh, -1, 0], [0, 1, sh.fh, 1, 0]] as const) {
-        const n = Math.max(1, Math.floor(len / 4.2));
-        for (let k = 0; k < n; k++) {
-          const u = (k + 0.5) / n - 0.5;
-          const x = sh.cx + ax * u * len * 0.86 + nx * (sh.fw / 2 + 0.25);
-          const y = sh.cy + ay * u * len * 0.86 + ny * (sh.fh / 2 + 0.25);
-          wp.push(x, y, z); wo.push(i); wh.push(hash01(wp.length, i));
+    for (const m of shapes[i]!.masses) {
+      if (m.w < 4 || m.h < 4 || m.height < 2.5) continue;
+      const floors = Math.max(1, Math.round(m.height / 3.2)), fl = m.height / floors;
+      for (let f = 0; f < floors; f++) {
+        const z = m.z + f * fl + fl * 0.55;
+        for (const [ax, ay, len, nx, ny] of [[1, 0, m.w, 0, -1], [1, 0, m.w, 0, 1], [0, 1, m.h, -1, 0], [0, 1, m.h, 1, 0]] as const) {
+          const n = Math.max(1, Math.floor(len / 4.2));
+          for (let k = 0; k < n; k++) {
+            const u = (k + 0.5) / n - 0.5;
+            const x = m.cx + ax * u * len * 0.86 + nx * (m.w / 2 + 0.25);
+            const y = m.cy + ay * u * len * 0.86 + ny * (m.h / 2 + 0.25);
+            wp.push(x, y, z); wo.push(i); wh.push(hash01(wp.length, i));
+          }
         }
       }
     }
+  }
+  const hips: { i: number; poly: [number, number, number][]; n: [number, number, number]; base: RGBA }[] = [];
+  const caps: { i: number; m: Mass }[] = [];
+  for (const { i, m } of masses) {
+    if (m.roof === "hip") { const base = hex(PAL.roofs[Math.floor(hash01(i, 23) * PAL.roofs.length)]!); for (const f of hipFaces(m)) hips.push({ i, ...f, base }); }
+    else if (m.w > 3) caps.push({ i, m });
   }
   // Street lamps: one at each road cell, to one side.
   const lamps: number[] = [];
@@ -97,16 +112,16 @@ function build(c: CityData): Built {
   const labels: Built["labels"] = [];
   for (const p of town.places) {
     const a = p.area;
-    if (p.kind === "district") labels.push({ pos: [(a.x + a.w * 0.5) * cell, -(a.y + a.h - 3) * cell, 0], text: p.name.toUpperCase(), size: 13, tier: 0 });
-    else labels.push({ pos: [(a.x + a.w / 2) * cell, -(a.y - 1.6) * cell, 0], text: p.name.toUpperCase(), size: 15, tier: 0 });
+    if (p.kind === "district") labels.push({ pos: [(a.x + a.w * 0.5) * cell, -(a.y + a.h - 3) * cell, 0], text: p.name.toUpperCase(), size: 13, tier: 0, prio: 5 });
+    else labels.push({ pos: [(a.x + a.w / 2) * cell, -(a.y - 1.6) * cell, 0], text: p.name.toUpperCase(), size: 15, tier: 0, prio: 9 });
   }
   town.structures.forEach((s, i) => {
     if (!["civic", "health", "education", "utility"].includes(s.category) && !(s.category === "commercial" && /office/.test(s.type))) return;
     const sh = shapes[i]!;
-    labels.push({ pos: [sh.cx, sh.cy, sh.height + 6], text: structureName(c, i), size: 11, tier: 1 });
+    labels.push({ pos: [sh.cx, sh.cy, sh.top + 5], text: structureName(c, i), size: 11, tier: 1, prio: s.category === "civic" ? 3 : 1 });
   });
   return {
-    shapes, boxes, parks,
+    shapes, boxes, parks, masses, hips, caps,
     windows: { pos: new Float32Array(wp), owner: new Uint32Array(wo), h: new Float32Array(wh), n: wo.length },
     lamps: new Float32Array(lamps), trees: treesOf(town), ground: paintGround(town), beyond: paintBeyond(), roads: new Roads(town), jx, jy, jz, disrepairMax, labels,
   };
@@ -239,9 +254,10 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
       if (s >= 0) {
         const sh = B.shapes[s]!;
         // Gathered on the roof of the building they are in, spread over its footprint.
-        pos[q * 3] = sh.cx + B.jx[q]! * sh.fw * 0.8;
-        pos[q * 3 + 1] = sh.cy + B.jy[q]! * sh.fh * 0.8;
-        pos[q * 3 + 2] = sh.height + sh.roof + 0.8 + B.jz[q]! * 0.6;
+        const mm = sh.masses[0];
+        pos[q * 3] = (mm?.cx ?? sh.cx) + B.jx[q]! * sh.fw * 0.6;
+        pos[q * 3 + 1] = (mm?.cy ?? sh.cy) + B.jy[q]! * sh.fh * 0.6;
+        pos[q * 3 + 2] = sh.top + 0.8 + B.jz[q]! * 0.6;
         const k = W.kind[q]!;
         c = whereCol[k] ?? movingCol;
         a = 255;
@@ -314,7 +330,9 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
 
   const visibleBoxes = useMemo(() => B.boxes.filter((i) => { const s = town.structures[i]!; return s.started === undefined || s.started <= t; }), [B, town, Math.floor(t / 3600)]);
   const underWay = (i: number) => { const s = town.structures[i]!; return s.started !== undefined && (s.completed === undefined || s.completed > t); };
-  const roofBoxes = useMemo(() => visibleBoxes.filter((i) => !underWay(i)), [visibleBoxes]);
+  const visibleMasses = useMemo(() => { const v = new Set(visibleBoxes); return B.masses.filter((d) => v.has(d.i)); }, [visibleBoxes, B]);
+  const roofCaps = useMemo(() => { const v = new Set(visibleBoxes.filter((i) => !underWay(i))); return B.caps.filter((d) => v.has(d.i)); }, [visibleBoxes, B]);
+  const roofHips = useMemo(() => { const v = new Set(visibleBoxes.filter((i) => !underWay(i))); return B.hips.filter((d) => v.has(d.i)); }, [visibleBoxes, B]);
 
   // The selected person's day so far: each move since midnight, along the roads.
   const trail = useMemo(() => {
@@ -359,7 +377,7 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
         if (s < 0 || s === hall || seen.has(s)) continue;
         seen.add(s);
         const sh = B.shapes[s]!;
-        out.push({ from: [src.cx, src.cy, src.height + 2], to: [sh.cx, sh.cy, sh.height + 1], age: Math.max(0, t - a.t) / ACT_WINDOW, act: a, target: tg?.name ?? id, refused: a.status === "refused" });
+        out.push({ from: [src.cx, src.cy, src.top + 2], to: [sh.cx, sh.cy, sh.top + 1], age: Math.max(0, t - a.t) / ACT_WINDOW, act: a, target: tg?.name ?? id, refused: a.status === "refused" });
       }
     }
     return out;
@@ -380,13 +398,19 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
       getColor: [...mix(hex("#3f7fa0"), hex("#1b3550"), sky.night * 0.7).slice(0, 3), 200] as any, getWidth: cell * 0.62, widthUnits: "meters", capRounded: true, jointRounded: true,
       updateTriggers: { getColor: sky.night },
     }),
-    new LineLayer({
-      id: "roads-bed", data: B.roads.segments, getSourcePosition: (s: any) => [s.a[0], s.a[1], 0.25], getTargetPosition: (s: any) => [s.b[0], s.b[1], 0.25],
-      getColor: mix(hex("#4c5058"), hex("#2a2e37"), sky.night) as any, getWidth: cell * 0.5, widthUnits: "meters", updateTriggers: { getColor: sky.night },
+    new PathLayer({
+      id: "roads-edge", data: B.roads.segments, getPath: ((d: any) => [[d.a[0], d.a[1], 0.25], [d.b[0], d.b[1], 0.25]]) as any,
+      getColor: mix(hex("#4a4e55"), hex("#1d2129"), sky.night) as any, getWidth: cell * 0.44, widthUnits: "meters", capRounded: true,
+      updateTriggers: { getColor: sky.night },
     }),
-    new LineLayer({
-      id: "roads-line", data: B.roads.segments, getSourcePosition: (s: any) => [s.a[0], s.a[1], 0.35], getTargetPosition: (s: any) => [s.b[0], s.b[1], 0.35],
-      getColor: [230, 224, 210, 70 - sky.night * 40], getWidth: 0.5, widthUnits: "meters", widthMinPixels: 0.5, updateTriggers: { getColor: sky.night },
+    new PathLayer({
+      id: "roads", data: B.roads.segments, getPath: ((d: any) => [[d.a[0], d.a[1], 0.3], [d.b[0], d.b[1], 0.3]]) as any,
+      getColor: mix(hex("#8f9296"), hex("#33373f"), sky.night) as any, getWidth: cell * 0.36, widthUnits: "meters", capRounded: true,
+      updateTriggers: { getColor: sky.night },
+    }),
+    new PathLayer({
+      id: "roads-line", data: B.roads.segments, getPath: ((d: any) => [[d.a[0], d.a[1], 0.35], [d.b[0], d.b[1], 0.35]]) as any,
+      getColor: [246, 242, 232, 60 - sky.night * 35], getWidth: 0.35, widthUnits: "meters", widthMinPixels: 0.4, updateTriggers: { getColor: sky.night },
     }),
     new SolidPolygonLayer({
       id: "parks", data: B.parks, getPolygon: (i: number) => { const sh = B.shapes[i]!; return rect(sh.cx, sh.cy, sh.fw, sh.fh, 0.3); },
@@ -396,25 +420,51 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
       id: "trees", data: staticLayers.trees, diskResolution: 7, extruded: true,
       getPosition: (_: any, { index }: any) => [B.trees[index * 4]!, B.trees[index * 4 + 1]!, 0],
       getElevation: (_: any, { index }: any) => B.trees[index * 4 + 2]!,
-      getFillColor: (_: any, { index }: any) => { const r = hash01(index, 17); return [52 + r * 30, 86 + r * 34, 50 + r * 18, 255]; },
+      getFillColor: (_: any, { index }: any) => { const r = hash01(index, 17); return [58 + r * 22, 78 + r * 22, 64 + r * 14, 255]; },
       radius: 3.4, radiusUnits: "meters", getLineColor: [0, 0, 0, 0],
       material: { ambient: 0.5, diffuse: 0.6, shininess: 8, specularColor: [30, 40, 30] },
     } as any),
+    // Depth: soft contact shading round each footprint, and the sun's shadow.
     new SolidPolygonLayer({
-      id: "buildings", data: visibleBoxes, extruded: true, wireframe: false, pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 50],
-      getPolygon: (i: number) => { const sh = B.shapes[i]!; return rect(sh.cx, sh.cy, sh.fw, sh.fh); },
-      getElevation: (i: number) => { const sh = B.shapes[i]!; if (!underWay(i)) return sh.height; const s = town.structures[i]!; const f = s.completed ? 1 : Math.min(1, (t - s.started!) / (s.completed ?? s.started! + 90 * DAY)); return Math.max(0.6, sh.height * f); },
-      getFillColor: (i: number) => underWay(i) ? [190, 175, 150, 140] : i === selS ? mix(buildingColor(i), hex(PAL.seat), 0.35) : buildingColor(i),
-      material: { ambient: 0.42, diffuse: 0.62, shininess: 24, specularColor: [60, 60, 70] },
+      id: "ao", data: visibleMasses, getPolygon: (d: any) => rect(d.m.cx, d.m.cy, d.m.w + 5, d.m.h + 5, 0.37),
+      getFillColor: [12, 16, 24, 34], extruded: false, parameters: { depthWriteEnabled: false },
+    }),
+    new SolidPolygonLayer({
+      id: "ao2", data: visibleMasses, getPolygon: (d: any) => rect(d.m.cx, d.m.cy, d.m.w + 1.6, d.m.h + 1.6, 0.38),
+      getFillColor: [12, 16, 24, 50], extruded: false, parameters: { depthWriteEnabled: false },
+    }),
+    sky.day > 0.02 && new SolidPolygonLayer({
+      id: "shadows", data: visibleMasses, getPolygon: ((d: any) => shadowOf(d.m, sky.sunDir).map(([x, y]) => [x, y, 0.4])) as any,
+      getFillColor: [16, 20, 30, 78 * Math.min(1, sky.day * 1.3)], extruded: false, parameters: { depthWriteEnabled: false },
+      updateTriggers: { getPolygon: sky.sunDir.join(","), getFillColor: sky.day },
+    }),
+    new SolidPolygonLayer({
+      id: "buildings", data: visibleMasses, extruded: true, wireframe: false, pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 50],
+      getPolygon: (d: any) => rect(d.m.cx, d.m.cy, d.m.w, d.m.h, d.m.z),
+      getElevation: (d: any) => { if (!underWay(d.i)) return d.m.height; const s = town.structures[d.i]!; const f = Math.min(1, (t - s.started!) / ((s.completed ?? s.started! + 90 * DAY) - s.started!)); return Math.max(0.6, d.m.height * f); },
+      getFillColor: (d: any) => underWay(d.i) ? [190, 175, 150, 140] : d.i === selS ? mix(buildingColor(d.i), hex(PAL.seat), 0.35) : buildingColor(d.i),
+      material: { ambient: 0.5, diffuse: 0.55, shininess: 20, specularColor: [50, 50, 56] },
       updateTriggers: { getFillColor: [overlays.colour, selS, Math.floor(t / 3600)], getElevation: Math.floor(t / 3600) },
     }),
     new SolidPolygonLayer({
-      id: "roofs", data: roofBoxes, extruded: true,
-      getPolygon: (i: number) => { const sh = B.shapes[i]!; return rect(sh.cx, sh.cy, sh.fw - 1.6, sh.fh - 1.6, sh.height); },
-      getElevation: (i: number) => B.shapes[i]!.roof,
-      getFillColor: (i: number) => { const c = buildingColor(i); return [c[0] * 0.7, c[1] * 0.68, c[2] * 0.66, 255]; },
-      material: { ambient: 0.4, diffuse: 0.55, shininess: 12, specularColor: [40, 40, 50] },
+      id: "roofs", data: roofCaps, extruded: true,
+      getPolygon: (d: any) => rect(d.m.cx, d.m.cy, d.m.w - 1.2, d.m.h - 1.2, d.m.z + d.m.height),
+      getElevation: 0.45,
+      getFillColor: (d: any) => { const c = buildingColor(d.i); return [Math.min(255, c[0] * 1.06 + 8), Math.min(255, c[1] * 1.06 + 8), Math.min(255, c[2] * 1.06 + 8), 255]; },
+      material: { ambient: 0.55, diffuse: 0.55, shininess: 30, specularColor: [70, 70, 76] },
       updateTriggers: { getFillColor: [overlays.colour] },
+    }),
+    new SolidPolygonLayer({
+      id: "hips", data: roofHips, extruded: false, pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 50],
+      getPolygon: (d: any) => d.poly, material: false as any,
+      getFillColor: (d: any) => {
+        const L = [-sky.sunDir[0], -sky.sunDir[1], -sky.sunDir[2]], ll = Math.hypot(L[0]!, L[1]!, L[2]!);
+        const lam = Math.max(0, (d.n[0] * L[0]! + d.n[1] * L[1]! + d.n[2] * L[2]!) / ll);
+        const k = (ch: number) => 0.5 * sky.ambientIntensity * sky.ambientColor[ch]! / 255 + 0.55 * sky.sunIntensity * lam * sky.sunColor[ch]! / 255;
+        const c = overlays.colour === "disrepair" ? buildingColor(d.i) : d.base;
+        return [Math.min(255, c[0] * k(0)), Math.min(255, c[1] * k(1)), Math.min(255, c[2] * k(2)), 255];
+      },
+      updateTriggers: { getFillColor: [sky.sunDir.join(","), sky.sunIntensity, sky.ambientIntensity, overlays.colour] },
     }),
     // Night: street lamps, lit windows, pools of light.
     sky.night > 0.02 && new ScatterplotLayer({
@@ -446,16 +496,17 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
     }),
     overlays.acts && arcs.length > 0 && new ArcLayer({
       id: "acts", data: arcs, getSourcePosition: (d: any) => d.from, getTargetPosition: (d: any) => d.to,
-      getSourceColor: (d: any) => hex(d.refused ? PAL.flag : PAL.seat, (d.act.seq === selAct ? 255 : 235) * (1 - d.age * 0.8)),
-      getTargetColor: (d: any) => hex(d.refused ? PAL.flag : "#ffe2a6", (d.act.seq === selAct ? 255 : 220) * (1 - d.age * 0.85)),
-      getWidth: (d: any) => (d.act.seq === selAct ? 4 : 1.6 + 1.6 * (1 - d.age)), getHeight: 0.45, greatCircle: false, pickable: true,
+      // One act picked (here or in the story): it stands out, the others step back.
+      getSourceColor: (d: any) => hex(d.refused ? PAL.flag : PAL.seat, d.act.seq === selAct ? 255 : 235 * (1 - d.age * 0.8) * (selAct >= 0 ? 0.25 : 1)),
+      getTargetColor: (d: any) => hex(d.refused ? PAL.flag : "#ffe2a6", d.act.seq === selAct ? 255 : 220 * (1 - d.age * 0.85) * (selAct >= 0 ? 0.25 : 1)),
+      getWidth: (d: any) => (d.act.seq === selAct ? 4.5 : 1.6 + 1.6 * (1 - d.age)), getHeight: 0.45, greatCircle: false, pickable: true,
       updateTriggers: { getSourceColor: [selAct], getTargetColor: [selAct], getWidth: [selAct] },
     }),
     overlays.acts && new ScatterplotLayer({
       id: "act-hits", data: arcs.filter((d) => t - d.act.t < 12 * 3600 || d.act.seq === selAct),
-      getPosition: (d: any) => [d.to[0], d.to[1], d.to[2]], getRadius: (d: any) => 8 + ((t - d.act.t) / 3600) * 2.5, radiusUnits: "meters", billboard: false,
-      stroked: true, filled: false, getLineColor: (d: any) => hex(d.refused ? PAL.flag : PAL.seat, Math.max(0, 230 * (1 - (t - d.act.t) / (12 * 3600)))), getLineWidth: 1.5, lineWidthUnits: "pixels",
-      updateTriggers: { getRadius: Math.floor(t / 300), getLineColor: Math.floor(t / 300) },
+      getPosition: (d: any) => [d.to[0], d.to[1], d.to[2]], getRadius: (d: any) => (d.act.seq === selAct ? 16 : 8 + ((t - d.act.t) / 3600) * 2.5), radiusUnits: "meters", billboard: false,
+      stroked: true, filled: false, getLineColor: (d: any) => hex(d.refused ? PAL.flag : PAL.seat, d.act.seq === selAct ? 255 : Math.max(0, 230 * (1 - (t - d.act.t) / (12 * 3600)))), getLineWidth: (d: any) => (d.act.seq === selAct ? 2.5 : 1.5), lineWidthUnits: "pixels",
+      updateTriggers: { getRadius: [Math.floor(t / 300), selAct], getLineColor: [Math.floor(t / 300), selAct], getLineWidth: selAct },
     }),
     // The seat's hall: a quiet amber ring when it acted lately.
     town.hall !== undefined && overlays.acts && new ScatterplotLayer({
@@ -494,7 +545,8 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
       getColor: (l: any) => (l.tier === 0 ? [232, 230, 225, 150] : [232, 230, 225, 215]), fontFamily: "Inter Variable, Inter, system-ui, sans-serif", fontWeight: 500,
       characterSet: "auto", billboard: true, getTextAnchor: "middle", getAlignmentBaseline: "bottom", fontSettings: { sdf: true, fontSize: 64, buffer: 6 },
       outlineWidth: 3, outlineColor: [11, 15, 23, 200], parameters: { depthCompare: "always" },
-      ...({ getPixelOffset: [0, -2] } as any),
+      // Names give way to each other, the town's first, then civic buildings.
+      extensions: [COLLIDE], ...({ collisionEnabled: true, getCollisionPriority: (l: any) => l.prio, collisionTestProps: { sizeScale: 1.6 }, getPixelOffset: [0, -2] } as any),
     }),
   ];
 
@@ -533,6 +585,7 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
   );
 }
 
+const COLLIDE = new CollisionFilterExtension();
 const ADDITIVE = { depthWriteEnabled: false, blend: true, blendColorOperation: "add", blendColorSrcFactor: "src-alpha", blendColorDstFactor: "one", blendAlphaOperation: "add", blendAlphaSrcFactor: "one", blendAlphaDstFactor: "one" } as any;
 const NET_COL: Record<string, string> = { pipe: "#5fb0e8", sewer: "#a48a62", wire: "#f2d36b" };
 const NET_OFF: Record<string, number> = { pipe: -4, sewer: 4, wire: 0 };
@@ -565,7 +618,7 @@ function sel2structure(c: CityData, s: ReturnType<typeof useLens.getState>["sele
 function pickToSelection(c: CityData, info: PickingInfo): ReturnType<typeof useLens.getState>["selection"] {
   if (!info.layer || info.index < 0) return null;
   const id = info.layer.id;
-  if (id === "buildings" || id === "parks" || id === "roofs") { const i = info.object as number; return { kind: "structure", id: c.town.structures[i]!.id }; }
+  if (id === "buildings" || id === "parks" || id === "roofs" || id === "hips") { const o = info.object as any; const i = typeof o === "number" ? o : o.i; return { kind: "structure", id: c.town.structures[i]!.id }; }
   if (id === "people") { const q = info.index; return { kind: "person", id: c.people.people[q]![0] }; }
   if (id === "acts" || id === "act-hits") return { kind: "act", seq: (info.object as any).act.seq };
   return null;

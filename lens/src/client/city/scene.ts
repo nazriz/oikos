@@ -11,21 +11,24 @@ export const mix = (a: RGBA | RGB, b: RGBA | RGB, f: number): RGBA => [
   a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, (a[3] ?? 255) + ((b[3] ?? 255) - (a[3] ?? 255)) * f,
 ];
 
-/** The look's palette (docs/design/lens.md section 4): one accent per meaning, buildings in quiet earth tones. */
+/** The look's palette (docs/design/lens.md section 4): one accent per meaning; the town itself in the quiet tones of an
+ * architect's model, so the accents (people, acts) carry the meaning. */
 export const PAL = {
   ink: "#0b0f17", panel: "#111723", panel2: "#161d2b", hair: "#ffffff14", text: "#e8e6e1", muted: "#9aa3b2",
   seat: "#f2b44b", citizen: "#5cc8c0", institution: "#8b9cf6", flag: "#f0647a", election: "#b48cf2",
-  // Buildings by category: muted, warm, separable at a glance.
+  // Building walls by category: pale, slightly warm, told apart by hue rather than strength.
   category: {
-    residential: "#d8c7ab", commercial: "#d49a72", industrial: "#8a94a3", civic: "#9aa8f0", health: "#e2a9b5",
-    education: "#86bcd6", utility: "#7d8796", green: "#6f9a66", transport: "#5b6170", other: "#a39e93",
+    residential: "#ddd6ca", commercial: "#d9b49a", industrial: "#a3aab4", civic: "#b3bcf0", health: "#e6c1c8",
+    education: "#a9cbdc", utility: "#9aa1aa", green: "#7f9277", transport: "#5b6170", other: "#bdb8ae",
   } as Record<string, string>,
-  // Ground covers.
+  roofs: ["#7f6a62", "#6f7279", "#86735f", "#706560", "#7b7f86"],
+  // Ground covers: desaturated, a little cool; tone, not colour, tells them apart.
   cover: {
-    woodland: "#2f4a32", farmland: "#7d7a4a", wetland: "#3d5a52", grassland: "#5f7448", scrub: "#6b6a46",
-    riverbank: "#71806a", cleared: "#7d7260", road: "#55585e", built: "#6d6a60", ground: "#5c6650",
+    woodland: "#36423c", farmland: "#70746a", wetland: "#516264", grassland: "#646c66", scrub: "#686a60",
+    riverbank: "#6f7a6d", cleared: "#77736a", road: "#55585e", built: "#6d6a60", ground: "#62695e",
   } as Record<string, string>,
-  water: "#2e5f7a",
+  water: "#3d5f72",
+  lot: "#7f817c",
   // People by where they are.
   where: { dwelling: "#ffd89a", workplace: "#5cc8c0", classroom: "#9fd3ff", hall: "#b9a3ff", waiting: "#ff9fb0", moving: "#ffffff", other: "#c8d0dc" } as Record<string, string>,
   window: "#ffc677",
@@ -35,8 +38,10 @@ export const WHERE_LABEL: Record<string, string> = {
   dwelling: "At home", workplace: "At work", classroom: "At school", hall: "In a hall", waiting: "At the clinic", moving: "On the way", other: "Elsewhere",
 };
 
-/** How tall, how wide: from the structure's type and its number of spaces (no place's figures: shapes only). */
-export interface Shape { cx: number; cy: number; fw: number; fh: number; height: number; floors: number; roof: number; kind: "box" | "flat" | "road" }
+/** One box of a building: centre, size, base height and height (metres). */
+export interface Mass { cx: number; cy: number; w: number; h: number; z: number; height: number; roof: "hip" | "flat" | "none"; roofH: number }
+/** How a structure is drawn: its main mass and any others (a tower, a wing, a chimney). Shapes only: no place's figures. */
+export interface Shape { cx: number; cy: number; fw: number; fh: number; height: number; floors: number; roof: number; kind: "box" | "flat" | "road"; masses: Mass[]; /** The highest point, roof included. */ top: number }
 
 export function shapeOf(s: TownStructure, cell: number): Shape {
   const cx = (s.x + s.w / 2) * cell;
@@ -44,29 +49,101 @@ export function shapeOf(s: TownStructure, cell: number): Shape {
   const W = s.w * cell, H = s.h * cell;
   const r = hash01(strHash(s.id));
   const r2 = hash01(strHash(s.id), 7);
-  const spaces = Object.values(s.spaces).reduce((a, b) => a + b, 0);
+  const r3 = hash01(strHash(s.id), 13);
   const dwellings = s.spaces.dwelling ?? 0;
-  if (s.category === "transport") return { cx, cy, fw: W, fh: H, height: 0, floors: 0, roof: 0, kind: "road" };
-  if (s.category === "green") return { cx, cy, fw: W * 0.92, fh: H * 0.92, height: 0.3, floors: 0, roof: 0, kind: "flat" };
-  let fw = 0.62, fh = 0.55, floors = 2, fl = 3.1;
+  if (s.category === "transport") return { cx, cy, fw: W, fh: H, height: 0, floors: 0, roof: 0, kind: "road", masses: [], top: 0 };
+  if (s.category === "green") return { cx, cy, fw: W * 0.92, fh: H * 0.92, height: 0.3, floors: 0, roof: 0, kind: "flat", masses: [], top: 0.3 };
   const t = s.type;
-  if (s.category === "residential") {
-    if (dwellings > 1) { floors = Math.min(8, Math.max(3, Math.ceil(dwellings / 3))); fw = 0.78; fh = 0.72; fl = 3.0; }
-    else if (/large/.test(t)) { floors = 2; fw = 0.66; fh = 0.58; }
-    else { floors = r < 0.3 ? 1 : 2; fw = 0.56; fh = 0.5; }
+  const m: Mass[] = [];
+  const box = (fx: number, fy: number, fw: number, fh: number, height: number, roof: Mass["roof"] = "flat", z = 0, roofH = 0) =>
+    m.push({ cx: cx + fx * W, cy: cy + fy * H, w: fw * W, h: fh * H, z, height, roof, roofH });
+  const swap = r3 < 0.5; // which way the long side runs
+  const wh = (a: number, b: number): [number, number] => (swap ? [b, a] : [a, b]);
+  let floors = 2;
+  if (s.category === "residential" && dwellings > 1) {
+    floors = Math.min(9, Math.max(4, Math.ceil(dwellings / 2)));
+    const [a, b] = wh(0.74, 0.5);
+    box(0, 0, a, b, floors * 3.0);
+  } else if (s.category === "residential") {
+    const large = /large/.test(t);
+    floors = large ? 2 : r < 0.45 ? 1 : 2;
+    const [a, b] = wh(large ? 0.58 : 0.5, large ? 0.42 : 0.38);
+    const h = floors * 2.8;
+    box((r2 - 0.5) * 0.08, (r - 0.5) * 0.08, a, b, h, "hip", 0, Math.min(a * W, b * H) * 0.36);
+    if (large) { const [c, d] = wh(0.24, 0.26); box(swap ? 0.16 : 0.2, swap ? 0.2 : 0.16, c, d, 2.8, "hip", 0, Math.min(c * W, d * H) * 0.4); }
+  } else if (s.category === "commercial" && /office/.test(t)) {
+    floors = 7; box(0, 0, 0.56, 0.56, 7 * 3.5); box(0, 0, 0.72, 0.72, 4.2);
   } else if (s.category === "commercial") {
-    if (/office/.test(t)) { floors = 5; fw = 0.74; fh = 0.7; fl = 3.4; }
-    else if (/unit/.test(t)) { floors = 1; fw = 0.8; fh = 0.62; fl = 4.5; }
-    else { floors = r < 0.5 ? 1 : 2; fw = 0.74; fh = 0.62; fl = 3.6; }
-  } else if (s.category === "industrial") { floors = 1; fw = 0.86; fh = 0.76; fl = 7 + r * 3; if (/yard/.test(t)) { fl = 3.5; fw = 0.8; } }
-  else if (s.category === "civic") { floors = /station/.test(t) ? 2 : 3; fw = 0.8; fh = 0.8; fl = 4.2; }
-  else if (s.category === "health") { floors = 2; fw = 0.8; fh = 0.7; fl = 3.8; }
-  else if (s.category === "education") { floors = 2; fw = 0.88; fh = 0.84; fl = 3.8; }
-  else if (s.category === "utility") { floors = 1; fw = /sub/.test(t) ? 0.5 : 0.86; fh = /sub/.test(t) ? 0.5 : 0.8; fl = /sub/.test(t) ? 3.5 : 6; }
-  else { floors = Math.max(1, Math.min(4, spaces)); }
-  // A little variety, so the grid reads as a town and not a spreadsheet.
-  fw *= 0.94 + r2 * 0.1; fh *= 0.94 + r * 0.1;
-  return { cx, cy, fw: fw * W, fh: fh * H, height: floors * fl, floors, roof: s.category === "residential" && dwellings <= 1 ? 1.2 : 0.6, kind: "box" };
+    floors = /unit/.test(t) ? 1 : r < 0.5 ? 1 : 2;
+    const [a, b] = wh(0.72, 0.52);
+    box(0, 0.06, a, b, floors * 3.9);
+  } else if (s.category === "industrial") {
+    floors = 1;
+    if (/yard/.test(t)) { box(-0.1, 0, 0.6, 0.5, 4.5); box(0.28, 0.2, 0.25, 0.3, 3.2); }
+    else { const [a, b] = wh(0.84, 0.62); box(0, 0, a, b, 8 + r * 3); box(0.3, -0.3, 0.07, 0.07, 22 + r2 * 6); }
+  } else if (s.category === "civic") {
+    floors = 3;
+    if (/station/.test(t)) { box(0, 0, 0.7, 0.55, 7.5); }
+    else { box(0, 0.05, 0.82, 0.62, 10.5); box(0, -0.24, 0.2, 0.2, 24, "hip", 0, 4); }
+  } else if (s.category === "health") {
+    floors = 2; box(0, -0.1, 0.8, 0.42, 8); box(-0.25, 0.22, 0.3, 0.36, 8);
+  } else if (s.category === "education") {
+    floors = 2; box(0, -0.2, 0.88, 0.36, 8.5); box(0.28, 0.18, 0.32, 0.5, 8.5); box(-0.3, 0.26, 0.26, 0.3, 5);
+  } else if (s.category === "utility") {
+    floors = 1;
+    if (/sub/.test(t)) box(0, 0, 0.5, 0.5, 4);
+    else { box(-0.2, 0, 0.42, 0.7, 6.5); box(0.25, -0.2, 0.28, 0.28, 9); box(0.25, 0.22, 0.28, 0.28, 9); }
+  } else box(0, 0, 0.6, 0.6, 6);
+  const main = m[0]!;
+  const top = Math.max(...m.map((x) => x.z + x.height + x.roofH * 0.6));
+  return { cx, cy, fw: main.w, fh: main.h, height: main.height, floors, roof: main.roof === "hip" ? main.roofH : 0.6, kind: "box", masses: m, top };
+}
+
+/** The four faces of a hipped roof over a mass, with their outward normals. */
+export function hipFaces(m: Mass, over = 0.7): { poly: [number, number, number][]; n: [number, number, number] }[] {
+  const w = m.w + over * 2, h = m.h + over * 2, z = m.z + m.height, rh = m.roofH;
+  const x0 = m.cx - w / 2, x1 = m.cx + w / 2, y0 = m.cy - h / 2, y1 = m.cy + h / 2;
+  const faces: [number, number, number][][] = [];
+  if (w >= h) {
+    const r0 = m.cx - (w - h) / 2, r1 = m.cx + (w - h) / 2, Z = z + rh;
+    faces.push([[x0, y0, z], [x1, y0, z], [r1, m.cy, Z], [r0, m.cy, Z]]);
+    faces.push([[x1, y1, z], [x0, y1, z], [r0, m.cy, Z], [r1, m.cy, Z]]);
+    faces.push([[x0, y1, z], [x0, y0, z], [r0, m.cy, Z]]);
+    faces.push([[x1, y0, z], [x1, y1, z], [r1, m.cy, Z]]);
+  } else {
+    const r0 = m.cy - (h - w) / 2, r1 = m.cy + (h - w) / 2, Z = z + rh;
+    faces.push([[x0, y1, z], [x0, y0, z], [m.cx, r0, Z], [m.cx, r1, Z]]);
+    faces.push([[x1, y0, z], [x1, y1, z], [m.cx, r1, Z], [m.cx, r0, Z]]);
+    faces.push([[x0, y0, z], [x1, y0, z], [m.cx, r0, Z]]);
+    faces.push([[x1, y1, z], [x0, y1, z], [m.cx, r1, Z]]);
+  }
+  return faces.map((poly) => {
+    const [a, b, c] = poly as [[number, number, number], [number, number, number], [number, number, number]];
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    let n: [number, number, number] = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+    if (n[2] < 0) n = [-n[0], -n[1], -n[2]];
+    const l = Math.hypot(...n) || 1;
+    return { poly, n: [n[0] / l, n[1] / l, n[2] / l] };
+  });
+}
+
+/** The shadow a mass casts on the ground with light travelling along `dir` (convex hull of its base and its projected top). */
+export function shadowOf(m: Mass, dir: [number, number, number], maxLen = 3): [number, number][] {
+  const k = Math.min(maxLen, 1 / Math.max(0.12, -dir[2]));
+  const top = m.z + m.height + m.roofH * 0.7;
+  const dx = dir[0] * k * top, dy = dir[1] * k * top;
+  const hw = m.w / 2, hh = m.h / 2;
+  const pts: [number, number][] = [];
+  for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) { pts.push([m.cx + sx * hw, m.cy + sy * hh]); pts.push([m.cx + sx * hw + dx, m.cy + sy * hh + dy]); }
+  return hull(pts);
+}
+function hull(p: [number, number][]): [number, number][] {
+  const s = p.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o: [number, number], a: [number, number], b: [number, number]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo: [number, number][] = [], up: [number, number][] = [];
+  for (const q of s) { while (lo.length >= 2 && cr(lo[lo.length - 2]!, lo[lo.length - 1]!, q) <= 0) lo.pop(); lo.push(q); }
+  for (const q of s.reverse()) { while (up.length >= 2 && cr(up[up.length - 2]!, up[up.length - 1]!, q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
 }
 
 export function rect(cx: number, cy: number, w: number, h: number, z = 0): [number, number, number][] {
@@ -198,8 +275,9 @@ function fbm(x: number, y: number, seed: number): number {
   return noise2(x, y, seed) * 0.5 + noise2(x * 2.03, y * 2.03, seed + 1) * 0.3 + noise2(x * 4.1, y * 4.1, seed + 2) * 0.2;
 }
 
-/** Paint the ground: covers with their own texture, the river, the lots under buildings. Returns a canvas. */
-export function paintGround(town: TownBundle, px = 8): HTMLCanvasElement | OffscreenCanvas {
+/** Paint the ground like a model's base: covers in quiet tones with gentle variation, woodland stippled, fields in
+ * soft strips, the river with a pale bank, and crisp pale lots under buildings. Returns a canvas. */
+export function paintGround(town: TownBundle, px = 10): HTMLCanvasElement | OffscreenCanvas {
   const { w, h } = town.ground;
   const W = w * px, H = h * px;
   const cover = new Uint8Array(w * h);
@@ -211,68 +289,66 @@ export function paintGround(town: TownBundle, px = 8): HTMLCanvasElement | Offsc
   }
   const lot = new Uint8Array(w * h);
   for (const s of town.structures) {
-    if (s.category === "transport") { for (let y = s.y; y < s.y + s.h; y++) for (let x = s.x; x < s.x + s.w; x++) lot[y * w + x] = 2; continue; }
-    for (let y = s.y; y < s.y + s.h; y++) for (let x = s.x; x < s.x + s.w; x++) lot[y * w + x] = s.category === "green" ? 3 : 1;
+    const v = s.category === "transport" ? 2 : s.category === "green" ? 3 : 1;
+    for (let y = s.y; y < s.y + s.h; y++) for (let x = s.x; x < s.x + s.w; x++) if (x < w && y < h) lot[y * w + x] = v;
   }
   const water = new Uint8Array(w * h);
   for (const chain of town.river) for (const [x, y] of chain) if (x >= 0 && y >= 0 && x < w && y < h) water[y * w + x] = 1;
   const base = names.map((n) => hex(PAL.cover[n] ?? PAL.cover.ground!));
-  const wat = hex(PAL.water);
-  const lotC = hex("#7b776c"), parkC = hex("#58784f");
-  // Farmland fields: blocks of 3x3 cells with their own crop and furrow direction.
-  const crops = [hex("#8a8550"), hex("#6f7c44"), hex("#94804c"), hex("#7a8a52"), hex("#867158")];
+  const wat = hex(PAL.water), bank = hex("#8a9184");
+  const lotC = hex(PAL.lot), lotEdge = hex("#5d605c"), parkC = hex("#66745f");
+  const crops = [hex("#76786a"), hex("#6c7461"), hex("#7c7867"), hex("#717a69"), hex("#7a7262")];
   const canvas: HTMLCanvasElement | OffscreenCanvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(W, H) : Object.assign(document.createElement("canvas"), { width: W, height: H });
   const ctx = canvas.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
   const img = ctx.createImageData(W, H);
   const d = img.data;
-  const iWood = names.indexOf("woodland"), iFarm = names.indexOf("farmland"), iWet = names.indexOf("wetland"), iScrub = names.indexOf("scrub"), iBank = names.indexOf("riverbank");
+  const iWood = names.indexOf("woodland"), iFarm = names.indexOf("farmland"), iWet = names.indexOf("wetland"), iScrub = names.indexOf("scrub");
+  const isWater = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && water[y * w + x] === 1;
   for (let Y = 0; Y < H; Y++) {
-    const cy = Math.floor(Y / px), fy = (Y + 0.5) / px;
+    const cy = Math.floor(Y / px), fy = (Y + 0.5) / px, uy = (Y % px + 0.5) / px;
     for (let X = 0; X < W; X++) {
-      const cx = Math.floor(X / px), fx = (X + 0.5) / px;
+      const cx = Math.floor(X / px), fx = (X + 0.5) / px, ux = (X % px + 0.5) / px;
       const ci = cy * w + cx;
       const k = cover[ci]!;
       let c: RGBA = base[k]!;
-      const n = fbm(fx * 0.35, fy * 0.35, 11);
-      let shade = 0.86 + n * 0.28;
+      const n = fbm(fx * 0.12, fy * 0.12, 11);
+      let shade = 0.95 + (n - 0.5) * 0.1;
       if (k === iWood) {
-        // Crowns: bright tops on a dark understory.
-        const t = noise2(fx * 2.4, fy * 2.4, 5) * 0.6 + noise2(fx * 5, fy * 5, 6) * 0.4;
-        shade = 0.62 + t * 0.75;
-        c = mix(c, hex("#3d5c3a"), noise2(fx * 0.5, fy * 0.5, 9));
+        const t = noise2(fx * 2.6, fy * 2.6, 5) * 0.65 + noise2(fx * 6, fy * 6, 6) * 0.35;
+        shade = 0.82 + t * 0.32;
       } else if (k === iFarm) {
         const bx = Math.floor(cx / 3), by = Math.floor(cy / 3);
         const hb = hash01(bx * 131 + by * 977, 3);
         c = crops[Math.floor(hb * crops.length)]!;
         const along = hb < 0.5 ? fx : fy;
-        shade = 0.9 + 0.1 * Math.sin(along * Math.PI * 2.2) + (n - 0.5) * 0.12;
-        // Field edges: a thin darker hedge line.
+        shade = 0.97 + 0.03 * Math.sin(along * Math.PI * 3) + (n - 0.5) * 0.06;
         const ex = (fx / 3) % 1, ey = (fy / 3) % 1;
-        if (ex < 0.03 || ey < 0.03) { c = hex("#3e4a30"); shade = 0.9; }
+        if (ex < 0.02 || ey < 0.02) { c = hex("#4e564a"); shade = 1; }
       } else if (k === iWet) {
-        const t = noise2(fx * 1.6, fy * 1.6, 21);
-        if (t > 0.66) { c = mix(c, wat, 0.75); shade = 0.9 + (t - 0.66); }
-        else shade = 0.85 + n * 0.25;
+        const t = noise2(fx * 1.4, fy * 1.4, 21);
+        if (t > 0.68) { c = mix(c, wat, 0.6); shade = 1; }
       } else if (k === iScrub) {
-        const t = noise2(fx * 3.5, fy * 3.5, 31);
-        shade = 0.8 + n * 0.2 + (t > 0.7 ? -0.18 : 0);
-      } else if (k === iBank) {
-        shade = 0.95 + n * 0.12;
+        const t = noise2(fx * 4, fy * 4, 31);
+        shade = 0.96 + (t > 0.72 ? -0.08 : 0) + (n - 0.5) * 0.08;
       }
       const L = lot[ci]!;
-      if (L === 1) { c = mix(c, lotC, 0.75); shade = 0.95 + n * 0.08; }
-      else if (L === 3) { c = parkC; const t = noise2(fx * 2.6, fy * 2.6, 41); shade = 0.8 + t * 0.4; }
+      if (L === 1) {
+        // A pale lot, inset from the cell with a fine darker edge.
+        const e = Math.min(ux, 1 - ux, uy, 1 - uy);
+        if (e > 0.07) { c = lotC; shade = 1 + (n - 0.5) * 0.04; }
+        else if (e > 0.045) { c = lotEdge; shade = 1; }
+      } else if (L === 3) {
+        c = parkC; shade = 0.95 + noise2(fx * 3, fy * 3, 41) * 0.1;
+      }
       if (water[ci]) {
-        // The river: water with a soft bank toward the cell edge.
-        const ex = Math.min((X % px) / px, 1 - (X % px) / px, 0.5), ey = Math.min((Y % px) / px, 1 - (Y % px) / px, 0.5);
-        const nb = (dx: number, dy: number) => { const xx = cx + dx, yy = cy + dy; return xx >= 0 && yy >= 0 && xx < w && yy < h && water[yy * w + xx] === 1; };
-        let edge = 1;
-        if (!nb(-1, 0) && (X % px) / px < 0.25) edge = Math.min(edge, ex * 4);
-        if (!nb(1, 0) && (X % px) / px > 0.75) edge = Math.min(edge, ex * 4);
-        if (!nb(0, -1) && (Y % px) / px < 0.25) edge = Math.min(edge, ey * 4);
-        if (!nb(0, 1) && (Y % px) / px > 0.75) edge = Math.min(edge, ey * 4);
-        c = mix(c, wat, Math.min(1, 0.35 + edge));
-        shade = 0.92 + noise2(fx * 3, fy * 3, 51) * 0.16;
+        // The river, with a pale bank where it meets land.
+        let e = 1;
+        if (!isWater(cx - 1, cy)) e = Math.min(e, ux);
+        if (!isWater(cx + 1, cy)) e = Math.min(e, 1 - ux);
+        if (!isWater(cx, cy - 1)) e = Math.min(e, uy);
+        if (!isWater(cx, cy + 1)) e = Math.min(e, 1 - uy);
+        c = e < 0.08 ? bank : wat;
+        shade = 0.97 + noise2(fx * 2, fy * 2, 51) * 0.06;
       }
       const o = (Y * W + X) * 4;
       d[o] = Math.min(255, c[0] * shade); d[o + 1] = Math.min(255, c[1] * shade); d[o + 2] = Math.min(255, c[2] * shade); d[o + 3] = 255;
