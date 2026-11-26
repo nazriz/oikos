@@ -122,6 +122,11 @@ function Chart({ city }: { city: CityData }) {
     return () => ro.disconnect();
   }, [now, insts, allTies, focus]);
 
+  // What a kin holder is to the seat, written at their post (not across the chart).
+  const seatKinLabel = (pp: string) => {
+    for (const sp of seatPeople) { const r = relation(P, pp, sp); if (r) return `${r.replace(/ of$/, "")} of ${name(sp)}, the seat`; }
+    return "kin of the seat";
+  };
   const f = fmtDay(t);
   const seatList = Object.entries(P.seats);
   return (
@@ -140,8 +145,6 @@ function Chart({ city }: { city: CityData }) {
       </div>
       <svg className="pw-lines" width="100%" height="100%">
         {lines.map((l, i) => <path key={i} d={l.d} className={`${l.seat ? "seat" : ""} ${l.same ? "same" : ""} ${focus && l.who.includes(focus) ? "focus" : ""}`}><title>{l.label}</title></path>)}
-        {lines.filter((l) => !l.same && !l.seat && focus && l.who.includes(focus)).map((l, i) => <text key={`f${i}`} x={l.x} y={l.y} className="pw-rel muted">{l.label}</text>)}
-        {lines.filter((l) => !l.same && l.seat).map((l, i) => <text key={`t${i}`} x={l.x} y={l.y} className="pw-rel">{l.label}</text>)}
       </svg>
       <div className="pw-grid">
         {insts.map(([ent, posts]) => (
@@ -159,6 +162,8 @@ function Chart({ city }: { city: CityData }) {
                     <span className="pw-post-title" title={p.id}>{p.title}</span>
                     {pp ? <button data-holder={pp} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => select({ kind: "person", id: pp })} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">×{now.holders.get(pp)!.length}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
                   </div>
+                  {kin && <div className="pw-kin">{seatKinLabel(pp!)}</div>}
+                  {!kin && focus && pp && focus !== pp && relation(P, pp, focus) && <div className="pw-kin muted">{relation(P, pp, focus)} {name(focus)}</div>}
                   {changed && <div className="pw-by">{h!.holder ? "appointed" : "vacated"} by {name(person(h!.by)!)}{seatOf(person(h!.by)) ? " (the seat)" : ""} · day {fmtDay(h!.from).day}</div>}
                   {list.length > 1 && (
                     <div className="pw-strip" title="Holders over the run">
@@ -186,8 +191,8 @@ const POWER_CSS = `
 .lens-city .pw-side { display: grid; gap: 8px; align-content: start; }
 .lens-city .pw-seat { display: flex; align-items: center; gap: 7px; }
 .lens-city .pw-seat .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--lc-seat); box-shadow: 0 0 8px var(--lc-seat); }
-.lens-city .pw-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; align-items: start; }
-.lens-city .pw-card { background: color-mix(in srgb, var(--lc-panel) 92%, transparent); border: 1px solid var(--lc-hair); border-radius: 12px; padding: 10px 12px 8px; }
+.lens-city .pw-grid { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; align-items: start; }
+.lens-city .pw-card { position: relative; z-index: 1; background: color-mix(in srgb, var(--lc-panel) 86%, transparent); border: 1px solid var(--lc-hair); border-radius: 12px; padding: 10px 12px 8px; }
 .lens-city .pw-card.gov { grid-column: span 2; border-color: color-mix(in srgb, var(--lc-seat) 30%, var(--lc-hair)); }
 .lens-city .pw-card-head { display: flex; justify-content: space-between; gap: 8px; font-family: var(--lc-serif); font-size: 15px; padding-bottom: 6px; border-bottom: 1px solid var(--lc-hair); margin-bottom: 4px; }
 .lens-city .pw-card-head .muted { font-family: var(--lc-ui); font-size: 11px; text-transform: capitalize; align-self: center; }
@@ -208,7 +213,9 @@ const POWER_CSS = `
 .lens-city .pw-strip span.kin { background: var(--lc-flag); }
 .lens-city .pw-strip span.vac { background: transparent; }
 .lens-city .pw-strip i { position: absolute; top: -2px; bottom: -2px; width: 1px; background: #fff; }
-.lens-city .pw-lines { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 3; overflow: visible; }
+.lens-city .pw-lines { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 0; overflow: visible; }
+.lens-city .pw-kin { color: #ffc2cc; font-size: 11px; margin-top: 2px; text-align: right; }
+.lens-city .pw-kin.muted { color: var(--lc-text); opacity: .8; }
 .lens-city .pw-lines path { fill: none; stroke: #9aa3b2; stroke-opacity: .55; stroke-width: 1.2; }
 .lens-city .pw-lines path.same { stroke: #5cc8c0; stroke-dasharray: 2 3; stroke-opacity: .5; }
 .lens-city .pw-lines path.seat { stroke: var(--lc-flag); stroke-opacity: .95; stroke-width: 2.2; }
@@ -219,3 +226,4 @@ const POWER_CSS = `
 .lens-city .pw-rel { fill: #ffc2cc; font-size: 11px; text-anchor: middle; paint-order: stroke; stroke: var(--lc-ink); stroke-width: 4px; }
 @media (max-width: 640px) { .lens-city .pw { padding: 14px 12px 30px; } .lens-city .pw-card.gov { grid-column: auto; columns: 1; } }
 `;
+
