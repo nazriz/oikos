@@ -20,19 +20,18 @@ const read = () => {
 export function About({ run, meta, world }: { run: string; meta: Meta; world: boolean }) {
   const researcher = useMode((m) => m.mode === "researcher");
   const [kept, setKept] = useState(read);
-  // (Over a turn the reader fills the page: there the panel stays folded unless opened for that turn.)
+  // (Over a turn the reader fills the page with its own headings: the panel stands aside rather than cover its columns.)
   const reading = useLens((s) => isMoment(s.selection));
-  const [overReader, setOverReader] = useState(false);
   // (On a phone the panel would cover the town: folded there until opened.)
-  const open = reading ? overReader : kept ? kept === "open" : !researcher && window.innerWidth > 760;
+  const open = kept ? kept === "open" : !researcher && window.innerWidth > 760;
   const toggle = () => {
-    if (reading) return setOverReader(!open);
     const v = open ? "closed" : "open";
     try {
       localStorage.setItem("lens.about", v);
     } catch {}
     setKept(v);
   };
+  if (reading) return null;
   return (
     <aside className={`about ${open ? "open" : ""}`} aria-label="About this view">
       <button className="about-head" aria-expanded={open} onClick={toggle} title={open ? "Fold this away" : "What am I looking at?"}>

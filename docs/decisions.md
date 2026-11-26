@@ -16516,3 +16516,10 @@ study's measure and is not changed): every label shows them through `dayNo`. Eve
 palette, life page, the shared outcome sentence). Differences ("59 days before the election") are unchanged.
 **Revisit if** a run passes the world's first year: the views write "Day 370" where the world writes "year 2, day 5"
 (`worldDate` has the world's form).
+
+## 2026-11-26 Lens: "About this view" stands aside for the turn reader
+
+Even folded, the panel sat over the reader's first column and covered its rows (the lead, from a screenshot). The reader
+names its own parts ("What it was shown", "What it thought and said", "What happened"), so the panel is not shown while
+a turn, a power grab or an act is open; it comes back as it was when the reader closes. **Revisit if** readers ask what
+the reader's columns mean: then a "?" in the reader's own header, not a floating panel.
