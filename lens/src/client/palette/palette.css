@@ -7,13 +7,6 @@
   align-items: flex-start;
   padding: 12vh 16px 16px;
   background: var(--shade);
-  backdrop-filter: blur(3px);
-  animation: pal-fade 120ms var(--ease);
-}
-@keyframes pal-fade {
-  from {
-    opacity: 0;
-  }
 }
 .pal {
   width: min(680px, 100%);
@@ -23,15 +16,8 @@
   border-radius: var(--r-3);
   background: var(--panel);
   border: 1px solid var(--line-2);
-  box-shadow: var(--shadow), 0 30px 80px -20px #000000a0;
+  border-top: 2px solid var(--text);
   overflow: hidden;
-  animation: pal-rise 160ms var(--ease);
-}
-@keyframes pal-rise {
-  from {
-    transform: translateY(-6px) scale(0.99);
-    opacity: 0;
-  }
 }
 .pal-input {
   display: flex;
@@ -76,7 +62,6 @@
 }
 .pal-group-head {
   padding: 10px 16px 4px;
-  font-size: 10.5px;
 }
 .pal-item {
   display: grid;
@@ -95,7 +80,7 @@
 }
 .pal-item.cur {
   background: var(--panel-2);
-  border-left-color: var(--seat);
+  border-left-color: var(--text);
 }
 .pal-title {
   grid-area: title;

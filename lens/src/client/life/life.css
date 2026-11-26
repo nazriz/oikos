@@ -13,9 +13,8 @@
 .life-name {
   font-size: 26px;
   line-height: 1.1;
-  font-weight: 460;
-  letter-spacing: -0.015em;
-  color: var(--citizen);
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 .life-sub {
   display: flex;
@@ -102,9 +101,8 @@
   margin-top: 8px;
 }
 .life-big {
-  font-size: 26px;
+  font-size: 24px;
   line-height: 1;
-  font-weight: 420;
 }
 .life-small {
   font-size: 11.5px;
@@ -166,7 +164,7 @@
   font-size: 11.5px;
 }
 .life-who.seat {
-  color: var(--seat);
+  color: var(--seat-text);
 }
 .life-who.inst {
   color: var(--inst);
@@ -203,7 +201,7 @@
   background: var(--seat-wash);
 }
 .life-row.now {
-  box-shadow: 0 -1px 0 var(--seat);
+  box-shadow: 0 -2px 0 var(--text);
 }
 .life-row.later {
   opacity: 0.55;
@@ -237,7 +235,8 @@
   color: var(--muted);
 }
 .life-text {
-  font-size: 12.5px;
+  font-family: var(--font-serif);
+  font-size: 14px;
   color: var(--text-2);
   line-height: 1.4;
   display: -webkit-box;
@@ -275,10 +274,10 @@
 .life-fork {
   margin: 6px 16px;
   padding: 4px 0;
-  border-top: 1px dashed var(--seat);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--seat);
+  border-top: 1px dashed var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
 }
 .life-fork .faint {
   margin-left: 6px;

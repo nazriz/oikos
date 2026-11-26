@@ -7,6 +7,7 @@ import { useLens, type Selection, type TimelineMark, type TimelineTrack } from "
 import { selToken } from "../router";
 import { DAY, HOUR, clock, dayOf, span as spanText } from "../format";
 import { Fit, Keyboard, Pause, Play } from "../icons";
+import { useMode } from "../mode";
 import "./timeline.css";
 
 export interface Ground {
@@ -53,7 +54,7 @@ function readPalette(el: Element): Palette {
   return {
     text: v("--text"), muted: v("--muted"), faint: v("--faint"), line: v("--line"), line2: v("--line-2"), panel: v("--panel"), panel2: v("--panel-2"), ink: v("--ink"),
     seat: v("--seat"), flag: v("--flag"), election: v("--election"), news: v("--inst"), inst: v("--inst"), citizen: v("--citizen"), good: v("--good"), bad: v("--bad"),
-    mono: v("--font-mono"),
+    mono: v("--font-sans"),
   };
 }
 const toneColor = (p: Palette, tone?: TimelineMark["tone"]) => (tone === "muted" || !tone ? p.muted : p[tone]);
@@ -115,7 +116,15 @@ export function Timeline({ ground, fork }: TimelineProps) {
   // (A new run, a new span: show all of it.)
   useEffect(() => setView(spanT), [spanT[0], spanT[1]]);
 
-  const sorted = useMemo(() => [...tracks].sort((a, b) => a.id.localeCompare(b.id)), [tracks]);
+  // (Story mode shows three lanes: the mayor's turns, its power grabs and the election. Researcher mode, every lane.)
+  const researcher = useMode((m) => m.mode === "researcher");
+  const sorted = useMemo(() => {
+    const all = [...tracks].sort((a, b) => a.id.localeCompare(b.id));
+    if (researcher) return all;
+    const pick = (re: RegExp) => all.find((tr) => re.test(`${tr.id} ${tr.label}`));
+    const chosen = [pick(/sitting|turn/i), pick(/lever|grab/i), pick(/elect/i)].filter((x, i, a): x is TimelineTrack => !!x && a.indexOf(x) === i);
+    return chosen.length ? chosen : all.slice(0, 3);
+  }, [tracks, researcher]);
   const [LANE, setLane] = useState(readLane);
   useEffect(() => {
     try {
@@ -185,7 +194,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, width, height);
     const p = palette;
-    const mono = `10.5px ${p.mono || "monospace"}`;
+    const mono = `600 11.5px ${p.mono || "sans-serif"}`;
 
     // Axis: day ticks, or hour ticks when close in.
     const pxPerDay = (DAY / Math.max(1, v1 - v0)) * width;
@@ -469,7 +478,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
           <span className="tl-clock mono num">{clock(t)}</span>
           <span className="tl-rel muted">
             {inFork !== undefined && inFork >= 0 ? `fork + ${spanText(inFork)}` : ""}
-            {spanT[1] > t ? `${inFork !== undefined ? " · " : ""}${spanText(spanT[1] - t)} to the end` : " · the end"}
+            {spanT[1] > t ? `${inFork !== undefined ? ", " : ""}${spanText(spanT[1] - t)} to the end` : ", the end"}
           </span>
         </div>
         <div className="tl-right">
@@ -526,7 +535,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
           <b>{hover.hit.mark.label ?? "—"}</b>
           <div className="mono faint" style={{ marginTop: 2 }}>
             day {dayOf(hover.hit.mark.t)} {clock(hover.hit.mark.t)}
-            {hover.hit.mark.t2 !== undefined ? ` → ${spanText(hover.hit.mark.t2 - hover.hit.mark.t)}` : ""}
+            {hover.hit.mark.t2 !== undefined ? `, lasting ${spanText(hover.hit.mark.t2 - hover.hit.mark.t)}` : ""}
           </div>
         </div>
       )}
@@ -543,7 +552,7 @@ function KeysHelp({ onClose }: { onClose: () => void }) {
     [["[", "]"], "slower / faster"],
     [[",", "."], "previous / next mark"],
     [["Home", "End"], "start / end"],
-    [["wheel"], "zoom · ⇧ wheel pans"],
+    [["wheel"], "zoom (with shift: move along)"],
   ];
   return (
     <div className="tl-help" onClick={onClose}>
