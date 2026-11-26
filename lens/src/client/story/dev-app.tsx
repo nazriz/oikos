@@ -10,6 +10,7 @@ import { useLens } from "../state";
 import { StoryRail } from "./StoryRail";
 import { SittingReader } from "./SittingReader";
 import { loadSeat, when } from "./data";
+import { ComparePage } from "../compare/ComparePage";
 
 const css = `
 html, body, #root { margin: 0; height: 100%; }
@@ -88,4 +89,18 @@ function App() {
     </div>
   );
 }
-createRoot(document.getElementById("root")!).render(<App />);
+/** `?compare=<keyA>,<keyB>`: the compare view, as core's router will show it at #/compare/<keyA>/<keyB>. */
+function CompareApp({ pair }: { pair: string }) {
+  const [a, b] = pair.split(",");
+  const theme = new URLSearchParams(location.search).get("theme");
+  useEffect(() => { if (theme) document.documentElement.dataset.theme = theme; }, [theme]);
+  return (
+    <div style={{ display: "grid", gridTemplateRows: "44px 1fr", height: "100vh" }}>
+      <style>{css}</style>
+      <div className="dv-top"><b>Lens</b><span className="st-faint" style={{ fontSize: 12 }}>compare · dev harness</span></div>
+      <div style={{ minHeight: 0 }}><ComparePage a={a!} b={b!} /></div>
+    </div>
+  );
+}
+const pair = new URLSearchParams(location.search).get("compare");
+createRoot(document.getElementById("root")!).render(pair ? <CompareApp pair={pair} /> : <App />);

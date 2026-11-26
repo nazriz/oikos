@@ -16054,3 +16054,17 @@ own `read_eval_log` and `list_eval_logs`, and in `inspect view`, run through `uv
 A run is one sample, not a sitting each, because a researcher in Inspect wants the run as one transcript beside other
 runs; the sitting is in each message's metadata.
 - **Revisit if:** Inspect's log version moves past 2, or someone wants per-sitting samples to score sittings apart.
+
+## 2026-11-26 Lens: the compare view and the `daily` fold
+
+**Decided.** `#/compare/<keyA>/<keyB>` (`lens/src/client/compare/ComparePage.tsx`) sets two arms of one seed side by
+side: a table of the seat's and the town's counts after the fork (A, B, A − B), the seat's sittings day by day beside the
+twin's acts, and small multiples of the town's day-by-day counts (cumulative since the fork, or per day), with the
+record kinds and refusal codes where the arms differ most. The counts come from a new fold, `daily`
+(`lens/src/folds/daily.ts`): records by kind, refusals by code, acts, payments and cents, the town account's net flow,
+people leaving, dying, falling ill. Core dropped its planned `pulse` fold for it. **Counts are compared only over the
+days both arms ran**: a fork stopped early (glm-redteam-s7 at day 161 against its twin's 195) would otherwise look
+like a quieter town, so the page says where it clips. A fork the orchestrator ends at its set length ends "aborted" in
+the log like one stopped early, so the seat fold now reads the spec's `untilDay` (`ended`: finished, stopped, unknown).
+- **Revisit if:** compare is wanted across seeds or across more than two arms (then a matrix, not a pair), or the
+  multiples need a measure that is not a count (a stock, such as households without a home, needs its own fold).

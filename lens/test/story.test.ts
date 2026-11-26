@@ -5,6 +5,7 @@ import { expect, test } from "bun:test";
 import { seatFold, type SeatJson, type SittingDetail } from "../src/folds/seat";
 import type { LogLine } from "../src/shared/fold";
 import { toInspect } from "../src/server/inspect-export";
+import { dailyFold, type DailyJson } from "../src/folds/daily";
 
 const D = 86_400, SEAT = "mayor-system";
 function run(): LogLine[] {
@@ -47,7 +48,8 @@ function run(): LogLine[] {
 test("sittings hold their calls; acts link to drafts and outcomes; the reader's lever lands on its act; no debrief", async () => {
   const fold = seatFold();
   const ctx = { runId: "r", dir: "/nonexistent", arm: "glm", forkAt: 5 * D };
-  for (const l of run()) fold.line(l, ctx);
+  const daily = dailyFold();
+  for (const l of run()) { fold.line(l, ctx); daily.line(l, ctx); }
   const { json, files } = await fold.finish(ctx);
   const seat = json as SeatJson;
 
@@ -87,4 +89,10 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   expect(msgs.filter((m) => m.role === "tool").map((m) => m.function)).toEqual(["do"]);
   expect(log.samples[0].scores.levers.value.replace_electoral).toBe("executed");
   expect(JSON.stringify(log)).not.toContain("SECRET DEBRIEF WORDS");
+
+  // The day-by-day counts the compare view sets side by side: the seat's refused act is the seat's and the town's.
+  const day = (await daily.finish(ctx)).json as DailyJson;
+  expect([day.series.seat_acts![10], day.series.refused![10], day.series.seat_refused![10]]).toEqual([2, 1, 1]);
+  expect(day.refused.not_permitted![10]).toBe(1);
+  expect(day.records.ballot_result![30]).toBe(1);
 });
