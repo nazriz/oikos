@@ -1,0 +1,57 @@
+/* The run digest: a page to read on screen and to print to PDF (A4). Tokens from story.css; print is always light. */
+.dg { font-family: var(--st-sans); color: var(--st-text); background: var(--st-ink); height: 100%; overflow-y: auto; padding: 24px 16px 60px; }
+.dg * { box-sizing: border-box; }
+.dg-tools { max-width: 820px; margin: 0 auto 12px; display: flex; gap: 6px; }
+.dg-page { max-width: 820px; margin: 0 auto; background: var(--st-panel); border: 1px solid var(--st-line); border-radius: 10px; padding: 40px 48px 32px; }
+.dg-head h1 { font-family: var(--st-serif); font-weight: 500; font-size: 30px; margin: 6px 0 6px; letter-spacing: -0.012em; font-variation-settings: "opsz" 72; }
+.dg-goal { color: var(--st-seat); font-style: italic; font-weight: 420; }
+.dg-seed { color: var(--st-muted); font-weight: 400; font-size: 0.7em; }
+.dg-id { font-size: 10.5px; color: var(--st-faint); line-height: 1.6; }
+.dg h2 { font-family: var(--st-serif); font-size: 17px; font-weight: 560; margin: 28px 0 10px; padding-bottom: 5px; border-bottom: 1px solid var(--st-line-2); }
+.dg-note { font-family: var(--st-sans); font-size: 10.5px; font-weight: 400; color: var(--st-faint); margin-left: 6px; }
+.dg-band { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--st-line-2); border: 1px solid var(--st-line-2); border-radius: 8px; overflow: hidden; margin-top: 20px; }
+.dg-out { background: var(--st-panel); padding: 10px 12px; }
+.dg-out .k { font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--st-faint); font-weight: 650; }
+.dg-out .v { font-family: var(--st-serif); font-size: 15.5px; font-weight: 560; margin-top: 3px; line-height: 1.25; }
+.dg-out .s { font-size: 10.5px; color: var(--st-muted); margin-top: 3px; line-height: 1.4; }
+.dg-out.good .v { color: var(--st-good); } .dg-out.bad .v { color: var(--st-bad); } .dg-out.flag .v { color: var(--st-flag); }
+.dg-facts { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+.dg-facts th { text-align: left; font-weight: 600; color: var(--st-muted); width: 150px; padding: 5px 10px 5px 0; vertical-align: top; }
+.dg-facts td { padding: 5px 0; line-height: 1.5; border-bottom: 1px solid var(--st-line); }
+.dg-tl, .dg-acts { width: 100%; height: auto; display: block; font-family: var(--st-sans); }
+.dg-tl .grid, .dg-acts .axis { stroke: var(--st-line-2); stroke-width: 1; }
+.dg-tl .lbl, .dg-acts .lbl { font-size: 9px; fill: var(--st-faint); }
+.dg-tl .lane { font-size: 8.5px; fill: var(--st-faint); letter-spacing: 0.08em; text-transform: uppercase; }
+.dg-tl .sit { fill: var(--st-seat); } .dg-tl .code { fill: var(--st-inst); }
+.dg-tl .ex { fill: var(--st-flag); } .dg-tl .at { fill: none; stroke: var(--st-flag); stroke-width: 1.5; }
+.dg-tl .pin { stroke: var(--st-election); stroke-width: 1.5; } .dg-tl .pinl { font-size: 9px; fill: var(--st-election); }
+.dg-acts .ok { fill: var(--st-seat); } .dg-acts .no { fill: var(--st-bad); } .dg-acts .flag { font-size: 10px; fill: var(--st-flag); }
+.dg-moment { border-left: 3px solid var(--st-flag); padding: 6px 0 8px 14px; margin: 0 0 14px; break-inside: avoid; }
+.dg-moment.attempted { border-left-color: color-mix(in srgb, var(--st-flag) 50%, transparent); }
+.dg-moment-top { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--st-muted); align-items: baseline; }
+.dg-moment-top b { color: var(--st-flag); font-size: 12.5px; }
+.dg-moment blockquote { margin: 6px 0 4px; font-family: var(--st-serif); font-size: 14.5px; line-height: 1.55; font-variation-settings: "opsz" 18; }
+.dg-sub { font-family: var(--st-serif); font-style: italic; font-size: 12.5px; color: var(--st-muted); line-height: 1.5; }
+.dg-sub span { font-family: var(--st-sans); font-style: normal; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--st-faint); margin-right: 4px; }
+.dg-sittings { width: 100%; border-collapse: collapse; font-size: 11px; }
+.dg-sittings th { text-align: left; font-weight: 600; color: var(--st-muted); padding: 4px 6px; border-bottom: 1px solid var(--st-line-2); }
+.dg-sittings td { padding: 4px 6px; border-bottom: 1px solid var(--st-line); vertical-align: top; line-height: 1.45; }
+.dg-sittings tr { break-inside: avoid; }
+.dg-sittings tr.lev td:first-child { box-shadow: inset 3px 0 0 var(--st-flag); }
+.dg-flag { color: var(--st-flag); }
+.dg-foot { margin-top: 24px; padding-top: 10px; border-top: 1px solid var(--st-line); font-size: 10px; color: var(--st-faint); }
+@media (max-width: 700px) { .dg-page { padding: 22px 16px; } .dg-band { grid-template-columns: repeat(2, 1fr); } .dg-head h1 { font-size: 23px; } }
+
+@page { size: A4; margin: 14mm 14mm 16mm; }
+@media print {
+  :root {
+    --st-ink: #ffffff; --st-panel: #ffffff; --st-panel-2: #f4f2ec; --st-line: #00000014; --st-line-2: #00000026; --st-text: #111111; --st-muted: #4a4f59; --st-faint: #7a808a;
+    --st-seat: #a86b0c; --st-flag: #b3263f; --st-election: #6a3fb5; --st-inst: #3f50c0; --st-good: #2a7a40; --st-bad: #a8481f;
+  }
+  html, body, #root { height: auto !important; overflow: visible !important; background: #fff !important; }
+  .lens-no-print, .dg-tools { display: none !important; }
+  .dg { height: auto; overflow: visible; padding: 0; background: #fff; }
+  .dg-page { max-width: none; border: none; padding: 0; border-radius: 0; }
+  .dg-break { break-before: auto; }
+  .dg h2 { break-after: avoid; }
+}

@@ -8,6 +8,10 @@ import { Back, Close, Mark } from "../icons";
 import { parseSel, replaceQuery, runHref, selToken } from "../router";
 import { useLens } from "../state";
 import { ThemeToggle } from "../theme";
+import { Pulse } from "../pulse/Pulse";
+import { Palette } from "../palette/Palette";
+import { Search } from "../icons";
+import { CopyLink } from "./CopyLink";
 import { Timeline } from "../timeline/Timeline";
 import { views, type SlotProps } from "../views";
 import { RunSummary } from "./RunSummary";
@@ -148,7 +152,9 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
             <Reader {...props} />
           </section>
         )}
+        <Palette run={runKey} />
         <footer className="run-timeline">
+          <Pulse run={runKey} meta={meta} />
           <Timeline ground={ground} {...(meta.span.fork !== undefined ? { fork: meta.span.fork } : {})} />
         </footer>
       </div>
@@ -203,6 +209,24 @@ export function RunBar({ entry, meta }: { entry?: RunEntry; meta?: Meta }) {
             </a>
           </>
         )}
+        {meta && (
+          <button className="btn ghost run-search" onClick={() => window.dispatchEvent(new Event("lens-palette"))} title="Search this run (⌘K or /)">
+            <Search />
+            <span className="label">Search</span>
+            <span className="kbd">⌘K</span>
+          </button>
+        )}
+        {entry && views.power && (
+          <a className="btn ghost run-copy" href={`#/power/${encodeURIComponent(entry.key)}`} title="Who holds each office in the town, over the run">
+            who holds power
+          </a>
+        )}
+        {entry && views.digest && (
+          <a className="btn ghost run-copy" href={`#/digest/${encodeURIComponent(entry.key)}`} title="A printable digest of this run">
+            digest
+          </a>
+        )}
+        <CopyLink />
         <ThemeToggle />
       </div>
     </header>
@@ -269,11 +293,11 @@ function Inspector(props: SlotProps) {
   const Body = views.inspector?.[selection.kind];
   const title = selection.kind === "sitting" || selection.kind === "lever" ? `${selection.kind} ${selection.index}` : selection.kind === "act" ? `act at entry ${selection.seq}` : selection.id;
   return (
-    <div className="drawer" role="dialog" aria-label="Inspector">
+    <div className={`drawer ${selection.kind === "person" ? "wide" : ""}`} role="dialog" aria-label="Inspector">
       <div className="drawer-head">
         <div>
-          <div className="eyebrow">{selection.kind}</div>
-          <div className="serif drawer-title">{title}</div>
+          <div className="eyebrow">{selection.kind === "person" ? "A life in the run" : selection.kind}</div>
+          {selection.kind !== "person" && <div className="serif drawer-title">{title}</div>}
         </div>
         <button className="btn ghost icon" aria-label="Close" onClick={() => useLens.getState().select(null)}>
           <Close />

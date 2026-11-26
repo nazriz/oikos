@@ -113,6 +113,31 @@ export function writeInspect(seat: SeatJson, files: Files, outDir: string, key: 
   return path;
 }
 
+/** Every fork of an experiment folder (`seed-N/<arm>.oklog`) as an Inspect log in `<outRoot>/<experiment>/`, the seat
+ * fold run over each on the kernel's export (nothing written beside the runs). The code twin is left out unless asked:
+ * it makes no model calls, so its sample has no messages. Returns the files written. */
+export async function inspectExperiment(dir: string, outRoot: string, o: { withCode?: boolean; log?: (s: string) => void } = {}): Promise<string[]> {
+  const { runFolds } = await import("../client/story/dev");
+  const { seatFold } = await import("../folds/seat");
+  const specFile = join(dir, "spec.json");
+  const spec = existsSync(specFile) ? JSON.parse(readFileSync(specFile, "utf8")) : undefined;
+  const name = basename(dir), out = join(outRoot, name), written: string[] = [];
+  const seeds = readdirSync(dir).filter((f) => /^seed-\d+$/.test(f)).sort((a, b) => Number(a.slice(5)) - Number(b.slice(5)));
+  if (!seeds.length) throw new Error(`no seed-N folders in ${dir}: is it an experiment folder?`);
+  for (const sd of seeds) for (const f of readdirSync(join(dir, sd)).filter((f) => f.endsWith(".oklog") && f !== "base.oklog").sort()) {
+    const arm = f.slice(0, -6);
+    if (arm === "code" && !o.withCode) continue;
+    const key = `${name}~${sd}~${arm}`, fold = seatFold();
+    const ctx = { runId: key, dir: join(dir, sd), arm, seed: Number(sd.slice(5)), ...(typeof spec?.forkDay === "number" ? { forkAt: spec.forkDay * 86_400 } : {}), ...(spec ? { spec } : {}) };
+    const { lines, ms } = await runFolds(join(dir, sd, f), [fold], ctx);
+    const res = await fold.finish(ctx);
+    const path = writeInspect(res.json as SeatJson, res.files ?? {}, out, key);
+    written.push(path);
+    o.log?.(`${key}: ${lines.toLocaleString()} lines in ${(ms / 1000).toFixed(1)} s -> ${path}`);
+  }
+  return written;
+}
+
 if (import.meta.main) {
   const a = process.argv.slice(2), src = a[0];
   const opt = (n: string) => { const i = a.indexOf(n); return i < 0 ? undefined : a[i + 1]; };

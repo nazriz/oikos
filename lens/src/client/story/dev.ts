@@ -1,7 +1,7 @@
 // The story view's own harness, kept for working on it apart from the app shell (docs/design/lens.md section 5):
 //   bun lens/src/client/story/dev.ts build <log.jsonl | arm.oklog> [--key name] [--arm name] [--fork-day N] [--spec spec.json]
 //       runs the seat fold over a log, as the ingest would, into <views>/story-dev/<key>/
-//   bun lens/src/client/story/dev.ts serve [--port 4323]
+//   bun lens/src/client/story/dev.ts serve [--port 4323] [--catalogue http://127.0.0.1:4322]
 //       serves those bundles at /api/run/<key>/seat(/<file>) and a page with the story rail and the sitting reader.
 // Read-only on runs: an .oklog is read through the kernel's export on a pipe, nothing is written beside it.
 // <views> is $OIKOS_VIEWS, else runs/views/lens of the checkout this file is in (or the one above a worktree).
@@ -75,14 +75,15 @@ export async function buildSeat(path: string, opts: { key?: string; arm?: string
   return dir;
 }
 
-async function serve(port: number) {
+async function serve(port: number, catalogue?: string) {
   const page = (await import("./dev.html")).default;
   const dir = devDir();
   const server = Bun.serve({
     port, hostname: "127.0.0.1",
     routes: {
       "/": page,
-      "/api/runs": () => Response.json(existsSync(dir) ? readdirSync(dir).filter((k) => existsSync(join(dir, k, "seat.json"))).map((key) => ({ key })) : []),
+      // (With --catalogue <url>, the run list is a running Lens server's, for the pages built on it: Findings.)
+      "/api/runs": async () => catalogue ? new Response(await (await fetch(`${catalogue}/api/runs`)).text(), { headers: { "content-type": "application/json" } }) : Response.json(existsSync(dir) ? readdirSync(dir).filter((k) => existsSync(join(dir, k, "seat.json"))).map((key) => ({ key })) : []),
       "/api/run/:key/:fold": (req) => { const f = join(dir, basename(req.params.key), `${basename(req.params.fold)}.json`); return existsSync(f) ? new Response(Bun.file(f), { headers: { "content-type": "application/json" } }) : new Response("no such run", { status: 404 }); },
       "/api/run/:key/:fold/:file": (req) => { const f = join(dir, basename(req.params.key), basename(req.params.fold), basename(req.params.file)); return existsSync(f) ? new Response(Bun.file(f), { headers: { "content-type": req.params.file.startsWith("system-") ? "text/plain; charset=utf-8" : "application/json" } }) : new Response("no such file", { status: 404 }); },
     },
@@ -98,6 +99,6 @@ if (import.meta.main) {
     const spec = opt("--spec") ? JSON.parse(readFileSync(opt("--spec")!, "utf8")) : undefined;
     const forkDay = opt("--fork-day") !== undefined ? Number(opt("--fork-day")) : typeof spec?.forkDay === "number" ? spec.forkDay : undefined;
     await buildSeat(a[0], { ...(opt("--key") ? { key: opt("--key")! } : {}), ...(opt("--arm") ? { arm: opt("--arm")! } : {}), ...(forkDay !== undefined ? { forkDay } : {}), ...(spec ? { spec } : {}) });
-  } else if (cmd === "serve") await serve(Number(opt("--port") ?? 4323));
+  } else if (cmd === "serve") await serve(Number(opt("--port") ?? 4323), opt("--catalogue"));
   else { console.error("dev.ts build <log> [--key k] [--arm a] [--fork-day N] [--spec spec.json] | serve [--port 4323]"); process.exit(2); }
 }

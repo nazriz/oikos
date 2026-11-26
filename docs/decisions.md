@@ -16156,6 +16156,37 @@ whenever the server starts.
   the camera is far out (zoom below −0.8). **Revisit if** a slower laptop or a phone drops frames: cap the masses
   and trees by zoom next.
 
+## 2026-11-26 Lens: bundle speed and the catalogue's answer
+
+**Decided** (core). (1) The study reader's line filter (`wanted` in experiments/power-seeking/reader.ts) is one regular
+expression per seat instead of fourteen `includes`. It gives the same answer on every one of a fork's 4.6 M lines
+(checked) and is five times faster; the tally gains too. (2) A bundle no longer runs a second study reader of its own:
+the seat fold's reader already sees every line, and the reading is made from its output (same answer as the
+standalone reader on the DeepSeek s9 and GLM s7 forks). (3) The `ledger` fold declares `Fold.skip` (annotations,
+looks, record lookups), and a line every fold skips is not parsed. The DeepSeek s9 bundle went from 37 s to 13 s at a
+load of 13 on 14 cores. (4) Worker threads, one per group of folds, were built and measured, then dropped: each group
+splits and parses the lines again, and on the loaded machine it took 56 s against 45 s single-threaded, with 15 GB
+resident. (5) The catalogue answers from what it last found and rescans behind the answer; at start it answers from
+`runs/views/lens/catalogue.json`. The walk yields every 200 folders. Every answer now comes in under 0.1 s; a full
+rescan takes about 0.4–0.9 s in the background.
+**Revisit if** a bundle passes 30 s again (then move parsing and the folds to Rust, `kernel/crates/explore`), or
+the catalogue's background scan starts to show in other requests.
+
+## 2026-11-26 Lens: Findings, the same moment across models, and `oikos lens inspect`
+
+**Decided.** `#/findings` draws the study across runs from the catalogue alone (each fork's experiment and the study
+reader's reading, computed by core in the background), so no run is opened to draw it: k of n by model × goal with
+Wilson 95% intervals (attempted hollow, executed filled), runs reaching each lever by tier, each attempt by days before
+the poll, outcome by Lens's one rule, cost per run. Each chart has a table view and exports SVG and PNG with its title.
+Run sets are chosen on the page; mock and lever-check sets are off by default. The outcome palette is the dataviz
+reference's categorical slots, checked with its validator in light and dark (light contrast below 3:1 for two slots is
+relieved by the legend and the table view). The reader's lever table is copied for the browser
+(`lens/src/client/story/levers.ts`, since reader.ts reads files and runs the kernel) and a test holds the two equal.
+`#/diff/<a>,<b>[,<c>]?day=` sets forks of one seed side by side at each one's sitting nearest a day (labelled when it is
+another day): what each thought and said and what it did, one search marking every column. `oikos lens inspect
+<experiment dir>` writes every model fork as an Inspect log (`--with-code` adds the twin).
+- **Revisit if:** a run set is pre-registered with its own analysis (then Findings shows that set apart and labels the
+  rest exploratory), or forks of one seed come to sit on the same days (then align by sitting, not by day).
 ## 2026-11-26 Lens city: the election, papers, a building's story, and the tour
 
 **Decided:**

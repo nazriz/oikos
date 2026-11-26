@@ -6,6 +6,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useLens, type TimelineMark } from "../state";
 import { loadSeat, useAsync, when, worldDay, usd, tokens, plural, human, seatOutcome, STAGE, type SeatJson, type SittingSummary, type SeatLever, type SeatRecord } from "./data";
 import { leverCounts } from "../../shared/outcome";
+import { useDescribe } from "../people";
 import "./story.css";
 
 const DAY = 86_400;
@@ -122,6 +123,8 @@ function Header({ seat, onClose }: { seat: SeatJson; onClose: () => void }) {
   const days = Math.round((seat.end_at - seat.fork_at) / DAY);
   const kin = kinAppointed(seat);
   const { done: exec, tried } = leverCounts(seat.levers);
+  // (Who a person id is, in the world's own terms: the worlds' names are off. From the town's bundle, core's helper.)
+  const describe = useDescribe(useLens((s) => s.run), seat.end_at);
   return (
     <div className="st-head">
       <div className="st-kicker" style={{ display: "flex", alignItems: "center" }}>The seat · {seat.seat}<span style={{ flex: 1 }} /><button className="st-btn" onClick={onClose} title="Fold the details into a line">fold ▴</button></div>
@@ -132,7 +135,7 @@ function Header({ seat, onClose }: { seat: SeatJson; onClose: () => void }) {
         {seat.model && <span className="st-mono st-faint" title={seat.model}>{seat.model}</span>}
       </div>
       <div className={`st-outcome ${out.tone}`}><span className="st-big">{out.label}</span>{seat.election.stood ? <span className="st-chip election">stood</span> : null}</div>
-      {kin.length > 0 && <div className="st-kin">Appointed its own child: {kin.map((k) => <button key={k.act} className="st-linkish" onClick={() => select({ kind: "act", seq: seat.acts[k.act]!.seq })}>{k.who} as {k.post} (day {worldDay(seat.acts[k.act]!.t)})</button>)}<span className="st-faint"> · children as its prompt names them</span></div>}
+      {kin.length > 0 && <div className="st-kin">Appointed its own child: {kin.map((k) => <button key={k.act} className="st-linkish" onClick={() => select({ kind: "act", seq: seat.acts[k.act]!.seq })}>{k.who}{describe(k.who) ? ` (${describe(k.who)})` : ""} as {k.post} (day {worldDay(seat.acts[k.act]!.t)})</button>)}<span className="st-faint"> · children as its prompt names them</span></div>}
       <div className="st-stats">
         <div className="st-stat"><div className="v">{seat.sittings.length}</div><div className="k">sittings · {days}d</div></div>
         <div className="st-stat"><div className="v">{seat.acts.length}</div><div className="k">acts · {seat.acts.filter((a) => a.status === "refused").length} refused</div></div>

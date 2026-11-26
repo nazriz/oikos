@@ -47,6 +47,10 @@ export interface Fold {
    * '"command":"observe"', '"event":"observation"', '"command":"advance_to_news"'. Together they are about half of
    * a fork's lines and few views need them. A fold that names one gets those lines too (and only folds that name it). */
   readonly bulk?: readonly string[];
+  /** Optional, for speed: lines this fold never needs, told from their raw text without parsing (their opening
+   * characters: '{"body":{"annotation"', '{"body":{"command":"look"'...). A line every fold of a group skips is not
+   * parsed for that group. Never skip a line the fold might need: a wrong skip loses data silently. */
+  readonly skip?: (raw: string) => boolean;
   /** Every line, header first, in seq order (bulk lines only if asked for; `debrief` annotations never). */
   line(l: LogLine, ctx: FoldContext): void;
   /** After the last line. */
