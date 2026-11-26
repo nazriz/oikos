@@ -45,6 +45,8 @@ export function Masthead({ run }: { run: string }) {
         )}
         {hall && (
           <g>
+            {/* (Once, as the page opens: the reach of the mayor's office, a ring going out from the town hall.) */}
+            <circle cx={hall.x + hall.w / 2} cy={hall.y + hall.h / 2} r={Math.max(w, h) / 3} className="plan-reach" />
             <rect x={hall.x - 0.4} y={hall.y - 0.4} width={hall.w + 0.8} height={hall.h + 0.8} className="plan-hall" />
             <text x={hall.x + hall.w + w / 80} y={hall.y + hall.h / 2 + w / 110} className="plan-label" style={{ fontSize: w / 34, strokeWidth: w / 160 }}>
               Town hall

@@ -55,18 +55,19 @@ export function HelpButtons() {
   );
 }
 
-/** "This page answers: …", the first line of every page. */
+/** What a page is for, as a quiet line, only where nothing else says it yet: a run's bar while the run opens. Every
+ * other page's title already says what it answers, and the site bar says where it is, so a templated "This page
+ * answers: …" above the title only repeated it (docs/decisions.md, 2026-11-27, lens/nav-5). */
 export function PageAnswer({ page, className }: { page: PageKey; className?: string }) {
-  return (
-    <p className={`page-answer ${className ?? ""}`}>
-      <span className="page-answer-label">This page answers</span> {PAGE_ANSWERS[page]}
-    </p>
-  );
+  if (page !== "run") return null;
+  return <p className={`page-answer ${className ?? ""}`}>{PAGE_ANSWERS[page]}</p>;
 }
 
 export function Glossary() {
   const open = useMode((s) => s.glossary);
   const set = useMode((s) => s.setGlossary);
+  // (The study's own names for each word are for researchers: Story mode gives the plain word alone.)
+  const researcher = useMode((s) => s.mode === "researcher");
   useEffect(() => {
     if (!open) return;
     const k = (e: KeyboardEvent) => e.key === "Escape" && set(false);
@@ -89,7 +90,7 @@ export function Glossary() {
             <div key={k} className="glossary-row">
               <dt>
                 {WORDS[k].plain.charAt(0).toUpperCase() + WORDS[k].plain.slice(1)}
-                <span className="glossary-term"> (in the study: {WORDS[k].term})</span>
+                {researcher && <span className="glossary-term"> (in the study: {WORDS[k].term})</span>}
               </dt>
               <dd>{WORDS[k].explain}</dd>
             </div>

@@ -206,6 +206,8 @@
 .st-prose.small { font-size: 12.5px; line-height: 1.6; color: var(--st-muted); }
 .st-prose.small li { margin: 0.3em 0; }
 .st-rec { font-family: var(--st-mono); font-size: 0.82em; color: var(--st-inst); }
+/* An id or date in a model's words, kept as written: a faint dotted underline, its meaning on hover (Story mode). */
+.st-id { text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; cursor: help; }
 mark.st-hit { background: var(--st-mark); color: inherit; border-radius: 2px; padding: 0 1px; }
 mark.st-hit.cur { background: var(--st-seat); color: var(--st-ink); }
 mark.st-lever { background: var(--st-flag-wash); color: inherit; border-bottom: 1.5px solid var(--st-flag); padding: 0 1px; }

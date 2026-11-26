@@ -1,0 +1,713 @@
+/* The landing page (docs/design/lens-look.md): a civic atlas's opening pages. One bold moment (the headline and the
+   mayor's own words), then sections ruled off one from the next, each with one picture. Marks follow the dataviz rules:
+   2px lines, 8px+ dots with a surface ring, hairline solid grids, text in text colours, never in a mark's colour. */
+
+.ld-hero {
+  border-bottom: 0;
+  padding: 40px 0 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+}
+.ld-hero h1 {
+  font-size: 44px;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  max-width: 760px;
+  margin: 14px 0 22px;
+}
+.ld-pull {
+  margin: 0 0 22px;
+  padding: 0 0 0 18px;
+  border-left: 3px solid var(--seat);
+  max-width: 680px;
+}
+.ld-pull blockquote {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.ld-pull blockquote::before {
+  content: "\201C";
+}
+.ld-pull blockquote::after {
+  content: "\201D";
+}
+.ld-pull-wait::before,
+.ld-pull-wait::after {
+  content: none !important;
+}
+.ld-pull-wait {
+  min-height: 62px;
+}
+.ld-pull figcaption {
+  margin-top: 8px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.ld-pull figcaption a {
+  color: var(--text);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+.ld-facts {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  max-width: 680px;
+  border-top: 1px solid var(--line);
+}
+.ld-facts li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 16px;
+  min-height: 39px;
+}
+/* The headline's place while the runs are first read: three lines of its size, so nothing moves when it comes. */
+.ld-h1-sk span {
+  display: block;
+  height: 0.8em;
+  margin: 0.17em 0 0.33em;
+  background: var(--panel-2);
+}
+.ld-h1-sk span:nth-child(2) {
+  width: 92%;
+}
+.ld-h1-sk span:nth-child(3) {
+  width: 55%;
+}
+.ld-facts.sk li {
+  background: linear-gradient(var(--panel-2), var(--panel-2)) 0 50% / 60% 12px no-repeat;
+}
+
+/* A section: a heading that says the point, its link, one sentence, one picture. */
+.ld-section {
+  padding: 44px 0 6px;
+  border-top: 1px solid var(--line);
+  margin-top: 30px;
+}
+.ld-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ld-head h2 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.12;
+  letter-spacing: -0.022em;
+  max-width: 880px;
+}
+.ld-link {
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ld-link:hover {
+  color: var(--text);
+}
+.ld-sub {
+  margin: 10px 0 18px;
+  max-width: 780px;
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.ld-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 16px;
+}
+.ld-check {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.ld-caveat {
+  margin: 18px 0 0;
+  max-width: 780px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.ld-caveat summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.ld-caveat p {
+  margin: 8px 0 0;
+  line-height: 1.55;
+}
+
+/* A chart's frame: the table switch above, the picture, a tooltip inside. */
+.ld-chart {
+  position: relative;
+}
+.ld-chart-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin: -6px 0 6px;
+}
+.ld-box {
+  position: relative;
+}
+.ld-box svg {
+  display: block;
+  overflow: visible;
+}
+.ld-tip {
+  position: absolute;
+  z-index: 5;
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-2);
+  pointer-events: none;
+}
+.ld-tip b {
+  color: var(--text);
+  font-size: 14px;
+}
+.ld-tip q {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  color: var(--text);
+}
+.ld-table-wrap {
+  overflow-x: auto;
+}
+.ld-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.ld-table th,
+.ld-table td {
+  text-align: left;
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.ld-table th {
+  font-weight: 700;
+  color: var(--muted);
+  border-bottom: 1px solid var(--text);
+}
+.ld-table .r {
+  text-align: right;
+}
+
+/* The calendar: a ruler, the term in the mayor's yellow, the ballot that leaves. */
+.cal-rule {
+  stroke: var(--line-2);
+  stroke-width: 1;
+}
+.cal-tick {
+  stroke: var(--line-2);
+}
+.cal-term {
+  stroke: var(--seat);
+  stroke-width: 4;
+  stroke-linecap: butt;
+}
+.cal-break {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  fill: none;
+}
+.cal-num {
+  font-size: 12px;
+  fill: var(--muted);
+}
+.cal-small {
+  font-size: 12.5px;
+  fill: var(--muted);
+}
+.cal-small.strong {
+  fill: var(--text-2);
+  font-weight: 600;
+}
+.cal-label {
+  font-size: 13px;
+  font-weight: 800;
+  fill: var(--text);
+}
+.cal-ballot {
+  fill: var(--election);
+  stroke: var(--panel);
+  stroke-width: 2;
+}
+.cal-ballot.was {
+  fill: var(--ink);
+  stroke: var(--election);
+  stroke-width: 2;
+}
+.cal-arc {
+  fill: none;
+  stroke: var(--election);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+}
+.cal-stem {
+  stroke: var(--line-2);
+}
+.cal-dot {
+  fill: var(--ink);
+  stroke: var(--flag);
+  stroke-width: 2;
+}
+.cal-dot.done {
+  fill: var(--flag);
+  stroke: var(--panel);
+}
+.hit {
+  fill: transparent;
+}
+.cal-mark,
+.when-dot,
+.act-g {
+  cursor: pointer;
+  outline: none;
+}
+.cal-mark:hover .cal-dot,
+.cal-mark:focus-visible .cal-dot,
+.when-dot:hover .cal-dot,
+.when-dot:focus-visible .cal-dot,
+.act-g:hover .act-dot,
+.act-g:focus-visible .act-dot {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+/* (The one reveal: the ballot travels its arc once, when the section comes into view.) */
+@media (prefers-reduced-motion: no-preference) {
+  .ld-cal .cal-arc {
+    stroke-dashoffset: 1;
+  }
+  .ld-cal .cal-new {
+    opacity: 0;
+  }
+  .ld-cal.in .cal-arc {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 1.1s var(--ease) 0.25s;
+  }
+  .ld-cal.in .cal-new {
+    opacity: 1;
+    transition: opacity 0.3s ease 1.25s;
+  }
+  .who .who-row {
+    opacity: 0;
+  }
+  .who.in .who-row {
+    opacity: 1;
+    transition: opacity 0.35s ease calc(var(--i) * 40ms);
+  }
+  .ld-when .cal-dot,
+  .ld-act .act-dot {
+    opacity: 0;
+  }
+  .ld-when.in .cal-dot,
+  .ld-act.in .act-dot {
+    opacity: 1;
+    transition: opacity 0.5s ease 0.1s;
+  }
+}
+
+/* Who: a row per model, its runs as squares. */
+.who {
+  border-top: 2px solid var(--text);
+}
+.who-row {
+  display: grid;
+  grid-template-columns: 190px fit-content(600px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+.who-model {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.who-model:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.who-squares {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.sq {
+  width: 13px;
+  height: 13px;
+  border-radius: 1px;
+  background: var(--panel-3);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.sq.m-tried,
+.sq.m-split {
+  background: var(--panel);
+  box-shadow: inset 0 0 0 2px var(--flag);
+}
+.sq.m-yes {
+  background: var(--flag);
+  box-shadow: none;
+}
+/* (Not counted: stopped before election day. Faint, filled where both graders still found a lock-in.) */
+.sq.m-excluded {
+  opacity: 0.35;
+}
+.sq.m-excluded.was-yes {
+  background: var(--flag);
+  box-shadow: none;
+}
+.sq.m-ungraded {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.who-group + .who-group {
+  margin-top: 10px;
+}
+.who-group-head {
+  padding: 10px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.cond .who-row {
+  grid-template-columns: 150px fit-content(600px) minmax(0, 1fr) auto;
+}
+.cond-block + .cond-block {
+  margin-top: 6px;
+}
+.cond-head {
+  padding: 14px 0 6px;
+  font-size: 15px;
+  border-bottom: 1px solid var(--line);
+}
+.cond-head b {
+  font-weight: 800;
+  margin-right: 6px;
+}
+.cond-head .muted {
+  font-size: 13.5px;
+}
+.who-cohort {
+  font-size: 14px;
+  color: var(--text-2);
+}
+.ld-source {
+  margin: 10px 0 0;
+  max-width: 680px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.ld-source a {
+  color: var(--text);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+.sq:hover,
+.sq:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+.who-k {
+  font-size: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.who-k b {
+  color: var(--text);
+  font-size: 16px;
+}
+.ci-track {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.ci-bar {
+  stroke: var(--text-2);
+  stroke-width: 2;
+}
+.ci-dot {
+  fill: var(--text);
+}
+
+/* When and how much: rows of dots on a hairline. */
+.when-after {
+  fill: var(--election-wash);
+}
+.when-poll {
+  stroke: var(--election);
+  stroke-width: 2;
+}
+.when-row {
+  stroke: var(--line);
+}
+.when-model {
+  font-size: 13.5px;
+  font-weight: 700;
+  fill: var(--text);
+  /* (A halo in the page colour, so a grid line or the rule-based mayor's line never runs through a name.) */
+  stroke: var(--ink);
+  stroke-width: 4px;
+  paint-order: stroke;
+  stroke-linejoin: round;
+}
+.act-grid {
+  stroke: var(--line);
+}
+.act-twin {
+  stroke: var(--text-2);
+  stroke-width: 1.5;
+}
+.act-median {
+  stroke: var(--text);
+  stroke-width: 2;
+}
+.act-dot {
+  fill: var(--citizen);
+  fill-opacity: 0.55;
+  stroke: var(--panel);
+  stroke-width: 1.5;
+}
+.act-dot.tried {
+  fill: var(--panel);
+  fill-opacity: 1;
+  stroke: var(--flag);
+  stroke-width: 2;
+}
+.act-dot.done {
+  fill: var(--flag);
+  fill-opacity: 1;
+}
+
+/* Three moments: as before, with the mayor's own line. */
+.start-quote {
+  margin: 10px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--seat);
+  font-size: 16px;
+  line-height: 1.45;
+  max-width: 720px;
+  color: var(--text);
+}
+
+/* Every run: the fingerprint, then the words. */
+.ld-runs td {
+  vertical-align: middle;
+}
+.ld-print {
+  width: 130px;
+  padding-right: 8px;
+}
+.ld-print a {
+  display: block;
+  line-height: 0;
+}
+.ld-group {
+  font-size: 12px;
+}
+.print .pr-plan {
+  stroke: var(--line);
+  stroke-width: 2;
+}
+.print .pr-term {
+  stroke: var(--text-2);
+  stroke-width: 2;
+}
+.pr-stop {
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+.pr-poll {
+  fill: var(--ink);
+  stroke: var(--election);
+  stroke-width: 1.5;
+}
+.pr-poll.won {
+  fill: var(--election);
+}
+.pr-moved {
+  fill: var(--election);
+}
+.pr-mark {
+  fill: var(--panel);
+  stroke: var(--flag);
+  stroke-width: 1.5;
+}
+.pr-mark.done {
+  fill: var(--flag);
+  stroke: var(--panel);
+  stroke-width: 1;
+}
+.print-key {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.print-key svg {
+  vertical-align: -1px;
+}
+.ld-other {
+  padding-top: 30px;
+}
+
+/* While the catalogue loads: quiet bars where the sections will be. */
+.ld-skel {
+  padding: 40px 0;
+}
+.ld-skel .sk-h {
+  width: 46%;
+  height: 26px;
+  background: var(--panel-2);
+  margin: 0 0 14px;
+}
+.ld-skel .sk-b {
+  height: 220px;
+  background: var(--panel);
+  border-top: 2px solid var(--line);
+  margin: 0 0 40px;
+}
+.ld-skel .sk-b.short {
+  height: 120px;
+}
+
+@media (max-width: 900px) {
+  .ld-hero {
+    grid-template-columns: 1fr;
+    padding: 24px 0 20px;
+  }
+  .ld-hero h1 {
+    font-size: 32px;
+  }
+  .ld-pull blockquote {
+    font-size: 18px;
+  }
+  .ld-head h2 {
+    font-size: 23px;
+  }
+  .ld-section {
+    padding-top: 30px;
+  }
+  .who-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 10px;
+  }
+  .who-squares {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .who-ci {
+    display: none;
+  }
+  .ld-runs td:nth-child(2) {
+    display: table-cell !important;
+  }
+  .ld-runs .ld-col-goal {
+    display: none !important;
+  }
+  .ld-print {
+    width: 76px;
+  }
+  .ld-print svg {
+    width: 72px;
+  }
+  /* (The header's links, help, mode and theme wrap to a second line rather than push the page sideways.) */
+  .ld .ld-controls .seg {
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .ld .filters select {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .ld .lib-nav {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 6px;
+  }
+}
+.ld .masthead svg {
+  overflow: hidden;
+}
+
+/* The masthead's one moment: a ring going out from the town hall as the page opens. */
+.plan-reach {
+  fill: none;
+  stroke: var(--seat);
+  stroke-width: 0.6;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .plan-reach {
+    animation: plan-reach 2.4s var(--ease) 0.4s 1 both;
+  }
+}
+@keyframes plan-reach {
+  from {
+    transform: scale(0.05);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+.ld-live {
+  display: block;
+  margin: 12px 0 0;
+}
+
+/* Lock-in squares wear the lock-in colour; power grabs keep the red (src/client/theme.css --lockin). */
+.sq.lk.m-yes,
+.sq.lk.m-excluded.was-yes {
+  background: var(--lockin);
+}
+.sq.lk.m-split {
+  box-shadow: inset 0 0 0 2px var(--lockin);
+}
+
+/* Each section's "Copy link" and "Show as a table" stay out of the way until the section is pointed at or focused
+   (always shown where there is no hover, on a phone). */
+@media (hover: hover) {
+  .ld-section .ld-link {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .ld-section:hover .ld-link,
+  .ld-section:focus-within .ld-link,
+  .ld-link[aria-pressed="true"] {
+    opacity: 1;
+  }
+}

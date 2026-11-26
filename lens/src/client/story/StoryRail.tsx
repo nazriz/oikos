@@ -7,8 +7,9 @@ import { useLens, type TimelineMark } from "../state";
 import { loadSeat, useAsync, when, worldDay, usd, tokens, plural, human, seatOutcome, STAGE, type SeatJson, type SittingSummary, type SeatLever, type SeatRecord } from "./data";
 import { leverCounts } from "../../shared/outcome";
 import { useDescribe } from "../people";
-import { useWords, leverTitle, modelName } from "../words";
+import { useWords, leverTitle, modelName, goalText } from "../words";
 import { useResearcher } from "../mode";
+import { winnerWords } from "../plain";
 import { StoryAccount } from "./StoryMode";
 import "./story.css";
 import { dayNo, dayOf } from "../format";
@@ -20,7 +21,7 @@ export function storyTracks(seat: SeatJson) {
   const e = seat.election;
   const elec: TimelineMark[] = [];
   const pin = (t: number | undefined, label: string) => { if (t !== undefined && t <= seat.end_at + 30 * DAY) elec.push({ t, label, tone: "election" }); };
-  pin(e.notice_at, "Election notice"); pin(e.nominations_close_at, "Nominations close"); pin(e.poll_at, "Poll"); pin(e.result_at, e.winner ? `Result: ${e.winner === seat.seat ? "the AI mayor" : e.winner} won` : "Result"); pin(e.seated_at, "Seated");
+  pin(e.notice_at, "Election notice"); pin(e.nominations_close_at, "Nominations close"); pin(e.poll_at, "Poll"); pin(e.result_at, e.winner ? `Result: ${winnerWords(e.winner, { seats: [seat.seat] })} won` : "Result"); pin(e.seated_at, "Seated");
   const news = seat.records.filter((r) => r.kind === "news" && r.t >= seat.fork_at);
   const results = seat.records.filter((r) => r.kind === "ballot_result" && r.t >= seat.fork_at);
   return [
@@ -100,7 +101,7 @@ function HeaderLine({ seat, onOpen }: { seat: SeatJson; onOpen: () => void }) {
       </div>
       <div className="st-line2">
         <span className={`st-outword ${out.tone}`}>{out.label}</span>
-        <span className="st-faint">{seat.goal ? `Instructions: ${seat.goal}. ` : ""}{seat.seed !== undefined ? `Town seed ${seat.seed}. ` : ""}{seat.sittings.length} turns, {seat.acts.length} acts, {usd(cost)}.</span>
+        <span className="st-faint">{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seat.seed !== undefined ? `Town ${seat.seed}. ` : ""}{seat.sittings.length} turns, {seat.acts.length} acts, {usd(cost)}.</span>
       </div>
       {(top.size > 0 || kin.length > 0) && (
         <div className="st-line3">
@@ -128,7 +129,7 @@ function Header({ seat, onClose }: { seat: SeatJson; onClose: () => void }) {
   return (
     <div className="st-head">
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><div className="st-title">{seat.model ? `${modelName(seat.model)} as mayor` : "The rule-based mayor"}</div><span style={{ flex: 1 }} /><button className="st-btn" onClick={onClose}>Hide details</button></div>
-      <p className="st-sub">{seat.goal ? `Given the “${seat.goal}” instructions. ` : ""}{seat.seed !== undefined ? `Town seed ${seat.seed}. ` : ""}The run began on day {dayOf(seat.fork_at)} and {seat.ended === "stopped" ? <span style={{ color: "var(--st-bad)" }}>stopped early on day {dayOf(seat.end_at)}{seat.until_at ? ` (it was set to run to day ${dayOf(seat.until_at)})` : ""}</span> : `ended on day ${dayOf(seat.end_at)}`}. The model is {seat.model ?? "a rule-based program"}.</p>
+      <p className="st-sub">{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seat.seed !== undefined ? `Town ${seat.seed}. ` : ""}The run began on day {dayOf(seat.fork_at)} and {seat.ended === "stopped" ? <span style={{ color: "var(--st-bad)" }}>stopped early on day {dayOf(seat.end_at)}{seat.until_at ? ` (it was set to run to day ${dayOf(seat.until_at)})` : ""}</span> : `ended on day ${dayOf(seat.end_at)}`}. The model is {seat.model ?? "a rule-based program"}.</p>
       <div className={`st-outcome ${out.tone}`}><span className="st-big">{out.label}</span>{seat.election.stood ? <span className="st-faint" style={{ fontSize: 12 }}>It stood for re-election.</span> : null}</div>
       {kin.length > 0 && <div className="st-kin">Appointed its own child: {kin.map((k) => <button key={k.act} className="st-linkish" onClick={() => select({ kind: "act", seq: seat.acts[k.act]!.seq })}>{k.who}{describe(k.who) ? ` (${describe(k.who)})` : ""} as {k.post} (day {worldDay(seat.acts[k.act]!.t)})</button>)}<span className="st-faint">. Its children as its own instructions name them.</span></div>}
       <div className="st-stats">
@@ -183,7 +184,7 @@ function Election({ seat, compact }: { seat: SeatJson; compact?: boolean }) {
       </div>
       {!compact && moved && <div className="st-elec-note">The election was moved to day {dayOf(e.poll_at ?? 0)} by a law the AI mayor proposed on day {dayNo(moved.day)}, and the council passed.</div>}
       {!compact && !moved && e.poll_at !== undefined && e.poll_at > seat.end_at && <div className="st-elec-note st-muted" style={{ color: "var(--st-muted)" }}>The run ended on day {dayOf(seat.end_at)}, before election day (day {dayOf(e.poll_at)}).</div>}
-      {!compact && e.result_at !== undefined && <div className="st-elec-note" style={{ color: "var(--st-muted)" }}>{e.seat_won ? "The AI mayor won" : `Won by ${e.winner ?? "another candidate"}`}, declared {when(e.result_at)}{e.seated ? `; ${e.seated === seat.seat ? "the AI mayor" : e.seated} took office ${when(e.seated_at ?? 0)}` : ""}.</div>}
+      {!compact && e.result_at !== undefined && <div className="st-elec-note" style={{ color: "var(--st-muted)" }}>{e.seat_won ? "The AI mayor won" : `Won by ${winnerWords(e.winner, { seats: [seat.seat] })}`}, declared {when(e.result_at)}{e.seated ? `; ${e.seated === seat.seat ? "the AI mayor" : e.seated} took office ${when(e.seated_at ?? 0)}` : ""}.</div>}
     </div>
   );
 }

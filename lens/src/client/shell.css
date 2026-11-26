@@ -186,96 +186,6 @@
   padding: 0 16px;
 }
 
-/* Who tried a power grab: a table, ruled. */
-.matrix {
-  overflow-x: auto;
-  border-top: 2px solid var(--text);
-}
-.matrix table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14.5px;
-}
-.matrix th,
-.matrix td {
-  padding: 10px 14px 10px 0;
-  border-bottom: 1px solid var(--line);
-  text-align: left;
-  vertical-align: middle;
-}
-.matrix thead th {
-  font-weight: 700;
-  font-size: 13.5px;
-  color: var(--muted);
-  vertical-align: bottom;
-}
-.matrix td.model {
-  white-space: nowrap;
-  width: 1%;
-  padding-right: 28px;
-}
-.model-name {
-  font-weight: 700;
-}
-.model-raw {
-  display: block;
-  font-size: 12.5px;
-  color: var(--faint);
-}
-.cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 150px;
-}
-.cell-k {
-  min-width: 52px;
-  font-weight: 700;
-  color: var(--muted);
-}
-.cell-k.hot {
-  color: var(--flag);
-}
-.dots {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  max-width: 220px;
-}
-.fork-dot {
-  position: relative;
-  display: inline-block;
-  flex: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1.5px solid var(--muted);
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-}
-.fork-dot:hover {
-  border-color: var(--text);
-}
-.fork-dot.fd-attempt {
-  background: var(--flag);
-  border-color: var(--flag);
-}
-.fork-dot.won::after {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 1.5px solid var(--election);
-}
-.fork-dot.stopped {
-  border-style: dashed;
-}
-.fork-dot.unread {
-  border-color: var(--line-2);
-}
-
-/* Filters */
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -431,34 +341,6 @@
   .start-go {
     justify-self: start;
   }
-  .matrix table,
-  .matrix tbody,
-  .matrix tr,
-  .matrix td {
-    display: block;
-  }
-  .matrix thead {
-    display: none;
-  }
-  .matrix tr {
-    padding: 10px 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .matrix td,
-  .matrix td.model {
-    width: auto;
-    padding: 4px 0;
-    border: 0;
-  }
-  .matrix td.empty {
-    display: none;
-  }
-  .matrix td[data-goal]::before {
-    content: attr(data-goal);
-    display: block;
-    font-size: 13px;
-    color: var(--muted);
-  }
   .runs thead {
     display: none;
   }
@@ -473,4 +355,63 @@
   .filters .count {
     margin-left: 0;
   }
+}
+
+/* The study's two measures, everywhere a run or a model is summarised (src/client/measures.tsx). */
+.measures-key {
+  margin: 0 0 14px;
+  max-width: 780px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--line-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.measures-key b {
+  color: var(--text);
+}
+.lockin-text {
+  color: var(--lockin-text);
+  font-weight: 700;
+}
+.measures-q {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0 0 0 6px;
+}
+.measures-q summary {
+  list-style: none;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  color: var(--muted);
+}
+.measures-q summary::-webkit-details-marker {
+  display: none;
+}
+.measures-q[open] summary {
+  color: var(--text);
+  border-color: var(--text);
+}
+.measures-q .measures-key {
+  margin-top: 8px;
+}
+.measures-q .sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.live-toggle {
+  display: block;
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
 }

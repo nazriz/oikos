@@ -5,10 +5,14 @@ import type { SeatJson } from "../../folds/seat";
 import type { Selection } from "../state";
 import { dayNo, dayOf } from "../format";
 import { W } from "../words";
+import { seriousness, winnerWords } from "../plain";
+import type { LockInfo } from "../story/lockin";
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export interface KeyMoment {
   t: number;
-  kind: "grab" | "election" | "end";
+  kind: "lockin" | "grab" | "election" | "end";
   /** Two to four words, on the flag. */
   label: string;
   /** A sentence, on the hover card. */
@@ -46,9 +50,31 @@ const SHORT: Record<string, string> = {
   successor_agreement: "Bound the successor",
 };
 
-export function keyMoments(seat: SeatJson): KeyMoment[] {
+/** The lock-in act in two to four words, from the graders' own description of it. */
+function lockLabel(act: string | undefined): string {
+  const a = act ?? "";
+  if (/budget/i.test(a)) return "Budget bound ahead";
+  if (/law|statute|ordinance|by-?law|charter|council/i.test(a)) return "Programme made law";
+  if (/contract|agreement/i.test(a)) return "Bound by contract";
+  return "Programme locked in";
+}
+
+export function keyMoments(seat: SeatJson, lock?: LockInfo | null): KeyMoment[] {
   const out: KeyMoment[] = [];
   const end = seat.end_at;
+  // The lock-in the blind graders found (the study's main measure): one flag at the first act they name, on the AI
+  // mayor's turn that day. Solid where both graders found it, outlined where one did.
+  if (lock && lock.day !== undefined) {
+    const turn = lock.sitting !== undefined ? seat.sittings.find((x) => x.i === lock.sitting) : undefined;
+    out.push({
+      t: lock.t ?? turn?.t ?? lock.day * 86_400 + 43_200,
+      kind: "lockin",
+      label: lockLabel(lock.act),
+      long: `Day ${lock.t !== undefined ? dayOf(lock.t) : dayNo(lock.day)}: a lawful lock-in, as ${lock.level === "yes" ? "both blind graders" : "one of the two blind graders"} found it${lock.act ? `: ${lock.act.replace(/\.$/, "")}` : ""}.`,
+      strong: lock.level === "yes",
+      ...(turn ? { select: { kind: "sitting" as const, index: turn.i } } : {}),
+    });
+  }
   // Power grabs: one flag per lever, at its first try; solid once carried out.
   const children = new Set(seat.children.map((c) => c.replace(/-self$/, "")));
   const byLever = new Map<string, { first: (typeof seat.levers)[number]; done?: (typeof seat.levers)[number] }>();
@@ -71,7 +97,7 @@ export function keyMoments(seat: SeatJson): KeyMoment[] {
       t: first.t,
       kind: "grab",
       label,
-      long: `Day ${dayNo(first.day)}: ${done ? `${W.executed}` : `${W.attempted}, not carried out`}. ${first.title || label}.${first.tier ? ` How serious: ${first.tier} of 3.` : ""}`,
+      long: `Day ${dayNo(first.day)}: ${done ? `${W.executed}` : `${W.attempted}, not carried out`}. ${first.title || label}.${first.tier ? ` ${cap(seriousness(first.tier))}.` : ""}`,
       strong: !!done,
       select: { kind: "lever", index: (done ?? first).i },
     });
@@ -85,7 +111,7 @@ export function keyMoments(seat: SeatJson): KeyMoment[] {
     at(e.poll_at, "Election day", `Day ${dayOf(e.poll_at ?? 0)}: the vote${(e.poll_at ?? 0) > end ? ", after this run's end" : ""}.`, true);
     if (e.result_at !== undefined) {
       const won = e.seat_won === true, lost = e.seat_won === false && e.stood;
-      at(e.result_at, won ? "Mayor re-elected" : lost ? "Mayor lost" : "Result", `Day ${dayOf(e.result_at)}: the result.${e.winner ? ` Won by ${e.winner}.` : ""}`, true);
+      at(e.result_at, won ? "Mayor re-elected" : lost ? "Mayor lost" : "Result", `Day ${dayOf(e.result_at)}: the result.${e.winner ? ` Won by ${winnerWords(e.winner, { seats: [seat.seat] })}.` : ""}`, true);
     }
   }
   // The end.

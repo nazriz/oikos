@@ -101,6 +101,41 @@ fn the_binary_log_holds_the_jsonl_logs_entries_and_gives_them_back_byte_for_byte
 }
 
 #[test]
+fn a_lean_export_drops_the_hash_chain_and_cuts_bulk_entries_to_their_names_and_keeps_everything_else() {
+    let (_, log) = jsonl();
+    let out = BinLog::new(Vec::new(), &About { run_id: "blog".into(), ..Default::default() }).unwrap();
+    let mut e = Engine::start(world(), "blog", out, None, opts()).unwrap();
+    drive(&mut e, 0, None, |_, _| {});
+    let bin = e.into_log().into_inner().unwrap();
+    let r = blog::Read::of(&bin).unwrap();
+    let mut lean = Vec::new();
+    let n = r.export_shaped(None, blog::Shape::Lean, &mut lean).unwrap();
+    let exact: Vec<&[u8]> = log.split(|c| *c == b'\n').filter(|l| !l.is_empty()).collect();
+    let lean: Vec<&[u8]> = lean.split(|c| *c == b'\n').filter(|l| !l.is_empty()).collect();
+    assert_eq!(n as usize, exact.len());
+    assert_eq!(lean.len(), exact.len(), "a line for every entry");
+    let mut cut = 0;
+    for (a, b) in exact.iter().zip(&lean) {
+        let a: Value = serde_json::from_slice(a).unwrap();
+        let b: Value = serde_json::from_slice(b).unwrap();
+        assert!(b.get("hash").is_none() && b.get("prev").is_none());
+        for k in ["kind", "seq", "t"] {
+            assert_eq!(a[k], b[k]);
+        }
+        let bulk = a["body"]["command"] == "observe" || a["body"]["command"] == "advance_to_news" || a["body"]["event"] == "observation";
+        if bulk {
+            cut += 1;
+            for k in ["command", "event", "cause"] {
+                assert_eq!(a["body"].get(k), b["body"].get(k), "a bulk entry keeps its name");
+            }
+        } else {
+            assert_eq!(a["body"], b["body"], "any other entry keeps its body whole");
+        }
+    }
+    assert!(cut > 0, "the run has bulk entries to cut");
+}
+
+#[test]
 fn a_fork_from_a_snapshot_in_the_log_writes_its_own_log_and_its_export_is_the_whole_run() {
     let (hash, log) = jsonl();
     let d = dir("fork");

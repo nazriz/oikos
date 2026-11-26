@@ -1,5 +1,6 @@
 // Lens's server: the client (built at start and served compressed, ./client.ts) and the API
 // (src/shared/api.ts). Bound to 127.0.0.1; reached from elsewhere through `tailscale serve` (docs/design/lens.md).
+import { loadGrades } from "./grades";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { clientRoutes } from "./client";
@@ -45,6 +46,10 @@ export function startServer(o: ServeOptions = {}) {
     port: o.port ?? 4322,
     development: o.development ?? false,
     idleTimeout: 0,
+    // (One server a port. With the port shared, a second Lens left running split the requests with the first at
+    // random: pages from one asked the other for files it did not have, and both made bundles. A run page then sat on
+    // "Drawing the town" for 50 s. A second start now fails with EADDRINUSE.)
+    reusePort: false,
     routes: {
       "/": (req) => client.page(req),
       "/fonts/:file": (req) => client.font(req.params.file) ?? notFound("font"),
@@ -60,7 +65,9 @@ export function startServer(o: ServeOptions = {}) {
         const e = await lens.catalogue.find(req.params.key);
         if (!e) return notFound("run");
         const m = lens.manifest(e);
-        return json({ ...e, ...(m ? { indexed: true, summary: m.summary, ...(m.reading ? { reading: m.reading } : {}), errors: m.errors } : {}) });
+        const g0 = loadGrades(lens.paths.runs).get(e.key);
+        const grade = g0 ? lens.placed(e, g0) : undefined;
+        return json({ ...e, ...(m ? { indexed: true, summary: m.summary, ...(m.reading ? { reading: m.reading } : {}), errors: m.errors } : {}), ...(grade ? { grade } : {}) });
       },
       "/api/run/:key/status": async (req) => {
         const e = await lens.catalogue.find(req.params.key);

@@ -1309,20 +1309,37 @@ export class WorldEngine {
     let lo = 0, hi = this.acts.length;
     while (lo < hi) { const m = (lo + hi) >> 1; if (this.acts[m]!.t <= t) lo = m + 1; else hi = m; }
     const shown: { a: { t: number; to: number; refused: boolean; seq: number }; text: string }[] = [];
-    const seenTo = new Set<number>();
+    // (One sign per act and per sentence: an act that reached five people is one sentence, "wrote to the councillor 1
+    // and 4 others", drawn once, over the first place it reached.)
+    const seenTo = new Set<number>(), seenSeq = new Set<number>(), seenText = new Set<string>();
     for (let i = lo - 1; i >= 0 && shown.length < 3 && t - this.acts[i]!.t < keep; i--) {
       const a = this.acts[i]!;
-      if (seenTo.has(a.to)) continue;
+      if (seenTo.has(a.to) || seenSeq.has(a.seq)) continue;
       const text = this.ev.caption?.(a.seq);
-      if (!text) continue;
+      if (!text || seenText.has(text)) continue;
       seenTo.add(a.to);
+      seenSeq.add(a.seq);
+      seenText.add(text);
       shown.push({ a, text });
     }
+    // (Each sign keeps its element while it stays shown: a sign that only moved up the list does not fade out in one
+    // place and in again in another, which drew it twice, one a ghost.)
+    const els = this.captions.slice();
+    const order: (HTMLDivElement | undefined)[] = shown.map((c) => {
+      const i = els.findIndex((e) => e && e.textContent === c.text);
+      if (i < 0) return undefined;
+      const e = els[i]!;
+      els.splice(i, 1);
+      return e;
+    });
+    for (let k = 0; k < order.length; k++) if (!order[k]) order[k] = els.shift();
+    this.captions = [...(order.filter(Boolean) as HTMLDivElement[]), ...els];
     const w = this.renderer.domElement.clientWidth, h = this.renderer.domElement.clientHeight;
     const placed: [number, number, number, number][] = [];
+    this.captionBoxes = placed;
     for (let k = 0; k < Math.max(shown.length, this.captions.length); k++) {
-      let el = this.captions[k];
-      if (!el) { el = document.createElement("div"); el.className = "lw-caption"; this.labelLayer.appendChild(el); this.captions.push(el); }
+      let el = k < shown.length ? order[k] : this.captions[k];
+      if (!el) { el = document.createElement("div"); el.className = "lw-caption"; this.labelLayer.appendChild(el); this.captions.splice(k, 0, el); }
       const c = shown[k];
       if (!c) { el.style.opacity = "0"; continue; }
       const L = this.plan.lots[c.a.to];
@@ -1410,6 +1427,8 @@ export class WorldEngine {
     }
   }
 
+  /** Where the act captions are this frame: a place's name never sits under one (the caption, the news, wins). */
+  private captionBoxes: [number, number, number, number][] = [];
   private updateLabels() {
     const w = this.renderer.domElement.clientWidth, h = this.renderer.domElement.clientHeight;
     const cam = this.camera.position;
@@ -1417,7 +1436,7 @@ export class WorldEngine {
     this.labelTick = (this.labelTick + 1) % 6;
     // Labels shown last frame go first (a head start of 150 m), so two near each other do not take turns.
     const order = this.labels.map((L) => ({ L, d: cam.distanceTo(L.p) })).sort((a, b) => (a.d - (a.L.on ? 150 : 0)) - (b.d - (b.L.on ? 150 : 0)));
-    const placed: [number, number, number, number][] = [];
+    const placed: [number, number, number, number][] = this.captionBoxes.map((b) => [b[0] - 4, b[1] - 4, b[2] + 4, b[3] + 4]);
     for (const { L, d } of order) {
       tmpV.copy(L.p).project(this.camera);
       const minor = L.el.dataset.kind === "industrial" || L.el.dataset.kind === "utility";

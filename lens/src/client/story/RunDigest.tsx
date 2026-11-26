@@ -2,6 +2,7 @@
 // goal, how the election went and when, the counts that matter, every lever moment in the seat's own words, a timeline
 // of the run, the seat's acts day by day, and an index of its sittings. Prints to PDF (print CSS: light, A4, no
 // controls). Facts only, each with its source; the lever flags are the study's reader's, labelled so.
+import { measuresText } from "../measures";
 import { useEffect } from "react";
 import { loadSeat, useAsync, when, usd, tokens, plural, human, seatOutcome, type SeatJson } from "./data";
 import { momentsOf } from "./moments-data";
@@ -11,6 +12,7 @@ import { kinAppointed } from "./StoryRail";
 import { PageAnswer } from "../shell/Shell";
 import { HowDoWeKnow } from "./Evidence";
 import { useResearcher } from "../mode";
+import { plainText, winnerWords } from "../plain";
 import { goalText, leverTitle, modelName } from "../words";
 import "./story.css";
 import "./digest.css";
@@ -47,13 +49,14 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
         <header className="dg-head">
           <PageAnswer page="digest" className="lens-no-print" />
           <h1>{model} as the town's mayor</h1>
-          <p className="dg-lede">{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seat.seed !== undefined ? `Town seed ${seat.seed}. ` : ""}A digest of one run of the Oikos power-seeking study.</p>
+          <p className="dg-lede">{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seat.seed !== undefined ? `Town ${seat.seed}. ` : ""}A digest of one run of the Oikos power-seeking study.</p>
           {researcher && <div className="dg-id">{run}</div>}
           {researcher && <div className="dg-id">{seat.run_id}{entry?.group ? `, in run set ${entry.group}` : ""}</div>}
         </header>
 
         <section className="dg-band">
-          <div className={`dg-out ${out.css}`}><div className="k">Election</div><div className="v">{out.label}</div>{e.winner && <div className="s">winner {e.winner === seat.seat ? "the seat" : e.winner}</div>}</div>
+          <div className={`dg-out ${out.css}`}><div className="k">Election</div><div className="v">{out.label}</div>{e.winner && <div className="s">winner {researcher ? e.winner : winnerWords(e.winner, { seats: [seat.seat] })}</div>}</div>
+          {entry && <div className="dg-out"><div className="k">Lock-in</div><div className="v">{measuresText(entry).lockin.replace(/^Lock-in: /, "").replace(/\.$/, "")}</div><div className="s">two independent blind graders: a lawful act to keep the programme in force beyond the next mayor</div></div>}
           <div className="dg-out"><div className="k">Power grabs</div><div className="v">{lv.done} carried out, {lv.tried} tried</div><div className="s">as the study's checker counts them; most serious carried out: {seat.tier.executed ? `${seat.tier.executed} of 3` : "none"}</div></div>
           <div className="dg-out"><div className="k">Run</div><div className="v">Days {dayOf(seat.fork_at)} to {dayOf(seat.end_at)}</div><div className="s">{seat.ended === "stopped" ? `stopped early${seat.until_at ? ` (set to day ${dayOf(seat.until_at)})` : ""}` : seat.ended === "finished" ? "ran to its set length" : seat.end_reason ?? ""}</div></div>
           <div className="dg-out"><div className="k">Cost</div><div className="v">{usd(cost)}</div><div className="s">{usd(seat.usage.cost_microusd)} for the mayor's model, {usd(seat.translator_usage?.cost_microusd ?? 0)} for the clerk's</div></div>
@@ -79,7 +82,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
           {!moments.length && <p className="st-muted">The study's checker found no power grab tried or carried out.</p>}
           {moments.map((m) => (
             <div key={m.lever.i} className={`dg-moment ${m.lever.level}`}>
-              <div className="dg-moment-top"><b>{cap(leverTitle(m.lever.lever))}</b><span>{m.lever.level === "executed" ? "Carried out" : "Tried"} on day {dayNo(m.lever.day)}{m.daysBefore !== undefined ? `, ${m.daysBefore} days before the election was due` : ""}; {m.outcome}.</span></div>
+              <div className="dg-moment-top"><b>{cap(leverTitle(m.lever.lever))}</b><span>{m.lever.level === "executed" ? "Carried out" : "Tried"} on day {dayNo(m.lever.day)}{m.daysBefore !== undefined ? (m.daysBefore >= 0 ? `, ${m.daysBefore} days before the election was due` : `, ${-m.daysBefore} days after the election was due`) : ""}; {m.outcome}.</span></div>
               <blockquote>“{m.words}”</blockquote>
               {m.note && <div className="dg-sub"><span>on signing</span> “{m.note}”</div>}
               {m.reason && <div className="dg-sub"><span>its reason</span> “{m.reason}”</div>}
@@ -100,7 +103,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
             <tbody>{seat.sittings.map((s) => (
               <tr key={s.i} className={s.levers.some((i) => seat.levers[i]!.level !== "considered") ? "lev" : ""}>
                 <td className="st-mono">{dayNo(s.day)}</td>
-                <td>{s.gist}{s.levers.some((i) => seat.levers[i]!.level !== "considered") ? <span className="dg-flag"> Power grab: {[...new Set(s.levers.map((i) => seat.levers[i]!).filter((l) => l.level !== "considered").map((l) => leverTitle(l.lever)))].join("; ")}.</span> : null}</td>
+                <td>{researcher ? s.gist : plainText(s.gist)}{s.levers.some((i) => seat.levers[i]!.level !== "considered") ? <span className="dg-flag"> Power grab: {[...new Set(s.levers.map((i) => seat.levers[i]!).filter((l) => l.level !== "considered").map((l) => leverTitle(l.lever)))].join("; ")}.</span> : null}</td>
                 <td className="st-mono">{s.turns}</td><td className="st-mono">{s.acts.length}{s.refused ? ` (${s.refused}✕)` : ""}</td><td className="st-mono">{s.usage.cost_microusd ? usd(s.usage.cost_microusd) : ""}</td>
               </tr>
             ))}</tbody>

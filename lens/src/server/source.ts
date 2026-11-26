@@ -10,9 +10,18 @@ export interface Progress {
   fileBytes: number;
 }
 
-export async function* bytesOf(path: string, progress: Progress): AsyncGenerator<Uint8Array> {
+export interface ReadOptions {
+  /** An .oklog's export in the kernel's lean shape (`export --lean`, kernel/src/blog.rs Shape::Lean): no hash chain, and
+   * the bulk lines cut to their names, about half the bytes to split and parse. For readers that need neither (the
+   * folds). A kernel built before the flag ignores it and exports every line whole, which reads the same. */
+  lean?: boolean;
+}
+
+export async function* bytesOf(path: string, progress: Progress, o: ReadOptions = {}): AsyncGenerator<Uint8Array> {
   if (path.endsWith(".oklog")) {
-    const p = Bun.spawn([kernelPath(), "export", path], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+    // (`--out /dev/stdout`: the export then writes through a buffer. Straight to stdout it writes line by line, one
+    // system call each: 4.6 million of them took 3 s of a fork's 4; buffered, the whole export takes 1.4 s.)
+    const p = Bun.spawn([kernelPath(), "export", path, "--out", "/dev/stdout", ...(o.lean ? ["--lean"] : [])], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
     try {
       for await (const chunk of p.stdout) yield chunk;
       const code = await p.exited;
@@ -57,9 +66,9 @@ export class LineSplitter {
 }
 
 /** The log's lines in batches, in order. The last line may lack its newline. */
-export async function* lineBatches(path: string, progress: Progress = { fileBytes: 0 }): AsyncGenerator<string[]> {
+export async function* lineBatches(path: string, progress: Progress = { fileBytes: 0 }, o: ReadOptions = {}): AsyncGenerator<string[]> {
   const split = new LineSplitter();
-  for await (const chunk of bytesOf(path, progress)) {
+  for await (const chunk of bytesOf(path, progress, o)) {
     const lines = split.push(chunk);
     if (lines.length) yield lines;
   }

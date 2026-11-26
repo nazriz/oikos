@@ -4,19 +4,17 @@
 //   bun lens/src/client/story/dev.ts serve [--port 4323] [--catalogue http://127.0.0.1:4322]
 //       serves those bundles at /api/run/<key>/seat(/<file>) and a page with the story rail and the sitting reader.
 // Read-only on runs: an .oklog is read through the kernel's export on a pipe, nothing is written beside it.
-// <views> is $OIKOS_VIEWS, else runs/views/lens of the checkout this file is in (or the one above a worktree).
+// <views> is $OIKOS_VIEWS, else ~/oikos-lens-cache (Lens's cache, outside runs/: src/server/paths.ts).
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { homedir } from "node:os";
 import type { Fold, FoldContext, LogLine } from "../../shared/fold";
 import { seatFold } from "../../folds/seat";
 import { dailyFold } from "../../folds/daily";
 
 const DAY = 86_400;
 export function viewsDir(): string {
-  if (process.env.OIKOS_VIEWS) return process.env.OIKOS_VIEWS;
-  let d = resolve(import.meta.dir);
-  while (d !== dirname(d)) { if (existsSync(join(d, "runs"))) return join(d, "runs", "views", "lens"); d = dirname(d); }
-  return resolve(import.meta.dir, "../../../../runs/views/lens");
+  return process.env.OIKOS_VIEWS ?? join(homedir(), "oikos-lens-cache");
 }
 export const devDir = () => join(viewsDir(), "story-dev");
 

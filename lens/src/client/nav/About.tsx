@@ -20,19 +20,18 @@ const read = () => {
 export function About({ run, meta, world }: { run: string; meta: Meta; world: boolean }) {
   const researcher = useMode((m) => m.mode === "researcher");
   const [kept, setKept] = useState(read);
-  // (Over a turn the reader fills the page: there the panel stays folded unless opened for that turn.)
+  // (Over a turn the reader fills the page with its own headings: the panel stands aside rather than cover its columns.)
   const reading = useLens((s) => isMoment(s.selection));
-  const [overReader, setOverReader] = useState(false);
   // (On a phone the panel would cover the town: folded there until opened.)
-  const open = reading ? overReader : kept ? kept === "open" : !researcher && window.innerWidth > 760;
+  const open = kept ? kept === "open" : !researcher && window.innerWidth > 760;
   const toggle = () => {
-    if (reading) return setOverReader(!open);
     const v = open ? "closed" : "open";
     try {
       localStorage.setItem("lens.about", v);
     } catch {}
     setKept(v);
   };
+  if (reading) return null;
   return (
     <aside className={`about ${open ? "open" : ""}`} aria-label="About this view">
       <button className="about-head" aria-expanded={open} onClick={toggle} title={open ? "Fold this away" : "What am I looking at?"}>
@@ -75,7 +74,7 @@ function AboutText({ run, meta, world }: { run: string; meta: Meta; world: boole
     lines.push(
       world
         ? `${place} in 3D on day ${dayOf(t)}, ${clock(t)}. The light follows the hour; the walkers are people going between buildings.`
-        : `The map of ${place} on day ${dayOf(t)}, ${clock(t)}. Each block is a building; the dots on it are the people inside now.`,
+        : `The plan of ${place} on day ${dayOf(t)}, ${clock(t)}. Each block is a building; the dots on it are the people inside now.`,
     );
     lines.push(`Yellow is ${W.seat}'s doing; red is a ${W.lever}, as the study's checker flags it. Click anything to open it.`);
   } else if (sel.kind === "sitting") {
@@ -89,7 +88,7 @@ function AboutText({ run, meta, world }: { run: string; meta: Meta; world: boole
     const l = seat?.levers[sel.index];
     lines.push(`This is a ${W.lever} as the study's checker flags it${l ? `, on day ${dayNo(l.day)}` : ""}: ${name(sel).replace(/^Power grab: /, "")}.`);
     if (l) lines.push(l.level === "executed" ? "It was carried out: the town's rules accepted it." : l.level === "attempted" ? "The mayor asked for it; it may have been refused or withdrawn." : "It appears only in the mayor's own thinking, found by matching words: often wrong.");
-    if (l?.tier) lines.push(`How serious: ${l.tier} of 3, where 3 is the most serious, such as moving the election.`);
+    if (l?.tier) lines.push(`Seriousness ${l.tier} of 3, where 3 is the most serious, such as moving the election.`);
     lines.push("The checker is the study's measure, not a verdict: read the turn itself. [ and ] move between power grabs.");
   } else if (sel.kind === "act") {
     lines.push(`This is one act ${W.seat} sent: ${name(sel).replace(/^Day \d+: /, "")}.`);

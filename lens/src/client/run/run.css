@@ -11,6 +11,9 @@
   flex: none;
   background: var(--panel);
   border-bottom: 2px solid var(--text);
+  /* (Above the map's own panels, so what opens from the bar, Other mayors, is never under "About this view".) */
+  position: relative;
+  z-index: 30;
 }
 .run-bar-top {
   display: flex;
@@ -581,4 +584,9 @@
   .empty-map-place {
     font-size: 32px;
   }
+}
+
+/* Phones: the run's instructions wrap rather than cut off mid-sentence (fresh-eyes, 2026-11-27). */
+@media (max-width: 700px) {
+  .run-sub { white-space: normal; overflow: visible; line-height: 1.35; }
 }

@@ -39,16 +39,16 @@ the sittings as messages (standing instructions, each sitting's prompt, each cal
 what came back) and the study reader's verdicts as scores. Read-only on the runs; nothing is installed in the repo.
 
     oikos lens inspect runs/ps-replicate-2026-11-25/glm-redteam-s7      # every model fork; --with-code adds the twin
-    uvx --from inspect-ai inspect view --log-dir runs/views/lens/inspect/glm-redteam-s7
+    uvx --from inspect-ai inspect view --log-dir ~/oikos-lens-cache/inspect/glm-redteam-s7
 
-The logs go to `<views>/inspect/<experiment>/` (`runs/views/lens/inspect/...`). One log alone:
+The logs go to `<views>/inspect/<experiment>/` (`~/oikos-lens-cache/inspect/...`). One log alone:
 `bun lens/src/server/inspect-export.ts <bundle dir | arm.oklog> [--spec spec.json]`.
 
 ## 2. Rules it keeps
 
 - **Read-only.** It never writes in a run's folder, never starts the kernel's `serve`, a participant or the
   orchestrator. It reads logs through `oikos-kernel export` (forks) or `orchestrator/src/logs.ts logLines`. Its own
-  files go to `runs/views/lens/` (`OIKOS_VIEWS` moves it). A test holds this (bytes and mtimes unchanged).
+  files go to its cache, `~/oikos-lens-cache/` (`--views` / `OIKOS_VIEWS` moves it; never inside runs/, which Lens refuses). A test holds this (bytes and mtimes unchanged).
 - **No debriefs** (VISION §15): the ingest drops `debrief` annotations and never opens `*.debriefs.jsonl`.
 - **Judges nothing.** Raw named quantities with their definition on the legend. Lever flags are the study's own
   reader (`experiments/power-seeking/reader.ts`), shown as that reader's output, labelled so.
@@ -58,7 +58,7 @@ The logs go to `<views>/inspect/<experiment>/` (`runs/views/lens/inspect/...`). 
 
 `src/server/ingest.ts` streams a log once and hands every line to every registered fold (`src/shared/fold.ts`). Each
 fold returns JSON (and optional binary columns); the ingest writes them to the bundle folder
-`runs/views/lens/<key>.<size-mtime hash>/<fold>.json`. Made once, on first open (progress streamed to the client),
+`~/oikos-lens-cache/bundles/<key>.<size-mtime hash>/<fold>.json`. Made once, on first open (progress streamed to the client),
 reused while the log is unchanged. 5 million lines in well under a minute is the bar.
 
 | Fold | Owner | What it keeps |
@@ -109,7 +109,7 @@ Each fold is registered with one line in `src/server/folds.ts`. Each view contri
   `"command":"advance_to_news"`) reach only folds that list their marker in `bulk`. A `debrief` annotation reaches no
   fold. Folds must not change the line objects they are handed: every fold gets the same object. The `meta` fold is
   registered by the ingest itself, and every other fold goes in `src/server/folds.ts`.
-- **Bundle**. `runs/views/lens/bundles/<key>.<stamp>/`: `manifest.json` (fold versions, lines, seconds, errors, a
+- **Bundle**. `<views>/bundles/<key>.<stamp>/` (views: `~/oikos-lens-cache`): `manifest.json` (fold versions, lines, seconds, errors, a
   summary for the library), `<fold>.json` (+ `.gz`), `<fold>.<file>.bin` (+ `.gz` over 4 KB). A run is made again when
   its log's size or mtime changes or any fold's `version` changes.
 - **Keys**. A log's path under runs/ without its extension, with `/` written `~`.

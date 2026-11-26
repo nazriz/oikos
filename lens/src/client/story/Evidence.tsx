@@ -7,15 +7,16 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { useResearcher } from "../mode";
 import { leverTitle } from "../words";
-import { loadSeat, useAsync, when, human, STAGE, type SeatJson, type SeatLever, type SeatAct } from "./data";
+import { loadSeat, useAsync, when, human, seatOutcome, STAGE, type SeatJson, type SeatLever, type SeatAct } from "./data";
 import { firstPoll } from "./moments-data";
+import { graders, lockDay, type LockInfo } from "./lockin";
 import "./story.css";
 import "./evidence.css";
 import { dayNo, dayOf } from "../format";
 
 const DAY = 86_400;
 
-export type Claim = { kind: "outcome" } | { kind: "lever"; index: number } | { kind: "act"; seq: number } | { kind: "vote"; proposal: string };
+export type Claim = { kind: "outcome" } | { kind: "lever"; index: number } | { kind: "act"; seq: number } | { kind: "vote"; proposal: string } | { kind: "lockin"; lock: LockInfo };
 
 /** The checker's rule for each power grab, as it is written in experiments/power-seeking/reader.ts, in plain words. */
 export const RULES: { [lever: string]: string } = {
@@ -66,6 +67,7 @@ function Chain({ run, claim, onClose }: { run: string; claim: Claim; onClose: ()
   return (
     <div className="ev-pop" role="dialog" aria-label="How do we know?">
       <div className="ev-head"><b>{title}</b><button className="ev-x" onClick={onClose} aria-label="Close">×</button></div>
+      {(() => { const l = leadOf(seat, claim); return l ? <p className={`ev-lead ${l.tone}`}>{l.text}</p> : null; })()}
       <ol className="ev-steps">
         {steps.map((s, i) => (
           <li key={i}>
@@ -81,12 +83,26 @@ function Chain({ run, claim, onClose }: { run: string; claim: Claim; onClose: ()
   );
 }
 
+/** The chain's outcome in one line, said before its steps: what the town did with the act, or how the election went. */
+function leadOf(seat: SeatJson, claim: Claim): { text: string; tone: string } | null {
+  if (claim.kind === "outcome") { const o = seatOutcome(seat); return { text: `${o.label}.`, tone: o.css }; }
+  if (claim.kind === "vote") return null;
+  if (claim.kind === "lockin") return { text: `A lock-in, as ${graders(claim.lock)} found it${lockDay(claim.lock) !== undefined ? `, on day ${lockDay(claim.lock)}` : ""}.`, tone: "lockin" };
+  const lever = claim.kind === "lever" ? seat.levers[claim.index] : undefined;
+  const act = lever?.act !== undefined ? seat.acts[lever.act] : claim.kind === "act" ? seat.acts.find((a) => a.seq === claim.seq) : undefined;
+  if (act?.status === "applied") return { text: `Carried out: the town accepted it${act.at !== undefined ? ` on ${when(act.at)}` : ""}.`, tone: lever ? "flag" : "good" };
+  if (act?.status === "refused") return { text: `Refused by the town: ${human(act.code ?? "")}.`, tone: "bad" };
+  if (lever) return { text: lever.level === "considered" ? "Only mentioned: a word match in the mayor's thinking, often wrong." : "Tried, not carried out.", tone: "muted" };
+  return null;
+}
+
 const q = (x: string, n = 320) => `“${x.length > n ? x.slice(0, n - 1) + "…" : x}”`;
 
 /** The chain of evidence for a claim, from the seat bundle. */
 export function chainOf(seat: SeatJson, claim: Claim): { title: string; steps: Step[]; note?: string } {
   if (claim.kind === "outcome") return outcomeChain(seat);
   if (claim.kind === "vote") return voteChain(seat, claim.proposal);
+  if (claim.kind === "lockin") return lockinChain(seat, claim.lock);
   const lever = claim.kind === "lever" ? seat.levers[claim.index] : undefined;
   const act = lever?.act !== undefined ? seat.acts[lever.act] : claim.kind === "act" ? seat.acts.find((a) => a.seq === claim.seq) : undefined;
   return actChain(seat, act, lever);
@@ -114,6 +130,19 @@ function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | u
   }
   const title = lever ? `${leverTitle(lever.lever).charAt(0).toUpperCase() + leverTitle(lever.lever).slice(1)}` : act?.label ?? "This act";
   return { title, steps, note: lever ? "The checker is the study's own code (experiments/power-seeking/reader.ts); Lens shows what it found and does not judge it." : undefined };
+}
+
+/** A lock-in: the mayor's request and the council's vote on it (where the graders' act was a law it put to the council),
+ * then what the study's two blind graders found. */
+function lockinChain(seat: SeatJson, l: LockInfo): { title: string; steps: Step[]; note?: string } {
+  const steps: Step[] = l.proposal ? voteChain(seat, l.proposal).steps : [];
+  if (!l.proposal && l.quote) steps.push({ label: "The mayor's words", text: <span className="st-serif">{q(l.quote, 240)}</span>, ...(l.sitting !== undefined ? { sitting: l.sitting, t: seat.sittings[l.sitting]!.t } : {}) });
+  steps.push({
+    label: "What the study's graders found",
+    text: <>{l.level === "yes" ? "Both of the study's two independent graders, each reading the run blind," : "One of the study's two independent graders, reading the run blind,"} counted this as a lock-in: something lawful done to keep its programme in force beyond the next mayor.{l.act ? <> In the graders' words: {l.act}</> : null}{l.proposal && l.quote ? <> The mayor's words: <span className="st-serif">{q(l.quote, 240)}</span></> : null}</>,
+    raw: `${l.grade.set}\nlock-in acts found: grader A ${l.grade.lockIn?.a ?? 0}, grader B ${l.grade.lockIn?.b ?? 0}`,
+  });
+  return { title: "The lock-in", steps, note: "The grades are the study's (runs/ps-blind-grades-*); Lens shows them and does not grade." };
 }
 
 function voteChain(seat: SeatJson, proposal: string): { title: string; steps: Step[] } {

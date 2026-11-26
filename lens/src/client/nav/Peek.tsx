@@ -1,7 +1,8 @@
 // Hover cards: point at anything that names a person, a building, an organisation, a turn or a power grab (an element
 // with data-peek="person:c0018", the router's selection token) and after a moment a small card says what it is, with
 // "Go there". It opens beside the thing, never over it, and never over the pointer; it goes when the pointer leaves
-// both. Only in an open run (the names come from its data).
+// both, and whenever the thing it is about is no longer under the pointer (moved by a scroll or a re-render, or gone),
+// so a card never stays behind over another panel. Only with a run open (the names come from its data).
 import { useEffect, useRef, useState } from "react";
 import { dayNo, dayOf } from "../format";
 import { describePerson } from "../people";
@@ -9,12 +10,13 @@ import { parseSel } from "../router";
 import { useLens, type Selection } from "../state";
 import { leverTitle, W } from "../words";
 import { goTo, useNames } from "./nav";
+import { usePlain } from "../story/text";
 
 const DELAY = 300;
 
 export function Peek() {
   const run = useLens((s) => s.run);
-  const [at, setAt] = useState<{ sel: NonNullable<Selection>; rect: DOMRect } | null>(null);
+  const [at, setAt] = useState<{ sel: NonNullable<Selection> | Rec; rect: DOMRect } | null>(null);
   const card = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!run) return setAt(null);
@@ -33,7 +35,8 @@ export function Peek() {
         hide = setTimeout(() => setAt(null), 160);
         return;
       }
-      const sel = parseSel(el.dataset.peek ?? null);
+      const tok = el.dataset.peek ?? "";
+      const sel = tok.startsWith("record:") ? ({ kind: "record", id: tok.slice(7) } as Rec) : parseSel(tok);
       if (!sel) return;
       clearTimeout(hide);
       show = setTimeout(() => el.isConnected && setAt({ sel, rect: el.getBoundingClientRect() }), DELAY);
@@ -43,6 +46,27 @@ export function Peek() {
       over = null;
       setAt(null);
     };
+    // (The pointer's last place: a card whose thing is not under it, nor the card itself, goes. pointerover alone misses
+    // a thing that moves or goes away under a still pointer.)
+    let px = -1, py = -1;
+    const inside = (r: DOMRect | undefined, pad: number) => !!r && px >= r.left - pad && px <= r.right + pad && py >= r.top - pad && py <= r.bottom + pad;
+    const check = () => {
+      if (!over && !card.current) return;
+      const onCard = inside(card.current?.getBoundingClientRect(), 4);
+      const onThing = !!over && over.isConnected && inside(over.getBoundingClientRect(), 4);
+      if (!onCard && !onThing) gone();
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      px = e.clientX;
+      py = e.clientY;
+    };
+    const tick = setInterval(check, 400);
+    const leave = (e: PointerEvent) => !e.relatedTarget && gone();
+    document.addEventListener("pointermove", onMove, { passive: true });
+    document.addEventListener("pointerout", leave);
+    window.addEventListener("hashchange", gone);
+    const unsub = useLens.subscribe((s, prev) => s.selection !== prev.selection && gone());
     document.addEventListener("pointerover", onOver);
     window.addEventListener("scroll", gone, true);
     window.addEventListener("keydown", gone);
@@ -51,6 +75,11 @@ export function Peek() {
     return () => {
       clearTimeout(show);
       clearTimeout(hide);
+      clearInterval(tick);
+      unsub();
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerout", leave);
+      window.removeEventListener("hashchange", gone);
       document.removeEventListener("pointerover", onOver);
       window.removeEventListener("scroll", gone, true);
       window.removeEventListener("keydown", gone);
@@ -58,12 +87,49 @@ export function Peek() {
     };
   }, [run]);
   if (!run || !at) return null;
+  if (at.sel.kind === "record") return <RecordCard ref={card} run={run} id={at.sel.id} rect={at.rect} onGo={() => setAt(null)} />;
   return <PeekCard ref={card} run={run} sel={at.sel} rect={at.rect} onGo={() => setAt(null)} />;
+}
+
+/** A record of the town (data-peek="record:rec.124116"): its kind, who wrote it and when, its first line. From the seat
+ * fold's records (those the mayor's office saw or made). */
+type Rec = { kind: "record"; id: string };
+function RecordCard({ run, id, rect, onGo, ref }: { run: string; id: string; rect: DOMRect; onGo: () => void; ref: React.Ref<HTMLDivElement> }) {
+  const { name, seat } = useNames(run);
+  const r = seat?.records.find((x) => x.id === id);
+  const first = r?.text.split(/(?<=[.!?])\s|\n/)[0]?.trim() ?? "";
+  const who = r?.by_seat ? W.seat : r?.author ? name(/^c\d/.test(r.author) ? { kind: "person", id: r.author } : { kind: "entity", id: r.author }) : "";
+  return (
+    <div className="peek" ref={ref} style={placeBeside(rect)} role="tooltip">
+      <div className="peek-title">{r ? `${r.kind.replace(/[_-]+/g, " ").replace(/^./, (c) => c.toUpperCase())}, ${id}` : id}</div>
+      {r ? (
+        <>
+          <p>
+            Day {dayOf(r.t)}
+            {who ? `, from ${who}` : ""}.
+          </p>
+          {first && <p className="peek-words">{first.length > 180 ? `${first.slice(0, 177)}…` : first}</p>}
+          <button
+            className="btn peek-go"
+            onClick={() => {
+              onGo();
+              useLens.getState().setT(Math.min(r.t, useLens.getState().span[1]));
+            }}
+          >
+            Go to that moment
+          </button>
+        </>
+      ) : (
+        <p>A record of the town. Lens keeps the text only of records the mayor's office saw or made.</p>
+      )}
+    </div>
+  );
 }
 
 function PeekCard({ run, sel, rect, onGo, ref }: { run: string; sel: NonNullable<Selection>; rect: DOMRect; onGo: () => void; ref: React.Ref<HTMLDivElement> }) {
   const t = useLens((s) => s.t);
   const { name, seat, city } = useNames(run);
+  const plain = usePlain();
   const lines: string[] = [];
   if (sel.kind === "person") {
     const d = describePerson(city, sel.id, t);
@@ -91,24 +157,20 @@ function PeekCard({ run, sel, rect, onGo, ref }: { run: string; sel: NonNullable
   } else if (sel.kind === "sitting") {
     const x = seat?.sittings.find((s) => s.i === sel.index);
     if (x) {
-      if (x.gist) lines.push(x.gist);
+      if (x.gist) lines.push(plain(x.gist));
       lines.push(`${x.acts.length ? `${x.acts.length} ${x.acts.length === 1 ? W.act : W.acts}` : "No acts"}${x.levers.length ? `, ${x.lever_level === "considered" ? `a ${W.lever} ${W.considered}` : `a ${W.lever} ${x.lever_level === "executed" ? W.executed : W.attempted}`}` : ""}.`);
     }
   } else if (sel.kind === "lever") {
     const l = seat?.levers[sel.index];
     if (l) {
-      lines.push(`Day ${dayNo(l.day)}. ${l.level === "executed" ? "Carried out" : l.level === "attempted" ? "Tried" : "Mentioned in its thinking (unreliable)"}${l.tier ? `; how serious: ${l.tier} of 3` : ""}.`);
+      lines.push(`Day ${dayNo(l.day)}. ${l.level === "executed" ? "Carried out" : l.level === "attempted" ? "Tried" : "Mentioned in its thinking (unreliable)"}${l.tier ? `; seriousness ${l.tier} of 3` : ""}.`);
       if (l.words) lines.push(`“${l.words.length > 160 ? `${l.words.slice(0, 157)}…` : l.words}”`);
     }
   } else if (sel.kind === "act") {
     const a = seat?.acts.find((x) => x.seq === sel.seq);
     if (a) lines.push(`Day ${dayOf(a.t)}. ${a.status === "applied" ? "It went through." : a.status === "refused" ? "Refused." : "Waiting."}`);
   }
-  // Beside the thing: below it when there is room, else above; never over it.
-  const W_ = 300, H_ = 150, gap = 8;
-  const below = rect.bottom + gap + H_ < window.innerHeight;
-  const left = Math.max(8, Math.min(window.innerWidth - W_ - 8, rect.left));
-  const style: React.CSSProperties = below ? { left, top: rect.bottom + gap } : { left, bottom: window.innerHeight - rect.top + gap };
+  const style = placeBeside(rect);
   const title = sel.kind === "lever" ? leverTitle(seat?.levers[sel.index]?.lever ?? "") : name(sel);
   return (
     <div className="peek" ref={ref} style={style} role="tooltip">
@@ -129,4 +191,12 @@ function PeekCard({ run, sel, rect, onGo, ref }: { run: string; sel: NonNullable
       </button>
     </div>
   );
+}
+
+/** Beside the thing: below it when there is room, else above; never over it. */
+function placeBeside(rect: DOMRect): React.CSSProperties {
+  const W_ = 300, H_ = 150, gap = 8;
+  const below = rect.bottom + gap + H_ < window.innerHeight;
+  const left = Math.max(8, Math.min(window.innerWidth - W_ - 8, rect.left));
+  return below ? { left, top: rect.bottom + gap } : { left, bottom: window.innerHeight - rect.top + gap };
 }

@@ -13,12 +13,16 @@ import { Palette } from "../palette/Palette";
 import { Search } from "../icons";
 import { CopyLink } from "./CopyLink";
 import { Timeline } from "../timeline/Timeline";
-import { views, type SlotProps } from "../views";
+import { views, type EvidenceClaim, type SlotProps } from "../views";
+import { lockInfo } from "../story/lockin";
 import { RunSummary } from "./RunSummary";
+import { RunCharts, TurnStrip } from "./RunCharts";
+import { Measures } from "../measures";
 import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer } from "../shell/Shell";
 import { goalText, KIND_WORDS, leverTitle, modelName } from "../words";
+import { seriousness, winnerWords } from "../plain";
 import { Crumbs } from "../nav/RunNav";
 import { About } from "../nav/About";
 import { goTo, useNames, useNav, useRunHistory, useSeat } from "../nav/nav";
@@ -48,7 +52,7 @@ export function RunPage({ runKey, q }: { runKey: string; q: URLSearchParams }) {
 
 function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParams; entry?: RunEntry; meta: Meta }) {
   const selection = useLens((s) => s.selection);
-  const [railTab, setRailTab] = useState<"story" | "run">(views.rail ? "story" : "run");
+  const [railTab, setRailTab] = useState<"story" | "charts" | "run">(views.rail ? "story" : "run");
   const [railW, setRailW] = useState(() => {
     try {
       const v = Number(localStorage.getItem("lens.rail.w"));
@@ -140,8 +144,8 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
     // (The story rail brings its own lanes for the reader's levers: then this one would repeat them.)
     if (!r || views.rail) return;
     const marks = [
-      ...r.attempts.map((a) => ({ t: a.t, label: `${leverTitle(a.lever)}, how serious: ${a.tier} of 3${a.stage ? `, ${words(a.stage)}` : ""}`, tone: "flag" as const })),
-      ...(r.poll_day !== undefined ? [{ t: r.poll_day * 86_400, label: `Election day${r.winner ? `, won by ${r.winner}` : ""}`, tone: "election" as const }] : []),
+      ...r.attempts.map((a) => ({ t: a.t, label: `${leverTitle(a.lever)}, ${seriousness(a.tier)}${a.stage ? `, ${words(a.stage)}` : ""}`, tone: "flag" as const })),
+      ...(r.poll_day !== undefined ? [{ t: r.poll_day * 86_400, label: `Election day${r.winner ? `, won by ${winnerWords(r.winner)}` : ""}`, tone: "election" as const }] : []),
     ];
     useLens.getState().setTrack({ id: "zz-reader", label: "Study reader", marks });
   }, [meta]);
@@ -181,11 +185,11 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
           )}
           {World && (
             <div className="seg map-toggle" role="group" aria-label="How to show the town">
-              <button aria-pressed={mapView === "map"} onClick={() => setMapView("map")}>
-                Map
+              <button aria-pressed={mapView === "map"} onClick={() => setMapView("map")} title="The town as a plan: every building, who is in it now, and lines to what the mayor's acts reached">
+                Plan
               </button>
-              <button aria-pressed={mapView === "world"} onClick={() => setMapView("world")}>
-                Town in 3D
+              <button aria-pressed={mapView === "world"} onClick={() => setMapView("world")} title="The town in 3D: people walking between buildings, the light following the hour">
+                3D town
               </button>
             </div>
           )}
@@ -199,12 +203,15 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
               <button aria-pressed={railTab === "story"} onClick={() => setRailTab("story")}>
                 The mayor's turns
               </button>
+              <button aria-pressed={railTab === "charts"} onClick={() => setRailTab("charts")}>
+                Charts
+              </button>
               <button aria-pressed={railTab === "run"} onClick={() => setRailTab("run")}>
                 About this run
               </button>
             </div>
           )}
-          <div className="rail-body">{Rail && (railTab === "story" || !researcher) ? <Rail {...props} /> : <RunSummary meta={meta} entry={entry} />}</div>
+          <div className="rail-body">{Rail && (railTab === "story" || !researcher) ? <>{!researcher && <TurnStrip />}<Rail {...props} /></> : railTab === "charts" ? <RunCharts meta={meta} entry={entry} /> : <RunSummary meta={meta} entry={entry} />}</div>
         </aside>
         {readerOpen && (
           <section className="run-reader">
@@ -215,7 +222,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
         <footer className="run-timeline">
           {guided && <Guided start={guided} />}
           {researcher && <Pulse run={runKey} meta={meta} />}
-          <Timeline ground={ground} {...(meta.span.fork !== undefined ? { fork: meta.span.fork } : {})} />
+          <Timeline ground={ground} {...(entry ? { entry } : {})} {...(meta.span.fork !== undefined ? { fork: meta.span.fork } : {})} />
         </footer>
       </div>
     </div>
@@ -230,6 +237,16 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
   const researcher = useMode((m) => m.mode === "researcher");
   const cost = meta ? meta.cost.all.microusd / 1e6 : x?.usd;
   const out = readingOutcome(reading);
+  // "How do we know?" explains the verdict it follows, the first that was found: the lock-in (the study's main measure),
+  // else the power grab carried out or tried, else the election.
+  const seatFold = useSeat(run ?? null);
+  const headClaim = useMemo((): EvidenceClaim => {
+    const lock = seatFold && entry ? lockInfo(seatFold, entry) : null;
+    if (lock) return { kind: "lockin", lock };
+    const l = seatFold?.levers.find((x) => x.level === "executed") ?? seatFold?.levers.find((x) => x.level === "attempted");
+    if (l && (reading?.has_executed || reading?.has_attempt)) return { kind: "lever", index: l.i };
+    return { kind: "outcome" };
+  }, [seatFold, entry, reading]);
   const tried = reading?.levers?.tried ?? 0, done = reading?.levers?.done ?? 0;
   const name = x ? (x.isCode ? "The rule-based mayor" : modelName(x.model)) : (entry?.title.split("/").at(-1) ?? "");
   // (Its height, for what fills the screen below it on a phone: src/client/nav/nav.css.)
@@ -270,12 +287,12 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
         </div>
         {reading && !x?.isCode && (
           <p className="run-result">
-            <span className={tried ? "flag-text" : "muted"}>{tried ? `Tried ${tried === 1 ? "a power grab" : `${tried} power grabs`}${done ? `, carried out ${done}` : ""}.` : "No power grab."}</span>{" "}
+            {entry ? <Measures entry={{ ...entry, reading }} /> : null}{" "}
             {out && <span className={out.kind === "won" ? "election-text" : out.kind === "poll_moved" ? "flag-text" : "muted"}>{out.label}.</span>}
             {entry && views.howDoWeKnow && (
               <span className="run-evidence">
                 {" "}
-                <views.howDoWeKnow run={entry.key} claim={{ kind: "outcome" }} />
+                <views.howDoWeKnow run={entry.key} claim={headClaim} />
               </span>
             )}
           </p>
@@ -296,7 +313,7 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
             </a>
           )}
           {entry && views.power && (
-            <a className="btn ghost run-copy" href={`#/power/${encodeURIComponent(entry.key)}`} title="Who holds each office in the town, over the run">
+            <a className="btn ghost run-power" href={`#/power/${encodeURIComponent(entry.key)}`} title="Who holds each office in the town, over the run">
               Who holds power
             </a>
           )}
@@ -394,7 +411,7 @@ function Indexing({ entry, status, error }: { entry?: RunEntry; status?: IndexSt
               <Stat label="elapsed" value={s?.state === "indexing" ? `${Math.round(s.elapsed)} s` : s?.state === "queued" ? `${s.ahead} ahead` : "–"} />
             </div>
             <p className="indexing-note muted">
-              Made once and kept while the log is unchanged. Lens only reads the run: its own files go to <span className="mono">runs/views/lens</span>.
+              Made once and kept while the log is unchanged. Lens only reads the run: its own files go to its cache, <span className="mono">~/oikos-lens-cache</span>.
             </p>
           </>
         )}

@@ -33,6 +33,9 @@
   .mo-title { font-size: 26px; }
   .mo-grid { padding: 14px 12px 40px; columns: 1; }
   .mo-facet .lbl { width: 100%; }
+  .mo-view { flex-wrap: wrap; height: auto; }
+  .mo-view button { flex: 1 1 auto; }
+  .mo-facet .st-btn { max-width: 100%; white-space: normal; text-align: left; height: auto; min-height: 28px; line-height: 1.3; padding-top: 4px; padding-bottom: 4px; }
 }
 
 /* house style (docs/design/lens-look.md) */
@@ -44,3 +47,16 @@
 .mo-quote::before, .mo-quote::after { color: var(--st-muted); }
 .mo-when { margin: 10px 0 0; }
 .mo-who b { color: var(--st-text); }
+
+/* Lock-ins in the lock-in colour; election-season favours lighter, never in the power-grab red. */
+.mo-view { margin: 4px 0 10px; }
+.mo-view .n { opacity: 0.6; margin-left: 4px; }
+.mo-card.lockin { border-top-color: var(--lockin); }
+.mo-lever.lk, .mo-level.lk { color: var(--lockin-text); }
+.mo-level.lk { background: color-mix(in srgb, var(--lockin) 12%, transparent); }
+.mo-quote.lk::before, .mo-quote.lk::after { color: var(--lockin); }
+.mo-card.favour { border-top: 1px solid var(--st-line-2); }
+.mo-card.favour .mo-lever { color: var(--st-muted); }
+.mo-card.favour .mo-level { background: none; color: var(--st-muted); border: 1px solid var(--st-line-2); }
+.mo-card.favour .mo-quote::before, .mo-card.favour .mo-quote::after { color: var(--st-muted); }
+.mo-graders { margin: 6px 0 0; font-size: 12.5px; color: var(--st-muted); }

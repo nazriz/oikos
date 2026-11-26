@@ -87,14 +87,23 @@ fn main() -> ExitCode {
         }
         Some("export") if args.len() >= 2 => (|| {
             let flag = args.iter().position(|a| a == "--out").and_then(|i| args.get(i + 1));
+            // (--lean: no hash chain and the bulk entries cut to their names, for a reader like Lens; blog::Shape.)
+            let shape = if args.iter().any(|a| a == "--lean") { oikos_kernel::blog::Shape::Lean } else { oikos_kernel::blog::Shape::Exact };
+            let log = std::path::Path::new(&args[1]);
             let n = match flag {
                 Some(p) => {
                     let mut f = std::io::BufWriter::new(std::fs::File::create(p).map_err(|e| format!("{p}: {e}"))?);
-                    let n = oikos_kernel::blog::export_file(std::path::Path::new(&args[1]), &mut f).map_err(|e| e.to_string())?;
+                    let n = oikos_kernel::blog::export_file_shaped(log, shape, &mut f).map_err(|e| e.to_string())?;
                     std::io::Write::flush(&mut f).map_err(|e| e.to_string())?;
                     n
                 }
-                None => oikos_kernel::blog::export_file(std::path::Path::new(&args[1]), &mut std::io::stdout().lock()).map_err(|e| e.to_string())?,
+                // (Buffered: stdout on its own writes a line at a time, a system call each.)
+                None => {
+                    let mut f = std::io::BufWriter::with_capacity(1 << 20, std::io::stdout().lock());
+                    let n = oikos_kernel::blog::export_file_shaped(log, shape, &mut f).map_err(|e| e.to_string())?;
+                    std::io::Write::flush(&mut f).map_err(|e| e.to_string())?;
+                    n
+                }
             };
             eprintln!("{n} entries");
             Ok(())
@@ -135,7 +144,7 @@ fn main() -> ExitCode {
             println!("oikos-kernel {} ({}) source {}", run::KERNEL_VERSION, run::KERNEL_BUILD, run::KERNEL_SOURCE);
             Ok(())
         }
-        _ => Err("usage: oikos-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | view <log> <seq> | world <config.json> --out <dir> [--run-id ID] [--until S] [--threads N] [--stand-in KIND] | manifests | export <log.oklog> [--out F] | snapshots <log.oklog> | delegation <log> | grants <log.oklog> | rules | version".into()),
+        _ => Err("usage: oikos-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | view <log> <seq> | world <config.json> --out <dir> [--run-id ID] [--until S] [--threads N] [--stand-in KIND] | manifests | export <log.oklog> [--out F] [--lean] | snapshots <log.oklog> | delegation <log> | grants <log.oklog> | rules | version".into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

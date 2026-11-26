@@ -13,6 +13,7 @@ import { goalText, modelName } from "../words";
 import "./story.css";
 import "./diff.css";
 import { dayNo, dayOf } from "../format";
+import { usePlain } from "./text";
 
 const DAY = 86_400;
 const modelOf = (s: SeatJson) => (s.model ? modelName(s.model) : "the rule-based mayor");
@@ -71,6 +72,7 @@ function Diff({ keys, seats, initial }: { keys: string[]; seats: SeatJson[]; ini
 }
 
 function Column({ runKey, seat, day }: { runKey: string; seat: SeatJson; day: number }) {
+  const plain = usePlain(false);
   const i = nearestSitting(seat, day);
   const s = i !== null ? seat.sittings[i]! : undefined;
   const d = useAsync(() => (i === null ? null : (loadSitting(runKey, i) as Promise<Detail>)), [runKey, i]);
@@ -82,7 +84,7 @@ function Column({ runKey, seat, day }: { runKey: string; seat: SeatJson; day: nu
         <div className="df-model">{modelOf(seat)}</div>
         <p className="st-faint" style={{ fontSize: 11.5, margin: 0 }}>{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seatOutcome(seat).label}. Cost {usd(seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0))}.</p>
         {s ? <p className="df-when">Turn {s.i + 1}, {when(s.t)}{off !== 0 ? <span className="df-off"> (it took no turn on day {day}; this is {off > 0 ? `${off} days later` : `${-off} days earlier`})</span> : null}. {s.acts.length ? `${plural(s.acts.length, "act")}.` : "No acts."}</p> : <p className="df-when">No turns.</p>}
-        {s && <div className="df-gist">{s.gist}</div>}
+        {s && <div className="df-gist">{plain(s.gist)}</div>}
         {s && <a className="st-btn" href={`#/run/${encodeURIComponent(runKey)}?t=${Math.round(s.t)}&sel=sitting:${s.i}`}>Open this turn in its run</a>}
       </div>
       <div className="df-col-body">

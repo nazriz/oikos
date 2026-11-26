@@ -69,7 +69,7 @@ function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string
     const what = String(b.data?.proposal ?? b.text ?? "").replace(/\s+/g, " ");
     const after = rec ? councilVerdict(seat, rec) : undefined;
     if (b.data?.kind === "budget") return { clause: "asked the council to adopt a budget", ...(after ? { after } : {}), kind: "proposal", noun: "the budget" };
-    if (b.data?.kind === "law") return { clause: `asked the council to adopt a new law${what ? `: “${what.length > 140 ? what.slice(0, 139) + "…" : what}”` : ""}`, ...(after ? { after } : {}), kind: "proposal", noun: "the new law" };
+    if (b.data?.kind === "law") return { clause: `asked the council to adopt a new law${what ? `: ${lawLead(what)}` : ""}`, ...(after ? { after } : {}), kind: "proposal", noun: "the new law" };
     const form = formWords(basis);
     return { clause: `asked the council to ${form.ask}`, ...(after ? { after } : {}), kind: "proposal", noun: form.noun };
   }
@@ -86,6 +86,12 @@ function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string
     return { clause: `withdrew ${what === "election_notice" ? "the notice calling the election" : what ? `a ${what.replace(/_/g, " ")}` : `a paper (${b.record})`} without a vote`, kind: "withdraw" };
   }
   if (b.block === "message") return { clause: "", kind: "letter" };
+  // (An offer it drew up and signed in one act: told as the offer, the same words for each person it went to.)
+  if (b.block === "propose_agreement" || b.block === "sign_agreement") {
+    const offer = a.blocks.find((x) => x?.block === "propose_agreement");
+    const what = offer?.terms?.template === "employment" ? "a job offer" : "an agreement";
+    return { clause: a.blocks.some((x) => x?.block === "sign_agreement") ? `signed ${what}` : `offered ${what === "a job offer" ? "a job" : what}`, kind: "agreement" };
+  }
   if (b.block === "publish" && b.kind === "petition_response") return { clause: "answered a residents' petition", kind: "petition" };
   return { clause: a.label.charAt(0).toLowerCase() + a.label.slice(1), kind: "other" };
 }
@@ -151,4 +157,15 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
   return { i: s.i, day: dayOf(s.t), t: s.t, sentences, ...(quote ? { quote } : {}), levers, votes, notable };
 }
 
+/** A law in a card: its whole text if short, else its opening sentences, never cut mid-word, and a pointer to the rest. */
+function lawLead(what: string): string {
+  if (what.length <= 160) return `“${what}”`;
+  // (A stop inside a word, "rec.109861" or "3.5", does not end a sentence: else the sentence before it is lost.)
+  const sentences = what.match(/(?:[^.!?]|[.!?](?=\S))+[.!?]+(?:\s+|$)/g) ?? [];
+  let out = "";
+  for (const x of sentences) { if ((out + x).length > 160 && out) break; out += x; }
+  out = out.trim();
+  if (!out || out.length > 200) { const cut = what.slice(0, 160); out = `${cut.slice(0, cut.lastIndexOf(" "))}…`; }
+  return `“${out}” (the law goes on; read it in this turn)`;
+}
 function joinAnd(xs: string[]): string { return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`; }

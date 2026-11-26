@@ -11,6 +11,7 @@ import type { Weather } from "./sky";
 import { WORLD_CSS } from "./style";
 import { buildSteps, Tour } from "../city/Tour";
 import { actSentence } from "../city/words";
+import { plainWords } from "../story/text";
 
 export interface WorldViewProps {
   run: string;
@@ -55,7 +56,7 @@ export function WorldView({ run, base, view, mode: startMode, weather, active = 
     let e: WorldEngine;
     try {
       const bySeq = new Map(city.town.acts.map((a) => [a.seq, a] as const));
-      const caption = (seq: number) => { const a = bySeq.get(seq); return a ? actSentence(city.town, a) : undefined; };
+      const caption = (seq: number) => { const a = bySeq.get(seq); return a ? plainWords(actSentence(city.town, a)) : undefined; };
       e = new WorldEngine(host.current, { city, world: extra.world, election: extra.election }, { onMode: setMode, onInfo: setInfo, caption, onReady: () => setReady(true) });
     } catch (err) {
       setFailed(String((err as Error)?.message ?? err));

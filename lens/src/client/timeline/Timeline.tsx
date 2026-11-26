@@ -6,13 +6,18 @@
 // in, a strip of the whole run sits on top. Keys: space play/pause, ←/→ an hour (shift: a day), - = slower/faster,
 // , . previous/next key moment (< > any mark), Home/End. Drawn on one canvas: thousands of marks stay smooth.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLens, type Selection, type TimelineMark, type TimelineTrack } from "../state";
 import { selToken } from "../router";
 import { DAY, HOUR, clock, dayNo, dayOf, span as spanText, spanWords } from "../format";
 import { Fit, Keyboard, Pause, Play } from "../icons";
 import { useMode } from "../mode";
 import { useSeat } from "../nav/nav";
+import { useFold } from "../api";
 import { keyMoments, phases as phasesOf, type KeyMoment, type Phase } from "./moments";
+import { lockInfo } from "../story/lockin";
+import { usePlain } from "../story/text";
+import type { RunEntry } from "../../shared/api";
 import "./timeline.css";
 
 export interface Ground {
@@ -24,6 +29,8 @@ export interface TimelineProps {
   ground?: Ground;
   /** The fork point, seconds: drawn as the start of the arm's own time. */
   fork?: number;
+  /** The run's catalogue entry: its blind grades put the lock-in among the key moments. */
+  entry?: RunEntry;
 }
 
 export const SPEEDS = [
@@ -63,14 +70,14 @@ const readLane = () => {
 };
 const PAD_B = 6;
 
-const PALETTE_KEYS = ["text", "muted", "faint", "line", "line2", "panel", "panel2", "ink", "seat", "flag", "election", "news", "inst", "citizen", "good", "bad", "mono", "body"] as const;
+const PALETTE_KEYS = ["text", "muted", "faint", "line", "line2", "panel", "panel2", "ink", "seat", "flag", "election", "lockin", "news", "inst", "citizen", "good", "bad", "mono", "body"] as const;
 type Palette = Record<(typeof PALETTE_KEYS)[number], string>;
 function readPalette(el: Element): Palette {
   const cs = getComputedStyle(el);
   const v = (n: string) => cs.getPropertyValue(n).trim();
   return {
     text: v("--text"), muted: v("--muted"), faint: v("--faint"), line: v("--line"), line2: v("--line-2"), panel: v("--panel"), panel2: v("--panel-2"), ink: v("--ink"),
-    seat: v("--seat"), flag: v("--flag"), election: v("--election"), news: v("--inst"), inst: v("--inst"), citizen: v("--citizen"), good: v("--good"), bad: v("--bad"),
+    seat: v("--seat"), flag: v("--flag"), election: v("--election"), lockin: v("--lockin"), news: v("--inst"), inst: v("--inst"), citizen: v("--citizen"), good: v("--good"), bad: v("--bad"),
     mono: v("--font-sans"),
     // (Read once with the palette: a style read on every frame of play forces the browser to recompute styles.)
     body: getComputedStyle(document.body).fontFamily,
@@ -116,7 +123,7 @@ function usePlayback() {
   }, [playing]);
 }
 
-export function Timeline({ ground, fork }: TimelineProps) {
+export function Timeline({ ground, fork, entry }: TimelineProps) {
   usePlayback();
   const t = useLens((s) => s.t);
   const spanT = useLens((s) => s.span);
@@ -126,12 +133,16 @@ export function Timeline({ ground, fork }: TimelineProps) {
   const selection = useLens((s) => s.selection);
   const run = useLens((s) => s.run);
   const seat = useSeat(run);
+  // (Still reading the run's own data, which brings the key moments: a run with none, or that failed, is not waiting.)
+  const seatState = useFold("seat", run);
+  const waiting = !!run && seatState.loading;
   // The key moments and the phases; a stopped run's axis runs on to its set length, hatched, so the loss shows.
-  const moments = useMemo(() => (seat ? keyMoments(seat) : []), [seat]);
+  const moments = useMemo(() => (seat ? keyMoments(seat, lockInfo(seat, entry)) : []), [seat, entry]);
   const phases = useMemo<Phase[]>(() => (seat ? phasesOf(seat, spanT[0]) : []), [seat, spanT[0]]);
   const dom = useMemo<[number, number]>(() => [spanT[0], Math.max(spanT[1], seat?.ended === "stopped" ? (seat.until_at ?? 0) : 0)], [spanT[0], spanT[1], seat]);
   const [view, setView] = useState<[number, number]>(dom);
   const wrap = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const hits = useRef<Hit[]>([]);
   const flagHits = useRef<FlagHit[]>([]);
@@ -142,10 +153,13 @@ export function Timeline({ ground, fork }: TimelineProps) {
 
   // (A new run, a new span: show all of it.)
   useEffect(() => setView(dom), [dom[0], dom[1]]);
+  // (A window narrower than a few hours is no view: a span that arrived after the first moment was set made one.)
+  const MIN_VIEW = 3 * HOUR;
 
   // (Story mode: the key moments carry the power grabs and the election, so one lane stays: the mayor's turns.
   // Researcher mode: every lane.)
   const researcher = useMode((m) => m.mode === "researcher");
+  const plain = usePlain();
   const sorted = useMemo(() => {
     const all = [...tracks].sort((a, b) => a.id.localeCompare(b.id));
     if (researcher) return all;
@@ -233,12 +247,17 @@ export function Timeline({ ground, fork }: TimelineProps) {
   // (Playing past the window's edge moves the window along; a jump out of it, to a key moment or a turn, brings the
   // window to it.)
   useEffect(() => {
-    const w = v1 - v0;
-    if (playing ? t > v1 - w * 0.04 || t < v0 : t > v1 || t < v0) {
-      const n0 = Math.max(dom[0], Math.min(dom[1] - w, playing ? t - w * 0.15 : t - w / 2));
-      setView([n0, n0 + w]);
-    }
-  }, [t, playing]);
+    setView(([a, b]) => {
+      const full = dom[1] - dom[0];
+      if (b - a < Math.min(MIN_VIEW, full)) return dom;
+      const w = b - a;
+      if (playing ? t > b - w * 0.04 || t < a : t > b || t < a) {
+        const n0 = Math.max(dom[0], Math.min(dom[1] - w, playing ? t - w * 0.15 : t - w / 2));
+        return [n0, n0 + w];
+      }
+      return [a, b];
+    });
+  }, [t, playing, dom[0], dom[1]]);
 
   const selTok = selToken(selection);
 
@@ -299,6 +318,14 @@ export function Timeline({ ground, fork }: TimelineProps) {
       if (ph.kind === "stopped") hatch(g, x, flagsTop, x2 - x, height - flagsTop, withAlpha(p.text, 0.14));
     }
 
+    // The playhead's line, under the axis labels, the phases' names and the flags (they stay readable where it passes);
+    // its head is drawn last, on top.
+    const px = Math.round(xOf(t)) + 0.5;
+    if (px >= -2 && px <= width + 2) {
+      g.fillStyle = withAlpha(p.seat, 0.85);
+      g.fillRect(px - 0.5, axisTop + AXIS - 2, 2, height - axisTop - AXIS + 2);
+    }
+
     // Axis: day ticks, or hour ticks when close in.
     const pxPerDay = (DAY / Math.max(1, v1 - v0)) * width;
     g.font = font(600, 11);
@@ -312,7 +339,9 @@ export function Timeline({ ground, fork }: TimelineProps) {
         g.fillStyle = isDay ? p.line2 : p.line;
         g.fillRect(x, isDay ? axisTop : axisTop + AXIS - 6, 1, isDay ? height - axisTop : 6);
         g.fillStyle = isDay ? p.text : p.faint;
-        g.fillText(isDay ? `day ${dayOf(tt)}` : clock(tt), x + 4, axisTop + AXIS / 2);
+        const lab = isDay ? `day ${dayOf(tt)}` : clock(tt);
+        // (A label that would run off the right edge is left out, never cut.)
+        if (x + 4 + g.measureText(lab).width <= width - 2) g.fillText(lab, x + 4, axisTop + AXIS / 2);
       }
     } else {
       const ds = niceDayStep(pxPerDay);
@@ -324,7 +353,8 @@ export function Timeline({ ground, fork }: TimelineProps) {
         g.fillStyle = withAlpha(p.line, 0.7);
         g.fillRect(x, axisTop + AXIS - 6, 1, height - axisTop - AXIS + 6);
         g.fillStyle = p.muted;
-        g.fillText(`${L === L0 ? "day " : ""}${L}`, x + 4, axisTop + AXIS / 2);
+        const lab = `${L === L0 ? "day " : ""}${L}`;
+        if (x + 4 + g.measureText(lab).width <= width - 2) g.fillText(lab, x + 4, axisTop + AXIS / 2);
       }
       if (pxPerDay > 6) {
         g.fillStyle = p.line;
@@ -353,14 +383,19 @@ export function Timeline({ ground, fork }: TimelineProps) {
         g.fill();
       }
     }
-    // The phases' names, at the left of each band, where they fit.
-    g.font = font(600, 10.5);
-    for (const ph of phases) {
-      const x = Math.max(0, xOf(ph.t)) + 5, x2 = Math.min(width, xOf(ph.t2)) - 4;
-      if (ph.kind === "before" || g.measureText(ph.label).width > x2 - x) continue;
-      g.fillStyle = ph.kind === "stopped" ? p.text : ph.kind === "after" ? p.muted : p.election;
-      g.fillText(ph.label, x, groundTop + GROUND / 2 + 0.5);
-    }
+    // (The phases' names are drawn with the flags, over the poles and the playhead, so nothing runs through them.)
+    const phaseNames = () => {
+      g.font = font(600, 10.5);
+      for (const ph of phases) {
+        const x = Math.max(0, xOf(ph.t)) + 5, x2 = Math.min(width, xOf(ph.t2)) - 4;
+        const tw = g.measureText(ph.label).width;
+        if (ph.kind === "before" || tw > x2 - x) continue;
+        g.fillStyle = withAlpha(p.panel, 0.85);
+        g.fillRect(x - 2, groundTop + 3, tw + 4, GROUND - 6);
+        g.fillStyle = ph.kind === "stopped" ? p.text : ph.kind === "after" ? p.muted : p.election;
+        g.fillText(ph.label, x, groundTop + GROUND / 2 + 0.5);
+      }
+    };
 
     // Lanes: quiet. A point mark is a thin tick; the selected one a ringed dot; spans as soft bars.
     const out: Hit[] = [];
@@ -422,11 +457,17 @@ export function Timeline({ ground, fork }: TimelineProps) {
       g.setLineDash([]);
     }
 
+    // Until the run's own data is in, the key moments' row is a quiet placeholder (and the strip takes no clicks).
+    if (waiting) {
+      g.fillStyle = withAlpha(p.text, 0.06);
+      for (let r = 0; r < FLAG_ROWS; r++) g.fillRect(8 + r * 140, flagsTop + 3 + r * FLAG_ROW, Math.min(width * 0.18, 110), FLAG_ROW - 5);
+    }
+
     // Key moments: a pole through everything and a labelled flag on top. Labels are placed most important first, in
     // two rows; one that fits nowhere keeps its pole and a small head, and says itself on hover.
     const fl: FlagHit[] = [];
     const rows: [number, number][][] = Array.from({ length: FLAG_ROWS }, () => []);
-    const prio = (m: KeyMoment) => (m.kind === "grab" ? (m.strong ? 0 : 1) : m.kind === "end" ? 2 : m.strong ? 3 : 4);
+    const prio = (m: KeyMoment) => (m.kind === "lockin" ? 0 : m.kind === "grab" ? (m.strong ? 0 : 1) : m.kind === "end" ? 2 : m.strong ? 3 : 4);
     const order = moments.map((m, i) => ({ m, i, x: xOf(m.t) })).filter((o) => o.x >= -2 && o.x <= width + 2).sort((a, b) => prio(a.m) - prio(b.m) || a.x - b.x);
     g.font = font(700, 11.5);
     const placed = new Map<KeyMoment, { row: number; bx: number; bw: number }>();
@@ -442,19 +483,29 @@ export function Timeline({ ground, fork }: TimelineProps) {
           break find;
         }
     }
+    // (Every pole first, then the phases' names, then every flag: a pole never runs through another flag's words.)
     for (const o of [...order].reverse()) {
       const m = o.m, x = Math.round(o.x) + 0.5;
       const col = momentColor(p, m);
       const pl = placed.get(m);
       const top = pl ? flagsTop + 3 + pl.row * FLAG_ROW : flagsTop + FLAGS - 9;
-      g.strokeStyle = withAlpha(col, m.kind === "grab" ? 0.75 : 0.55);
-      g.lineWidth = m.kind === "grab" && m.strong ? 1.5 : 1;
+      const sharp = m.kind === "grab" || m.kind === "lockin";
+      g.strokeStyle = withAlpha(col, sharp ? 0.75 : 0.55);
+      g.lineWidth = sharp && m.strong ? 1.5 : 1;
       if (m.after) g.setLineDash([3, 3]);
       g.beginPath();
       g.moveTo(x, top + (pl ? FLAG_ROW - 3 : 6));
       g.lineTo(x, height - PAD_B);
       g.stroke();
       g.setLineDash([]);
+    }
+    phaseNames();
+    g.font = font(700, 11.5);
+    for (const o of [...order].reverse()) {
+      const m = o.m, x = Math.round(o.x) + 0.5;
+      const col = momentColor(p, m);
+      const pl = placed.get(m);
+      const top = pl ? flagsTop + 3 + pl.row * FLAG_ROW : flagsTop + FLAGS - 9;
       if (pl) {
         const h = FLAG_ROW - 3;
         if (m.strong) {
@@ -467,7 +518,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
           g.strokeStyle = col;
           g.lineWidth = 1.25;
           g.strokeRect(pl.bx + 0.5, top + 0.5, pl.bw - 1, h - 1);
-          g.fillStyle = m.kind === "grab" ? p.flag : col;
+          g.fillStyle = m.kind === "grab" ? p.flag : m.kind === "lockin" ? p.lockin : col;
         }
         g.fillText(m.label, pl.bx + 5, top + h / 2 + 0.5);
         fl.push({ x: pl.bx, x2: pl.bx + pl.bw, y: top, y2: top + h, m });
@@ -485,11 +536,9 @@ export function Timeline({ ground, fork }: TimelineProps) {
       g.fillStyle = p.line2;
       g.fillRect(x, flagsTop, 1, height - flagsTop);
     }
-    // Playhead.
-    const px = Math.round(xOf(t)) + 0.5;
+    // The playhead's head.
     if (px >= -2 && px <= width + 2) {
       g.fillStyle = p.seat;
-      g.fillRect(px - 0.5, axisTop + AXIS - 2, 2, height - axisTop - AXIS + 2);
       g.beginPath();
       g.moveTo(px - 5.5, axisTop + 3);
       g.lineTo(px + 6.5, axisTop + 3);
@@ -497,7 +546,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
       g.closePath();
       g.fill();
     }
-  }, [palette, width, height, v0, v1, t, sorted, ground, fork, selTok, hoverT, xOf, xAll, LANE, compact, moments, phases, ov]);
+  }, [palette, width, height, v0, v1, t, sorted, ground, fork, selTok, hoverT, xOf, xAll, LANE, compact, moments, phases, ov, waiting]);
 
   // Pointer: scrub, pick a mark or a flag, or move the window on the overview strip.
   const drag = useRef<{ startX: number; moved: boolean; hit?: Hit; flag?: KeyMoment; ov?: boolean } | null>(null);
@@ -517,10 +566,13 @@ export function Timeline({ ground, fork }: TimelineProps) {
     const r = canvas.current!.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
+  /** On the whole-run strip: bring the window there, and the moment shown with it. */
   const centreOn = (x: number) => {
-    const w = v1 - v0, at = dom[0] + (x / width) * total;
+    const w = v1 - v0, at = dom[0] + (Math.max(0, Math.min(width, x)) / width) * total;
     const n0 = Math.max(dom[0], Math.min(dom[1] - w, at - w / 2));
     setView([n0, n0 + w]);
+    const s = useLens.getState();
+    s.setT(Math.max(s.span[0], Math.min(s.span[1], at)));
   };
   const openMoment = (m: KeyMoment) => {
     const s = useLens.getState();
@@ -636,7 +688,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
   const hasPrev = keyTimes.some((x) => x < t - 1), hasNext = keyTimes.some((x) => x > t + 1);
 
   return (
-    <div className={`tl ${compact ? "compact" : ""}`}>
+    <div className={`tl ${compact ? "compact" : ""}`} ref={root}>
       <div className="tl-grip" onPointerDown={onGrip} title="Drag to make the lanes taller or shorter" />
       <div className="tl-bar">
         <div className="tl-controls">
@@ -662,10 +714,12 @@ export function Timeline({ ground, fork }: TimelineProps) {
           {moments.length > 0 && (
             <div className="seg tl-moments" role="group" aria-label="Key moments">
               <button disabled={!hasPrev} onClick={() => stepMoment(-1)} title="The previous key moment: a power grab, an election date (,)">
-                Previous moment
+                <span className="tl-long">Previous moment</span>
+                <span className="tl-short" aria-hidden="true">‹ Moment</span>
               </button>
               <button disabled={!hasNext} onClick={() => stepMoment(1)} title="The next key moment: a power grab, an election date (.)">
-                Next moment
+                <span className="tl-long">Next moment</span>
+                <span className="tl-short" aria-hidden="true">Moment ›</span>
               </button>
             </div>
           )}
@@ -717,7 +771,8 @@ export function Timeline({ ground, fork }: TimelineProps) {
         <div className="tl-canvas" ref={wrap}>
           <canvas
             ref={canvas}
-            style={{ width, height, cursor: hover ? "pointer" : "col-resize" }}
+            style={{ width, height, cursor: waiting ? "progress" : hover ? "pointer" : "col-resize", pointerEvents: waiting ? "none" : undefined }}
+            aria-busy={waiting}
             onPointerDown={onDown}
             onPointerMove={onMove}
             onPointerUp={onUp}
@@ -730,12 +785,12 @@ export function Timeline({ ground, fork }: TimelineProps) {
           {!sorted.length && <div className="tl-empty faint">The map and the story add their lanes here.</div>}
         </div>
       </div>
-      {hover && (
-        <div className="tip" style={{ left: Math.min(window.innerWidth - 330, hover.cx + 12), top: hover.cy - 70 }}>
+      {hover && createPortal(
+        <div className="tip" style={{ left: Math.max(8, Math.min(window.innerWidth - 330, hover.cx + 12)), bottom: window.innerHeight - (root.current?.getBoundingClientRect().top ?? hover.cy - 70) + 6 }}>
           {hover.flag ? (
             <>
               <b>{hover.flag.label}</b>
-              <div style={{ marginTop: 2 }}>{hover.flag.long}</div>
+              <div style={{ marginTop: 2 }}>{plain(hover.flag.long)}</div>
               {hover.flag.select && <div className="faint" style={{ marginTop: 2 }}>Click to open the turn.</div>}
             </>
           ) : hover.hit ? (
@@ -743,20 +798,21 @@ export function Timeline({ ground, fork }: TimelineProps) {
               <div className="muted" style={{ marginBottom: 2 }}>
                 {hover.hit.track.label}
               </div>
-              <b>{hover.hit.mark.label ?? "—"}</b>
+              <b>{hover.hit.mark.label ? plain(hover.hit.mark.label) : "—"}</b>
               <div className="faint num" style={{ marginTop: 2 }}>
                 Day {dayOf(hover.hit.mark.t)}, {clock(hover.hit.mark.t)}
                 {hover.hit.mark.t2 !== undefined ? `, lasting ${spanText(hover.hit.mark.t2 - hover.hit.mark.t)}` : ""}
               </div>
             </>
           ) : null}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
 }
 
-const momentColor = (p: Palette, m: KeyMoment) => (m.kind === "grab" ? p.flag : m.kind === "election" ? p.election : p.text);
+const momentColor = (p: Palette, m: KeyMoment) => (m.kind === "lockin" ? p.lockin : m.kind === "grab" ? p.flag : m.kind === "election" ? p.election : p.text);
 
 /** Diagonal hatching over a box: what a stopped run never reached. */
 function hatch(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, col: string) {

@@ -319,8 +319,17 @@ button.crumb:hover {
     left: 8px;
     bottom: 8px;
   }
+  /* (Folded, the panel sits bottom left and the Plan | 3D town switch bottom right, side by side; open, the panel
+     stands above the switch, never over it.) */
   .about.open {
     width: calc(100% - 16px);
+    bottom: 52px;
+  }
+  .run-map .map-toggle {
+    left: auto;
+    right: 8px;
+    bottom: 8px;
+    transform: none;
   }
   .peek {
     display: none;
@@ -347,6 +356,12 @@ button.crumb:hover {
 .id-link:hover {
   color: var(--text);
   text-decoration-color: currentColor;
+}
+.id-seat {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: 0.86em;
+  color: var(--muted);
 }
 
 /* The inspector's head: back to the turn it was opened from */
@@ -387,5 +402,88 @@ button.crumb:hover {
   .run-page .drawer.wide,
   .run-page .run-reader {
     top: var(--run-bar-h, 0px);
+  }
+}
+
+/* The site bar: the header of the pages that are neither the library nor an open run (nav/SiteBar.tsx). The page
+   scrolls below it. */
+.site-page {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.site-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 48px;
+  padding: 4px 10px 4px 16px;
+  background: var(--panel);
+  border-bottom: 2px solid var(--text);
+}
+.site-home {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  padding-right: 16px;
+  border-right: 1px solid var(--line);
+}
+.site-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+.site-bar-actions .btn.ghost {
+  height: 30px;
+  font-size: 13.5px;
+}
+.site-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.site-body > * {
+  flex: 1 0 auto;
+  min-height: 0;
+}
+@media (max-width: 760px) {
+  .site-bar {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    padding: 6px 8px 6px 12px;
+  }
+  .site-home {
+    font-size: 18px;
+    padding-right: 10px;
+  }
+  .site-bar .crumbs {
+    flex: 1 1 0;
+  }
+  .site-bar-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+  .site-bar-actions .help-btn {
+    padding: 0 6px;
+    font-size: 13px;
+  }
+  .site-bar .site-links {
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+}
+@media print {
+  .site-bar {
+    display: none;
+  }
+  .site-page,
+  .site-body {
+    height: auto;
+    overflow: visible;
   }
 }

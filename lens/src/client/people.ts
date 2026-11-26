@@ -53,6 +53,25 @@ export function describePerson(c: CityData | null, id: string, t: number): strin
   return [age >= 0 ? String(age) : "", x.place].filter(Boolean).join(", ");
 }
 
+/** Whether a person's id (or "<id>-self") is the body the AI mayor holds office as (the seat's person). */
+export function isSeatPerson(c: CityData | null | undefined, id: string): boolean {
+  if (!c) return false;
+  const pid = id.replace(/-self$/, "");
+  return Object.values(c.town.power?.seats ?? {}).some((p) => p.replace(/-self$/, "") === pid);
+}
+
+/** How a person is named on a page: "the AI mayor (c0572)" for the seat's person, wherever its id would show; else their
+ * name, else "c0018 (58, works at Shop 28)", else the id. */
+export function personLabel(c: CityData | null | undefined, id: string, t: number): string {
+  const pid = id.replace(/-self$/, "");
+  if (isSeatPerson(c, pid)) return `the AI mayor (${pid})`;
+  const q = c?.pById.get(pid);
+  const name = q !== undefined ? c!.people.people[q]![1] : "";
+  if (name && name !== pid) return name;
+  const d = describePerson(c ?? null, pid, t);
+  return d ? `${pid} (${d})` : pid;
+}
+
 /** For a run: a function from a person's id to its descriptor (for the palette, the rail, chips). */
 export function useDescribe(run: string | null, t = 0): (id: string) => string | undefined {
   const { city } = useCity(run ? `/api/run/${encodeURIComponent(run)}` : null);

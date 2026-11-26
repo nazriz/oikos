@@ -2,15 +2,19 @@
 // thought and said (each call: reasoning, words, tool calls with what came back), and what happened (each request to
 // the translator, the draft, the seat's sign-off, the act sent, and what the world did with it). The study reader's
 // lever flags sit beside the act or the words they came from. Opens on selection of a sitting, an act or a lever.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, loadSystem, useAsync, when, worldDay, usd, tokens, plural, human, STAGE, type SeatAct, type SeatDraft, type SeatJson, type SeatLever, type SittingDetail, type SittingTurn } from "./data";
-import { Hi, Md, MarksContext, hasQuery, openPerson, type Marks } from "./text";
+import { Hi, Md, MarksContext, hasQuery, openPerson, keyWords, keySentences, usePlain, plainReason, type Marks } from "./text";
 import { leverTitle } from "../words";
 import { useResearcher } from "../mode";
 import { firstPoll } from "./moments-data";
 import { HowDoWeKnow } from "./Evidence";
+import { PromptDoc } from "./PromptDoc";
+import { readPrompt } from "./prompt-parts";
+import { useReadMode, useFull } from "./readmode";
 import "./story.css";
+import "./read.css";
 
 export type Detail = SittingDetail & { acts: SeatAct[] };
 
@@ -98,7 +102,7 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
           <h2>Turn {s.i + 1} of {seat.sittings.length}, day {worldDay(s.t)} at {when(s.t).split(", ").at(-1)}{s.kind === "code" ? " (rule-based mayor)" : ""}</h2>
           <p className="meta">
           {researcher && <>{s.turns > 0 ? `The AI mayor was asked ${s.turns === 1 ? "once" : `${s.turns} times`} in this turn` : "No model was asked in this turn"}{s.usage.calls > 0 ? `, reading ${tokens(s.usage.input_tokens)} tokens and writing ${tokens(s.usage.output_tokens)}${s.usage.reasoning_tokens ? ` (${tokens(s.usage.reasoning_tokens)} of them hidden reasoning)` : ""}, at a cost of ${usd(s.usage.cost_microusd)}` : ""}.</>}
-          {firstPoll(seat) !== undefined && <span style={{ color: "var(--st-election)" }}> {Math.round((firstPoll(seat)! - s.t) / 86_400)} days before the election was due.</span>}
+          {firstPoll(seat) !== undefined && <span style={{ color: "var(--st-election)" }}> {plural(Math.round((firstPoll(seat)! - s.t) / 86_400), "day")} before the election was due.</span>}
           </p>
         </div>
         <div className="grow" />
@@ -107,11 +111,13 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
           <input placeholder="Find words in this turn" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setHit((h) => (hits ? (h + (e.shiftKey ? hits - 1 : 1)) % hits : 0)); }} />
           {query.trim().length >= 2 && <span className="n">{hits ? `${hit + 1}/${hits}` : "none"}</span>}
         </div>
+        <ReadToggle />
         <div className="group">
           <button className="st-btn" disabled={tg.sitting === 0} onClick={() => go(-1)} title="Key: k">Previous turn</button>
           <button className="st-btn" disabled={tg.sitting === seat.sittings.length - 1} onClick={() => go(1)} title="Key: j">Next turn</button>
         </div>
-        {seat.levers.length > 0 && <div className="group">
+        {/* (Only where the checker found a power grab tried or carried out: a run with none has nothing to step to.) */}
+        {strong.length > 0 && <div className="group">
           <button className="st-btn flag" onClick={() => lever(-1)} title="Key: [">Previous power grab</button>
           <button className="st-btn flag" onClick={() => lever(1)} title="Key: ]">Next power grab</button>
         </div>}
@@ -129,6 +135,22 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
           </div>
         </MarksContext.Provider>
       )}
+    </div>
+  );
+}
+
+/** Skim (each part folded to its summary, long passages to their key sentences) or read in full; remembered. Key: v. */
+function ReadToggle() {
+  const mode = useReadMode((s) => s.mode), set = useReadMode((s) => s.set);
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => { if (e.key === "v" && !e.metaKey && !e.ctrlKey && (e.target as HTMLElement)?.tagName !== "INPUT") set(useReadMode.getState().mode === "full" ? "skim" : "full"); };
+    window.addEventListener("keydown", on);
+    return () => window.removeEventListener("keydown", on);
+  }, [set]);
+  return (
+    <div className="group st-seg" role="group" aria-label="How much to show">
+      <button className={`st-btn ${mode === "skim" ? "on" : ""}`} aria-pressed={mode === "skim"} onClick={() => set("skim")} title="Summaries and highlighted lines only (key: v)">Skim</button>
+      <button className={`st-btn ${mode === "full" ? "on" : ""}`} aria-pressed={mode === "full"} onClick={() => set("full")} title="Everything open (key: v)">Read in full</button>
     </div>
   );
 }
@@ -152,34 +174,40 @@ export function sections(input: string): { prelude: string; parts: { title: stri
   return { prelude, parts: chunks.map((c) => { const nl = c.indexOf("\n"); const head = (nl < 0 ? c : c.slice(0, nl)).trim(); const m = /^(.*?)\s*\(([^()]*)\)\s*$/.exec(head); return { title: m ? m[1]! : head, ...(m ? { count: m[2]! } : {}), body: nl < 0 ? "" : c.slice(nl + 1) }; }) };
 }
 
-function Saw({ run, seat, d, query }: { run: string; seat: SeatJson; d: Detail; query: string }) {
+function Saw({ run, d, query }: { run: string; seat: SeatJson; d: Detail; query: string }) {
+  const full = useFull();
+  const plain = usePlain();
   const first = d.turns.find((t) => t.purpose === "participant" && typeof t.input === "string");
-  if (!first) return <div className="st-muted" style={{ fontSize: 13 }}>{d.turns.length ? "This sitting carried on from the one before: no new prompt." : "A code seat: it reads the world directly, with no prompt."}</div>;
-  const { prelude, parts } = sections(first.input as string);
-  return (
-    <>
-      <Md text={prelude} className="st-prose st-prelude" />
-      {parts.map((p, k) => {
-        const big = p.body.length > 2_400;
-        return (
-          <details key={k} className="st-sec" open={!big || hasQuery(p.body, query)}>
-            <summary><Hi text={p.title} /><span className="n">{p.count ?? ""}{big ? `, ${Math.round(p.body.length / 1000)}k characters` : ""}</span></summary>
+  const input = first?.input as string | undefined;
+  const shaped = useMemo(() => (input ? readPrompt(input).shaped : false), [input]);
+  if (!first || input === undefined) return <div className="st-muted" style={{ fontSize: 13 }}>{d.turns.length ? "This sitting carried on from the one before: no new prompt." : "A code seat: it reads the world directly, with no prompt."}</div>;
+  // (A prompt without the digest's shape is shown as before: its prelude, then each "## " section.)
+  if (!shaped) {
+    const { prelude, parts } = sections(input);
+    return (
+      <>
+        <Md text={prelude} className="st-prose st-prelude" />
+        {parts.map((p, k) => (
+          <details key={`${k}${full}`} className="st-sec" open={full || hasQuery(p.body, query)}>
+            <summary><Hi text={plain(p.title)} /><span className="n">{p.count ?? ""}{p.body.length > 2_400 ? `, ${Math.round(p.body.length / 1000)}k characters` : ""}</span></summary>
             <div className="body"><Md text={p.body} className="st-prose small" /></div>
           </details>
-        );
-      })}
-      {first.system && <System run={run} sha={first.system} />}
-    </>
-  );
+        ))}
+        {first.system && <System run={run} sha={first.system} />}
+      </>
+    );
+  }
+  return <><PromptDoc input={input} query={query} />{first.system && <System run={run} sha={first.system} />}</>;
 }
 
 function System({ run, sha }: { run: string; sha: string }) {
+  const researcher = useResearcher();
   const [open, setOpen] = useState(false);
   const text = useAsync(() => (open ? loadSystem(run, sha) : null), [open, run, sha]);
   return (
-    <details className="st-sec" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
-      <summary>Standing instructions <span className="n st-mono">{sha.slice(0, 10)}</span></summary>
-      <div className="body">{text === undefined ? <div className="st-muted">…</div> : text instanceof Error ? <div className="st-muted">{text.message}</div> : <Md text={text} className="st-prose small" />}</div>
+    <details className="pr-fold pr-standing" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+      <summary><span className="pr-fold-t">Standing instructions</span><span className="pr-fold-g">the same at every turn: its office, its powers and what it was told to aim for</span>{researcher && <span className="pr-fold-n">{sha.slice(0, 10)}</span>}</summary>
+      <div className="pr-fold-body">{text === undefined ? <div className="st-muted">Reading…</div> : text instanceof Error ? <div className="st-muted">{text.message}</div> : <Md text={text} className="st-prose small" />}</div>
     </details>
   );
 }
@@ -192,78 +220,155 @@ function resultsOf(turns: SittingTurn[]): Map<string, string> {
   return m;
 }
 
+const QUIET_TOOLS = new Set(["look", "done_for_now", "notebook"]);
+/** A call that only looked things up (or set its next wake-up): folded together with its neighbours when skimming. */
+function quiet(t: SittingTurn): boolean {
+  return Array.isArray(t.output) && t.output.length > 0 && t.output.every((c: any) => c?.type === "tool_use" && QUIET_TOOLS.has(c.name)) && !(Array.isArray(t.input) && t.input.some((x: any) => x?.type === "text"));
+}
+
 export function Said({ seat, d, levers }: { seat: SeatJson; d: Detail; levers: SeatLever[] }) {
   const researcher = useResearcher();
+  const full = useFull();
   const results = useMemo(() => resultsOf(d.turns), [d]);
+  // (The key sentences, those on the election and power, are picked out here only: in the mayor's own words.)
+  const outer = useContext(MarksContext);
+  const marks = useMemo(() => ({ ...outer, keys: keyWords(seat.children) }), [outer, seat.children]);
   if (!d.turns.length) return <div className="st-muted" style={{ fontSize: 13 }}>No model calls: {d.acts.length ? "a code seat's acts." : "nothing was asked."}</div>;
-  let call = 0;
   const unseen = d.turns.reduce((n, t) => n + (Array.isArray(t.output) && t.output.some((c: any) => c?.type === "thinking") ? 0 : t.usage?.reasoning_tokens ?? 0), 0);
+  // Number the answers, then (skimming) fold runs of look-only answers into one line.
+  let call = 0;
+  const numbered = d.turns.map((t, k) => ({ t, k, n: t.purpose === "notebook" ? 0 : ++call }));
+  const rows: ({ one: (typeof numbered)[number] } | { quiet: typeof numbered })[] = [];
+  for (const x of numbered) {
+    const q = !full && quiet(x.t) && !levers.some((l) => l.level === "considered" && l.turn === x.k);
+    const last = rows.at(-1);
+    if (q && last && "quiet" in last) last.quiet.push(x); else rows.push(q ? { quiet: [x] } : { one: x });
+  }
+  const turn = (x: (typeof numbered)[number]) => <Turn key={x.k} seat={seat} t={x.t} k={x.k} n={x.n} levers={levers} results={results} />;
   return (
-    <>
+    <MarksContext.Provider value={marks}>
+      <p className="st-legend"><span className="st-key">Highlighted</span>: mentions of the election and power.</p>
       {researcher && unseen > 0 && <div className="st-unseen">{tokens(unseen)} tokens of reasoning in this turn were kept hidden by the model's provider. Below is what it wrote, not all it thought.</div>}
-      {d.turns.map((t, k) => {
-        const flagged = levers.filter((l) => l.level === "considered" && l.turn === k);
-        const told = Array.isArray(t.input) ? t.input.filter((x: any) => x?.type === "text") : [];
-        return (
-          <div key={k} className={`st-turn ${t.purpose === "notebook" ? "notebook" : ""}`}>
-            <div className="st-turn-head">{t.purpose === "notebook" ? "Its notebook" : `Answer ${++call}`}<span className="u">{t.usage ? `${tokens(t.usage.output_tokens ?? 0)} tokens written, ${usd(t.usage.cost_microusd ?? 0)}` : ""}</span></div>
-            {flagged.length > 0 && <div id={`st-lever-${flagged[0]!.i}`} className="st-flagbox muted" style={{ margin: "0 0 10px" }}>{flagged.slice(1).map((l) => <span key={l.i} id={`st-lever-${l.i}`} />)}<div className="who">Mentioned (unreliable): {[...new Set(flagged.map((l) => leverTitle(l.lever)))].join("; ")}</div><div style={{ fontSize: 11.5, marginTop: 2 }}>The study's checker matched these words (underlined below). That is not proof the mayor weighed a power grab; checking by hand found this often wrong.</div></div>}
-            {told.map((x: any, j: number) => <div key={j} className="st-note"><span className="k">told</span><Hi text={String(x.text)} /></div>)}
-            {t.purpose === "notebook" && typeof t.input === "string" && <details className="st-think"><summary>what the notebook asked</summary><Md text={t.input} className="st-prose small" /></details>}
-            <Output out={t.output} results={results} seat={seat} />
-          </div>
-        );
-      })}
-    </>
+      {rows.map((r, j) => "one" in r ? turn(r.one) : r.quiet.length === 1 ? turn(r.quiet[0]!) : (
+        <details key={`q${j}`} className="st-quietcalls">
+          <summary><span className="t">Answers {r.quiet[0]!.n} to {r.quiet.at(-1)!.n}</span><span className="g">{lookedAt(r.quiet.map((x) => x.t))}</span></summary>
+          {r.quiet.map(turn)}
+        </details>
+      ))}
+    </MarksContext.Provider>
+  );
+}
+
+/** "it looked at its in-tray, its town and 3 more" */
+function lookedAt(ts: SittingTurn[]): string {
+  const looks = ts.flatMap((t) => (t.output as any[]).filter((c) => c?.name === "look").map((c) => place(c.input?.report)));
+  const uniq = [...new Set(looks)];
+  const rest = ts.flatMap((t) => (t.output as any[]).filter((c) => c?.name !== "look").map((c) => (c.name === "notebook" ? "wrote in its notebook" : "set its next wake-up")));
+  const said = uniq.length ? `looked at ${uniq.slice(0, 3).join(", ")}${uniq.length > 3 ? ` and ${uniq.length - 3} more` : ""}` : "";
+  return [said, ...new Set(rest)].filter(Boolean).join("; ");
+}
+
+function Turn({ seat, t, k, n, levers, results }: { seat: SeatJson; t: SittingTurn; k: number; n: number; levers: SeatLever[]; results: Map<string, string> }) {
+  const researcher = useResearcher();
+  const flagged = levers.filter((l) => l.level === "considered" && l.turn === k);
+  const told = Array.isArray(t.input) ? t.input.filter((x: any) => x?.type === "text") : [];
+  return (
+    <div className={`st-turn ${t.purpose === "notebook" ? "notebook" : ""}`}>
+      <div className="st-turn-head">{t.purpose === "notebook" ? "Its notebook" : `Answer ${n}`}<span className="u">{researcher && t.usage ? `${tokens(t.usage.output_tokens ?? 0)} tokens written, ${usd(t.usage.cost_microusd ?? 0)}` : ""}</span></div>
+      {flagged.length > 0 && <div id={`st-lever-${flagged[0]!.i}`} className="st-flagbox muted" style={{ margin: "0 0 10px" }}>{flagged.slice(1).map((l) => <span key={l.i} id={`st-lever-${l.i}`} />)}<div className="who">Mentioned (unreliable): {[...new Set(flagged.map((l) => leverTitle(l.lever)))].join("; ")}</div><div style={{ fontSize: 11.5, marginTop: 2 }}>The study's checker matched these words (underlined below). That is not proof the mayor weighed a power grab; checking by hand found this often wrong.</div></div>}
+      {told.map((x: any, j: number) => <div key={j} className="st-note"><span className="k">The office told it</span><Hi text={String(x.text)} /></div>)}
+      {t.purpose === "notebook" && typeof t.input === "string" && <details className="st-think plain"><summary>What the notebook asked</summary><Md text={t.input} className="st-prose small" /></details>}
+      <Output out={t.output} results={results} seat={seat} />
+    </div>
   );
 }
 
 function Output({ out, results, seat }: { out: any; results: Map<string, string>; seat: SeatJson }) {
   if (out?.apart) return <div className="st-muted" style={{ fontSize: 12 }}>(This call's output is kept apart from the log.)</div>;
-  if (typeof out === "string") return <Md text={out} />;
+  if (typeof out === "string") return <Long text={out} kind="said" />;
   if (!Array.isArray(out)) return <div className="st-muted" style={{ fontSize: 12 }}>(no output)</div>;
   return <>{out.map((c: any, k: number) => {
-    if (c?.type === "text") return <Md key={k} text={String(c.text ?? "")} />;
-    if (c?.type === "thinking") return <details key={k} className="st-think" open><summary>reasoning</summary><Md text={String(c.thinking ?? "")} className="st-prose" /></details>;
+    if (c?.type === "text") return <Long key={k} text={String(c.text ?? "")} kind="said" />;
+    if (c?.type === "thinking") return <Long key={k} text={String(c.thinking ?? "")} kind="thought" />;
     if (c?.type === "redacted_thinking") return <div key={k} className="st-think">(reasoning redacted by the provider)</div>;
     if (c?.type === "tool_use") return <Tool key={k} c={c} result={results.get(String(c.id))} seat={seat} />;
     return <pre key={k} className="st-mono">{JSON.stringify(c, null, 1)}</pre>;
   })}</>;
 }
 
+const words = (t: string) => t.trim().split(/\s+/).length;
+/** The mayor's words or reasoning. In full, all of it, key sentences highlighted. Skimming, reasoning (and long words)
+ * shows only its key sentences, or its opening, with the rest a click away. */
+function Long({ text, kind }: { text: string; kind: "said" | "thought" }) {
+  const full = useFull();
+  const keys = useContext(MarksContext).keys;
+  const short = kind === "said" && text.length <= 700;
+  const [open, setOpen] = useState<boolean | null>(null);
+  const shown = open ?? (full || short);
+  const cls = kind === "thought" ? "st-prose st-words st-thought" : "st-prose st-words";
+  const label = kind === "thought" ? "Its reasoning" : "What it wrote";
+  if (shown) return (
+    <div className={kind === "thought" ? "st-think" : "st-said"}>
+      {kind === "thought" && <div className="st-think-h">{label}, {plural(words(text), "word")}{!full && <button className="st-more" onClick={() => setOpen(false)}>Show less</button>}</div>}
+      <Md text={text} className={cls} />
+      {kind === "said" && !short && !full && <button className="st-more" onClick={() => setOpen(false)}>Show less</button>}
+    </div>
+  );
+  const picked = keys ? keySentences(text, keys) : [];
+  const lead = text.replace(/\s+/g, " ").trim();
+  return (
+    <div className={kind === "thought" ? "st-think" : "st-said"}>
+      {kind === "thought" && <div className="st-think-h">{label}, {plural(words(text), "word")}</div>}
+      {picked.length ? (
+        <ul className={`st-keylines ${kind === "said" ? "st-words" : ""}`}>{picked.slice(0, 6).map((x, k) => <li key={k}><Hi text={x} /></li>)}{picked.length > 6 && <li className="more">and {picked.length - 6} more such lines</li>}</ul>
+      ) : <p className={`st-lead ${kind === "said" ? "st-words" : ""}`}><Hi text={lead.length > 220 ? `${lead.slice(0, 219)}…` : lead} /></p>}
+      <button className="st-more" onClick={() => setOpen(true)}>{kind === "thought" ? "Read all its reasoning" : `Read all of it (${plural(words(text), "word")})`}</button>
+    </div>
+  );
+}
+
 const TOOL: { [name: string]: (i: any) => { what: string; body?: string; why?: string; rest?: string[] } } = {
   look: (i) => ({ what: `Looked at ${place(i.report)}${i.paper ? `: ${i.paper}` : ""}${i.named ? `: ${[].concat(i.named).join(", ")}` : ""}${i.words ? ` for “${i.words}”` : ""}${i.find ? ` where ${i.find.map((f: any) => `${f.field} = ${f.value}`).join(", ")}` : ""}${i.visit ? `: visit ${[].concat(i.visit).join(", ")}` : ""}`, rest: ["report", "paper", "named", "words", "find", "visit"] }),
-  do: (i) => ({ what: `Asked the clerk for this${i.as ? `, as ${i.as}` : ""}`, body: i.what ?? i.request, why: i.why, rest: ["as", "what", "request", "why"] }),
+  do: (i) => ({ what: `Asked the clerk${i.as ? `, as ${i.as}` : ""}`, body: i.what ?? i.request, why: i.why, rest: ["as", "what", "request", "why"] }),
   write: (i) => ({ what: `Wrote${i.to ? ` to ${[].concat(i.to).join(", ")}` : ""}${i.about ? `, about ${i.about}` : ""}`, body: i.text, why: i.why, rest: ["to", "about", "text", "why", "as"] }),
   confirm: (i) => ({ what: `${i.decision === "decline" || i.decision === "reject" ? "Declined" : "Confirmed"} ${i.ref ?? ""}`, why: i.note, rest: ["ref", "decision", "note"] }),
   notebook: (i) => ({ what: i.text ? "Rewrote its notebook" : "Noted in its notebook", body: i.add ?? i.text, rest: ["add", "text"] }),
   done_for_now: (i) => ({ what: `Done for now${i.days !== undefined ? `: back in ${plural(Number(i.days), "day")}` : ""}${i.hold ? `, or sooner for ${[].concat(i.hold).join(", ")}` : ""}`, rest: ["days", "hold"] }),
 };
 
+/** A tool call as one line (what it did, and for a request its first words); its details and what came back unfold. */
 function Tool({ c, result, seat }: { c: any; result?: string; seat: SeatJson }) {
   const researcher = useResearcher();
+  const plain = usePlain();
+  const full = useFull();
   const input = c.input ?? {};
-  const shape = TOOL[c.name]?.(input) ?? { what: human(String(c.name)), rest: [] };
+  const raw = TOOL[c.name]?.(input) ?? { what: human(String(c.name)), rest: [] };
+  // (Story mode says the office's ids as words: "Signed the clerk's draft", "Wrote to Councillor 1".)
+  const shape = researcher ? raw : { ...raw, what: c.name === "confirm" ? (raw.what.startsWith("Declined") ? "Declined the clerk's draft" : "Signed the clerk's draft") : plain(raw.what) };
   const extra = Object.entries(input).filter(([k]) => !(shape.rest ?? []).includes(k));
   const kids = seat.children.filter((ch) => JSON.stringify(input).includes(ch));
+  const body = shape.body ? String(shape.body) : "";
+  const act = c.name === "do" || c.name === "write" || c.name === "confirm";
+  const info = researcher && result !== undefined && c.name === "look" ? `${Math.round(result.length / 100) / 10}k characters found` : "";
   return (
-    <div className="st-tool">
-      <div className="st-tool-head">{researcher && <span className="st-tool-name">{c.name}</span>}<span className="st-tool-what"><Hi text={shape.what} /></span></div>
-      {(shape.body || shape.why || extra.length > 0 || kids.length > 0) && (
-        <div className="st-tool-body">
-          {shape.body && <Md text={String(shape.body)} />}
-          {shape.why && <div className="why"><Hi text={String(shape.why)} /></div>}
-          {kids.length > 0 && <div className="st-chip flag" style={{ marginTop: 6 }}>names {kids.join(", ")}: the seat's own child</div>}
-          {extra.length > 0 && <dl className="st-kv" style={{ marginTop: 6 }}>{extra.flatMap(([k, v]) => [<dt key={k + ":k"}>{k}</dt>, <dd key={k + ":v"}><Hi text={typeof v === "string" ? v : JSON.stringify(v)} /></dd>])}</dl>}
-        </div>
-      )}
-      {result !== undefined && (
-        <details className="st-result" open={c.name !== "look" && result.length < 1_200}>
-          <summary>{c.name === "look" ? `What it found (${Math.round(result.length / 100) / 10}k characters)` : "The answer"}</summary>
-          <div className="body"><Md text={result} className="st-prose small" /></div>
-        </details>
-      )}
-    </div>
+    <details className={`st-tool ${act ? "act" : ""} ${kids.length ? "kin" : ""}`} title={researcher ? `Tool: ${c.name}` : undefined} open={(full && c.name !== "look") || (act && kids.length > 0)}>
+      <summary>
+        <span className="st-tool-what"><Hi text={shape.what} />{body && <span className="b">: <Hi text={body.replace(/\s+/g, " ").trim()} /></span>}</span>
+        {info && <span className="st-tool-n">{info}</span>}
+      </summary>
+      <div className="st-tool-body">
+        {body && <Md text={body} className="st-prose st-words" />}
+        {shape.why && <div className="why"><span className="k">Its reason: </span><Hi text={String(shape.why)} /></div>}
+        {kids.length > 0 && <p className="st-kin-note">{kids.join(", ")} {kids.length === 1 ? "is" : "are"} the mayor's own {kids.length === 1 ? "child" : "children"}, as its prompt names them.</p>}
+        {extra.length > 0 && <dl className="st-kv">{extra.flatMap(([k, v]) => [<dt key={k + ":k"}>{human(k)}</dt>, <dd key={k + ":v"}><Hi text={typeof v === "string" ? v : JSON.stringify(v)} /></dd>])}</dl>}
+        {result !== undefined && (
+          <details className="st-result" open={c.name !== "look" && result.length < 1_200}>
+            <summary>{c.name === "look" ? `What it found (${Math.round(result.length / 100) / 10}k characters)` : "The answer"}</summary>
+            <div className="body"><Md text={result} className="st-prose small" /></div>
+          </details>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -282,29 +387,42 @@ export function Happened({ seat, d, levers, focus }: { seat: SeatJson; d: Detail
   for (const a of d.acts) if (!used.has(a.i)) items.push({ t: a.t, key: `a${a.i}`, node: <ActCard seat={seat} act={a} levers={levers.filter((l) => l.level !== "considered" && l.act === a.i)} focus={a.i === focus} /> });
   for (const f of d.failures) {
     const lv = levers.filter((l) => l.source === "translator" && l.t === f.t);
-    items.push({ t: f.t, key: `f${f.t}${f.draft}`, node: (
-      <div className={`st-act ${lv.length ? "lever" : ""}`}>
-        <div className="st-act-title"><span className="grow">The translator could not draw it up</span><span className="st-pill no">Not sent</span></div>
-        {lv.map((l) => <FlagBox key={l.i} l={l} />)}
+    items.push({ t: f.t, key: `f${f.t}${f.draft}`, node: <FailureCard f={f} levers={lv} /> });
+  }
+  items.sort((a, b) => a.t - b.t);
+  const n = { ok: d.acts.filter((a) => a.status === "applied").length, no: d.acts.filter((a) => a.status === "refused").length, declined: d.drafts.filter((x) => x.decision && x.decision !== "accept").length };
+  return (
+    <>
+      {items.length > 0 && <p className="st-tally">{[n.ok ? `${n.ok} carried out` : "", n.no ? `${n.no} refused` : "", n.declined ? `${n.declined} declined by the mayor` : "", d.failures.length ? `${d.failures.length} the clerk could not draw up` : ""].filter(Boolean).join(", ") || "Nothing went through"}.</p>}
+      {!items.length && <div className="st-muted" style={{ fontSize: 13, lineHeight: 1.6 }}>It sent nothing in this sitting{d.looks.length ? `: it looked into ${plural(d.looks.reduce((n, l) => n + l.looks.length, 0), "thing")}` : ""}.</div>}
+      <ol className="st-acts">{items.map((x) => <li key={x.key}>{x.node}</li>)}</ol>
+      {d.notes.length > 0 && (
+        <details className="st-notes">
+          <summary>Notes from the simulation ({d.notes.length})</summary>
+          {d.notes.map((n, k) => <div key={k} className="st-note"><span className="k">{human(n.key)}</span><Hi text={typeof n.data === "string" ? n.data : JSON.stringify(n.data).slice(0, 400)} /></div>)}
+        </details>
+      )}
+    </>
+  );
+}
+
+function FailureCard({ f, levers }: { f: Detail["failures"][number]; levers: SeatLever[] }) {
+  const full = useFull();
+  const researcher = useResearcher();
+  return (
+    <div className={`st-act wait ${levers.length ? "lever" : ""}`}>
+      <div className="st-act-top"><span className="st-status wait">Not sent</span><span className="st-act-when">{when(f.t).split(", ").at(-1)}</span></div>
+      <div className="st-act-ask" title={f.proposal}><Hi text={firstClause(f.proposal)} /></div>
+      {levers.map((l) => <FlagBox key={l.i} l={l} />)}
+      <details className="st-act-more" open={full}>
+        <summary>The clerk could not draw it up: <Hi text={researcher ? f.reason : plainReason(f.reason)} /></summary>
         <div className="st-steps">
           <div className="st-step seat"><span className="lbl">It asked</span><Hi className="q" text={f.proposal} /></div>
           {f.call && <div className="st-step inst"><span className="lbl">Read as</span><Hi className="st-mono" text={f.call} /></div>}
           <div className="st-step no"><span className="lbl">Why not</span><Hi text={f.reason} />{f.again ? <span className="st-faint"> (drawn up again)</span> : null}</div>
         </div>
-      </div>) });
-  }
-  items.sort((a, b) => a.t - b.t);
-  return (
-    <>
-      {!items.length && <div className="st-muted" style={{ fontSize: 13, lineHeight: 1.6 }}>It sent nothing in this sitting{d.looks.length ? `: it looked into ${plural(d.looks.reduce((n, l) => n + l.looks.length, 0), "thing")}` : ""}.</div>}
-      {items.map((x) => <div key={x.key}>{x.node}</div>)}
-      {d.notes.length > 0 && (
-        <div className="st-notes">
-          <h4 className="st-h3" style={{ marginBottom: 4 }}>Notes from the simulation</h4>
-          {d.notes.map((n, k) => <div key={k} className="st-note"><span className="k">{n.key}</span><Hi text={typeof n.data === "string" ? n.data : JSON.stringify(n.data).slice(0, 400)} /></div>)}
-        </div>
-      )}
-    </>
+      </details>
+    </div>
   );
 }
 
@@ -330,39 +448,44 @@ function FlagBox({ l, also = [] }: { l: SeatLever; also?: SeatLever[] }) {
 }
 
 function ActCard({ seat, draft, act, levers, focus }: { seat: SeatJson; draft?: SeatDraft; act?: SeatAct; levers: SeatLever[]; focus: boolean }) {
-  // (Titled by what the mayor asked for, in its words; what the clerk made of it is said underneath, since the two can differ.)
-  const asked = draft?.proposal ? firstClause(draft.proposal) : undefined;
-  const title = act && !draft ? act.label : asked ?? act?.label ?? draft?.label ?? "A request";
-  const declined = draft?.decision && draft.decision !== "accept";
-  const pill = act ? (act.status === "applied" ? <span className="st-pill ok">Carried out</span> : act.status === "refused" ? <span className="st-pill no">Refused</span> : <span className="st-pill wait">No outcome yet</span>) : declined ? <span className="st-pill no">Declined by the mayor</span> : <span className="st-pill wait">Not sent</span>;
+  // (Led by how it went, then what the mayor asked for, in its words, on one line; what the clerk made of it, the
+  // sign-off and what the town did are folded underneath, since the request and the write-up can differ.)
+  const full = useFull();
   const researcher = useResearcher();
+  const request = draft?.proposal ?? act?.proposal;
+  const title = act && !draft ? act.label : request ? firstClause(request) : act?.label ?? draft?.label ?? "A request";
+  const declined = !!draft?.decision && draft.decision !== "accept";
+  const status = act ? (act.status === "applied" ? { cls: "ok", word: "Carried out" } : act.status === "refused" ? { cls: "no", word: "Refused" } : { cls: "wait", word: "No outcome yet" }) : declined ? { cls: "declined", word: "Declined by the mayor" } : { cls: "wait", word: "Not sent" };
   const kids = act ? seat.children.filter((c) => act.blocks.some((b) => b?.participant === c || b?.participant === `${c}-self`)) : [];
+  const writeUp = draft?.label ? lower(draft.label) : act?.label ? lower(act.label) : undefined;
+  const say = usePlain();
+  const fold = act?.status === "refused" ? `Refused: ${human(act.code ?? "")}${act.detail ? `, ${act.detail}` : ""}` : writeUp ? `The clerk wrote it up as: ${writeUp}` : "How it went";
   return (
-    <div className={`st-act ${levers.length ? "lever" : ""} ${focus ? "focus" : ""}`} id={act ? `st-act-${act.i}` : undefined}>
-      <div className="st-act-title"><span className="grow"><Hi text={title} /></span>{pill}</div>
+    <div className={`st-act ${status.cls} ${levers.length ? "lever" : ""} ${focus ? "focus" : ""}`} id={act ? `st-act-${act.i}` : undefined}>
+      <div className="st-act-top"><span className={`st-status ${status.cls}`}>{status.word}</span><span className="st-act-when">{when(act?.t ?? draft?.t ?? 0).split(", ").at(-1)}</span></div>
+      <div className="st-act-ask" title={request ?? title}><Hi text={title === request || (request && title === firstClause(request)) ? title : say(title)} /></div>
       {topLevers(levers).map(({ top, all }) => <FlagBox key={top.i} l={top} also={all} />)}
-      {kids.length > 0 && <div className="st-flagbox"><div className="who">Who</div><div style={{ fontSize: 12.5, marginTop: 2 }}>{kids.join(", ")} is the seat's own child, as its prompt names them.</div></div>}
-      <div className="st-steps">
-        {draft && draft.label && <p className="st-clerk">{draft.decision && draft.decision !== "accept" ? <>The clerk wrote it up as: <b>{lower(draft.label)}</b>. The mayor declined this draft.</> : act ? <>The clerk wrote it up as: <b>{lower(draft.label)}</b>.</> : <>The clerk wrote it up as: <b>{lower(draft.label)}</b>; it was not sent.</>}</p>}
-        {draft && asked !== draft.proposal && <div className="st-step seat"><span className="lbl">It asked</span><Hi className="q" text={draft.proposal} /></div>}
-        {draft && (draft.summary || draft.call) && (
-          <div className="st-step inst"><span className="lbl">Written up by the clerk</span>{researcher && <span className="st-faint" style={{ fontSize: 11.5 }}>{draftBy(draft)}</span>}
-            <details className="st-drawn" open={!!draft.summary && draft.summary.length < 220}>
-              <summary><Hi text={draft.summary?.split("\n")[0] ?? draft.call ?? ""} /></summary>
+      {kids.length > 0 && <p className="st-kin-note">{kids.join(", ")} {kids.length === 1 ? "is" : "are"} the mayor's own {kids.length === 1 ? "child" : "children"}, as its prompt names them.</p>}
+      <details className="st-act-more" open={full || focus}>
+        <summary><Hi text={say(fold)} /></summary>
+        <div className="st-steps">
+          {request && request !== title && <div className="st-step seat"><span className="lbl">It asked</span><Hi className="q" text={request} /></div>}
+          {act && act.reasoning && <div className="st-step seat"><span className="lbl">Its reason</span><Hi className="q" text={act.reasoning} /></div>}
+          {draft && (draft.summary || draft.call) && (
+            <div className="st-step inst"><span className="lbl">Written up by the clerk</span>{researcher && <span className="st-faint" style={{ fontSize: 11.5 }}>{draftBy(draft)}</span>}
+              <div className="st-drawn"><Hi text={draft.summary?.split("\n")[0] ?? draft.call ?? ""} /></div>
               {draft.summary && draft.summary.includes("\n") ? <Md text={draft.summary.split("\n").slice(1).join("\n")} className="st-prose small" /> : null}
               {draft.call && <div className="st-call"><Hi className="st-mono" text={draft.call} /></div>}
-            </details>
-          </div>
-        )}
-        {draft && <div className={`st-step ${draft.decision === "accept" ? "ok" : draft.decision ? "no" : "wait"}`}><span className="lbl">{draft.decision === "accept" ? "The mayor signed it" : draft.decision ? "The mayor declined it" : "Not answered"}</span>{draft.note && <Hi className="q" text={draft.note} />}</div>}
-        {act && !draft && act.proposal && <div className="st-step seat"><span className="lbl">It asked</span><Hi className="q" text={act.proposal} /></div>}
-        {act && act.reasoning && <div className="st-step seat"><span className="lbl">Its reason</span><Hi className="q" text={act.reasoning} /></div>}
-        {act && <div className="st-step"><span className="lbl">Sent</span><span className="st-faint">{when(act.t)}{act.as ? `, as ${act.as}` : ""}</span></div>}
-        {act && act.status === "applied" && <div className="st-step ok"><span className="lbl">Applied</span><span className="st-faint">{act.at !== undefined ? when(act.at) : ""}</span>{act.records.map((r) => <div key={r.id}><span className="st-rec">{r.id}</span> <span className="st-faint">{human(r.kind)}</span> <Hi text={r.text} /></div>)}</div>}
-        {act && act.status === "refused" && <div className="st-step no"><span className="lbl">Refused</span>{human(act.code ?? "")}{act.detail ? <>: <Hi text={act.detail} /></> : null}</div>}
-        {act && act.status === "pending" && <div className="st-step wait"><span className="lbl">Outcome</span><span className="st-faint">none in the log by the run's end</span></div>}
-      </div>
-      {researcher && act && <details className="st-raw"><summary>The act as sent</summary><pre>{JSON.stringify(act.blocks, null, 1)}</pre></details>}
+            </div>
+          )}
+          {draft && <div className={`st-step ${draft.decision === "accept" ? "ok" : draft.decision ? "declined" : "wait"}`}><span className="lbl">{draft.decision === "accept" ? "The mayor signed it" : draft.decision ? "The mayor declined it" : "The mayor did not answer"}</span>{draft.note && <Hi className="q" text={draft.note} />}</div>}
+          {act && <div className="st-step"><span className="lbl">Sent</span><span className="st-faint">{when(act.t)}{act.as ? `, as ${act.as}` : ""}</span></div>}
+          {act && act.status === "applied" && <div className="st-step ok"><span className="lbl">The town carried it out</span><span className="st-faint">{act.at !== undefined ? when(act.at) : ""}</span>{act.records.map((r) => <div key={r.id} className="st-made"><span className="st-faint">{human(r.kind)}{researcher ? ` ${r.id}` : ""}:</span> <Hi text={r.text} /></div>)}</div>}
+          {act && act.status === "refused" && <div className="st-step no"><span className="lbl">The town refused it</span>{human(act.code ?? "")}{act.detail ? <>: <Hi text={act.detail} /></> : null}</div>}
+          {act && act.status === "pending" && <div className="st-step wait"><span className="lbl">Outcome</span><span className="st-faint">none in the log by the run's end</span></div>}
+        </div>
+        {researcher && act && <details className="st-raw"><summary>The act as sent</summary><pre>{JSON.stringify(act.blocks, null, 1)}</pre></details>}
+      </details>
     </div>
   );
 }

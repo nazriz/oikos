@@ -3,14 +3,18 @@
 // kept in <views>/readings.json (by each log's size and mtime, and the reader's own source: a changed reader reads
 // again). Read-only toward the runs folder.
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statfsSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { Catalogue as CatalogueJson, ForkReading, IndexStatus, RunEntry } from "../shared/api";
 import type { FoldContext } from "../shared/fold";
-import { bundleDir, readyManifest, type Manifest } from "./bundle";
+import { bundleDir, bundlesBytes, readyManifest, type Manifest } from "./bundle";
 import type { IngestProgress } from "./ingest";
 import { Catalogue } from "./catalogue";
-import { ensureDir, type LensPaths } from "./paths";
+import { loadGrades } from "./grades";
+import { placeLockIn } from "../shared/lockin-place";
+import type { BlindGrade } from "../shared/api";
+import type { SeatJson } from "../folds/seat";
+import { checkPaths, ensureDir, type LensPaths } from "./paths";
 import type { ReadingInput } from "./reading";
 
 const DAY = 86_400;
@@ -34,7 +38,8 @@ export class Lens {
   readonly catalogue: Catalogue;
   private readings: ReadingsFile;
   private readonly queue: RunEntry[] = [];
-  /** Runs made ahead of being asked for (the showcase: forks whose seat tried a lever), after anything asked for. */
+  /** Runs made ahead of being asked for, after anything asked for: forks whose seat tried a lever first, then every
+   * experiment fork, newest first (`indexAll`), so a viewer opening a run almost never waits for it. */
   private readonly ahead: RunEntry[] = [];
   private readonly aheadKeys = new Set<string>();
   /** A bundle someone asked for is being made (the background reader waits for these, not for the ones made ahead). */
@@ -47,8 +52,13 @@ export class Lens {
   private stopped = false;
   private child?: { kill(): void };
   private maker?: { kill(): void };
+  /** The run being made ahead (not asked for): a viewer's open stops it and goes first; it is made again later. */
+  private makingAhead?: RunEntry;
+  private lastIndexAll = 0;
+  private readonly staleCache = new Map<string, { at: number; v: { dir: string; m: Manifest; stale: boolean } | undefined }>();
 
   constructor(readonly paths: LensPaths, readonly opts: { background?: boolean } = {}) {
+    checkPaths(paths);
     ensureDir(paths.views);
     this.catalogue = new Catalogue(paths);
     const f = join(paths.views, "readings.json");
@@ -67,13 +77,18 @@ export class Lens {
 
   async list(fresh = false): Promise<CatalogueJson> {
     const c = await this.catalogue.runs(fresh ? 0 : 15_000);
+    const grades = loadGrades(this.paths.runs);
     const runs = c.runs.map((r) => {
-      if (r.reading) return r;
+      const g = grades.get(r.key);
+      const e = g ? { ...r, grade: this.placed(r, g) } : r;
+      if (e.reading) return e;
       const x = this.readings[r.key];
-      return x && x.reading && x.bytes === r.bytes && x.mtimeMs === r.mtimeMs && x.v === readerVersion ? { ...r, reading: x.reading } : r;
+      return x && x.reading && x.bytes === r.bytes && x.mtimeMs === r.mtimeMs && x.v === readerVersion ? { ...e, reading: x.reading } : e;
     });
     if (this.opts.background !== false) {
-      for (const r of runs) if (r.reading?.levers?.tried && !r.indexed) this.makeAhead(r);
+      // (Runs the checker or the graders flagged are made first, so Moments has every one of them.)
+      for (const r of runs) if (!r.indexed && (r.reading?.levers?.tried || (r.grade?.lockIn && r.grade.lockIn.a + r.grade.lockIn.b > 0))) this.makeAhead(r);
+      this.indexAll(runs);
       this.startReading(runs);
     }
     return { runs, reading: this.reading, scannedAt: c.at, scanMs: c.ms };
@@ -97,17 +112,74 @@ export class Lens {
     return { runId: e.title, dir, arm: x.arm, seed: x.seed, ...(x.forkDay !== undefined ? { forkAt: x.forkDay * DAY } : {}), ...(spec ? { spec } : {}) };
   }
 
-  manifest(e: RunEntry): Manifest | undefined {
+  /** The bundle made of this log as it is now. */
+  private ownManifest(e: RunEntry): Manifest | undefined {
     return readyManifest(bundleDir(this.paths.views, e.key, e.bytes, e.mtimeMs));
   }
 
+  /** The bundle to serve: this log's own, else, for a log that has grown since (a run still going), the one made of it
+   * before, while this one is made. A viewer sees the run as of its last bundle at once rather than waiting a full
+   * reading at every look. The older bundle stays until the new one replaces it (bundle.ts clears it then). */
+  private served(e: RunEntry): { dir: string; m: Manifest; stale: boolean } | undefined {
+    const own = bundleDir(this.paths.views, e.key, e.bytes, e.mtimeMs);
+    const m = readyManifest(own);
+    if (m) return { dir: own, m, stale: false };
+    const hit = this.staleCache.get(e.key);
+    if (hit && Date.now() - hit.at < 10_000) return hit.v;
+    let v: { dir: string; m: Manifest; stale: boolean } | undefined;
+    const parent = join(this.paths.views, "bundles");
+    try {
+      for (const f of readdirSync(parent)) {
+        if (!f.startsWith(`${e.key}.`) || !/^[0-9a-f]{10}$/.test(f.slice(e.key.length + 1))) continue;
+        const sm = readyManifest(join(parent, f));
+        if (sm && sm.bytes <= e.bytes && (!v || sm.bytes > v.m.bytes)) v = { dir: join(parent, f), m: sm, stale: true };
+      }
+    } catch {}
+    this.staleCache.set(e.key, { at: Date.now(), v });
+    return v;
+  }
+
+  /** A grade with its lock-in act's time, where the run's bundle is made and the act is found in it (by the graders'
+   * words: src/shared/lockin-place.ts), so every page says the day the act happened. Kept per bundle. */
+  private lockAt = new Map<string, number | null>();
+  placed(e: RunEntry, g: BlindGrade): BlindGrade {
+    const q = g.lockInQuote;
+    if (!q) return g;
+    const dir = this.served(e)?.dir;
+    if (!dir) return g;
+    const k = `${dir}|${q.day}|${q.act}`;
+    let t = this.lockAt.get(k);
+    if (t === undefined) {
+      try {
+        const seat = JSON.parse(readFileSync(join(dir, "seat.json"), "utf8")) as SeatJson;
+        t = placeLockIn(seat, q)?.act.t ?? null;
+      } catch {
+        t = null;
+      }
+      this.lockAt.set(k, t);
+    }
+    return t === null ? g : { ...g, lockInQuote: { ...q, t } };
+  }
+
+  manifest(e: RunEntry): Manifest | undefined {
+    return this.served(e)?.m;
+  }
+
   bundlePath(e: RunEntry): string {
-    return bundleDir(this.paths.views, e.key, e.bytes, e.mtimeMs);
+    return this.served(e)?.dir ?? bundleDir(this.paths.views, e.key, e.bytes, e.mtimeMs);
   }
 
   statusOf(e: RunEntry): IndexStatus {
-    const m = this.manifest(e);
-    if (m) return { state: "ready", key: e.key, seconds: m.seconds, lines: m.lines };
+    const sv = this.served(e);
+    if (sv) {
+      // (An older bundle is served; the log's own is made behind it.)
+      if (sv.stale && !this.aheadKeys.has(e.key) && !this.status.has(e.key)) {
+        this.aheadKeys.add(e.key);
+        this.ahead.push(e);
+        void this.work();
+      }
+      return { state: "ready", key: e.key, seconds: sv.m.seconds, lines: sv.m.lines };
+    }
     return this.status.get(e.key) ?? { state: "queued", key: e.key, ahead: 0 };
   }
 
@@ -124,6 +196,16 @@ export class Lens {
       const cur = this.status.get(e.key);
       if (!cur || cur.state === "failed") {
         this.queue.push(e);
+        // (A run being made ahead gives way: the viewer's run starts now, that one goes back in line.)
+        if (this.makingAhead && this.makingAhead.key !== e.key) {
+          const back = this.makingAhead;
+          this.makingAhead = undefined;
+          this.maker?.kill();
+          this.aheadKeys.delete(back.key);
+          this.status.delete(back.key);
+          this.ahead.unshift(back);
+          this.aheadKeys.add(back.key);
+        }
         this.emit(e.key, { state: "queued", key: e.key, ahead: this.queue.length - 1 + (this.working ? 1 : 0) });
         void this.work();
       } else listen?.(cur);
@@ -147,7 +229,7 @@ export class Lens {
         const e = fromQueue ? this.queue.shift()! : this.ahead.shift()!;
         this.asked = fromQueue;
         if (!fromQueue && this.status.has(e.key)) continue; // (asked for meanwhile: it is in the queue)
-        if (this.manifest(e)) {
+        if (this.ownManifest(e)) {
           this.emit(e.key, this.statusOf(e));
           continue;
         }
@@ -158,7 +240,8 @@ export class Lens {
         try {
           this.emit(e.key, { state: "indexing", key: e.key, lines: 0, t: 0, fraction: 0, elapsed: 0, rate: 0 });
           const job = { views: this.paths.views, entry: e, path: this.catalogue.abs(e), ctx: this.ctxOf(e), ...(reading ? { reading } : {}) };
-          const m = await this.makeInChild(job, (p) => {
+          this.makingAhead = fromQueue ? undefined : e;
+          const m = await this.makeInChild(job, !fromQueue, (p) => {
             const elapsed = (performance.now() - started) / 1000;
             const fraction = endT ? Math.min(1, p.t / endT) : p.fileBytes && e.kind === "plain" ? Math.min(1, p.fileBytes / e.bytes) : null;
             this.emit(e.key, { state: "indexing", key: e.key, lines: p.lines, t: p.t, fraction, elapsed, rate: elapsed > 0 ? p.lines / elapsed : 0 });
@@ -166,7 +249,17 @@ export class Lens {
           if (m.reading) this.remember(e, m.reading);
           this.emit(e.key, { state: "ready", key: e.key, seconds: m.seconds, lines: m.lines });
         } catch (err) {
+          // (Stopped to let a viewer's run go first: it is back in line, not failed.)
+          if (!fromQueue && this.makingAhead !== e) {
+            if (!this.queue.includes(e)) this.status.delete(e.key);
+            continue;
+          }
           this.emit(e.key, { state: "failed", key: e.key, error: String((err as Error).message ?? err).slice(0, 2000) });
+        } finally {
+          if (this.makingAhead === e) this.makingAhead = undefined;
+          // (Done: a log that grows again joins the line again.)
+          if (!this.ahead.includes(e)) this.aheadKeys.delete(e.key);
+          this.staleCache.delete(e.key);
         }
       }
     } finally {
@@ -176,8 +269,10 @@ export class Lens {
   }
 
   /** makeBundle in a child process (src/server/make-one.ts): the server's own loop stays free to answer. */
-  private async makeInChild(job: object, onProgress: (p: IngestProgress) => void): Promise<Manifest> {
-    const p = Bun.spawn([process.execPath, join(here, "make-one.ts"), JSON.stringify(job)], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+  private async makeInChild(job: object, ahead: boolean, onProgress: (p: IngestProgress) => void): Promise<Manifest> {
+    // (Made ahead, at low priority: the machine's own work, and a viewer's, come first.)
+    const cmd = [process.execPath, join(here, "make-one.ts"), JSON.stringify(job)];
+    const p = Bun.spawn(ahead && existsSync("/usr/bin/nice") ? ["/usr/bin/nice", "-n", "15", ...cmd] : cmd, { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
     this.maker = p;
     let manifest: Manifest | undefined;
     const errP = new Response(p.stderr).text();
@@ -199,9 +294,37 @@ export class Lens {
     return manifest;
   }
 
+  /** Every experiment fork without a bundle, made ahead: the study's own (mayor) forks first, then newest first. Within
+   * a budget of disk (OIKOS_LENS_BUNDLES_GB, default 12 GB of bundles, and never with under 15 GB free): a bundle is
+   * about 20 MB, and this machine's disk is shared with the runs themselves. Plain runs are made only when opened.
+   * Looked at again with each listing (at most once a minute), so new runs join the line as they appear. */
+  private indexAll(runs: RunEntry[]) {
+    if (this.opts.background === false || Date.now() - this.lastIndexAll < 60_000) return;
+    this.lastIndexAll = Date.now();
+    const budget = Number(process.env.OIKOS_LENS_BUNDLES_GB ?? 12) * 1e9;
+    let used = bundlesBytes(this.paths.views);
+    let free = Infinity;
+    try {
+      const f = statfsSync(this.paths.views);
+      free = f.bavail * f.bsize;
+    } catch {}
+    // (Not a log still being written: its bundle would be stale within the minute, and made again and again.)
+    const todo = runs.filter((r) => r.kind === "fork" && !r.indexed && !this.aheadKeys.has(r.key) && !this.status.has(r.key) && Date.now() - r.mtimeMs > 5 * 60_000);
+    const mayor = (r: RunEntry) => (r.experiment?.post === "mayor" ? 1 : 0);
+    todo.sort((a, b) => mayor(b) - mayor(a) || b.mtimeMs - a.mtimeMs);
+    for (const r of todo) {
+      // (A bundle is about a fifth of its log's size: room for this one, or stop.)
+      const need = r.bytes / 5;
+      if (used + need > budget || free - need < 15e9) break;
+      used += need;
+      free -= need;
+      this.makeAhead(r);
+    }
+  }
+
   /** Make this run's bundle ahead of being asked for, when nothing asked for is waiting. */
   private makeAhead(e: RunEntry) {
-    if (this.opts.background === false || this.aheadKeys.has(e.key) || this.manifest(e)) return;
+    if (this.opts.background === false || this.aheadKeys.has(e.key) || this.ownManifest(e)) return;
     this.aheadKeys.add(e.key);
     this.ahead.push(e);
     void this.work();
@@ -237,7 +360,9 @@ export class Lens {
       if (this.stopped) return;
       this.reading = { ...this.reading, current: r.key };
       try {
-        const p = Bun.spawn([process.execPath, join(here, "read-one.ts"), this.catalogue.abs(r), JSON.stringify(this.readingInput(r))], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+        // (At low priority, like the bundles made ahead: a viewer's request comes first.)
+        const cmd = [process.execPath, join(here, "read-one.ts"), this.catalogue.abs(r), JSON.stringify(this.readingInput(r))];
+        const p = Bun.spawn(existsSync("/usr/bin/nice") ? ["/usr/bin/nice", "-n", "15", ...cmd] : cmd, { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
         children.add(p);
         const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
         children.delete(p);

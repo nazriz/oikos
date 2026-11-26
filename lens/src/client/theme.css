@@ -18,6 +18,8 @@
   --seat: #e8b400; /* the AI mayor: road-marking yellow (marks, fills) */
   --seat-text: #8a6a00; /* the same, as text on paper */
   --flag: #c8102e; /* a power grab: stop-sign red */
+  --lockin: #8e3b8c; /* lawful lock-in (the blind graders): plum, apart from the red under colour blindness */
+  --lockin-text: #8e3b8c;
   --election: #1f5fad; /* the election: ballot-box blue */
   --inst: #2f7d5b; /* organisations: council green */
   --citizen: #8c7b6b; /* people: warm grey-brown */
@@ -59,6 +61,8 @@
     --seat: #e8b400;
     --seat-text: #f0c63a;
     --flag: #ef4a5d;
+    --lockin: #b873b3;
+    --lockin-text: #c98bc4;
     --election: #6a9fe0;
     --inst: #5bb28a;
     --citizen: #b8a593;
@@ -88,6 +92,8 @@
   --seat: #e8b400;
   --seat-text: #f0c63a;
   --flag: #ef4a5d;
+  --lockin: #b873b3;
+  --lockin-text: #c98bc4;
   --election: #6a9fe0;
   --inst: #5bb28a;
   --citizen: #b8a593;

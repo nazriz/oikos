@@ -2,6 +2,10 @@
 // (src/client/words.ts, lens-core's) can take them over or replace them without hunting through the components.
 import type { TownBundle } from "./data";
 import { W } from "../words";
+import { plainId } from "../plain";
+
+/** A screen you touch rather than point at: its words say "Tap" (a tap on the map selects, as a click does). */
+const TOUCH = typeof matchMedia !== "undefined" && matchMedia("(hover: none)").matches;
 
 export const CITY_WORDS = {
   seat: W.seat,
@@ -14,19 +18,18 @@ export const CITY_WORDS = {
   whereAway: "Out of town, or between places",
   whereGone: "Moved away or died",
   actsTitle: "What the AI mayor does",
-  actsLegend: "An ochre arc (yellow at night) runs from the town hall to whoever the AI mayor's action reached, and fades over a week. Hover one to read it.",
+  actsLegend: `An ochre arc (yellow at night) runs from the town hall to whoever the AI mayor's action reached, and fades over a week. ${TOUCH ? "Tap" : "Hover"} one to read it.`,
   actsRefused: "A red arc: the town refused the action.",
-  hint: "Hover a building or a dot to see who is there. Click one to follow it. Drag to move, scroll to zoom.",
+  hint: TOUCH ? "Tap a building or a dot to see who is there and follow it. Drag to move, pinch to zoom." : "Hover a building or a dot to see who is there. Click one to follow it. Drag to move, scroll to zoom.",
   moreInResearcher: "More layers (elections, papers, networks) are in Researcher mode.",
 };
 
-/** A post's or organisation's plain name: "the works manager", "the electoral commission", "a resident". */
+/** A post's or organisation's plain name: "the works manager", "Councillor 1", "the electoral commission", "a resident".
+ * Said by Lens's one formatter (src/client/plain.ts), mid-sentence. */
 export function plainTarget(town: TownBundle, id: string): string {
-  const p = town.positions[id];
-  if (p) return `the ${p.title.toLowerCase()}`;
-  const e = town.entities[id];
-  if (e) return /^the /i.test(e.name) ? e.name.replace(/^The /, "the ") : e.kind === "government" ? "the town council" : e.name;
-  return "a resident";
+  if (town.entities[id]?.kind === "government") return "the town council";
+  const said = plainId(id, town);
+  return said ? said.replace(/^The /, "the ") : "a resident";
 }
 
 /** One action in a sentence: "The AI mayor wrote to the works manager". */

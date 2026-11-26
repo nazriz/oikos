@@ -150,6 +150,10 @@
   line-height: 1.5;
   color: var(--text-2);
 }
+.tour-wait {
+  font-size: 13.5px;
+  color: var(--muted);
+}
 .tour-foot {
   display: flex;
   align-items: center;

@@ -14,6 +14,7 @@ import { dayNo, dayOf } from "../format";
 import { parseHash, parseSel, selToken } from "../router";
 import { useLens, type Selection } from "../state";
 import { leverTitle, modelName } from "../words";
+import { isSeatPerson } from "../people";
 
 export type Sel = NonNullable<Selection>;
 const MOMENT = new Set(["sitting", "lever", "act"]);
@@ -204,6 +205,7 @@ export function useNames(run: string | null) {
         if (!sel) return "";
         switch (sel.kind) {
           case "person": {
+            if (isSeatPerson(city, sel.id)) return `The AI mayor (${sel.id.replace(/-self$/, "")})`;
             const q = city?.pById.get(sel.id.replace(/-self$/, ""));
             const n = q !== undefined ? city!.people.people[q]![1] : "";
             // (Towns without names give each person their id as a name.)

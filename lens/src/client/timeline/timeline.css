@@ -186,7 +186,8 @@
     gap: 10px;
     padding: 0 8px;
   }
-  .tl-speeds button:nth-child(1),
+  /* (Researcher's five speeds lose the slowest and fastest; Story's three, Slow, Normal, Fast, all stay.) */
+  .tl-speeds button:nth-child(1):nth-last-child(5),
   .tl-speeds button:nth-child(5) {
     display: none;
   }
@@ -223,7 +224,16 @@
   opacity: 0.4;
   cursor: default;
 }
+.tl-short {
+  display: none;
+}
 @media (max-width: 720px) {
+  .tl-moments .tl-long {
+    display: none;
+  }
+  .tl-moments .tl-short {
+    display: inline;
+  }
   .tl-moments button {
     padding: 0 7px;
     font-size: 12px;

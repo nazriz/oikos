@@ -3,9 +3,10 @@
 // beside it. Debrief annotations are dropped before any fold sees them (VISION 15). The bulk lines (observe commands,
 // observation events, advance_to_news), about half of a fork, are counted and not parsed unless a fold asks for them.
 //
-// Speed (docs/decisions.md, 2026-11-26): over a 4.6 M-line fork the kernel's export takes about 7 s and parsing the
-// JSON about 7 s; the folds together about 4 s. Worker threads per group of folds were tried and dropped: each group
-// must split and parse the lines again, which on a loaded machine cost more than it saved (56 s against 45, 15 GB).
+// Speed (docs/decisions.md, 2026-11-26, "Lens: fast"): over a 4.6 M-line fork the export and splitting the lines take
+// 1.4 s, JSON.parse about 3 s (most of the rest), the folds about 1 s. Worker threads per group of folds were tried and
+// dropped: each group must split and parse the lines again, which on a loaded machine cost more than it saved (56 s
+// against 45, 15 GB); two processes per group, each with its own export, were no faster either (8.3 s against 7.5).
 import type { ForkReading } from "../shared/api";
 import type { Fold, FoldContext, LogLine } from "../shared/fold";
 import { metaFold, type IngestStats } from "../folds/meta";
@@ -190,7 +191,9 @@ export async function ingest(path: string, o: IngestOptions): Promise<IngestResu
   const run = new Runner(folds, o.ctx, stats, study);
   const progress: Progress = { fileBytes: 0 };
   let lastReport = 0;
-  for await (const batch of lineBatches(path, progress)) {
+  // (Lean: the folds read neither the hash chain nor the bulk lines' bodies. A reading of our own, below, may want an
+  // observation naming the seat, so then the lines come whole.)
+  for await (const batch of lineBatches(path, progress, { lean: !study })) {
     if (o.signal?.aborted) throw new Error("aborted");
     for (const raw of batch) run.line(raw);
     const now = performance.now();

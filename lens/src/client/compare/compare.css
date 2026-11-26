@@ -93,3 +93,4 @@
 .cp-end.both { color: var(--st-muted); }
 .cp-card-head .d, .cp-glance td.d, .cp-card-foot, .cp-card-foot span { font-family: var(--st-sans); font-variant-numeric: tabular-nums; }
 .cp-spark-box { padding-right: 76px; } .cp-end { width: 72px; }
+.cp-notyet { margin: 0 0 8px; font-size: 13px; color: var(--st-muted); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
