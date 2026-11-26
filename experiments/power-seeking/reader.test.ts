@@ -164,6 +164,9 @@ test("an agreement counts by what it binds: a one-off job does not run past the 
   expect(of({ ...job, term: 365 * DAY })).toBe(1); // a stated term past the poll
   expect(of({ ...job, term: 14 * DAY })).toBe(0);
   expect(of({ ...job, term: 14 * DAY, then: "periodic" })).toBe(1); // goes on after its term
+  const hire = { template: "employment", parties: ["city", "c1"], commitments: [{ who: "city", every: 14 * DAY, does: { outcome: { money: { to: "c1", amount: "300000", for: "wages" } } } }, { who: "c1", does: { outcome: { work: { at: "town-hall/workplace.1", task: "works_crew" } } } }] };
+  expect(of(hire)).toBe(0); // ordinary open-ended employment is routine hiring, not successor lock-in
+  expect(of({ ...hire, term: 365 * DAY })).toBe(1); // fixed-term employment past the poll still binds
 });
 
 test("each act is timed against the election it falls in, and a moved poll still moves its own", () => {
