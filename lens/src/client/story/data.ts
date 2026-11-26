@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { SeatJson, SittingDetail } from "../../folds/seat";
 import { outcomeOf, type Outcome } from "../../shared/outcome";
+import { relabel } from "../../folds/act-label";
 
 export type { SeatAct, SeatDraft, SeatJson, SeatLever, SeatRecord, SittingDetail, SittingSummary, SittingTurn } from "../../folds/seat";
 
@@ -27,6 +28,7 @@ export function loadSeat(run: string): Promise<SeatJson> {
     const url = `/api/run/${encodeURIComponent(run)}/seat`;
     // (409: the run has no current bundle yet; it is made on request, then read.)
     p = fetch(url).then(async (r) => (r.status === 409 ? (await indexed(run), get<SeatJson>(url)) : r.ok ? (r.json() as Promise<SeatJson>) : Promise.reject(new Error(`${r.status} ${url}`))));
+    p = p.then((s) => (s && Array.isArray(s.acts) ? relabel(s) : s));
     seatCache.set(run, p); p.catch(() => seatCache.delete(run));
   }
   return p;

@@ -110,7 +110,7 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
           <div className="mo-facet"><span className="lbl">Order</span>
             {(["poll", "day", "model"] as const).map((k) => <button key={k} className={`st-btn ${sort === k ? "on" : ""}`} onClick={() => setSort(k)}>{k === "poll" ? "Nearest election day" : k === "day" ? "By day" : "By model"}</button>)}
             <span style={{ flex: 1 }} />
-            <button className={`st-btn ${weak ? "on" : ""}`} onClick={() => setWeak(!weak)} title="The checker matched words only; often wrong">{weak ? "Hide" : "Show"} mentions (unreliable)</button>
+            <button className={`st-btn ${weak ? "on" : ""}`} onClick={() => setWeak(!weak)} title="Where the idea only came up in its thinking: the checker matched words, which is often wrong">{weak ? "Hide" : "Also show"} ideas it only mentioned</button>
           </div>
         </div>}
       </div>
@@ -154,7 +154,7 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
   const [copied, setCopied] = useState(false);
   return (
     <article className={`mo-card ${weak ? "weak" : ""} ${l.level} ${(l.tier ?? 2) === 1 ? "favour" : ""}`}>
-      <div className="mo-card-top"><span className="mo-lever">{(l.tier ?? 2) === 1 ? "Election-season favour: " : ""}{(l.tier ?? 2) === 1 ? leverTitle(l.lever) : leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`}>{l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}</span></div>
+      <div className="mo-card-top"><span className="mo-lever">{(l.tier ?? 2) === 1 ? "Election-season favour: " : ""}{(l.tier ?? 2) === 1 ? leverTitle(l.lever) : leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`}>{l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}{m.redrafted ? " (after redrafting)" : ""}</span></div>
       <blockquote className={`mo-quote ${more ? "open" : ""}`} onClick={() => setMore(!more)}>{m.words}</blockquote>
       {m.note && <div className="mo-sub"><span className="k">on signing</span>“{m.note}”</div>}
       {m.reason && <div className="mo-sub"><span className="k">its reason</span>“{m.reason}”</div>}

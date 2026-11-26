@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLens } from "../state";
 import { useCity, useDark } from "./CityView";
 import { describePerson } from "../people";
+import { useMode } from "../mode";
 import type { CityData, TownBundle } from "./data";
 import { fmtDay } from "./Panel";
 import { actSentence, CITY_WORDS } from "./words";
@@ -51,6 +52,8 @@ function Chart({ city }: { city: CityData }) {
   const person = (participant: string | null) => (participant ? P.bodies[participant] ?? (participant.endsWith("-self") ? participant.slice(0, -5) : `system:${participant}`) : null);
   const seatPeople = new Set(Object.values(P.seats));
   const seatOf = (pp: string | null) => !!pp && seatPeople.has(pp);
+  // (Story mode names a holder as a reader would: "a resident (c0066, 52, works at Town hall)"; Researcher, by id.)
+  const story = useMode((m) => m.mode !== "researcher");
   const name = (pp: string) => (pp.startsWith("system:") ? "an automated system" : seatOf(pp) ? `the AI mayor (${pp})` : P.names[pp] ?? pp);
 
   // Each post's holders over the run: [from, to, holder participant | null, by].
@@ -165,7 +168,7 @@ function Chart({ city }: { city: CityData }) {
                 <div key={p.id} className="pw-post">
                   <div className="pw-row">
                     <span className="pw-post-title" title={p.id}>{p.title}</span>
-                    {pp ? <button data-holder={pp} {...(pp.startsWith("system:") ? {} : { "data-peek": `person:${pp}` })} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => { if (!pp.startsWith("system:")) select({ kind: "person", id: pp }); }} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">, holds {now.holders.get(pp)!.length} posts</span>}{!isSeat && describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
+                    {pp ? <button data-holder={pp} {...(pp.startsWith("system:") ? {} : { "data-peek": `person:${pp}` })} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => { if (!pp.startsWith("system:")) select({ kind: "person", id: pp }); }} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{story && !isSeat && !pp.startsWith("system:") ? <>a resident <span className="pw-desc-inline">({[name(pp), describePerson(city, pp, t)].filter(Boolean).join(", ")})</span></> : name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">, holds {now.holders.get(pp)!.length} posts</span>}{!story && !isSeat && describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
                   </div>
                   {kin && <div className="pw-kin">{seatKinLabel(pp!)}</div>}
                   {!kin && focus && pp && focus !== pp && relation(P, pp, focus) && <div className="pw-kin muted">{relation(P, pp, focus)} {name(focus)}</div>}
@@ -213,6 +216,7 @@ const POWER_CSS = `
 .lens-city .pw-chip.vacant { color: var(--lc-muted); font-weight: 400; font-style: italic; cursor: default; }
 .lens-city .pw-desc { display: block; font-weight: 400; color: var(--lc-muted); font-size: 11.5px; text-align: right; }
 .lens-city .pw-n { margin-left: 5px; color: var(--lc-muted); font-size: 11.5px; font-weight: 400; }
+.lens-city .pw-desc-inline { font-weight: 400; color: var(--lc-muted); }
 .lens-city .pw-by { color: var(--lc-muted); font-size: 12px; margin-top: 2px; }
 .lens-city .pw-kin { color: var(--lc-flag); font-size: 12px; font-weight: 700; margin-top: 2px; text-align: right; }
 .lens-city .pw-kin.muted { color: var(--lc-text); font-weight: 400; }

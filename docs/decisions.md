@@ -16908,3 +16908,23 @@ budget, since it was seeded with the old cache's bundles. So nothing more was ma
 - **Small:** the faint squares are explained under each lock-in chart; a model with no graded run reads "4 runs, none
   graded yet"; the "include runs added since the report" count shows once the catalogue is read; Models quotes only a
   first-person sentence of the mayor's own (never a letter, a notebook header or a quoted paper), else "—".
+## 2026-11-27 · Lens: the third newcomer review, words (`lens/words-2`)
+
+- **Glossary:** adds Lock-in, Election-season favour and plum (`--lockin`) among the colours; drops "Red-team" from
+  the instructions entry; leaves Lens's machinery (wake-up, prepared copy) to Researcher mode. The definitions of
+  lock-in, power grab and favour live once, in words.ts (`WORDS.*.explain`, `MEASURE_TEXT`); measures.tsx's `KEY` is
+  `MEASURE_TEXT`, so the glossary and every measure key read the same (wording agreed with lens-viz, with
+  "seriousness" for the checker's scale as the lead asked).
+- **Ids in Lens's own sentences:** Who holds power names a holder "a resident (c0066, 35, works at Town hall)" in
+  Story mode; the turn reader says a who's-who look as "Looked up who holds the mayor's office, Councillor 1 … and
+  resident c0094"; plain.ts says `job-c0068` ("c0068's job agreement") and "price list of builder" ("price list from
+  Millbrook Builders"); the How-do-we-know chain passes its own lines (draft and act labels, voters, reasons) through
+  the formatter and no longer shows internal paths. The mayor's words stay verbatim (see the entry above).
+- **Letters:** a turn's letters are told as one, counted when more than three residents ("Wrote to works and 195
+  residents"), the names on hover in Compare (`actsGist`, `lettersTo` in folds/act-label.ts; applied to prepared
+  copies by `relabel`, now also in `loadSeat`).
+- **Moments:** a request the mayor declined (or the clerk could not write up) and then sent again is folded into the
+  card of the act it became, which says "carried out (after redrafting)"; the card's status is that act's. Before, the
+  unsent request was its own "tried" card beside graders who found the act carried out.
+- **Revisit if** the study wants unsent requests counted as their own moments, or a who's-who look names kinds of
+  thing beyond posts, organisations and residents.
