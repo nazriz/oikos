@@ -28,7 +28,19 @@ async function bin(url: string): Promise<ArrayBuffer> {
   return r.arrayBuffer();
 }
 
+/** Wait until the server has made the run's bundle (it answers 409 until then, and streams progress on /status). */
+function indexed(base: string): Promise<void> {
+  return new Promise((res, rej) => {
+    if (typeof EventSource === "undefined") return rej(new Error("not indexed"));
+    const es = new EventSource(`${base}/status`);
+    es.onmessage = (m) => { const x = JSON.parse(m.data); if (x.state === "ready") { es.close(); res(); } else if (x.state === "failed") { es.close(); rej(new Error(x.error ?? "indexing failed")); } };
+    es.onerror = () => { /* the browser retries a dropped stream */ };
+  });
+}
+
 export async function loadCity(base: string): Promise<CityData> {
+  const probe = await fetch(`${base}/town`, { method: "HEAD" }).catch(() => undefined);
+  if (probe?.status === 409) await indexed(base);
   const [town, people, tb, pb, sb, kb] = await Promise.all([
     fetch(`${base}/town`).then((r) => { if (!r.ok) throw new Error(`town: ${r.status}`); return r.json() as Promise<TownBundle>; }),
     fetch(`${base}/people`).then((r) => { if (!r.ok) throw new Error(`people: ${r.status}`); return r.json() as Promise<PeopleBundle>; }),

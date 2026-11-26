@@ -21,8 +21,10 @@ export interface Overlays {
   /** Days back from now that papers are shown (0: everything so far). */
   paperDays: number;
   paperMode: "pins" | "heat";
+  /** Two towns: show where this arm differs from the other. */
+  diff: boolean;
 }
-export const DEFAULT_OVERLAYS: Overlays = { people: true, acts: true, wildlife: false, networks: false, labels: true, colour: "kind", election: false, papers: false, paperGroups: PAPER_GROUPS.map((_, i) => i).filter((i) => !["money", "building"].includes(PAPER_GROUPS[i]!.id)), paperDays: 7, paperMode: "pins" };
+export const DEFAULT_OVERLAYS: Overlays = { people: true, acts: true, wildlife: false, networks: false, labels: true, colour: "kind", election: false, papers: false, paperGroups: PAPER_GROUPS.map((_, i) => i).filter((i) => !["money", "building"].includes(PAPER_GROUPS[i]!.id)), paperDays: 7, paperMode: "pins", diff: true };
 
 export interface HoverInfo { x: number; y: number; layer: string; object: any; index: number }
 
@@ -50,8 +52,8 @@ export function Clock({ t, sky, town }: { t: number; sky: Sky; town: TownBundle 
 
 const CAT_ORDER = ["residential", "commercial", "industrial", "civic", "education", "health", "utility", "green"];
 
-export function Panel({ open0, overlays, setOverlays, counts, kinds, city, t, arcs, onHome, ev, candCol, papersShown, onTour }: {
-  open0: boolean; overlays: Overlays; setOverlays: (o: Overlays) => void; counts: Record<string, number>; kinds: string[]; city: CityData; t: number; arcs: number; onHome: () => void;
+export function Panel({ onPresent, onRecord, twin, open0, overlays, setOverlays, counts, kinds, city, t, arcs, onHome, ev, candCol, papersShown, onTour }: {
+  onPresent?: () => void; onRecord?: () => void; twin?: boolean; open0: boolean; overlays: Overlays; setOverlays: (o: Overlays) => void; counts: Record<string, number>; kinds: string[]; city: CityData; t: number; arcs: number; onHome: () => void;
   ev?: ElectionView; candCol: Record<string, string>; papersShown: number[]; onTour?: () => void;
 }) {
   const [open, setOpen] = useState(() => open0 && (typeof window === "undefined" || window.innerWidth > 640));
@@ -66,7 +68,9 @@ export function Panel({ open0, overlays, setOverlays, counts, kinds, city, t, ar
       <div className="lc-panel-head">
         <button className="lc-ghost" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Layers" : "Layers"}<span className="lc-chev">{open ? "▾" : "▸"}</span></button>
         {onTour && <button className="lc-ghost" onClick={onTour} title="Play the run's key moments">Tour</button>}
-        <button className="lc-ghost" onClick={onHome} title="Frame the town">Frame town</button>
+        {open && onPresent && <button className="lc-ghost" onClick={onPresent} title="Full screen, a caption bar, the camera on its own (Esc to leave)">Present</button>}
+        {open && onRecord && <button className="lc-ghost" onClick={onRecord} title="Record the tour as a video (it downloads at the end)">Record</button>}
+        <button className="lc-ghost" onClick={onHome} title="Frame the town"><span className="lc-long">Frame town</span><span className="lc-short">Frame</span></button>
       </div>
       {open && (
         <div className="lc-panel-body">
@@ -79,12 +83,14 @@ export function Panel({ open0, overlays, setOverlays, counts, kinds, city, t, ar
               {gone > 0 && <div className="lc-row muted"><span className="lc-sw" /><span>Left or died</span><span className="lc-num">{n0(gone)}</span></div>}
             </div>
           </Section>
-          <Section on={overlays.acts} toggle={() => tog("acts")} title="The seat's acts" note="Arcs from the town hall to what each act reached, over the last 7 days; the arc fades with age. Rose: refused.">
+          {city.town.seats.length > 0 && (
+            <Section on={overlays.acts} toggle={() => tog("acts")} title="The seat's acts" note="Arcs from the town hall to what each act reached, over the last 7 days; the arc fades with age. Rose: refused.">
             <div className="lc-legend">
               <div className="lc-row"><span className="lc-sw line" style={{ background: `linear-gradient(90deg, ${PAL.seat}, #ffe2a6)` }} /><span>Acts in the last 7 days</span><span className="lc-num">{recentActs}</span></div>
               <div className="lc-row muted"><span className="lc-sw" /><span>Places reached</span><span className="lc-num">{arcs}</span></div>
             </div>
           </Section>
+          )}
           <div className="lc-section">
             <div className="lc-sec-head"><span className="lc-sec-title">Buildings</span>
               <div className="lc-seg">
@@ -103,6 +109,7 @@ export function Panel({ open0, overlays, setOverlays, counts, kinds, city, t, ar
               </div>
             )}
           </div>
+          {twin && <Section on={overlays.diff} toggle={() => tog("diff")} title="Difference from the other arm" note="Violet arcs: a person is somewhere else in the other arm right now (from there to here). Filled marks: papers of the last 7 days only in this arm; rings: only in the other (matched by kind, place and day)."><div /></Section>}
           {city.town.elections.length > 0 && (
             <Section on={overlays.election} toggle={() => tog("election")} title="The election" note={ev ? electionNote(ev) : "No election in this run."}>
               {ev && <ElectionLegend ev={ev} col={candCol} />}

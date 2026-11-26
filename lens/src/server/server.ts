@@ -6,6 +6,7 @@ import index from "../client/index.html";
 import type { IndexStatus } from "../shared/api";
 import { lensPaths, type LensPaths } from "./paths";
 import { Lens } from "./service";
+import { momentsResponse } from "./moments";
 
 export interface ServeOptions {
   runs?: string;
@@ -52,6 +53,7 @@ export function startServer(o: ServeOptions = {}) {
         if ((req.headers.get("accept-encoding") ?? "").includes("gzip")) return new Response(Bun.gzipSync(Buffer.from(body)), { headers: { ...headers, "content-encoding": "gzip" } });
         return new Response(body, { headers });
       },
+      "/api/moments": (req) => momentsResponse(lens, req),
       "/api/run/:key": async (req) => {
         const e = await lens.catalogue.find(req.params.key);
         if (!e) return notFound("run");

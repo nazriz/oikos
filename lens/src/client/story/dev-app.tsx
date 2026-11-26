@@ -14,6 +14,7 @@ import { ComparePage } from "../compare/ComparePage";
 import { Moments } from "./Moments";
 import { SittingDiff } from "./SittingDiff";
 import { Findings } from "./Findings";
+import { RunDigest } from "./RunDigest";
 
 const css = `
 html, body, #root { margin: 0; height: 100%; }
@@ -136,4 +137,4 @@ function Page({ title, children }: { title: string; children: React.ReactNode })
   return <div style={{ display: "grid", gridTemplateRows: "44px 1fr", height: "100vh" }}><style>{css}</style><div className="dv-top"><b>Lens</b><span className="st-faint" style={{ fontSize: 12 }}>{title} · dev harness</span></div><div style={{ minHeight: 0 }}>{children}</div></div>;
 }
 const q0 = new URLSearchParams(location.search), pair = q0.get("compare"), diff = q0.get("diff");
-createRoot(document.getElementById("root")!).render(pair ? <CompareApp pair={pair} /> : diff ? <DiffApp keys={diff.split(",")} {...(q0.get("day") ? { day: Number(q0.get("day")) } : {})} /> : q0.has("moments") ? <MomentsApp /> : q0.has("findings") ? <Page title="findings"><Findings /></Page> : <App />);
+createRoot(document.getElementById("root")!).render(pair ? <CompareApp pair={pair} /> : diff ? <DiffApp keys={diff.split(",")} {...(q0.get("day") ? { day: Number(q0.get("day")) } : {})} /> : q0.has("moments") ? <MomentsApp /> : q0.has("findings") ? <Page title="findings"><Findings /></Page> : q0.get("digest") ? <Page title="digest"><RunDigest run={q0.get("digest")!} /></Page> : <App />);

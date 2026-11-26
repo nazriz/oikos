@@ -11,6 +11,9 @@ import type { DailyJson } from "../../folds/daily";
 import { Multiples, type Panel } from "./Multiples";
 import "../story/story.css";
 import "./compare.css";
+import { TwoTowns } from "../city/TwoTowns";
+import { useMeta } from "../api";
+import { views } from "../views";
 
 const DAY = 86_400;
 const dailyCache = new Map<string, Promise<DailyJson>>();
@@ -41,6 +44,7 @@ export function ComparePage({ a, b }: { a: string; b: string }) {
 function Compare({ A, B }: { A: Arm; B: Arm }) {
   const selection = useLens((s) => s.selection), select = useLens((s) => s.select);
   const [cum, setCum] = useState(true);
+  const [towns, setTowns] = useState(true);
   const fork = Math.min(A.seat.fork_at, B.seat.fork_at);
   // (Counts are compared only over the days both arms ran: a fork stopped early would otherwise look quieter.)
   const until = Math.floor(Math.min(A.seat.end_at, B.seat.end_at) / DAY) + 1;
@@ -64,11 +68,15 @@ function Compare({ A, B }: { A: Arm; B: Arm }) {
           <Decisions A={A} B={B} onOpen={(run) => setReaderRun(run)} />
         </div>
         <div className="cp-right">
+          <div className="cp-sec-head"><h3>The two towns</h3><span className="st-faint">one camera, one clock; on the left, the difference from the other arm</span><span className="grow" />
+            <button className="st-btn" onClick={() => setTowns(!towns)}>{towns ? "hide" : "show"}</button></div>
+          {towns && <div className="cp-towns"><TwoTowns a={A.key} b={B.key} names={[armName(A.seat), armName(B.seat)]} /></div>}
           <div className="cp-sec-head"><h3>The town, day by day</h3><span className="st-faint">both arms from a week before the fork</span><span className="grow" />
             <button className={`st-btn ${cum ? "on" : ""}`} onClick={() => setCum(true)}>since the fork</button><button className={`st-btn ${!cum ? "on" : ""}`} onClick={() => setCum(false)}>per day</button></div>
           <Multiples panels={panels(A, B)} from={Math.max(0, Math.floor(fork / DAY) - 7)} fork={Math.floor(fork / DAY)} cumulative={cum} until={until} polls={[A.seat.election.poll_at, B.seat.election.poll_at].filter((x): x is number => x !== undefined)} names={[armName(A.seat), armName(B.seat)]} />
         </div>
       </div>
+      {selection && (selection.kind === "person" || selection.kind === "structure" || selection.kind === "entity") && <Inspect run={A.key} />}
       {open && <div className="cp-drawer"><SittingReader run={readerRun} /><button className="st-btn cp-drawer-x" onClick={() => select(null)}>close</button></div>}
     </div>
   );
@@ -155,4 +163,14 @@ function panels(A: Arm, B: Arm): Panel[] {
   const codes = [...new Set([...Object.keys(A.daily.refused), ...Object.keys(B.daily.refused)])].map((k) => ({ k, d: diff(A.daily.refused[k], B.daily.refused[k]) })).filter((x) => x.d > 0).sort((x, y) => y.d - x.d).slice(0, 6);
   for (const { k } of codes) out.push({ id: `ref:${k}`, title: k, note: `Acts refused with code ${k}`, a: A.daily.refused[k] ?? [], b: B.daily.refused[k] ?? [], group: "Refusals, by code (where the arms differ most)" });
   return out;
+}
+
+/** What a click in the towns selected (a person, a building, an organisation), by the inspector the Run page uses. */
+function Inspect({ run }: { run: string }) {
+  const selection = useLens((x) => x.selection), select = useLens((x) => x.select);
+  const meta = useMeta(run);
+  if (!selection || !meta.data) return null;
+  const Body = views.inspector?.[selection.kind];
+  if (!Body) return null;
+  return <div className="cp-inspect"><button className="st-btn cp-inspect-x" onClick={() => select(null)}>×</button><Body run={run} meta={meta.data} selection={selection} /></div>;
 }

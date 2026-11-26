@@ -2,11 +2,12 @@
 // their days, their money day by day, and everything that reached them (payments, papers, messages, illnesses), each
 // with who decided it: the seat (amber), an institution (periwinkle), a person (teal). From the `ledger` fold's file
 // for this person (fetched when the page opens) and the map's people data. Raw facts in order; it judges nothing.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { LedgerItem, LedgerJson, PersonLedger } from "../../folds/ledger";
 import { fetchFold, foldFile } from "../api";
 import { useCity, structureName } from "../city/CityView";
 import { personRows, type CityData } from "../city/data";
+import { describePerson } from "../people";
 import { DAY, clock, dayOf, words } from "../format";
 import { useLens } from "../state";
 import type { InspectorProps } from "../views";
@@ -49,12 +50,25 @@ export function PersonLife({ run, selection }: InspectorProps) {
   const q = city?.pById.get(id);
   const person = q !== undefined ? city!.people.people[q] : undefined;
   const seat = meta?.seat;
-  const whoOf = (x?: string): Who => (x && x === seat ? "seat" : x && (x.endsWith("-self") || city?.pById.has(x)) ? "person" : "inst");
+  // (Who decided: the seat; a person acting for themselves; else an organisation: a shop, the bank, an office. A
+  // person who acts as a shop's manager acts for the shop, so the ledger names the shop.)
+  const whoOf = (x?: string): Who => {
+    if (!x) return "inst";
+    if (x === seat) return "seat";
+    const id = x.replace(/-self$/, "");
+    if (city?.pById.has(id)) return "person";
+    const k = city?.town.entities[id]?.kind;
+    return k === "person" ? "person" : "inst";
+  };
   const nameOf = (x?: string): string => {
     if (!x) return "—";
     if (x === seat) return "the seat";
     const p = city?.pById.get(x.replace(/-self$/, ""));
-    if (p !== undefined) return city!.people.people[p]![1];
+    if (p !== undefined) {
+      const [pid, name] = city!.people.people[p]!;
+      const d = describePerson(city, pid, t);
+      return name !== pid ? name : d ? `${pid} (${d})` : pid;
+    }
     const e = city?.town.entities[x.replace(/-system$/, "")];
     return e?.name ?? words(x.replace(/-system$/, ""));
   };
@@ -65,9 +79,9 @@ export function PersonLife({ run, selection }: InspectorProps) {
   return (
     <div className="life">
       <Who_ c={city} q={q} id={id} t={t} />
-      <Places c={city} q={q} t={t} />
-      <Money ledger={ledger} t={t} nameOf={nameOf} whoOf={whoOf} />
       <Reached ledger={ledger} t={t} nameOf={nameOf} whoOf={whoOf} filter={filter} setFilter={setFilter} bulk={meta?.bulk ?? []} />
+      <Money ledger={ledger} t={t} nameOf={nameOf} whoOf={whoOf} />
+      <Places c={city} q={q} t={t} />
       {person === undefined && <p className="life-note">Not among the town's people at the start.</p>}
     </div>
   );
@@ -86,6 +100,10 @@ function Who_({ c, q, id, t }: { c: CityData; q: number | undefined; id: string;
       <div className="life-sub">
         <span className="mono">{id}</span>
         {age >= 0 && <span>{age} years old</span>}
+        {(() => {
+          const d = describePerson(c, id, t)?.split(", ").slice(1).join(", ");
+          return d ? <span>{d}</span> : null;
+        })()}
         {sex && <span>{sex === "f" ? "female" : "male"}</span>}
         {home >= 0 && c.sMap[home]! >= 0 && (
           <button className="life-link" onClick={() => select({ kind: "structure", id: c.town.structures[c.sMap[home]!]!.id })}>
@@ -99,11 +117,15 @@ function Who_({ c, q, id, t }: { c: CityData; q: number | undefined; id: string;
       {mates.length > 0 && (
         <div className="life-house">
           <span className="eyebrow">Household</span>
-          {mates.map(([p]) => (
-            <button key={p[0]} className="life-chip" onClick={() => select({ kind: "person", id: p[0] })}>
-              {p[1]}
-            </button>
-          ))}
+          {mates.map(([p]) => {
+            const d = describePerson(c, p[0], t);
+            return (
+              <button key={p[0]} className="life-chip" title={d} onClick={() => select({ kind: "person", id: p[0] })}>
+                {p[1]}
+                {d && p[1] === p[0] && <span className="faint"> · {d}</span>}
+              </button>
+            );
+          })}
         </div>
       )}
     </section>
@@ -249,12 +271,14 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
   const s = useLens.getState();
   type Row = { t: number; who: Who; from?: string; kind: string; text: string; it?: LedgerItem; cents?: number };
   const rows = useMemo<Row[]>(() => {
-    const r: Row[] = ledger.items.map((it) => ({ t: it.t, who: it.seat ? "seat" : whoOf(it.from), ...(it.from ? { from: it.from } : {}), kind: it.kind, text: it.text, it }));
-    // (Payments: only those someone other than the person themselves decided, and not the everyday ones in bulk.)
+    // (What they did themselves, for themselves or for an organisation they act for, did not "reach" them: left out.)
+    const r: Row[] = ledger.items
+      .filter((it) => !it.own)
+      .map((it) => ({ t: it.t, who: it.seat ? "seat" : whoOf(it.for ?? it.from), ...(it.for || it.from ? { from: it.for ?? it.from } : {}), kind: it.kind, text: it.text, it }));
+    // (Payments: those someone other than the person themselves decided: wages, benefits, rent, refunds.)
     for (const [tt, c, other, reason, memo, decider] of ledger.transfers) {
       const w = whoOf(decider);
-      if (w === "person" && decider.replace(/-self$/, "") === ledger.id) continue;
-      if (reason === "payment" && w === "inst") continue;
+      if (decider.replace(/-self$/, "") === ledger.id) continue;
       r.push({ t: tt, who: w, from: decider, kind: reason || "payment", text: `${c >= 0 ? "Received" : "Paid"} ${money(Math.abs(c))} ${c >= 0 ? "from" : "to"} ${nameOf(other)}${memo ? ` · ${memo}` : ""}`, cents: c });
     }
     for (const [tt, ev, kind, sev] of ledger.conditions) r.push({ t: tt, who: "inst", kind: `${kind} ${ev}`, text: `${words(kind)} ${ev}${sev ? ` (${sev})` : ""}` });
@@ -265,6 +289,16 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
   for (const r of rows) counts[r.who]++;
   const shown = rows.filter((r) => filter === "all" || r.who === filter);
   const nowIdx = shown.findIndex((r) => r.t > t);
+  const fork = useLens((st) => st.span[0]);
+  const forkIdx = shown.findIndex((r) => r.t >= fork);
+  // (Opened at the moment shown, not at day 0: the first row after it, centred, once per person and filter.)
+  const listRef = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const list = listRef.current;
+    const el = (list?.querySelector(".life-row.now") ?? list?.querySelector(".life-row:last-child")) as HTMLElement | null;
+    // (The list scrolls in its own box, so the person's head stays in view.)
+    if (list && el) list.scrollTop = el.offsetTop - list.clientHeight / 2;
+  }, [ledger, filter]);
   const bulkLine = Object.entries(ledger.counts);
   return (
     <section className="life-sec">
@@ -273,13 +307,18 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
         <div className="seg">
           {(["all", "seat", "inst", "person"] as const).map((f) => (
             <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>
-              {f === "all" ? "All" : f === "seat" ? `Seat ${counts.seat}` : f === "inst" ? `Institutions ${counts.inst}` : `People ${counts.person}`}
+              {f === "all" ? "All" : f === "seat" ? `Seat ${counts.seat}` : f === "inst" ? `Organisations ${counts.inst}` : `People ${counts.person}`}
             </button>
           ))}
         </div>
       </div>
-      <ol className="life-list">
-        {shown.map((r, i) => (
+      <ol className="life-list" ref={listRef}>
+        {shown.map((r, i) => [
+          forkIdx === i && fork > 0 ? (
+            <li key={`fork${i}`} className="life-fork">
+              fork · day {dayOf(fork)} <span className="faint">the arm's own time begins</span>
+            </li>
+          ) : null,
           <li key={i} className={`life-row ${r.who} ${nowIdx === i ? "now" : ""} ${r.t > t ? "later" : ""}`}>
             <button
               className="life-row-btn"
@@ -289,19 +328,19 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
               }}
             >
               <span className="life-when mono">
-                d{dayOf(r.t)} <span className="faint">{clock(r.t)}</span>
+                day {dayOf(r.t)} <span className="faint">{clock(r.t)}</span>
               </span>
               <span className="life-what">
                 <span className="life-kind">
                   {words(r.kind)}
-                  {r.from && <span className={`life-who ${r.who}`}> · {r.it?.own ? "their own" : nameOf(r.from)}</span>}
+                  {r.from && <span className={`life-who ${r.who}`}> · {nameOf(r.from)}</span>}
                   {r.it?.refused && <span className="bad"> · refused ({words(r.it.refused)})</span>}
                 </span>
                 <span className="life-text">{r.text}</span>
               </span>
             </button>
-          </li>
-        ))}
+          </li>,
+        ])}
         {!shown.length && <li className="life-note">Nothing here.</li>}
       </ol>
       {bulkLine.length > 0 && (

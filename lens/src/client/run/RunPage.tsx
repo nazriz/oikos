@@ -216,6 +216,16 @@ export function RunBar({ entry, meta }: { entry?: RunEntry; meta?: Meta }) {
             <span className="kbd">⌘K</span>
           </button>
         )}
+        {entry && views.power && (
+          <a className="btn ghost run-copy" href={`#/power/${encodeURIComponent(entry.key)}`} title="Who holds each office in the town, over the run">
+            who holds power
+          </a>
+        )}
+        {entry && views.digest && (
+          <a className="btn ghost run-copy" href={`#/digest/${encodeURIComponent(entry.key)}`} title="A printable digest of this run">
+            digest
+          </a>
+        )}
         <CopyLink />
         <ThemeToggle />
       </div>

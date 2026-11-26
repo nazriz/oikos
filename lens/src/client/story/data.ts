@@ -89,8 +89,4 @@ export const OUTCOME: { [k in SeatJson["outcome"]]: { label: string; tone: strin
   no_result: { label: "No result in the run", tone: "muted" },
   did_not_stand: { label: "Did not stand", tone: "muted" },
 };
-export const STAGE: { [k: string]: string } = {
-  applied: "applied", refused: "refused by the world", not_applied: "sent, no outcome yet", translator_failed: "translator could not draw it up",
-  asked_back: "asked back (nothing sent)", seat_declined: "seat declined the draft", proposed: "filed", rejected: "rejected by the council", passed: "passed, not applied",
-  insufficient_notice: "refused: too little notice", date_passed: "refused: date passed", ballot_open: "refused: ballot open", fixed_by_law: "refused: fixed by law",
-};
+export { STAGE } from "./moments-data";
