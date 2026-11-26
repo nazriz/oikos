@@ -45,7 +45,13 @@ export function startServer(o: ServeOptions = {}) {
     idleTimeout: 0,
     routes: {
       "/": index,
-      "/api/runs": async (req) => json(await lens.list(new URL(req.url).searchParams.has("fresh"))),
+      "/api/runs": async (req) => {
+        // (A thousand runs' entries are a megabyte; gzipped, a tenth of it: it matters on a phone.)
+        const body = JSON.stringify(await lens.list(new URL(req.url).searchParams.has("fresh")));
+        const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", vary: "accept-encoding" };
+        if ((req.headers.get("accept-encoding") ?? "").includes("gzip")) return new Response(Bun.gzipSync(Buffer.from(body)), { headers: { ...headers, "content-encoding": "gzip" } });
+        return new Response(body, { headers });
+      },
       "/api/run/:key": async (req) => {
         const e = await lens.catalogue.find(req.params.key);
         if (!e) return notFound("run");

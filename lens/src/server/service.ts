@@ -9,7 +9,6 @@ import type { Catalogue as CatalogueJson, ForkReading, IndexStatus, RunEntry } f
 import type { FoldContext } from "../shared/fold";
 import { bundleDir, makeBundle, readyManifest, type Manifest } from "./bundle";
 import { Catalogue } from "./catalogue";
-import { readOnly } from "./ingest";
 import { ensureDir, type LensPaths } from "./paths";
 import type { ReadingInput } from "./reading";
 
@@ -39,6 +38,7 @@ export class Lens {
   private reading: { done: number; total: number; current?: string } = { done: 0, total: 0 };
   private readingLoop = false;
   private stopped = false;
+  private child?: { kill(): void };
 
   constructor(readonly paths: LensPaths, readonly opts: { background?: boolean } = {}) {
     ensureDir(paths.views);
@@ -53,6 +53,7 @@ export class Lens {
 
   stop() {
     this.stopped = true;
+    this.child?.kill();
   }
 
   async list(fresh = false): Promise<CatalogueJson> {
@@ -188,8 +189,13 @@ export class Lens {
           while (this.working && !this.stopped) await Bun.sleep(500);
           this.reading = { ...this.reading, current: r.key };
           try {
-            const reading = await readOnly(this.catalogue.abs(r), this.readingInput(r)!);
-            this.remember(r, reading ?? null);
+            const p = Bun.spawn([process.execPath, join(here, "read-one.ts"), this.catalogue.abs(r), JSON.stringify(this.readingInput(r))], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+            this.child = p;
+            const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+            this.child = undefined;
+            if (this.stopped) break;
+            if (code !== 0) throw new Error(err.trim().split("\n").slice(-3).join(" | ") || `exit ${code}`);
+            this.remember(r, JSON.parse(out) as ForkReading | null);
           } catch (err) {
             this.remember(r, null, String((err as Error).message ?? err).slice(0, 500));
           }

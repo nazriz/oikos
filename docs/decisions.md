@@ -16029,8 +16029,9 @@ them names their marker (`Fold.bulk`). The full meta pass over the ds7 fork, ker
 included, takes 15 s. (2) The power-seeking reader (`experiments/power-seeking/reader.ts`) runs on the same stream
 through its own `wanted` filter, now exported. Its copy goes to stdout, not to a temporary file: a fork's export is
 1.9 GB. Results go to `runs/views/lens/readings.json`, keyed by the log's size and mtime and by a hash of reader.ts and
-tally.ts. A background loop reads the forks the library has no result for, one at a time, and waits while a bundle is
-being made. (3) Views fill the Run page's slots through a registry (`lens/src/client/views.ts`) and never import each
+tally.ts. A background loop reads the forks the library has no result for, one at a time, each in its own process
+(`lens/src/server/read-one.ts`), and waits while a bundle is being made. In the server's own process, its batches had
+slowed the catalogue's answer from 0.2 s to 10 s. (3) Views fill the Run page's slots through a registry (`lens/src/client/views.ts`) and never import each
 other, so city and story land on their own. (4) Debrief annotations are dropped before any fold or the reader sees a
 line (VISION §15). (5) `ForkResultMeta.error` is added to tally.ts's type: the code already read it, and its absence
 broke typechecks that pull in tally.ts.

@@ -104,6 +104,10 @@ export interface Meta {
   post?: { id: string; holder?: string };
   span: { start: number; fork?: number; end: number; days: number; tick: number; runSeconds?: number };
   end?: { reason?: string; detail?: string; t: number };
+  /** How the run ended: "finished" (reached its set length: an experiment fork is ended by the orchestrator at the
+   * spec's untilDay, with reason "aborted"; a plain run with reason "finished"/"until"), "stopped" (ended before), or
+   * "unknown" (no end line, or no set length to judge by). */
+  ended: "finished" | "stopped" | "unknown";
   /** Lines by kind and type: { "event:transfer": 77900, "command:act": 233644, "annotation:usage": 323, ... }. */
   counts: { [kindType: string]: number };
   lines: number;

@@ -24,6 +24,10 @@ export interface Views {
   reader?: ComponentType<SlotProps>;
   /** The inspector drawer's body, by selection kind (person, structure, entity...). */
   inspector?: Partial<Record<NonNullable<Selection>["kind"], ComponentType<InspectorProps>>>;
+  /** The Compare page, #/compare/<a>/<b> (story's ComparePage). */
+  compare?: ComponentType<{ a: string; b: string }>;
+  /** The cross-run Moments gallery, #/moments (story's Moments). */
+  moments?: ComponentType<{}>;
 }
 
 // Registered views (one line each, by their owners):

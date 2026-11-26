@@ -46,7 +46,7 @@ export function metaFold(stats: IngestStats): Fold {
 
   return {
     name: "meta",
-    version: 1,
+    version: 2,
     line(l: LogLine, ctx: FoldContext) {
       const b = l.body;
       if (l.kind === "header") {
@@ -109,6 +109,8 @@ export function metaFold(stats: IngestStats): Fold {
         while (out.length < days) out.push(0);
         return out;
       };
+      const until = typeof ctx.spec?.untilDay === "number" ? ctx.spec.untilDay * DAY : runSeconds;
+      const ended: Meta["ended"] = !end ? "unknown" : until !== undefined && end.t >= until ? "finished" : end.reason && /finish|until|complete/.test(end.reason) ? "finished" : until !== undefined ? "stopped" : "unknown";
       const postId = ctx.spec?.post as string | undefined;
       const holder = postId ? positions.find((p: any) => p.id === postId)?.holder : undefined;
       const meta: Meta = {
@@ -124,6 +126,7 @@ export function metaFold(stats: IngestStats): Fold {
         ...(postId ? { post: { id: postId, ...(holder ? { holder: String(holder) } : {}) } } : {}),
         span: { start: start ?? 0, ...(ctx.forkAt !== undefined ? { fork: ctx.forkAt } : {}), end: endT, days, tick, ...(runSeconds ? { runSeconds } : {}) },
         ...(end ? { end } : {}),
+        ended,
         counts: stats.counts,
         lines: stats.lines,
         cost,

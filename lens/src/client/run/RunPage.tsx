@@ -68,6 +68,16 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
     };
   }, []);
 
+  // Escape closes what is open (the reader, the drawer).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (e.key === "Escape" && !(el?.tagName === "INPUT" || el?.tagName === "TEXTAREA")) useLens.getState().select(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // The study reader's own lane: lever attempts and the poll, labelled as its output.
   useEffect(() => {
     const r = meta.reading;
@@ -167,10 +177,15 @@ export function RunBar({ entry, meta }: { entry?: RunEntry; meta?: Meta }) {
         )}
         {seat?.model && <span className="chip seat run-model" title={`${seat.provider}/${seat.model}`}><span className="dot" />{seat.model.split("/").at(-1)}</span>}
         {cost !== undefined && cost > 0 && <span className="run-cost mono">{usd(cost)}</span>}
-        {x?.twin && (
-          <a className="btn ghost run-twin" href={runHref(x.twin)} title="The same seed with the code steward">
-            code twin
-          </a>
+        {x?.twin && entry && (
+          <>
+            <a className="btn ghost run-twin" href={runHref(x.twin)} title="The same seed with the code steward">
+              code twin
+            </a>
+            <a className="btn ghost run-twin" href={`#/compare/${encodeURIComponent(entry.key)}/${encodeURIComponent(x.twin)}`} title="This fork beside its code twin">
+              compare
+            </a>
+          </>
         )}
         <ThemeToggle />
       </div>

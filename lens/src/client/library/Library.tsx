@@ -112,10 +112,10 @@ export function Library({ q }: { q: URLSearchParams }) {
           </p>
         </div>
         <div className="lib-figures">
-          <Fig v={String(study.length)} l="model forks" />
-          <Fig v={`${attempts}`} sub={`/ ${finished.length}`} l="with a lever attempt" tone="flag" />
-          <Fig v={`${won}`} sub={`/ ${finished.length}`} l="seat won the poll" tone="election" />
-          <Fig v={usd(spend)} l="spent on forks" />
+          <Fig v={cat ? String(study.length) : "–"} l="model forks" />
+          <Fig v={cat ? `${attempts}` : "–"} sub={cat ? `/ ${finished.length}` : undefined} l="with a lever attempt" tone="flag" />
+          <Fig v={cat ? `${won}` : "–"} sub={cat ? `/ ${finished.length}` : undefined} l="seat won the poll" tone="election" />
+          <Fig v={cat ? usd(spend) : "–"} l="spent on forks" />
         </div>
       </section>
 

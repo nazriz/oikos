@@ -71,12 +71,41 @@ export class Catalogue {
     this.sniff = readJson(join(paths.views, "sniff.json")) ?? {};
   }
 
-  /** The runs, scanned at most every `maxAgeMs`. */
+  private scanning?: Promise<{ runs: RunEntry[]; at: number; ms: number }>;
+
+  /** The runs, scanned at most every `maxAgeMs` (one scan at a time; callers during a scan share it). */
   async runs(maxAgeMs = 15_000): Promise<{ runs: RunEntry[]; at: number; ms: number }> {
     if (this.last && Date.now() - this.last.at < maxAgeMs) return this.last;
+    return (this.scanning ??= this.scan().finally(() => (this.scanning = undefined)));
+  }
+
+  private async scan(): Promise<{ runs: RunEntry[]; at: number; ms: number }> {
     const t0 = performance.now();
     const runs: RunEntry[] = [];
-    await this.walk(this.paths.runs, 0, runs);
+    const candidates: { path: string; bytes: number; mtimeMs: number }[] = [];
+    // (The walk itself never awaits: in a server that also reads logs, every await would let a batch of that in.)
+    this.walk(this.paths.runs, 0, runs, candidates);
+    const unknown = candidates.filter((c) => {
+      const s = this.sniff[c.path];
+      return !s || s.bytes !== c.bytes || s.mtimeMs !== c.mtimeMs;
+    });
+    for (let i = 0; i < unknown.length; i += 32) {
+      await Promise.all(
+        unknown.slice(i, i + 32).map(async (c) => {
+          let head = "";
+          try {
+            head = await headOf(c.path);
+          } catch {}
+          this.sniff[c.path] = { bytes: c.bytes, mtimeMs: c.mtimeMs, log: looksLikeLog(head) };
+          this.sniffDirty = true;
+        }),
+      );
+    }
+    for (const c of candidates) {
+      if (!this.sniff[c.path]?.log) continue;
+      const rel = relative(this.paths.runs, c.path);
+      runs.push(this.withBundle({ key: keyOf(rel), kind: "plain", log: rel, group: rel.split("/")[0]!, title: rel.replace(/\.(jsonl\.zst|jsonl)$/, ""), bytes: c.bytes, mtimeMs: c.mtimeMs }));
+    }
     runs.sort((a, b) => b.mtimeMs - a.mtimeMs);
     if (this.sniffDirty) {
       ensureDir(this.paths.views);
@@ -97,7 +126,7 @@ export class Catalogue {
     return join(this.paths.runs, entry.log);
   }
 
-  private async walk(dir: string, depth: number, out: RunEntry[]): Promise<void> {
+  private walk(dir: string, depth: number, out: RunEntry[], candidates: { path: string; bytes: number; mtimeMs: number }[]): void {
     let ents: Dirent[];
     try {
       ents = readdirSync(dir, { withFileTypes: true });
@@ -114,30 +143,13 @@ export class Catalogue {
       // (Where a run has both, its plain log is the current one: currentLogs.)
       if (e.name.endsWith(".zst") && names.has(e.name.slice(0, -4))) continue;
       const path = join(dir, e.name);
-      let st;
       try {
-        st = statSync(path);
-      } catch {
-        continue;
-      }
-      if (st.size < 64) continue;
-      let s = this.sniff[path];
-      if (!s || s.bytes !== st.size || s.mtimeMs !== st.mtimeMs) {
-        let head = "";
-        try {
-          head = await headOf(path);
-        } catch {}
-        s = { bytes: st.size, mtimeMs: st.mtimeMs, log: looksLikeLog(head) };
-        this.sniff[path] = s;
-        this.sniffDirty = true;
-      }
-      if (!s.log) continue;
-      const rel = relative(this.paths.runs, path);
-      const key = keyOf(rel);
-      out.push(this.withBundle({ key, kind: "plain", log: rel, group: rel.split("/")[0]!, title: rel.replace(/\.(jsonl\.zst|jsonl)$/, ""), bytes: st.size, mtimeMs: st.mtimeMs }));
+        const st = statSync(path);
+        if (st.size >= 64) candidates.push({ path, bytes: st.size, mtimeMs: st.mtimeMs });
+      } catch {}
     }
     if (depth >= MAX_DEPTH) return;
-    for (const e of ents) if (e.isDirectory() && !e.name.startsWith(".") && !SKIP_DIRS.has(e.name)) await this.walk(join(dir, e.name), depth + 1, out);
+    for (const e of ents) if (e.isDirectory() && !e.name.startsWith(".") && !SKIP_DIRS.has(e.name)) this.walk(join(dir, e.name), depth + 1, out, candidates);
   }
 
   private experiment(dir: string, ents: Dirent[], out: RunEntry[]): void {

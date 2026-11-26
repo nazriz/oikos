@@ -1,4 +1,5 @@
-// `oikos lens [--runs DIR] [--port 4322] [--dev] [--no-background]`: serve Lens on 127.0.0.1 (docs/design/lens.md).
+// `oikos lens [--runs DIR] [--port 4322] [--no-background] [--dev]`: serve Lens on 127.0.0.1 (docs/design/lens.md).
+//   --dev is Bun's development mode (hot reload): it breaks deck.gl's shaders, so the map does not draw under it.
 //   oikos lens index <key>   make one run's bundle and print its manifest (no server)
 //   oikos lens list          print the catalogue
 import { startServer } from "./server";
@@ -37,7 +38,13 @@ export async function runLens(argv: string[]): Promise<void> {
     console.log(JSON.stringify(lens.manifest(e), null, 1));
     return;
   }
-  const { url, paths } = startServer({ runs, views, port: flag("port") ? Number(flag("port")) : undefined, development: has("dev"), background: !has("no-background") });
+  const { url, paths, lens } = startServer({ runs, views, port: flag("port") ? Number(flag("port")) : undefined, development: has("dev"), background: !has("no-background") });
+  // (Stopping the server stops the reading it started in the background, its child process included.)
+  for (const sig of ["SIGINT", "SIGTERM"] as const)
+    process.on(sig, () => {
+      lens.stop();
+      process.exit(0);
+    });
   console.log(`Lens on ${url} (runs: ${paths.runs}; its own files: ${paths.views})`);
   await new Promise(() => {});
 }

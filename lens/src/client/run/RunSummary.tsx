@@ -107,7 +107,10 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
             {forkDay !== undefined ? `fork at day ${forkDay}, ` : ""}to day {dayOf(meta.span.end)}
           </dd>
           <dt>ended</dt>
-          <dd>{meta.end ? `${meta.end.reason ?? "–"}${meta.end.detail ? ` (${meta.end.detail})` : ""}` : "no end line (cut short?)"}</dd>
+          <dd>
+            {meta.ended === "finished" ? `reached its set length, day ${dayOf(meta.span.end)}` : meta.ended === "stopped" ? `stopped on day ${dayOf(meta.span.end)}` : "no end line (cut short?)"}
+            {meta.end?.reason && <span className="faint"> · {meta.end.reason}</span>}
+          </dd>
           <dt>kernel</dt>
           <dd className="mono">{meta.kernel ? `${meta.kernel.version ?? ""} ${meta.kernel.build ?? ""}` : "–"}</dd>
           <dt>run id</dt>

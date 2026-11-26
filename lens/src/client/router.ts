@@ -5,7 +5,8 @@ import type { Selection } from "./state";
 export type Route =
   | { page: "library"; q: URLSearchParams }
   | { page: "run"; key: string; q: URLSearchParams }
-  | { page: "compare"; a: string; b: string; q: URLSearchParams };
+  | { page: "compare"; a: string; b: string; q: URLSearchParams }
+  | { page: "moments"; q: URLSearchParams };
 
 export function parseHash(hash: string): Route {
   const h = hash.replace(/^#/, "") || "/";
@@ -13,6 +14,7 @@ export function parseHash(hash: string): Route {
   const q = new URLSearchParams(query);
   const parts = path.split("/").filter(Boolean).map(decodeURIComponent);
   if (parts[0] === "run" && parts[1]) return { page: "run", key: parts[1], q };
+  if (parts[0] === "moments") return { page: "moments", q };
   if (parts[0] === "compare" && parts[1] && parts[2]) return { page: "compare", a: parts[1], b: parts[2], q };
   return { page: "library", q };
 }

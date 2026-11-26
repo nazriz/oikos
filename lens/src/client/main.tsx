@@ -7,11 +7,25 @@ import "./shell.css";
 import { createRoot } from "react-dom/client";
 import { Library } from "./library/Library";
 import { RunPage } from "./run/RunPage";
-import { useRoute } from "./router";
+import { runHref, useRoute } from "./router";
+import { views } from "./views";
 
 function App() {
   const route = useRoute();
   if (route.page === "run") return <RunPage key={route.key} runKey={route.key} q={route.q} />;
+  if (route.page === "compare") {
+    const Compare = views.compare;
+    if (Compare) return <Compare a={route.a} b={route.b} />;
+    return (
+      <div className="lib-empty">
+        Comparing two runs side by side is on its way. Meanwhile, open <a href={runHref(route.a)}>the first</a> or <a href={runHref(route.b)}>the second</a>.
+      </div>
+    );
+  }
+  if (route.page === "moments" && views.moments) {
+    const Moments = views.moments;
+    return <Moments />;
+  }
   return <Library q={route.q} />;
 }
 
