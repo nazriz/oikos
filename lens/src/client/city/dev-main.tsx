@@ -23,7 +23,7 @@ function Dev() {
     if (started.current) return;
     started.current = true;
     st.setRun(q.get("run") ?? "dev");
-    st.setT(((num("day") ?? 121) - 1) * DAY + (num("hour") ?? 9.5) * 3600);
+    st.setT((num("day") ?? 120) * DAY + (num("hour") ?? 9.5) * 3600);
     if (q.get("play")) st.setPlaying(true);
     if (num("speed")) st.setSpeed(num("speed")!);
     const sel = q.get("sel");
@@ -54,7 +54,7 @@ function Dev() {
             {acts.map((m, i) => <div key={i} style={{ position: "absolute", left: `${(m.t / (span[1] || 1)) * 100}%`, top: 2, width: 2, height: 6, background: m.tone === "bad" ? "#f0647a" : "#f2b44b", opacity: 0.8 }} />)}
             <input type="range" min={span[0]} max={span[1]} step={60} value={t} onChange={(e) => st.setT(+e.target.value)} style={{ position: "absolute", left: 0, right: 0, top: 6, width: "100%", accentColor: "#f2b44b" }} />
           </div>
-          <span style={{ fontFamily: "JetBrains Mono Variable, monospace", color: "#9aa3b2", minWidth: 120, textAlign: "right" }}>day {Math.floor(t / DAY) + 1} · {String(Math.floor((t % DAY) / 3600)).padStart(2, "0")}:{String(Math.floor((t % 3600) / 60)).padStart(2, "0")}</span>
+          <span style={{ fontFamily: "JetBrains Mono Variable, monospace", color: "#9aa3b2", minWidth: 120, textAlign: "right" }}>day {Math.floor(t / DAY)} · {String(Math.floor((t % DAY) / 3600)).padStart(2, "0")}:{String(Math.floor((t % 3600) / 60)).padStart(2, "0")}</span>
         </div>
       )}
     </div>

@@ -989,7 +989,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       {placeLabels.map((l) => <div key={l.text} className={`lc-anno place${inkLight ? "" : " night"}`} style={{ left: l.x, top: l.y }}>{l.text}</div>)}
       {actNotes.map((n) => { const p = n.at ? onScreen(n.at[0], n.at[1], n.at[2] + 10) : null; return p && <div key={n.seq} className={`lc-anno act ${n.refused ? "refused" : ""}${inkLight ? "" : " night"}`} style={{ left: Math.min(size.w - 150, Math.max(150, p[0])), top: p[1], opacity: 1 - n.age * 0.7 }}><b />{n.text}</div>; })}
       {hint && !present && !bare && <div className="lc-hint" onMouseEnter={dropHint}>{CITY_WORDS.hint} <button className="lc-ghost" onClick={dropHint}>Got it</button></div>}
-      {diff && diff.ended !== undefined && <div className="lc-diff"><b>Difference from the other arm</b><span>An arm ended on day {Math.floor(diff.ended / DAY) + 1}: nothing to compare after it.</span></div>}
+      {diff && diff.ended !== undefined && <div className="lc-diff"><b>Difference from the other arm</b><span>An arm ended on day {Math.floor(diff.ended / DAY)}: nothing to compare after it.</span></div>}
       {diff && diff.ended === undefined && <div className="lc-diff"><b>Difference from the other arm</b><span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people elsewhere now</span><span><i className="sw dot" />{diff.onlyHere.length} papers only here (7 d)</span><span><i className="sw ring" />{diff.onlyThere.length} only there</span></div>}
       {!present && <Minimap B={B} town={town} view={view} size={size} setView={setView} />}
       {!bare && !present && panel}
