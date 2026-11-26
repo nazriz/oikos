@@ -75,7 +75,8 @@ export function Glossary() {
     return () => window.removeEventListener("keydown", k);
   }, [open]);
   if (!open) return null;
-  const order = ["seat", "fork", "sitting", "lever", "tier", "attempted", "executed", "considered", "poll", "twin", "translator", "goal", "reader", "wake", "refusal", "bundle"] as const;
+  // (Lens's own machinery, the wake-up and the prepared copy, is for researchers: Story mode leaves it out.)
+  const order = ["seat", "fork", "sitting", "lockin", "lever", "favour", "tier", "attempted", "executed", "considered", "poll", "twin", "translator", "goal", "reader", "refusal", ...(researcher ? (["wake", "bundle"] as const) : [])] as const;
   return (
     <div className="glossary-back" onMouseDown={() => set(false)}>
       <aside className="glossary" role="dialog" aria-label="What the words mean" onMouseDown={(e) => e.stopPropagation()}>

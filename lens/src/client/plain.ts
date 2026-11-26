@@ -61,6 +61,7 @@ export function plainId(id: string, names?: PlainNames): string | undefined {
   if (/^ent\.\d+$/.test(id)) return "a home business";
   if ((m = /^form-([a-z][a-z-]*[a-z])$/.exec(id))) return `the ${words(m[1]!)} form`;
   if (/^ask-\d+$/.test(id)) return "the clerk's draft";
+  if ((m = /^job-(c\d+)(-wages)?$/.exec(id))) return m[2] ? `the wages for ${m[1]}'s job` : `${m[1]}'s job agreement`;
   return structure(id, names);
 }
 
@@ -75,6 +76,7 @@ const IDS = [
   "council-clerk|town-hall|town-offices",
   "form-[a-z][a-z-]*[a-z]",
   "ask-\\d+",
+  "job-c\\d+(?:-[a-z]+)*", // a job agreement, or its standing payment: job-c0068, job-c0068-wages
 ];
 const ID_RE = new RegExp(`(?<![\\w.$/-])(?:the )?(?:${IDS.join("|")})(?![\\w/-]|\\.\\w)`, "g");
 
@@ -105,6 +107,8 @@ function plainPart(s: string, names?: PlainNames): string {
     .replace(/\bstanding direction(s?)\b/gi, "standing order$1 to a town office")
     .replace(/\b[Dd]irection: /g, "Standing order to a town office: ")
     .replace(YEAR1, yearOne)
+    // (A kind of paper the world names by its maker's id: "1 price list of builder" → "1 price list from Millbrook Builders".)
+    .replace(/\b(price lists?) of ([a-z][a-z0-9-]*)\b/g, (hit, what: string, id: string) => { const n = names?.entities?.[id]?.name ?? plainId(id, names); return n ? `${what} from ${n}` : hit; })
     // (A group or the union, named by its bare id in a resident's words: "what union teaches".)
     .replace(/\b(what|at|for|in|join|joined|of) union\b/g, "$1 the union")
     .replace(/\b([a-z]+)_([a-z]+)\b/g, "$1 $2");

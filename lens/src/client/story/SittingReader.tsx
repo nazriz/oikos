@@ -5,7 +5,7 @@
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, loadSystem, useAsync, when, worldDay, usd, tokens, plural, human, STAGE, type SeatAct, type SeatDraft, type SeatJson, type SeatLever, type SittingDetail, type SittingTurn } from "./data";
-import { Hi, Md, MarksContext, hasQuery, openPerson, keyWords, keySentences, usePlain, plainReason, type Marks } from "./text";
+import { Hi, Md, MarksContext, hasQuery, openPerson, keyWords, keySentences, usePlain, usePlainNames, plainReason, type Marks } from "./text";
 import { leverTitle } from "../words";
 import { useResearcher } from "../mode";
 import { firstPoll } from "./moments-data";
@@ -13,6 +13,7 @@ import { HowDoWeKnow } from "./Evidence";
 import { PromptDoc } from "./PromptDoc";
 import { readPrompt } from "./prompt-parts";
 import { useReadMode, useFull } from "./readmode";
+import { plainId, type PlainNames } from "../plain";
 import "./story.css";
 import "./read.css";
 
@@ -338,13 +339,16 @@ const TOOL: { [name: string]: (i: any) => { what: string; body?: string; why?: s
 
 /** A tool call as one line (what it did, and for a request its first words); its details and what came back unfold. */
 function Tool({ c, result, seat }: { c: any; result?: string; seat: SeatJson }) {
+  const names = usePlainNames();
   const researcher = useResearcher();
   const plain = usePlain();
   const full = useFull();
   const input = c.input ?? {};
   const raw = TOOL[c.name]?.(input) ?? { what: human(String(c.name)), rest: [] };
   // (Story mode says the office's ids as words: "Signed the clerk's draft", "Wrote to Councillor 1".)
-  const shape = researcher ? raw : { ...raw, what: c.name === "confirm" ? (raw.what.startsWith("Declined") ? "Declined the clerk's draft" : "Signed the clerk's draft") : plain(raw.what) };
+  // (A look in the who's-who: "Looked up who holds the mayor's office and Councillor 1, and resident c0094".)
+  const who = c.name === "look" && input.named && /(^|\/)who$/.test(String(input.report ?? "")) ? lookedUpWho([].concat(input.named), names) : undefined;
+  const shape = researcher ? raw : { ...raw, what: who ?? (c.name === "confirm" ? (raw.what.startsWith("Declined") ? "Declined the clerk's draft" : "Signed the clerk's draft") : plain(raw.what)) };
   const extra = Object.entries(input).filter(([k]) => !(shape.rest ?? []).includes(k));
   const kids = seat.children.filter((ch) => JSON.stringify(input).includes(ch));
   const body = shape.body ? String(shape.body) : "";
@@ -509,4 +513,16 @@ const lower = (x: string) => x.charAt(0).toLowerCase() + x.slice(1);
 function place(report: unknown): string {
   const r = String(report ?? "").replace(/^[\w-]+\//, "").replace(/[-_]/g, " ");
   return r ? `its ${r}` : "its papers";
+}
+
+/** A look in the who's-who, in words: the posts and organisations it asked about, then the residents. */
+export function lookedUpWho(named: string[], names: PlainNames = {}): string {
+  const people = named.filter((x) => /^c\d+$/.test(x));
+  // (An office's common name mid-sentence: "Electoral commission" → "the electoral commission"; a proper name, "Millbrook
+  // Water", is kept.)
+  const common = (n: string) => (/^[A-Z][a-z]+(?: [a-z][\w']*)+$/.test(n) ? `the ${n.charAt(0).toLowerCase()}${n.slice(1)}` : n.replace(/^The /, "the "));
+  const posts = named.filter((x) => !/^c\d+$/.test(x)).map((x) => (x === "mayor" ? "the mayor's office" : common(plainId(x, names) ?? `the ${x.replace(/[-_]+/g, " ")}`)));
+  const and = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+  const parts = [posts.length ? `who holds ${and(posts)}` : "", people.length ? `${people.length === 1 ? "resident" : "residents"} ${and(people)}` : ""].filter(Boolean);
+  return `Looked up ${parts.join(", and ")}`;
 }
