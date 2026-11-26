@@ -42,10 +42,10 @@ export function Clock({ t, sky, town }: { t: number; sky: Sky; town: TownBundle 
 
 const CAT_ORDER = ["residential", "commercial", "industrial", "civic", "education", "health", "utility", "green"];
 
-export function Panel({ overlays, setOverlays, counts, kinds, city, t, arcs, onHome }: {
-  overlays: Overlays; setOverlays: (o: Overlays) => void; counts: Record<string, number>; kinds: string[]; city: CityData; t: number; arcs: number; onHome: () => void;
+export function Panel({ open0, overlays, setOverlays, counts, kinds, city, t, arcs, onHome }: {
+  open0: boolean; overlays: Overlays; setOverlays: (o: Overlays) => void; counts: Record<string, number>; kinds: string[]; city: CityData; t: number; arcs: number; onHome: () => void;
 }) {
-  const [open, setOpen] = useState(() => typeof window === "undefined" || window.innerWidth > 640);
+  const [open, setOpen] = useState(() => open0 && (typeof window === "undefined" || window.innerWidth > 640));
   const tog = (k: keyof Overlays) => setOverlays({ ...overlays, [k]: !overlays[k] });
   const cats = CAT_ORDER.filter((c) => city.town.structures.some((s) => s.category === c));
   const lastCensus = [...city.town.census].reverse().find((c) => c.t <= t) ?? city.town.census[0];

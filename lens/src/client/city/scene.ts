@@ -24,11 +24,11 @@ export const PAL = {
   roofs: ["#7f6a62", "#6f7279", "#86735f", "#706560", "#7b7f86"],
   // Ground covers: desaturated, a little cool; tone, not colour, tells them apart.
   cover: {
-    woodland: "#36423c", farmland: "#70746a", wetland: "#516264", grassland: "#646c66", scrub: "#686a60",
-    riverbank: "#6f7a6d", cleared: "#77736a", road: "#55585e", built: "#6d6a60", ground: "#62695e",
+    woodland: "#4b5a4d", farmland: "#939884", wetland: "#6c7f7b", grassland: "#8b9584", scrub: "#878a78",
+    riverbank: "#8f998b", cleared: "#99958a", road: "#55585e", built: "#8d8a80", ground: "#899282",
   } as Record<string, string>,
-  water: "#3d5f72",
-  lot: "#7f817c",
+  water: "#557f94",
+  lot: "#aeada5",
   // People by where they are.
   where: { dwelling: "#ffd89a", workplace: "#5cc8c0", classroom: "#9fd3ff", hall: "#b9a3ff", waiting: "#ff9fb0", moving: "#ffffff", other: "#c8d0dc" } as Record<string, string>,
   window: "#ffc677",
@@ -295,14 +295,16 @@ export function paintGround(town: TownBundle, px = 10): HTMLCanvasElement | Offs
   const water = new Uint8Array(w * h);
   for (const chain of town.river) for (const [x, y] of chain) if (x >= 0 && y >= 0 && x < w && y < h) water[y * w + x] = 1;
   const base = names.map((n) => hex(PAL.cover[n] ?? PAL.cover.ground!));
-  const wat = hex(PAL.water), bank = hex("#8a9184");
-  const lotC = hex(PAL.lot), lotEdge = hex("#5d605c"), parkC = hex("#66745f");
-  const crops = [hex("#76786a"), hex("#6c7461"), hex("#7c7867"), hex("#717a69"), hex("#7a7262")];
+  const wat = hex(PAL.water), bank = hex("#adb2a4");
+  const lotC = hex(PAL.lot), lotEdge = hex("#7e817b"), parkC = hex("#819478");
+  const crops = [hex("#9d9d86"), hex("#8e997b"), hex("#a49c84"), hex("#939d84"), hex("#a0957e")];
+  const fence = hex("#6f7a68");
+  const inTown = townMask(town);
   const canvas: HTMLCanvasElement | OffscreenCanvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(W, H) : Object.assign(document.createElement("canvas"), { width: W, height: H });
   const ctx = canvas.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
   const img = ctx.createImageData(W, H);
   const d = img.data;
-  const iWood = names.indexOf("woodland"), iFarm = names.indexOf("farmland"), iWet = names.indexOf("wetland"), iScrub = names.indexOf("scrub");
+  const iWood = names.indexOf("woodland"), iFarm = names.indexOf("farmland"), iWet = names.indexOf("wetland"), iScrub = names.indexOf("scrub"), iGrass = names.indexOf("grassland");
   const isWater = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && water[y * w + x] === 1;
   for (let Y = 0; Y < H; Y++) {
     const cy = Math.floor(Y / px), fy = (Y + 0.5) / px, uy = (Y % px + 0.5) / px;
@@ -323,13 +325,18 @@ export function paintGround(town: TownBundle, px = 10): HTMLCanvasElement | Offs
         const along = hb < 0.5 ? fx : fy;
         shade = 0.97 + 0.03 * Math.sin(along * Math.PI * 3) + (n - 0.5) * 0.06;
         const ex = (fx / 3) % 1, ey = (fy / 3) % 1;
-        if (ex < 0.02 || ey < 0.02) { c = hex("#4e564a"); shade = 1; }
+        if (ex < 0.02 || ey < 0.02) { c = hex("#66705f"); shade = 1; }
       } else if (k === iWet) {
         const t = noise2(fx * 1.4, fy * 1.4, 21);
         if (t > 0.68) { c = mix(c, wat, 0.6); shade = 1; }
       } else if (k === iScrub) {
         const t = noise2(fx * 4, fy * 4, 31);
         shade = 0.96 + (t > 0.72 ? -0.08 : 0) + (n - 0.5) * 0.08;
+      } else if (k === iGrass && !inTown[ci]) {
+        // Countryside: paddocks, each a slightly different tone, with fence lines.
+        const P = paddock(cx, cy), ex = (fx - P.x0) / P.w, ey = (fy - P.y0) / P.h;
+        shade = 0.95 + (P.r - 0.5) * 0.1 + (n - 0.5) * 0.06;
+        if (Math.min(ex, ey) * Math.min(P.w, P.h) < 0.035) { c = fence; shade = 1; }
       }
       const L = lot[ci]!;
       if (L === 1) {
@@ -365,7 +372,7 @@ export function paintBeyond(): HTMLCanvasElement | OffscreenCanvas {
   const canvas: HTMLCanvasElement | OffscreenCanvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(N, N) : Object.assign(document.createElement("canvas"), { width: N, height: N });
   const ctx = canvas.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
   const img = ctx.createImageData(N, N);
-  const base = hex("#4f5f45");
+  const base = hex("#6f7d68");
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     // Distance from the district's square (the middle fifth), in the margin.
     const dx = Math.max(0, Math.abs(x / N - 0.5) - 0.125) / 0.375, dy = Math.max(0, Math.abs(y / N - 0.5) - 0.125) / 0.375;
@@ -380,22 +387,73 @@ export function paintBeyond(): HTMLCanvasElement | OffscreenCanvas {
   return canvas;
 }
 
-/** Trees for the woodland and parks: a few per cell, jittered. [x, y, height, radius] in metres. */
+/** Which cells are inside the town (any place below the district). */
+export function townMask(town: TownBundle): Uint8Array {
+  const { w, h } = town.ground;
+  const m = new Uint8Array(w * h);
+  for (const p of town.places) {
+    if (!p.within) continue;
+    const a = p.area;
+    for (let y = a.y; y < Math.min(h, a.y + a.h); y++) for (let x = a.x; x < Math.min(w, a.x + a.w); x++) m[y * w + x] = 1;
+  }
+  return m;
+}
+/** The countryside's paddocks: blocks of about 5 by 4 cells, staggered by row (cell coordinates of the block). */
+export function paddock(cx: number, cy: number): { x0: number; y0: number; w: number; h: number; r: number } {
+  const ph = 4, by = Math.floor(cy / ph);
+  const pw = 5 + (by % 2), off = (by * 3) % pw, bx = Math.floor((cx + off) / pw);
+  return { x0: bx * pw - off, y0: by * ph, w: pw, h: ph, r: hash01(bx * 7919 + by * 104729, 61) };
+}
+
+/** Trees: woodland, park clusters, street trees on the verges, hedgerow trees on paddock fences, and trees along the
+ * river. [x, y, height, radius] in metres. */
 export function treesOf(town: TownBundle, perCell = 2): Float32Array {
   const { w, h, cell } = town.ground;
   const cover = new Array<string>(w * h).fill("");
   for (const r of town.terrain) for (let y = r.y; y < Math.min(h, r.y + r.h); y++) for (let x = r.x; x < Math.min(w, r.x + r.w); x++) cover[y * w + x] = r.cover;
   const taken = new Set(town.structures.filter((s) => s.category !== "green").map((s) => s.y * w + s.x));
+  const roads = new Set(town.structures.filter((s) => s.category === "transport").map((s) => s.y * w + s.x));
   const parks = new Set(town.structures.filter((s) => s.category === "green").map((s) => s.y * w + s.x));
+  const water = new Set<number>();
+  for (const chain of town.river) for (const [x, y] of chain) water.add(y * w + x);
+  const inTown = townMask(town);
   const out: number[] = [];
+  const tree = (x: number, y: number, hgt: number, r: number) => out.push(x * cell, -y * cell, hgt, r);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * w + x;
-    if (taken.has(i)) continue;
+    if (roads.has(i)) {
+      // Street trees on the verges, every other cell, where the side is not a building's front.
+      if ((x + y) % 2) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const j = (y + dy) * w + x + dx;
+        if (roads.has(j) || water.has(j) || x + dx < 0 || y + dy < 0 || x + dx >= w || y + dy >= h) continue;
+        if (hash01(i * 4 + dx * 2 + dy, 71) < 0.55) tree(x + 0.5 + dx * 0.43 + dy * 0.25, y + 0.5 + dy * 0.43 + dx * 0.25, 4.5 + hash01(i, 72) * 2, 2.2);
+      }
+      continue;
+    }
+    if (taken.has(i) || water.has(i)) continue;
     const c = cover[i];
-    const n = c === "woodland" ? perCell : parks.has(i) ? 3 : c === "scrub" ? (hash01(i, 2) < 0.25 ? 1 : 0) : c === "riverbank" ? (hash01(i, 4) < 0.3 ? 1 : 0) : c === "grassland" ? (hash01(i, 5) < 0.02 ? 1 : 0) : 0;
+    if (parks.has(i)) {
+      // A park: two loose clusters.
+      for (let k = 0; k < 7; k++) {
+        const cl = k % 2, cxr = 0.3 + cl * 0.4 + (hash01(i, 80 + cl) - 0.5) * 0.15, cyr = 0.35 + cl * 0.3;
+        const a = hash01(i * 9 + k, 81) * Math.PI * 2, d = hash01(i * 9 + k, 82) * 0.18;
+        tree(x + cxr + Math.cos(a) * d, y + cyr + Math.sin(a) * d, 6 + hash01(i * 9 + k, 83) * 5, 2.6 + hash01(i * 9 + k, 84) * 1.5);
+      }
+      continue;
+    }
+    const nearWater = water.has(i + 1) || water.has(i - 1) || water.has(i + w) || water.has(i - w);
+    let n = c === "woodland" ? perCell : c === "scrub" ? (hash01(i, 2) < 0.25 ? 1 : 0) : c === "riverbank" ? (hash01(i, 4) < 0.55 ? 1 : 0) : 0;
+    if (nearWater && c !== "woodland" && hash01(i, 6) < 0.45) n++;
+    if (c === "grassland" && !inTown[i]) {
+      // Hedgerow trees along the paddock fences, and the odd tree standing alone.
+      const P = paddock(x, y);
+      if ((x === P.x0 || y === P.y0) && hash01(i, 7) < 0.4) tree(x === P.x0 ? x + 0.05 : x + hash01(i, 8), y === P.y0 ? y + 0.05 : y + hash01(i, 9), 6 + hash01(i, 10) * 4, 3 + hash01(i, 10) * 1.5);
+      else if (hash01(i, 5) < 0.015) n++;
+    } else if (c === "grassland" && hash01(i, 5) < 0.02) n++;
     for (let k = 0; k < n; k++) {
       const rx = hash01(i * 7 + k, 11), ry = hash01(i * 7 + k, 12), rh = hash01(i * 7 + k, 13);
-      out.push((x + 0.1 + rx * 0.8) * cell, -(y + 0.1 + ry * 0.8) * cell, 5 + rh * 6, 3 + rh * 2);
+      tree(x + 0.1 + rx * 0.8, y + 0.1 + ry * 0.8, 5 + rh * 6, 3 + rh * 2);
     }
   }
   return new Float32Array(out);

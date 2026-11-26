@@ -26,13 +26,15 @@ export interface CityViewProps {
   run?: string;
   /** Show the selection card on the map (default true; the shell's inspector drawer may stand in for it). */
   card?: boolean;
+  /** Start with the Layers panel open (default: collapsed to a small pill). */
+  layers?: boolean;
   /** Where the bundle is served; defaults to `/api/run/<key>`. */
   base?: string;
   /** Start the camera here instead of framed on the town (zoom, rotationX = tilt, rotationOrbit = turn, target in metres). */
   camera?: Partial<{ zoom: number; rotationX: number; rotationOrbit: number; target: [number, number, number] }>;
 }
 
-export function CityView({ runKey, run: runProp, base, camera, card = true }: CityViewProps) {
+export function CityView({ runKey, run: runProp, base, camera, card = true, layers = false }: CityViewProps) {
   const open = useLens((s) => s.run);
   const key = runKey ?? runProp ?? open;
   const url = base ?? (key ? `/api/run/${encodeURIComponent(key)}` : null);
@@ -40,7 +42,7 @@ export function CityView({ runKey, run: runProp, base, camera, card = true }: Ci
   return (
     <div className="lens-city">
       <style>{CITY_CSS}</style>
-      {city ? <Map city={city} camera={camera} card={card} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : url ? <><div className="lc-spin" />Drawing the town</> : "No run open"}</div>}
+      {city ? <Map city={city} camera={camera} card={card} layersOpen={layers} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : url ? <><div className="lc-spin" />Drawing the town</> : "No run open"}</div>}
     </div>
   );
 }
@@ -160,7 +162,7 @@ export function useCity(url: string | null): { city: CityData | null; error: str
   return state.url === url ? state : { city: null, error: null };
 }
 
-function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["camera"]; card: boolean }) {
+function Map({ city, camera, card, layersOpen }: { city: CityData; camera?: CityViewProps["camera"]; card: boolean; layersOpen: boolean }) {
   const t = useLens((s) => s.t);
   const selection = useLens((s) => s.selection);
   const hovered = useLens((s) => s.hovered);
@@ -230,6 +232,11 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
   const hovS = sel2structure(city, hovered);
   const selAct = selection?.kind === "act" ? selection.seq : hovered?.kind === "act" ? hovered.seq : -1;
 
+  // Follow: a selected person is tracked by the camera while time runs, until the viewer moves the map.
+  const playing = useLens((s) => s.playing);
+  const [follow, setFollow] = useState(false);
+  useEffect(() => { setFollow(selP >= 0); }, [selP]);
+
   // Fly to what is selected.
   useEffect(() => {
     let p: [number, number, number] | undefined;
@@ -239,6 +246,7 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
     setView((v) => ({ ...v, target: p!, zoom: Math.max(v.zoom as number, 2.1), transitionDuration: 900, transitionInterpolator: new LinearInterpolator(["target", "zoom"]) } as any));
   }, [selS, selP]);
 
+  const ver = city.where.version;
   // ---- People, every frame ----
   const nP = city.where.nP;
   const people = useMemo(() => ({ pos: new Float32Array(nP * 3), col: new Uint8Array(nP * 4), counts: {} as Record<string, number> }), [nP]);
@@ -281,8 +289,35 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
     people.counts = counts;
   }
 
+  // The camera follows the selected person (a gentle ease toward them each frame).
+  useEffect(() => {
+    if (!follow || selP < 0 || people.col[selP * 4 + 3] === 0) return;
+    const x = people.pos[selP * 3]!, y = people.pos[selP * 3 + 1]!;
+    setView((v) => {
+      const tg = (v.target ?? [0, 0, 0]) as number[];
+      const k = playing ? 0.12 : 0.25;
+      if (Math.abs(tg[0]! - x) + Math.abs(tg[1]! - y) < 0.3) return v;
+      return { ...v, target: [tg[0]! + (x - tg[0]!) * k, tg[1]! + (y - tg[1]!) * k, 0], transitionDuration: 0 } as any;
+    });
+  });
+
+  // ---- Crowds: at a distance, each building's people read as one soft glow sized by how many ----
+  const crowds = useMemo(() => {
+    const W = city.where, out: { p: [number, number, number]; n: number; c: RGBA }[] = [];
+    for (const i of B.boxes) {
+      const n = W.count[i]!;
+      if (!n) continue;
+      let best = 0, bk = 0;
+      for (let k = 0; k < W.nK; k++) { const m = W.countKind[k * W.nS + i]!; if (m > best) { best = m; bk = k; } }
+      const sh = B.shapes[i]!;
+      out.push({ p: [sh.cx, sh.cy, sh.top + 2], n, c: whereCol[bk] ?? movingCol });
+    }
+    return out;
+  }, [ver, B, city]);
+  const zoomNow = view.zoom as number;
+  const crowdF = Math.max(0, Math.min(1, (1.5 - zoomNow) / 1.1));
+
   // ---- Windows and pools of light, when anyone's place changes or the hour does ----
-  const ver = city.where.version;
   const glow = useMemo(() => {
     const W = city.where, n = B.windows.n;
     const col = new Uint8Array(n * 4);
@@ -307,7 +342,12 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
   // ---- Static data (kept by reference, so deck.gl does not recompute it each frame) ----
   const staticLayers = useMemo(() => ({
     W: town.ground.w * cell, H: town.ground.h * cell,
-    trees: { length: B.trees.length / 4 },
+    // Trees by crown size, one layer each (a column has one radius per layer).
+    trees: [2.2, 3.2, 4.2].map((r, k, all) => {
+      const idx: number[] = [];
+      for (let i = 0; i < B.trees.length / 4; i++) { const tr = B.trees[i * 4 + 3]!; const lo = k ? (all[k - 1]! + r) / 2 : 0, hi = k < all.length - 1 ? (r + all[k + 1]!) / 2 : 99; if (tr >= lo && tr < hi) idx.push(i); }
+      return { r, idx };
+    }),
     lamps: { length: B.lamps.length / 3, attributes: { getPosition: { value: B.lamps, size: 3 } } },
     wildlife: { length: town.wildlife.cells.length / 4 },
     nets: town.networks.filter((l) => l.mode !== "road"),
@@ -416,14 +456,14 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
       id: "parks", data: B.parks, getPolygon: (i: number) => { const sh = B.shapes[i]!; return rect(sh.cx, sh.cy, sh.fw, sh.fh, 0.3); },
       getFillColor: [92, 128, 84, 255], extruded: false, pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 40],
     }),
-    new ColumnLayer({
-      id: "trees", data: staticLayers.trees, diskResolution: 7, extruded: true,
-      getPosition: (_: any, { index }: any) => [B.trees[index * 4]!, B.trees[index * 4 + 1]!, 0],
-      getElevation: (_: any, { index }: any) => B.trees[index * 4 + 2]!,
-      getFillColor: (_: any, { index }: any) => { const r = hash01(index, 17); return [58 + r * 22, 78 + r * 22, 64 + r * 14, 255]; },
-      radius: 3.4, radiusUnits: "meters", getLineColor: [0, 0, 0, 0],
-      material: { ambient: 0.5, diffuse: 0.6, shininess: 8, specularColor: [30, 40, 30] },
-    } as any),
+    ...staticLayers.trees.map(({ r, idx }) => new ColumnLayer({
+      id: `trees-${r}`, data: idx, diskResolution: 7, extruded: true,
+      getPosition: (i: number) => [B.trees[i * 4]!, B.trees[i * 4 + 1]!, 0],
+      getElevation: (i: number) => B.trees[i * 4 + 2]!,
+      getFillColor: (i: number) => { const q = hash01(i, 17); return [76 + q * 22, 96 + q * 22, 80 + q * 14, 255]; },
+      radius: r, radiusUnits: "meters", getLineColor: [0, 0, 0, 0],
+      material: { ambient: 0.55, diffuse: 0.55, shininess: 8, specularColor: [30, 40, 30] },
+    } as any)),
     // Depth: soft contact shading round each footprint, and the sun's shadow.
     new SolidPolygonLayer({
       id: "ao", data: visibleMasses, getPolygon: (d: any) => rect(d.m.cx, d.m.cy, d.m.w + 5, d.m.h + 5, 0.37),
@@ -433,7 +473,7 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
       id: "ao2", data: visibleMasses, getPolygon: (d: any) => rect(d.m.cx, d.m.cy, d.m.w + 1.6, d.m.h + 1.6, 0.38),
       getFillColor: [12, 16, 24, 50], extruded: false, parameters: { depthWriteEnabled: false },
     }),
-    sky.day > 0.02 && new SolidPolygonLayer({
+    sky.day > 0.02 && zoomNow > -0.8 && new SolidPolygonLayer({
       id: "shadows", data: visibleMasses, getPolygon: ((d: any) => shadowOf(d.m, sky.sunDir).map(([x, y]) => [x, y, 0.4])) as any,
       getFillColor: [16, 20, 30, 78 * Math.min(1, sky.day * 1.3)], extruded: false, parameters: { depthWriteEnabled: false },
       updateTriggers: { getPolygon: sky.sunDir.join(","), getFillColor: sky.day },
@@ -513,10 +553,18 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
       id: "hall", data: [town.hall], getPosition: (i: number) => [B.shapes[i]!.cx, B.shapes[i]!.cy, 0.6], getRadius: 22, radiusUnits: "meters", billboard: false,
       stroked: true, filled: true, getFillColor: hex(PAL.seat, 26), getLineColor: hex(PAL.seat, 150), getLineWidth: 1.2, lineWidthUnits: "pixels",
     }),
-    // People.
+    // People: crowds at a distance, points up close.
+    overlays.people && crowdF > 0.02 && new ScatterplotLayer({
+      id: "crowds", data: crowds, getPosition: (d: any) => [d.p[0], d.p[1], 0.6], getRadius: (d: any) => 5 + Math.sqrt(d.n) * 3.4, radiusUnits: "meters", radiusMinPixels: 1.5,
+      getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * (0.22 + 0.2 * sky.night), parameters: { ...(sky.night > 0.5 ? ADDITIVE : { depthWriteEnabled: false }), depthCompare: "always" },
+    }),
+    overlays.people && crowdF > 0.02 && new ScatterplotLayer({
+      id: "crowds-core", data: crowds, getPosition: (d: any) => [d.p[0], d.p[1], 0.7], getRadius: (d: any) => 2 + Math.sqrt(d.n) * 1.5, radiusUnits: "meters", radiusMinPixels: 1,
+      getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * 0.55, parameters: { depthWriteEnabled: false, depthCompare: "always" },
+    }),
     overlays.people && new ScatterplotLayer({
       id: "people-halo", data: { length: nP, attributes: { getPosition: { value: people.pos, size: 3 }, getFillColor: { value: people.col, size: 4, normalized: true } } },
-      getRadius: 1.9, radiusUnits: "meters", radiusMinPixels: 2.2, radiusMaxPixels: 7, billboard: true, opacity: 0.16 + 0.22 * sky.night, parameters: ADDITIVE,
+      getRadius: 1.9, radiusUnits: "meters", radiusMinPixels: 2.2, radiusMaxPixels: 7, billboard: true, opacity: (0.16 + 0.22 * sky.night) * (1 - crowdF * 0.6), parameters: ADDITIVE,
     }),
     overlays.people && new ScatterplotLayer({
       id: "people", data: { length: nP, attributes: { getPosition: { value: people.pos, size: 3 }, getFillColor: { value: people.col, size: 4, normalized: true } } },
@@ -564,9 +612,9 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
   return (
     <div ref={wrap} className={`lc-wrap${dark ? "" : " light"}`} style={{ background: `rgb(${sky.backdrop.join(",")})` }}>
       <DeckGL
-        views={new OrbitView({ id: "city", orbitAxis: "Z", fovy: 32, near: 1, far: 20000 } as any)}
+        views={ORBIT}
         viewState={view as any}
-        onViewStateChange={({ viewState }) => setView(viewState as OrbitViewState)}
+        onViewStateChange={({ viewState, interactionState }) => { if (interactionState?.isDragging || interactionState?.isPanning || interactionState?.isZooming) setFollow(false); setView(viewState as OrbitViewState); }}
         controller={{ dragMode: "pan", inertia: 250, scrollZoom: { speed: 0.012, smooth: true }, touchRotate: true } as any}
         layers={layers.filter(Boolean) as any}
         effects={effects}
@@ -576,9 +624,11 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
         useDevicePixels={Math.min(2, typeof window !== "undefined" ? window.devicePixelRatio : 1)}
         parameters={{ depthCompare: "less-equal" } as any}
       />
+      <div className="lc-haze" style={{ opacity: Math.max(0, Math.min(1, (82 - (view.rotationX as number)) / 40)), background: `linear-gradient(to bottom, rgba(${sky.backdrop.join(",")},0.92) 0%, rgba(${sky.backdrop.join(",")},0.5) 16%, rgba(${sky.backdrop.join(",")},0) 44%)` }} />
       <div className="lc-vignette" />
+      {selP >= 0 && <button className={`lc-follow ${follow ? "on" : ""}`} onClick={() => setFollow(!follow)}>{follow ? <>Following {city.people.people[selP]![1]}<span className="muted"> · stop</span></> : <>Follow {city.people.people[selP]![1]}</>}</button>}
       <Clock t={t} sky={sky} town={town} />
-      <Panel overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />
+      <Panel open0={layersOpen} overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />
       {tip && <Tooltip tip={tip} city={city} t={t} name={(i) => structureName(city, i)} />}
       {card && <Card city={city} t={t} selection={selection} name={(i) => structureName(city, i)} onClose={() => select(null)} />}
     </div>
@@ -586,6 +636,7 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
 }
 
 const COLLIDE = new CollisionFilterExtension();
+const ORBIT = new OrbitView({ id: "city", orbitAxis: "Z", fovy: 32, near: 1, far: 20000 } as any);
 const ADDITIVE = { depthWriteEnabled: false, blend: true, blendColorOperation: "add", blendColorSrcFactor: "src-alpha", blendColorDstFactor: "one", blendAlphaOperation: "add", blendAlphaSrcFactor: "one", blendAlphaDstFactor: "one" } as any;
 const NET_COL: Record<string, string> = { pipe: "#5fb0e8", sewer: "#a48a62", wire: "#f2d36b" };
 const NET_OFF: Record<string, number> = { pipe: -4, sewer: 4, wire: 0 };
