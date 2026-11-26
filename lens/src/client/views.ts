@@ -36,6 +36,8 @@ export interface Views {
   diff?: ComponentType<{ keys: string[]; day?: number }>;
   /** A printable digest of one run, #/digest/<key> (story's RunDigest): the top bar and nothing else around it. */
   digest?: ComponentType<{ run: string }>;
+  /** The town in 3D (lens-world's WorldView): offered beside the map in the map slot as "Map | Town in 3D". */
+  world?: ComponentType<SlotProps>;
   /** Who holds which office over the run, #/power/<key> (city's PowerView). */
   power?: ComponentType<{ run: string }>;
 }

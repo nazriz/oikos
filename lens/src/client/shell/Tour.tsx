@@ -53,6 +53,12 @@ const STEPS: Step[] = [
   },
   {
     route: onRun,
+    target: ['[data-tour="city-town-hall"]', '[data-tour="city-map"]', ".run-map"],
+    title: "The town hall",
+    body: "This is where the AI mayor works. When one of its acts reaches someone, a yellow line runs from here to the building it reached.",
+  },
+  {
+    route: onRun,
     target: [".run-timeline .tl"],
     title: "Time",
     body: "Drag along this strip to move through the run, or press play. The marks are the mayor's turns, the election and other events; click one to jump to it.",

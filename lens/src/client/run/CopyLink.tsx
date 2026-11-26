@@ -47,7 +47,7 @@ export function CopyLink() {
   }, []);
   return (
     <button className={`btn ghost run-copy ${done ? "done" : ""}`} onClick={go} title="Copy a link to this moment and selection (L)">
-      {done ? "link copied" : "copy link"}
+      {done ? "Link copied" : "Copy link"}
     </button>
   );
 }
