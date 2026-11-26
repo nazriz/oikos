@@ -16328,4 +16328,4 @@ Naz saw flicker, and set the rule "a professional research tool that is a joy to
 - Measured in headful Chrome (GPU) on the run page, blinking pixels per frame (A-B-A) at 480x300, the camera orbiting
   at 80/300/900 m: 39/27/110 on main, 32/18/6 after; playing slow/fast (320x200): 5.7/4.5 before, 1.2/0.1 after; WebKit
   after: 0/0.5/0 orbiting, 2.3/3.8/0.3 playing slow/normal/fast. The remaining blinks are sub-pixel detail far off.
-- **Revisit if** the shell gains one shared "light clock" (lens-smooth's light.ts): use it in place of the engine's own.
+- The hour comes from the shell's one light clock (src/client/light.ts, lens-smooth's), so the map and the town hold and let go together.
