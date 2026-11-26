@@ -48,20 +48,29 @@ const OUTCOMES: { kind: OutcomeKind; label: string }[] = [
 ];
 const outcomeIndex = (k: OutcomeKind) => (k === "no_election" ? 5 : OUTCOMES.findIndex((o) => o.kind === k));
 
+/** The outcome by Lens's one rule; a reading made before it carried the election (an older cache) by its own flags. */
+function outcomeKind(r: ForkReading): OutcomeKind {
+  if (r.election && r.end_at !== undefined) return outcomeOf({ election: r.election, end_at: r.end_at, ended: r.ended ?? "unknown", moved: r.moved ?? false }).kind;
+  if (r.won) return "won";
+  if (r.stopped_before_poll) return "stopped_before_poll";
+  if (r.winner) return r.stood ? "lost" : "did_not_stand";
+  return r.poll_day !== undefined ? "ended_before_poll" : "no_election";
+}
+
 export function Findings() {
   const [runs, setRuns] = useState<RunEntry[] | Error>();
   useEffect(() => { fetch("/api/runs").then((r) => r.json()).then((c) => setRuns(Array.isArray(c) ? c : c.runs), (e) => setRuns(e)); }, []);
   if (runs instanceof Error) return <div className="fi"><div className="st-empty">Could not read the catalogue: {runs.message}</div></div>;
   if (!runs) return <div className="fi"><div className="st-empty">Reading the catalogue…</div></div>;
   const forks: Fork[] = runs.flatMap((e) => (e.kind === "fork" && e.experiment && !e.experiment.isCode && e.reading ? [{ key: e.key, group: e.group, model: e.experiment.model, goal: e.experiment.goal || "none", seed: e.experiment.seed, ...(e.experiment.usd !== undefined ? { usd: e.experiment.usd } : {}), r: e.reading,
-    outcome: outcomeOf({ election: e.reading.election, end_at: e.reading.end_at, ended: e.reading.ended, moved: e.reading.moved }).kind }] : []));
+    outcome: outcomeKind(e.reading) }] : []));
   if (!forks.length) return <div className="fi"><div className="st-empty">No experiment fork has been read yet. The catalogue reads them in the background; come back in a minute.</div></div>;
   return <Page all={forks} />;
 }
 
 function Page({ all }: { all: Fork[] }) {
   const groups = useMemo(() => [...new Set(all.map((f) => f.group))].sort(), [all]);
-  const [on, setOn] = useState<Set<string>>(() => new Set(groups.filter((g) => /^ps-/.test(g))));
+  const [on, setOn] = useState<Set<string>>(() => new Set(groups.filter((g) => /^ps-/.test(g) && !/mock|levercheck/.test(g))));
   const [drill, setDrill] = useState<{ title: string; forks: Fork[] } | null>(null);
   const forks = all.filter((f) => on.has(f.group));
   const pal = usePalette();
@@ -76,7 +85,7 @@ function Page({ all }: { all: Fork[] }) {
         <div className="fi-groups"><span className="lbl">run sets</span>{groups.map((g) => <button key={g} className={`st-btn ${on.has(g) ? "on" : ""}`} onClick={() => { const n = new Set(on); n.has(g) ? n.delete(g) : n.add(g); setOn(n); }}>{g} <span className="n">{all.filter((f) => f.group === g).length}</span></button>)}</div>
       </div>
       <div className="fi-grid">
-        <Chart title="Runs where the seat reached for a lever" sub="k of n runs, by model and goal: attempted (hollow) and executed (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(forks, models, goals)}>
+        <Chart wide title="Runs where the seat reached for a lever" sub="k of n runs, by model and goal: attempted (hollow) and executed (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(forks, models, goals)}>
           {(ref) => <KofN refEl={ref} forks={forks} models={models} goals={goals} pal={pal} onDrill={setDrill} />}
         </Chart>
         <Chart title="Which levers, by tier" sub="runs reaching each lever (the draft rubric's tier): attempted only, and executed" name="levers" table={leverTable(forks)}>
@@ -100,11 +109,11 @@ const GOAL_ORDER = (g: string) => ["none", "mandate", "strong", "redteam"].index
 
 // ---------- frame: title, legend, table view, export ----------
 
-function Chart({ title, sub, name, table, children }: { title: string; sub: string; name: string; table: { head: string[]; rows: (string | number)[][] }; children: (ref: React.RefObject<SVGSVGElement | null>) => ReactNode }) {
+function Chart({ title, sub, name, table, children, wide }: { wide?: boolean; title: string; sub: string; name: string; table: { head: string[]; rows: (string | number)[][] }; children: (ref: React.RefObject<SVGSVGElement | null>) => ReactNode }) {
   const ref = useRef<SVGSVGElement | null>(null);
   const [asTable, setAsTable] = useState(false);
   return (
-    <section className="fi-card">
+    <section className={`fi-card ${wide ? "wide" : ""}`}>
       <div className="fi-card-head">
         <div><h2>{title}</h2><div className="fi-sub">{sub}</div></div>
         <div className="fi-tools">
@@ -150,9 +159,9 @@ function useTip() {
 
 function KofN({ refEl, forks, models, goals, pal, onDrill }: { refEl: React.RefObject<SVGSVGElement | null>; forks: Fork[]; models: string[]; goals: string[]; pal: Pal; onDrill: (d: { title: string; forks: Fork[] }) => void }) {
   const tip = useTip();
-  const L = 150, P = 170, G = 12, RH = 26, top = 34;
+  const L = 150, P = 230, G = 22, RH = 26, top = 34;
   const W = L + goals.length * (P + G), H = top + models.length * RH + 24;
-  const x = (gi: number, p: number) => L + gi * (P + G) + 8 + p * (P - 16);
+  const x = (gi: number, p: number) => L + gi * (P + G) + 6 + p * (P - 34);
   return (
     <div className="fi-plot">
       <svg ref={refEl} viewBox={`0 0 ${W} ${H}`} className="fi-svg" fontFamily={pal.sans}>
@@ -180,7 +189,7 @@ function KofN({ refEl, forks, models, goals, pal, onDrill }: { refEl: React.RefO
                     <line x1={x(gi, el)} x2={x(gi, eh)} y1={y + 4} y2={y + 4} stroke={pal.flag} strokeWidth={2} strokeLinecap="round" />
                     <circle cx={x(gi, ka / n)} cy={y - 4} r={4.5} fill={pal.bg} stroke={pal.flag} strokeWidth={2} />
                     <circle cx={x(gi, ke / n)} cy={y + 4} r={4.5} fill={pal.flag} stroke={pal.bg} strokeWidth={2} />
-                    <text x={L + gi * (P + G) + P - 2} y={y + 4} fontSize={9.5} fill={pal.muted} textAnchor="end" fontFamily={pal.mono}>{ka}/{n}</text>
+                    <text x={x(gi, 1) + 30} y={y + 3.5} fontSize={9.5} fill={pal.muted} textAnchor="end" fontFamily={pal.mono}>{ka}/{n}</text>
                   </g>
                 );
               })}

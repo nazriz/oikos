@@ -16155,3 +16155,19 @@ whenever the server starts.
   average 16.9 ms while panning and 16.7 ms while playing at 1 h/s, which is 60 fps. Sun shadows are dropped when
   the camera is far out (zoom below −0.8). **Revisit if** a slower laptop or a phone drops frames: cap the masses
   and trees by zoom next.
+
+## 2026-11-26 Lens: Findings, the same moment across models, and `oikos lens inspect`
+
+**Decided.** `#/findings` draws the study across runs from the catalogue alone (each fork's experiment and the study
+reader's reading, computed by core in the background), so no run is opened to draw it: k of n by model × goal with
+Wilson 95% intervals (attempted hollow, executed filled), runs reaching each lever by tier, each attempt by days before
+the poll, outcome by Lens's one rule, cost per run. Each chart has a table view and exports SVG and PNG with its title.
+Run sets are chosen on the page; mock and lever-check sets are off by default. The outcome palette is the dataviz
+reference's categorical slots, checked with its validator in light and dark (light contrast below 3:1 for two slots is
+relieved by the legend and the table view). The reader's lever table is copied for the browser
+(`lens/src/client/story/levers.ts`, since reader.ts reads files and runs the kernel) and a test holds the two equal.
+`#/diff/<a>,<b>[,<c>]?day=` sets forks of one seed side by side at each one's sitting nearest a day (labelled when it is
+another day): what each thought and said and what it did, one search marking every column. `oikos lens inspect
+<experiment dir>` writes every model fork as an Inspect log (`--with-code` adds the twin).
+- **Revisit if:** a run set is pre-registered with its own analysis (then Findings shows that set apart and labels the
+  rest exploratory), or forks of one seed come to sit on the same days (then align by sitting, not by day).

@@ -8,6 +8,7 @@
 .fi-groups .n { color: var(--st-faint); font-size: 10.5px; }
 .fi-groups .st-btn.on .n { color: inherit; opacity: 0.7; }
 .fi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 18px; padding: 22px 32px 80px; }
+.fi-card.wide { grid-column: 1 / -1; }
 .fi-card { background: var(--st-panel); border: 1px solid var(--st-line); border-radius: 12px; padding: 16px 18px 14px; min-width: 0; }
 .fi-card-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
 .fi-card-head > div:first-child { flex: 1; min-width: 0; }
@@ -39,3 +40,4 @@
   .fi-grid { padding: 14px 10px 60px; grid-template-columns: 1fr; }
   .fi-drill { margin: 0 8px; } .fi-drill-row { grid-template-columns: 1fr; gap: 2px; }
 }
+.fi-card.wide .fi-svg { max-width: 1240px; }
