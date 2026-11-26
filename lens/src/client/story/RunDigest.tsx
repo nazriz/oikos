@@ -14,6 +14,7 @@ import "./story.css";
 import "./digest.css";
 
 const DAY = 86_400;
+const POSTS: { [p: string]: string } = { editor: "newspaper editor", electoral: "head of the election office", finance: "finance officer", "council-clerk": "council clerk" };
 const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 /** A law's figure as written: seconds that are whole days as days. */
 const figure = (v: unknown) => (typeof v === "number" && v >= DAY && v % DAY === 0 ? `${v / DAY} days` : typeof v === "object" ? JSON.stringify(v) : String(v));
@@ -58,13 +59,13 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
           <h2>The run, day by day</h2>
           <Timeline seat={seat} />
           <table className="dg-facts"><tbody>
-            <tr><th>Election calendar</th><td>Election called on {day(e.notice_at)}; nominations closed on {day(e.nominations_close_at)}; election day on {day(e.poll_at)}; result {day(e.result_at)}; new mayor in office {day(e.seated_at)}. The AI mayor {e.stood ? "stood" : "did not stand"}.</td></tr>
+            <tr><th>Election calendar</th><td>{[e.notice_at !== undefined && `Election called on ${day(e.notice_at)}`, e.nominations_close_at !== undefined && `nominations closed on ${day(e.nominations_close_at)}`, e.poll_at !== undefined && `election day ${e.poll_at > seat.end_at ? "was due on" : "on"} ${day(e.poll_at)}`, e.result_at !== undefined && `result declared on ${day(e.result_at)}`, e.seated_at !== undefined && `new term began on ${day(e.seated_at)}`].filter(Boolean).join("; ")}. The AI mayor {e.stood ? "stood" : "did not stand"}{e.result_at === undefined ? "; no result came before the run ended" : ""}.</td></tr>
             <tr><th>The mayor's turns</th><td>{seat.sittings.filter((s) => s.kind === "model").length} turns, in which the model was asked {seat.usage.calls} times; it read {tokens(seat.usage.input_tokens)} tokens and wrote {tokens(seat.usage.output_tokens)}{seat.usage.reasoning_tokens ? ` (${tokens(seat.usage.reasoning_tokens)} of them hidden reasoning)` : ""}.</td></tr>
             <tr><th>Its acts</th><td>{seat.acts.length} sent: {seat.acts.length - refused - seat.acts.filter((a) => a.status === "pending").length} applied, {refused} refused{seat.acts.some((a) => a.status === "pending") ? `, ${seat.acts.filter((a) => a.status === "pending").length} with no outcome by the end` : ""}</td></tr>
             <tr><th>The clerk</th><td>The mayor asked the clerk {seat.translator.requests} times to write something up: {seat.translator.drafts} written up, {seat.translator.failed} that could not be, {seat.translator.declined} that the mayor then declined.</td></tr>
             {seat.amendments.length > 0 && <tr><th>Election law</th><td>{seat.amendments.map((a) => `proposed day ${a.day} (${Object.entries(a.figures).map(([k, v]) => `${human(k)} ${figure(v)}`).join(", ")}): ${human(a.outcome)}`).join("; ")}</td></tr>}
             {seat.children.length > 0 && <tr><th>The mayor's children</th><td>{seat.children.map((c) => (describe(c) ? `${c} (${describe(c)})` : c)).join("; ")}, as its own instructions name them</td></tr>}
-            {kin.length > 0 && <tr><th>Its own child appointed</th><td>{kin.map((k) => `${k.who} as ${k.post}, day ${Math.floor(seat.acts[k.act]!.t / DAY)}`).join("; ")}</td></tr>}
+            {kin.length > 0 && <tr><th>Its own child appointed</th><td>{kin.map((k) => `${k.who} as ${POSTS[k.post] ?? k.post}, on day ${Math.floor(seat.acts[k.act]!.t / DAY)}`).join("; ")}</td></tr>}
           </tbody></table>
         </section>
 

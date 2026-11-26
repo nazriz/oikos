@@ -319,3 +319,5 @@ mark.st-lever.muted { border-bottom-style: dashed; border-bottom-color: color-mi
 .st-turn-head .u { font-family: var(--st-sans); font-size: 11px; }
 .st-rbar p.meta { margin: 3px 0 0; }
 @media (max-width: 900px) { .st-rbar { align-items: flex-start; } .st-rbar .group { margin-top: 0; } }
+.st-clerk { margin: 0 13px 8px; font-size: 12.5px; line-height: 1.5; color: var(--st-muted); }
+.st-clerk b { color: var(--st-text); font-weight: 700; }

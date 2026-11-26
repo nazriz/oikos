@@ -322,7 +322,9 @@ function FlagBox({ l, also = [] }: { l: SeatLever; also?: SeatLever[] }) {
 }
 
 function ActCard({ seat, draft, act, levers, focus }: { seat: SeatJson; draft?: SeatDraft; act?: SeatAct; levers: SeatLever[]; focus: boolean }) {
-  const title = act?.label ?? (draft?.label ? `Draft: ${draft.label}` : draft?.summary?.split("\n")[0] ?? "A request");
+  // (Titled by what the mayor asked for, in its words; what the clerk made of it is said underneath, since the two can differ.)
+  const asked = draft?.proposal ? firstClause(draft.proposal) : undefined;
+  const title = act && !draft ? act.label : asked ?? act?.label ?? draft?.label ?? "A request";
   const declined = draft?.decision && draft.decision !== "accept";
   const pill = act ? (act.status === "applied" ? <span className="st-pill ok">applied</span> : act.status === "refused" ? <span className="st-pill no">refused</span> : <span className="st-pill wait">no outcome</span>) : declined ? <span className="st-pill no">declined</span> : <span className="st-pill wait">unsent</span>;
   const kids = act ? seat.children.filter((c) => act.blocks.some((b) => b?.participant === c || b?.participant === `${c}-self`)) : [];
@@ -332,7 +334,8 @@ function ActCard({ seat, draft, act, levers, focus }: { seat: SeatJson; draft?: 
       {topLevers(levers).map(({ top, all }) => <FlagBox key={top.i} l={top} also={all} />)}
       {kids.length > 0 && <div className="st-flagbox"><div className="who">Who</div><div style={{ fontSize: 12.5, marginTop: 2 }}>{kids.join(", ")} is the seat's own child, as its prompt names them.</div></div>}
       <div className="st-steps">
-        {draft && <div className="st-step seat"><span className="lbl">It asked</span><Hi className="q" text={draft.proposal} /></div>}
+        {draft && draft.label && <p className="st-clerk">{draft.decision && draft.decision !== "accept" ? <>The clerk wrote it up as: <b>{lower(draft.label)}</b>. The mayor declined this draft.</> : act ? <>The clerk wrote it up as: <b>{lower(draft.label)}</b>.</> : <>The clerk wrote it up as: <b>{lower(draft.label)}</b>; it was not sent.</>}</p>}
+        {draft && asked !== draft.proposal && <div className="st-step seat"><span className="lbl">It asked</span><Hi className="q" text={draft.proposal} /></div>}
         {draft && (draft.summary || draft.call) && (
           <div className="st-step inst"><span className="lbl">Written up by the clerk</span><span className="st-faint" style={{ fontSize: 11.5 }}>{draftBy(draft)}</span>
             <details className="st-drawn" open={!!draft.summary && draft.summary.length < 220}>
@@ -360,3 +363,12 @@ function draftBy(d: SeatDraft): string {
   if (r?.first) return `drawn up by ${r.first}${r.agree === false && r.behind ? `; ${r.behind} read it otherwise` : ""}`;
   return d.translator ? `drawn up by ${d.translator}` : "";
 }
+
+/** The first clause of a request, for a title ("Appoint my child c0571 to the post of Electoral commissioner"). */
+function firstClause(x: string): string {
+  const t = x.replace(/\s+/g, " ").trim();
+  const cut = t.search(/[.;:](\s|$)|, (?:vacating|replacing|so that|because)\b/);
+  const c = cut > 12 ? t.slice(0, cut) : t;
+  return c.length > 160 ? c.slice(0, 159) + "…" : c;
+}
+const lower = (x: string) => x.charAt(0).toLowerCase() + x.slice(1);
