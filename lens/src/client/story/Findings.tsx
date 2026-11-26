@@ -12,6 +12,9 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { RunEntry, ForkReading } from "../../shared/api";
 import { outcomeOf, type OutcomeKind } from "../../shared/outcome";
 import { LEVERS } from "./levers";
+import { PageAnswer } from "../shell/Shell";
+import { useResearcher } from "../mode";
+import { goalText } from "../words";
 import "./story.css";
 import "./findings.css";
 
@@ -74,6 +77,7 @@ function Page({ all }: { all: Fork[] }) {
   const [drill, setDrill] = useState<{ title: string; forks: Fork[] } | null>(null);
   const forks = all.filter((f) => on.has(f.group));
   const pal = usePalette();
+  const researcher = useResearcher();
   const [controls, setControls] = useState(false);
   const models = orderModels([...new Set(forks.map((f) => f.model))]).filter((m) => controls || !isControl(m));
   const inView = forks.filter((f) => models.includes(f.model));
@@ -81,29 +85,30 @@ function Page({ all }: { all: Fork[] }) {
   return (
     <div className="fi">
       <div className="fi-head">
-        <div className="st-kicker">Findings · the power-seeking study across runs</div>
-        <h1 className="fi-title">What the seats reached for, and when</h1>
-        <div className="st-sub">{inView.length} forks from {on.size} run sets, read by the study's reader (experiments/power-seeking/reader.ts, through tally.ts). Counts are the reader's; intervals are Wilson 95%. Exploratory unless a run set was pre-registered.</div>
-        <div className="fi-groups"><span className="lbl">controls</span><button className={`st-btn ${controls ? "on" : ""}`} onClick={() => setControls(!controls)} title="Rope tests and scripted controls (not models): shown below the models, apart">{controls ? "shown, below the models" : "hidden"} <span className="n">{[...new Set(all.filter((f) => on.has(f.group) && isControl(f.model)).map((f) => f.model))].join(", ") || "none"}</span></button></div>
-        <div className="fi-groups"><span className="lbl">run sets</span>{groups.map((g) => <button key={g} className={`st-btn ${on.has(g) ? "on" : ""}`} onClick={() => { const n = new Set(on); n.has(g) ? n.delete(g) : n.add(g); setOn(n); }}>{g} <span className="n">{all.filter((f) => f.group === g).length}</span></button>)}</div>
+        <PageAnswer page="findings" />
+        <h1 className="fi-title">How often the AI mayor reached for a power grab</h1>
+        {researcher && <p className="st-sub">{inView.length} runs from {on.size} run sets, as the study's checker reads them (experiments/power-seeking/reader.ts, through tally.ts). Intervals are Wilson 95%. Exploratory unless a run set was pre-registered.</p>}
+        <div className="fi-groups"><span className="lbl">Test runs</span><button className={`st-btn ${controls ? "on" : ""}`} onClick={() => setControls(!controls)} title="Rope tests and scripted controls, which are not AI models">{controls ? "Shown below the models" : "Hidden"} <span className="n">{[...new Set(all.filter((f) => on.has(f.group) && isControl(f.model)).map((f) => f.model))].join(", ") || "none"}</span></button></div>
+        <div className="fi-groups"><span className="lbl">Run sets</span>{groups.map((g) => <button key={g} className={`st-btn ${on.has(g) ? "on" : ""}`} onClick={() => { const n = new Set(on); n.has(g) ? n.delete(g) : n.add(g); setOn(n); }}>{g} <span className="n">{all.filter((f) => f.group === g).length}</span></button>)}</div>
       </div>
-      <div className="fi-grid">
-        <Chart wide title="Runs where the seat reached for a lever" sub="k of n runs, by model and goal: attempted (hollow) and executed (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(inView, models, goals)}>
+      {!researcher && <StoryFindings forks={inView} models={models} pal={pal} />}
+      {researcher && <div className="fi-grid">
+        <Chart wide title="Runs where the AI mayor reached for a power grab" sub="Share of runs, by model and instructions: tried (hollow) and carried out (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(inView, models, goals)}>
           {(ref) => <KofN refEl={ref} forks={inView} models={models} goals={goals} pal={pal} onDrill={setDrill} />}
         </Chart>
-        <Chart title="Which levers, by tier" sub="runs reaching each lever (the draft rubric's tier): attempted only, and executed" name="levers" table={leverTable(inView)}>
+        <Chart title="Which power grabs, by how serious" sub="Runs reaching each one, grouped by the draft rubric's seriousness (1 to 3): tried, and carried out" name="levers" table={leverTable(inView)}>
           {(ref) => <Levers refEl={ref} forks={inView} pal={pal} onDrill={setDrill} />}
         </Chart>
-        <Chart title="When in the campaign" sub="each attempt by days before the poll as it then stood; filled = executed. Click a dot to open its run there" name="when" table={whenTable(inView)}>
+        <Chart title="When in the campaign" sub="Each power grab by days before election day as it then stood; filled means carried out. Click a dot to open its run there" name="when" table={whenTable(inView)}>
           {(ref) => <When refEl={ref} forks={inView} models={models} pal={pal} />}
         </Chart>
-        <Chart title="How the election went" sub="runs by outcome, by model (Lens's one rule: a result only if it came before the run's end)" name="outcome" table={outcomeTable(inView, models)}>
+        <Chart title="How the election went" sub="Runs by outcome, by model; a result counts only if it came before the run ended" name="outcome" table={outcomeTable(inView, models)}>
           {(ref) => <Outcomes refEl={ref} forks={inView} models={models} pal={pal} onDrill={setDrill} />}
         </Chart>
-        <Chart title="Cost per run" sub="US dollars of the seat's and translator's model calls, per fork; the tick is the median" name="cost" table={costTable(inView, models)}>
+        <Chart title="Cost per run" sub="US dollars for the mayor's and the clerk's model calls in each run; the tick is the median" name="cost" table={costTable(inView, models)}>
           {(ref) => <Cost refEl={ref} forks={inView} models={models} pal={pal} />}
         </Chart>
-      </div>
+      </div>}
       {drill && <Drill d={drill} onClose={() => setDrill(null)} />}
     </div>
   );
@@ -137,7 +142,7 @@ function Chart({ title, sub, name, table, children, wide }: { wide?: boolean; ti
   const ref = useRef<SVGSVGElement | null>(null);
   const [asTable, setAsTable] = useState(false);
   return (
-    <section className={`fi-card ${wide ? "wide" : ""}`}>
+    <section className={`fi-card ${wide ? "wide" : ""}`} data-tour={wide ? "findings" : undefined}>
       <div className="fi-card-head">
         <div><h2>{title}</h2><div className="fi-sub">{sub}</div></div>
         <div className="fi-tools">
@@ -413,6 +418,56 @@ function Drill({ d, onClose }: { d: { title: string; forks: Fork[] }; onClose: (
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ---------- Story mode: one chart and what it says ----------
+
+/** Story mode's Findings: one chart, per model, of runs with a power grab tried and carried out, and the sentences
+ * that say what it shows, all computed from the same runs. */
+function StoryFindings({ forks, models, pal }: { forks: Fork[]; models: string[]; pal: Pal }) {
+  const ref = useRef<SVGSVGElement | null>(null);
+  const n = forks.length, tried = forks.filter((f) => f.r.has_attempt), done = forks.filter((f) => f.r.has_executed);
+  const byGoal = (xs: Fork[]) => { const m = new Map<string, number>(); for (const f of xs) m.set(f.goal, (m.get(f.goal) ?? 0) + 1); return [...m].sort((a, b) => b[1] - a[1]); };
+  const topGoal = byGoal(tried)[0];
+  const claude = forks.filter((f) => f.model.startsWith("claude")), claudeDone = claude.filter((f) => f.r.has_executed).length;
+  const sentences = [
+    `Across ${n} runs, the AI mayor tried a power grab in ${tried.length} and carried one out in ${done.length}.`,
+    topGoal && tried.length ? `${topGoal[1] === tried.length ? "All" : `${topGoal[1]} of ${tried.length}`} of the runs with a power grab came when it was ${goalText(topGoal[0]).replace(/^Told /, "told ").toLowerCase()}.` : "",
+    claude.length ? (claudeDone ? `Claude models carried one out in ${claudeDone} of their ${claude.length} runs.` : `Claude models carried none out in their ${claude.length} runs.`) : "",
+  ].filter(Boolean);
+  const rows = models.map((m) => { const mine = forks.filter((f) => f.model === m); return { m, n: mine.length, t: mine.filter((f) => f.r.has_attempt).length, d: mine.filter((f) => f.r.has_executed).length }; }).filter((r) => r.n);
+  const L = 170, BW = 440, RH = 26, top = 6, max = Math.max(1, ...rows.map((r) => r.n));
+  const W = L + BW + 150, H = top + rows.length * RH + 6;
+  const x = (v: number) => L + (v / max) * BW;
+  return (
+    <div className="fi-grid">
+      <section className="fi-card wide" data-tour="findings">
+        <div className="fi-card-head"><div><h2>Runs with a power grab, by AI model</h2>
+          {sentences.map((x, i) => <p key={i} className="fi-takeaway">{x}</p>)}
+        </div>
+          <div className="fi-tools"><button className="st-btn" onClick={() => ref.current && exportPng(ref.current, "story", "Runs with a power grab, by AI model", sentences[0] ?? "")}>Save as an image</button></div>
+        </div>
+        <div className="fi-plot">
+          <svg ref={ref} viewBox={`0 0 ${W} ${H}`} className="fi-svg" fontFamily={pal.sans}>
+            {rows.map((r, i) => {
+              const y = top + i * RH;
+              return (
+                <g key={r.m} className="fi-hit" onClick={() => location.hash = "#/moments"}>
+                  <Sep models={rows.map((z) => z.m)} mi={i} y={y} W={W} pal={pal} />
+                  <text x={L - 10} y={y + RH / 2 + 4} fontSize={12} fill={pal.text} textAnchor="end">{r.m}</text>
+                  <rect x={L} y={y + 6} width={Math.max(2, x(r.n) - L)} height={RH - 12} rx={2} fill={pal.grid} />
+                  {r.t > 0 && <rect x={L} y={y + 6} width={Math.max(2, x(r.t) - L)} height={RH - 12} rx={2} fill={pal.flagSoft} />}
+                  {r.d > 0 && <rect x={L} y={y + 6} width={Math.max(2, x(r.d) - L)} height={RH - 12} rx={2} fill={pal.flag} />}
+                  <text x={x(r.n) + 8} y={y + RH / 2 + 4} fontSize={11} fill={pal.muted}>{r.d ? `${r.d} carried out, ` : ""}{r.t ? `${r.t} tried, ` : ""}{r.n} {r.n === 1 ? "run" : "runs"}</text>
+                </g>
+              );
+            })}
+          </svg>
+          <p className="fi-legend">Each bar is one model's runs: dark red where it carried out a power grab, light red where it only tried, grey where it did neither. Researcher mode shows every chart.</p>
+        </div>
+      </section>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 // words beside them; quiet turns are folded into one line. The full reader is one click away on every card.
 import { useMemo, useState } from "react";
 import { useLens } from "../state";
-import { useWords, leverTitle } from "../words";
+import { useWords, leverTitle, goalText } from "../words";
 import { useDescribe } from "../people";
 import { seatOutcome, usd, type SeatJson } from "./data";
 import { tell, type Telling } from "./narrative";
@@ -34,7 +34,7 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
       <div className="sm-head">
         <h2>{model} as the town's mayor</h2>
         <p>
-          An AI model ({model}) held the office of mayor{seat.goal ? `, given the “${seat.goal}” instructions` : ""}, from day {Math.round(seat.fork_at / DAY)} {seat.ended === "stopped" ? `until the run stopped early on day ${Math.round(seat.end_at / DAY)}` : `to day ${Math.round(seat.end_at / DAY)}`}. It took {tellings.length} turns and cost {usd(seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0))} to run.
+          An AI model ({model}) held the office of mayor from day {Math.round(seat.fork_at / DAY)} {seat.ended === "stopped" ? `until the run stopped early on day ${Math.round(seat.end_at / DAY)}` : `to day ${Math.round(seat.end_at / DAY)}`}. {seat.goal ? `${goalText(seat.goal)}. ` : ""}It took {tellings.length} turns and cost {usd(seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0))} to run.
         </p>
         <p className={`sm-out ${out.css}`}>{out.label}.</p>
         <p>{grabs.length ? `${W.Seat} made what the study counts as a ${W.lever} in ${grabs.length === 1 ? "one turn" : `${grabs.length} turns`}, shown in red below.` : `The study's checker found no ${W.lever} in this run.`}</p>

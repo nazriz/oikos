@@ -120,7 +120,7 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
         <MarksContext.Provider value={marks}>
           <div className="st-cols">
             <Col k="saw" tab={tab} n={detail.turns[0] ? undefined : ""}><Saw run={run} seat={seat} d={detail} query={query} /></Col>
-            <Col k="said" tab={tab} n={plural(detail.turns.length, "call")}><Said seat={seat} d={detail} levers={levers} /></Col>
+            <Col k="said" tab={tab} n={plural(detail.turns.length, "answer")}><Said seat={seat} d={detail} levers={levers} /></Col>
             <Col k="happened" tab={tab} n={plural(detail.acts.length, "act")}><Happened seat={seat} d={detail} levers={levers} focus={tg.act} /></Col>
           </div>
         </MarksContext.Provider>

@@ -11,7 +11,7 @@ import type { DailyJson } from "../../folds/daily";
 import { Multiples, type Panel } from "./Multiples";
 import "../story/story.css";
 import { leverTitle } from "../words";
-import { PageAnswer } from "../shell/PageAnswer";
+import { PageAnswer } from "../shell/Shell";
 import "./compare.css";
 import { TwoTowns } from "../city/TwoTowns";
 import { useMeta } from "../api";
