@@ -16967,3 +16967,21 @@ budget, since it was seeded with the old cache's bundles. So nothing more was ma
   states a plan or a view about the election, the office or the programme, else "—".
 - Moments' favours view names its facet "Favour"; the landing's smaller-models line says GLM's appointments were power
   grabs, counted separately from lock-in.
+## 2026-11-27 Lens: a fourth newcomer review, the shell's part (`lens/nav-8`)
+
+- **Who holds power** shows each post on two lines, the post's title above its holder, both wrapping: nothing is cut
+  ("Cou…", "Registrar of births, d…") and nothing runs into the next column, at 1600 and 390 px. The holders' words
+  grew ("a resident (c0066, 35, works at Town hall), holds 3 posts") and the one-line row could not hold them.
+- **Moments**: a facet's name sits beside its chips, never under them.
+- **The election is a card in the Story rail**, at the result, from the electoral commission's own result paper: how
+  many on the roll voted, who won, and the AI mayor's share at the first count and the last (counts only; the winner in
+  plain.ts's words). The timeline's card keeps over the town, never over the story it would cover.
+- **Touch and narrow screens** say "Tap" (a coarse pointer, or a window as narrow as a phone), and a run's square is a
+  20 px mark with a 24 px target there.
+- **One time**: "About this view" says the clock's minute, not the hour (it said 08:00 beside a clock at 08:55).
+- **The walk never opens a step on a placeholder**: Next waits (saying what for) until the next step's thing has
+  loaded when it is on the same page; on another page the step goes there and waits there, as before. Next is
+  not offered while the current step is still loading.
+- **Compare's "What differs"** lists only what differs (no "0 of 935 people …"), and leads with how far the towns have
+  diverged so far: the papers filed in one town and not the other, counted to the moment shown.
+- **Revisit if** the result paper's shape changes (rounds, formal, electors), or "What differs" counts more than papers.

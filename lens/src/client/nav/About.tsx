@@ -47,9 +47,10 @@ export function About({ run, meta, world }: { run: string; meta: Meta; world: bo
 
 function AboutText({ run, meta, world }: { run: string; meta: Meta; world: boolean }) {
   const sel = useLens((s) => s.selection);
-  // (Whole hours: the sentences change with the hour, not every frame while playing.)
-  const hour = useLens((s) => Math.floor(s.t / 3600));
-  const t = hour * 3600;
+  // (Whole minutes, the clock's own: the time it says is the time the clock and the timeline show, one source; the
+  // sentences change by the minute, not every frame while playing.)
+  const minute = useLens((s) => Math.floor(s.t / 60));
+  const t = minute * 60;
   const { name, seat, city } = useNames(run);
   const residents = useMemo(() => {
     if (!city || sel?.kind !== "structure") return undefined;

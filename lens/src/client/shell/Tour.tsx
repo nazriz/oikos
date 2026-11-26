@@ -231,6 +231,22 @@ export function Tour() {
   }, [step]);
 
   const noteRef = useRef<HTMLDivElement>(null);
+  // The step Next is waiting to open (its thing still loading), and the wait itself.
+  const [pending, setPending] = useState<number | null>(null);
+  useEffect(() => setPending(null), [step]);
+  useEffect(() => {
+    if (pending === null) return;
+    const next = STEPS[pending]!;
+    const t0 = Date.now();
+    const id = setInterval(() => {
+      const el = find(next.target);
+      if ((el && (next.ready ?? loaded)(el)) || Date.now() - t0 > WAIT_MS) {
+        clearInterval(id);
+        setTour(pending);
+      }
+    }, 150);
+    return () => clearInterval(id);
+  }, [pending]);
   const [note, setNote] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   useLayoutEffect(() => {
     const vw = window.innerWidth, vh = window.innerHeight, pad = 12;
@@ -255,8 +271,19 @@ export function Tour() {
   const go = (d: number) => {
     const n = step + d;
     if (n < 0) return;
-    if (n >= STEPS.length) setTour(null);
-    else setTour(n);
+    if (n >= STEPS.length) return setTour(null);
+    // (Forward on the same page: wait until the next step's thing is ready, then go, so a step never opens on a
+    // placeholder. A step on another page goes there at once and waits there, saying what it waits for.)
+    const next = STEPS[n]!, here = window.location.hash.split("?")[0], there = next.route?.().split("?")[0];
+    if (d > 0 && (!there || there === here)) {
+      const ok = () => { const el = find(next.target); return !!el && (next.ready ?? loaded)(el); };
+      if (!ok()) {
+        setPending(n);
+        return;
+      }
+    }
+    setPending(null);
+    setTour(n);
   };
   const r = rect;
   // (Clipped to the screen: a section taller than the screen is lit where it shows.)
@@ -282,8 +309,8 @@ export function Tour() {
               Back
             </button>
           )}
-          <button className="btn primary" onClick={() => go(1)}>
-            {step === STEPS.length - 1 ? "Finish" : "Next"}
+          <button className="btn primary" onClick={() => go(1)} disabled={pending !== null || (!r && !lost)} aria-busy={pending !== null}>
+            {step === STEPS.length - 1 ? "Finish" : pending !== null ? (STEPS[pending]!.waiting ?? "Opening…") : "Next"}
           </button>
         </div>
       </div>

@@ -5,7 +5,7 @@ import { W } from "../words";
 import { plainId } from "../plain";
 
 /** A screen you touch rather than point at: its words say "Tap" (a tap on the map selects, as a click does). */
-const TOUCH = typeof matchMedia !== "undefined" && matchMedia("(hover: none)").matches;
+const TOUCH = typeof matchMedia !== "undefined" && matchMedia("(hover: none), (pointer: coarse), (max-width: 760px)").matches;
 
 export const CITY_WORDS = {
   seat: W.seat,

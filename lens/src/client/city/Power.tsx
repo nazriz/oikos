@@ -199,26 +199,28 @@ const POWER_CSS = `
 .lens-city .pw-sub { color: var(--lc-muted); max-width: 640px; line-height: 1.45; }
 .lens-city .pw-sub .rose { color: var(--lc-flag); font-weight: 700; }
 .lens-city .pw-side { display: grid; gap: 8px; align-content: start; }
-.lens-city .pw-seat { display: flex; align-items: center; gap: 7px; }
-.lens-city .pw-seat .dot { width: 10px; height: 10px; background: var(--lc-seat); }
+.lens-city .pw-seat { display: block; line-height: 1.4; }
+.lens-city .pw-seat .dot { display: inline-block; width: 10px; height: 10px; margin-right: 7px; background: var(--lc-seat); }
 .lens-city .pw-grid { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 22px 22px; align-items: start; }
 .lens-city .pw-card { position: relative; z-index: 1; background: var(--lc-ink); border-top: 2px solid var(--lc-text); padding: 6px 0 4px; }
 .lens-city .pw-card.gov { grid-column: span 2; border-top-color: var(--lc-seat); columns: 2 240px; column-gap: 22px; }
 .lens-city .pw-card-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 800; font-size: 15px; padding-bottom: 6px; margin-bottom: 2px; column-span: all; }
 .lens-city .pw-card-head .muted { font-weight: 400; font-size: 12px; align-self: center; }
 .lens-city .pw-post { break-inside: avoid; padding: 4px 0; border-bottom: 1px solid var(--lc-hair); }
-.lens-city .pw-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.lens-city .pw-post-title { color: var(--lc-text); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lens-city .pw-chip { border: 0; background: none; color: var(--lc-text); font: inherit; font-size: 13px; font-weight: 700; padding: 0 0 1px; cursor: pointer; flex: none; border-bottom: 1px solid transparent; }
+/* Each post on two lines, the post above its holder, both wrapping: no name is ever cut, at any width (a post's title
+   or a holder's description can be long, "Registrar of births, deaths and marriages", "a resident (c0066, 35, ...)"). */
+.lens-city .pw-row { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 1px; }
+.lens-city .pw-post-title { color: var(--lc-muted); font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+.lens-city .pw-chip { justify-self: start; max-width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; border: 0; background: none; color: var(--lc-text); font: inherit; font-size: 13px; font-weight: 700; padding: 0 0 1px; cursor: pointer; border-bottom: 1px solid transparent; }
 .lens-city .pw-chip:hover, .lens-city .pw-chip.focus { border-bottom-color: currentColor; }
 .lens-city .pw-chip.seat { color: var(--lc-seat-text); border-bottom: 3px solid var(--lc-seat); }
 .lens-city .pw-chip.kin { color: var(--lc-flag); border-bottom: 3px solid var(--lc-flag); }
 .lens-city .pw-chip.vacant { color: var(--lc-muted); font-weight: 400; font-style: italic; cursor: default; }
-.lens-city .pw-desc { display: block; font-weight: 400; color: var(--lc-muted); font-size: 11.5px; text-align: right; }
-.lens-city .pw-n { margin-left: 5px; color: var(--lc-muted); font-size: 11.5px; font-weight: 400; }
+.lens-city .pw-desc { display: block; font-weight: 400; color: var(--lc-muted); font-size: 11.5px; text-align: left; }
+.lens-city .pw-n { margin-left: 0; color: var(--lc-muted); font-size: 11.5px; font-weight: 400; white-space: nowrap; }
 .lens-city .pw-desc-inline { font-weight: 400; color: var(--lc-muted); }
 .lens-city .pw-by { color: var(--lc-muted); font-size: 12px; margin-top: 2px; }
-.lens-city .pw-kin { color: var(--lc-flag); font-size: 12px; font-weight: 700; margin-top: 2px; text-align: right; }
+.lens-city .pw-kin { color: var(--lc-flag); font-size: 12px; font-weight: 700; margin-top: 2px; text-align: left; }
 .lens-city .pw-kin.muted { color: var(--lc-text); font-weight: 400; }
 .lens-city .pw-strip { position: relative; display: flex; height: 4px; margin-top: 5px; background: color-mix(in srgb, var(--lc-text) 6%, transparent); }
 .lens-city .pw-strip span { height: 100%; background: color-mix(in srgb, var(--lc-muted) 55%, transparent); border-right: 1px solid var(--lc-ink); }
