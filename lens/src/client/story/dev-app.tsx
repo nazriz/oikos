@@ -12,6 +12,8 @@ import { SittingReader } from "./SittingReader";
 import { loadSeat, when } from "./data";
 import { ComparePage } from "../compare/ComparePage";
 import { Moments } from "./Moments";
+import { SittingDiff } from "./SittingDiff";
+import { Findings } from "./Findings";
 
 const css = `
 html, body, #root { margin: 0; height: 100%; }
@@ -115,5 +117,23 @@ function MomentsApp() {
     </div>
   );
 }
-const q0 = new URLSearchParams(location.search), pair = q0.get("compare");
-createRoot(document.getElementById("root")!).render(pair ? <CompareApp pair={pair} /> : q0.has("moments") ? <MomentsApp /> : <App />);
+/** `?diff=<a>,<b>[,<c>]&day=<n>`: the same moment across models, as core shows it at #/diff/... */
+function DiffApp({ keys, day }: { keys: string[]; day?: number }) {
+  const theme = new URLSearchParams(location.search).get("theme");
+  useEffect(() => { if (theme) document.documentElement.dataset.theme = theme; }, [theme]);
+  return (
+    <div style={{ display: "grid", gridTemplateRows: "44px 1fr", height: "100vh" }}>
+      <style>{css}</style>
+      <div className="dv-top"><b>Lens</b><span className="st-faint" style={{ fontSize: 12 }}>same moment · dev harness</span></div>
+      <div style={{ minHeight: 0 }}><SittingDiff keys={keys} {...(day !== undefined ? { day } : {})} /></div>
+    </div>
+  );
+}
+/** A full page under the harness bar (`?findings`, served with `serve --catalogue <a Lens server>`). */
+function Page({ title, children }: { title: string; children: React.ReactNode }) {
+  const theme = new URLSearchParams(location.search).get("theme");
+  useEffect(() => { if (theme) document.documentElement.dataset.theme = theme; }, [theme]);
+  return <div style={{ display: "grid", gridTemplateRows: "44px 1fr", height: "100vh" }}><style>{css}</style><div className="dv-top"><b>Lens</b><span className="st-faint" style={{ fontSize: 12 }}>{title} · dev harness</span></div><div style={{ minHeight: 0 }}>{children}</div></div>;
+}
+const q0 = new URLSearchParams(location.search), pair = q0.get("compare"), diff = q0.get("diff");
+createRoot(document.getElementById("root")!).render(pair ? <CompareApp pair={pair} /> : diff ? <DiffApp keys={diff.split(",")} {...(q0.get("day") ? { day: Number(q0.get("day")) } : {})} /> : q0.has("moments") ? <MomentsApp /> : q0.has("findings") ? <Page title="findings"><Findings /></Page> : <App />);

@@ -8,7 +8,7 @@ import { loadSeat, loadSitting, loadSystem, useAsync, when, worldDay, usd, token
 import { Hi, Md, MarksContext, hasQuery, type Marks } from "./text";
 import "./story.css";
 
-type Detail = SittingDetail & { acts: SeatAct[] };
+export type Detail = SittingDetail & { acts: SeatAct[] };
 
 /** Which sitting the selection points at, and what in it to bring into view. */
 function target(seat: SeatJson, sel: ReturnType<typeof useLens.getState>["selection"]): { sitting: number; act?: number; lever?: number } | null {
@@ -190,7 +190,7 @@ function resultsOf(turns: SittingTurn[]): Map<string, string> {
   return m;
 }
 
-function Said({ seat, d, levers }: { seat: SeatJson; d: Detail; levers: SeatLever[] }) {
+export function Said({ seat, d, levers }: { seat: SeatJson; d: Detail; levers: SeatLever[] }) {
   const results = useMemo(() => resultsOf(d.turns), [d]);
   if (!d.turns.length) return <div className="st-muted" style={{ fontSize: 13 }}>No model calls: {d.acts.length ? "a code seat's acts." : "nothing was asked."}</div>;
   let call = 0;
@@ -265,7 +265,7 @@ function Tool({ c, result, seat }: { c: any; result?: string; seat: SeatJson }) 
 
 // ---------- what happened ----------
 
-function Happened({ seat, d, levers, focus }: { seat: SeatJson; d: Detail; levers: SeatLever[]; focus?: number }) {
+export function Happened({ seat, d, levers, focus }: { seat: SeatJson; d: Detail; levers: SeatLever[]; focus?: number }) {
   type Item = { t: number; key: string; node: ReactNode };
   const items: Item[] = [];
   const used = new Set<number>();

@@ -2,6 +2,7 @@
 import type { Meta, RunEntry, UsageTotals } from "../../shared/api";
 import { compact, dayOf, int, usd, words } from "../format";
 import { useLens } from "../state";
+import { readingOutcome } from "../outcome";
 
 const DAY = 86_400;
 
@@ -55,8 +56,8 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
             <Level label="executed" n={r.levels.executed} tier={r.tier.executed} flag />
           </div>
           <div className="sum-sub muted">
-            {r.stood ? (r.won ? "Stood and won the poll" : "Stood and lost the poll") : "Did not stand"}
-            {r.poll_day !== undefined ? ` · poll on day ${r.poll_day}` : ""}
+            {readingOutcome(r)?.label ?? (r.stood ? "Stood" : "Did not stand")}
+            {r.levers ? ` · ${r.levers.tried} lever${r.levers.tried === 1 ? "" : "s"} tried, ${r.levers.done} done` : ""}
             {r.stopped_before_poll ? ` · stopped before the poll (day ${r.stopped_day ?? "?"})` : ""}
           </div>
           {r.attempts.length > 0 && (

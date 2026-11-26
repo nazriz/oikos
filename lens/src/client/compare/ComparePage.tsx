@@ -4,7 +4,7 @@
 // little before the fork. Raw counts with what each counts; the difference is a number, never a verdict.
 import { useEffect, useMemo, useState } from "react";
 import { useLens } from "../state";
-import { loadSeat, useAsync, usd, worldDay, human, type SeatJson } from "../story/data";
+import { loadSeat, useAsync, usd, worldDay, human, seatOutcome, type SeatJson } from "../story/data";
 import { SittingReader } from "../story/SittingReader";
 import { kinAppointed } from "../story/StoryRail";
 import type { DailyJson } from "../../folds/daily";
@@ -16,7 +16,7 @@ const DAY = 86_400;
 const dailyCache = new Map<string, Promise<DailyJson>>();
 export function loadDaily(run: string): Promise<DailyJson> {
   let p = dailyCache.get(run);
-  if (!p) { p = fetch(`/api/run/${encodeURIComponent(run)}/daily`).then((r) => { if (!r.ok) throw new Error(`${r.status} daily`); return r.json(); }); dailyCache.set(run, p); p.catch(() => dailyCache.delete(run)); }
+  if (!p) { p = loadSeat(run).then(() => fetch(`/api/run/${encodeURIComponent(run)}/daily`)).then((r) => { if (!r.ok) throw new Error(`${r.status} daily`); return r.json(); }); dailyCache.set(run, p); p.catch(() => dailyCache.delete(run)); }
   return p;
 }
 
@@ -77,7 +77,7 @@ function Compare({ A, B }: { A: Arm; B: Arm }) {
 function Glance({ A, B, until }: { A: Arm; B: Arm; until: number }) {
   const after = (d: DailyJson, s: string) => (d.series[s] ?? []).slice(Math.floor((d.fork_at ?? 0) / DAY), until).reduce((n, x) => n + x, 0);
   const lv = (s: SeatJson, lev: "executed" | "attempted") => new Set(s.levers.filter((l) => (lev === "executed" ? l.level === "executed" : l.level !== "considered")).map((l) => l.lever)).size;
-  const outcome = (s: SeatJson) => (s.outcome === "won" ? "won" : s.outcome === "lost" ? "lost" : s.outcome === "not_held" ? (s.amendments.some((x) => x.outcome === "applied") ? `poll moved (day ${Math.round((s.election.poll_at ?? 0) / DAY)})` : s.ended === "stopped" ? "stopped before the poll" : "no poll in the run") : human(s.outcome));
+  const outcome = (s: SeatJson) => seatOutcome(s).label;
   const rows: [string, (x: Arm) => number | string, boolean?][] = [
     ["Election", (x) => outcome(x.seat)],
     ["Ended", (x) => `day ${Math.round(x.seat.end_at / DAY)}${x.seat.ended === "stopped" ? " (stopped early)" : ""}`],

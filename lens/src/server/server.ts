@@ -116,5 +116,7 @@ export function startServer(o: ServeOptions = {}) {
       return new Response("Not found", { status: 404 });
     },
   });
+  // (At start: the catalogue, the background reading, and the showcase runs made ahead.)
+  if (o.background !== false) void lens.list().catch(() => {});
   return { server, lens, paths, url: `http://${server.hostname}:${server.port}/` };
 }

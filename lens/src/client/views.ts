@@ -30,19 +30,28 @@ export interface Views {
   compare?: ComponentType<{ a: string; b: string }>;
   /** The cross-run Moments gallery, #/moments (story's Moments). */
   moments?: ComponentType<{}>;
+  /** The study across runs, #/findings (story's Findings). */
+  findings?: ComponentType<{}>;
+  /** One day's sittings side by side across forks, #/diff/<a>,<b>[,<c>]?day=<n> (story's SittingDiff). */
+  diff?: ComponentType<{ keys: string[]; day?: number }>;
 }
 
 import { CityView } from "./city/CityView";
 import { CityInspector } from "./city/Inspector";
 import { ComparePage } from "./compare/ComparePage";
 import { Moments } from "./story/Moments";
+import { Findings } from "./story/Findings";
+import { SittingDiff } from "./story/SittingDiff";
+import { PersonLife } from "./life/PersonLife";
 
 // Registered views (one line each, by their owners):
 export const views: Views = {
   rail: StoryRail,
   reader: SittingReader,
   map: (p) => createElement(CityView, { run: p.run, card: false }),
-  inspector: { person: CityInspector, structure: CityInspector, entity: CityInspector },
+  inspector: { person: PersonLife, structure: CityInspector, entity: CityInspector },
   compare: ComparePage,
   moments: Moments,
+  findings: Findings,
+  diff: SittingDiff,
 };

@@ -7,6 +7,7 @@ import { ago, bytes, dayOf, usd, words } from "../format";
 import { Mark, Search } from "../icons";
 import { replaceQuery, runHref } from "../router";
 import { ThemeToggle } from "../theme";
+import { LeverChip, OutcomeChip, readingOutcome } from "../outcome";
 
 type Outcome = "any" | "attempt" | "won" | "lost" | "stopped" | "indexed";
 
@@ -56,9 +57,10 @@ export function Library({ q }: { q: URLSearchParams }) {
       if (model && r.experiment?.model !== model) return false;
       if (goal && r.experiment?.goal !== goal) return false;
       const rd = r.reading;
-      if (outcome === "attempt" && !rd?.has_attempt) return false;
-      if (outcome === "won" && !rd?.won) return false;
-      if (outcome === "lost" && !(rd?.stood && !rd.won)) return false;
+      const oc = readingOutcome(rd)?.kind;
+      if (outcome === "attempt" && !rd?.levers?.tried) return false;
+      if (outcome === "won" && oc !== "won") return false;
+      if (outcome === "lost" && oc !== "lost") return false;
       if (outcome === "stopped" && !(r.experiment?.stopped || rd?.stopped_before_poll)) return false;
       if (outcome === "indexed" && !r.indexed) return false;
       if (needle && !`${r.key} ${r.experiment?.model ?? ""} ${r.experiment?.goal ?? ""} ${r.summary?.place ?? ""}`.toLowerCase().includes(needle)) return false;
@@ -79,7 +81,7 @@ export function Library({ q }: { q: URLSearchParams }) {
   const read = study.filter((r) => r.reading);
   const finished = read.filter((r) => !r.reading!.stopped_before_poll && !r.experiment!.stopped);
   const attempts = finished.filter((r) => r.reading!.has_attempt).length;
-  const won = finished.filter((r) => r.reading!.won).length;
+  const won = finished.filter((r) => readingOutcome(r.reading)?.kind === "won").length;
   const spend = runs.reduce((n, r) => n + (r.experiment?.usd ?? 0), 0);
 
   return (
@@ -113,7 +115,7 @@ export function Library({ q }: { q: URLSearchParams }) {
         </div>
         <div className="lib-figures">
           <Fig v={cat ? String(study.length) : "–"} l="model forks" />
-          <Fig v={cat ? `${attempts}` : "–"} sub={cat ? `/ ${finished.length}` : undefined} l="with a lever attempt" tone="flag" />
+          <Fig v={cat ? `${attempts}` : "–"} sub={cat ? `/ ${finished.length}` : undefined} l="tier-2/3 attempt (study)" tone="flag" />
           <Fig v={cat ? `${won}` : "–"} sub={cat ? `/ ${finished.length}` : undefined} l="seat won the poll" tone="election" />
           <Fig v={cat ? usd(spend) : "–"} l="spent on forks" />
         </div>
@@ -165,7 +167,7 @@ export function Library({ q }: { q: URLSearchParams }) {
             </select>
             <select value={outcome} onChange={(e) => setOutcome(e.target.value as Outcome)} aria-label="Outcome">
               <option value="any">Any outcome</option>
-              <option value="attempt">Lever attempt</option>
+              <option value="attempt">Tried a lever</option>
               <option value="won">Won the poll</option>
               <option value="lost">Lost the poll</option>
               <option value="stopped">Stopped</option>
@@ -274,8 +276,9 @@ function Matrix({ study, models, goals }: { study: RunEntry[]; models: string[];
 function ForkDot({ r }: { r: RunEntry }) {
   const rd = r.reading;
   const stopped = Boolean(r.experiment!.stopped || rd?.stopped_before_poll);
-  const cls = ["fork-dot", !rd ? "unread" : "", rd?.has_attempt ? "attempt" : "", rd?.won ? "won" : "", stopped ? "stopped" : ""].join(" ");
-  const title = `seed ${r.experiment!.seed} · ${r.experiment!.dir}${rd ? ` · ${rd.has_attempt ? `${rd.attempts.length} lever attempt(s)` : "no lever attempt"} · ${rd.stood ? (rd.won ? "won" : "lost") : "did not stand"}` : " · not read yet"}${stopped ? ` · stopped${r.experiment!.stopped ? `: ${r.experiment!.stopped}` : ""}` : ""}`;
+  const oc = readingOutcome(rd);
+  const cls = ["fork-dot", !rd ? "unread" : "", rd?.has_attempt ? "attempt" : "", oc?.kind === "won" ? "won" : "", stopped ? "stopped" : ""].join(" ");
+  const title = `seed ${r.experiment!.seed} · ${r.experiment!.dir}${rd ? ` · ${rd.has_attempt ? "tier-2/3 attempt" : "no tier-2/3 attempt"}${rd.levers ? ` · ${rd.levers.tried} lever(s) tried, ${rd.levers.done} done` : ""} · ${oc?.label ?? ""}` : " · not read yet"}${stopped ? ` · stopped${r.experiment!.stopped ? `: ${r.experiment!.stopped}` : ""}` : ""}`;
   return <a className={cls} href={runHref(r.key)} title={title} aria-label={title} />;
 }
 
@@ -329,7 +332,7 @@ function Card({ r }: { r: RunEntry }) {
   const rd = r.reading;
   const stopped = x.stopped || (rd?.stopped_before_poll ? `stopped before the poll (day ${rd.stopped_day ?? "?"})` : undefined);
   const first = rd?.attempts[0];
-  const cls = ["card", rd?.has_attempt ? "attempt" : "", stopped ? "stopped" : "", x.isCode ? "code" : ""].join(" ");
+  const cls = ["card", rd?.levers?.tried ? "attempt" : "", stopped ? "stopped" : "", x.isCode ? "code" : ""].join(" ");
   return (
     <a className={cls} href={runHref(r.key)}>
       <div className="card-top">
@@ -342,14 +345,8 @@ function Card({ r }: { r: RunEntry }) {
       </div>
       <div className="card-chips">
         {x.goal !== "none" && <span className="chip quiet">goal: {x.goal}</span>}
-        {rd?.has_attempt && (
-          <span className="chip flag">
-            <span className="dot" />
-            {rd.attempts.length} lever attempt{rd.attempts.length === 1 ? "" : "s"}
-          </span>
-        )}
-        {rd?.stood && <span className={`chip ${rd.won ? "election" : "quiet"}`}>{rd.won ? "won the poll" : "lost the poll"}</span>}
-        {rd && !rd.stood && !x.isCode && <span className="chip quiet">did not stand</span>}
+        <LeverChip reading={rd} quietNone />
+        <OutcomeChip reading={rd} />
         {stopped && (
           <span className="chip quiet" title={stopped}>
             stopped

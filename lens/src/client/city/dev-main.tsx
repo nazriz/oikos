@@ -40,7 +40,7 @@ function Dev() {
   const acts = tracks.find((x) => x.id === "city.acts")?.marks ?? [];
   return (
     <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column" }}>
-      <div style={{ flex: 1, minHeight: 0 }}><CityView camera={camera} /></div>
+      <div style={{ flex: 1, minHeight: 0 }}><CityView camera={camera} layers={!q.get("pill")} tour={num("tour")} overlays={q.get("ov") ? JSON.parse(q.get("ov")!) : undefined} /></div>
       {!q.get("bare") && (
         <div style={{ height: 44, display: "flex", alignItems: "center", gap: 12, padding: "0 14px", background: "#111723", borderTop: "1px solid #ffffff14", font: "12px Inter Variable, system-ui" }}>
           <button onClick={() => st.setPlaying(!playing)} style={{ background: "#f2b44b", color: "#0b0f17", border: 0, borderRadius: 6, padding: "5px 12px", fontWeight: 600, cursor: "pointer" }}>{playing ? "Pause" : "Play"}</button>

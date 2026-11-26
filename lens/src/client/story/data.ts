@@ -1,6 +1,7 @@
 // Fetching the seat fold's output, and the small formatters the story view shares.
 import { useEffect, useState } from "react";
 import type { SeatJson, SittingDetail } from "../../folds/seat";
+import { outcomeOf, type Outcome } from "../../shared/outcome";
 
 export type { SeatAct, SeatDraft, SeatJson, SeatLever, SeatRecord, SittingDetail, SittingSummary, SittingTurn } from "../../folds/seat";
 
@@ -10,9 +11,24 @@ const textCache = new Map<string, Promise<string>>();
 
 const get = <T,>(url: string, as: "json" | "text" = "json"): Promise<T> => fetch(url).then((r) => { if (!r.ok) throw new Error(`${r.status} ${url}`); return (as === "json" ? r.json() : r.text()) as Promise<T>; });
 
+/** Waits until the server has made a run's bundle (its status stream: queued, indexing, ready). The pages that read
+ * several runs (Moments, compare, the same moment) open runs nobody has opened yet. */
+export function indexed(run: string): Promise<void> {
+  return new Promise((res, rej) => {
+    if (typeof EventSource === "undefined") return rej(new Error("not indexed"));
+    const es = new EventSource(`/api/run/${encodeURIComponent(run)}/status`);
+    es.onmessage = (m) => { const x = JSON.parse(m.data); if (x.state === "ready") { es.close(); res(); } else if (x.state === "failed") { es.close(); rej(new Error(x.error ?? "indexing failed")); } };
+    es.onerror = () => { /* (the browser retries a dropped stream) */ };
+  });
+}
 export function loadSeat(run: string): Promise<SeatJson> {
   let p = seatCache.get(run);
-  if (!p) { p = get<SeatJson>(`/api/run/${encodeURIComponent(run)}/seat`); seatCache.set(run, p); p.catch(() => seatCache.delete(run)); }
+  if (!p) {
+    const url = `/api/run/${encodeURIComponent(run)}/seat`;
+    // (409: the run has no current bundle yet; it is made on request, then read.)
+    p = fetch(url).then(async (r) => (r.status === 409 ? (await indexed(run), get<SeatJson>(url)) : r.ok ? (r.json() as Promise<SeatJson>) : Promise.reject(new Error(`${r.status} ${url}`))));
+    seatCache.set(run, p); p.catch(() => seatCache.delete(run));
+  }
   return p;
 }
 export function loadSitting(run: string, i: number) {
@@ -61,6 +77,11 @@ export function tokens(n: number): string { return n >= 1e6 ? `${(n / 1e6).toFix
 export const plural = (n: number, w: string, ws = `${w}s`) => `${n} ${n === 1 ? w : ws}`;
 export const human = (s: string) => s.replace(/[_-]+/g, " ");
 
+/** The election's outcome by Lens's one rule (src/shared/outcome.ts), with the story's tone for it. */
+export function seatOutcome(seat: SeatJson): Outcome & { css: "good" | "bad" | "flag" | "muted" } {
+  const o = outcomeOf({ election: seat.election, end_at: seat.end_at, ended: seat.ended ?? "unknown", moved: seat.amendments.some((a) => a.outcome === "applied") });
+  return { ...o, css: o.kind === "won" ? "good" : o.kind === "lost" ? "bad" : o.tone === "flag" ? "flag" : "muted" };
+}
 export const OUTCOME: { [k in SeatJson["outcome"]]: { label: string; tone: string } } = {
   won: { label: "Won the election", tone: "good" },
   lost: { label: "Lost the election", tone: "bad" },

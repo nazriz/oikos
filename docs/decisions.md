@@ -16120,3 +16120,78 @@ shown once. The seat fold's version is 2 (its output gained `ended`, `translator
 bundles are made again.
 - **Revisit if:** the gallery is slow with hundreds of runs (then a server-side aggregate of each bundle's levers), or
   the blind graders' verdicts become available per lever (show them beside the reader's).
+
+## 2026-11-26 Lens core: one outcome rule, bundles made in a child, showcase runs made ahead
+
+**Decided** (core builder, after the integrated page showed "lost the poll" for a fork whose poll had been moved to
+day 5000). (1) There is one rule for an election's outcome, `lens/src/shared/outcome.ts` `outcomeOf`, read by the run
+bar, the library's cards and the matrix, with the story rail asked to use it too. It says won or lost only when a
+result came before the run's end. Otherwise it says "no poll held (moved to day N)" when a law moved the poll,
+"stopped before the poll", or "run ended before the poll". (2) Lever counts everywhere are distinct levers tried
+(attempted or executed) and done (executed), never "considered" (`leverCounts`). The matrix keeps the study's own
+measure, a tier-2/3 attempt, and says so. (3) Bundles are made in a child process (`make-one.ts`), like the readings:
+in the server's own process, all five folds over a 4.6 M-line log left the API unanswered for seconds. (4) Forks whose
+seat tried a lever are made ahead at server start, after anything a viewer asks for. Readings run two at a time,
+forks an older reading flagged first. (5) The timeline's lanes are compact (12 px) by default. Dragging the top edge
+or the toggle makes them taller, and they show words only when the words fit. The rail's width can be dragged too.
+Both sizes are kept in the browser.
+**Revisit if** the showcase set grows past a few dozen forks: make them ahead in a slot (scripts/slots.ts) rather than
+whenever the server starts.
+## 2026-11-26 Lens city: the look of the map (passes 2 and 3)
+
+**Decided:**
+- **A model, not a game.** The ground is painted in quiet, slightly cool tones, with pale inset lots and fine fence
+  lines. Countryside outside the town is shown as paddocks with hedgerow trees, and there are trees along the river
+  and on the town's verges. All of this is decoration drawn from the cover and road layout; none of it is in the
+  world (the world has no paddocks or street trees). The same goes for the sun's shadows, contact shading, the haze
+  toward the horizon, and the buildings' shapes (hipped roofs, towers, wings). These come from type and size only, so
+  no place's figures go into the code.
+- **People read at every distance.** Zoomed out, each building's people are drawn as one soft disc, sized by the
+  square root of how many are inside and coloured by the space most of them are in. Zoomed in, they are individual
+  points.
+- **Follow.** Selecting a person turns follow on: the camera eases toward them each frame. Dragging or zooming
+  turns it off.
+- **Performance, measured.** In a real Chrome window on the run server (M4 Pro GPU, 1440×900 at 2×), frames
+  average 16.9 ms while panning and 16.7 ms while playing at 1 h/s, which is 60 fps. Sun shadows are dropped when
+  the camera is far out (zoom below −0.8). **Revisit if** a slower laptop or a phone drops frames: cap the masses
+  and trees by zoom next.
+
+## 2026-11-26 Lens: Findings, the same moment across models, and `oikos lens inspect`
+
+**Decided.** `#/findings` draws the study across runs from the catalogue alone (each fork's experiment and the study
+reader's reading, computed by core in the background), so no run is opened to draw it: k of n by model × goal with
+Wilson 95% intervals (attempted hollow, executed filled), runs reaching each lever by tier, each attempt by days before
+the poll, outcome by Lens's one rule, cost per run. Each chart has a table view and exports SVG and PNG with its title.
+Run sets are chosen on the page; mock and lever-check sets are off by default. The outcome palette is the dataviz
+reference's categorical slots, checked with its validator in light and dark (light contrast below 3:1 for two slots is
+relieved by the legend and the table view). The reader's lever table is copied for the browser
+(`lens/src/client/story/levers.ts`, since reader.ts reads files and runs the kernel) and a test holds the two equal.
+`#/diff/<a>,<b>[,<c>]?day=` sets forks of one seed side by side at each one's sitting nearest a day (labelled when it is
+another day): what each thought and said and what it did, one search marking every column. `oikos lens inspect
+<experiment dir>` writes every model fork as an Inspect log (`--with-code` adds the twin).
+- **Revisit if:** a run set is pre-registered with its own analysis (then Findings shows that set apart and labels the
+  rest exploratory), or forks of one seed come to sit on the same days (then align by sitting, not by day).
+## 2026-11-26 Lens city: the election, papers, a building's story, and the tour
+
+**Decided:**
+- **What the town fold reads now (v2).** It reads three more things:
+  - Elections: a ballot with candidates, with every vote, the roll, nominations, the paper's opinion-poll replies,
+    the notice and the result.
+  - Petitions, with who signed them and when.
+  - Papers of a civic kind (`PAPER_KINDS` in town.ts: complaints, tribunal orders, warrants, notices to vacate,
+    benefit claims and decisions, departures, building notices, rates notices…). Each paper is placed at the
+    structure it concerns: by `data.structure` / `space` / `at` cell / `lot`, else at its people (placed by the client
+    at their home then).
+  - Work done at each structure, by task.
+
+  Trade papers (orders, invoices, delivery notes) are left out: there are 150k of them, and they are commerce, not
+  the town's civic life.
+- **The researcher's view of the ballot.** Votes are drawn at the voter's home, coloured by first preference. In the
+  world the ballot is secret (visible only to the electoral commission); Lens is the researcher's instrument and says
+  so on the legend. Turnout is read block by block: a block is the land between the town's roads, found by flood
+  fill. A block's turnout is the electors living there at the poll who have voted by now.
+- **The tour** reads the story fold (`seat`): its sittings that sent the most acts, every sitting with a lever event,
+  and the reader's lever events. It also reads the town fold's election result. Without the story fold it falls back
+  to the seat's busiest days. It does not set the shared selection, so story's reader does not open over the map; it
+  lights its acts on the map only. **Revisit if** the lead wants the tour to drive the story rail too: then select
+  the sitting.

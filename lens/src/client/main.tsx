@@ -26,6 +26,15 @@ function App() {
     const Moments = views.moments;
     return <Moments />;
   }
+  if (route.page === "findings" && views.findings) {
+    const Findings = views.findings;
+    return <Findings />;
+  }
+  if (route.page === "diff" && views.diff) {
+    const Diff = views.diff;
+    const day = Number(route.q.get("day"));
+    return <Diff keys={route.keys} {...(route.q.has("day") && Number.isFinite(day) ? { day } : {})} />;
+  }
   return <Library q={route.q} />;
 }
 
