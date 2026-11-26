@@ -3,6 +3,21 @@
 Naz: "make it as non-AI looking as possible … certain things that the Claude models do." This replaces docs/design/lens.md
 §4's palette and type. Every page follows it; every builder sweeps their own pages against the ban list below.
 
+## First rule: a professional tool that is a joy to use and never gets in the way
+
+Naz (2026-11-26): "a professional research tool that is a joy to use, but also doesn't get in the way." Think Linear,
+Figma, a good map app: fast, calm, predictable.
+- **Help is on demand, never imposed.** The walkthrough runs once, is skippable in one key (Esc) and never returns by
+  itself. Hints appear once, small, and go when you act. No banner or modal blocks the work; prompts like "Play the
+  first week" sit inline and vanish on the first interaction.
+- **Instant and quiet.** Every action answers in under 100 ms (or shows a skeleton in place); nothing flickers, jumps
+  or animates without a reason. Motion only shows what changed.
+- **Keyboard-first and remembered.** Every common action has a key (listed under ?); the app remembers mode, theme,
+  panel sizes, open layers and the last run and moment, per viewer.
+- **Dense when wanted.** Researcher mode may show more at once; Story mode shows less. Neither hides the way to go
+  deeper: evidence is one click away from every claim.
+- **No nagging, no decoration.** Nothing celebrates, nothing asks for attention it hasn't earned.
+
 ## Where the look comes from
 
 The subject is a town and its public record: a council's minutes, the electoral roll, the planning map, road signs, a
