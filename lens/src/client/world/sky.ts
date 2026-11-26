@@ -70,7 +70,7 @@ export function lightAt(hour: number, weather: Weather, out?: Light): Light {
   L.night = 1 - smooth(-0.1, 0.06, e);
   L.sunIntensity = day > 0 ? 0.4 + day * 3.4 : 0;
   L.hemiIntensity = 0.5 + day * 0.6;
-  L.fogDensity = 0.00042;
+  L.fogDensity = 0.00032;
   L.turbidity = 2.6; L.rayleigh = 1.2 + (1 - day) * 1.2; L.clouds = 0.28; L.exposure = 0.56 + L.night * 0.44;
   if (weather === "heavy_rain") {
     L.sunIntensity *= 0.18; L.hemiIntensity *= 0.85;

@@ -177,7 +177,7 @@ export class WorldEngine {
     const tp = town.places.find((p) => p.kind !== "district")?.area ?? { x: 0, y: 0, w: town.ground.w, h: town.ground.h };
     const c = town.ground.cell;
     const centre = new THREE.Vector3((tp.x + tp.w / 2) * c, 0, (tp.y + tp.h / 2) * c);
-    this.camera.position.set(centre.x + 520, 430, centre.z + 760);
+    this.camera.position.set(centre.x + 330, 300, centre.z + 500);
     this.controls = new OrbitControls(this.camera, r.domElement);
     this.controls.target.copy(centre);
     this.controls.enableDamping = true;
@@ -837,6 +837,8 @@ export class WorldEngine {
     }
     if (sel?.kind === "person" && this.mode === "follow") this.followSnap = true;
     if (sel && (sel.kind === "structure" || sel.kind === "person") && !this.fromOwnClick(sel)) this.swoopTo(sel);
+    // An act picked in the story: frame what it reached.
+    if (sel?.kind === "act" && this.mode === "fly") this.tourTo([sel.seq], false, false);
   }
   private followSnap = false;
   /** A selection that came from a click in this view is already in sight; one from elsewhere (the story) is flown to. */
@@ -1225,6 +1227,7 @@ export class WorldEngine {
       shown.push({ a, text });
     }
     const w = this.renderer.domElement.clientWidth, h = this.renderer.domElement.clientHeight;
+    const placed: [number, number, number, number][] = [];
     for (let k = 0; k < Math.max(shown.length, this.captions.length); k++) {
       let el = this.captions[k];
       if (!el) { el = document.createElement("div"); el.className = "lw-caption"; this.labelLayer.appendChild(el); this.captions.push(el); }
@@ -1238,12 +1241,20 @@ export class WorldEngine {
       el.style.display = "";
       if (el.textContent !== c.text) el.textContent = c.text;
       el.classList.toggle("refused", c.a.refused);
-      el.style.transform = `translate(-50%, -100%) translate(${((tmpV.x + 1) / 2) * w}px, ${((1 - tmpV.y) / 2) * h - k * 2}px)`;
+      // Kept inside the view: a sign near the edge slides in rather than being cut off.
+      const half = (el.offsetWidth || 200) / 2, eh = el.offsetHeight || 34;
+      const x = Math.max(half + 8, Math.min(w - half - 8, ((tmpV.x + 1) / 2) * w));
+      // Stacked upward where signs would overlap.
+      let y = ((1 - tmpV.y) / 2) * h;
+      for (let tries = 0; tries < 4 && placed.some(([a, b, c, d]) => x - half < c && x + half > a && y - eh < d && y > b); tries++) y = Math.min(...placed.filter(([a, , c]) => x - half < c && x + half > a).map(([, b]) => b)) - 4;
+      y = Math.max(y, eh + 100); // below the view's own controls
+      placed.push([x - half, y - eh, x + half, y]);
+      el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;
     }
   }
 
   /** The tour: frame what a moment's acts reached (or the town hall, or the polling place), and turn slowly round it. */
-  tourTo(actSeqs: number[], election: boolean) {
+  tourTo(actSeqs: number[], election: boolean, turn = true) {
     const set = new Set(actSeqs);
     const pts: THREE.Vector3[] = [];
     const add = (i: number | undefined) => { if (i !== undefined && i >= 0 && this.plan.lots[i]) pts.push(new THREE.Vector3(this.model.centres[i * 2]!, 0, this.model.centres[i * 2 + 1]!)); };
@@ -1255,7 +1266,7 @@ export class WorldEngine {
     const spread = Math.max(...pts.map((p) => p.distanceTo(c)));
     if (this.mode !== "fly") this.setMode("fly");
     this.flyTo(c.setY(4), Math.max(85, Math.min(900, spread * 2.2 + 60)), pts.length > 1 ? 0.55 : 0.4);
-    this.controls.autoRotate = true;
+    this.controls.autoRotate = turn;
     this.controls.autoRotateSpeed = 0.35;
   }
   endTour() { this.controls.autoRotate = false; }
