@@ -2,12 +2,14 @@
 // byte- and mtime-identical, and its own files go only to its views folder.
 import "./kernel-env"; // (first: where the kernel is, before anything reads it)
 import { afterAll, expect, test } from "bun:test";
-import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mockPilot } from "../../scripts/pilot-mock";
 import { Lens } from "../src/server/service";
 import { lensPaths, removeOwn } from "../src/server/paths";
+import { bundleDir, relistBundles, servedBundle } from "../src/server/bundle";
+import { foldVersions } from "../src/server/ingest";
 
 const base = realpathSync(mkdtempSync(join(tmpdir(), "oikos-lens-ro-")));
 afterAll(() => rmSync(base, { recursive: true, force: true }));
@@ -59,6 +61,25 @@ test("making a run's bundle changes nothing in the run's folder", async () => {
   // (Three seconds on a quiet machine; the mock run it makes first slows with the machine's load, as other agents' runs
   // share it: the suite's own limit, not a tighter one.)
 }, 120_000);
+
+test("a run's older bundle (an earlier log, or older folds) is served while its own is made", () => {
+  const views = join(base, "stale-views");
+  const put = (bytes: number, mtimeMs: number, folds: { [k: string]: number }, madeAt: string) => {
+    const dir = bundleDir(views, "k", bytes, mtimeMs);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "manifest.json"), JSON.stringify({ key: "k", bytes, mtimeMs, folds, madeAt, errors: {} }));
+    relistBundles();
+    return dir;
+  };
+  const old = { ...foldVersions(), seat: -1 };
+  const a = put(100, 1, old, "2026-11-26T00:00:00Z");
+  expect(servedBundle(views, "k", 100, 1)).toMatchObject({ dir: a, stale: true }); // (older folds, same log)
+  expect(servedBundle(views, "k", 50, 2)).toBeUndefined(); // (never a bundle of a longer log than this one)
+  const b = put(200, 2, old, "2026-11-27T00:00:00Z");
+  expect(servedBundle(views, "k", 300, 3)).toMatchObject({ dir: b, stale: true }); // (the newest made)
+  const c = put(300, 3, foldVersions(), "2026-11-27T01:00:00Z");
+  expect(servedBundle(views, "k", 300, 3)).toMatchObject({ dir: c, stale: false });
+});
 
 test("Lens refuses a views folder inside the runs folder, and deletes nothing outside its views folder", () => {
   const runs = join(base, "guard-runs"), views = join(base, "guard-views");

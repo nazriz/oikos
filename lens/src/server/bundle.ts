@@ -49,6 +49,57 @@ export function readyManifest(dir: string): Manifest | undefined {
   }
 }
 
+/** A bundle's manifest whatever folds made it (an older bundle served while the current one is made). */
+export function anyManifest(dir: string): Manifest | undefined {
+  const f = join(dir, "manifest.json");
+  if (!existsSync(f)) return undefined;
+  try {
+    return JSON.parse(readFileSync(f, "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
+/** The bundle folders there are, by run key (the folder's name less its stamp), listed at most every few seconds: a
+ * thousand runs asking which bundles they have must not each list the folder. */
+let listed: { views: string; at: number; byKey: Map<string, string[]> } | undefined;
+function bundleFolders(views: string): Map<string, string[]> {
+  if (listed && listed.views === views && Date.now() - listed.at < 5_000) return listed.byKey;
+  const byKey = new Map<string, string[]>();
+  const parent = join(views, "bundles");
+  try {
+    for (const f of readdirSync(parent)) {
+      const dot = f.lastIndexOf(".");
+      if (dot < 0 || !/^[0-9a-f]{10}$/.test(f.slice(dot + 1))) continue;
+      const k = f.slice(0, dot);
+      let a = byKey.get(k);
+      if (!a) byKey.set(k, (a = []));
+      a.push(join(parent, f));
+    }
+  } catch {}
+  listed = { views, at: Date.now(), byKey };
+  return byKey;
+}
+
+/** Forget the folder listing (after a bundle is made or removed in this process). */
+export function relistBundles(): void {
+  listed = undefined;
+}
+
+/** The bundle to serve for a log: its own when current, else the newest made of it before (of an earlier, shorter log,
+ * or by earlier folds, as after a fold's version goes up), served while its own is made. */
+export function servedBundle(views: string, key: string, bytes: number, mtimeMs: number): { dir: string; m: Manifest; stale: boolean } | undefined {
+  const own = bundleDir(views, key, bytes, mtimeMs);
+  const m = readyManifest(own);
+  if (m) return { dir: own, m, stale: false };
+  let v: { dir: string; m: Manifest; stale: true } | undefined;
+  for (const dir of bundleFolders(views).get(key) ?? []) {
+    const sm = anyManifest(dir);
+    if (sm && sm.bytes <= bytes && (!v || sm.madeAt > v.m.madeAt)) v = { dir, m: sm, stale: true };
+  }
+  return v;
+}
+
 export interface MakeBundle {
   views: string;
   entry: RunEntry;
@@ -119,6 +170,7 @@ export async function makeBundle(o: MakeBundle): Promise<Manifest> {
     writeFileSync(join(scratch, "manifest.json"), JSON.stringify(m, null, 1));
     removeOwn(o.views, dir);
     renameSync(scratch, dir);
+    relistBundles();
     // (Bundles of this run made from an older log, or by older folds, go: they are Lens's own files.)
     const parent = join(o.views, "bundles");
     for (const f of readdirSync(parent)) {

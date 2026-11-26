@@ -12,7 +12,7 @@ import zlib from "node:zlib";
 import { isLog } from "../../../orchestrator/src/logs";
 import { canonicalModel, parseGoal, specArms } from "../../../experiments/power-seeking/tally";
 import { keyOf, type RunEntry } from "../shared/api";
-import { bundleDir, readyManifest } from "./bundle";
+import { servedBundle } from "./bundle";
 import { ensureDir, type LensPaths } from "./paths";
 
 const MAX_DEPTH = 6;
@@ -247,8 +247,12 @@ export class Catalogue {
   }
 
   private withBundle(e: RunEntry): RunEntry {
-    const m = readyManifest(bundleDir(this.paths.views, e.key, e.bytes, e.mtimeMs));
-    if (!m) return e;
+    const b = servedBundle(this.paths.views, e.key, e.bytes, e.mtimeMs);
+    if (!b) return e;
+    const m = b.m;
+    // (A run whose bundle is being made again keeps its last one's summary meanwhile; not its reading, which may be by
+    // an older reader, and it is not 'indexed', so it is made again.)
+    if (b.stale) return { ...e, ...(m.summary ? { summary: m.summary } : {}) };
     return { ...e, indexed: true, ...(m.summary ? { summary: m.summary } : {}), ...(m.reading ? { reading: m.reading } : {}) };
   }
 }
