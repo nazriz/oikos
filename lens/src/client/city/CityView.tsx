@@ -303,7 +303,8 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   const home = useMemo((): OrbitViewState => {
     const tp = town.places.find((p) => p.kind !== "district") ?? town.places[0];
     const a = tp?.area ?? { x: 0, y: 0, w: town.ground.w, h: town.ground.h };
-    return { target: [(a.x + a.w / 2) * cell, -(a.y + a.h / 2 + 2) * cell, 0], zoom: fitZoom(size.w, size.h, a.w * cell * 0.95, a.h * cell * 1.15), rotationX: 48, rotationOrbit: -18, minZoom: -4, maxZoom: 4.5, minRotationX: 12, maxRotationX: 90, ...camera } as OrbitViewState;
+    // Opens as a plan, looking straight down with north up (a surveyor's plan); drag with Shift or two fingers to tilt.
+    return { target: [(a.x + a.w / 2) * cell, -(a.y + a.h / 2) * cell, 0], zoom: fitZoom(size.w, size.h, a.w * cell * 1.08, a.h * cell * 1.12), rotationX: 90, rotationOrbit: 0, minZoom: -4, maxZoom: 4.5, minRotationX: 12, maxRotationX: 90, ...camera } as OrbitViewState;
   }, [town, cell, size.w > 700, size.h > 500]);
   const [ownView, setOwnView] = useState<OrbitViewState>(home);
   const view = (sharedView?.[0] ?? ownView) as OrbitViewState;
