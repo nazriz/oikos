@@ -80,7 +80,40 @@ export interface TownBundle {
   /** Town-level moments for the timeline: building begun/completed, births, deaths, departures, arrivals. */
   moments: { t: number; kind: string; subject: string; detail?: string }[];
   span: [number, number];
+  /** Elections for an office held by a public poll (a ballot with candidates). The researcher's view: every vote. */
+  elections: TownElection[];
+  /** Petitions and who signed them, when. */
+  petitions: { id: string; t: number; by: string; text: string; signers: [number, string][] }[];
+  /** Papers about a place or a person (complaints, tribunal orders, warrants, benefit decisions...): where they point. */
+  papers: TownPaper[];
+  /** Work done at each structure (index): task → [times, last t]. */
+  work: Record<number, Record<string, [number, number]>>;
 }
+
+export interface TownElection {
+  ballot: string; t: number; office?: string; text?: string;
+  candidates: { number: string; participant: string; person: string; name: string; nomination?: string }[];
+  /** [t, voter person, choice as written ("1>3>4>2")]. */
+  votes: [number, string, string][];
+  roll?: string[];
+  nominations: { t: number; id: string; person: string; text: string }[];
+  /** Opinion polls answered by electors: [t, person, first choice (participant), approval]. */
+  polls: [number, string, string, number][];
+  notice?: { t: number; poll_at?: number; nominations_close_at?: number };
+  result?: { t: number; winner?: string; rounds?: Record<string, number>[]; electors?: number; formal?: number; turnout_bps?: number; text?: string };
+}
+
+/** A paper that concerns a place (`s`, structure index) or people (`p`, placed by the client at their home then). */
+export interface TownPaper { t: number; id: string; kind: string; by?: string; s?: number; p?: string[]; text: string; d?: Record<string, unknown> }
+
+/** The kinds of paper the map shows (others, such as orders and invoices, are trade, not the town's civic life). */
+export const PAPER_KINDS = new Set([
+  "complaint", "complaint_notice", "venue_decision", "tribunal_application", "hearing_notice", "tribunal_order", "warrant", "warrant_executed",
+  "notice_to_vacate", "rent_statement", "rental_application", "stay_request", "benefit_claim", "benefit_decision", "benefit_change",
+  "departure", "death_registration", "death_notification", "building_notice", "building_inspection", "permit_application", "permit_decision",
+  "petition", "nomination", "closure", "insolvency", "welfare_check_request", "rates_notice", "loan_arrears", "garnishee_order",
+  "enforcement_request", "care_request",
+]);
 
 const cellXY = (c: unknown): [number, number] | undefined => {
   if (typeof c !== "string" || !c.startsWith("cell.")) return undefined;
@@ -128,6 +161,7 @@ export function townFold(): Fold {
       targets: {},
       moments: [],
       span: [0, 0],
+      elections: [], petitions: [], papers: [], work: {},
     };
     for (const st of cat.structure_types ?? []) {
       const spaces: Record<string, number> = {};
@@ -227,9 +261,81 @@ export function townFold(): Fold {
     return { kind: "person", person: id, name: id };
   }
 
+  const electionBy = new Map<string, TownElection>();
+  const petitionBy = new Map<string, TownBundle["petitions"][number]>();
+  let pendingNominations: TownElection["nominations"] = [];
+  let pendingPolls: TownElection["polls"] = [];
+  let pendingNotice: TownElection["notice"];
+  let pendingRoll: string[] | undefined;
+  const lotCell = (lot: unknown): [number, number] | undefined => { const m = typeof lot === "string" ? /^lot-(\d+)-(\d+)$/.exec(lot) : null; return m ? [+m[1]!, +m[2]!] : undefined; };
+  const atCell = new Map<string, number>();
+  const structureAtCell = (x: number, y: number) => {
+    if (!atCell.size) b!.structures.forEach((s, i) => { if (s.category !== "transport") atCell.set(`${s.x},${s.y}`, i); });
+    return atCell.get(`${x},${y}`);
+  };
+  const personish = (v: unknown) => typeof v === "string" && !b!.entities[v] && !b!.positions[v] && !sIndex.has(v);
+  function placePaper(r: any): { s?: number; p?: string[] } {
+    const d = r.data ?? {};
+    for (const k of ["structure", "about", "premises"]) { const i = typeof d[k] === "string" ? sIndex.get(d[k]) : undefined; if (i !== undefined) return { s: i }; }
+    if (typeof d.space === "string") { const i = sIndex.get(d.space.split("/")[0]); if (i !== undefined) return { s: i }; }
+    const c = cellXY(d.at) ?? lotCell(d.lot) ?? lotCell(Array.isArray(d.lots) ? d.lots[0] : undefined);
+    if (c) { const i = structureAtCell(c[0], c[1]); if (i !== undefined) return { s: i }; }
+    if (typeof d.firm === "string" && b!.entities[d.firm]?.structure !== undefined) return { s: b!.entities[d.firm]!.structure };
+    const people: string[] = [];
+    for (const k of ["deceased", "missing", "tenant", "applicant", "name"]) if (personish(d[k])) people.push(d[k]);
+    for (const k of ["household", "members"]) if (Array.isArray(d[k])) for (const x of d[k]) if (personish(x)) people.push(x);
+    if (!people.length && personish(r.speaks_for)) people.push(r.speaks_for);
+    if (!people.length) for (const x of r.addressed_to ?? []) if (personish(x)) people.push(x);
+    return people.length ? { p: [...new Set(people)].slice(0, 8) } : {};
+  }
+  function record(t: number, r: any) {
+    if (!r || !b) return;
+    const kind: string | undefined = r.kind ?? (r.record === "vote" ? "vote" : undefined);
+    if (kind === "vote") {
+      const e = electionBy.get(r.ballot);
+      if (e) { e.votes.push([t, r.speaks_for, String(r.choice)]); return; }
+      const pe = petitionBy.get(r.ballot);
+      if (pe && r.choice === "sign") pe.signers.push([t, r.speaks_for]);
+      return;
+    }
+    if (kind === "ballot" && Array.isArray(r.data?.candidates)) {
+      const e: TownElection = {
+        ballot: r.id, t, office: r.data.office, text: typeof r.text === "string" ? r.text.slice(0, 400) : undefined,
+        candidates: r.data.candidates.map((c: any) => ({ number: String(c.number), participant: c.candidate, person: personish(c.for) ? c.for : (c.name ?? c.for), name: c.name ?? c.for, nomination: c.nomination })),
+        votes: [], nominations: pendingNominations, polls: pendingPolls, notice: pendingNotice, roll: pendingRoll,
+      };
+      pendingNominations = []; pendingPolls = []; pendingNotice = undefined; pendingRoll = undefined;
+      electionBy.set(r.id, e); b.elections.push(e);
+    } else if (kind === "ballot_result" && electionBy.has(r.data?.ballot)) {
+      const d = r.data;
+      electionBy.get(d.ballot)!.result = { t, winner: d.winner, rounds: d.rounds, electors: d.electors, formal: d.formal, turnout_bps: d.turnout_bps, text: typeof r.text === "string" ? r.text.slice(0, 300) : undefined };
+    } else if (kind === "nomination") {
+      const person = r.data?.name ?? r.speaks_for;
+      const open = b.elections.find((e) => !e.result && e.candidates.some((c) => c.person === person));
+      (open ? open.nominations : pendingNominations).push({ t, id: r.id, person, text: String(r.text ?? "").slice(0, 300) });
+    } else if (kind === "poll_reply") {
+      const fc = r.data?.first_choice;
+      if (typeof fc === "string") (b.elections.find((e) => !e.result)?.polls ?? pendingPolls).push([t, r.speaks_for, fc, Number(r.data?.approval ?? 0)]);
+    } else if (kind === "election_notice") {
+      pendingNotice = { t, poll_at: r.data?.poll_at, nominations_close_at: r.data?.nominations_close_at };
+    } else if (kind === "electoral_roll" && Array.isArray(r.data?.electors)) {
+      const open = b.elections.find((e) => !e.result);
+      if (open) open.roll = r.data.electors; else pendingRoll = r.data.electors;
+    } else if (kind === "petition") {
+      const pe = { id: r.id, t, by: r.speaks_for, text: String(r.text ?? "").slice(0, 300), signers: [] as [number, string][] };
+      petitionBy.set(r.id, pe); b.petitions.push(pe);
+    }
+    if (kind && PAPER_KINDS.has(kind)) {
+      const at = placePaper(r);
+      const d: Record<string, unknown> = {};
+      for (const k of ["granted", "finding", "matter", "amount", "payment", "removed", "found", "against", "signatures"]) if (r.data?.[k] !== undefined) d[k] = r.data[k];
+      b.papers.push({ t, id: r.id, kind, by: r.speaks_for, ...at, text: String(r.text ?? "").slice(0, 240), d: Object.keys(d).length ? d : undefined });
+    }
+  }
+
   return {
     name: "town",
-    version: 1,
+    version: 2,
     line(l: LogLine) {
       if (l.t > tMax) tMax = l.t;
       if (l.kind === "header") return header(l.body);
@@ -274,6 +380,15 @@ export function townFold(): Fold {
           case "entity_created":
             b.entities[body.entity] = { kind: body.kind ?? "entity", name: body.name ?? body.entity };
             return;
+          case "recorded": return record(l.t, body.record);
+          case "worked": {
+            const i = sIndex.get(body.at);
+            if (i === undefined || typeof body.task !== "string") return;
+            const w = (b.work[i] ??= {});
+            const e = (w[body.task] ??= [0, 0]);
+            e[0]++; e[1] = l.t;
+            return;
+          }
           case "nature_census":
             b.census.push({ t: l.t, species: body.species ?? {}, covers: body.covers ?? {} });
             return;

@@ -14,6 +14,8 @@ import { along, hex, hipFaces, mix, PAL, paintBeyond, paintGround, rect, shadowO
 import { skyAt } from "./sky";
 import { Panel, Tooltip, Clock, type Overlays, type HoverInfo, DEFAULT_OVERLAYS, Card } from "./Panel";
 import { CITY_CSS } from "./style";
+import { blocksOf, candidateColours, electionView, homeAt, paintHeat, PAPER_GROUPS, papersIn, turnoutByBlock } from "./civic";
+import { Tour, useTourSteps } from "./Tour";
 
 const DAY = 86_400;
 /** A gap between leaving one place and entering the next longer than this is not a walk: they are away. */
@@ -28,13 +30,17 @@ export interface CityViewProps {
   card?: boolean;
   /** Start with the Layers panel open (default: collapsed to a small pill). */
   layers?: boolean;
+  /** Start the tour at this step once the run is read (for demos and the dev page). */
+  tour?: number;
+  /** Start with these overlays set (e.g. { election: true }). */
+  overlays?: Partial<Overlays>;
   /** Where the bundle is served; defaults to `/api/run/<key>`. */
   base?: string;
   /** Start the camera here instead of framed on the town (zoom, rotationX = tilt, rotationOrbit = turn, target in metres). */
   camera?: Partial<{ zoom: number; rotationX: number; rotationOrbit: number; target: [number, number, number] }>;
 }
 
-export function CityView({ runKey, run: runProp, base, camera, card = true, layers = false }: CityViewProps) {
+export function CityView({ runKey, run: runProp, base, camera, card = true, layers = false, tour, overlays }: CityViewProps) {
   const open = useLens((s) => s.run);
   const key = runKey ?? runProp ?? open;
   const url = base ?? (key ? `/api/run/${encodeURIComponent(key)}` : null);
@@ -42,7 +48,7 @@ export function CityView({ runKey, run: runProp, base, camera, card = true, laye
   return (
     <div className="lens-city">
       <style>{CITY_CSS}</style>
-      {city ? <Map city={city} camera={camera} card={card} layersOpen={layers} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : url ? <><div className="lc-spin" />Drawing the town</> : "No run open"}</div>}
+      {city ? <Map city={city} camera={camera} card={card} layersOpen={layers} base={url} tour0={tour} overlays0={overlays} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : url ? <><div className="lc-spin" />Drawing the town</> : "No run open"}</div>}
     </div>
   );
 }
@@ -162,7 +168,7 @@ export function useCity(url: string | null): { city: CityData | null; error: str
   return state.url === url ? state : { city: null, error: null };
 }
 
-function Map({ city, camera, card, layersOpen }: { city: CityData; camera?: CityViewProps["camera"]; card: boolean; layersOpen: boolean }) {
+function Map({ city, camera, card, layersOpen, base, tour0, overlays0 }: { city: CityData; camera?: CityViewProps["camera"]; card: boolean; layersOpen: boolean; base: string | null; tour0?: number; overlays0?: Partial<Overlays> }) {
   const t = useLens((s) => s.t);
   const selection = useLens((s) => s.selection);
   const hovered = useLens((s) => s.hovered);
@@ -176,7 +182,7 @@ function Map({ city, camera, card, layersOpen }: { city: CityData; camera?: City
   const wrap = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 1200, h: 800 });
   const [overlays, setOverlays] = useState<Overlays>(() => {
-    try { return { ...DEFAULT_OVERLAYS, ...JSON.parse(localStorage.getItem("lens.city.overlays") ?? "{}") }; } catch { return DEFAULT_OVERLAYS; }
+    try { return { ...DEFAULT_OVERLAYS, ...JSON.parse(localStorage.getItem("lens.city.overlays") ?? "{}"), ...overlays0 }; } catch { return { ...DEFAULT_OVERLAYS, ...overlays0 }; }
   });
   useEffect(() => { try { localStorage.setItem("lens.city.overlays", JSON.stringify(overlays)); } catch { /* private mode */ } }, [overlays]);
   const [tip, setTip] = useState<HoverInfo | null>(null);
@@ -231,6 +237,14 @@ function Map({ city, camera, card, layersOpen }: { city: CityData; camera?: City
   const selP = selection?.kind === "person" ? city.pById.get(selection.id) ?? -1 : -1;
   const hovS = sel2structure(city, hovered);
   const selAct = selection?.kind === "act" ? selection.seq : hovered?.kind === "act" ? hovered.seq : -1;
+  // The tour (a run's key moments): its step, and the acts it lights up.
+  const [tour, setTour] = useState<number | null>(null);
+  const tourStarted = useRef(false);
+  const steps = useTourSteps(base, city);
+  const [tourActs, setTourActs] = useState<number[]>([]);
+  const hi = useMemo(() => new Set([...(selAct >= 0 ? [selAct] : []), ...(tour !== null ? tourActs : [])]), [selAct, tour, tourActs.join(",")]);
+  const hiKey = [...hi].join(",");
+  useEffect(() => { if (tour0 !== undefined && !tourStarted.current && steps.length) { tourStarted.current = true; setTour(Math.min(tour0, steps.length - 1)); } }, [steps.length]);
 
   // Follow: a selected person is tracked by the camera while time runs, until the viewer moves the map.
   const playing = useLens((s) => s.playing);
@@ -400,8 +414,8 @@ function Map({ city, camera, card, layersOpen }: { city: CityData; camera?: City
   }, [selP, city, B, town, Math.floor(t / 120)]);
 
   const actsNow = useMemo(() => {
-    return town.acts.filter((a) => (a.t <= t && a.t > t - ACT_WINDOW) || a.seq === selAct);
-  }, [town, Math.floor(t / 600), selAct]);
+    return town.acts.filter((a) => (a.t <= t && a.t > t - ACT_WINDOW) || hi.has(a.seq));
+  }, [town, Math.floor(t / 600), hiKey]);
   const arcs = useMemo(() => {
     const hall = town.hall;
     if (hall === undefined) return [];
@@ -422,6 +436,85 @@ function Map({ city, camera, card, layersOpen }: { city: CityData; camera?: City
     }
     return out;
   }, [actsNow, B, city, town, Math.floor(t / 600)]);
+
+  // ---- The tour: go to each step's moment and frame what it touched ----
+  const tourElection = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (tour === null) { if (tourElection.current !== null) { const was = tourElection.current; tourElection.current = null; setOverlays((o) => ({ ...o, election: was })); } return; }
+    const st = steps[tour];
+    if (!st) { setTour(null); return; }
+    const L = useLens.getState();
+    L.setPlaying(false);
+    L.setT(st.t + 30);
+    setTourActs(st.acts);
+    if (st.election) { if (tourElection.current === null) tourElection.current = overlays.election; setOverlays((o) => ({ ...o, election: true })); }
+    const pts: [number, number][] = [];
+    if (town.hall !== undefined) pts.push([B.shapes[town.hall]!.cx, B.shapes[town.hall]!.cy]);
+    for (const seq of st.acts) {
+      const a = town.acts.find((x) => x.seq === seq);
+      for (const id of a?.blocks.flatMap((b) => b.to) ?? []) {
+        const tg = town.targets[id];
+        const s = tg?.kind === "entity" ? tg.structure ?? -1 : tg?.kind === "person" && tg.person ? placeAt(city, tg.person, st.t) : -1;
+        if (s !== undefined && s >= 0) pts.push([B.shapes[s]!.cx, B.shapes[s]!.cy]);
+      }
+    }
+    if (st.election) { const e = electionView(city, st.t + 30); for (const h of e?.homes ?? []) if (h.s >= 0) pts.push([B.shapes[h.s]!.cx, B.shapes[h.s]!.cy]); }
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const cx = pts.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : (home.target as number[])[0]!, cy = pts.length ? (Math.min(...ys) + Math.max(...ys)) / 2 : (home.target as number[])[1]!;
+    const ext = pts.length > 1 ? Math.max(Math.max(...xs) - Math.min(...xs), (Math.max(...ys) - Math.min(...ys)) * 1.3, 160) : 260;
+    const zoom = Math.max(-0.2, Math.min(2.4, Math.log2(Math.min(size.w / (ext * 1.5), size.h / (ext * 1.8)))));
+    setView((v) => ({ ...v, target: [cx, cy - ext * 0.12, 0], zoom, rotationX: 50, rotationOrbit: -18 + (((tour * 23) % 50) - 25),
+      transitionDuration: 2600, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]), transitionEasing: (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2) } as any));
+  }, [tour, steps]);
+
+  // ---- The election and the papers ----
+  const blocks = useMemo(() => blocksOf(town), [town]);
+  const tMin = Math.floor(t / 600);
+  const ev = useMemo(() => (town.elections.length ? electionView(city, t) : undefined), [city, tMin]);
+  const candCol = useMemo(() => (ev ? candidateColours(ev.e, town.seats) : {}), [ev?.e, town]);
+  const turnout = useMemo(() => (overlays.election && ev && ev.cast > 0 ? turnoutByBlock(city, blocks, ev, ev.e.notice?.poll_at ?? t) : []), [overlays.election, ev, blocks]);
+  const townTurnout = useMemo(() => { let r = 0, v = 0; for (const b of turnout) { r += b.roll; v += b.voted; } return r ? v / r : 0; }, [turnout]);
+  // Only blocks with enough electors to say anything, and only where they differ from the town by 3 points or more.
+  const turnoutCells = useMemo(() => turnout.filter((b) => b.roll >= 8 && Math.abs(b.voted / b.roll - townTurnout) >= 0.03).flatMap((b) => blocks.cells[b.block]!.map((j) => ({ j, dev: b.voted / b.roll - townTurnout }))), [turnout, blocks, townTurnout]);
+  // Pies: per building, the votes cast there by first preference (the campaign: opinion-poll answers).
+  const { pies, pieRims } = useMemo(() => {
+    const out: { poly: [number, number, number][]; n: string; s: number; count: number; total: number; poll: boolean }[] = [];
+    const rims: { path: [number, number, number][] }[] = [];
+    if (!overlays.election || !ev) return { pies: out, pieRims: rims };
+    const poll = ev.phase === "campaign";
+    const by = new globalThis.Map<number, globalThis.Map<string, number>>();
+    for (const x of poll ? ev.polls : ev.votes) { if (x.s < 0) continue; const m = by.get(x.s) ?? by.set(x.s, new globalThis.Map()).get(x.s)!; m.set(x.n, (m.get(x.n) ?? 0) + 1); }
+    for (const [st, m] of by) {
+      const sh = B.shapes[st]!, total = [...m.values()].reduce((a, b) => a + b, 0);
+      const r = 2.6 + Math.sqrt(total) * 2.1, z = sh.top + 1.2, cx = sh.cx, cy = sh.cy;
+      let a0 = -Math.PI / 2;
+      for (const c of ev.e.candidates) {
+        const k = m.get(c.number);
+        if (!k) continue;
+        const a1 = a0 + (k / total) * Math.PI * 2;
+        const poly: [number, number, number][] = [[cx, cy, z]];
+        const steps = Math.max(2, Math.ceil((a1 - a0) / 0.2));
+        for (let i = 0; i <= steps; i++) { const a = a0 + ((a1 - a0) * i) / steps; poly.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r, z]); }
+        out.push({ poly, n: c.number, s: st, count: k, total, poll });
+        a0 = a1;
+      }
+      const ring: [number, number, number][] = [];
+      for (let i = 0; i <= 32; i++) { const a = (i / 32) * Math.PI * 2; ring.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r, z]); }
+      rims.push({ path: ring });
+    }
+    return { pies: out, pieRims: rims };
+  }, [overlays.election, ev, B]);
+  const petitionSigners = useMemo(() => {
+    if (!overlays.election || !ev || ev.phase !== "campaign") return [];
+    const out: { s: number; person: string }[] = [];
+    for (const pe of town.petitions) for (const [st, who] of pe.signers) if (st <= t) out.push({ s: homeAt(city, who, st), person: who });
+    return out.filter((x) => x.s >= 0);
+  }, [overlays.election, ev, town, city, tMin]);
+  const paperGroupsSet = useMemo(() => new Set(overlays.paperGroups), [overlays.paperGroups.join(",")]);
+  const placedPapers = useMemo(() => (overlays.papers ? papersIn(city, t, overlays.paperDays ? overlays.paperDays * DAY : Infinity, paperGroupsSet) : []), [overlays.papers, overlays.paperDays, paperGroupsSet, city, Math.floor(t / 900)]);
+  const papersShown = useMemo(() => { const n = PAPER_GROUPS.map(() => 0); for (const x of (overlays.papers ? papersIn(city, t, overlays.paperDays ? overlays.paperDays * DAY : Infinity, new Set(PAPER_GROUPS.map((_, i) => i))) : [])) n[x.g]!++; return n; }, [overlays.papers, overlays.paperDays, city, Math.floor(t / 900)]);
+  const heat = useMemo(() => (overlays.papers && overlays.paperMode === "heat" ? paintHeat(city, placedPapers) : null), [overlays.papers, overlays.paperMode, placedPapers]);
+  const jit = (k: number, salt: number, sh: Shape) => [(hash01(k, salt) - 0.5) * sh.fw * 0.7, (hash01(k, salt + 1) - 0.5) * sh.fh * 0.7] as const;
 
   const layers = [
     new BitmapLayer({
@@ -537,38 +630,87 @@ function Map({ city, camera, card, layersOpen }: { city: CityData; camera?: City
     overlays.acts && arcs.length > 0 && new ArcLayer({
       id: "acts", data: arcs, getSourcePosition: (d: any) => d.from, getTargetPosition: (d: any) => d.to,
       // One act picked (here or in the story): it stands out, the others step back.
-      getSourceColor: (d: any) => hex(d.refused ? PAL.flag : PAL.seat, d.act.seq === selAct ? 255 : 235 * (1 - d.age * 0.8) * (selAct >= 0 ? 0.25 : 1)),
-      getTargetColor: (d: any) => hex(d.refused ? PAL.flag : "#ffe2a6", d.act.seq === selAct ? 255 : 220 * (1 - d.age * 0.85) * (selAct >= 0 ? 0.25 : 1)),
-      getWidth: (d: any) => (d.act.seq === selAct ? 4.5 : 1.6 + 1.6 * (1 - d.age)), getHeight: 0.45, greatCircle: false, pickable: true,
-      updateTriggers: { getSourceColor: [selAct], getTargetColor: [selAct], getWidth: [selAct] },
+      getSourceColor: (d: any) => hex(d.refused ? PAL.flag : PAL.seat, hi.has(d.act.seq) ? 255 : 235 * (1 - d.age * 0.8) * (hi.size ? 0.25 : 1)),
+      getTargetColor: (d: any) => hex(d.refused ? PAL.flag : "#ffe2a6", hi.has(d.act.seq) ? 255 : 220 * (1 - d.age * 0.85) * (hi.size ? 0.25 : 1)),
+      getWidth: (d: any) => (hi.has(d.act.seq) ? 4.5 : 1.6 + 1.6 * (1 - d.age)), getHeight: 0.45, greatCircle: false, pickable: true,
+      updateTriggers: { getSourceColor: [hiKey], getTargetColor: [hiKey], getWidth: [hiKey] },
     }),
     overlays.acts && new ScatterplotLayer({
-      id: "act-hits", data: arcs.filter((d) => t - d.act.t < 12 * 3600 || d.act.seq === selAct),
-      getPosition: (d: any) => [d.to[0], d.to[1], d.to[2]], getRadius: (d: any) => (d.act.seq === selAct ? 16 : 8 + ((t - d.act.t) / 3600) * 2.5), radiusUnits: "meters", billboard: false,
-      stroked: true, filled: false, getLineColor: (d: any) => hex(d.refused ? PAL.flag : PAL.seat, d.act.seq === selAct ? 255 : Math.max(0, 230 * (1 - (t - d.act.t) / (12 * 3600)))), getLineWidth: (d: any) => (d.act.seq === selAct ? 2.5 : 1.5), lineWidthUnits: "pixels",
-      updateTriggers: { getRadius: [Math.floor(t / 300), selAct], getLineColor: [Math.floor(t / 300), selAct], getLineWidth: selAct },
+      id: "act-hits", data: arcs.filter((d) => t - d.act.t < 12 * 3600 || hi.has(d.act.seq)),
+      getPosition: (d: any) => [d.to[0], d.to[1], d.to[2]], getRadius: (d: any) => (hi.has(d.act.seq) ? 16 : 8 + ((t - d.act.t) / 3600) * 2.5), radiusUnits: "meters", billboard: false,
+      stroked: true, filled: false, getLineColor: (d: any) => hex(d.refused ? PAL.flag : PAL.seat, hi.has(d.act.seq) ? 255 : Math.max(0, 230 * (1 - (t - d.act.t) / (12 * 3600)))), getLineWidth: (d: any) => (hi.has(d.act.seq) ? 2.5 : 1.5), lineWidthUnits: "pixels",
+      updateTriggers: { getRadius: [Math.floor(t / 300), hiKey], getLineColor: [Math.floor(t / 300), hiKey], getLineWidth: hiKey },
     }),
     // The seat's hall: a quiet amber ring when it acted lately.
     town.hall !== undefined && overlays.acts && new ScatterplotLayer({
       id: "hall", data: [town.hall], getPosition: (i: number) => [B.shapes[i]!.cx, B.shapes[i]!.cy, 0.6], getRadius: 22, radiusUnits: "meters", billboard: false,
       stroked: true, filled: true, getFillColor: hex(PAL.seat, 26), getLineColor: hex(PAL.seat, 150), getLineWidth: 1.2, lineWidthUnits: "pixels",
     }),
+    // The election: turnout by block, each vote at the voter's home, the campaign, the candidates' homes.
+    // Turnout only where a block differs from the town's (diverging about the town's turnout so far).
+    overlays.election && turnoutCells.length > 0 && new SolidPolygonLayer({
+      id: "turnout", data: turnoutCells, getPolygon: (d: any) => { const x = d.j % town.ground.w, y = Math.floor(d.j / town.ground.w); return rect((x + 0.5) * cell, -(y + 0.5) * cell, cell, cell, 0.42); },
+      getFillColor: (d: any) => (d.dev >= 0 ? [120, 170, 255, Math.min(90, d.dev * 600)] : [235, 150, 90, Math.min(90, -d.dev * 600)]), extruded: false, parameters: { depthWriteEnabled: false },
+    }),
+    // Each building's votes (or, in the campaign, its opinion-poll answers): a pie by first preference on its roof, sized by count.
+    overlays.election && pies.length > 0 && new SolidPolygonLayer({
+      id: "pies", data: pies, getPolygon: (d: any) => d.poly, getFillColor: (d: any) => hex(candCol[d.n] ?? "#ffffff", d.poll ? 170 : 245),
+      extruded: false, material: false as any, pickable: true, parameters: { depthCompare: "always" }, updateTriggers: { getFillColor: [candCol] },
+    }),
+    overlays.election && pies.length > 0 && new PathLayer({
+      id: "pie-rims", data: pieRims, getPath: (d: any) => d.path, getColor: [11, 15, 23, 200], getWidth: 1, widthUnits: "pixels", parameters: { depthCompare: "always" },
+    }),
+    overlays.election && petitionSigners.length > 0 && new ScatterplotLayer({
+      id: "signers", data: petitionSigners,
+      getPosition: (v: any, { index }: any) => { const sh = B.shapes[v.s]!; const [dx, dy] = jit(index, 51, sh); return [sh.cx + dx, sh.cy + dy, sh.top + 1.5]; },
+      getFillColor: hex(PAL.election, 220), getRadius: 1.1, radiusUnits: "meters", radiusMinPixels: 1.8, billboard: true, parameters: { depthCompare: "always" },
+    }),
+    overlays.election && ev && ev.phase !== "before" && new ScatterplotLayer({
+      id: "cand-homes", data: ev.homes.filter((h) => h.s >= 0), pickable: true,
+      getPosition: (h: any) => [B.shapes[h.s]!.cx, B.shapes[h.s]!.cy, 0.7], getRadius: 17, radiusUnits: "meters", billboard: false, filled: true, stroked: true,
+      getFillColor: (h: any) => hex(candCol[h.number] ?? "#fff", 40), getLineColor: (h: any) => hex(candCol[h.number] ?? "#fff", 230), getLineWidth: 2, lineWidthUnits: "pixels",
+      parameters: { depthCompare: "always" }, updateTriggers: { getFillColor: [candCol], getLineColor: [candCol] },
+    }),
+    overlays.election && ev && ev.phase !== "before" && new TextLayer({
+      id: "cand-labels", data: ev.homes.filter((h) => h.s >= 0), getPosition: (h: any) => [B.shapes[h.s]!.cx, B.shapes[h.s]!.cy, B.shapes[h.s]!.top + 8],
+      getText: (h: any) => `${h.number} · ${h.name}${h.seat ? " (seat)" : ""}`, getSize: 12, getColor: (h: any) => hex(candCol[h.number] ?? "#fff"),
+      fontFamily: "Inter Variable, Inter, system-ui, sans-serif", fontWeight: 600, characterSet: "auto", billboard: true, getAlignmentBaseline: "bottom",
+      fontSettings: { sdf: true, fontSize: 64, buffer: 6 }, outlineWidth: 3, outlineColor: [11, 15, 23, 220], parameters: { depthCompare: "always" }, updateTriggers: { getColor: [candCol] },
+    }),
+    // Papers: pins at the address, stacked, fading over the window; or a heat of them.
+    overlays.papers && overlays.paperMode === "pins" && placedPapers.length > 0 && new LineLayer({
+      id: "paper-stems", data: placedPapers,
+      getSourcePosition: (d: any) => { const sh = B.shapes[d.s]!; return [sh.cx + sh.fw * 0.32, sh.cy - sh.fh * 0.32, sh.top]; },
+      getTargetPosition: (d: any) => { const sh = B.shapes[d.s]!; return [sh.cx + sh.fw * 0.32, sh.cy - sh.fh * 0.32, sh.top + 4 + d.stack * 3]; },
+      getColor: (d: any) => hex(PAPER_GROUPS[d.g]!.colour, 200), getWidth: 1.2, widthUnits: "pixels",
+    }),
+    overlays.papers && overlays.paperMode === "pins" && placedPapers.length > 0 && new ScatterplotLayer({
+      id: "papers", data: placedPapers, pickable: true,
+      getPosition: (d: any) => { const sh = B.shapes[d.s]!; return [sh.cx + sh.fw * 0.32, sh.cy - sh.fh * 0.32, sh.top + 4 + d.stack * 3]; },
+      getFillColor: (d: any) => { const age = overlays.paperDays ? (t - d.p.t) / (overlays.paperDays * DAY) : 0; return hex(PAPER_GROUPS[d.g]!.colour, 255 * (1 - 0.6 * age)); },
+      getRadius: 1.9, radiusUnits: "meters", radiusMinPixels: 4.2, radiusMaxPixels: 9, billboard: true, stroked: true, getLineColor: [255, 255, 255, 170], lineWidthMinPixels: 0.8, parameters: { depthCompare: "always" },
+      updateTriggers: { getFillColor: [Math.floor(t / 900), overlays.paperDays] },
+    }),
+    overlays.papers && overlays.paperMode === "heat" && heat && new BitmapLayer({
+      id: "heat", image: heat as any, bounds: [0, -staticLayers.H, staticLayers.W, 0], coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+      parameters: { depthWriteEnabled: false, depthCompare: "always" },
+    }),
     // People: crowds at a distance, points up close.
-    overlays.people && crowdF > 0.02 && new ScatterplotLayer({
+    overlays.people && !overlays.election && crowdF > 0.02 && new ScatterplotLayer({
       id: "crowds", data: crowds, getPosition: (d: any) => [d.p[0], d.p[1], 0.6], getRadius: (d: any) => 5 + Math.sqrt(d.n) * 3.4, radiusUnits: "meters", radiusMinPixels: 1.5,
-      getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * (0.22 + 0.2 * sky.night), parameters: { ...(sky.night > 0.5 ? ADDITIVE : { depthWriteEnabled: false }), depthCompare: "always" },
+      getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * (0.22 + 0.2 * sky.night) * (overlays.election || overlays.papers ? 0.3 : 1), parameters: { ...(sky.night > 0.5 ? ADDITIVE : { depthWriteEnabled: false }), depthCompare: "always" },
     }),
-    overlays.people && crowdF > 0.02 && new ScatterplotLayer({
+    overlays.people && !overlays.election && crowdF > 0.02 && new ScatterplotLayer({
       id: "crowds-core", data: crowds, getPosition: (d: any) => [d.p[0], d.p[1], 0.7], getRadius: (d: any) => 2 + Math.sqrt(d.n) * 1.5, radiusUnits: "meters", radiusMinPixels: 1,
-      getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * 0.55, parameters: { depthWriteEnabled: false, depthCompare: "always" },
+      getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * 0.55 * (overlays.election || overlays.papers ? 0.3 : 1), parameters: { depthWriteEnabled: false, depthCompare: "always" },
     }),
-    overlays.people && new ScatterplotLayer({
+    overlays.people && !overlays.election && new ScatterplotLayer({
       id: "people-halo", data: { length: nP, attributes: { getPosition: { value: people.pos, size: 3 }, getFillColor: { value: people.col, size: 4, normalized: true } } },
-      getRadius: 1.9, radiusUnits: "meters", radiusMinPixels: 2.2, radiusMaxPixels: 7, billboard: true, opacity: (0.16 + 0.22 * sky.night) * (1 - crowdF * 0.6), parameters: ADDITIVE,
+      getRadius: 1.9, radiusUnits: "meters", radiusMinPixels: 2.2, radiusMaxPixels: 7, billboard: true, opacity: (0.16 + 0.22 * sky.night) * (1 - crowdF * 0.6) * (overlays.election || overlays.papers ? 0.35 : 1), parameters: ADDITIVE,
     }),
     overlays.people && new ScatterplotLayer({
       id: "people", data: { length: nP, attributes: { getPosition: { value: people.pos, size: 3 }, getFillColor: { value: people.col, size: 4, normalized: true } } },
-      getRadius: 0.7, radiusUnits: "meters", radiusMinPixels: 0.9, radiusMaxPixels: 3, billboard: true, pickable: true, parameters: { depthWriteEnabled: false },
+      getRadius: 0.7, radiusUnits: "meters", radiusMinPixels: 0.9, radiusMaxPixels: 3, billboard: true, pickable: true, opacity: overlays.election ? 0.18 : overlays.papers ? 0.4 : 1, parameters: { depthWriteEnabled: false },
     }),
     // Selection.
     trail.length > 0 && new PathLayer({
@@ -628,9 +770,10 @@ function Map({ city, camera, card, layersOpen }: { city: CityData; camera?: City
       <div className="lc-vignette" />
       {selP >= 0 && <button className={`lc-follow ${follow ? "on" : ""}`} onClick={() => setFollow(!follow)}>{follow ? <>Following {city.people.people[selP]![1]}<span className="muted"> · stop</span></> : <>Follow {city.people.people[selP]![1]}</>}</button>}
       <Clock t={t} sky={sky} town={town} />
-      <Panel open0={layersOpen} overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />
+      <Panel open0={layersOpen} ev={ev} candCol={candCol} papersShown={papersShown} onTour={steps.length ? () => setTour(0) : undefined} overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />
       {tip && <Tooltip tip={tip} city={city} t={t} name={(i) => structureName(city, i)} />}
-      {card && <Card city={city} t={t} selection={selection} name={(i) => structureName(city, i)} onClose={() => select(null)} />}
+      {tour !== null && <Tour steps={steps} at={tour} setAt={setTour} onExit={() => setTour(null)} />}
+      {card && tour === null && <Card city={city} t={t} selection={selection} name={(i) => structureName(city, i)} onClose={() => select(null)} />}
     </div>
   );
 }
