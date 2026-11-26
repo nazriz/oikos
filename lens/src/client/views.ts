@@ -1,0 +1,48 @@
+// The Run page's slots (src/client/run/RunPage.tsx): what fills the map in the middle, the story rail on the right, the
+// sitting reader over them, and the inspector drawer's body. Each view's owner registers its component here with one
+// line; an empty slot shows a quiet placeholder. Views talk to each other only through src/client/state.ts.
+import { createElement, type ComponentType } from "react";
+import type { Meta, RunEntry } from "../shared/api";
+import type { Selection } from "./state";
+import { SittingReader } from "./story/SittingReader";
+import { StoryRail } from "./story/StoryRail";
+
+export interface SlotProps {
+  /** The open run's key. */
+  run: string;
+  meta: Meta;
+  entry?: RunEntry;
+}
+export interface InspectorProps extends SlotProps {
+  selection: NonNullable<Selection>;
+}
+
+export interface Views {
+  /** Center: the town (city's CityView). Fills its box. */
+  map?: ComponentType<SlotProps>;
+  /** Right: the seat's story (story's StoryRail), ~420 px wide, fills the height. */
+  rail?: ComponentType<SlotProps>;
+  /** Over the map and rail, when the selection is a sitting, a lever or an act (story's SittingReader). */
+  reader?: ComponentType<SlotProps>;
+  /** The inspector drawer's body, by selection kind (person, structure, entity...). */
+  inspector?: Partial<Record<NonNullable<Selection>["kind"], ComponentType<InspectorProps>>>;
+  /** The Compare page, #/compare/<a>/<b> (story's ComparePage). */
+  compare?: ComponentType<{ a: string; b: string }>;
+  /** The cross-run Moments gallery, #/moments (story's Moments). */
+  moments?: ComponentType<{}>;
+}
+
+import { CityView } from "./city/CityView";
+import { CityInspector } from "./city/Inspector";
+import { ComparePage } from "./compare/ComparePage";
+import { Moments } from "./story/Moments";
+
+// Registered views (one line each, by their owners):
+export const views: Views = {
+  rail: StoryRail,
+  reader: SittingReader,
+  map: (p) => createElement(CityView, { run: p.run, card: false }),
+  inspector: { person: CityInspector, structure: CityInspector, entity: CityInspector },
+  compare: ComparePage,
+  moments: Moments,
+};

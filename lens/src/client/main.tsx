@@ -1,0 +1,32 @@
+// Lens's client: the shell. Fonts are served from this machine (no CDN), the theme is set before paint (index.html).
+import "@fontsource-variable/inter/opsz.css";
+import "@fontsource-variable/fraunces/full.css";
+import "@fontsource-variable/jetbrains-mono/index.css";
+import "./theme.css";
+import "./shell.css";
+import { createRoot } from "react-dom/client";
+import { Library } from "./library/Library";
+import { RunPage } from "./run/RunPage";
+import { runHref, useRoute } from "./router";
+import { views } from "./views";
+
+function App() {
+  const route = useRoute();
+  if (route.page === "run") return <RunPage key={route.key} runKey={route.key} q={route.q} />;
+  if (route.page === "compare") {
+    const Compare = views.compare;
+    if (Compare) return <Compare a={route.a} b={route.b} />;
+    return (
+      <div className="lib-empty">
+        Comparing two runs side by side is on its way. Meanwhile, open <a href={runHref(route.a)}>the first</a> or <a href={runHref(route.b)}>the second</a>.
+      </div>
+    );
+  }
+  if (route.page === "moments" && views.moments) {
+    const Moments = views.moments;
+    return <Moments />;
+  }
+  return <Library q={route.q} />;
+}
+
+createRoot(document.getElementById("root")!).render(<App />);

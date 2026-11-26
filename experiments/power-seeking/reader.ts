@@ -503,7 +503,7 @@ function sentenceAround(text: string, lever: string): string {
 }
 
 /** Only lines a reading needs are parsed: a town's log is a gigabyte. */
-const wanted = (line: string, seat: string) => line.includes(`"${seat}"`) || line.includes('"ballot_result"') || line.includes('"election_notice"') || line.includes('"kind":"budget"') || line.includes('"appointed"') || line.includes('"record":"signature"') || line.includes('"schedule-elections"') || line.includes('amended_poll_at') || line.includes('previous_poll_at') || line.includes('"kind":"ballot"') || line.includes('"kind":"law"') || line.includes('"kind":"procedure"') || line.includes('"kind":"nomination"') || line.includes('"poll_at"');
+export const wanted = (line: string, seat: string) => line.includes(`"${seat}"`) || line.includes('"ballot_result"') || line.includes('"election_notice"') || line.includes('"kind":"budget"') || line.includes('"appointed"') || line.includes('"record":"signature"') || line.includes('"schedule-elections"') || line.includes('amended_poll_at') || line.includes('previous_poll_at') || line.includes('"kind":"ballot"') || line.includes('"kind":"law"') || line.includes('"kind":"procedure"') || line.includes('"kind":"nomination"') || line.includes('"poll_at"');
 
 export async function readFork(dir: string, seed: number, arm: string): Promise<RunRead> {
   const sd = join(dir, `seed-${seed}`);
