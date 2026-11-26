@@ -201,7 +201,8 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
   // Where everyone is, now.
   city.where.seek(t);
   const hour = ((t % DAY) + DAY) % DAY / 3600;
-  const sky = useMemo(() => skyAt(Math.round(hour * 12) / 12), [Math.round(hour * 12)]);
+  const dark = useDark();
+  const sky = useMemo(() => skyAt(Math.round(hour * 12) / 12, dark), [Math.round(hour * 12), dark]);
   const effects = useMemo(() => [new LightingEffect({
     ambient: new AmbientLight({ color: sky.ambientColor, intensity: sky.ambientIntensity }),
     sun: new DirectionalLight({ color: sky.sunColor, intensity: sky.sunIntensity, direction: sky.sunDir }),
@@ -509,7 +510,7 @@ function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["c
   }, [city, select]);
 
   return (
-    <div ref={wrap} className="lc-wrap" style={{ background: `rgb(${sky.backdrop.join(",")})` }}>
+    <div ref={wrap} className={`lc-wrap${dark ? "" : " light"}`} style={{ background: `rgb(${sky.backdrop.join(",")})` }}>
       <DeckGL
         views={new OrbitView({ id: "city", orbitAxis: "Z", fovy: 32, near: 1, far: 20000 } as any)}
         viewState={view as any}
@@ -575,4 +576,25 @@ function personXY(c: CityData, B: Built, q: number, t: number): [number, number]
   if (s >= 0) return [B.shapes[s]!.cx, B.shapes[s]!.cy];
   const p = placeAt(c, c.people.people[q]![0], t);
   return p >= 0 ? [B.shapes[p]!.cx, B.shapes[p]!.cy] : undefined;
+}
+
+/** Dark unless the shell says light (<html data-theme="light">, or the system prefers light and no theme is set). */
+function useDark(): boolean {
+  const read = () => {
+    if (typeof document === "undefined") return true;
+    const th = document.documentElement.dataset.theme;
+    if (th) return th !== "light";
+    return !(typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: light)").matches);
+  };
+  const [dark, setDark] = useState(read);
+  useEffect(() => {
+    const on = () => setDark(read());
+    window.addEventListener("lens-theme", on);
+    const mq = typeof matchMedia !== "undefined" ? matchMedia("(prefers-color-scheme: light)") : undefined;
+    mq?.addEventListener("change", on);
+    const mo = new MutationObserver(on);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => { window.removeEventListener("lens-theme", on); mq?.removeEventListener("change", on); mo.disconnect(); };
+  }, []);
+  return dark;
 }

@@ -9,6 +9,7 @@ import { CityView } from "./CityView";
 
 const q = new URLSearchParams(location.search);
 const DAY = 86_400;
+if (q.get("theme")) document.documentElement.dataset.theme = q.get("theme")!;
 const num = (k: string) => (q.has(k) ? +q.get(k)! : undefined);
 
 function Dev() {

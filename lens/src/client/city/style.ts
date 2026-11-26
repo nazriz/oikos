@@ -94,7 +94,12 @@ export const CITY_CSS = `
   .lens-city .lc-card { left: 10px; right: 10px; bottom: 10px; width: auto; }
   .lens-city .lc-tip { display: none; }
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) .lens-city .lc-vignette { background: radial-gradient(120% 90% at 50% 45%, transparent 60%, rgba(5,7,12,.35) 100%); }
-}
+/* Light: the shell's tokens carry the panels; the map keeps its own ground and loses the dark edge. */
+.lens-city .lc-wrap.light .lc-vignette { background: radial-gradient(120% 90% at 50% 45%, transparent 62%, rgba(120,110,90,.18) 100%); }
+.lens-city .lc-wrap.light .lc-clock { text-shadow: 0 1px 10px rgba(246,243,236,.8); color: var(--text, #22252c); }
+.lens-city .lc-wrap.light .lc-clock-sub, .lens-city .lc-wrap.light .lc-clock-place { color: var(--muted, #5d6470); }
+.lens-city .lc-wrap.light .lc-panel { box-shadow: 0 10px 30px rgba(40,30,10,.12); }
+.lens-city .lc-wrap.light .lc-chip, .lens-city .lc-wrap.light .lc-seg { background: #0000000d; }
+.lens-city .lc-wrap.light .lc-ghost:hover { background: #0000000a; }
+.lens-city .lc-wrap.light .lc-quote { color: inherit; }
 `;
