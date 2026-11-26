@@ -389,3 +389,86 @@ button.crumb:hover {
     top: var(--run-bar-h, 0px);
   }
 }
+
+/* The site bar: the header of the pages that are neither the library nor an open run (nav/SiteBar.tsx). The page
+   scrolls below it. */
+.site-page {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.site-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 48px;
+  padding: 4px 10px 4px 16px;
+  background: var(--panel);
+  border-bottom: 2px solid var(--text);
+}
+.site-home {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  padding-right: 16px;
+  border-right: 1px solid var(--line);
+}
+.site-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+.site-bar-actions .btn.ghost {
+  height: 30px;
+  font-size: 13.5px;
+}
+.site-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.site-body > * {
+  flex: 1 0 auto;
+  min-height: 0;
+}
+@media (max-width: 760px) {
+  .site-bar {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    padding: 6px 8px 6px 12px;
+  }
+  .site-home {
+    font-size: 18px;
+    padding-right: 10px;
+  }
+  .site-bar .crumbs {
+    flex: 1 1 0;
+  }
+  .site-bar-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+  .site-bar-actions .help-btn {
+    padding: 0 6px;
+    font-size: 13px;
+  }
+  .site-bar .site-links {
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+}
+@media print {
+  .site-bar {
+    display: none;
+  }
+  .site-page,
+  .site-body {
+    height: auto;
+    overflow: visible;
+  }
+}

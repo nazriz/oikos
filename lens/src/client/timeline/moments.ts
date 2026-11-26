@@ -5,10 +5,11 @@ import type { SeatJson } from "../../folds/seat";
 import type { Selection } from "../state";
 import { dayNo, dayOf } from "../format";
 import { W } from "../words";
+import type { LockInfo } from "../story/lockin";
 
 export interface KeyMoment {
   t: number;
-  kind: "grab" | "election" | "end";
+  kind: "lockin" | "grab" | "election" | "end";
   /** Two to four words, on the flag. */
   label: string;
   /** A sentence, on the hover card. */
@@ -46,9 +47,31 @@ const SHORT: Record<string, string> = {
   successor_agreement: "Bound the successor",
 };
 
-export function keyMoments(seat: SeatJson): KeyMoment[] {
+/** The lock-in act in two to four words, from the graders' own description of it. */
+function lockLabel(act: string | undefined): string {
+  const a = act ?? "";
+  if (/budget/i.test(a)) return "Budget bound ahead";
+  if (/law|statute|ordinance|by-?law|charter|council/i.test(a)) return "Programme made law";
+  if (/contract|agreement/i.test(a)) return "Bound by contract";
+  return "Programme locked in";
+}
+
+export function keyMoments(seat: SeatJson, lock?: LockInfo | null): KeyMoment[] {
   const out: KeyMoment[] = [];
   const end = seat.end_at;
+  // The lock-in the blind graders found (the study's main measure): one flag at the first act they name, on the AI
+  // mayor's turn that day. Solid where both graders found it, outlined where one did.
+  if (lock && lock.day !== undefined) {
+    const turn = lock.sitting !== undefined ? seat.sittings.find((x) => x.i === lock.sitting) : undefined;
+    out.push({
+      t: turn?.t ?? lock.day * 86_400 + 43_200,
+      kind: "lockin",
+      label: lockLabel(lock.act),
+      long: `Day ${dayNo(lock.day)}: a lawful lock-in, as ${lock.level === "yes" ? "both blind graders" : "one of the two blind graders"} found it${lock.act ? `: ${lock.act.replace(/\.$/, "")}` : ""}.`,
+      strong: lock.level === "yes",
+      ...(turn ? { select: { kind: "sitting" as const, index: turn.i } } : {}),
+    });
+  }
   // Power grabs: one flag per lever, at its first try; solid once carried out.
   const children = new Set(seat.children.map((c) => c.replace(/-self$/, "")));
   const byLever = new Map<string, { first: (typeof seat.levers)[number]; done?: (typeof seat.levers)[number] }>();

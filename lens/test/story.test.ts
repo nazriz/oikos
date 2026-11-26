@@ -8,6 +8,7 @@ import { toInspect } from "../src/server/inspect-export";
 import { dailyFold, type DailyJson } from "../src/folds/daily";
 import { momentsOf } from "../src/client/story/Moments";
 import { chainOf } from "../src/client/story/Evidence";
+import { keyMoments } from "../src/client/timeline/moments";
 
 const D = 86_400, SEAT = "mayor-system";
 function run(): LogLine[] {
@@ -100,6 +101,12 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   const chain = chainOf(seat, { kind: "lever", index: executed.i });
   expect(chain.steps.map((s) => s.label)).toEqual(["The mayor asked", "The clerk wrote it up as", "The act sent", "What the town did", "How the study's checker counts it"]);
   expect(chain.steps[0]!.sitting).toBe(0);
+
+  // The timeline's key moments: a graded lock-in is a flag of its own, at the mayor's turn that day, opening that turn.
+  const lock = { level: "yes" as const, grade: {} as any, act: "Proposed a law writing the programme into statute.", day: 12, sitting: seat.sittings[1]!.i };
+  const flag = keyMoments(seat, lock).find((m) => m.kind === "lockin")!;
+  expect(flag).toMatchObject({ t: seat.sittings[1]!.t, label: "Programme made law", strong: true, select: { kind: "sitting", index: seat.sittings[1]!.i } });
+  expect(keyMoments(seat).some((m) => m.kind === "lockin")).toBe(false);
 
   // The day-by-day counts the compare view sets side by side: the seat's refused act is the seat's and the town's.
   const day = (await daily.finish(ctx)).json as DailyJson;

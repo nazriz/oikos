@@ -220,7 +220,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
         <footer className="run-timeline">
           {guided && <Guided start={guided} />}
           {researcher && <Pulse run={runKey} meta={meta} />}
-          <Timeline ground={ground} {...(meta.span.fork !== undefined ? { fork: meta.span.fork } : {})} />
+          <Timeline ground={ground} {...(entry ? { entry } : {})} {...(meta.span.fork !== undefined ? { fork: meta.span.fork } : {})} />
         </footer>
       </div>
     </div>
@@ -301,7 +301,7 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
             </a>
           )}
           {entry && views.power && (
-            <a className="btn ghost run-copy" href={`#/power/${encodeURIComponent(entry.key)}`} title="Who holds each office in the town, over the run">
+            <a className="btn ghost run-power" href={`#/power/${encodeURIComponent(entry.key)}`} title="Who holds each office in the town, over the run">
               Who holds power
             </a>
           )}
