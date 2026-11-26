@@ -16215,3 +16215,58 @@ another day): what each thought and said and what it did, one search marking eve
   ground the camera sees: the screen's corners cast onto z = 0 and clamped near the horizon. Clicking or dragging on
   it moves the camera.
 - The loader waits on `/status` when a bundle answers 409, as story's does.
+
+## 2026-11-26 Lens city: robustness (wave 5)
+
+- **The city test needs no kernel and no run slot.** It folds a small log written by hand in the kernel's line shapes:
+  3 houses, a workplace, a hall, 6 people over 3 days, a house built mid-run, one act of the seat, a ballot with 4 votes,
+  a complaint and a benefit decision. It checks the folds' invariants, the whereabouts engine against a plain replay,
+  and where the election and papers are placed. It runs in about 20 ms. The mock run it replaced waited on run slots
+  and could wedge the merge gate.
+- **Papers are placed at a known person,** not at anything that is not an entity. A decision goes to its addressee
+  first, then its author. The town fold is now version 3.
+- **Other runs.** Tried on a plain 3,000-person run with no seat (living-pilot-7 twinA: 1,713 structures, 476k
+  moves) and on an older 1,000-person run whose seats never acted (w2-01-council). Both draw. With no seat, the seat's
+  layer and the hall ring are hidden, and the tour shows only when there is something to tour. Measured in GPU
+  Chrome at 3,000 people: panning 16.7 ms/frame (p95 17.1), playing 16.6 ms. Panning had a 25 ms p95 until the panel
+  stopped re-rendering on camera frames.
+
+## 2026-11-26 Lens city: who holds power
+
+**Decided:** `PowerView` (lens/src/client/city/Power.tsx) is a chart, not a force graph. Institutions are cards: the
+government first, two columns wide; then by number of posts. Each post is a row: its holder now (a chip) and, if it
+changed hands, a strip of its holders over the run and who appointed or vacated it. Lines join holders who are kin.
+Ties to the seat (rose) always show. Other ties show on request, or for the holder pointed at. A person holding
+several posts carries ×n. A force layout was rejected: it moves as time scrubs, and the reader loses the place.
+The data is in the town fold (v4, `power`):
+- the posts of the town's own organisations (not the outside's), with first holders;
+- every `appointed` event (a holder of null is a vacancy);
+- each participant's person, the seat's person included (`participants[].person`);
+- parents (from entities and households), couples and households.
+
+Kin are parent/child, siblings (a shared parent), partners (couples) and one household. Appointments go on the shared
+timeline as track `power.appointments`; an appointment of kin of the seat is marked as a flag. On GLM seed 7 the
+seat's child c0571 is appointed editor and electoral commissioner on day 155, and the chart ties both posts to the
+mayor in rose. **Revisit if** the world records ties beyond family and household (employment, debts): add them as
+further kinds of line.
+
+## 2026-11-26 Lens city: presentation and recording
+
+**Decided:**
+- **Present.** Present (a button in the open Layers panel, or the `present` prop) asks for full screen and hides the
+  map's chrome. A caption bar says what is happening, in this order of precedence:
+  1. A lever of the study's reader in the last 12 h, attempted or executed only.
+  2. The election declared in the last day.
+  3. The seat's current sitting in its own words (its gist and first words) while it is under 1.5 days old.
+  4. The time of day.
+
+  The clock plays at 1 h/s. The camera eases toward what the seat's acts touched in the last 12 h, else the town,
+  with a slow drift round. A hand on the map holds the camera for 4 s. Esc leaves and restores the clock's play
+  and speed.
+- **Record.** Record plays the tour in presentation and records it. Through the tour the town moves at 15 min/s. The
+  recording copies each rendered frame of the map's canvas to a 2D canvas and draws the caption onto it.
+  `captureStream(30)` feeds a MediaRecorder: MP4 (H.264) where the browser offers it, else WebM (VP9 or VP8), at
+  8 Mb/s. The size is the map's own (at most 1920 wide), set from the first full frame. The file downloads when the
+  tour ends. The sample tour is 70 s, 1280×720 H.264, about 65 MB.
+- **Measured.** In GPU Chrome presentation holds 60 frames a second. The headless software renderer cannot keep up
+  with it (screenshots time out), so presentation is checked in a real window.
