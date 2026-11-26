@@ -1,6 +1,7 @@
 // Fetching the seat fold's output, and the small formatters the story view shares.
 import { useEffect, useState } from "react";
 import type { SeatJson, SittingDetail } from "../../folds/seat";
+import { outcomeOf, type Outcome } from "../../shared/outcome";
 
 export type { SeatAct, SeatDraft, SeatJson, SeatLever, SeatRecord, SittingDetail, SittingSummary, SittingTurn } from "../../folds/seat";
 
@@ -61,6 +62,11 @@ export function tokens(n: number): string { return n >= 1e6 ? `${(n / 1e6).toFix
 export const plural = (n: number, w: string, ws = `${w}s`) => `${n} ${n === 1 ? w : ws}`;
 export const human = (s: string) => s.replace(/[_-]+/g, " ");
 
+/** The election's outcome by Lens's one rule (src/shared/outcome.ts), with the story's tone for it. */
+export function seatOutcome(seat: SeatJson): Outcome & { css: "good" | "bad" | "flag" | "muted" } {
+  const o = outcomeOf({ election: seat.election, end_at: seat.end_at, ended: seat.ended ?? "unknown", moved: seat.amendments.some((a) => a.outcome === "applied") });
+  return { ...o, css: o.kind === "won" ? "good" : o.kind === "lost" ? "bad" : o.tone === "flag" ? "flag" : "muted" };
+}
 export const OUTCOME: { [k in SeatJson["outcome"]]: { label: string; tone: string } } = {
   won: { label: "Won the election", tone: "good" },
   lost: { label: "Lost the election", tone: "bad" },

@@ -4,7 +4,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useLens, type TimelineMark } from "../state";
-import { loadSeat, useAsync, when, worldDay, usd, tokens, plural, human, OUTCOME, STAGE, type SeatJson, type SittingSummary, type SeatLever, type SeatRecord } from "./data";
+import { loadSeat, useAsync, when, worldDay, usd, tokens, plural, human, seatOutcome, STAGE, type SeatJson, type SittingSummary, type SeatLever, type SeatRecord } from "./data";
+import { leverCounts } from "../../shared/outcome";
 import "./story.css";
 
 const DAY = 86_400;
@@ -70,12 +71,7 @@ export function kinAppointed(seat: SeatJson): { act: number; who: string; post: 
 }
 function modelName(m?: string) { return m ? m.split("/").at(-1)! : "code"; }
 function pollMoved(seat: SeatJson) { return seat.amendments.find((a) => a.outcome === "applied"); }
-function outcomeOf(seat: SeatJson): { label: string; tone: string } {
-  const moved = pollMoved(seat);
-  if (seat.outcome === "not_held" && moved) return { label: `Poll moved to day ${Math.round((seat.election.poll_at ?? 0) / DAY)}`, tone: "flag" };
-  if (seat.outcome === "not_held" && seat.election.poll_at !== undefined) return { label: `${seat.ended === "stopped" ? "Stopped" : "Run ended"} before the poll (day ${Math.round(seat.election.poll_at / DAY)})`, tone: "muted" };
-  return OUTCOME[seat.outcome];
-}
+function outcomeOf(seat: SeatJson): { label: string; tone: string } { const o = seatOutcome(seat); return { label: o.label, tone: o.css }; }
 
 /** Short names for the reader's levers, for a chip on one line (the full title is its tooltip). */
 const SHORT: { [lever: string]: string } = {
@@ -103,7 +99,7 @@ function HeaderLine({ seat, onOpen }: { seat: SeatJson; onOpen: () => void }) {
       </div>
       <div className="st-line2">
         <span className={`st-outword ${out.tone}`}>{out.label}</span>
-        <span className="st-faint">· {seat.sittings.length} sittings · {seat.acts.length} acts{seat.ended === "stopped" ? " · stopped early" : ""} · {usd(cost)}</span>
+        <span className="st-faint">{seat.sittings.length} sittings · {seat.acts.length} acts{seat.ended === "stopped" ? " · stopped early" : ""} · {usd(cost)}</span>
       </div>
       {(top.size > 0 || kin.length > 0) && (
         <div className="st-line3">
@@ -125,8 +121,7 @@ function Header({ seat, onClose }: { seat: SeatJson; onClose: () => void }) {
   for (const l of seat.levers) { const x = byLever.get(l.lever); if (!x) byLever.set(l.lever, { title: l.title, level: l.level, n: 1, first: l.i }); else { x.n++; if (rank[l.level] > rank[x.level]) { x.level = l.level; x.first = l.i; } } }
   const days = Math.round((seat.end_at - seat.fork_at) / DAY);
   const kin = kinAppointed(seat);
-  const exec = new Set(seat.levers.filter((l) => l.level === "executed").map((l) => l.lever)).size;
-  const tried = new Set(seat.levers.filter((l) => l.level !== "considered").map((l) => l.lever)).size;
+  const { done: exec, tried } = leverCounts(seat.levers);
   return (
     <div className="st-head">
       <div className="st-kicker" style={{ display: "flex", alignItems: "center" }}>The seat · {seat.seat}<span style={{ flex: 1 }} /><button className="st-btn" onClick={onClose} title="Fold the details into a line">fold ▴</button></div>

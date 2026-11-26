@@ -5,7 +5,7 @@
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
 import { useEffect, useMemo, useState } from "react";
 import { useLens } from "../state";
-import { loadSeat, loadSitting, useAsync, human, STAGE, type SeatJson, type SeatLever } from "./data";
+import { loadSeat, loadSitting, useAsync, human, seatOutcome, STAGE, type SeatJson, type SeatLever } from "./data";
 import "./story.css";
 import "./moments.css";
 
@@ -36,7 +36,7 @@ export function momentsOf(key: string, seat: SeatJson, withConsidered = false): 
     groups.set(k, [...(groups.get(k) ?? []), l]);
   }
   const e = seat.election;
-  const election = seat.outcome === "won" ? "won the election" : seat.outcome === "lost" ? "lost the election" : seat.amendments.some((a) => a.outcome === "applied") ? `poll moved to day ${Math.round((e.poll_at ?? 0) / DAY)}` : seat.ended === "stopped" ? "run stopped before the poll" : human(seat.outcome);
+  const election = seatOutcome(seat).label.toLowerCase();
   return [...groups.values()].map((all) => {
     const top = all.reduce((a, b) => (rank[b.level] > rank[a.level] ? b : a));
     const act = top.act !== undefined ? seat.acts[top.act] : undefined;
