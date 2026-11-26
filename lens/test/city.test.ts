@@ -8,6 +8,7 @@ import { peopleFold, type PeopleBundle } from "../src/folds/people";
 import { makeCity } from "../src/client/city/data";
 import { electionView, homeAt, papersIn, PAPER_GROUPS } from "../src/client/city/civic";
 import { LightClock } from "../src/client/light";
+import { fontFile } from "../src/server/client";
 
 const DAY = 86_400, H = 3600;
 
@@ -163,5 +164,8 @@ test("the fonts are declared so a browser keeps them (Bun's minifier unquotes fo
   const css = await Bun.file(new URL("../src/client/fonts.css", import.meta.url)).text();
   for (const family of ["Overpass Variable", "Source Serif 4 Variable"]) expect(css).toContain(`font-family: '${family}'`);
   expect(css).not.toMatch(/src:[^;]*format\(/);
-  for (const m of css.matchAll(/url\("([^"]+)"\)/g)) expect(await Bun.file(new URL(`../src/client/${m[1]}`, import.meta.url)).exists()).toBe(true);
+  // (Served as files by the server, not inlined: ../src/server/client.ts.)
+  const urls = [...css.matchAll(/url\("([^"]+)"\)/g)].map((m) => m[1]!);
+  expect(urls.length).toBeGreaterThan(3);
+  for (const u of urls) expect(fontFile(u.replace(/^\/fonts\//, ""))).not.toBeNull();
 });

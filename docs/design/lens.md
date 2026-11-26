@@ -13,8 +13,9 @@ does it differ from the code twin and from other models.* Second: anyone watchin
 
 `lens/` (a Bun workspace). `oikos lens [--runs DIR] [--port 4322]` serves it on 127.0.0.1; on the tailnet at
 `https://clawds-mac-mini.tail70bea4.ts.net:8443/` (`tailscale serve --bg --https=8443 http://127.0.0.1:4322`).
-Bun's full-stack server (`Bun.serve` with an HTML import) bundles the client: React 19, zustand, deck.gl (map),
-uPlot and d3 (charts), marked (transcripts), self-hosted fonts. No CDN: everything is served from the machine.
+The server builds the client at start (Bun.build of `src/client/index.html`, `src/server/client.ts`) and serves it
+compressed (brotli or gzip): React 19, zustand, deck.gl (map), uPlot and d3 (charts), marked (transcripts),
+self-hosted woff2 fonts at `/fonts/`. No CDN: everything is served from the machine.
 
 Pages (hash routes):
 - **Library** `#/`: every run under `runs/`: experiments (spec.json, results.json, seed-N/arm.oklog) and plain runs.

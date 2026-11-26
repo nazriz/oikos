@@ -1,5 +1,5 @@
 // The dev page: the CityView filling the window, with a minimal clock bar (the real timeline is the shell's).
-import "../fonts.css";
+// (No house fonts here: they are served by the Lens server at /fonts/, which this page does not have.)
 import "../theme.css";
 import { useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";

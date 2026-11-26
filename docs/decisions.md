@@ -16342,6 +16342,20 @@ Numbers are in `runs/views/lens-dev/smooth/`.
 - **No half-drawn map, no jumping timeline.** The map keeps its loading cover until deck has drawn twice. The timeline
   keeps room for as many lanes as it last had while views add theirs, for 2.5 s at most. The map's background uses
   `--ink`; the undefined `--bg` made its loading state dark in the light theme.
+- **The client is served compressed** (`lens/src/server/client.ts`). At start the server builds `index.html` with
+  Bun.build and keeps brotli and gzip copies. The hashed files are cached for good and the page is never cached. Bun's
+  HTML-import serving sent 2.75 MB of JS and 0.87 MB of CSS uncompressed; now it is 0.62 MB of JS and 15 KB of CSS
+  with brotli. The fonts are real woff2 files at `/fonts/` (marked external to the build, read from the fontsource
+  packages), and the three the first screen draws with are preloaded. `--dev` builds unminified, again on each load of
+  the page; Bun's HTML import and its hot reload are no longer used. The city dev page goes without the house fonts.
+  **Revisit if** Bun's HTML serving learns compression and keeps format() quotes.
+- **Opening a run the browser has seen skips painting the ground.** Painting it took 260 ms on the main thread. The
+  broad variation is now sampled every 5 px and interpolated (190 ms), and the result is kept per run and theme in
+  IndexedDB (`city/ground-cache.ts`), decoded off the thread on the next open. Map drawn: about 700 ms before, 490-530
+  ms on a cached open, 780 ms on a first. The rail's words come in at 110-150 ms. What is left is deck's first build
+  and GPU upload (about 140 ms in one task). The other theme's ground is got ready 3 s after open, never while playing.
+  The pulse stands at its full height while its data loads; the timeline footer grew by it and shifted the map, the
+  About panel and the map switch above it (CLS 0.02 down to 0.001).
 
 ## 2026-11-26 Lens: the 3D town without flicker, and quiet until asked
 

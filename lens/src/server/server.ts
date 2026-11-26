@@ -1,8 +1,8 @@
-// Lens's server: Bun's full-stack server (an HTML import, bundled by Bun: the client's TSX, CSS and fonts) and the API
+// Lens's server: the client (built at start and served compressed, ./client.ts) and the API
 // (src/shared/api.ts). Bound to 127.0.0.1; reached from elsewhere through `tailscale serve` (docs/design/lens.md).
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import index from "../client/index.html";
+import { clientRoutes } from "./client";
 import type { IndexStatus } from "../shared/api";
 import { lensPaths, type LensPaths } from "./paths";
 import { Lens } from "./service";
@@ -13,7 +13,7 @@ export interface ServeOptions {
   views?: string;
   port?: number;
   hostname?: string;
-  /** Bun's development mode (hot reload, unminified). */
+  /** Development: the client unminified and built again on each load of the page. */
   development?: boolean;
   /** Read the study's readings in the background (default true). */
   background?: boolean;
@@ -38,6 +38,7 @@ export function startServer(o: ServeOptions = {}) {
   const paths: LensPaths = lensPaths(o);
   const lens = new Lens(paths, { background: o.background !== false });
   const NAME = /^[a-z0-9_-]+$/i;
+  const client = clientRoutes(o.development ?? false);
 
   const server = Bun.serve({
     hostname: o.hostname ?? "127.0.0.1",
@@ -45,7 +46,8 @@ export function startServer(o: ServeOptions = {}) {
     development: o.development ?? false,
     idleTimeout: 0,
     routes: {
-      "/": index,
+      "/": (req) => client.page(req),
+      "/fonts/:file": (req) => client.font(req.params.file) ?? notFound("font"),
       "/api/runs": async (req) => {
         // (A thousand runs' entries are a megabyte; gzipped, a tenth of it: it matters on a phone.)
         const body = JSON.stringify(await lens.list(new URL(req.url).searchParams.has("fresh")));
@@ -114,8 +116,8 @@ export function startServer(o: ServeOptions = {}) {
       },
       "/api/*": () => notFound("route"),
     },
-    fetch() {
-      return new Response("Not found", { status: 404 });
+    async fetch(req) {
+      return (await client.asset(req)) ?? new Response("Not found", { status: 404 });
     },
   });
   // (At start: the catalogue, the background reading, and the showcase runs made ahead.)

@@ -10,6 +10,7 @@ import { CollisionFilterExtension } from "@deck.gl/extensions";
 import { ArcLayer, BitmapLayer, ColumnLayer, LineLayer, PathLayer, ScatterplotLayer, SolidPolygonLayer, TextLayer } from "@deck.gl/layers";
 import { useLens, useViewT } from "../state";
 import { useLightHour } from "../light";
+import { cachedGround, keepGround } from "./ground-cache";
 import { hash01, loadCity, personRows, placeAt, strHash, tripOf, type CityData } from "./data";
 import { along, hex, hipFaces, mix, PAL, paintBeyond, paintGround, rect, shadowOf, type Mass, Roads, shapeOf, treesOf, WHERE_LABEL, type RGBA, type Shape } from "./scene";
 import { skyAt } from "./sky";
@@ -144,13 +145,32 @@ function build(c: CityData): Built {
   };
 }
 
-/** The painted ground (a plan by day, the town at night), kept per city and theme: painting takes a few hundred ms. */
-const painted = new WeakMap<CityData, globalThis.Map<boolean, { ground: HTMLCanvasElement | OffscreenCanvas; beyond: HTMLCanvasElement | OffscreenCanvas }>>();
-function paintFor(c: CityData, plan: boolean) {
+/** The painted ground (a plan by day, the town at night), kept per city and theme: in memory, and in this browser
+ * (./ground-cache.ts), since painting takes ~200 ms. Resolves at once when it is in memory. */
+interface Painted { ground: HTMLCanvasElement | OffscreenCanvas | ImageBitmap; beyond: HTMLCanvasElement | OffscreenCanvas }
+const painted = new WeakMap<CityData, globalThis.Map<boolean, Promise<Painted>>>();
+const paintedNow = new WeakMap<CityData, globalThis.Map<boolean, Painted>>();
+function paintFor(c: CityData, plan: boolean, url: string | null): Promise<Painted> {
   let m = painted.get(c);
   if (!m) painted.set(c, (m = new globalThis.Map()));
   let p = m.get(plan);
-  if (!p) m.set(plan, (p = { ground: paintGround(c.town, 10, plan), beyond: paintBeyond(plan) }));
+  if (!p) {
+    const t = c.town;
+    const key = `${url}|${plan ? "plan" : "night"}|${t.ground.w}x${t.ground.h}|${t.structures.length}|${t.terrain.length}|${t.river.length}|v1`;
+    p = (url ? cachedGround(key) : Promise.resolve(null)).then((bm) => {
+      let ground: Painted["ground"] | null = bm;
+      if (!ground) {
+        ground = paintGround(t, 10, plan);
+        if (url) keepGround(key, ground);
+      }
+      const v = { ground, beyond: paintBeyond(plan) };
+      let n = paintedNow.get(c);
+      if (!n) paintedNow.set(c, (n = new globalThis.Map()));
+      n.set(plan, v);
+      return v;
+    });
+    m.set(plan, p);
+  }
   return p;
 }
 
@@ -221,12 +241,26 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   const dark = useDark();
   // (The geometry does not depend on the theme: a theme toggle repaints the ground and nothing else.)
   const B = useMemo(() => build(city), [city]);
-  const paint = useMemo(() => paintFor(city, !dark), [city, dark]);
-  // (The other theme's ground is painted while the page is idle, so a theme toggle swaps it in without a pause.)
+  // (Until the ground is in, the loading cover stays; on a theme toggle the old ground shows until the new one is.)
+  const [paint, setPaint] = useState<Painted | null>(() => paintedNow.get(city)?.get(!dark) ?? null);
   useEffect(() => {
-    const ric = (window as any).requestIdleCallback as ((f: () => void, o?: object) => number) | undefined;
-    const id = ric ? ric(() => paintFor(city, dark), { timeout: 4000 }) : (setTimeout(() => paintFor(city, dark), 1500) as unknown as number);
-    return () => (ric ? (window as any).cancelIdleCallback(id) : clearTimeout(id));
+    let live = true;
+    const now = paintedNow.get(city)?.get(!dark);
+    if (now) setPaint(now);
+    else paintFor(city, !dark, base).then((p) => live && setPaint(p), (e) => console.error(e));
+    return () => {
+      live = false;
+    };
+  }, [city, dark]);
+  // (The other theme's ground is got ready while the page is idle, so a theme toggle swaps it in without a pause.)
+  // (Never while playing: it is a long task the first time, and would drop frames.)
+  useEffect(() => {
+    let id: ReturnType<typeof setTimeout>;
+    const later = () => {
+      id = setTimeout(() => (useLens.getState().playing ? later() : void paintFor(city, dark, base)), 3000);
+    };
+    later();
+    return () => clearTimeout(id);
   }, [city, dark]);
   const town = city.town, cell = town.ground.cell;
   const wrap = useRef<HTMLDivElement>(null);
@@ -304,9 +338,11 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   const recorder = useRef<ReturnType<typeof makeRecorder> | null>(null);
   const [recording, setRecording] = useState(false);
   const deckRef = useRef<any>(null);
-  // (Until the GPU has drawn the town twice, the loading cover stays: no empty ground with its words floating on it.)
+  // (Until the GPU has drawn the town with its ground, the loading cover stays: no empty ground with its words on it.)
   const drawnFrames = useRef(0);
   const [firstDrawn, setFirstDrawn] = useState(false);
+  const hasPaint = useRef(false);
+  hasPaint.current = !!paint;
   const before = useRef<{ playing: boolean; speed: number } | null>(null);
   const [tourActs, setTourActs] = useState<number[]>([]);
   const hi = useMemo(() => new Set([...(selAct >= 0 ? [selAct] : []), ...(tour !== null ? tourActs : [])]), [selAct, tour, tourActs.join(",")]);
@@ -634,12 +670,12 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   }, [twin, overlays.diff, city, B, Math.floor(t / 300)]);
 
   const layers = [
-    new BitmapLayer({
+    paint && new BitmapLayer({
       id: "beyond", image: paint.beyond as any, coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
       bounds: [-staticLayers.W * 1.5, -staticLayers.H * 2.5, staticLayers.W * 2.5, staticLayers.H * 1.5],
       tintColor: sky.groundTint, parameters: GROUND,
     }),
-    new BitmapLayer({
+    paint && new BitmapLayer({
       id: "ground", image: paint.ground as any, bounds: [0, -staticLayers.H, staticLayers.W, 0], coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
       tintColor: sky.groundTint, textureParameters: { minFilter: "linear", magFilter: "linear", mipmapFilter: "linear", addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge" } as any,
       parameters: GROUND,
@@ -1022,7 +1058,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     <div ref={wrap} data-tour="city-map" id="city-map" className={`lc-wrap${dark ? "" : " light"}`} style={{ background: `rgb(${sky.backdrop.join(",")})` }}>
       <DeckGL
         ref={deckRef}
-        onAfterRender={() => { if (++drawnFrames.current === 2) setFirstDrawn(true); const r = recorder.current; const cv = deckRef.current?.deck?.getCanvas?.() ?? deckRef.current?.deck?.canvas; if (r && cv && captionRef.current) r.frame(cv, captionRef.current); }}
+        onAfterRender={() => { if (hasPaint.current && ++drawnFrames.current === 1) requestAnimationFrame(() => setFirstDrawn(true)); const r = recorder.current; const cv = deckRef.current?.deck?.getCanvas?.() ?? deckRef.current?.deck?.canvas; if (r && cv && captionRef.current) r.frame(cv, captionRef.current); }}
         views={ORBIT}
         viewState={view as any}
         onViewStateChange={({ viewState, interactionState }) => { if (interactionState?.isDragging || interactionState?.isPanning || interactionState?.isZooming) { setFollow(false); manual.current = performance.now(); } setView(viewState as OrbitViewState); }}
@@ -1037,7 +1073,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       />
       <div className="lc-haze" style={{ opacity: Math.max(0, Math.min(1, (82 - (view.rotationX as number)) / 40)), background: `linear-gradient(to bottom, rgba(${sky.backdrop.join(",")},0.92) 0%, rgba(${sky.backdrop.join(",")},0.5) 16%, rgba(${sky.backdrop.join(",")},0) 44%)` }} />
       <div className="lc-vignette" />
-      {!firstDrawn && <div className="lc-loading" style={{ zIndex: 40, background: "var(--lc-ink)" }}><div className="lc-spin" />Drawing the town</div>}
+      {(!firstDrawn || !paint) && <div className="lc-loading" style={{ zIndex: 40, background: "var(--lc-ink)" }}><div className="lc-spin" />Drawing the town</div>}
       {!present && selP >= 0 && <button className={`lc-follow ${follow ? "on" : ""}`} onClick={() => setFollow(!follow)}>{follow ? <>Stop following {city.people.people[selP]![1]}</> : <>Follow {city.people.people[selP]![1]}</>}</button>}
       {label && <div className={`lc-pane-label${bare ? " bare" : ""}`}>{label}</div>}
       {!bare && !present && <Clock t={t} sky={sky} town={town} />}
@@ -1047,7 +1083,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       {hint && !present && !bare && <div className="lc-hint" data-lens-prompt="city-hint" onMouseEnter={dropHint}>{CITY_WORDS.hint} <button className="lc-ghost" onClick={dropHint}>Got it</button></div>}
       {diff && diff.ended !== undefined && <div className="lc-diff"><b>What differs from the other town</b><span>One town's run ended on day {Math.floor(diff.ended / DAY)}, so there is nothing to compare after it.</span></div>}
       {diff && diff.ended === undefined && <div className="lc-diff"><b>What differs from the other town</b><span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people are somewhere else there right now</span><span><i className="sw dot" />{diff.onlyHere.length} {diff.onlyHere.length === 1 ? "paper" : "papers"} in the last 7 days only in this town</span><span><i className="sw ring" />{diff.onlyThere.length} only in the other town</span></div>}
-      {!present && <Minimap B={paint} town={town} view={view} size={size} setView={setView} />}
+      {!present && paint && <Minimap B={paint} town={town} view={view} size={size} setView={setView} />}
       {!bare && !present && panel}
       {present && caption && <PresentBar c={caption} recording={recording} onExit={() => stopPresent()} />}
       {!present && tip && <Tooltip tip={tip} city={city} t={t} name={(i) => structureName(city, i)} />}

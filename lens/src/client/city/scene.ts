@@ -312,14 +312,22 @@ export function paintGround(town: TownBundle, px = 10, plan = false): HTMLCanvas
   const d = img.data;
   const iWood = names.indexOf("woodland"), iFarm = names.indexOf("farmland"), iWet = names.indexOf("wetland"), iScrub = names.indexOf("scrub"), iGrass = names.indexOf("grassland");
   const isWater = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && water[y * w + x] === 1;
+  // (The broad variation, a period of about eight cells, sampled every 5 px and interpolated: three noise lookups per
+  // pixel were most of the ~260 ms this took on opening a run.)
+  const G = 5, gw = Math.ceil(W / G) + 2, gh = Math.ceil(H / G) + 2;
+  const broad = new Float32Array(gw * gh);
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) broad[j * gw + i] = fbm(((i * G + 0.5) / px) * 0.12, ((j * G + 0.5) / px) * 0.12, 11);
+  const edge = wash(hex("#66705f"));
   for (let Y = 0; Y < H; Y++) {
+    const gj = Math.floor(Y / G), gv = (Y - gj * G) / G;
     const cy = Math.floor(Y / px), fy = (Y + 0.5) / px, uy = (Y % px + 0.5) / px;
     for (let X = 0; X < W; X++) {
       const cx = Math.floor(X / px), fx = (X + 0.5) / px, ux = (X % px + 0.5) / px;
       const ci = cy * w + cx;
       const k = cover[ci]!;
       let c: RGBA = base[k]!;
-      const n = fbm(fx * 0.12, fy * 0.12, 11);
+      const gi = Math.floor(X / G), gu = (X - gi * G) / G, g0 = gj * gw + gi;
+      const n = (broad[g0]! * (1 - gu) + broad[g0 + 1]! * gu) * (1 - gv) + (broad[g0 + gw]! * (1 - gu) + broad[g0 + gw + 1]! * gu) * gv;
       let shade = 0.95 + (n - 0.5) * 0.1;
       if (k === iWood) {
         const t = noise2(fx * 2.6, fy * 2.6, 5) * 0.65 + noise2(fx * 6, fy * 6, 6) * 0.35;
@@ -331,7 +339,7 @@ export function paintGround(town: TownBundle, px = 10, plan = false): HTMLCanvas
         const along = hb < 0.5 ? fx : fy;
         shade = 0.97 + 0.03 * Math.sin(along * Math.PI * 3) + (n - 0.5) * 0.06;
         const ex = (fx / 3) % 1, ey = (fy / 3) % 1;
-        if (ex < 0.02 || ey < 0.02) { c = wash(hex("#66705f")); shade = 1; }
+        if (ex < 0.02 || ey < 0.02) { c = edge; shade = 1; }
       } else if (k === iWet) {
         const t = noise2(fx * 1.4, fy * 1.4, 21);
         if (t > 0.68) { c = mix(c, wat, 0.6); shade = 1; }
