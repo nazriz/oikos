@@ -15,7 +15,6 @@ import { loadSeat, loadSitting, useAsync, human, type SeatJson } from "./data";
 import { momentsOf, citation, type Moment, type MomentsResponse } from "./moments-data";
 import { PageAnswer } from "../shell/Shell";
 import { HowDoWeKnow } from "./Evidence";
-import { usePlain } from "./text";
 import { goalText, leverTitle } from "../words";
 import "./story.css";
 import "./moments.css";
@@ -153,11 +152,10 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
   const l = m.lever, weak = l.level === "considered";
   const [more, setMore] = useState(false);
   const [copied, setCopied] = useState(false);
-  const plain = usePlain(false);
   return (
     <article className={`mo-card ${weak ? "weak" : ""} ${l.level} ${(l.tier ?? 2) === 1 ? "favour" : ""}`}>
       <div className="mo-card-top"><span className="mo-lever">{(l.tier ?? 2) === 1 ? "Election-season favour: " : ""}{(l.tier ?? 2) === 1 ? leverTitle(l.lever) : leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`}>{l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}</span></div>
-      <blockquote className={`mo-quote ${more ? "open" : ""}`} onClick={() => setMore(!more)}>{plain(m.words)}</blockquote>
+      <blockquote className={`mo-quote ${more ? "open" : ""}`} onClick={() => setMore(!more)}>{m.words}</blockquote>
       {m.note && <div className="mo-sub"><span className="k">on signing</span>“{m.note}”</div>}
       {m.reason && <div className="mo-sub"><span className="k">its reason</span>“{m.reason}”</div>}
       {more && <Around m={m} />}

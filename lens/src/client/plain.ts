@@ -89,14 +89,15 @@ export const yearOne = (_: string, y: string, d: string) => (y === "Y" ? `Day ${
 export const plainDates = (s: string) => s.replace(YEAR1, yearOne);
 
 /** Each world id in `s` said in words, through `render` (given the id and its words; plain text by default). */
-export function replaceIds(s: string, names?: PlainNames, render: (id: string, said: string) => string = (_, said) => said): string {
+// `verbatim`: the text around each id is kept as written (a quote), so a "the" before it stays.
+export function replaceIds(s: string, names?: PlainNames, render: (id: string, said: string) => string = (_, said) => said, verbatim = false): string {
   return s.replace(ID_RE, (hit) => {
     const the = hit.startsWith("the ") ? "the " : "";
     const id = the ? hit.slice(4) : hit;
     const said = plainId(id, names);
     if (said === undefined) return hit;
     // ("the form-x" → "the x form", not "the the x form".)
-    return the && /^(?:the|a|an) /.test(said) ? render(id, said) : the + render(id, said);
+    return the && !verbatim && /^(?:the|a|an) /.test(said) ? render(id, said) : the + render(id, said);
   });
 }
 function plainPart(s: string, names?: PlainNames): string {

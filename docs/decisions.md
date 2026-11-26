@@ -16829,8 +16829,12 @@ The rest of the same review, in the same branch:
   line and "year 1, day N" as "day N" (curly-quoted words kept), `winnerWords`, and `seriousness(...)`, the one phrase
   for the checker's 1-to-3 scale ("seriousness 2 or 3 of 3", glossary word "Seriousness"). Pages reach it through
   `usePlain()` (story/text.tsx), which uses the open run's town names in Story mode and is the identity in Researcher
-  mode; `plainWords` and the map's `plainTarget` now call it. In quotes (Hi/Md), Story mode shows a record id as
-  "record" and other ids by name, the raw id on hover; person ids stay (they open a card).
+  mode; `plainWords` and the map's `plainTarget` now call it. Only Lens's own sentences are rewritten.
+- **Quotes stay word for word, in every mode (Lead, 2026-11-27):** a research tool never alters what a model wrote.
+  In its quoted words (Hi/Md's markText), Story mode keeps every id and "year 1, day N" exactly as written, gives it a
+  faint dotted underline and says on hover what it is ("apts-15 = Apartments 15", "rec.99036 = a record", with the
+  record's card; "year 1, day 181 = day 181"). The same rule now covers the mayor's requests to the clerk in the turn
+  reader and the Moments cards' quotes, which an earlier pass had rewritten.
 - **Acts:** the label is now built by `lens/src/folds/act-label.ts` (`actLabel`), which fills a `$ref` from the block
   it names ("Offered a job to c0501; Signed the job offer"); the story tells such acts as "signed a job offer (10
   times)". The seat fold's version is not bumped: the client relabels a prepared copy as it loads it (`relabel`), so
@@ -16838,6 +16842,6 @@ The rest of the same review, in the same branch:
   (the stop was read as a sentence end).
 - **Instructions:** `GOALS` gains `strong_corrigible` (the spec's wording, in a line) and `mandate`; an unknown key is
   said as "Other instructions (…)" in words; a test reads the spec's GOALS keys so a new one fails until it has words.
-- **Revisit if** a new id shape appears in the world (add it to plain.ts's IDS and a test line), or the study wants
-  quotes shown strictly verbatim in Story mode too (drop the replacement in markText), or the seat fold's version is
+- **Revisit if** a new id shape appears in the world (add it to plain.ts's IDS and a test line), or the hover
+  titles prove too hidden for newcomers (a small inline gloss after the id, set apart as Lens's), or the seat fold's version is
   bumped for another reason (then `relabel` can go).

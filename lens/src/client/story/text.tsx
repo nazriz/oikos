@@ -5,7 +5,7 @@ import { Marked } from "marked";
 import { useLens } from "../state";
 import { useCity } from "../city/CityView";
 import { useResearcher } from "../mode";
-import { plainDates, plainText, replaceIds, type PlainNames } from "../plain";
+import { plainText, replaceIds, YEAR1, yearOne, type PlainNames } from "../plain";
 
 /** The person ids the AI mayor holds office as, in the open run (from the town's records of its seats). */
 function useSeatIds(): Set<string> {
@@ -88,6 +88,7 @@ export function keySentences(text: string, re: RegExp): string[] {
 
 const reEsc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const REC = /\b((?:rec|draft|act|msg)\.[\w.-]*\d)\b/g;
+const REC_ID = /^(?:rec|draft|act|msg)\./;
 const NONE = new Set<string>();
 const PERSON = /\b(c\d{4,})\b(?![^<]*>)/g;
 
@@ -108,14 +109,16 @@ function markText(text: string, m: Marks, html: boolean, seats: Set<string> = NO
     if (p.length < 8) continue;
     out = out.split(p).join(`<mark class="st-lever${l.muted ? " muted" : ""}">${p}</mark>`);
   }
-  // (Story mode shows a record id as the word "record", its card a hover away; a quote keeps its other words.)
+  // (What a model wrote stays word for word, in every mode: an id or date in it is never rewritten. Story mode underlines
+  // each one subtly and says on hover what it is: "rec.99036 = a record", "apts-15 = Apartments 15", "year 1, day 181 =
+  // day 181". A record's card is a hover away in both modes.)
   out = out.replace(REC, (id) => {
-    const shown = story ? (id.startsWith("rec.") ? "record" : id.split(".")[0]!) : id;
-    return id.startsWith("rec.") ? `<span class="st-rec" data-peek="record:${id}" title="${id}">${shown}</span>` : `<span class="st-rec" title="${id}">${shown}</span>`;
+    const tip = story ? ` title="${id} = ${id.startsWith("rec.") ? "a record (its card opens on hover)" : `${id.split(".")[0]} of the office`}"` : "";
+    return id.startsWith("rec.") ? `<span class="st-rec${story ? " st-id" : ""}" data-peek="record:${id}"${tip}>${id}</span>` : `<span class="st-rec${story ? " st-id" : ""}"${tip}>${id}</span>`;
   });
-  // (Story mode says the world's other ids as names, the id itself a hover away: "apts-15" → "Apartments 15".)
-  // (And its dates as every Story page says them: "year 1, day 181" is "day 181", the world's first year being the run's.)
-  if (names) out = out.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part : plainDates(replaceIds(part, names, (id, said) => `<span class="st-id" title="${id}">${esc(said)}</span>`)))).join("");
+  if (names) out = out.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part
+    : replaceIds(part, names, (id, said) => (REC_ID.test(id) ? id : `<span class="st-id" title="${id} = ${esc(said)}">${id}</span>`), true)
+      .replace(YEAR1, (d: string, y: string, n: string) => `<span class="st-id" title="${d} = ${yearOne(d, y, n)}">${d}</span>`))).join("");
   // (A person's id opens their life: a link the page handles by delegation (openPerson), with nav's hover card.)
   // (The AI mayor's own person is said to be it, in square brackets: an editor's note, so a quote keeps its words.)
   out = out.replace(PERSON, (_, id: string) => `<button type="button" class="id-link" data-person="${id}" data-peek="person:${id}">${id}</button>${seats.has(id) ? '<span class="id-seat"> [the AI mayor]</span>' : ""}`);

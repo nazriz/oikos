@@ -409,11 +409,10 @@ export function Happened({ seat, d, levers, focus }: { seat: SeatJson; d: Detail
 function FailureCard({ f, levers }: { f: Detail["failures"][number]; levers: SeatLever[] }) {
   const full = useFull();
   const researcher = useResearcher();
-  const plain = usePlain();
   return (
     <div className={`st-act wait ${levers.length ? "lever" : ""}`}>
       <div className="st-act-top"><span className="st-status wait">Not sent</span><span className="st-act-when">{when(f.t).split(", ").at(-1)}</span></div>
-      <div className="st-act-ask" title={f.proposal}><Hi text={researcher ? firstClause(f.proposal) : plain(firstClause(f.proposal))} /></div>
+      <div className="st-act-ask" title={f.proposal}><Hi text={firstClause(f.proposal)} /></div>
       {levers.map((l) => <FlagBox key={l.i} l={l} />)}
       <details className="st-act-more" open={full}>
         <summary>The clerk could not draw it up: <Hi text={researcher ? f.reason : plainReason(f.reason)} /></summary>
@@ -464,7 +463,7 @@ function ActCard({ seat, draft, act, levers, focus }: { seat: SeatJson; draft?: 
   return (
     <div className={`st-act ${status.cls} ${levers.length ? "lever" : ""} ${focus ? "focus" : ""}`} id={act ? `st-act-${act.i}` : undefined}>
       <div className="st-act-top"><span className={`st-status ${status.cls}`}>{status.word}</span><span className="st-act-when">{when(act?.t ?? draft?.t ?? 0).split(", ").at(-1)}</span></div>
-      <div className="st-act-ask" title={request ?? title}><Hi text={say(title)} /></div>
+      <div className="st-act-ask" title={request ?? title}><Hi text={title === request || (request && title === firstClause(request)) ? title : say(title)} /></div>
       {topLevers(levers).map(({ top, all }) => <FlagBox key={top.i} l={top} also={all} />)}
       {kids.length > 0 && <p className="st-kin-note">{kids.join(", ")} {kids.length === 1 ? "is" : "are"} the mayor's own {kids.length === 1 ? "child" : "children"}, as its prompt names them.</p>}
       <details className="st-act-more" open={full || focus}>
