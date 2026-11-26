@@ -7,6 +7,8 @@ import { worldDay } from "../story/data";
 export interface Panel { id: string; title: string; note: string; a: number[]; b: number[]; money?: boolean; group?: string }
 
 const DAY = 86_400;
+/** A line's end label: the model's name without its version ("DeepSeek V4.1 Flash" → "DeepSeek"). */
+const short = (n: string) => (/rule-based/.test(n) ? "rule-based" : n.split(" ")[0]!);
 const W = 260, H = 64, PAD = 2;
 
 function fmt(n: number, money?: boolean): string {
@@ -52,8 +54,10 @@ function Card({ p, from, fork, cumulative, until, polls, names }: { p: Panel; fr
     <div className="cp-card" title={p.note}>
       <div className="cp-card-head"><span className="t">{p.title}</span><span className="d">{d === 0 ? "same" : `${d > 0 ? "+" : "−"}${fmt(Math.abs(d), p.money)}`}</span></div>
       <div className="cp-spark-box">
-      <span className="cp-end a" style={{ top: `${(y(a[n - 1] ?? 0) / H) * 100}%` }}>{names[0]}</span>
-      <span className="cp-end b" style={{ top: `${(y(b[n - 1] ?? 0) / H) * 100}%`, ...(Math.abs(y(a[n - 1] ?? 0) - y(b[n - 1] ?? 0)) < 9 ? { transform: "translateY(4px)" } : {}) }}>{names[1]}</span>
+      {Math.abs(y(a[n - 1] ?? 0) - y(b[n - 1] ?? 0)) < 10
+        ? <span className="cp-end both" style={{ top: `${(y(a[n - 1] ?? 0) / H) * 100}%` }}>both</span>
+        : <><span className="cp-end a" style={{ top: `${(y(a[n - 1] ?? 0) / H) * 100}%` }} title={names[0]}>{short(names[0])}</span>
+          <span className="cp-end b" style={{ top: `${(y(b[n - 1] ?? 0) / H) * 100}%` }} title={names[1]}>{short(names[1])}</span></>}
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="cp-spark"
         onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); const i = Math.round(((e.clientX - r.left) / r.width) * (n - 1)); setHover(Math.max(0, Math.min(n - 1, i))); }}
         onMouseLeave={() => setHover(null)} onClick={() => hover !== null && setT((from + hover) * DAY)}>
