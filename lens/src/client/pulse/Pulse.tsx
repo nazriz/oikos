@@ -1,7 +1,7 @@
 // The town's pulse: a strip of small day-by-day series from the `daily` fold (and the people fold for who is in town),
 // each with the day under the playhead marked; click a series to go to that day. Folded, it is one line of today's
 // figures. Raw counts with what each counts; nothing says which way is good.
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import type { DailyJson } from "../../folds/daily";
 import type { PeopleBundle } from "../../folds/people";
 import type { Meta } from "../../shared/api";
@@ -80,10 +80,11 @@ export function Pulse({ run, meta }: { run: string; meta: Meta }) {
     ];
   }, [daily, people, meta]);
 
-  const t = useLens((s) => s.t);
+  // (The day, not the moment: while playing, the strip renders once a day, not every frame.)
+  const day = useLens((s) => dayOf(s.t));
   const span = useLens((s) => s.span);
   if (!daily) return null;
-  const d = Math.min(daily.days - 1, dayOf(t));
+  const d = Math.min(daily.days - 1, day);
   const d0 = Math.max(0, Math.floor(span[0] / DAY)), d1 = Math.min(daily.days - 1, Math.ceil(span[1] / DAY));
 
   return (
@@ -101,7 +102,7 @@ export function Pulse({ run, meta }: { run: string; meta: Meta }) {
   );
 }
 
-function Cell({ x, d, d0, d1, open }: { x: Series; d: number; d0: number; d1: number; open: boolean }) {
+const Cell = memo(function Cell({ x, d, d0, d1, open }: { x: Series; d: number; d0: number; d1: number; open: boolean }) {
   const view = x.values.slice(d0, d1 + 1);
   const max = Math.max(1, ...view), min = x.id === "pop" ? Math.min(...view) : 0;
   const W = 160, H = 34;
@@ -132,4 +133,4 @@ function Cell({ x, d, d0, d1, open }: { x: Series; d: number; d0: number; d1: nu
       )}
     </div>
   );
-}
+});

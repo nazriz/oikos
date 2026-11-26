@@ -110,6 +110,14 @@
   overflow: hidden;
   background: var(--ink);
 }
+.map-slot {
+  position: absolute;
+  inset: 0;
+}
+.map-slot.off {
+  visibility: hidden;
+  pointer-events: none;
+}
 .rail-grip {
   position: absolute;
   left: -4px;

@@ -1,9 +1,9 @@
 // The Run page's slots (src/client/run/RunPage.tsx): what fills the map in the middle, the story rail on the right, the
 // sitting reader over them, and the inspector drawer's body. Each view's owner registers its component here with one
 // line; an empty slot shows a quiet placeholder. Views talk to each other only through src/client/state.ts.
-import { createElement, type ComponentType } from "react";
+import { createElement, useContext, type ComponentType } from "react";
 import type { Meta, RunEntry } from "../shared/api";
-import type { Selection } from "./state";
+import { ViewActive, type Selection } from "./state";
 import { SittingReader } from "./story/SittingReader";
 import { StoryRail } from "./story/StoryRail";
 
@@ -76,5 +76,10 @@ export const views: Views = {
   models: ModelsPage,
   howDoWeKnow: HowDoWeKnow,
   power: PowerView,
-  world: (p) => createElement(WorldView, { run: p.run }),
+  // (Kept mounted by the run page once opened: it runs only while it is the view on screen.)
+  world: (p) => createElement(WorldSlot, p),
 };
+
+function WorldSlot(p: SlotProps) {
+  return createElement(WorldView, { run: p.run, active: useContext(ViewActive) });
+}

@@ -16312,6 +16312,37 @@ Naz asked for "a really crazy interactive thing in the browser" and chose the im
 - **A dev page of its own** (`bun lens/src/client/world/dev.ts`, port 4331) serves a bundle folder with the world fold
   beside the city's files, as the city's dev page does.
 
+## 2026-11-26 Lens: smooth (flicker, re-renders, fonts)
+
+Naz saw flicker on the map, in the 3D town and in panels. `lens/scripts/flicker.ts` measures the full run page in headful
+GPU Chrome. For each action (idle, play at each speed, scrub, hover, open a turn, Map/3D, theme, mode, library to run
+and back) it reports React commits/s and which components rendered, DOM churn, layout shift with its sources, long
+tasks, frame times and A-B-A pixel blinks between screencast frames. The worst blinks' frames are saved to look at.
+Numbers are in `runs/views/lens-dev/smooth/`.
+- **The house fonts never loaded.** Bun's CSS minifier writes fontsource's `format('woff2-variations')` unquoted. That
+  is invalid, so Chrome dropped every face's `src` and Lens rendered in Helvetica Neue. `src/client/fonts.css` declares
+  the faces itself: Latin and Latin Extended only, no `format()`, `font-display: block` (the faces are inlined into the
+  CSS, so nothing waits). **Revisit if** Bun keeps the quotes (go back to fontsource's CSS) or the inlined CSS (~0.9 MB)
+  slows first paint on the phone (serve the woff2 files and preload them).
+- **The light holds while time races** (`src/client/light.ts`). At a day or a week a second, and when dragging across
+  days, day and night strobed several times a second: 50 of 91 frames of a scrub blinked over the whole map. The light
+  now holds when the clock runs faster than three quarters of a day a second (two fast steps in a row, or the smoothed
+  rate), and takes the true hour once time slows. A lone jump is shown at once. An eased jump was tried and dropped:
+  each step of the ease re-lit the whole map, which cost 2 s of long tasks for one click. It is display only: the
+  clock, people and acts are not smoothed, so a fast scrub still shows people swapping between home and work, as they
+  did. **Revisit if** a viewer wants to see the hour while playing fast (a toggle).
+- **One commit a frame while playing, and only what moved renders.** The rail's rows, the election bar and the pulse
+  cells now read the turn index, a fifth of a percent and the day through selectors (memo rows), not `t`. The timeline
+  canvas is resized only when its size changes (resizing blanks it), and fonts are read once with the palette.
+- **The map stays mounted under the 3D town** (`ViewActive` and `useViewT` in `state.ts`). Hidden, it holds its clock and
+  neither renders nor draws. Switching back used to rebuild deck (190 to 440 ms); now it is instant, and the camera is
+  kept. The 3D view still unmounts until its engine can pause.
+- **A theme toggle repaints only the ground**, not the whole map (913 ms down to none). Both themes' ground is cached per
+  run, and the other theme is painted while the page is idle.
+- **No half-drawn map, no jumping timeline.** The map keeps its loading cover until deck has drawn twice. The timeline
+  keeps room for as many lanes as it last had while views add theirs, for 2.5 s at most. The map's background uses
+  `--ink`; the undefined `--bg` made its loading state dark in the light theme.
+
 ## 2026-11-26 Lens: the 3D town without flicker, and quiet until asked
 
 Naz saw flicker, and set the rule "a professional research tool that is a joy to use, but also doesn't get in the way".

@@ -4,7 +4,7 @@
 // when it sets them; these are the fallbacks.
 export const CITY_CSS = `
 .lens-city {
-  --lc-ink: var(--bg, #16212B); --lc-panel: var(--panel, #1E2B37); --lc-panel2: var(--panel-2, #1E2B37);
+  --lc-ink: var(--ink, #16212B); --lc-panel: var(--panel, #1E2B37); --lc-panel2: var(--panel-2, #1E2B37);
   --lc-hair: var(--line, #33424F); --lc-text: var(--text, #E4EAEE); --lc-muted: var(--muted, #8FA0AD);
   --lc-seat: #E8B400; --lc-seat-text: #E8B400; --lc-flag: #C8102E; --lc-ballot: #1F5FAD; --lc-inst: #2F7D5B;
   --lc-ui: var(--font-sans, "Overpass Variable", Overpass, system-ui, -apple-system, sans-serif);
@@ -14,7 +14,7 @@ export const CITY_CSS = `
   font-family: var(--lc-ui); font-size: 13px; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
 }
 .lens-city .lc-wrap.light {
-  --lc-ink: var(--bg, #EDF0F2); --lc-panel: var(--panel, #F8F9FA); --lc-panel2: var(--panel, #F8F9FA);
+  --lc-ink: var(--ink, #EDF0F2); --lc-panel: var(--panel, #F8F9FA); --lc-panel2: var(--panel, #F8F9FA);
   --lc-hair: var(--line, #C3CCD3); --lc-text: var(--text, #1D2B36); --lc-muted: var(--muted, #5B6B78); --lc-seat-text: #8A6A00;
   color: var(--lc-text);
 }

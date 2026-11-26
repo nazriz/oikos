@@ -52,7 +52,7 @@ const readLane = () => {
 };
 const PAD_B = 6;
 
-const PALETTE_KEYS = ["text", "muted", "faint", "line", "line2", "panel", "panel2", "ink", "seat", "flag", "election", "news", "inst", "citizen", "good", "bad", "mono"] as const;
+const PALETTE_KEYS = ["text", "muted", "faint", "line", "line2", "panel", "panel2", "ink", "seat", "flag", "election", "news", "inst", "citizen", "good", "bad", "mono", "body"] as const;
 type Palette = Record<(typeof PALETTE_KEYS)[number], string>;
 function readPalette(el: Element): Palette {
   const cs = getComputedStyle(el);
@@ -61,6 +61,8 @@ function readPalette(el: Element): Palette {
     text: v("--text"), muted: v("--muted"), faint: v("--faint"), line: v("--line"), line2: v("--line-2"), panel: v("--panel"), panel2: v("--panel-2"), ink: v("--ink"),
     seat: v("--seat"), flag: v("--flag"), election: v("--election"), news: v("--inst"), inst: v("--inst"), citizen: v("--citizen"), good: v("--good"), bad: v("--bad"),
     mono: v("--font-sans"),
+    // (Read once with the palette: a style read on every frame of play forces the browser to recompute styles.)
+    body: getComputedStyle(document.body).fontFamily,
   };
 }
 const toneColor = (p: Palette, tone?: TimelineMark["tone"]) => (tone === "muted" || !tone ? p.muted : p[tone]);
@@ -137,7 +139,33 @@ export function Timeline({ ground, fork }: TimelineProps) {
     } catch {}
   }, [LANE]);
   const compact = LANE < 17;
-  const height = AXIS + GROUND + sorted.length * LANE + PAD_B;
+  // (Views add their lanes as their data arrives, a few hundred ms apart: the timeline keeps room for as many lanes as
+  // it last had in this mode while they come, so the map above it does not jump as each one lands.)
+  const laneKey = `lens.tl.n.${researcher ? "r" : "s"}`;
+  const [reserved, setReserved] = useState(() => {
+    try {
+      // (A first visit: the lanes Lens usually has, three in Story mode, seven in Researcher mode.)
+      return Math.min(12, Number(localStorage.getItem(laneKey)) || (researcher ? 7 : 3));
+    } catch {
+      return researcher ? 7 : 3;
+    }
+  });
+  useEffect(() => {
+    if (!reserved) return;
+    if (sorted.length >= reserved) return setReserved(0);
+    const id = setTimeout(() => setReserved(0), 2500);
+    return () => clearTimeout(id);
+  }, [sorted.length, reserved]);
+  useEffect(() => {
+    if (!sorted.length) return;
+    const id = setTimeout(() => {
+      try {
+        localStorage.setItem(laneKey, String(sorted.length));
+      } catch {}
+    }, 3000);
+    return () => clearTimeout(id);
+  }, [sorted.length, laneKey]);
+  const height = AXIS + GROUND + Math.max(sorted.length, reserved) * LANE + PAD_B;
   // (Drag the top edge: the lanes grow or shrink with it.)
   const onGrip = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -193,13 +221,16 @@ export function Timeline({ ground, fork }: TimelineProps) {
     const c = canvas.current;
     if (!c || !palette) return;
     const dpr = window.devicePixelRatio || 1;
-    c.width = Math.round(width * dpr);
-    c.height = Math.round(height * dpr);
+    // (Resizing a canvas reallocates and blanks it: only when its size changes, not on every frame of play.)
+    const cw = Math.round(width * dpr), ch = Math.round(height * dpr);
+    if (c.width !== cw) c.width = cw;
+    if (c.height !== ch) c.height = ch;
     const g = c.getContext("2d")!;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, width, height);
     const p = palette;
     const mono = `600 11.5px ${p.mono || "sans-serif"}`;
+    const spanFont = `11px ${p.body || "sans-serif"}`;
 
     // Axis: day ticks, or hour ticks when close in.
     const pxPerDay = (DAY / Math.max(1, v1 - v0)) * width;
@@ -277,7 +308,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
           g.fill();
           g.fillStyle = col;
           g.fillRect(x, y - bh / 2, 1.5, bh);
-          g.font = `11px ${getComputedStyle(document.body).fontFamily}`;
+          g.font = spanFont;
           // (Words in a lane only where they fit whole, and only when the lanes are tall enough to read them.)
           if (!compact && m.label && g.measureText(m.label).width <= x2 - x - 10) {
             g.save();

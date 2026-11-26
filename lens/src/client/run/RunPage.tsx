@@ -6,7 +6,7 @@ import { fetchFold, fetchRun, useIndexStatus, useMeta } from "../api";
 import { compact, dayOf, int, span as spanText, usd, when, words } from "../format";
 import { Back, Close, Mark } from "../icons";
 import { parseSel, replaceQuery, runHref, selToken } from "../router";
-import { useLens } from "../state";
+import { useLens, ViewActive } from "../state";
 import { ThemeToggle } from "../theme";
 import { Pulse } from "../pulse/Pulse";
 import { Palette } from "../palette/Palette";
@@ -149,6 +149,8 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
   const props: SlotProps = { run: runKey, meta, ...(entry ? { entry } : {}) };
   const Map = views.map, Rail = views.rail, Reader = views.reader, World = views.world;
   const [mapView, setMapView] = useState<"map" | "world">("map");
+  const [worldSeen, setWorldSeen] = useState(false);
+  useEffect(() => { if (mapView === "world") setWorldSeen(true); }, [mapView]);
   const readerOpen = Reader && selection && (selection.kind === "sitting" || selection.kind === "lever" || selection.kind === "act");
   const drawerOpen = selection && !readerOpen && (selection.kind === "person" || selection.kind === "structure" || selection.kind === "entity" || !Reader);
   const ground = useMemo(() => ({ label: "activity per day", values: meta.daily.lines }), [meta]);
@@ -159,7 +161,24 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
       <RunBar entry={entry} meta={meta} run={runKey} />
       <div className="run-grid" style={{ ["--rail-w" as string]: `${railW}px` }}>
         <main className="run-map">
-          {World && mapView === "world" ? <World {...props} /> : Map ? <Map {...props} /> : <EmptyMap meta={meta} />}
+          {/* (The map stays mounted under the 3D town, hidden and still: back to it is instant, with its camera kept.) */}
+          {Map ? (
+            <div className={`map-slot${World && mapView === "world" ? " off" : ""}`}>
+              <ViewActive.Provider value={!World || mapView === "map"}>
+                <Map {...props} />
+              </ViewActive.Provider>
+            </div>
+          ) : (
+            mapView === "map" && <EmptyMap meta={meta} />
+          )}
+          {/* (The 3D town, once opened, stays mounted too, its engine stopped while the map is shown.) */}
+          {World && worldSeen && (
+            <div className={`map-slot${mapView === "world" ? "" : " off"}`}>
+              <ViewActive.Provider value={mapView === "world"}>
+                <World {...props} />
+              </ViewActive.Provider>
+            </div>
+          )}
           {World && (
             <div className="seg map-toggle" role="group" aria-label="How to show the town">
               <button aria-pressed={mapView === "map"} onClick={() => setMapView("map")}>

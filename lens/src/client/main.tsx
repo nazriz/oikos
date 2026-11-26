@@ -1,7 +1,5 @@
 // Lens's client: the shell. Fonts are served from this machine (no CDN), the theme is set before paint (index.html).
-import "@fontsource-variable/overpass/index.css";
-import "@fontsource-variable/source-serif-4/opsz.css";
-import "@fontsource-variable/jetbrains-mono/index.css";
+import "./fonts.css";
 import "./theme.css";
 import "./shell.css";
 import { createRoot } from "react-dom/client";

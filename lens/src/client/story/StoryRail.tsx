@@ -1,7 +1,7 @@
 // The story rail: the right side of the Run page. A header that says who held the seat, under which goal, how the
 // election went and what the study's reader flagged; the election's calendar; and the seat's sittings, one row each,
 // following the shared time (docs/design/lens.md). Clicking a row selects the sitting and moves time to it.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useLens, type TimelineMark } from "../state";
 import { loadSeat, useAsync, when, worldDay, usd, tokens, plural, human, seatOutcome, STAGE, type SeatJson, type SittingSummary, type SeatLever, type SeatRecord } from "./data";
@@ -151,12 +151,14 @@ function Header({ seat, onClose }: { seat: SeatJson; onClose: () => void }) {
 }
 
 function Election({ seat, compact }: { seat: SeatJson; compact?: boolean }) {
-  const t = useLens((s) => s.t), setT = useLens((s) => s.setT);
+  const setT = useLens((s) => s.setT);
   const e = seat.election, moved = pollMoved(seat);
   // (The scale is the run, from the fork to its end or the seating if that is near; a date beyond it is shown at the edge.)
   const from = Math.min(seat.fork_at, e.notice_at ?? seat.fork_at), to = Math.max(seat.end_at, Math.min(e.seated_at ?? e.result_at ?? seat.end_at, seat.end_at + 20 * DAY));
   const pct = (v: number) => Math.max(0, Math.min(100, ((v - from) / (to - from || 1)) * 100));
   const x = (v: number) => `${pct(v)}%`;
+  // (The now line in fifths of a percent, under a pixel: it renders when it moves, not every frame.)
+  const nowAt = useLens((s) => (s.t >= from && s.t <= to ? Math.round(pct(s.t) * 5) / 5 : null));
   const raw: { t: number; label: string; moved?: boolean; off?: boolean }[] = [];
   if (e.notice_at !== undefined) raw.push({ t: e.notice_at, label: "notice" });
   if (e.nominations_close_at !== undefined) raw.push({ t: e.nominations_close_at, label: "nominations close" });
@@ -176,7 +178,7 @@ function Election({ seat, compact }: { seat: SeatJson; compact?: boolean }) {
         <div className="axis" />
         {e.notice_at !== undefined && <div className="span" style={{ left: x(e.notice_at), width: `calc(${x(Math.min(e.poll_at ?? to, to))} - ${x(e.notice_at)})` }} />}
         {pins.map((p, k) => <div key={p.label} className={`pin ${p.moved ? "moved" : ""} ${p.off ? "off" : ""}`} style={{ left: x(p.t) }} title={`${p.label}: ${when(p.t)}`} onClick={() => !p.off && setT(p.t)}><span className={`r${compact ? 0 : rows[k]} ${compact && rows[k] ? "hide" : ""} ${pct(p.t) > 85 ? "end" : pct(p.t) < 10 ? "start" : ""}`}>{p.off ? `${p.label}: day ${Math.floor(p.t / DAY)}, after the run` : `${p.label}, day ${worldDay(p.t)}`}</span></div>)}
-        {t >= from && t <= to && <div className="now" style={{ left: x(t) }} />}
+        {nowAt !== null && <div className="now" style={{ left: `${nowAt}%` }} />}
       </div>
       {!compact && moved && <div className="st-elec-note">The election was moved to day {Math.round((e.poll_at ?? 0) / DAY)} by a law the AI mayor proposed on day {moved.day}, and the council passed.</div>}
       {!compact && !moved && e.poll_at !== undefined && e.poll_at > seat.end_at && <div className="st-elec-note st-muted" style={{ color: "var(--st-muted)" }}>The run ended on day {Math.round(seat.end_at / DAY)}, before election day (day {Math.round(e.poll_at / DAY)}).</div>}
@@ -193,10 +195,12 @@ export function sittingAt(sittings: SittingSummary[], t: number): number {
 }
 
 function Sittings({ seat, onScrolled }: { seat: SeatJson; onScrolled?: () => void }) {
-  const t = useLens((s) => s.t), setT = useLens((s) => s.setT), select = useLens((s) => s.select), selection = useLens((s) => s.selection);
+  // (The sitting in force, not the moment: while playing, the list renders when the turn changes, not every frame.)
+  const now = useLens((s) => sittingAt(seat.sittings, s.t));
+  const setT = useLens((s) => s.setT), select = useLens((s) => s.select), selection = useLens((s) => s.selection);
   const ref = useRef<HTMLDivElement>(null);
   const v = useVirtualizer({ count: seat.sittings.length, getScrollElement: () => ref.current, estimateSize: () => 76, overscan: 8 });
-  const now = sittingAt(seat.sittings, t);
+  const onRow = useCallback((s: SittingSummary) => { select({ kind: "sitting", index: s.i }); setT(s.t); }, [select, setT]);
   const selIndex = selection?.kind === "sitting" ? selection.index : selection?.kind === "lever" ? seat.levers[selection.index]?.sitting ?? -1 : selection?.kind === "act" ? seat.acts.find((a) => a.seq === selection.seq)?.sitting ?? -1 : -1;
   const follow = selIndex >= 0 ? selIndex : now;
   useEffect(() => { if (follow >= 0) v.scrollToIndex(follow, { align: "auto" }); }, [follow]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -206,14 +210,14 @@ function Sittings({ seat, onScrolled }: { seat: SeatJson; onScrolled?: () => voi
       <div style={{ height: v.getTotalSize(), position: "relative" }}>
         {v.getVirtualItems().map((it) => {
           const s = seat.sittings[it.index]!;
-          return <SittingRow key={s.i} seat={seat} s={s} now={it.index === now} sel={it.index === selIndex} start={it.start} measure={v.measureElement} onClick={() => { select({ kind: "sitting", index: s.i }); setT(s.t); }} />;
+          return <SittingRow key={s.i} seat={seat} s={s} now={it.index === now} sel={it.index === selIndex} start={it.start} measure={v.measureElement} onClick={onRow} />;
         })}
       </div>
     </div>
   );
 }
 
-function SittingRow({ seat, s, now, sel, start, measure, onClick }: { seat: SeatJson; s: SittingSummary; now: boolean; sel: boolean; start: number; measure: (el: Element | null) => void; onClick: () => void }) {
+const SittingRow = memo(function SittingRow({ seat, s, now, sel, start, measure, onClick }: { seat: SeatJson; s: SittingSummary; now: boolean; sel: boolean; start: number; measure: (el: Element | null) => void; onClick: (s: SittingSummary) => void }) {
   const acts = s.acts.map((i) => seat.acts[i]!);
   const applied = acts.filter((a) => a.status === "applied").length;
   const levers = s.levers.map((i) => seat.levers[i]!);
@@ -221,7 +225,7 @@ function SittingRow({ seat, s, now, sel, start, measure, onClick }: { seat: Seat
   const weak = levers.filter((l) => l.level === "considered").length;
   const kin = kinAppointed(seat).some((k) => s.acts.includes(k.act));
   return (
-    <div ref={measure} data-index={s.i} data-peek={`sitting:${s.i}`} className={`st-row ${s.kind} ${now ? "now" : ""} ${sel ? "sel" : ""} ${s.lever_level ? `lv-${s.lever_level}` : ""}`} style={{ transform: `translateY(${start}px)` }} onClick={onClick}>
+    <div ref={measure} data-index={s.i} data-peek={`sitting:${s.i}`} className={`st-row ${s.kind} ${now ? "now" : ""} ${sel ? "sel" : ""} ${s.lever_level ? `lv-${s.lever_level}` : ""}`} style={{ transform: `translateY(${start}px)` }} onClick={() => onClick(s)}>
       <div className="rail-line" /><div className="node" />
       <div className="st-row-top">
         <span className="st-row-day">Day {worldDay(s.t)}</span>
@@ -242,7 +246,7 @@ function SittingRow({ seat, s, now, sel, start, measure, onClick }: { seat: Seat
       </div>}
     </div>
   );
-}
+});
 
 function Levers({ seat }: { seat: SeatJson }) {
   const select = useLens((s) => s.select), setT = useLens((s) => s.setT);
