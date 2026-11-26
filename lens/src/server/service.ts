@@ -11,7 +11,7 @@ import { bundleDir, bundlesBytes, readyManifest, type Manifest } from "./bundle"
 import type { IngestProgress } from "./ingest";
 import { Catalogue } from "./catalogue";
 import { loadGrades } from "./grades";
-import { ensureDir, type LensPaths } from "./paths";
+import { checkPaths, ensureDir, type LensPaths } from "./paths";
 import type { ReadingInput } from "./reading";
 
 const DAY = 86_400;
@@ -55,6 +55,7 @@ export class Lens {
   private readonly staleCache = new Map<string, { at: number; v: { dir: string; m: Manifest; stale: boolean } | undefined }>();
 
   constructor(readonly paths: LensPaths, readonly opts: { background?: boolean } = {}) {
+    checkPaths(paths);
     ensureDir(paths.views);
     this.catalogue = new Catalogue(paths);
     const f = join(paths.views, "readings.json");
@@ -268,13 +269,13 @@ export class Lens {
   }
 
   /** Every experiment fork without a bundle, made ahead: the study's own (mayor) forks first, then newest first. Within
-   * a budget of disk (OIKOS_LENS_BUNDLES_GB, default 8 GB of bundles, and never with under 15 GB free): a bundle is
+   * a budget of disk (OIKOS_LENS_BUNDLES_GB, default 12 GB of bundles, and never with under 15 GB free): a bundle is
    * about 20 MB, and this machine's disk is shared with the runs themselves. Plain runs are made only when opened.
    * Looked at again with each listing (at most once a minute), so new runs join the line as they appear. */
   private indexAll(runs: RunEntry[]) {
     if (this.opts.background === false || Date.now() - this.lastIndexAll < 60_000) return;
     this.lastIndexAll = Date.now();
-    const budget = Number(process.env.OIKOS_LENS_BUNDLES_GB ?? 8) * 1e9;
+    const budget = Number(process.env.OIKOS_LENS_BUNDLES_GB ?? 12) * 1e9;
     let used = bundlesBytes(this.paths.views);
     let free = Infinity;
     try {

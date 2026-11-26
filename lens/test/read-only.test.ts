@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { mockPilot } from "../../scripts/pilot-mock";
 import { Lens } from "../src/server/service";
+import { lensPaths, removeOwn } from "../src/server/paths";
 
 const base = realpathSync(mkdtempSync(join(tmpdir(), "oikos-lens-ro-")));
 afterAll(() => rmSync(base, { recursive: true, force: true }));
@@ -58,3 +59,12 @@ test("making a run's bundle changes nothing in the run's folder", async () => {
   // (Three seconds on a quiet machine; the mock run it makes first slows with the machine's load, as other agents' runs
   // share it: the suite's own limit, not a tighter one.)
 }, 120_000);
+
+test("Lens refuses a views folder inside the runs folder, and deletes nothing outside its views folder", () => {
+  const runs = join(base, "guard-runs"), views = join(base, "guard-views");
+  expect(() => new Lens({ runs, views: join(runs, "views", "lens") }, { background: false })).toThrow(/inside the runs folder/);
+  expect(() => lensPaths({ runs, views: runs })).toThrow(/inside the runs folder/);
+  expect(() => removeOwn(views, join(runs, "x"))).toThrow(/refuses to delete/);
+  expect(() => removeOwn(views, views)).toThrow(/refuses to delete/);
+  expect(() => removeOwn(views, join(views, "..", "guard-runs"))).toThrow(/refuses to delete/);
+});
