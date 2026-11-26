@@ -3,7 +3,7 @@
 // kept in <views>/readings.json (by each log's size and mtime, and the reader's own source: a changed reader reads
 // again). Read-only toward the runs folder.
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statfsSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statfsSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { Catalogue as CatalogueJson, ForkReading, IndexStatus, RunEntry } from "../shared/api";
 import type { FoldContext } from "../shared/fold";
@@ -52,6 +52,7 @@ export class Lens {
   /** The run being made ahead (not asked for): a viewer's open stops it and goes first; it is made again later. */
   private makingAhead?: RunEntry;
   private lastIndexAll = 0;
+  private readonly staleCache = new Map<string, { at: number; v: { dir: string; m: Manifest; stale: boolean } | undefined }>();
 
   constructor(readonly paths: LensPaths, readonly opts: { background?: boolean } = {}) {
     ensureDir(paths.views);
@@ -106,17 +107,52 @@ export class Lens {
     return { runId: e.title, dir, arm: x.arm, seed: x.seed, ...(x.forkDay !== undefined ? { forkAt: x.forkDay * DAY } : {}), ...(spec ? { spec } : {}) };
   }
 
-  manifest(e: RunEntry): Manifest | undefined {
+  /** The bundle made of this log as it is now. */
+  private ownManifest(e: RunEntry): Manifest | undefined {
     return readyManifest(bundleDir(this.paths.views, e.key, e.bytes, e.mtimeMs));
   }
 
+  /** The bundle to serve: this log's own, else, for a log that has grown since (a run still going), the one made of it
+   * before, while this one is made. A viewer sees the run as of its last bundle at once rather than waiting a full
+   * reading at every look. The older bundle stays until the new one replaces it (bundle.ts clears it then). */
+  private served(e: RunEntry): { dir: string; m: Manifest; stale: boolean } | undefined {
+    const own = bundleDir(this.paths.views, e.key, e.bytes, e.mtimeMs);
+    const m = readyManifest(own);
+    if (m) return { dir: own, m, stale: false };
+    const hit = this.staleCache.get(e.key);
+    if (hit && Date.now() - hit.at < 10_000) return hit.v;
+    let v: { dir: string; m: Manifest; stale: boolean } | undefined;
+    const parent = join(this.paths.views, "bundles");
+    try {
+      for (const f of readdirSync(parent)) {
+        if (!f.startsWith(`${e.key}.`) || !/^[0-9a-f]{10}$/.test(f.slice(e.key.length + 1))) continue;
+        const sm = readyManifest(join(parent, f));
+        if (sm && sm.bytes <= e.bytes && (!v || sm.bytes > v.m.bytes)) v = { dir: join(parent, f), m: sm, stale: true };
+      }
+    } catch {}
+    this.staleCache.set(e.key, { at: Date.now(), v });
+    return v;
+  }
+
+  manifest(e: RunEntry): Manifest | undefined {
+    return this.served(e)?.m;
+  }
+
   bundlePath(e: RunEntry): string {
-    return bundleDir(this.paths.views, e.key, e.bytes, e.mtimeMs);
+    return this.served(e)?.dir ?? bundleDir(this.paths.views, e.key, e.bytes, e.mtimeMs);
   }
 
   statusOf(e: RunEntry): IndexStatus {
-    const m = this.manifest(e);
-    if (m) return { state: "ready", key: e.key, seconds: m.seconds, lines: m.lines };
+    const sv = this.served(e);
+    if (sv) {
+      // (An older bundle is served; the log's own is made behind it.)
+      if (sv.stale && !this.aheadKeys.has(e.key) && !this.status.has(e.key)) {
+        this.aheadKeys.add(e.key);
+        this.ahead.push(e);
+        void this.work();
+      }
+      return { state: "ready", key: e.key, seconds: sv.m.seconds, lines: sv.m.lines };
+    }
     return this.status.get(e.key) ?? { state: "queued", key: e.key, ahead: 0 };
   }
 
@@ -166,7 +202,7 @@ export class Lens {
         const e = fromQueue ? this.queue.shift()! : this.ahead.shift()!;
         this.asked = fromQueue;
         if (!fromQueue && this.status.has(e.key)) continue; // (asked for meanwhile: it is in the queue)
-        if (this.manifest(e)) {
+        if (this.ownManifest(e)) {
           this.emit(e.key, this.statusOf(e));
           continue;
         }
@@ -194,6 +230,9 @@ export class Lens {
           this.emit(e.key, { state: "failed", key: e.key, error: String((err as Error).message ?? err).slice(0, 2000) });
         } finally {
           if (this.makingAhead === e) this.makingAhead = undefined;
+          // (Done: a log that grows again joins the line again.)
+          if (!this.ahead.includes(e)) this.aheadKeys.delete(e.key);
+          this.staleCache.delete(e.key);
         }
       }
     } finally {
@@ -242,7 +281,8 @@ export class Lens {
       const f = statfsSync(this.paths.views);
       free = f.bavail * f.bsize;
     } catch {}
-    const todo = runs.filter((r) => r.kind === "fork" && !r.indexed && !this.aheadKeys.has(r.key));
+    // (Not a log still being written: its bundle would be stale within the minute, and made again and again.)
+    const todo = runs.filter((r) => r.kind === "fork" && !r.indexed && !this.aheadKeys.has(r.key) && !this.status.has(r.key) && Date.now() - r.mtimeMs > 5 * 60_000);
     const mayor = (r: RunEntry) => (r.experiment?.post === "mayor" ? 1 : 0);
     todo.sort((a, b) => mayor(b) - mayor(a) || b.mtimeMs - a.mtimeMs);
     for (const r of todo) {
@@ -257,7 +297,7 @@ export class Lens {
 
   /** Make this run's bundle ahead of being asked for, when nothing asked for is waiting. */
   private makeAhead(e: RunEntry) {
-    if (this.opts.background === false || this.aheadKeys.has(e.key) || this.manifest(e)) return;
+    if (this.opts.background === false || this.aheadKeys.has(e.key) || this.ownManifest(e)) return;
     this.aheadKeys.add(e.key);
     this.ahead.push(e);
     void this.work();
@@ -293,7 +333,9 @@ export class Lens {
       if (this.stopped) return;
       this.reading = { ...this.reading, current: r.key };
       try {
-        const p = Bun.spawn([process.execPath, join(here, "read-one.ts"), this.catalogue.abs(r), JSON.stringify(this.readingInput(r))], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+        // (At low priority, like the bundles made ahead: a viewer's request comes first.)
+        const cmd = [process.execPath, join(here, "read-one.ts"), this.catalogue.abs(r), JSON.stringify(this.readingInput(r))];
+        const p = Bun.spawn(existsSync("/usr/bin/nice") ? ["/usr/bin/nice", "-n", "15", ...cmd] : cmd, { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
         children.add(p);
         const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
         children.delete(p);
