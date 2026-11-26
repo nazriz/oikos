@@ -37,7 +37,8 @@ function Diff({ keys, seats, initial }: { keys: string[]; seats: SeatJson[]; ini
   const seeds = new Set(seats.map((s) => s.seed));
   const marks: Marks = useMemo(() => ({ query, levers: [] }), [query]);
   const at = days.indexOf(day);
-  const poll = seats[0]!.election.poll_at;
+  // (The poll as first called: a seat that moved it would otherwise set the count for all.)
+  const polls = seats.map((s) => s.election.poll_at).filter((x): x is number => x !== undefined), poll = polls.length ? Math.min(...polls) : undefined;
   return (
     <div className="df">
       <div className="df-head">
