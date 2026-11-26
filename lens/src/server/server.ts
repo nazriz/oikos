@@ -51,17 +51,19 @@ export function startServer(o: ServeOptions = {}) {
     // "Drawing the town" for 50 s. A second start now fails with EADDRINUSE.)
     reusePort: false,
     routes: {
-      "/": (req) => client.page(req),
+      "/": (req) => (lens.noteViewer(), client.page(req)),
       "/fonts/:file": (req) => client.font(req.params.file) ?? notFound("font"),
       "/api/runs": async (req) => {
+        lens.noteViewer();
         // (A thousand runs' entries are a megabyte; gzipped, a tenth of it: it matters on a phone.)
         const body = JSON.stringify(await lens.list(new URL(req.url).searchParams.has("fresh")));
         const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", vary: "accept-encoding" };
         if ((req.headers.get("accept-encoding") ?? "").includes("gzip")) return new Response(Bun.gzipSync(Buffer.from(body)), { headers: { ...headers, "content-encoding": "gzip" } });
         return new Response(body, { headers });
       },
-      "/api/moments": (req) => momentsResponse(lens, req),
+      "/api/moments": (req) => (lens.noteViewer(), momentsResponse(lens, req)),
       "/api/run/:key": async (req) => {
+        lens.noteViewer();
         const e = await lens.catalogue.find(req.params.key);
         if (!e) return notFound("run");
         const m = lens.manifest(e);
@@ -70,6 +72,7 @@ export function startServer(o: ServeOptions = {}) {
         return json({ ...e, ...(m ? { indexed: true, summary: m.summary, ...(m.reading ? { reading: m.reading } : {}), errors: m.errors } : {}), ...(grade ? { grade } : {}) });
       },
       "/api/run/:key/status": async (req) => {
+        lens.noteViewer();
         const e = await lens.catalogue.find(req.params.key);
         if (!e) return notFound("run");
         let unsubscribe = () => {};
@@ -104,6 +107,7 @@ export function startServer(o: ServeOptions = {}) {
         return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" } });
       },
       "/api/run/:key/:fold": async (req) => {
+        lens.noteViewer();
         const e = await lens.catalogue.find(req.params.key);
         if (!e) return notFound("run");
         const m = lens.manifest(e);
@@ -114,6 +118,7 @@ export function startServer(o: ServeOptions = {}) {
         return fileResponse(req, join(lens.bundlePath(e), `${fold}.json`), "application/json; charset=utf-8");
       },
       "/api/run/:key/:fold/:file": async (req) => {
+        lens.noteViewer();
         const e = await lens.catalogue.find(req.params.key);
         if (!e) return notFound("run");
         if (!lens.manifest(e)) return json({ error: "not indexed yet" }, { status: 409 });

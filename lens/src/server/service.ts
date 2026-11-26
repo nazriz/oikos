@@ -7,7 +7,7 @@ import { existsSync, readdirSync, readFileSync, statfsSync, writeFileSync } from
 import { join, resolve } from "node:path";
 import type { Catalogue as CatalogueJson, ForkReading, IndexStatus, RunEntry } from "../shared/api";
 import type { FoldContext } from "../shared/fold";
-import { bundleDir, bundlesBytes, readyManifest, servedBundle, type Manifest } from "./bundle";
+import { bundleDir, readyManifest, servedBundle, type Manifest } from "./bundle";
 import type { IngestProgress } from "./ingest";
 import { Catalogue } from "./catalogue";
 import { loadGrades } from "./grades";
@@ -55,6 +55,12 @@ export class Lens {
   /** The run being made ahead (not asked for): a viewer's open stops it and goes first; it is made again later. */
   private makingAhead?: RunEntry;
   private lastIndexAll = 0;
+  /** When a viewer last asked for anything (`noteViewer`): Lens's own work waits while one is active. */
+  private viewerAt = 0;
+  /** The bytes Lens's bundles take, measured by `du` in its own process every ten minutes (a walk of the cache's 1.5 M
+   * files in the server took 12 s, and stopped every request meanwhile). */
+  private diskUsed?: { bytes: number; at: number };
+  private measuring = false;
 
   constructor(readonly paths: LensPaths, readonly opts: { background?: boolean } = {}) {
     checkPaths(paths);
@@ -66,6 +72,35 @@ export class Lens {
     } catch {
       this.readings = {};
     }
+  }
+
+  /** A viewer asked for something: Lens's own work (bundles made ahead, the reader) holds off for a few seconds. */
+  noteViewer() {
+    this.viewerAt = Date.now();
+  }
+
+  /** Until no viewer has asked for anything for 3 s, or a viewer's own run is waiting to be made (or Lens stops). */
+  private async quiet() {
+    while (Date.now() - this.viewerAt < 3_000 && !this.stopped && !this.queue.length) await Bun.sleep(250);
+  }
+
+  private measureDisk() {
+    if (this.measuring || (this.diskUsed && Date.now() - this.diskUsed.at < 10 * 60_000)) return;
+    this.measuring = true;
+    const dir = join(this.paths.views, "bundles");
+    if (!existsSync(dir)) {
+      this.diskUsed = { bytes: 0, at: Date.now() };
+      this.measuring = false;
+      return;
+    }
+    const p = Bun.spawn([...(existsSync("/usr/bin/nice") ? ["/usr/bin/nice", "-n", "19"] : []), "du", "-sk", dir], { stdout: "pipe", stderr: "ignore", stdin: "ignore" });
+    void new Response(p.stdout).text().then(
+      (out) => {
+        const kb = parseInt(out, 10);
+        if (kb >= 0) this.diskUsed = { bytes: kb * 1024, at: Date.now() };
+      },
+      () => {},
+    ).finally(() => (this.measuring = false));
   }
 
   stop() {
@@ -86,9 +121,12 @@ export class Lens {
     });
     if (this.opts.background !== false) {
       // (Runs the checker or the graders flagged are made first, so Moments has every one of them.)
-      for (const r of runs) if (!r.indexed && (r.reading?.levers?.tried || (r.grade?.lockIn && r.grade.lockIn.a + r.grade.lockIn.b > 0))) this.makeAhead(r);
-      this.indexAll(runs);
-      this.startReading(runs);
+      // (After the answer is sent: none of this may hold up the listing.)
+      setTimeout(() => {
+        for (const r of runs) if (!r.indexed && (r.reading?.levers?.tried || (r.grade?.lockIn && r.grade.lockIn.a + r.grade.lockIn.b > 0))) this.makeAhead(r);
+        this.indexAll(runs);
+        this.startReading(runs);
+      }, 0);
     }
     return { runs, reading: this.reading, scannedAt: c.at, scanMs: c.ms };
   }
@@ -209,6 +247,9 @@ export class Lens {
     this.working = true;
     try {
       while ((this.queue.length || this.ahead.length) && !this.stopped) {
+        // (Made ahead only while no viewer is asking: a viewer's own run goes straight on.)
+        if (!this.queue.length) await this.quiet();
+        if (!this.queue.length && !this.ahead.length) break;
         const fromQueue = this.queue.length > 0;
         const e = fromQueue ? this.queue.shift()! : this.ahead.shift()!;
         this.asked = fromQueue;
@@ -255,7 +296,7 @@ export class Lens {
   private async makeInChild(job: object, ahead: boolean, onProgress: (p: IngestProgress) => void): Promise<Manifest> {
     // (Made ahead, at low priority: the machine's own work, and a viewer's, come first.)
     const cmd = [process.execPath, join(here, "make-one.ts"), JSON.stringify(job)];
-    const p = Bun.spawn(ahead && existsSync("/usr/bin/nice") ? ["/usr/bin/nice", "-n", "15", ...cmd] : cmd, { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+    const p = Bun.spawn(ahead && existsSync("/usr/bin/nice") ? ["/usr/bin/nice", "-n", "19", ...cmd] : cmd, { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
     this.maker = p;
     let manifest: Manifest | undefined;
     const errP = new Response(p.stderr).text();
@@ -286,7 +327,9 @@ export class Lens {
     if (this.opts.background === false || Date.now() - this.lastIndexAll < 60_000) return;
     this.lastIndexAll = Date.now();
     const budget = Number(process.env.OIKOS_LENS_BUNDLES_GB ?? 12) * 1e9;
-    let used = bundlesBytes(this.paths.views);
+    // (Unknown until the first measure: then only the study's forks are made.)
+    this.measureDisk();
+    let used = this.diskUsed?.bytes ?? Infinity;
     let free = Infinity;
     try {
       const f = statfsSync(this.paths.views);
@@ -344,12 +387,13 @@ export class Lens {
     this.child = { kill: () => children.forEach((c) => c.kill()) };
     const readOne = async (r: RunEntry) => {
       while (this.asked && !this.stopped) await Bun.sleep(500);
+      await this.quiet();
       if (this.stopped) return;
       this.reading = { ...this.reading, current: r.key };
       try {
         // (At low priority, like the bundles made ahead: a viewer's request comes first.)
         const cmd = [process.execPath, join(here, "read-one.ts"), this.catalogue.abs(r), JSON.stringify(this.readingInput(r))];
-        const p = Bun.spawn(existsSync("/usr/bin/nice") ? ["/usr/bin/nice", "-n", "15", ...cmd] : cmd, { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+        const p = Bun.spawn(existsSync("/usr/bin/nice") ? ["/usr/bin/nice", "-n", "19", ...cmd] : cmd, { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
         children.add(p);
         const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
         children.delete(p);
@@ -364,7 +408,8 @@ export class Lens {
       this.reading = { ...this.reading, done: this.reading.done + 1 };
     };
     // (Two at a time: each is one core and the kernel's export.)
-    const lanes = 2;
+    // (One at a time: a reading is one core and a kernel export, and the machine is the viewers' too.)
+    const lanes = 1;
     let next = 0;
     void Promise.all(
       Array.from({ length: lanes }, async () => {
