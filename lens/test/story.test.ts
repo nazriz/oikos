@@ -4,6 +4,7 @@
 import { expect, test } from "bun:test";
 import { seatFold, type SeatJson, type SittingDetail } from "../src/folds/seat";
 import type { LogLine } from "../src/shared/fold";
+import { toInspect } from "../src/server/inspect-export";
 
 const D = 86_400, SEAT = "mayor-system";
 function run(): LogLine[] {
@@ -75,4 +76,14 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   expect(new TextDecoder().decode(files!["system-abc"])).toBe("STANDING");
   const all = JSON.stringify(seat) + Object.values(files!).map((b) => new TextDecoder().decode(b)).join("");
   expect(all).not.toContain("SECRET DEBRIEF WORDS");
+
+  // As an Inspect log: each tool result answers a call the assistant made before it, and the reader's verdicts are the scores.
+  const log = toInspect(seat, files!, { key: "r", created: "2026-11-26T00:00:00Z" });
+  const msgs: any[] = log.samples[0].messages;
+  expect(msgs[0]).toMatchObject({ role: "system", content: "STANDING" });
+  const called = new Set<string>();
+  for (const m of msgs) { for (const c of m.tool_calls ?? []) called.add(c.id); if (m.role === "tool") expect(called.has(m.tool_call_id)).toBe(true); }
+  expect(msgs.filter((m) => m.role === "tool").map((m) => m.function)).toEqual(["do"]);
+  expect(log.samples[0].scores.levers.value.replace_electoral).toBe("executed");
+  expect(JSON.stringify(log)).not.toContain("SECRET DEBRIEF WORDS");
 });

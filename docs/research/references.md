@@ -1166,3 +1166,9 @@ Nothing opened on 2026-11-16 for this entry: both lines are cited from memory an
 |---|---|---|
 | Formal authority (the right to decide) against real authority (who in effect decides): a principal who rubber-stamps what its agent proposes has handed over real authority while keeping the formal kind | Aghion and Tirole (1997), "Formal and Real Authority in Organizations", *Journal of Political Economy* 105(1), 1-29 (pages to confirm) | docs/north-star.md (the project plan, step 4); docs/design/obstacles.md section 10; docs/design/stakes.md; docs/behaviour/assistants.md |
 | "Rogue AIs" as one of four classes of catastrophic risk, power-seeking among its paths: the problem area the project plan is filed under | Hendrycks, Mazeika and Woodside (2023), "An Overview of Catastrophic AI Risks", Center for AI Safety, arXiv:2306.12001 (to confirm) | docs/north-star.md (the project plan, "Problem") |
+
+### Lens (reading runs)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| An eval's transcript as one log a common viewer opens: samples of chat messages, tool calls and their results, scores and metadata | UK AI Security Institute, Inspect AI (`inspect_ai`), eval log format version 2 (`inspect_ai/log/_log.py`, `EvalLog`/`EvalSample`; read with `read_eval_log`, shown by `inspect view`), package 0.3.292 as read 2026-11-26 | `lens/src/server/inspect-export.ts`: a fork's seat as an Inspect log, one sample per run |

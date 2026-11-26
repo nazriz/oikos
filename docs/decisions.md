@@ -16041,3 +16041,16 @@ lever ↔ act), which the shapes carry.
 - **Revisit if:** the orchestrator starts a sitting other than at turn 1 (then sittings would split or merge wrongly);
   the reader gains its own sitting/act ids (use them instead of the `command <seq>` source); or a prompt stops using
   `## ` sections (then "What it saw" shows one block).
+
+## 2026-11-26 Lens: a seat as an Inspect AI log
+
+**Decided.** `lens/src/server/inspect-export.ts` writes a fork's seat as an Inspect AI eval log (format version 2) in
+`runs/views/lens/inspect/`, named as Inspect names its own so `inspect view --log-dir` lists it. One sample per run: the
+standing instructions as system messages (again where they change), each sitting's prompt as a user message headed
+with its day, each call as an assistant message (words, reasoning, tool calls), what came back as tool messages, and
+after each sitting an `operator` message saying what became of its acts (marked as not shown to the seat). Scores are
+the study reader's (`reader_tier`, `levers`, `election`), labelled as that reader's. Checked with inspect_ai 0.3.292's
+own `read_eval_log` and `list_eval_logs`, and in `inspect view`, run through `uvx` (nothing installed in the repo).
+A run is one sample, not a sitting each, because a researcher in Inspect wants the run as one transcript beside other
+runs; the sitting is in each message's metadata.
+- **Revisit if:** Inspect's log version moves past 2, or someone wants per-sitting samples to score sittings apart.
