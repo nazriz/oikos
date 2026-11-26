@@ -7,7 +7,7 @@ import { existsSync, readdirSync, readFileSync, statfsSync, writeFileSync } from
 import { join, resolve } from "node:path";
 import type { Catalogue as CatalogueJson, ForkReading, IndexStatus, RunEntry } from "../shared/api";
 import type { FoldContext } from "../shared/fold";
-import { bundleDir, bundlesBytes, readyManifest, type Manifest } from "./bundle";
+import { bundleDir, bundlesBytes, readyManifest, servedBundle, type Manifest } from "./bundle";
 import type { IngestProgress } from "./ingest";
 import { Catalogue } from "./catalogue";
 import { loadGrades } from "./grades";
@@ -52,7 +52,6 @@ export class Lens {
   /** The run being made ahead (not asked for): a viewer's open stops it and goes first; it is made again later. */
   private makingAhead?: RunEntry;
   private lastIndexAll = 0;
-  private readonly staleCache = new Map<string, { at: number; v: { dir: string; m: Manifest; stale: boolean } | undefined }>();
 
   constructor(readonly paths: LensPaths, readonly opts: { background?: boolean } = {}) {
     checkPaths(paths);
@@ -114,26 +113,11 @@ export class Lens {
     return readyManifest(bundleDir(this.paths.views, e.key, e.bytes, e.mtimeMs));
   }
 
-  /** The bundle to serve: this log's own, else, for a log that has grown since (a run still going), the one made of it
-   * before, while this one is made. A viewer sees the run as of its last bundle at once rather than waiting a full
+  /** The bundle to serve: this log's own, else, for a log that has grown since (a run still going) or after a fold's
+   * version went up, the one made before, while this one is made. A viewer sees the run as of its last bundle at once rather than waiting a full
    * reading at every look. The older bundle stays until the new one replaces it (bundle.ts clears it then). */
   private served(e: RunEntry): { dir: string; m: Manifest; stale: boolean } | undefined {
-    const own = bundleDir(this.paths.views, e.key, e.bytes, e.mtimeMs);
-    const m = readyManifest(own);
-    if (m) return { dir: own, m, stale: false };
-    const hit = this.staleCache.get(e.key);
-    if (hit && Date.now() - hit.at < 10_000) return hit.v;
-    let v: { dir: string; m: Manifest; stale: boolean } | undefined;
-    const parent = join(this.paths.views, "bundles");
-    try {
-      for (const f of readdirSync(parent)) {
-        if (!f.startsWith(`${e.key}.`) || !/^[0-9a-f]{10}$/.test(f.slice(e.key.length + 1))) continue;
-        const sm = readyManifest(join(parent, f));
-        if (sm && sm.bytes <= e.bytes && (!v || sm.bytes > v.m.bytes)) v = { dir: join(parent, f), m: sm, stale: true };
-      }
-    } catch {}
-    this.staleCache.set(e.key, { at: Date.now(), v });
-    return v;
+    return servedBundle(this.paths.views, e.key, e.bytes, e.mtimeMs);
   }
 
   manifest(e: RunEntry): Manifest | undefined {
@@ -234,7 +218,6 @@ export class Lens {
           if (this.makingAhead === e) this.makingAhead = undefined;
           // (Done: a log that grows again joins the line again.)
           if (!this.ahead.includes(e)) this.aheadKeys.delete(e.key);
-          this.staleCache.delete(e.key);
         }
       }
     } finally {
@@ -270,8 +253,9 @@ export class Lens {
   }
 
   /** Every experiment fork without a bundle, made ahead: the study's own (mayor) forks first, then newest first. Within
-   * a budget of disk (OIKOS_LENS_BUNDLES_GB, default 12 GB of bundles, and never with under 15 GB free): a bundle is
-   * about 20 MB, and this machine's disk is shared with the runs themselves. Plain runs are made only when opened.
+   * a budget of disk for all but the study's (mayor) forks (OIKOS_LENS_BUNDLES_GB, default 12 GB of bundles), and never
+   * with under 15 GB free: a bundle is about 20 MB, and this machine's disk is shared with the runs themselves. Plain
+   * runs are made only when opened.
    * Looked at again with each listing (at most once a minute), so new runs join the line as they appear. */
   private indexAll(runs: RunEntry[]) {
     if (this.opts.background === false || Date.now() - this.lastIndexAll < 60_000) return;
@@ -289,8 +273,11 @@ export class Lens {
     todo.sort((a, b) => mayor(b) - mayor(a) || b.mtimeMs - a.mtimeMs);
     for (const r of todo) {
       // (A bundle is about a fifth of its log's size: room for this one, or stop.)
-      const need = r.bytes / 5;
-      if (used + need > budget || free - need < 15e9) break;
+      // (Making a run again replaces its older bundle: no new room needed.)
+      const need = this.served(r) ? 0 : r.bytes / 5;
+      if (free - need < 15e9) break;
+      // (The study's own forks are always made: they are what is opened. The budget holds the rest.)
+      if (!mayor(r) && used + need > budget) continue;
       used += need;
       free -= need;
       this.makeAhead(r);
