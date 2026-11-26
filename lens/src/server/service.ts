@@ -83,7 +83,8 @@ export class Lens {
       return x && x.reading && x.bytes === r.bytes && x.mtimeMs === r.mtimeMs && x.v === readerVersion ? { ...e, reading: x.reading } : e;
     });
     if (this.opts.background !== false) {
-      for (const r of runs) if (r.reading?.levers?.tried && !r.indexed) this.makeAhead(r);
+      // (Runs the checker or the graders flagged are made first, so Moments has every one of them.)
+      for (const r of runs) if (!r.indexed && (r.reading?.levers?.tried || (r.grade?.lockIn && r.grade.lockIn.a + r.grade.lockIn.b > 0))) this.makeAhead(r);
       this.indexAll(runs);
       this.startReading(runs);
     }

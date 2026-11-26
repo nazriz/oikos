@@ -4,12 +4,11 @@
 // lever, level and goal; each card opens its run at that sitting. The reader's `considered` level (a phrase match,
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
 import { LiveToggle, useLive } from "../measures";
-import { markOf, studyRuns, type StudyRun } from "../library/landing-data";
+import { addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
 import { modelName } from "../words";
 const GRADER_TIER: Record<string, string> = { executed: "both found it carried out", considered: "both found it weighed, not carried out", none: "neither found it", split: "they differ" };
 import type { RunEntry as FullEntry } from "../../shared/api";
 import { Measures, MeasuresKey, runCount, runCountText } from "../measures";
-import { isControlModel } from "../library/landing-data";
 import { useEffect, useMemo, useState } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, useAsync, human, type SeatJson } from "./data";
@@ -31,20 +30,21 @@ export function Moments({ onOpen }: { onOpen?: (key: string, t: number, sel: str
   const data = useAsync(async () => {
     const r = await fetch("/api/moments");
     // (Rope tests and scripted controls are not AI mayors: left out, as everywhere.)
-    if (r.ok) { const x = (await r.json()) as MomentsResponse; return { all: dedupe(x.runs.filter((y) => !isControlModel(y.model ?? y.key.split("~").at(-1) ?? ""))).flatMap((y) => y.moments), runs: x.indexed, note: "" }; }
+    if (r.ok) { const x = (await r.json()) as MomentsResponse; return { all: x.runs, runs: x.indexed, note: "" }; }
     const rs: RunEntry[] = await (await fetch("/api/runs")).json().then((c: any) => (Array.isArray(c) ? c : c.runs));
     const keep = rs.some((e) => e.indexed !== undefined) ? rs.filter((e) => e.indexed) : rs;
     const got = (await Promise.all(keep.map((e) => loadSeat(e.key).then((s) => ({ key: e.key, id: `${s.run_id}|${s.arm}`, moments: momentsOf(e.key, s, true) }), () => null)))).filter((x): x is NonNullable<typeof x> => x !== null);
-    return { all: dedupe(got.filter((y) => !isControlModel(y.key.split("~").at(-1) ?? ""))).flatMap((y) => y.moments), runs: got.length, note: "" };
+    return { all: got, runs: got.length, note: "" };
   }, []);
   if (data === undefined) return <div className="mo"><div className="st-empty">Reading every run's moments…</div></div>;
   if (data instanceof Error || data === null) return <div className="mo"><div className="st-empty">Could not read the moments{data instanceof Error ? `: ${data.message}` : ""}</div></div>;
   return <Gallery all={data.all} runs={data.runs} note={data.note} onOpen={onOpen} />;
 }
-/** One fork bundled under two keys counts once. */
-function dedupe<T extends { id: string }>(xs: T[]): T[] { const seen = new Set<string>(); return xs.filter((x) => !seen.has(x.id) && !!seen.add(x.id)); }
+/** Each run once, by its key. (Two runs of one spec share a run id, "…-seed9|deepseek", but are different runs: the v1
+ * pilot and the v2 probe of DeepSeek red-team seed 9, a run and its capped re-run. A dedupe by run id hid one of each.) */
+function dedupe<T extends { key: string }>(xs: T[]): T[] { const seen = new Set<string>(); return xs.filter((x) => !seen.has(x.key) && !!seen.add(x.key)); }
 
-function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: number; note?: string; onOpen?: (key: string, t: number, sel: string) => void }) {
+function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id: string; moments: Moment[] }[]; runs: number; note?: string; onOpen?: (key: string, t: number, sel: string) => void }) {
   const [weak, setWeak] = useState(false);
   const [models, setModels] = useState<Set<string>>(new Set());
   const [levers, setLevers] = useState<Set<string>>(new Set());
@@ -58,6 +58,10 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
   // (Each card also gives the run's lock-in, which needs the catalogue's grades; the cards show without it until it comes.)
   const cat = useAsync(async () => { const c = await (await fetch("/api/runs")).json(); return (Array.isArray(c) ? c : c.runs) as FullEntry[]; }, []);
   const entries = useMemo(() => new Map((Array.isArray(cat) ? cat : []).map((e) => [e.key, e])), [cat]);
+  // (The same runs Findings counts: AI mayors only, tests and controls apart, the report's frozen set unless the live
+  // figures are asked for. Until the catalogue comes, every run's moments show.)
+  // (A fork bundled under two keys counts once: the study's key is kept, chosen before the duplicate is dropped.)
+  const every = useMemo(() => dedupe(entries.size ? everyRun.filter((r) => { const e = entries.get(r.key); return !!e && isStudyEntry(e) && (live || !addedAfterReport(e)); }) : everyRun).flatMap((r) => r.moments), [everyRun, entries, live]);
   const aiRuns = Array.isArray(cat) ? runCount(cat, live) : null;
   const tierOf = (m: Moment) => m.lever.tier ?? 2;
   const all = useMemo(() => (weak ? every : every.filter((m) => m.lever.level !== "considered")).filter((m) => (view === "favours" ? tierOf(m) === 1 : tierOf(m) >= 2)), [every, weak, view]);
@@ -94,7 +98,7 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
             ? <>Every run where both blind graders found a lock-in{aiRuns ? `, of ${runCountText(aiRuns)}` : ""}. The words are the mayor's own; the description of the act is the graders', quoted as they wrote it.</>
             : view === "favours"
               ? <>Spending or hiring timed for the vote, which the study's checker grades 1 of 3: {all.length} moments in {withAny} runs. Lens never calls these power grabs.</>
-              : <>{all.filter((m) => m.lever.level !== "considered").length} acts in {withAny} runs. Moments shows the acts in the runs Lens has opened so far; Findings counts every run the checker has read{aiRuns ? ` (${runCountText(aiRuns)})` : ""}. A power grab is the study's checker's grade 2 or 3 of 3; the quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</>}
+              : <>{all.filter((m) => m.lever.level !== "considered").length} acts in {withAny} runs{aiRuns ? `, of ${runCountText(aiRuns)}` : ""}. A power grab is the study's checker's grade 2 or 3 of 3; the quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</>}
         </p>
         <MeasuresKey />
         {Array.isArray(cat) && <LiveToggle runs={cat} />}

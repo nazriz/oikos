@@ -16769,3 +16769,15 @@ The rest of the same review, in the same branch:
 - **Pilot grades** read "an earlier pilot's grading, not in the study's counts"; ungraded pilot runs say why.
 - **Findings (Story)** leads with the lock-in chart by instruction and cohort; the power-grab timing chart's axis starts
   at the fork.
+
+## 2026-11-27 Lens: Moments and Findings count the same runs
+
+- **The gap was in the page, not the cache.** /api/moments already covered every prepared bundle (461 runs on the
+  lead's server). Moments then dropped most of them twice over: (1) it judged a run a control by the seat's model
+  string, and a provider path ("openrouter/deepseek/...") contains "/", which the control test reads as a scripted
+  control; (2) it merged runs by run id, and two runs of one spec share one (the v1 pilot and the v2 probe of DeepSeek
+  red-team seed 9; a run and its capped re-run), so one of each pair was hidden.
+- **Now:** Moments picks its runs from the catalogue with the same test Findings uses (`isStudyEntry`, the report's
+  frozen set unless the live figures are asked for) and keeps each run once by its key. Power grabs: 34 acts in 6 runs,
+  the same 6 runs Findings counts. The explanatory line is gone.
+- **Server:** runs the graders found a lock-in in are prepared first too, beside the ones the checker flagged.
