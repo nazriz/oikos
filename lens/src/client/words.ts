@@ -120,4 +120,28 @@ export const W = {
   lever_title: leverTitle,
 } as const;
 export const useWords = () => W;
+
+/** An AI model's name as people write it: "deepseek-v4.1-flash" → "DeepSeek V4.1 Flash", "claude-sonnet-4-5" →
+ * "Claude Sonnet 4.5", "glm-5.3" → "GLM 5.3". Any "provider/" prefix is dropped. */
+const BRANDS: Record<string, string> = { deepseek: "DeepSeek", glm: "GLM", gpt: "GPT", qwen4: "Qwen 4", grok: "Grok", gemini: "Gemini", mistral: "Mistral", claude: "Claude", inkling: "Inkling", llama: "Llama" };
+export function modelName(id: string | undefined): string {
+  if (!id) return "";
+  if (id.startsWith("scripted/")) return `Scripted test mayor (${id.slice(9)})`;
+  const base = id.split("/").at(-1)!;
+  if (base === "code") return "the rule-based mayor";
+  const parts = base.split("-");
+  const out: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i]!;
+    // (Version numbers written with dashes: "4-5" is 4.5.)
+    if (/^\d+$/.test(p) && /^\d+$/.test(parts[i + 1] ?? "") && out.length) {
+      out.push(`${p}.${parts[++i]}`);
+      continue;
+    }
+    if (BRANDS[p]) out.push(BRANDS[p]!);
+    else if (/^v?\d/.test(p)) out.push(p.toUpperCase().replace(/^V/, "V"));
+    else out.push(p.charAt(0).toUpperCase() + p.slice(1));
+  }
+  return out.join(" ").replace(/^GPT (\d)/, "GPT-$1");
+}
 export const term = (k: WordKey) => WORDS[k].term;

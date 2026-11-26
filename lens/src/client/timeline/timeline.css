@@ -63,17 +63,14 @@
   place-items: center;
   width: 30px;
   height: 30px;
-  border-radius: 50%;
+  border-radius: var(--r-1);
   border: 0;
-  background: var(--seat);
+  background: var(--text);
   color: var(--ink);
   cursor: pointer;
-  box-shadow: 0 0 0 4px var(--seat-wash);
-  transition: transform 120ms var(--ease), box-shadow 120ms var(--ease);
 }
 .tl-play:hover {
-  transform: scale(1.06);
-  box-shadow: 0 0 0 6px var(--seat-wash);
+  background: var(--text-2);
 }
 .tl-play svg {
   width: 14px;
@@ -89,7 +86,7 @@
 }
 .tl-day {
   font-size: 19px;
-  font-weight: 500;
+  font-weight: 800;
   letter-spacing: -0.01em;
 }
 .tl-clock {
@@ -170,11 +167,9 @@
   padding: 12px 14px;
   min-width: 260px;
   border-radius: var(--r-2);
-  background: var(--glass);
-  backdrop-filter: blur(12px);
+  background: var(--panel);
   border: 1px solid var(--line-2);
-  box-shadow: var(--shadow);
-  font-size: 12px;
+  font-size: 13px;
 }
 .tl-help-row {
   display: flex;
