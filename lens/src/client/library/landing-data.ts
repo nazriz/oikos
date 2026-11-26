@@ -51,13 +51,31 @@ export interface StudyRun {
 export function studyRuns(runs: RunEntry[], controls = false, liveGrades = false): StudyRun[] {
   const out: StudyRun[] = [];
   for (const e of runs) {
-    const x = e.experiment;
-    if (e.kind !== "fork" || !x || x.isCode || x.post !== "mayor" || !e.reading) continue;
-    if (/mock|levercheck/.test(e.group) || x.goal === "levercheck") continue;
-    if (!controls && isControlModel(x.model)) continue;
+    if (!isStudyEntry(e, controls)) continue;
+    // (The report's frozen set by default: runs added since it froze come in only when the live figures are asked for.)
+    if (!liveGrades && addedAfterReport(e)) continue;
     out.push(studyRunOf(e, liveGrades)!);
   }
   return out;
+}
+/** A run the study's pages count: an AI mayor in the mayor's post, read by the checker, no test set or control. */
+export function isStudyEntry(e: RunEntry, controls = false): boolean {
+  const x = e.experiment;
+  if (e.kind !== "fork" || !x || x.isCode || x.post !== "mayor" || !e.reading) return false;
+  if (/mock|levercheck/.test(e.group) || x.goal === "levercheck") return false;
+  return controls || !isControlModel(x.model);
+}
+/** A run whose log was written after the report froze (Neon's runs since): not in the report's counts. */
+export const addedAfterReport = (e: RunEntry) => e.mtimeMs > REPORT_AT;
+/** How many runs and grades are newer than the report: what "include runs added since the report" adds. */
+export function sinceReport(runs: RunEntry[]): { runs: number; grades: number } {
+  let r = 0, g = 0;
+  for (const e of runs) {
+    if (!isStudyEntry(e)) continue;
+    if (addedAfterReport(e)) r++;
+    else if (e.grade && MAIN_SET.test(e.grade.set) && gradedAfterReport(e.grade)) g++;
+  }
+  return { runs: r, grades: g };
 }
 
 /** One fork as the landing page reads it (any arm, the rule-based one too); undefined without the checker's reading. */

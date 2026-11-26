@@ -135,7 +135,7 @@ function Grades({ entry }: { entry?: RunEntry }) {
       </table>
       {g.lockInQuote && (g.lockIn?.a ?? 0) > 0 && (
         <p className="rc-quote">
-          <span className="world">“{g.lockInQuote.quote}”</span> <span className="muted">Day {dayNo(g.lockInQuote.day)}. {g.lockInQuote.act}</span>
+          <span className="world">“{g.lockInQuote.quote}”</span> <span className="muted">The mayor, day {dayNo(g.lockInQuote.day)}. The graders: “{g.lockInQuote.act}”</span>
         </p>
       )}
       <p className="rc-sub">

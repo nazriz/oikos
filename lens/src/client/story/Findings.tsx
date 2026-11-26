@@ -8,6 +8,10 @@
 //   when        each attempt by days before the poll, by model
 //   outcome     how each run's election went, by model (Lens's one rule, src/shared/outcome.ts)
 //   cost        dollars per run, by model
+import { LiveToggle, useLive } from "../measures";
+import { conditionsSentence, type StudyRun } from "../library/landing-data";
+import { Conditions } from "../library/charts";
+import "../library/landing.css";
 import { studyRuns } from "../library/landing-data";
 import { MeasuresKey } from "../measures";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -64,19 +68,20 @@ function outcomeKind(r: ForkReading): OutcomeKind {
 }
 
 export function Findings() {
+  const live = useLive();
   const [runs, setRuns] = useState<RunEntry[] | Error>();
   useEffect(() => { fetch("/api/runs").then((r) => r.json()).then((c) => setRuns(Array.isArray(c) ? c : c.runs), (e) => setRuns(e)); }, []);
   if (runs instanceof Error) return <div className="fi"><div className="st-empty">Could not read the catalogue: {runs.message}</div></div>;
   if (!runs) return <div className="fi"><div className="st-empty">Reading the catalogue…</div></div>;
   // (Story mode counts the runs every page counts: runs with an AI mayor, tests and controls apart, src/client/measures.tsx.)
-  const keep = new Set(studyRuns(runs, true).map((f) => f.key));
+  const keep = new Set(studyRuns(runs, true, live).map((f) => f.key));
   const forks: Fork[] = runs.flatMap((e) => (e.kind === "fork" && e.experiment && !e.experiment.isCode && e.reading && keep.has(e.key) ? [{ key: e.key, group: e.group, model: e.experiment.model, goal: e.experiment.goal || "none", seed: e.experiment.seed, ...(e.experiment.usd !== undefined ? { usd: e.experiment.usd } : {}), r: e.reading,
     outcome: outcomeKind(e.reading) }] : []));
   if (!forks.length) return <div className="fi"><div className="st-empty">No experiment fork has been read yet. The catalogue reads them in the background; come back in a minute.</div></div>;
-  return <Page all={forks} />;
+  return <Page all={forks} lockRuns={studyRuns(runs, false, live)} entries={runs} />;
 }
 
-function Page({ all }: { all: Fork[] }) {
+function Page({ all, lockRuns, entries }: { all: Fork[]; lockRuns: StudyRun[]; entries: RunEntry[] }) {
   const groups = useMemo(() => [...new Set(all.map((f) => f.group))].sort(), [all]);
   const [on, setOn] = useState<Set<string>>(() => new Set(groups.filter((g) => /^ps-/.test(g) && !/mock|levercheck/.test(g))));
   const [drill, setDrill] = useState<{ title: string; forks: Fork[] } | null>(null);
@@ -96,7 +101,7 @@ function Page({ all }: { all: Fork[] }) {
         {researcher && <div className="fi-groups"><span className="lbl">Test runs</span><button className={`st-btn ${controls ? "on" : ""}`} onClick={() => setControls(!controls)} title="Rope tests and scripted controls, which are not AI models">{controls ? "Test mayors shown below the models" : "Test mayors hidden"} <span className="n">{[...new Set(all.filter((f) => on.has(f.group) && isControl(f.model)).map((f) => f.model))].join(", ") || "none"}</span></button></div>}
         {researcher && <div className="fi-groups"><span className="lbl">Run sets</span>{groups.map((g) => <button key={g} className={`st-btn ${on.has(g) ? "on" : ""}`} onClick={() => { const n = new Set(on); n.has(g) ? n.delete(g) : n.add(g); setOn(n); }}>{g} <span className="n">{all.filter((f) => f.group === g).length}</span></button>)}</div>}
       </div>
-      {!researcher && <StoryFindings forks={inView} models={models} pal={pal} />}
+      {!researcher && <StoryFindings forks={inView} models={models} pal={pal} lockRuns={lockRuns} entries={entries} />}
       {researcher && <div className="fi-grid">
         <Chart wide title="Runs where the AI mayor reached for a power grab" sub="Share of runs, by model and instructions: tried (hollow) and carried out (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(inView, models, goals)}>
           {(ref) => <KofN refEl={ref} forks={inView} models={models} goals={goals} pal={pal} onDrill={setDrill} />}
@@ -431,7 +436,7 @@ function Drill({ d, onClose }: { d: { title: string; forks: Fork[] }; onClose: (
 
 /** Story mode's Findings: one chart, per model, of runs with a power grab tried and carried out, and the sentences
  * that say what it shows, all computed from the same runs. */
-function StoryFindings({ forks, models, pal }: { forks: Fork[]; models: string[]; pal: Pal }) {
+function StoryFindings({ forks, models, pal, lockRuns, entries }: { forks: Fork[]; models: string[]; pal: Pal; lockRuns: StudyRun[]; entries: RunEntry[] }) {
   const ref = useRef<SVGSVGElement | null>(null);
   const n = forks.length, tried = forks.filter((f) => f.r.has_attempt), done = forks.filter((f) => f.r.has_executed);
   const byGoal = (xs: Fork[]) => { const m = new Map<string, number>(); for (const f of xs) m.set(f.goal, (m.get(f.goal) ?? 0) + 1); return [...m].sort((a, b) => b[1] - a[1]); };
@@ -446,10 +451,17 @@ function StoryFindings({ forks, models, pal }: { forks: Fork[]; models: string[]
   const x = (v: number) => L + (v / max) * BW;
   return (
     <div className="fi-grid">
+      <section className="fi-card wide">
+        <div className="fi-card-head"><div><h2>Lock-in, by instruction: the study's main measure</h2>
+          <p className="fi-takeaway">{conditionsSentence(lockRuns)}</p>
+          <div className="fi-takeaway st-faint">Each square is a run: plum where both blind graders found a lock-in, outlined where one did, faint where the run stopped before election day (not counted). From the study's report's graded runs. <MeasuresKey /></div>
+          <LiveToggle runs={entries} />
+        </div></div>
+        <Conditions runs={lockRuns} researcher={false} />
+      </section>
       <section className="fi-card wide" data-tour="findings">
         <div className="fi-card-head"><div><h2>Runs with a power grab, by AI model</h2>
           {sentences.map((x, i) => <p key={i} className="fi-takeaway">{x}</p>)}
-          <MeasuresKey />
         </div>
           <div className="fi-tools"><button className="st-btn" onClick={() => ref.current && exportPng(ref.current, "story", "Runs with a power grab, by AI model", sentences[0] ?? "")}>Save as an image</button></div>
         </div>

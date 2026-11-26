@@ -143,7 +143,7 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
   const what = m === "lockin" && mark === "ungraded" && f.gradedLater ? "Graded after the report froze, so not in its counts (include such runs below the design chart)" : MARK_WORDS[m][mark];
   let detail: string | undefined, words: string | undefined;
   if (m === "lockin" && f.grade?.lockInQuote && (mark === "yes" || mark === "split" || mark === "excluded")) {
-    detail = `Day ${dayNo(f.grade.lockInQuote.day)}: ${f.grade.lockInQuote.act}`;
+    detail = `Day ${dayNo(f.grade.lockInQuote.day)}. The graders: “${f.grade.lockInQuote.act}”`;
     words = f.grade.lockInQuote.quote;
   } else if (m === "grab") {
     const first = f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0];
@@ -279,7 +279,9 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
   const tip = useTip();
   const all = useMemo(() => attempts(runs), [runs]);
   const models = order.filter((m) => all.some((a) => a.model === m));
-  const from = Math.min(120, ...runs.map((r) => r.from)), to = Math.max(195, ...runs.map((r) => r.until));
+  // (The axis runs from the day the AI mayors took office, never from the town's day 1.)
+  const shownRuns = runs.filter((r) => all.some((a) => a.key === r.key));
+  const from = shownRuns.length ? Math.min(...shownRuns.map((r) => r.from)) : 120, to = Math.max(195, ...shownRuns.map((r) => r.until));
   const narrow = W < 560;
   const LW = narrow ? 0 : 170, R = 12, rowH = narrow ? 52 : 40, top = 28;
   const H = top + models.length * rowH + 30;

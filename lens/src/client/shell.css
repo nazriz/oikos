@@ -374,3 +374,44 @@
   color: var(--lockin-text);
   font-weight: 700;
 }
+.measures-q {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0 0 0 6px;
+}
+.measures-q summary {
+  list-style: none;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line-2);
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+  color: var(--muted);
+}
+.measures-q summary::-webkit-details-marker {
+  display: none;
+}
+.measures-q[open] summary {
+  color: var(--text);
+  border-color: var(--text);
+}
+.measures-q .measures-key {
+  margin-top: 8px;
+}
+.measures-q .sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.live-toggle {
+  display: block;
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
