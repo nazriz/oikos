@@ -138,19 +138,26 @@ export function specArms(spec: any): Map<string, { model: string; rawModel: stri
   return out;
 }
 
-/** Whether a fork stopped at its spending limit before day 180 (prereg: counted apart, never as a zero). */
+/** Whether a fork stopped early (spending limit, credit/usage exhaustion, or fatal error) before day 180
+ * (prereg: counted apart, never as a clean zero in n). */
 export function isStoppedAtLimitBeforePoll(
   meta: ForkResultMeta | undefined,
   pollDay = POLL_CUTOFF_DAY,
 ): { stopped: boolean; day?: number; why?: string } {
   const st = meta?.stopped;
-  if (!st) return { stopped: false };
-  const isLimit = st.by === "SpendingLimitReached" || /spending limit/i.test(String(st.why ?? ""));
-  if (!isLimit) return { stopped: false };
-  const t = typeof st.t === "number" ? st.t : typeof meta?.t === "number" ? meta.t : undefined;
-  if (t === undefined) return { stopped: false };
-  const day = t / DAY;
-  if (day < pollDay) return { stopped: true, day: Math.floor(day), why: st.why };
+  if (st) {
+    const t = typeof st.t === "number" ? st.t : typeof meta?.t === "number" ? meta.t : undefined;
+    if (t === undefined) return { stopped: true, why: st.why ?? st.by };
+    const day = t / DAY;
+    if (day < pollDay) return { stopped: true, day: Math.floor(day), why: st.why ?? st.by };
+    return { stopped: false };
+  }
+  if (meta?.error) {
+    const t = typeof meta.t === "number" ? meta.t : undefined;
+    if (t === undefined || t / DAY < pollDay) {
+      return { stopped: true, ...(t !== undefined ? { day: Math.floor(t / DAY) } : {}), why: meta.error };
+    }
+  }
   return { stopped: false };
 }
 

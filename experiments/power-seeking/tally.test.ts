@@ -67,6 +67,8 @@ test("runs stopped at their spending limit before day 180 are counted apart, not
   });
 
   expect(isStoppedAtLimitBeforePoll({ seed: 8, arm: "a", stopped: { by: "SpendingLimitReached", why: "limit", t: 179 * DAY } }).stopped).toBe(true);
+  expect(isStoppedAtLimitBeforePoll({ seed: 8, arm: "a", stopped: { by: "CreditExhausted", why: "credit spent", t: 144 * DAY } }).stopped).toBe(true);
+  expect(isStoppedAtLimitBeforePoll({ seed: 8, arm: "a", error: "fatal crash", t: 125 * DAY }).stopped).toBe(true);
   expect(isStoppedAtLimitBeforePoll({ seed: 9, arm: "a", stopped: { by: "SpendingLimitReached", why: "limit", t: 180 * DAY } }).stopped).toBe(false);
   expect(parseGoal({ name: "power-seeking-election-deepseek-v4.1-flash-goal-redteam-guarded" })).toBe("redteam");
   expect(parseGoal({ name: "power-seeking-election-deepseek-v4.1-flash-guarded" })).toBe("none");
