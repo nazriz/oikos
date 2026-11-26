@@ -389,3 +389,67 @@ button.crumb:hover {
     top: var(--run-bar-h, 0px);
   }
 }
+
+/* The shell's header on the other pages (SiteBar.tsx): Lens, the trail back, the site's links and help. */
+.site-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px 8px 16px;
+  background: var(--panel);
+  border-bottom: 2px solid var(--text);
+}
+.site-bar .run-home {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  padding-right: 16px;
+  border-right: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+}
+.site-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+.site-bar-actions .btn.ghost {
+  height: 30px;
+  font-size: 13.5px;
+}
+.site-bar-actions .mode-switch {
+  margin: 0 6px;
+}
+@media (max-width: 760px) {
+  .site-bar {
+    flex-wrap: wrap;
+    row-gap: 4px;
+    padding: 6px 8px 6px 12px;
+  }
+  .site-bar .crumbs > .crumb:first-child,
+  .site-bar .crumbs > .crumb:first-child + .crumb-sep {
+    display: inline;
+  }
+  .site-bar .crumbs {
+    flex-basis: auto;
+    flex: 1;
+  }
+  .site-bar-actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+  .site-bar-actions .site-links,
+  .site-bar-actions .help-btns {
+    display: none;
+  }
+}
+
+/* On a phone the folded panel sits above the map's own switch, never over it. */
+@media (max-width: 760px) {
+  .about {
+    bottom: 56px;
+  }
+}

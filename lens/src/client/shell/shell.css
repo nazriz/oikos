@@ -13,17 +13,11 @@
   color: var(--text-2);
   padding: 0 8px;
 }
+/* A page's line under its title: a quiet subtitle in plain words, not a label. */
 .page-answer {
   margin: 0;
   font-size: 15px;
-  color: var(--text-2);
-}
-.page-answer-label {
-  font-weight: 700;
-  color: var(--text);
-}
-.page-answer-label::after {
-  content: ":";
+  color: var(--muted);
 }
 
 /* Glossary: a sheet on the right, like a page of a handbook. */

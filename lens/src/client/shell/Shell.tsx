@@ -59,7 +59,7 @@ export function HelpButtons() {
 export function PageAnswer({ page, className }: { page: PageKey; className?: string }) {
   return (
     <p className={`page-answer ${className ?? ""}`}>
-      <span className="page-answer-label">This page answers</span> {PAGE_ANSWERS[page]}
+      {PAGE_ANSWERS[page]}
     </p>
   );
 }
@@ -115,6 +115,7 @@ export function Glossary() {
 export function useFirstVisitTour() {
   const startTour = useMode((s) => s.startTour);
   useEffect(() => {
-    if (!toured()) startTour(0);
+    // (Not while a walk is under way: the walk itself comes back to the library at its end.)
+    if (!toured() && useMode.getState().tour === null) startTour(0);
   }, []);
 }

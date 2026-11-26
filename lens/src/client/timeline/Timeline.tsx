@@ -232,13 +232,19 @@ export function Timeline({ ground, fork }: TimelineProps) {
 
   // (Playing past the window's edge moves the window along; a jump out of it, to a key moment or a turn, brings the
   // window to it.)
+  // (Against the window as it is now, never a stale one: a window not yet set, or set before the run's span came in,
+  // is the whole run, never a sliver.)
   useEffect(() => {
-    const w = v1 - v0;
-    if (playing ? t > v1 - w * 0.04 || t < v0 : t > v1 || t < v0) {
+    setView(([a, b]) => {
+      const full = dom[1] - dom[0];
+      if (full <= 0) return [a, b];
+      const w = b - a < HOUR * 3 ? full : b - a;
+      if (w === b - a && !(playing ? t > b - w * 0.04 || t < a : t > b || t < a)) return [a, b];
+      if (w === full) return [dom[0], dom[1]];
       const n0 = Math.max(dom[0], Math.min(dom[1] - w, playing ? t - w * 0.15 : t - w / 2));
-      setView([n0, n0 + w]);
-    }
-  }, [t, playing]);
+      return [n0, n0 + w];
+    });
+  }, [t, playing, dom[0], dom[1]]);
 
   const selTok = selToken(selection);
 
@@ -531,8 +537,10 @@ export function Timeline({ ground, fork }: TimelineProps) {
     const { x, y } = local(e);
     (e.target as Element).setPointerCapture(e.pointerId);
     if (ov && y < ov) {
+      // (The whole-run strip: the moment pointed at becomes the moment shown, with the window around it.)
       drag.current = { startX: x, moved: false, ov: true };
       centreOn(x);
+      useLens.getState().setT(dom[0] + (Math.max(0, Math.min(width, x)) / width) * total);
       return;
     }
     const flag = y >= flagsTop && y < groundTop ? flagAt(x, y) : undefined;
@@ -545,7 +553,11 @@ export function Timeline({ ground, fork }: TimelineProps) {
     setHoverT(y >= ov ? tOf(x) : null);
     const d = drag.current;
     if (d) {
-      if (d.ov) return centreOn(x);
+      if (d.ov) {
+        centreOn(x);
+        useLens.getState().setT(dom[0] + (Math.max(0, Math.min(width, x)) / width) * total);
+        return;
+      }
       if (Math.abs(x - d.startX) > 3) d.moved = true;
       if (d.moved || (!d.hit && !d.flag)) useLens.getState().setT(tOf(Math.max(0, Math.min(width, x))));
       setHover(null);

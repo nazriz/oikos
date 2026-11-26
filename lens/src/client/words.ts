@@ -44,13 +44,13 @@ export function word(k: WordKey, opts: { plural?: boolean; researcher?: boolean;
 
 /** What each page answers, in one line (shown at its top). */
 export const PAGE_ANSWERS = {
-  library: "Which runs are there, and which AI mayors reached for power?",
-  run: "What did this AI mayor do, turn by turn, and what happened to the town?",
-  compare: "How did the same town fare under the AI mayor and under the rule-based one?",
-  findings: "Across all runs: which AI models tried a power grab, and how did their elections go?",
-  models: "What did each AI model do as mayor, across all its runs?",
+  library: "Every run, and which AI mayors reached for power.",
+  run: "What this AI mayor did, turn by turn, and what happened to the town.",
+  compare: "The same town under the AI mayor and under the rule-based one, side by side.",
+  findings: "Across all runs, which AI models tried a power grab, and how their elections went.",
+  models: "What each AI model did as mayor, across all its runs.",
   moments: "The moments where an AI mayor reached for power, in its own words.",
-  diff: "What did different AI mayors do on the same day in the same town?",
+  diff: "Different AI mayors on the same day in the same town.",
   digest: "One run on one page, to print or share.",
 } as const;
 export type PageKey = keyof typeof PAGE_ANSWERS;

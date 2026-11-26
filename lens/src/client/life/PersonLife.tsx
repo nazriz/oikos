@@ -7,7 +7,7 @@ import type { LedgerItem, LedgerJson, PersonLedger } from "../../folds/ledger";
 import { fetchFold, foldFile } from "../api";
 import { useCity, structureName } from "../city/CityView";
 import { personRows, type CityData } from "../city/data";
-import { describePerson } from "../people";
+import { describePerson, isSeatPerson, personLabel } from "../people";
 import { DAY, clock, dayIndex, dayOf, words } from "../format";
 import { useLens } from "../state";
 import type { InspectorProps } from "../views";
@@ -67,6 +67,7 @@ export function PersonLife({ run, selection }: InspectorProps) {
     if (p !== undefined) {
       const [pid, name] = city!.people.people[p]!;
       const d = describePerson(city, pid, t);
+      if (isSeatPerson(city, pid)) return personLabel(city, pid);
       return name !== pid ? name : d ? `${pid} (${d})` : pid;
     }
     const e = city?.town.entities[x.replace(/-system$/, "")];
@@ -96,7 +97,7 @@ function Who_({ c, q, id, t }: { c: CityData; q: number | undefined; id: string;
   const died = c.people.died[q], left = c.people.left[q];
   return (
     <section className="life-sec life-who">
-      <div className="life-name serif">{name}</div>
+      <div className="life-name serif">{isSeatPerson(c, id) ? "The AI mayor" : name}</div>
       <div className="life-sub">
         <span className="mono">{id}</span>
         {age >= 0 && <span>{age} years old</span>}

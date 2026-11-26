@@ -73,8 +73,8 @@ function AboutText({ run, meta, world }: { run: string; meta: Meta; world: boole
     lines.push(PAGE_ANSWERS.run);
     lines.push(
       world
-        ? `${place} in 3D on day ${dayOf(t)}, ${clock(t)}. The light follows the hour; the walkers are people going between buildings.`
-        : `The map of ${place} on day ${dayOf(t)}, ${clock(t)}. Each block is a building; the dots on it are the people inside now.`,
+        ? `${place} as a place, on day ${dayOf(t)}, ${clock(t)}: fly over it or walk its streets. The light follows the hour; the walkers are people going between buildings. Plan, below, draws the run's data.`
+        : `The plan of ${place} on day ${dayOf(t)}, ${clock(t)}, with the run's data drawn on it. Each block is a building; the dots on it are the people inside now. 3D town, below, shows it as a place.`,
     );
     lines.push(`Yellow is ${W.seat}'s doing; red is a ${W.lever}, as the study's checker flags it. Click anything to open it.`);
   } else if (sel.kind === "sitting") {

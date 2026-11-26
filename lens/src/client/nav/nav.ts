@@ -11,6 +11,7 @@ import type { SeatJson } from "../../folds/seat";
 import { useFold } from "../api";
 import { structureName, useCity } from "../city/CityView";
 import { dayNo, dayOf } from "../format";
+import { isSeatPerson } from "../people";
 import { parseHash, parseSel, selToken } from "../router";
 import { useLens, type Selection } from "../state";
 import { leverTitle, modelName } from "../words";
@@ -204,10 +205,12 @@ export function useNames(run: string | null) {
         if (!sel) return "";
         switch (sel.kind) {
           case "person": {
-            const q = city?.pById.get(sel.id.replace(/-self$/, ""));
+            const pid = sel.id.replace(/-self$/, "");
+            if (isSeatPerson(city, pid)) return `The AI mayor (${pid})`;
+            const q = city?.pById.get(pid);
             const n = q !== undefined ? city!.people.people[q]![1] : "";
             // (Towns without names give each person their id as a name.)
-            return n && n !== sel.id ? n : `Resident ${sel.id.replace(/-self$/, "")}`;
+            return n && n !== pid ? n : `Resident ${pid}`;
           }
           case "structure": {
             const i = city?.sById.get(sel.id);

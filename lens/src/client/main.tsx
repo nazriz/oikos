@@ -10,11 +10,23 @@ import { views } from "./views";
 import { Glossary } from "./shell/Shell";
 import { Tour } from "./shell/Tour";
 import { Keys } from "./nav/Keys";
+import { SiteBar } from "./nav/SiteBar";
 import { Peek } from "./nav/Peek";
 
 function App() {
   const route = useRoute();
   if (route.page === "run") return <RunPage key={route.key} runKey={route.key} q={route.q} />;
+  if (route.page === "library") return <Library q={route.q} />;
+  // (Every other page under the shell's header: Lens, the way back, help.)
+  return (
+    <>
+      <SiteBar route={route} />
+      <Page route={route} />
+    </>
+  );
+}
+
+function Page({ route }: { route: ReturnType<typeof useRoute> }) {
   if (route.page === "compare") {
     const Compare = views.compare;
     if (Compare) return <Compare a={route.a} b={route.b} />;

@@ -37,7 +37,11 @@ export function ComparePage({ a, b }: { a: string; b: string }) {
     if (!data || data instanceof Error) return;
     const [sa, , sb] = data;
     setSpan([Math.min(sa.fork_at, sb.fork_at), Math.max(sa.end_at, sb.end_at)]);
-    setT(sa.fork_at);
+    // (Open where the two towns first differ: the first act either mayor got through after the split, a minute on so
+    // its effect shows. Before it the towns are the same by construction, and every difference reads zero.)
+    const fork = Math.min(sa.fork_at, sb.fork_at);
+    const firstActs = [sa, sb].map((s) => s.acts.find((x) => x.t > fork && x.status === "applied")?.t).filter((x): x is number => x !== undefined);
+    setT(firstActs.length ? Math.min(...firstActs) + 60 : sa.fork_at);
   }, [data, setSpan, setT]);
   if (data === undefined) return <div className="cp" data-tour="compare"><div className="st-empty">Reading both runs…</div></div>;
   if (data instanceof Error) return <div className="cp"><div className="st-empty">Could not read both runs.<br /><span className="st-mono st-faint">{data.message}</span></div></div>;

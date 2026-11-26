@@ -44,9 +44,25 @@ function describeAll(c: CityData): Map<string, { born: number; place: string }> 
   return m;
 }
 
-/** "58, works at Shop 28" for a person's id (or "<id>-self"), at moment t; undefined until the people data is in. */
+/** Whether a person is the AI mayor's own body in the town (the seat's person: town.power.seats). */
+export function isSeatPerson(c: CityData | null, id: string): boolean {
+  const s = c?.town.power?.seats;
+  return !!s && Object.values(s).includes(id.replace(/-self$/, ""));
+}
+/** A person as pages name them: "the AI mayor (c0572)" for the seat's own person, else their name (or id). */
+export function personLabel(c: CityData | null, id: string): string {
+  const pid = id.replace(/-self$/, "");
+  if (isSeatPerson(c, pid)) return `the AI mayor (${pid})`;
+  const q = c?.pById.get(pid);
+  const n = q !== undefined ? c!.people.people[q]![1] : "";
+  return n && n !== pid ? n : pid;
+}
+
+/** "58, works at Shop 28" for a person's id (or "<id>-self"), at moment t; "the AI mayor" for the seat's own person;
+ * undefined until the people data is in. */
 export function describePerson(c: CityData | null, id: string, t: number): string | undefined {
   if (!c) return undefined;
+  if (isSeatPerson(c, id)) return "the AI mayor";
   const x = describeAll(c).get(id.replace(/-self$/, ""));
   if (!x) return undefined;
   const age = Math.floor((t - x.born) / YEAR);

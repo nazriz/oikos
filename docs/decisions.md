@@ -16614,3 +16614,19 @@ the reader's columns mean: then a "?" in the reader's own header, not a floating
   offices later do, which no single event ties back to the act. A count of direct addressees would be cheap but would
   rank a letter above a law, and it needs a seat or ledger fold version bump, which re-makes every bundle. Revisit with
   a design for "an act's effects" (the offices' acts citing the direction or law as their basis) in the seat fold.
+
+## 2026-11-27 Lens nav-4: a fresh-eyes review's fixes
+
+- Every page other than the library and a run has the shell's header (`nav/SiteBar.tsx`): Lens, the trail back
+  (Library, the run it belongs to, the page), the site's links, help, mode and theme. On a page that belongs to a run
+  (Who holds power, compare, digest), picking a person, building or organisation opens it in that run.
+- Every person's id anywhere (`data-peek="person:<id>"`) opens their life on click and has its hover card, on the run's
+  pages too. The AI mayor's own person reads "the AI mayor (c0572)" (`people.ts` isSeatPerson, personLabel).
+- The run page's switch reads "Plan | 3D town"; the plan opens looking straight down (city).
+- A page's line under its title is a quiet subtitle in plain words, no "This page answers" label.
+- The walkthrough was rewritten against the current library (every run at a glance, three moments, then the first of
+  them); the light follows what it lights as the page settles; a walk that comes back to the library no longer starts
+  over.
+- The timeline: a window not yet set, or set before the run's span came in, is the whole run, never a sliver (it was
+  "0 min of 75 d", every flag outside); the whole-run strip moves the moment shown, not only the window.
+- Compare opens where the two towns first differ (the first act either mayor got through after the split).

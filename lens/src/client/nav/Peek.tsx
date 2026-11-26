@@ -5,7 +5,8 @@
 import { useEffect, useRef, useState } from "react";
 import { dayNo, dayOf } from "../format";
 import { describePerson } from "../people";
-import { parseSel } from "../router";
+import { parseSel, selToken, useRoute } from "../router";
+import { runOf } from "./SiteBar";
 import { useLens, type Selection } from "../state";
 import { leverTitle, W } from "../words";
 import { goTo, useNames } from "./nav";
@@ -13,7 +14,24 @@ import { goTo, useNames } from "./nav";
 const DELAY = 300;
 
 export function Peek() {
-  const run = useLens((s) => s.run);
+  // (On a page that belongs to a run, its compare, power or digest page, the cards read that run.)
+  const open = useLens((s) => s.run);
+  const route = useRoute();
+  const run = open ?? (route.page === "library" ? null : (runOf(route) ?? null));
+  // Every person's id anywhere is a way into their life: a click on one opens it, unless what was clicked opened it
+  // already. (On a page outside the run, the shell's header takes the selection to the run.)
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const el = (e.target as HTMLElement).closest?.<HTMLElement>('[data-peek^="person:"]');
+      if (!el || e.defaultPrevented) return;
+      const tok = el.dataset.peek!;
+      queueMicrotask(() => {
+        if (selToken(useLens.getState().selection) !== tok) useLens.getState().select(parseSel(tok));
+      });
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, []);
   const [at, setAt] = useState<{ sel: NonNullable<Selection> | Rec; rect: DOMRect } | null>(null);
   const card = useRef<HTMLDivElement>(null);
   useEffect(() => {

@@ -1,5 +1,6 @@
 // The walkthrough: one thing lit at a time, two plain sentences beside it, Back and Next. It walks from the library
-// into a showcase run (the town, time, the mayor's turns, a power grab, the election) and on to compare and findings.
+// (every run at a glance, three moments to start with) into the first of those moments (the run bar, the town, time and
+// its key moments, the mayor's turns, power grabs, other mayors, compare) and on to findings and help.
 // Opens by itself on a first visit, and from "How to read this" at any time.
 import { useEffect, useLayoutEffect, useState } from "react";
 import { useMode } from "../mode";
@@ -18,38 +19,47 @@ interface Step {
   body: string;
 }
 
-const onRun = () => runHref(SHOWCASE, { t: SHOWCASE_T });
+// The run the walk opens: the first of the library's "moments to start with" (what step 3 promises), read off the page
+// when the walk gets there; the showcase run if the page has none.
+let walkRun: string | null = null;
+const onRun = () => {
+  if (!walkRun) {
+    const a = document.querySelector<HTMLAnchorElement>('.start a[href^="#/run/"]');
+    walkRun = a?.getAttribute("href") ?? runHref(SHOWCASE, { t: SHOWCASE_T });
+  }
+  return walkRun;
+};
 
 const STEPS: Step[] = [
   {
     route: () => "#/",
-    target: [".lib-hero h1"],
+    target: [".lib-hero-text", ".lib-hero"],
     title: "Welcome to Lens",
     body: "Each run here is a simulated town of a thousand people whose mayor is an AI model. Lens shows what that AI mayor did with its power, and how the town and its election went.",
   },
   {
     route: () => "#/",
-    target: [".start"],
-    title: "Start with these three moments",
-    body: "Each one opens a run at the moment something important happened. Next, we open the first one together.",
+    target: [".who.matrix", "#who"],
+    title: "Every run at a glance",
+    body: "Each row is an AI model and each square is one run. The key above the chart says what the colours mean; point at a square for what happened in that run, and click it to open the run.",
   },
   {
     route: () => "#/",
-    target: [".matrix"],
-    title: "Who tried a power grab",
-    body: "Each row is an AI model and each dot is one run. A red dot means the study's checker found a serious power grab; a blue ring means that AI mayor won its election.",
+    target: [".start"],
+    title: "Three moments to start with",
+    body: "Each opens a run at the moment something important happened. Next, we open the first one together.",
   },
   {
     route: onRun,
     target: [".run-bar"],
     title: "One run",
-    body: "The top line says which AI model was the mayor, what it was told to do, and how things ended. This one tried two power grabs, and the election never took place.",
+    body: "The top line says which AI model was the mayor, what it was told to do, and how things ended. The line below it says where you are; click any step of it to go back.",
   },
   {
     route: onRun,
     target: ['[data-tour="city-map"]', ".run-map"],
     title: "The town",
-    body: "Each small dot is a person, gathered in the building they are in at this moment. Yellow lines run from the town hall to whatever the mayor's acts reached.",
+    body: "Plan draws the run's data on the town: each small dot is a person, in the building they are in at this moment. 3D town shows the same town as a place to fly over or walk through.",
   },
   {
     route: onRun,
@@ -60,44 +70,44 @@ const STEPS: Step[] = [
   {
     route: onRun,
     target: [".run-timeline .tl"],
-    title: "Time",
-    body: "Drag along this strip to move through the run, or press play. The marks are the mayor's turns, the election and other events; click one to jump to it.",
+    title: "Time, and the key moments",
+    body: "Drag along the strip or press play to move through the run. The flags above it are the key moments: red for a power grab, blue for the election. Previous moment and Next moment step between them.",
   },
   {
     route: onRun,
     target: ['[data-tour="rail"]', ".run-rail"],
     title: "The mayor's turns",
-    body: "Each entry is one turn: what the AI mayor read, what it thought and said, and what it did. Click a turn to read it in full.",
+    body: "Each entry is one turn: what the AI mayor read, what it thought and said, and what it did. Click a turn to read it in full; Esc closes it again.",
   },
   {
     route: onRun,
-    target: ['[data-tour="levers-tab"]', ".run-outcome"],
+    target: [".run-result", ".run-bar"],
     title: "Power grabs",
-    body: "A power grab is an act that would help the mayor keep its power, graded 1 to 3 by how serious it is. The study's checker finds them by rule, so always read the turn itself.",
+    body: "A power grab is an act that would help the mayor keep its power, graded 1 to 3 by how serious it is. The study's checker finds them by rule, so read the turn itself before believing it.",
   },
   {
     route: onRun,
-    target: ['[data-tour="election"]', ".run-outcome"],
-    title: "The election",
-    body: "The town elects its mayor on a set day. Here the AI mayor had a law passed that moved the vote to day 5000, so no vote was held during the run.",
+    target: [".switcher-btn", ".run-bar"],
+    title: "Other mayors, same town",
+    body: "Every run of this town starts from the same history. Other mayors opens this same day under another AI model, or under the rule-based mayor.",
   },
   {
     route: onRun,
-    target: [".run-compare"],
+    target: [".run-compare", ".run-bar"],
     title: "Compare",
-    body: "Compare puts this run beside the same town run by a simple rule-based mayor. Whatever differs is what the AI mayor changed.",
+    body: "Compare puts this run beside the same town run by a simple rule-based mayor, day by day. Whatever differs is what the AI mayor changed.",
   },
   {
     route: () => (views.findings ? "#/findings" : "#/"),
-    target: ['[data-tour="findings"]', "main", ".matrix"],
+    target: ['[data-tour="findings"]', ".fi-head"],
     title: "All the runs together",
-    body: "Findings sums up every run: which AI models tried power grabs, how serious, and how their elections went.",
+    body: "Findings sums up every run: which AI models tried power grabs, how serious they were, and how their elections went.",
   },
   {
     route: () => "#/",
     target: [".help-btns"],
     title: "Help is always here",
-    body: "“How to read this” runs this walk again and “Words” explains every term. Switch to Researcher to see every figure and detail.",
+    body: "“How to read this” runs this walk again, “Words” explains every term, and ? lists the keys. Switch to Researcher to see every figure and detail.",
   },
 ];
 
@@ -117,6 +127,7 @@ export function Tour() {
   // Go where the step is, then find what to light (it may take a moment to appear: a run's page loads).
   useEffect(() => {
     if (step === null) return;
+    if (step === 0) walkRun = null;
     const s = STEPS[step]!;
     const want = s.route?.();
     if (want && window.location.hash.split("?")[0] !== want.split("?")[0]) window.location.hash = want;
@@ -137,8 +148,15 @@ export function Tour() {
     const re = () => el && setRect(el.getBoundingClientRect());
     window.addEventListener("resize", re);
     window.addEventListener("scroll", re, true);
+    // (A page settles as its data comes in, fonts load and charts draw: the light follows what it lights.)
+    const settle = setInterval(() => {
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setRect((o) => (o && o.left === r.left && o.top === r.top && o.width === r.width && o.height === r.height ? o : r));
+    }, 400);
     return () => {
       clearInterval(id);
+      clearInterval(settle);
       window.removeEventListener("resize", re);
       window.removeEventListener("scroll", re, true);
     };
