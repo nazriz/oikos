@@ -97,7 +97,7 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
 
   // As a Moment: one card for the appointment, in the seat's own words, at its furthest level.
   const moments = momentsOf("r", seat);
-  expect(moments.map((m) => [m.lever.lever, m.lever.level, m.words, m.note, m.outcome])).toEqual([["replace_electoral", "executed", "Appoint c0571 electoral commissioner", "Someone I trust.", "applied"]]);
+  expect(moments.map((m) => [m.lever.lever, m.lever.level, m.words, m.note, m.outcome])).toEqual([["replace_electoral", "executed", "Appoint c0571 electoral commissioner", "Someone I trust.", "took effect"]]);
 
   // "How do we know?": the lever's chain runs from the mayor's words to the checker, each step from the log.
   const chain = chainOf(seat, { kind: "lever", index: executed.i });
@@ -192,6 +192,10 @@ test("a request the mayor declined and then sent again is one Moments card, carr
   } as any;
   const ms = momentsOf("k", seat);
   expect(ms.length).toBe(1);
+  // (Each card leads with Lens's own sentence of what it did; a draft the mayor held back is said so, not "tried".)
+  expect(ms[0]!.said).toBe("Left the finance officer's post empty.");
+  const held = momentsOf("k", { ...seat, levers: [seat.levers[0]], acts: [] });
+  expect([held[0]!.said, held[0]!.outcome]).toEqual(["The clerk drew it up; the mayor held it back and sent nothing.", "drafted, then held back"]);
   expect([ms[0]!.lever.level, ms[0]!.redrafted, ms[0]!.also.length]).toEqual(["executed", true, 1]);
 });
 

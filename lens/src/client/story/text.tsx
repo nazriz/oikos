@@ -118,7 +118,9 @@ function markText(text: string, m: Marks, html: boolean, seats: Set<string> = NO
   });
   if (names) out = out.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part
     : replaceIds(part, names, (id, said) => (REC_ID.test(id) ? id : `<span class="st-id" title="${id} = ${esc(said)}">${id}</span>`), true)
-      .replace(YEAR1, (d: string, y: string, n: string) => `<span class="st-id" title="${d} = ${yearOne(d, y, n)}">${d}</span>`))).join("");
+      .replace(YEAR1, (d: string, y: string, n: string) => `<span class="st-id" title="${d} = ${yearOne(d, y, n)}">${d}</span>`)
+      // (Its own shorthand for a date, "Y1 d122" or "d181", the same way.)
+      .replace(/\b(?:Y1 )?d(\d{1,3})\b/g, (d: string, n: string) => `<span class="st-id" title="${d} = day ${n}">${d}</span>`))).join("");
   // (A person's id opens their life: a link the page handles by delegation (openPerson), with nav's hover card.)
   // (The AI mayor's own person is said to be it, in square brackets: an editor's note, so a quote keeps its words.)
   out = out.replace(PERSON, (_, id: string) => `<button type="button" class="id-link" data-person="${id}" data-peek="person:${id}">${id}</button>${seats.has(id) ? '<span class="id-seat"> [the AI mayor]</span>' : ""}`);

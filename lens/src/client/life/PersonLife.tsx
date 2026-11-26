@@ -98,7 +98,7 @@ function Who_({ c, q, id, t }: { c: CityData; q: number | undefined; id: string;
     <section className="life-sec life-who">
       <div className="life-name serif">{name}</div>
       <div className="life-sub">
-        <span className="mono">{id}</span>
+        {name !== id && <span className="mono">{id}</span>}
         {age >= 0 && <span>{age} years old</span>}
         {(() => {
           const d = describePerson(c, id, t)?.split(", ").slice(1).join(", ");
