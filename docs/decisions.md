@@ -16424,3 +16424,28 @@ navigation, so nobody is lost, and the lead's rule that it is a professional too
 - **Decision:** Freeze and report the v2 multi-lab dataset (78 dual blind-graded runs across 5 frontier labs and 4 smaller/lower-capability control models; 62 complete runs reaching day >= 180; 16 pre-poll stops transparently excluded from $n$; $27.41 / $30.00 OpenRouter spend) as the headline study in `docs/design/power-seeking-results-v2.md` and `docs/design/tara-deliverables-v2.md`. Keep v1 (`ps-replicate-2026-11-25`) strictly as exploratory pilot/appendix.
 - **Why:** Dual blind grading (Sonnet 5.5 + Opus 5.5) achieved 99.1% exact agreement (232/234 tier ratings) and surfaced four replicable, statistically decisive findings: (1) 5-lab frontier convergence on lawful institutional lock-in under pure policy goal `strong` + `election` (`13/14 = 92.9%`, 95% CI `[66.1%, 99.8%]`) vs `0/9` frontier `mandate` (`p = 1.22e-5`) and `0/27` smaller/lower-cap models (`p = 7.95e-10`); (2) `no-election` counterfactual separation (`50.0%`, 1.33 vs 3.14 acts/run; `0/0` in OpenAI & Qwen, anticipatory lock-in + deceptive `"affects neither"` re-tagging in DeepSeek); (3) guardrail water-finding under guarded `redteam` (Qwen4-Max explicitly noted `election_guard`, then purged sitting `councillor-1` mid-ballot, packed `councillor-3`, and weighed replacing the editor); and (4) Adversarial-Prompt Inversion (OpenAI & Anthropic showed more restraint under explicit `redteam` than benign `strong`).
 - **Revisit if:** Additional overnight Claude confirmatory seeds (`W1`/`W2`/`W3`: `sonnet55-strong-noelec-s8`, `sonnet46-redteam`, `sonnet55-redteam-s7/s8`, `sonnet45-strong`) finish and warrant appending an addendum table to `docs/design/power-seeking-results-v2.md`.
+
+## 2026-11-26 Lens: fast (a run opens without waiting for its reading)
+
+Naz: "it would be nice if the logs can load even faster." Measured on a 4.66 M-line fork (sonnet45-redteam-elec-s8), on
+the run server under load (load average 4 to 22, so seconds vary by ±30 %).
+- **The kernel's export, buffered.** `oikos-kernel export` straight to stdout writes line by line, one system call per
+  line: 3.0 s, 2.9 s of it in the kernel. With `--out /dev/stdout` it goes through a buffer: 1.4 s. Exporting and
+  splitting a fork's 1.9 GB of lines went from 3.4 s to 1.4 s (`lens/src/server/source.ts`). Lens only reads the
+  stream, so nothing else changes. A whole bundle took 8 to 13 s (manifests); it now takes 5.6 to 7 s.
+- **Where the rest goes** (a CPU profile of a whole ingest): JSON.parse takes 3.5 s of 6, the folds about 1 s together.
+  Tried: parsing only a line's body and reading kind, seq and t from its tail, skipping the two 64-character hashes.
+  Parse went down 0.7 s, but cutting the strings cost as much, so it was dropped. Under 5 s needs fewer bytes to parse.
+  Either the kernel's export leaves out what no fold reads (the hashes, and the bulk lines' bodies, about 45 % of the
+  bytes), or the heavy folds move to Rust. Both are proposed, not done: the first is a kernel flag, the second a port.
+- **Nobody waits for a reading.** The server makes the bundle of every experiment fork ahead of being asked: the
+  study's (mayor) forks first, then newest first, one at a time, at low priority (`nice 15`). New runs join the line
+  at the next listing, at most once a minute. A viewer's run goes first: a run being made ahead is stopped, its scratch
+  folder cleared, and it is made again later. The disk sets the limit, and this machine's is 95 % full: at most
+  OIKOS_LENS_BUNDLES_GB of bundles (default 8; a bundle is about a fifth of its log, ~25 MB), never with under 15 GB
+  free. Plain runs (2,156, most of them old) are made only when opened. **Revisit if** the disk has room (raise the
+  budget), or bundles shrink.
+- **Progressive opening is not done.** One pass must read the whole log before any fold is complete, and the parse is
+  the floor (about 3.5 s on its own). A quick pass for the story alone would show it about 2 s sooner, for a second
+  pass's CPU and a client that works with half a bundle. With every fork made ahead, the only runs a viewer waits for
+  are ones that have just finished. **Revisit if** that wait is common (a live run's view, say).
