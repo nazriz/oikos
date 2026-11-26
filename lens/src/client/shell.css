@@ -27,8 +27,74 @@
 }
 
 .lib-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+  align-items: start;
+  gap: 40px;
   padding: 30px 0 26px;
   border-bottom: 1px solid var(--line);
+}
+/* The masthead: the town's street plan, ink on survey paper. */
+.masthead {
+  margin: 8px 0 0;
+  --plan-wood: color-mix(in srgb, var(--inst) 16%, transparent);
+  --plan-farm: color-mix(in srgb, var(--citizen) 12%, transparent);
+  --plan-wet: color-mix(in srgb, var(--election) 12%, transparent);
+  --plan-scrub: color-mix(in srgb, var(--inst) 8%, transparent);
+}
+.masthead svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--text);
+  background: var(--panel);
+}
+.masthead-empty {
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--line);
+}
+.plan-ground {
+  fill: var(--panel);
+}
+.plan-river {
+  fill: none;
+  stroke: var(--election);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  opacity: 0.55;
+}
+.plan-road {
+  fill: var(--line-2);
+}
+.plan-b {
+  fill: var(--text-2);
+  opacity: 0.55;
+}
+.plan-b.residential {
+  opacity: 0.38;
+}
+.plan-b.civic,
+.plan-b.education,
+.plan-b.health {
+  fill: var(--inst);
+  opacity: 0.85;
+}
+.plan-hall {
+  fill: var(--seat);
+  stroke: var(--text);
+  stroke-width: 0.35;
+}
+.plan-label {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  fill: var(--text);
+  stroke: var(--panel);
+  paint-order: stroke;
+}
+.masthead figcaption {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
 }
 .lib-hero h1 {
   margin: 14px 0 10px;
@@ -347,6 +413,10 @@
   }
   .lib-nav .seg button {
     padding: 0 8px;
+  }
+  .lib-hero {
+    grid-template-columns: 1fr;
+    gap: 18px;
   }
   .lib-hero h1 {
     font-size: 32px;

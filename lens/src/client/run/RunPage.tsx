@@ -2,7 +2,7 @@
 // drawer (docs/design/lens.md section 1). Until the run's bundle is made, its making, with progress.
 import { useEffect, useMemo, useState } from "react";
 import type { IndexStatus, Meta, RunEntry } from "../../shared/api";
-import { fetchRun, useIndexStatus, useMeta } from "../api";
+import { fetchFold, fetchRun, useIndexStatus, useMeta } from "../api";
 import { compact, dayOf, int, span as spanText, usd, when, words } from "../format";
 import { Back, Close, Mark } from "../icons";
 import { parseSel, replaceQuery, runHref, selToken } from "../router";
@@ -85,6 +85,26 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
     };
   }, [runKey]);
 
+  // Story mode opens in a guided state: with no moment in the link, at the AI mayor's first notable turn, paused, with
+  // a line saying what pressing play will show.
+  const [guided, setGuided] = useState<{ t: number; label: string } | null>(null);
+  useEffect(() => {
+    if (q.has("t") || useMode.getState().mode !== "story") return;
+    let live = true;
+    fetchFold<any>(runKey, "seat").then(
+      (seat) => {
+        if (!live || !seat?.sittings?.length) return;
+        const first = seat.sittings[0];
+        useLens.getState().setT(first.t);
+        setGuided({ t: first.t, label: `Day ${first.day}: the AI mayor's first turn in office.` });
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [runKey]);
+
   // Keep the URL on the moment and the selection (no history entries; not while playing).
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -123,7 +143,8 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
   }, [meta]);
 
   const props: SlotProps = { run: runKey, meta, ...(entry ? { entry } : {}) };
-  const Map = views.map, Rail = views.rail, Reader = views.reader;
+  const Map = views.map, Rail = views.rail, Reader = views.reader, World = views.world;
+  const [mapView, setMapView] = useState<"map" | "world">("map");
   const readerOpen = Reader && selection && (selection.kind === "sitting" || selection.kind === "lever" || selection.kind === "act");
   const drawerOpen = selection && !readerOpen && (selection.kind === "person" || selection.kind === "structure" || selection.kind === "entity" || !Reader);
   const ground = useMemo(() => ({ label: "activity per day", values: meta.daily.lines }), [meta]);
@@ -134,7 +155,17 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
       <RunBar entry={entry} meta={meta} />
       <div className="run-grid" style={{ ["--rail-w" as string]: `${railW}px` }}>
         <main className="run-map">
-          {Map ? <Map {...props} /> : <EmptyMap meta={meta} />}
+          {World && mapView === "world" ? <World {...props} /> : Map ? <Map {...props} /> : <EmptyMap meta={meta} />}
+          {World && (
+            <div className="seg map-toggle" role="group" aria-label="How to show the town">
+              <button aria-pressed={mapView === "map"} onClick={() => setMapView("map")}>
+                Map
+              </button>
+              <button aria-pressed={mapView === "world"} onClick={() => setMapView("world")}>
+                Town in 3D
+              </button>
+            </div>
+          )}
           {drawerOpen && <Inspector {...props} />}
         </main>
         <aside className="run-rail">
@@ -158,6 +189,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
         )}
         <Palette run={runKey} />
         <footer className="run-timeline">
+          {guided && <Guided start={guided} />}
           {researcher && <Pulse run={runKey} meta={meta} />}
           <Timeline ground={ground} {...(meta.span.fork !== undefined ? { fork: meta.span.fork } : {})} />
         </footer>
@@ -232,6 +264,42 @@ export function RunBar({ entry, meta }: { entry?: RunEntry; meta?: Meta }) {
         </nav>
       </div>
     </header>
+  );
+}
+
+/** The guided start (Story mode): one line and a play button above the timeline, until play is pressed. */
+function Guided({ start }: { start: { t: number; label: string } }) {
+  const playing = useLens((s) => s.playing);
+  const [gone, setGone] = useState(false);
+  useEffect(() => {
+    if (!playing) return;
+    setGone(true);
+    // (The first week, then a pause: the viewer chooses what next.)
+    const end = start.t + 7 * 86_400;
+    return useLens.subscribe((s) => {
+      if (s.playing && s.t >= end) s.setPlaying(false);
+    });
+  }, [playing]);
+  if (gone) return null;
+  return (
+    <div className="guided">
+      <span>
+        {start.label} Press play to watch the AI mayor's first week.
+      </span>
+      <button
+        className="btn primary"
+        onClick={() => {
+          const s = useLens.getState();
+          s.setSpeed(6 * 3600);
+          s.setPlaying(true);
+        }}
+      >
+        Play the first week
+      </button>
+      <button className="btn ghost" onClick={() => setGone(true)}>
+        Not now
+      </button>
+    </div>
   );
 }
 

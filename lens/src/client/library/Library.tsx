@@ -11,6 +11,7 @@ import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer, useFirstVisitTour } from "../shell/Shell";
 import { goalText, leverTitle } from "../words";
+import { Masthead } from "./Masthead";
 
 type Outcome = "any" | "attempt" | "won" | "lost" | "stopped" | "indexed";
 
@@ -110,6 +111,7 @@ export function Library({ q }: { q: URLSearchParams }) {
       </header>
 
       <section className="lib-hero">
+        <div className="lib-hero-text">
         <PageAnswer page="library" />
         <h1 className="head">What AI mayors did with power</h1>
         <p className="lib-lede">
@@ -128,6 +130,8 @@ export function Library({ q }: { q: URLSearchParams }) {
             )}
           </p>
         )}
+        </div>
+        {cat && runs.some((r) => r.key === SHOWCASE[0]!.key && r.indexed) && <Masthead run={SHOWCASE[0]!.key} />}
       </section>
 
       {cat && <StartHere runs={runs} />}
