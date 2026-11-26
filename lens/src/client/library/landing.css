@@ -460,6 +460,11 @@
   font-size: 13.5px;
   font-weight: 700;
   fill: var(--text);
+  /* (A halo in the page colour, so a grid line or the rule-based mayor's line never runs through a name.) */
+  stroke: var(--ink);
+  stroke-width: 4px;
+  paint-order: stroke;
+  stroke-linejoin: round;
 }
 .act-grid {
   stroke: var(--line);
@@ -621,6 +626,24 @@
   .ld-print svg {
     width: 72px;
   }
+  /* (The header's links, help, mode and theme wrap to a second line rather than push the page sideways.) */
+  .ld .ld-controls .seg {
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .ld .filters select {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .ld .lib-nav {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    row-gap: 6px;
+  }
+}
+.ld .masthead svg {
+  overflow: hidden;
 }
 
 /* The masthead's one moment: a ring going out from the town hall as the page opens. */

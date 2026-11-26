@@ -60,7 +60,7 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
             {ticks.map((d) => (
               <g key={d}>
                 <line x1={x(d)} x2={x(d)} y1={base} y2={base + (dayNo(d) % 30 === 0 ? 8 : 5)} className="cal-tick" />
-                {(dayNo(d) % 30 === 0 || d === run.from) && <text x={x(d)} y={base + 22} className="cal-num" textAnchor="middle">day {dayNo(d)}</text>}
+                {(dayNo(d) % 30 === 0 || d === run.from) && Math.abs(d - POLL_DAY) > 4 && <text x={x(d)} y={base + 22} className="cal-num" textAnchor="middle">day {dayNo(d)}</text>}
               </g>
             ))}
             {/* the break, and the far stretch */}
@@ -73,6 +73,7 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
             <text x={x(run.from)} y={base + (narrow ? 40 : 38)} className="cal-small">took office</text>
             {/* election day, first called: a hollow ballot left behind */}
             <rect x={pollX - 7} y={base - 7} width={14} height={14} className="cal-ballot was" />
+            <text x={pollX} y={base + 22} className="cal-num" textAnchor="middle">day {dayNo(POLL_DAY)}</text>
             <text x={pollX} y={base + (narrow ? 40 : 38)} className="cal-small" textAnchor="middle">election day, first called</text>
             {/* the arc it travels */}
             <path d={`M${pollX},${base - 10} C${pollX + (farX - pollX) * 0.25},${base - (narrow ? 46 : 92)} ${farX - (farX - pollX) * 0.25},${base - (narrow ? 46 : 92)} ${farX},${base - 12}`} className="cal-arc" pathLength={1} />
@@ -299,7 +300,7 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
             <rect x={x(POLL_DAY)} y={top - 8} width={Math.max(0, x(to) - x(POLL_DAY))} height={H - top - 22} className="when-after" />
             <line x1={x(POLL_DAY)} x2={x(POLL_DAY)} y1={top - 8} y2={H - 22} className="when-poll" />
             <text x={x(POLL_DAY) - 6} y={top - 14} className="cal-small strong" textAnchor="end">election day, first called (day {dayNo(POLL_DAY)})</text>
-            {[from, 149, POLL_DAY, to].map((d) => <text key={d} x={x(d)} y={H - 6} className="cal-num" textAnchor={d === from ? "start" : d === to ? "end" : "middle"}>day {dayNo(d)}</text>)}
+            {[from, 149, POLL_DAY, to].filter((d, i, all) => i === 0 || i === all.length - 1 || (x(d) - x(all[i - 1]!) > 70 && x(all[all.length - 1]!) - x(d) > 70)).map((d) => <text key={d} x={x(d)} y={H - 6} className="cal-num" textAnchor={d === from ? "start" : d === to ? "end" : "middle"}>day {dayNo(d)}</text>)}
             {models.map((m, mi) => {
               const y = top + mi * rowH + rowH / 2 + (narrow ? 8 : 0);
               const mine = all.filter((a) => a.model === m);
@@ -339,7 +340,7 @@ export function Activity({ runs, order, twinActs }: { runs: StudyRun[]; order: s
   const models = order.filter((m) => has.some((r) => r.model === m));
   const max = Math.max(10, ...has.map((r) => r.acts!));
   const narrow = W < 560;
-  const LW = narrow ? 0 : 170, R = 16, rowH = narrow ? 40 : 26, top = 26;
+  const LW = narrow ? 0 : 170, R = 16, rowH = narrow ? 50 : 26, top = 26;
   const H = top + models.length * rowH + 28;
   // (A square-root scale: most runs send a handful of acts, a few send a hundred.)
   const x = (n: number) => LW + Math.sqrt(n / max) * (W - LW - R);
@@ -360,12 +361,12 @@ export function Activity({ runs, order, twinActs }: { runs: StudyRun[]; order: s
             {ticks.map((t) => <g key={t}><line x1={x(t)} x2={x(t)} y1={top - 6} y2={H - 22} className="act-grid" /><text x={x(t)} y={H - 6} className="cal-num" textAnchor="middle">{t}</text></g>)}
             {twinActs !== undefined && <><line x1={x(twinActs)} x2={x(twinActs)} y1={top - 10} y2={H - 22} className="act-twin" /><text x={x(twinActs) + 5} y={top - 12} className="cal-small strong">rule-based mayor: {twinActs}</text></>}
             {models.map((m, mi) => {
-              const y = top + mi * rowH + rowH / 2 + (narrow ? 8 : 0);
+              const y = top + mi * rowH + rowH / 2 + (narrow ? 12 : 0);
               const mine = has.filter((r) => r.model === m);
               const md = median(mine.map((r) => r.acts!));
               return (
                 <g key={m}>
-                  <text x={narrow ? 0 : LW - 12} y={narrow ? y - 11 : y + 4} className="when-model" textAnchor={narrow ? "start" : "end"}>{modelName(m)}</text>
+                  <text x={narrow ? 0 : LW - 12} y={narrow ? y - 18 : y + 4} className="when-model" textAnchor={narrow ? "start" : "end"}>{modelName(m)}</text>
                   <line x1={x(md)} x2={x(md)} y1={y - 8} y2={y + 8} className="act-median" />
                   {place(mine, (r) => x(r.acts!)).map(([r, dy]) => {
                     const cls = r.r.has_executed ? "act-dot done" : r.r.has_attempt ? "act-dot tried" : "act-dot";
