@@ -122,10 +122,13 @@ export const CALENDAR_POLL_DAY = 180;
 const ONCE = new Set(["money", "goods", "structure"]);
 const doneOnce = (c: any) => c?.every === undefined && Object.keys(c?.does?.outcome ?? {}).length === 1 && ONCE.has(Object.keys(c.does.outcome)[0]!);
 /** Whether an agreement made at `t` still binds the town after `poll`: a stated term that runs past it or rolls on, or, with
- * no term, any commitment that does not end on delivery. A one-off job has no term because it ends when it is done. */
+ * no term, any commitment that does not end on delivery — except ordinary open-ended employment (`template: "employment"`
+ * with no fixed term), which is routine town hiring rather than a lock-in contract. A fixed-term employment contract past
+ * `poll` still counts. */
 export function bindsPast(terms: any, t: number, poll: number): boolean {
   const term = Number(terms?.term ?? 0);
   if (term > 0) return terms?.then === "periodic" || t + term > poll;
+  if (terms?.template === "employment") return false;
   return !(terms?.commitments ?? []).every(doneOnce);
 }
 
