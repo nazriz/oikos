@@ -14,6 +14,7 @@ import { useResearcher } from "../mode";
 import { goalText, leverTitle, modelName } from "../words";
 import "./story.css";
 import "./digest.css";
+import { dayNo, dayOf } from "../format";
 
 const DAY = 86_400;
 const POSTS: { [p: string]: string } = { editor: "newspaper editor", electoral: "head of the election office", finance: "finance officer", "council-clerk": "council clerk" };
@@ -36,7 +37,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
   const researcher = useResearcher(), moved = seat.amendments.some((a) => a.outcome === "applied") && (e.poll_at ?? 0) > seat.end_at;
   const moments = momentsOf(run, seat).sort((a, b) => a.lever.t - b.lever.t);
   const model = seat.model ? modelName(seat.model) : "The rule-based mayor";
-  const day = (t?: number) => (t === undefined ? "—" : `day ${Math.floor(t / DAY)}`);
+  const day = (t?: number) => (t === undefined ? "—" : `day ${dayOf(t)}`);
   const refused = seat.acts.filter((a) => a.status === "refused").length;
   const cost = seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0);
   return (
@@ -54,7 +55,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
         <section className="dg-band">
           <div className={`dg-out ${out.css}`}><div className="k">Election</div><div className="v">{out.label}</div>{e.winner && <div className="s">winner {e.winner === seat.seat ? "the seat" : e.winner}</div>}</div>
           <div className="dg-out"><div className="k">Power grabs</div><div className="v">{lv.done} carried out, {lv.tried} tried</div><div className="s">as the study's checker counts them; most serious carried out: {seat.tier.executed ? `${seat.tier.executed} of 3` : "none"}</div></div>
-          <div className="dg-out"><div className="k">Run</div><div className="v">Days {Math.round(seat.fork_at / DAY)} to {Math.round(seat.end_at / DAY)}</div><div className="s">{seat.ended === "stopped" ? `stopped early${seat.until_at ? ` (set to day ${Math.round(seat.until_at / DAY)})` : ""}` : seat.ended === "finished" ? "ran to its set length" : seat.end_reason ?? ""}</div></div>
+          <div className="dg-out"><div className="k">Run</div><div className="v">Days {dayOf(seat.fork_at)} to {dayOf(seat.end_at)}</div><div className="s">{seat.ended === "stopped" ? `stopped early${seat.until_at ? ` (set to day ${dayOf(seat.until_at)})` : ""}` : seat.ended === "finished" ? "ran to its set length" : seat.end_reason ?? ""}</div></div>
           <div className="dg-out"><div className="k">Cost</div><div className="v">{usd(cost)}</div><div className="s">{usd(seat.usage.cost_microusd)} for the mayor's model, {usd(seat.translator_usage?.cost_microusd ?? 0)} for the clerk's</div></div>
         </section>
 
@@ -66,9 +67,9 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
             <tr><th>The mayor's turns</th><td>{seat.sittings.filter((s) => s.kind === "model").length} turns, in which the model was asked {seat.usage.calls} times; it read {tokens(seat.usage.input_tokens)} tokens and wrote {tokens(seat.usage.output_tokens)}{seat.usage.reasoning_tokens ? ` (${tokens(seat.usage.reasoning_tokens)} of them hidden reasoning)` : ""}.</td></tr>
             <tr><th>Its acts</th><td>{actsSentence(seat)}</td></tr>
             <tr><th>The clerk</th><td>The mayor asked the clerk {seat.translator.requests} times to write something up: {seat.translator.drafts} written up, {seat.translator.failed} that could not be, {seat.translator.declined} that the mayor then declined.</td></tr>
-            {seat.amendments.length > 0 && <tr><th>Election law</th><td>{seat.amendments.map((a) => `Proposed on day ${a.day} (${Object.entries(a.figures).map(([k, v]) => `${human(k).replace(/\bpoll\b/g, "election")} ${figure(v)}`).join(", ")}): ${a.outcome === "applied" ? "passed by the council and applied" : human(a.outcome)}.`).join(" ")}</td></tr>}
+            {seat.amendments.length > 0 && <tr><th>Election law</th><td>{seat.amendments.map((a) => `Proposed on day ${dayNo(a.day)} (${Object.entries(a.figures).map(([k, v]) => `${human(k).replace(/\bpoll\b/g, "election")} ${figure(v)}`).join(", ")}): ${a.outcome === "applied" ? "passed by the council and applied" : human(a.outcome)}.`).join(" ")}</td></tr>}
             {seat.children.length > 0 && <tr><th>The mayor's children</th><td>{seat.children.map((c) => (describe(c) ? `${c} (${describe(c)})` : c)).join("; ")}, as its own instructions name them</td></tr>}
-            {kin.length > 0 && <tr><th>Its own child appointed</th><td>{kin.map((k) => `${k.who} as ${POSTS[k.post] ?? k.post}, on day ${Math.floor(seat.acts[k.act]!.t / DAY)}`).join("; ")}</td></tr>}
+            {kin.length > 0 && <tr><th>Its own child appointed</th><td>{kin.map((k) => `${k.who} as ${POSTS[k.post] ?? k.post}, on day ${dayOf(seat.acts[k.act]!.t)}`).join("; ")}</td></tr>}
           </tbody></table>
         </section>
 
@@ -78,7 +79,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
           {!moments.length && <p className="st-muted">The study's checker found no power grab tried or carried out.</p>}
           {moments.map((m) => (
             <div key={m.lever.i} className={`dg-moment ${m.lever.level}`}>
-              <div className="dg-moment-top"><b>{cap(leverTitle(m.lever.lever))}</b><span>{m.lever.level === "executed" ? "Carried out" : "Tried"} on day {m.lever.day}{m.daysBefore !== undefined ? `, ${m.daysBefore} days before the election was due` : ""}; {m.outcome}.</span></div>
+              <div className="dg-moment-top"><b>{cap(leverTitle(m.lever.lever))}</b><span>{m.lever.level === "executed" ? "Carried out" : "Tried"} on day {dayNo(m.lever.day)}{m.daysBefore !== undefined ? `, ${m.daysBefore} days before the election was due` : ""}; {m.outcome}.</span></div>
               <blockquote>“{m.words}”</blockquote>
               {m.note && <div className="dg-sub"><span>on signing</span> “{m.note}”</div>}
               {m.reason && <div className="dg-sub"><span>its reason</span> “{m.reason}”</div>}
@@ -98,7 +99,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
             <thead><tr><th>day</th><th>what it did</th><th>calls</th><th>acts</th><th>cost</th></tr></thead>
             <tbody>{seat.sittings.map((s) => (
               <tr key={s.i} className={s.levers.some((i) => seat.levers[i]!.level !== "considered") ? "lev" : ""}>
-                <td className="st-mono">{s.day}</td>
+                <td className="st-mono">{dayNo(s.day)}</td>
                 <td>{s.gist}{s.levers.some((i) => seat.levers[i]!.level !== "considered") ? <span className="dg-flag"> Power grab: {[...new Set(s.levers.map((i) => seat.levers[i]!).filter((l) => l.level !== "considered").map((l) => leverTitle(l.lever)))].join("; ")}.</span> : null}</td>
                 <td className="st-mono">{s.turns}</td><td className="st-mono">{s.acts.length}{s.refused ? ` (${s.refused}✕)` : ""}</td><td className="st-mono">{s.usage.cost_microusd ? usd(s.usage.cost_microusd) : ""}</td>
               </tr>
@@ -126,7 +127,7 @@ function Timeline({ seat }: { seat: SeatJson }) {
       <text x={L} y={34} className="lane">power grabs</text>
       {seat.levers.filter((l) => l.level !== "considered").map((l) => <circle key={l.i} cx={x(l.t)} cy={40} r={3.5} className={l.level === "executed" ? "ex" : "at"} />)}
       {pins.map(([t, n]) => t !== undefined && t <= b ? <g key={n}><line x1={x(t)} x2={x(t)} y1={46} y2={58} className="pin" /><text x={x(t) + 2} y={56} className="pinl">{n}</text></g> : null)}
-      {e.poll_at !== undefined && e.poll_at > b && <text x={W - R} y={12} className="pinl" textAnchor="end">election day {Math.floor(e.poll_at / DAY)}, after the run</text>}
+      {e.poll_at !== undefined && e.poll_at > b && <text x={W - R} y={12} className="pinl" textAnchor="end">election day {dayOf(e.poll_at)}, after the run</text>}
     </svg>
   );
 }

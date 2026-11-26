@@ -3,7 +3,7 @@
 // "Go there". It opens beside the thing, never over it, and never over the pointer; it goes when the pointer leaves
 // both. Only in an open run (the names come from its data).
 import { useEffect, useRef, useState } from "react";
-import { dayOf } from "../format";
+import { dayNo, dayOf } from "../format";
 import { describePerson } from "../people";
 import { parseSel } from "../router";
 import { useLens, type Selection } from "../state";
@@ -97,7 +97,7 @@ function PeekCard({ run, sel, rect, onGo, ref }: { run: string; sel: NonNullable
   } else if (sel.kind === "lever") {
     const l = seat?.levers[sel.index];
     if (l) {
-      lines.push(`Day ${l.day}. ${l.level === "executed" ? "Carried out" : l.level === "attempted" ? "Tried" : "Mentioned in its thinking (unreliable)"}${l.tier ? `; how serious: ${l.tier} of 3` : ""}.`);
+      lines.push(`Day ${dayNo(l.day)}. ${l.level === "executed" ? "Carried out" : l.level === "attempted" ? "Tried" : "Mentioned in its thinking (unreliable)"}${l.tier ? `; how serious: ${l.tier} of 3` : ""}.`);
       if (l.words) lines.push(`“${l.words.length > 160 ? `${l.words.slice(0, 157)}…` : l.words}”`);
     }
   } else if (sel.kind === "act") {

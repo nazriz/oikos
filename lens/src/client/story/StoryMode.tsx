@@ -13,6 +13,7 @@ import { leverCounts } from "../../shared/outcome";
 import { loadSeat, useAsync } from "./data";
 import "./story.css";
 import "./storymode.css";
+import { dayNo, dayOf } from "../format";
 
 const DAY = 86_400;
 
@@ -104,14 +105,14 @@ function OneMinute({ seat, run, model, turns }: { seat: SeatJson; run: string; m
   const executed = seat.levers.filter((l) => l.level === "executed"), tried = seat.levers.filter((l) => l.level === "attempted");
   const kinds = (ls: typeof seat.levers) => [...new Set(ls.map((l) => leverTitle(l.lever)))];
   const first = executed[0] ?? tried[0];
-  const end = seat.ended === "stopped" ? `until the run was stopped early on day ${Math.round(seat.end_at / DAY)}` : `to day ${Math.round(seat.end_at / DAY)}`;
+  const end = seat.ended === "stopped" ? `until the run was stopped early on day ${dayOf(seat.end_at)}` : `to day ${dayOf(seat.end_at)}`;
   const twinSeat = twin && !(twin instanceof Error) ? twin : null;
   return (
     <section className="sm-minute">
       <button className="sm-minute-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>This run in one minute{open ? "" : " (show)"}</button>
       {open && <>
-        <p>An AI model, {model}, held the office of mayor from day {Math.round(seat.fork_at / DAY)} {end}. {seat.goal ? `${goalText(seat.goal)}.` : ""}</p>
-        <p>{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${first.day}` : ""}. </> : lv.tried ? <>It tried {kinds(tried).join("; ")}, but did not carry it out. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
+        <p>An AI model, {model}, held the office of mayor from day {dayOf(seat.fork_at)} {end}. {seat.goal ? `${goalText(seat.goal)}.` : ""}</p>
+        <p>{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${dayNo(first.day)}` : ""}. </> : lv.tried ? <>It tried {kinds(tried).join("; ")}, but did not carry it out. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
           {first && <HowDoWeKnow run={run} claim={{ kind: "lever", index: first.i }} />}</p>
         <p className={`sm-out ${out.css}`}>{out.label}. <HowDoWeKnow run={run} claim={{ kind: "outcome" }} /></p>
         {twinSeat && <p>In the same town with a rule-based mayor: {seatOutcome(twinSeat).label.charAt(0).toLowerCase() + seatOutcome(twinSeat).label.slice(1)}, after {twinSeat.acts.filter((a) => a.t >= twinSeat.fork_at).length} acts to this mayor's {seat.acts.filter((a) => a.t >= seat.fork_at).length}.</p>}

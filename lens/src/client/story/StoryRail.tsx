@@ -11,6 +11,7 @@ import { useWords, leverTitle, modelName } from "../words";
 import { useResearcher } from "../mode";
 import { StoryAccount } from "./StoryMode";
 import "./story.css";
+import { dayNo, dayOf } from "../format";
 
 const DAY = 86_400;
 
@@ -127,7 +128,7 @@ function Header({ seat, onClose }: { seat: SeatJson; onClose: () => void }) {
   return (
     <div className="st-head">
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><div className="st-title">{seat.model ? `${modelName(seat.model)} as mayor` : "The rule-based mayor"}</div><span style={{ flex: 1 }} /><button className="st-btn" onClick={onClose}>Hide details</button></div>
-      <p className="st-sub">{seat.goal ? `Given the “${seat.goal}” instructions. ` : ""}{seat.seed !== undefined ? `Town seed ${seat.seed}. ` : ""}The run began on day {Math.round(seat.fork_at / DAY)} and {seat.ended === "stopped" ? <span style={{ color: "var(--st-bad)" }}>stopped early on day {Math.round(seat.end_at / DAY)}{seat.until_at ? ` (it was set to run to day ${Math.round(seat.until_at / DAY)})` : ""}</span> : `ended on day ${Math.round(seat.end_at / DAY)}`}. The model is {seat.model ?? "a rule-based program"}.</p>
+      <p className="st-sub">{seat.goal ? `Given the “${seat.goal}” instructions. ` : ""}{seat.seed !== undefined ? `Town seed ${seat.seed}. ` : ""}The run began on day {dayOf(seat.fork_at)} and {seat.ended === "stopped" ? <span style={{ color: "var(--st-bad)" }}>stopped early on day {dayOf(seat.end_at)}{seat.until_at ? ` (it was set to run to day ${dayOf(seat.until_at)})` : ""}</span> : `ended on day ${dayOf(seat.end_at)}`}. The model is {seat.model ?? "a rule-based program"}.</p>
       <div className={`st-outcome ${out.tone}`}><span className="st-big">{out.label}</span>{seat.election.stood ? <span className="st-faint" style={{ fontSize: 12 }}>It stood for re-election.</span> : null}</div>
       {kin.length > 0 && <div className="st-kin">Appointed its own child: {kin.map((k) => <button key={k.act} className="st-linkish" onClick={() => select({ kind: "act", seq: seat.acts[k.act]!.seq })}>{k.who}{describe(k.who) ? ` (${describe(k.who)})` : ""} as {k.post} (day {worldDay(seat.acts[k.act]!.t)})</button>)}<span className="st-faint">. Its children as its own instructions name them.</span></div>}
       <div className="st-stats">
@@ -177,11 +178,11 @@ function Election({ seat, compact }: { seat: SeatJson; compact?: boolean }) {
       <div className="st-elec-bar">
         <div className="axis" />
         {e.notice_at !== undefined && <div className="span" style={{ left: x(e.notice_at), width: `calc(${x(Math.min(e.poll_at ?? to, to))} - ${x(e.notice_at)})` }} />}
-        {pins.map((p, k) => <div key={p.label} className={`pin ${p.moved ? "moved" : ""} ${p.off ? "off" : ""}`} style={{ left: x(p.t) }} title={`${p.label}: ${when(p.t)}`} onClick={() => !p.off && setT(p.t)}><span className={`r${compact ? 0 : rows[k]} ${compact && rows[k] ? "hide" : ""} ${pct(p.t) > 85 ? "end" : pct(p.t) < 10 ? "start" : ""}`}>{p.off ? `${p.label}: day ${Math.floor(p.t / DAY)}, after the run` : `${p.label}, day ${worldDay(p.t)}`}</span></div>)}
+        {pins.map((p, k) => <div key={p.label} className={`pin ${p.moved ? "moved" : ""} ${p.off ? "off" : ""}`} style={{ left: x(p.t) }} title={`${p.label}: ${when(p.t)}`} onClick={() => !p.off && setT(p.t)}><span className={`r${compact ? 0 : rows[k]} ${compact && rows[k] ? "hide" : ""} ${pct(p.t) > 85 ? "end" : pct(p.t) < 10 ? "start" : ""}`}>{p.off ? `${p.label}: day ${dayOf(p.t)}, after the run` : `${p.label}, day ${worldDay(p.t)}`}</span></div>)}
         {nowAt !== null && <div className="now" style={{ left: `${nowAt}%` }} />}
       </div>
-      {!compact && moved && <div className="st-elec-note">The election was moved to day {Math.round((e.poll_at ?? 0) / DAY)} by a law the AI mayor proposed on day {moved.day}, and the council passed.</div>}
-      {!compact && !moved && e.poll_at !== undefined && e.poll_at > seat.end_at && <div className="st-elec-note st-muted" style={{ color: "var(--st-muted)" }}>The run ended on day {Math.round(seat.end_at / DAY)}, before election day (day {Math.round(e.poll_at / DAY)}).</div>}
+      {!compact && moved && <div className="st-elec-note">The election was moved to day {dayOf(e.poll_at ?? 0)} by a law the AI mayor proposed on day {dayNo(moved.day)}, and the council passed.</div>}
+      {!compact && !moved && e.poll_at !== undefined && e.poll_at > seat.end_at && <div className="st-elec-note st-muted" style={{ color: "var(--st-muted)" }}>The run ended on day {dayOf(seat.end_at)}, before election day (day {dayOf(e.poll_at)}).</div>}
       {!compact && e.result_at !== undefined && <div className="st-elec-note" style={{ color: "var(--st-muted)" }}>{e.seat_won ? "The AI mayor won" : `Won by ${e.winner ?? "another candidate"}`}, declared {when(e.result_at)}{e.seated ? `; ${e.seated === seat.seat ? "the AI mayor" : e.seated} took office ${when(e.seated_at ?? 0)}` : ""}.</div>}
     </div>
   );

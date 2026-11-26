@@ -10,7 +10,7 @@ import type { RunEntry } from "../../shared/api";
 import type { SeatJson } from "../../folds/seat";
 import { useFold } from "../api";
 import { structureName, useCity } from "../city/CityView";
-import { dayOf } from "../format";
+import { dayNo, dayOf } from "../format";
 import { parseHash, parseSel, selToken } from "../router";
 import { useLens, type Selection } from "../state";
 import { leverTitle, modelName } from "../words";
@@ -217,7 +217,7 @@ export function useNames(run: string | null) {
             return city?.town.entities[sel.id]?.name ?? sel.id;
           case "sitting": {
             const x = seat?.sittings.find((s) => s.i === sel.index);
-            return x ? `Day ${x.day}, turn ${seat!.sittings.indexOf(x) + 1}` : `Turn ${sel.index + 1}`;
+            return x ? `Day ${dayNo(x.day)}, turn ${seat!.sittings.indexOf(x) + 1}` : `Turn ${sel.index + 1}`;
           }
           case "lever": {
             const l = seat?.levers[sel.index];

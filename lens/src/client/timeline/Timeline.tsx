@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLens, type Selection, type TimelineMark, type TimelineTrack } from "../state";
 import { selToken } from "../router";
-import { DAY, HOUR, clock, dayOf, span as spanText, spanWords } from "../format";
+import { DAY, HOUR, clock, dayNo, dayOf, span as spanText, spanWords } from "../format";
 import { Fit, Keyboard, Pause, Play } from "../icons";
 import { useMode } from "../mode";
 import { useSeat } from "../nav/nav";
@@ -316,13 +316,15 @@ export function Timeline({ ground, fork }: TimelineProps) {
       }
     } else {
       const ds = niceDayStep(pxPerDay);
-      for (let d = Math.ceil(d0 / ds) * ds; d <= d1; d += ds) {
-        const x = Math.round(xOf(d * DAY)) + 0.5;
+      // (Round day numbers in the world's calendar: day L begins at t = (L - 1) days.)
+      const L0 = Math.ceil(dayNo(d0) / ds) * ds;
+      for (let L = L0; L <= dayNo(d1); L += ds) {
+        const x = Math.round(xOf((L - 1) * DAY)) + 0.5;
         if (x < -40 || x > width + 4) continue;
         g.fillStyle = withAlpha(p.line, 0.7);
         g.fillRect(x, axisTop + AXIS - 6, 1, height - axisTop - AXIS + 6);
         g.fillStyle = p.muted;
-        g.fillText(`${d === Math.ceil(d0 / ds) * ds ? "day " : ""}${d}`, x + 4, axisTop + AXIS / 2);
+        g.fillText(`${L === L0 ? "day " : ""}${L}`, x + 4, axisTop + AXIS / 2);
       }
       if (pxPerDay > 6) {
         g.fillStyle = p.line;

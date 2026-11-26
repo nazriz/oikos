@@ -3,6 +3,7 @@
 // and what then happened to them (the council's ballots, the reader's lever events), each fact from the log. A turn in
 // which it only looked around or wrote nothing is quiet, and is folded by the page. No grades: what happened, said plainly.
 import type { SeatAct, SeatJson, SeatLever, SittingSummary } from "../../folds/seat";
+import { dayNo, dayOf } from "../format";
 
 const DAY = 86_400;
 
@@ -58,7 +59,7 @@ function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string
     const basis = String(Array.isArray(b.basis) ? b.basis[0] : b.basis ?? "");
     if (basis === "form-amend-elections") {
       const f = b.data ?? {}, parts: string[] = [];
-      if (f.first_poll_day !== undefined) parts.push(`the next election would be on day ${days(f.first_poll_day)}`);
+      if (f.first_poll_day !== undefined) parts.push(`the next election would be on day ${dayNo(days(f.first_poll_day))}`);
       if (f.term_days !== undefined) parts.push(`a term would last ${days(f.term_days)} days`);
       if (f.takes_office_days !== undefined) parts.push(`the winner would take office after ${days(f.takes_office_days)} days`);
       const am = seat.amendments.find((x) => x.proposal === rec);
@@ -147,7 +148,7 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
   const draft = key?.draft ? seat.drafts.find((d) => d.id === key.draft) : undefined;
   const quote = draft?.note || key?.reasoning || s.words;
   const votes = clauses.filter((c) => c.proposal && seat.records.some((r) => r.kind === "ballot" && r.data?.proposal === c.proposal)).map((c) => c.proposal!);
-  return { i: s.i, day: Math.floor(s.t / DAY), t: s.t, sentences, ...(quote ? { quote } : {}), levers, votes, notable };
+  return { i: s.i, day: dayOf(s.t), t: s.t, sentences, ...(quote ? { quote } : {}), levers, votes, notable };
 }
 
 function joinAnd(xs: string[]): string { return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`; }

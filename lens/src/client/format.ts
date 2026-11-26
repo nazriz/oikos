@@ -1,16 +1,28 @@
-// How Lens writes times, money and sizes. Simulated time is seconds since the run began; day 0 is its first day.
+// How Lens writes times, money and sizes. Simulated time is seconds since the run began.
+//
+// Lens uses the world's own calendar: t = 0 is "year 1, day 1", as every prompt, notice and ballot in the world says it
+// (participants/src/llm/render.ts). So the day a person reads is floor(t / 86400) + 1. The folds and the study's reader
+// keep day *indices* from 0 (floor(t / 86400): `day`, `poll_day`, `forkDay`...): show those through dayNo, never as
+// they are. Runs stay within the world's first year, so "Day 181" is "year 1, day 181".
 export const DAY = 86_400;
 export const HOUR = 3_600;
 
-export const dayOf = (t: number) => Math.floor(t / DAY);
+/** The world's day number of moment t: day 1 is t = 0. For labels; for arrays by day, dayIndex. */
+export const dayOf = (t: number) => Math.floor(t / DAY) + 1;
+/** The 0-based index of t's day, for arrays by day (the daily series, keyframes). */
+export const dayIndex = (t: number) => Math.floor(t / DAY);
+/** A day index as data carries it (from 0) as the world's day number. */
+export const dayNo = (index: number) => index + 1;
+/** The world's own wording of a moment's date: "year 1, day 181". */
+export const worldDate = (t: number) => `year ${Math.floor(t / (365 * DAY)) + 1}, day ${Math.floor(((t % (365 * DAY)) + 365 * DAY) % (365 * DAY) / DAY) + 1}`;
 export const clock = (t: number) => {
   const s = ((t % DAY) + DAY) % DAY;
   const h = Math.floor(s / HOUR);
   const m = Math.floor((s % HOUR) / 60);
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 };
-/** "Day 132 · 14:00" */
-export const when = (t: number) => `Day ${dayOf(t)} · ${clock(t)}`;
+/** "Day 132, 14:00" (the world's day number). */
+export const when = (t: number) => `Day ${dayOf(t)}, ${clock(t)}`;
 
 export const span = (seconds: number) => {
   const a = Math.abs(seconds);

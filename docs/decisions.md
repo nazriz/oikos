@@ -16445,3 +16445,17 @@ Naz: "make certain events and things stand out even more." The timeline now read
   or drag it to move.
 - **Revisit if** the reader gains levers the short labels don't name (they fall back to the lever's words), or runs
   hold several elections (each gets its flags; the bands follow the first).
+
+## 2026-11-26 Lens uses the world's own calendar (day 1 = t 0)
+
+Lens wrote days from 0 (floor(t / 86400)), while the world writes them from 1: every prompt, notice and ballot says
+"year 1, day 1" at t = 0 (participants/src/llm/render.ts). So Lens said "Day 179, turn 9" where the mayor read "Now: day
+180", and flagged election day at 180 where the notice said 181. Now one formatter, `src/client/format.ts`: `dayOf(t)` is
+the world's day number (floor(t / 86400) + 1), `when(t)` "Day 122, 09:00", `worldDate(t)` "year 1, day 122", `dayIndex(t)`
+the 0-based index for arrays by day, and `dayNo(i)` turns a stored index into the day people read. The folds and the
+study's reader keep their 0-based indices (`day`, `poll_day`, `stopped_day`, `forkDay`, `untilDay`; the reader is the
+study's measure and is not changed): every label shows them through `dayNo`. Every view's day labels were switched
+(timeline axis and flags, run bar, trail, rail, reader, map clock and cards, digest, findings, moments, evidence, compare,
+palette, life page, the shared outcome sentence). Differences ("59 days before the election") are unchanged.
+**Revisit if** a run passes the world's first year: the views write "Day 370" where the world writes "year 2, day 5"
+(`worldDate` has the world's form).

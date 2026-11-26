@@ -33,8 +33,8 @@ export interface HoverInfo { x: number; y: number; layer: string; object: any; i
 const DAY = 86_400;
 export const fmtDay = (t: number) => {
   const d = Math.floor(t / DAY), h = Math.floor((t % DAY) / 3600), m = Math.floor((t % 3600) / 60);
-  // Days count from 0, as everywhere in Lens (dayOf(t) = floor(t / 86400)).
-  return { day: d, year: Math.floor(d / 365) + 1, dayOfYear: d % 365, clock: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}` };
+  // The world's calendar, as everywhere in Lens (format.ts dayOf): day 1 is t = 0.
+  return { day: d + 1, year: Math.floor(d / 365) + 1, dayOfYear: (d % 365) + 1, clock: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}` };
 };
 const n0 = (n: number) => n.toLocaleString("en-GB");
 

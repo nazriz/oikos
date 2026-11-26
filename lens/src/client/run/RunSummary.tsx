@@ -4,6 +4,7 @@ import { compact, dayOf, int, usd, words } from "../format";
 import { useLens } from "../state";
 import { goalText } from "../words";
 import { readingOutcome } from "../outcome";
+import { dayIndex, dayNo } from "../format";
 
 const DAY = 86_400;
 
@@ -14,7 +15,8 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
   const maxP = Math.max(1, ...purposes.map(([, u]) => u.microusd));
   const counts = Object.entries(meta.counts).sort((a, b) => b[1] - a[1]).slice(0, 12);
   const maxC = Math.max(1, ...counts.map(([, n]) => n));
-  const forkDay = meta.span.fork !== undefined ? dayOf(meta.span.fork) : undefined;
+  // (An index into the daily series; shown through dayNo.)
+  const forkDay = meta.span.fork !== undefined ? dayIndex(meta.span.fork) : undefined;
   const wakes = meta.daily.wakes.reduce((a, b) => a + b, 0);
   return (
     <div className="summary">
@@ -59,7 +61,7 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
           <div className="sum-sub muted">
             {readingOutcome(r)?.label ?? (r.stood ? "Stood" : "Did not stand")}
             {r.levers ? `. Power grabs tried: ${r.levers.tried}, carried out: ${r.levers.done}.` : ""}
-            {r.stopped_before_poll ? ` Stopped before the election (day ${r.stopped_day ?? "?"}).` : ""}
+            {r.stopped_before_poll ? ` Stopped before the election (day ${r.stopped_day !== undefined ? dayNo(r.stopped_day) : "?"}).` : ""}
           </div>
           {r.attempts.length > 0 && (
             <ol className="attempts">
@@ -69,7 +71,7 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
                     <span className="attempt-head">
                       <span className="chip flag">tier {a.tier}</span>
                       <b>{words(a.lever)}</b>
-                      <span className="faint">day {a.day}</span>
+                      <span className="faint">day {dayNo(a.day)}</span>
                     </span>
                     {a.stage && <span className="muted attempt-stage">{words(a.stage)}</span>}
                     <q className="serif attempt-words">{a.words}</q>
@@ -106,7 +108,7 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
           </dd>
           <dt>span</dt>
           <dd className="num">
-            {forkDay !== undefined ? `fork at day ${forkDay}, ` : ""}to day {dayOf(meta.span.end)}
+            {forkDay !== undefined ? `fork at day ${dayNo(forkDay)}, ` : ""}to day {dayOf(meta.span.end)}
           </dd>
           <dt>ended</dt>
           <dd>

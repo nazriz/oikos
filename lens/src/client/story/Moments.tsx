@@ -12,6 +12,7 @@ import { HowDoWeKnow } from "./Evidence";
 import { goalText, leverTitle } from "../words";
 import "./story.css";
 import "./moments.css";
+import { dayNo } from "../format";
 
 const DAY = 86_400;
 const LEVEL: { [k: string]: string } = { executed: "carried out", attempted: "tried", considered: "mentioned (unreliable)" };
@@ -93,7 +94,7 @@ function Card({ m, onOpen }: { m: Moment; onOpen: () => void }) {
       {m.note && <div className="mo-sub"><span className="k">on signing</span>“{m.note}”</div>}
       {m.reason && <div className="mo-sub"><span className="k">its reason</span>“{m.reason}”</div>}
       {more && <Around m={m} />}
-      <p className="mo-when">Day {l.day}{m.daysBefore !== undefined ? `, ${m.daysBefore} days before the election was due` : ""}.</p>
+      <p className="mo-when">Day {dayNo(l.day)}{m.daysBefore !== undefined ? `, ${m.daysBefore} days before the election was due` : ""}.</p>
       <div className="mo-out"><span className={`st-pill ${m.outcomeTone}`}>{m.outcome}</span></div>
       <div className="mo-foot">
         <span className="mo-who"><b>{m.model}</b>, {m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}{m.seed !== undefined ? `, town seed ${m.seed}` : ""}. <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span></span>

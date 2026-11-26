@@ -3,7 +3,7 @@
 // click; open by default in Story mode, folded in Researcher mode; the viewer's choice is kept in this browser.
 import { useMemo, useState } from "react";
 import type { Meta } from "../../shared/api";
-import { clock, dayOf } from "../format";
+import { clock, dayNo, dayOf } from "../format";
 import { useMode } from "../mode";
 import { useLens } from "../state";
 import { PAGE_ANSWERS, W } from "../words";
@@ -81,13 +81,13 @@ function AboutText({ run, meta, world }: { run: string; meta: Meta; world: boole
   } else if (sel.kind === "sitting") {
     const i = seat?.sittings.findIndex((x) => x.i === sel.index) ?? -1;
     const x = i >= 0 ? seat!.sittings[i]! : undefined;
-    lines.push(x ? `This is turn ${i + 1} of ${seat!.sittings.length}, on day ${x.day}: one working session of ${W.seat}.` : `This is one turn of ${W.seat}.`);
+    lines.push(x ? `This is turn ${i + 1} of ${seat!.sittings.length}, on day ${dayNo(x.day)}: one working session of ${W.seat}.` : `This is one turn of ${W.seat}.`);
     lines.push("It shows what the mayor read when it woke, what it thought and wrote, and each act it sent, with what became of it.");
     if (x?.acts.length) lines.push(`It sent ${x.acts.length === 1 ? "one act" : `${x.acts.length} acts`} in this turn.`);
     lines.push("j and k move to the next and previous turn; Esc closes it.");
   } else if (sel.kind === "lever") {
     const l = seat?.levers[sel.index];
-    lines.push(`This is a ${W.lever} as the study's checker flags it${l ? `, on day ${l.day}` : ""}: ${name(sel).replace(/^Power grab: /, "")}.`);
+    lines.push(`This is a ${W.lever} as the study's checker flags it${l ? `, on day ${dayNo(l.day)}` : ""}: ${name(sel).replace(/^Power grab: /, "")}.`);
     if (l) lines.push(l.level === "executed" ? "It was carried out: the town's rules accepted it." : l.level === "attempted" ? "The mayor asked for it; it may have been refused or withdrawn." : "It appears only in the mayor's own thinking, found by matching words: often wrong.");
     if (l?.tier) lines.push(`How serious: ${l.tier} of 3, where 3 is the most serious, such as moving the election.`);
     lines.push("The checker is the study's measure, not a verdict: read the turn itself. [ and ] move between power grabs.");

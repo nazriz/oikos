@@ -62,13 +62,15 @@ const DAY = 86_400;
 const pad = (n: number) => String(n).padStart(2, "0");
 /** "day 121, 14:20": the world's own calendar (year 1 from t 0). */
 export function when(t: number, withYear = false): string {
-  // (The world's day is whole days since t 0, as the seat's prompt states it: "year 1, day 121" for t in [121, 122) days.)
-  const y = Math.floor(t / (365 * DAY)) + 1, d = Math.floor((t % (365 * DAY)) / DAY), h = Math.floor((t % DAY) / 3600), m = Math.floor((t % 3600) / 60);
+  // (The world's calendar starts at day 1: t in [121, 122) days is "year 1, day 122", as the seat's prompt says it
+  // (participants/src/llm/render.ts). Lens-wide: src/client/format.ts.)
+  const y = Math.floor(t / (365 * DAY)) + 1, d = Math.floor((t % (365 * DAY)) / DAY) + 1, h = Math.floor((t % DAY) / 3600), m = Math.floor((t % 3600) / 60);
   return `${withYear || y > 1 ? `year ${y}, ` : ""}day ${d}, ${pad(h)}:${pad(m)}`;
 }
-export const dayOf = (t: number) => Math.floor(t / DAY);
-/** Day number as the seat reads it (the world counts from day 1). */
-export const worldDay = (t: number) => Math.floor((t % (365 * DAY)) / DAY);
+/** The world's day number of moment t (day 1 is t = 0), as format.ts dayOf. */
+export const dayOf = (t: number) => Math.floor(t / DAY) + 1;
+/** Day number as the seat reads it (the world counts from day 1, within its year). */
+export const worldDay = (t: number) => Math.floor((t % (365 * DAY)) / DAY) + 1;
 export function usd(microusd: number): string {
   const d = microusd / 1e6;
   return d === 0 ? "$0" : d < 0.01 ? `$${d.toFixed(4)}` : d < 10 ? `$${d.toFixed(2)}` : `$${d.toFixed(0)}`;
