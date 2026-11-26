@@ -6,6 +6,7 @@ import type { CityData } from "./data";
 import { fmtDay } from "./Panel";
 import { actSentence, CITY_WORDS } from "./words";
 import { W } from "../words";
+import { plainText } from "../plain";
 
 export interface TourStep {
   t: number;
@@ -57,7 +58,7 @@ export function buildSteps(city: CityData, seat: any): TourStep[] {
     for (const s of sittings) if (s.lever_level === "attempted" || s.lever_level === "executed") picked.add(s.i);
     for (const s of sittings.filter((x) => picked.has(x.i))) {
       steps.push({
-        t: s.t, kicker: `${W.Sitting} ${s.i + 1} of ${W.seat}`, title: short(s.gist, 140) ?? "A turn", words: short(s.words, 320),
+        t: s.t, kicker: `${W.Sitting} ${s.i + 1} of ${W.seat}`, title: short(plainText(s.gist ?? "", city.town), 140) ?? "A turn", words: short(s.words, 320),
         note: s.acts?.length ? `${s.acts.length} act${s.acts.length > 1 ? "s" : ""} sent` : undefined,
         acts: (s.acts ?? []).map((i: number) => actSeq(i)).filter((x: number | undefined): x is number => x !== undefined), tone: "seat",
       });

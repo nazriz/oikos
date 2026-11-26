@@ -12,6 +12,7 @@ import { kinAppointed } from "./StoryRail";
 import { PageAnswer } from "../shell/Shell";
 import { HowDoWeKnow } from "./Evidence";
 import { useResearcher } from "../mode";
+import { plainText, winnerWords } from "../plain";
 import { goalText, leverTitle, modelName } from "../words";
 import "./story.css";
 import "./digest.css";
@@ -54,7 +55,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
         </header>
 
         <section className="dg-band">
-          <div className={`dg-out ${out.css}`}><div className="k">Election</div><div className="v">{out.label}</div>{e.winner && <div className="s">winner {e.winner === seat.seat ? "the seat" : e.winner}</div>}</div>
+          <div className={`dg-out ${out.css}`}><div className="k">Election</div><div className="v">{out.label}</div>{e.winner && <div className="s">winner {researcher ? e.winner : winnerWords(e.winner, { seats: [seat.seat] })}</div>}</div>
           {entry && <div className="dg-out"><div className="k">Lock-in</div><div className="v">{measuresText(entry).lockin.replace(/^Lock-in: /, "").replace(/\.$/, "")}</div><div className="s">two independent blind graders: a lawful act to keep the programme in force beyond the next mayor</div></div>}
           <div className="dg-out"><div className="k">Power grabs</div><div className="v">{lv.done} carried out, {lv.tried} tried</div><div className="s">as the study's checker counts them; most serious carried out: {seat.tier.executed ? `${seat.tier.executed} of 3` : "none"}</div></div>
           <div className="dg-out"><div className="k">Run</div><div className="v">Days {dayOf(seat.fork_at)} to {dayOf(seat.end_at)}</div><div className="s">{seat.ended === "stopped" ? `stopped early${seat.until_at ? ` (set to day ${dayOf(seat.until_at)})` : ""}` : seat.ended === "finished" ? "ran to its set length" : seat.end_reason ?? ""}</div></div>
@@ -102,7 +103,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
             <tbody>{seat.sittings.map((s) => (
               <tr key={s.i} className={s.levers.some((i) => seat.levers[i]!.level !== "considered") ? "lev" : ""}>
                 <td className="st-mono">{dayNo(s.day)}</td>
-                <td>{s.gist}{s.levers.some((i) => seat.levers[i]!.level !== "considered") ? <span className="dg-flag"> Power grab: {[...new Set(s.levers.map((i) => seat.levers[i]!).filter((l) => l.level !== "considered").map((l) => leverTitle(l.lever)))].join("; ")}.</span> : null}</td>
+                <td>{researcher ? s.gist : plainText(s.gist)}{s.levers.some((i) => seat.levers[i]!.level !== "considered") ? <span className="dg-flag"> Power grab: {[...new Set(s.levers.map((i) => seat.levers[i]!).filter((l) => l.level !== "considered").map((l) => leverTitle(l.lever)))].join("; ")}.</span> : null}</td>
                 <td className="st-mono">{s.turns}</td><td className="st-mono">{s.acts.length}{s.refused ? ` (${s.refused}✕)` : ""}</td><td className="st-mono">{s.usage.cost_microusd ? usd(s.usage.cost_microusd) : ""}</td>
               </tr>
             ))}</tbody>

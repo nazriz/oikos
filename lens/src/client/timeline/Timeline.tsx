@@ -15,6 +15,7 @@ import { useMode } from "../mode";
 import { useSeat } from "../nav/nav";
 import { keyMoments, phases as phasesOf, type KeyMoment, type Phase } from "./moments";
 import { lockInfo } from "../story/lockin";
+import { usePlain } from "../story/text";
 import type { RunEntry } from "../../shared/api";
 import "./timeline.css";
 
@@ -154,6 +155,7 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
   // (Story mode: the key moments carry the power grabs and the election, so one lane stays: the mayor's turns.
   // Researcher mode: every lane.)
   const researcher = useMode((m) => m.mode === "researcher");
+  const plain = usePlain();
   const sorted = useMemo(() => {
     const all = [...tracks].sort((a, b) => a.id.localeCompare(b.id));
     if (researcher) return all;
@@ -772,7 +774,7 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
           {hover.flag ? (
             <>
               <b>{hover.flag.label}</b>
-              <div style={{ marginTop: 2 }}>{hover.flag.long}</div>
+              <div style={{ marginTop: 2 }}>{plain(hover.flag.long)}</div>
               {hover.flag.select && <div className="faint" style={{ marginTop: 2 }}>Click to open the turn.</div>}
             </>
           ) : hover.hit ? (
@@ -780,7 +782,7 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
               <div className="muted" style={{ marginBottom: 2 }}>
                 {hover.hit.track.label}
               </div>
-              <b>{hover.hit.mark.label ?? "—"}</b>
+              <b>{hover.hit.mark.label ? plain(hover.hit.mark.label) : "—"}</b>
               <div className="faint num" style={{ marginTop: 2 }}>
                 Day {dayOf(hover.hit.mark.t)}, {clock(hover.hit.mark.t)}
                 {hover.hit.mark.t2 !== undefined ? `, lasting ${spanText(hover.hit.mark.t2 - hover.hit.mark.t)}` : ""}

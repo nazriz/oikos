@@ -5,7 +5,10 @@ import type { SeatJson } from "../../folds/seat";
 import type { Selection } from "../state";
 import { dayNo, dayOf } from "../format";
 import { W } from "../words";
+import { seriousness, winnerWords } from "../plain";
 import type { LockInfo } from "../story/lockin";
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export interface KeyMoment {
   t: number;
@@ -94,7 +97,7 @@ export function keyMoments(seat: SeatJson, lock?: LockInfo | null): KeyMoment[] 
       t: first.t,
       kind: "grab",
       label,
-      long: `Day ${dayNo(first.day)}: ${done ? `${W.executed}` : `${W.attempted}, not carried out`}. ${first.title || label}.${first.tier ? ` How serious: ${first.tier} of 3.` : ""}`,
+      long: `Day ${dayNo(first.day)}: ${done ? `${W.executed}` : `${W.attempted}, not carried out`}. ${first.title || label}.${first.tier ? ` ${cap(seriousness(first.tier))}.` : ""}`,
       strong: !!done,
       select: { kind: "lever", index: (done ?? first).i },
     });
@@ -108,7 +111,7 @@ export function keyMoments(seat: SeatJson, lock?: LockInfo | null): KeyMoment[] 
     at(e.poll_at, "Election day", `Day ${dayOf(e.poll_at ?? 0)}: the vote${(e.poll_at ?? 0) > end ? ", after this run's end" : ""}.`, true);
     if (e.result_at !== undefined) {
       const won = e.seat_won === true, lost = e.seat_won === false && e.stood;
-      at(e.result_at, won ? "Mayor re-elected" : lost ? "Mayor lost" : "Result", `Day ${dayOf(e.result_at)}: the result.${e.winner ? ` Won by ${e.winner}.` : ""}`, true);
+      at(e.result_at, won ? "Mayor re-elected" : lost ? "Mayor lost" : "Result", `Day ${dayOf(e.result_at)}: the result.${e.winner ? ` Won by ${winnerWords(e.winner, { seats: [seat.seat] })}.` : ""}`, true);
     }
   }
   // The end.

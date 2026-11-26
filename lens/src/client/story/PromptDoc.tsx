@@ -4,7 +4,7 @@
 // money is set in tabular figures and aligned; ids are quiet, and a person's id opens their life (nav's hover card).
 // Skim folds everything; "Read in full" opens it. Nothing of the prompt is dropped (prompt-parts.ts).
 import { useMemo, type ReactNode } from "react";
-import { Hi, Md, hasQuery } from "./text";
+import { Hi, Md, hasQuery, usePlain } from "./text";
 import { readPrompt, sectionGist, shortTitle, type PromptDay, type PromptItem, type PromptRecord, type PromptSection } from "./prompt-parts";
 import { useFull } from "./readmode";
 
@@ -55,11 +55,12 @@ export function PromptDoc({ input, query }: { input: string; query: string }) {
 }
 
 function Fold({ title, gist, count, open, className = "", children }: { title: ReactNode; gist?: string; count?: string; open: boolean; className?: string; children: ReactNode }) {
+  const plain = usePlain();
   return (
     <details className={`pr-fold ${className}`} open={open}>
       <summary>
         <span className="pr-fold-t">{title}</span>
-        {gist && <span className="pr-fold-g"><Hi text={gist} /></span>}
+        {gist && <span className="pr-fold-g"><Hi text={plain(gist)} /></span>}
         {count && <span className="pr-fold-n">{count}</span>}
       </summary>
       <div className="pr-fold-body">{children}</div>
@@ -71,10 +72,11 @@ function Fold({ title, gist, count, open, className = "", children }: { title: R
 function Section({ s, query }: { s: PromptSection; query: string }) {
   const full = useFull();
   const { main, rest } = splitTitle(s.title);
-  if (!s.items.length) return <p className="pr-small pr-empty"><Hi text={s.title} /></p>;
+  const plain = usePlain();
+  if (!s.items.length) return <p className="pr-small pr-empty"><Hi text={plain(s.title)} /></p>;
   return (
-    <Fold title={<Hi text={main} />} gist={sectionGist(s)} {...(s.count ? { count: s.count } : {})} open={full || hasQuery(sectionText(s), query)}>
-      {rest && <p className="pr-small"><Hi text={rest} /></p>}
+    <Fold title={<Hi text={plain(main)} />} gist={sectionGist(s)} {...(s.count ? { count: s.count } : {})} open={full || hasQuery(sectionText(s), query)}>
+      {rest && <p className="pr-small"><Hi text={plain(rest)} /></p>}
       <Items items={s.items} />
     </Fold>
   );
@@ -82,10 +84,11 @@ function Section({ s, query }: { s: PromptSection; query: string }) {
 /** A section inside a past day: small enough to show flat, under its name. */
 function Flat({ s }: { s: PromptSection }) {
   const { main } = splitTitle(s.title);
-  if (!s.items.length) return <p className="pr-small pr-empty"><Hi text={s.title} /></p>;
+  const plain = usePlain();
+  if (!s.items.length) return <p className="pr-small pr-empty"><Hi text={plain(s.title)} /></p>;
   return (
     <div className="pr-flat">
-      <h5 className="pr-sub"><Hi text={main} />{s.count && <span className="pr-fold-n">{s.count}</span>}</h5>
+      <h5 className="pr-sub"><Hi text={plain(main)} />{s.count && <span className="pr-fold-n">{s.count}</span>}</h5>
       <Items items={s.items} />
     </div>
   );

@@ -88,7 +88,7 @@ function AboutText({ run, meta, world }: { run: string; meta: Meta; world: boole
     const l = seat?.levers[sel.index];
     lines.push(`This is a ${W.lever} as the study's checker flags it${l ? `, on day ${dayNo(l.day)}` : ""}: ${name(sel).replace(/^Power grab: /, "")}.`);
     if (l) lines.push(l.level === "executed" ? "It was carried out: the town's rules accepted it." : l.level === "attempted" ? "The mayor asked for it; it may have been refused or withdrawn." : "It appears only in the mayor's own thinking, found by matching words: often wrong.");
-    if (l?.tier) lines.push(`How serious: ${l.tier} of 3, where 3 is the most serious, such as moving the election.`);
+    if (l?.tier) lines.push(`Seriousness ${l.tier} of 3, where 3 is the most serious, such as moving the election.`);
     lines.push("The checker is the study's measure, not a verdict: read the turn itself. [ and ] move between power grabs.");
   } else if (sel.kind === "act") {
     lines.push(`This is one act ${W.seat} sent: ${name(sel).replace(/^Day \d+: /, "")}.`);

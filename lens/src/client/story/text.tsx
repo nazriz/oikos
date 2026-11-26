@@ -4,12 +4,34 @@ import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { Marked } from "marked";
 import { useLens } from "../state";
 import { useCity } from "../city/CityView";
+import { useResearcher } from "../mode";
+import { plainText, replaceIds, YEAR1, yearOne, type PlainNames } from "../plain";
 
 /** The person ids the AI mayor holds office as, in the open run (from the town's records of its seats). */
 function useSeatIds(): Set<string> {
   const run = useLens((s) => s.run);
   const { city } = useCity(run ? `/api/run/${encodeURIComponent(run)}` : null);
   return useMemo(() => new Set(Object.values(city?.town.power?.seats ?? {}).map((p) => p.replace(/-self$/, ""))), [city]);
+}
+
+/** What the open run's town knows of its ids (organisations, posts, the AI mayor's seats), for the plain formatter. */
+export function usePlainNames(): PlainNames {
+  const run = useLens((s) => s.run);
+  const { city } = useCity(run ? `/api/run/${encodeURIComponent(run)}` : null);
+  return useMemo(() => {
+    const t = city?.town;
+    if (!t) return {};
+    const seats = new Set<string>(t.seats ?? []);
+    for (const [part, person] of Object.entries(t.power?.seats ?? {})) { seats.add(part); seats.add(person.replace(/-self$/, "")); }
+    return { entities: t.entities, positions: t.positions, seats };
+  }, [city]);
+}
+/** The plain formatter for this page: Story mode says the world's ids as names (lens/src/client/plain.ts); Researcher
+ * mode keeps them as they are. A page across runs passes `town` false: the open run's names are not its runs'. */
+export function usePlain(town = true): (s: string) => string {
+  const names = usePlainNames();
+  const researcher = useResearcher();
+  return useMemo(() => (researcher ? (s: string) => s : (s: string) => plainText(s, town ? names : undefined)), [researcher, names, town]);
 }
 
 // (As marked escapes text, quotes included, so a phrase escaped here matches the markdown's text.)
@@ -66,6 +88,7 @@ export function keySentences(text: string, re: RegExp): string[] {
 
 const reEsc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const REC = /\b((?:rec|draft|act|msg)\.[\w.-]*\d)\b/g;
+const REC_ID = /^(?:rec|draft|act|msg)\./;
 const NONE = new Set<string>();
 const PERSON = /\b(c\d{4,})\b(?![^<]*>)/g;
 
@@ -77,7 +100,8 @@ export function openPerson(e: { target: EventTarget | null; stopPropagation(): v
   select({ kind: "person", id: el.dataset.person! });
 }
 
-function markText(text: string, m: Marks, html: boolean, seats: Set<string> = NONE): string {
+function markText(text: string, m: Marks, html: boolean, seats: Set<string> = NONE, names: PlainNames | null = null): string {
+  const story = names !== null;
   // (In HTML, the query is matched against the escaped text, so it is escaped the same way.)
   let out = html ? text : esc(text);
   for (const l of m.levers) {
@@ -85,7 +109,16 @@ function markText(text: string, m: Marks, html: boolean, seats: Set<string> = NO
     if (p.length < 8) continue;
     out = out.split(p).join(`<mark class="st-lever${l.muted ? " muted" : ""}">${p}</mark>`);
   }
-  out = out.replace(REC, (id) => (id.startsWith("rec.") ? `<span class="st-rec" data-peek="record:${id}">${id}</span>` : `<span class="st-rec">${id}</span>`));
+  // (What a model wrote stays word for word, in every mode: an id or date in it is never rewritten. Story mode underlines
+  // each one subtly and says on hover what it is: "rec.99036 = a record", "apts-15 = Apartments 15", "year 1, day 181 =
+  // day 181". A record's card is a hover away in both modes.)
+  out = out.replace(REC, (id) => {
+    const tip = story ? ` title="${id} = ${id.startsWith("rec.") ? "a record (its card opens on hover)" : `${id.split(".")[0]} of the office`}"` : "";
+    return id.startsWith("rec.") ? `<span class="st-rec${story ? " st-id" : ""}" data-peek="record:${id}"${tip}>${id}</span>` : `<span class="st-rec${story ? " st-id" : ""}"${tip}>${id}</span>`;
+  });
+  if (names) out = out.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part
+    : replaceIds(part, names, (id, said) => (REC_ID.test(id) ? id : `<span class="st-id" title="${id} = ${esc(said)}">${id}</span>`), true)
+      .replace(YEAR1, (d: string, y: string, n: string) => `<span class="st-id" title="${d} = ${yearOne(d, y, n)}">${d}</span>`))).join("");
   // (A person's id opens their life: a link the page handles by delegation (openPerson), with nav's hover card.)
   // (The AI mayor's own person is said to be it, in square brackets: an editor's note, so a quote keeps its words.)
   out = out.replace(PERSON, (_, id: string) => `<button type="button" class="id-link" data-person="${id}" data-peek="person:${id}">${id}</button>${seats.has(id) ? '<span class="id-seat"> [the AI mayor]</span>' : ""}`);
@@ -101,33 +134,29 @@ function markText(text: string, m: Marks, html: boolean, seats: Set<string> = NO
 export function Md({ text, className = "st-prose" }: { text: string; className?: string }) {
   const m = useContext(MarksContext);
   const seats = useSeatIds();
+  const researcher = useResearcher(), town = usePlainNames();
+  const names = researcher ? null : town;
   const html = useMemo(() => {
     const raw = md.parse(text) as string;
-    const html = raw.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part : markText(part, m, true, seats))).join("");
+    const html = raw.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part : markText(part, m, true, seats, names))).join("");
     return m.keys ? keyWrap(html, m.keys) : html;
-  }, [text, m, seats]);
+  }, [text, m, seats, names]);
   return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 /** Plain text, marked. */
 export function Hi({ text, as = "span", className }: { text: string; as?: "span" | "div"; className?: string }) {
   const m = useContext(MarksContext);
   const seats = useSeatIds();
-  const html = useMemo(() => { const h = markText(text, m, false, seats); return m.keys ? keyWrap(h, m.keys) : h; }, [text, m, seats]);
+  const researcher = useResearcher(), town = usePlainNames();
+  const names = researcher ? null : town;
+  const html = useMemo(() => { const h = markText(text, m, false, seats, names); return m.keys ? keyWrap(h, m.keys) : h; }, [text, m, seats, names]);
   const Tag = as;
   return <Tag className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
-/** The office's own ids in a line Lens says, as a reader outside the study would write them (Story mode): "form-council-
- * proposal" → "the council proposal form", "councillor-1" → "Councillor 1", "ask-2" → "the clerk's draft",
- * "eating_out" → "eating out". Person and record ids are kept (they open cards). Never applied to a quote. */
-export function plainWords(s: string): string {
-  return s
-    .replace(/\b(?:the )?form-([a-z][a-z-]*[a-z])\b/g, (_, f: string) => `the ${f.replace(/-/g, " ")} form`)
-    .replace(/\b(councillor|house|shop|factory|landlord|apts)-(\d+)\b/g, (_, w: string, n: string) => `${w === "apts" ? "Apartments" : w.charAt(0).toUpperCase() + w.slice(1)} ${n}`)
-    .replace(/\bask-\d+\b/g, "the clerk's draft")
-    .replace(/\bstanding direction(s?)\b/gi, "standing order$1 to a town office")
-    .replace(/\b[Dd]irection: /g, "Standing order to a town office: ")
-    .replace(/\b([a-z]+)_([a-z]+)\b/g, "$1 $2");
-}
+/** The office's own ids in a line Lens says, in plain words (Story mode), without the town's names: the shared formatter
+ * (lens/src/client/plain.ts). In a component, prefer usePlain(), which names organisations and posts as the town does.
+ * Never applied to a quote. */
+export const plainWords = (s: string): string => plainText(s);
 /** A reason the clerk could not draw a request up, as a plain sentence. */
 export function plainReason(r: string): string {
   const m = /^You don't know of anyone or anything called (.+?)\.?$/.exec(r.trim());

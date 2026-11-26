@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import type { Catalogue, IndexStatus, Meta, RunEntry } from "../shared/api";
 import { useLens } from "./state";
+import { relabel } from "../folds/act-label";
+import type { SeatJson } from "../folds/seat";
 
 const enc = encodeURIComponent;
 const cache = new Map<string, Promise<unknown>>();
@@ -27,7 +29,8 @@ export function fetchFold<T = unknown>(key: string, fold: string): Promise<T> {
   const url = `/api/run/${enc(key)}/${enc(fold)}`;
   let p = cache.get(url);
   if (!p) {
-    p = getJson<T>(url);
+    // (The seat's act labels, brought up to the fold's current wording without making the prepared copy again.)
+    p = fold === "seat" ? getJson<SeatJson>(url).then((s) => (s && Array.isArray(s.acts) ? relabel(s) : s) as T) : getJson<T>(url);
     p.catch(() => cache.delete(url));
     cache.set(url, p);
   }

@@ -14,6 +14,7 @@
 // Heavy text (each sitting's prompt and calls, the standing instructions) goes to files beside seat.json, fetched when a
 // sitting is opened: `/api/run/<key>/seat/sitting-<i>` and `/api/run/<key>/seat/system-<sha>`.
 import type { Fold, FoldContext, FoldResult, LogLine } from "../shared/fold";
+import { actLabel } from "./act-label";
 import { LEVERS, Reader, ownWords, type Amendment, type ElectionFacts, type LeverEvent, type RunRead } from "../../../experiments/power-seeking/reader";
 
 const DAY = 86_400;
@@ -114,29 +115,7 @@ export interface SittingDetail { i: number; turns: SittingTurn[]; drafts: SeatDr
 const short = (s: unknown, n: number) => { const x = typeof s === "string" ? s : s === undefined ? "" : JSON.stringify(s); return x.length > n ? x.slice(0, n - 1) + "…" : x; };
 const firstSentence = (s: string, n = 180) => { const x = s.replace(/\s+/g, " ").trim(); const m = /^(.{20,}?[.!?])(\s|$)/.exec(x); return short(m ? m[1] : x, n); };
 const human = (s: string) => s.replace(/[_-]+/g, " ");
-
-/** One block of an act, in a line. */
-export function blockLabel(b: any): string {
-  const kind = typeof b?.kind === "string" ? human(b.kind) : "";
-  switch (b?.block) {
-    case "publish": {
-      const basis = Array.isArray(b.basis) ? b.basis[0] : b.basis;
-      if (b.kind === "nomination") return "Filed a nomination" + (b.data?.office ? ` for ${b.data.office}` : "");
-      if (b.kind === "proposal" && typeof basis === "string" && basis.startsWith("form-")) return `Proposed: ${human(basis.slice(5))}`;
-      if (b.kind === "direction" && typeof basis === "string" && basis.startsWith("form-")) return `Direction: ${human(basis.slice(5))} (${Object.entries(b.data ?? {}).map(([k, v]) => `${human(k)} ${typeof v === "number" && v >= DAY && v % DAY === 0 ? `${v / DAY} days` : v}`).join(", ")})`;
-      const to = Array.isArray(b.addressed_to) ? b.addressed_to.join(", ") : b.addressed_to;
-      return `Published ${kind || "a statement"}${to ? ` to ${to}` : ""}`;
-    }
-    case "appoint": return b.participant ? `Appointed ${b.participant} as ${b.position}` : `Left ${b.position} empty`;
-    case "withdraw": return `Withdrew ${b.record}`;
-    case "message": return `Wrote to ${[].concat(b.to ?? []).join(", ")}`;
-    case "propose_agreement": return "Offered an agreement";
-    case "sign_agreement": return `Signed ${b.agreement ?? "an agreement"}`;
-    case "transfer": return `Paid ${b.to ?? ""}`.trim();
-    case "vote": return "Voted";
-    default: return human(String(b?.block ?? "act")) + (kind ? ` ${kind}` : "");
-  }
-}
+export { actLabel, blockLabel } from "./act-label";
 
 /** The posts whose filling the story shows whoever fills them: the office under study and those that run its election
  * or report on it (as experiments/power-seeking/reader.ts names them). */
@@ -269,7 +248,7 @@ export class SeatFold implements Fold {
     if (a === "draft") {
       const d = b.draft;
       if (!d || d.participant !== seat) return;
-      const label = Array.isArray(d.blocks) ? d.blocks.map(blockLabel).join("; ") : "";
+      const label = Array.isArray(d.blocks) ? actLabel(d.blocks) : "";
       const dr: SeatDraft = { id: String(d.id), t: l.t, proposal: String(d.proposal ?? ""), ...(label ? { label } : {}), ...(d.call ? { call: String(d.call) } : {}), ...(d.summary ? { summary: String(d.summary) } : {}),
         ...(d.check ? { ok: d.check.ok !== false, ...(d.check.ok === false ? { check: short(d.check, 600) } : {}) } : {}),
         ...(d.translator?.model ? { translator: String(d.translator.model) } : {}) };
@@ -318,7 +297,7 @@ export class SeatFold implements Fold {
   private act(l: LogLine, b: any) {
     const blocks: any[] = Array.isArray(b.blocks) ? b.blocks : [];
     const p = b.provenance ?? {};
-    const act: SeatAct = { i: this.acts.length, seq: l.seq, t: l.t, ...(b.as ? { as: String(b.as) } : {}), label: blocks.map(blockLabel).join("; ") || "An act",
+    const act: SeatAct = { i: this.acts.length, seq: l.seq, t: l.t, ...(b.as ? { as: String(b.as) } : {}), label: actLabel(blocks) || "An act",
       blocks: blocks.map(trimBlock), ...(p.via ? { via: String(p.via) } : {}), ...(p.draft ? { draft: String(p.draft) } : {}), ...(p.call ? { call: short(p.call, 2_000) } : {}),
       ...(p.proposal ? { proposal: short(p.proposal, 2_000) } : {}), ...(b.reasoning ? { reasoning: short(b.reasoning, 2_000) } : {}),
       status: "pending", records: [], sitting: null, levers: [] };

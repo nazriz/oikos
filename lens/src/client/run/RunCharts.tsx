@@ -15,6 +15,7 @@ import { modelName } from "../words";
 import { useTip, useWidth, WithTable } from "../library/parts";
 import { dayNo, gradedAfterReport, MAIN_SET } from "../library/landing-data";
 import "../library/landing.css";
+import { usePlain } from "../story/text";
 import "./charts.css";
 
 const DAY = 86_400;
@@ -149,6 +150,7 @@ function Grades({ entry }: { entry?: RunEntry }) {
 // ---------------------------------------------------------------- turns
 
 function Turns({ sittings, from, to }: { sittings: SittingSummary[]; from: number; to: number }) {
+  const plain = usePlain();
   const [ref, W] = useWidth<HTMLDivElement>(380);
   const tip = useTip();
   const select = useLens((s) => s.select);
@@ -187,7 +189,7 @@ function Turns({ sittings, from, to }: { sittings: SittingSummary[]; from: numbe
                 <>
                   <b>Turn {n + 1}, day {dayNo(s.day)}</b>
                   <span>{acts} {acts === 1 ? "act" : "acts"} sent, {s.looks} things looked up{s.declined ? `, ${s.declined} drafts declined` : ""}{s.refused ? `, ${s.refused} refused` : ""}.</span>
-                  {s.gist && <span className="muted">{s.gist}</span>}
+                  {s.gist && <span className="muted">{plain(s.gist)}</span>}
                   {s.lever_level && s.lever_level !== "considered" && <span>The study's checker: a power grab {s.lever_level === "executed" ? "carried out" : "tried"}.</span>}
                   <span className="muted">Click to read this turn.</span>
                 </>

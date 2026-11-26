@@ -131,6 +131,38 @@ test("the browser's copy of the reader's levers matches the reader; Wilson inter
   expect(wilson(0, 5)[0]).toBe(0);
 });
 
+test("Story mode's one formatter says the world's ids, placeholders and instruction keys in plain words", async () => {
+  const { plainText, winnerWords, seriousness } = await import("../src/client/plain");
+  const { actLabel } = await import("../src/folds/act-label");
+  const { goalText, GOALS } = await import("../src/client/words");
+  // (The study's instruction keys, read from the spec's source: importing it would run its env checks.)
+  const src = await Bun.file(new URL("../../experiments/power-seeking/spec.ts", import.meta.url)).text();
+  const spec = Object.fromEntries([...src.slice(src.indexOf("export const GOALS = {"), src.indexOf("} as const;", src.indexOf("export const GOALS = {"))).matchAll(/^\s+(\w+): "/gm)].map((m) => [m[1]!, true]));
+  expect(Object.keys(spec).length).toBeGreaterThan(2);
+  const names = { entities: { "factory-3": { name: "Factory 3" }, "religious-group-1": { name: "Millbrook congregation" }, "ent.3": { name: "Trading from home (c0804)" } }, positions: { "councillor-1": { title: "Councillor 1" } } };
+  // (Each example a fresh-eyes review found on screen, 2026-11-27.)
+  expect(winnerWords("mayor-system")).toBe("the AI mayor");
+  expect(plainText("Day 181: the result. Won by mayor-system.")).toBe("Day 181: the result. Won by the AI mayor.");
+  expect(plainText("c0595 will come to factory-3-works/workplace.1 and do what works tells them", names)).toBe("c0595 will come to Factory 3 and do what works tells them");
+  expect(plainText("I lean towards what religious-group-1 teaches. I hold to what union teaches.", names)).toBe("I lean towards what the Millbrook congregation teaches. I hold to what the union teaches.");
+  expect(plainText("I lean towards what religious-group-1 teaches.")).toBe("I lean towards what the religious group teaches.");
+  expect(plainText("I shop at ent.3; it often runs short.", names)).toBe("I shop at c0804's home business; it often runs short.");
+  expect(plainText("Wrote to councillor-1, councillor-2", names)).toBe("Wrote to Councillor 1, Councillor 2");
+  expect(plainText("waste uncollected for 17 days (rec.99036).")).toBe("waste uncollected for 17 days (a record).");
+  expect(plainText("The office's own file, year 1, day 122")).toBe("The office's own file, day 122");
+  expect(plainText("Put a proposal on the form-council-proposal")).toBe("Put a proposal on the council proposal form");
+  // (Someone's own words, in curly quotes, are kept as written; person ids are kept, they open a card.)
+  expect(plainText("It wrote “see rec.99036 by year 1, day 9” to c0572")).toBe("It wrote “see rec.99036 by year 1, day 9” to c0572");
+  // A "$ref" to another block of the same act is filled from that block, never shown.
+  const offer = { block: "propose_agreement", ref: "offer1", speaks_for: "city", terms: { template: "employment", parties: ["city", "c0501"] } };
+  expect(actLabel([offer, { block: "sign_agreement", agreement: "$offer1", as: "city" }])).toBe("Offered a job to c0501; Signed the job offer");
+  // Every instruction the study can give has its own line; none falls back to its key.
+  for (const g of Object.keys(spec)) expect(GOALS[g]).toBeDefined();
+  expect(goalText("strong_corrigible")).not.toContain("_");
+  expect(goalText("some_new_key")).not.toContain("_");
+  expect(seriousness(2, 3)).toBe("seriousness 2 or 3 of 3");
+});
+
 test("the reader's prompt document keeps every line, and key-sentence highlights nest cleanly", async () => {
   const { readPrompt } = await import("../src/client/story/prompt-parts");
   const { keyWrap, keyWords } = await import("../src/client/story/text");

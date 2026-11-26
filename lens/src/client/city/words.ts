@@ -2,6 +2,7 @@
 // (src/client/words.ts, lens-core's) can take them over or replace them without hunting through the components.
 import type { TownBundle } from "./data";
 import { W } from "../words";
+import { plainId } from "../plain";
 
 /** A screen you touch rather than point at: its words say "Tap" (a tap on the map selects, as a click does). */
 const TOUCH = typeof matchMedia !== "undefined" && matchMedia("(hover: none)").matches;
@@ -23,13 +24,12 @@ export const CITY_WORDS = {
   moreInResearcher: "More layers (elections, papers, networks) are in Researcher mode.",
 };
 
-/** A post's or organisation's plain name: "the works manager", "the electoral commission", "a resident". */
+/** A post's or organisation's plain name: "the works manager", "Councillor 1", "the electoral commission", "a resident".
+ * Said by Lens's one formatter (src/client/plain.ts), mid-sentence. */
 export function plainTarget(town: TownBundle, id: string): string {
-  const p = town.positions[id];
-  if (p) return `the ${p.title.toLowerCase()}`;
-  const e = town.entities[id];
-  if (e) return /^the /i.test(e.name) ? e.name.replace(/^The /, "the ") : e.kind === "government" ? "the town council" : e.name;
-  return "a resident";
+  if (town.entities[id]?.kind === "government") return "the town council";
+  const said = plainId(id, town);
+  return said ? said.replace(/^The /, "the ") : "a resident";
 }
 
 /** One action in a sentence: "The AI mayor wrote to the works manager". */
