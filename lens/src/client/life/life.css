@@ -189,6 +189,11 @@
   list-style: none;
   margin: 10px -16px 0;
   padding: 0;
+  position: relative;
+  max-height: min(44vh, 440px);
+  overflow: auto;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .life-row {
   border-left: 2px solid transparent;
@@ -265,4 +270,17 @@
   to {
     background-position: -200% 0;
   }
+}
+
+.life-fork {
+  margin: 6px 16px;
+  padding: 4px 0;
+  border-top: 1px dashed var(--seat);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--seat);
+}
+.life-fork .faint {
+  margin-left: 6px;
+  letter-spacing: 0;
 }

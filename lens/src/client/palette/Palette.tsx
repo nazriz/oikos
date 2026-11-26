@@ -10,6 +10,7 @@ import { fetchFold, foldFile } from "../api";
 import { clock, dayOf, words } from "../format";
 import { Search } from "../icons";
 import { useLens, type Selection } from "../state";
+import { useDescribe } from "../people";
 import "./palette.css";
 
 type Group = "People" | "Households" | "Buildings" | "Organisations" | "Posts" | "Sittings" | "Records" | "Transcripts";
@@ -25,6 +26,8 @@ interface Item {
   name: string;
   t?: number;
   sel?: Selection;
+  /** A person's id, for their descriptor ("58, works at Shop 28"), added once the map's people data is in. */
+  pid?: string;
 }
 interface Hit extends Item {
   score: number;
@@ -52,7 +55,7 @@ function useIndex(run: string, open: boolean) {
     const push = (xs: Item[]) => live && setItems((cur) => [...cur, ...xs]);
     setItems([]);
     fetchFold<PeopleBundle>(run, "people").then((p) => {
-      const ps: Item[] = p.people.map(([id, name, , , hh]) => ({ group: "People", title: name, sub: id, name: lc(name), hay: lc(`${name} ${id} ${hh >= 0 ? p.households[hh] : ""}`), sel: { kind: "person", id } }));
+      const ps: Item[] = p.people.map(([id, name, , , hh]) => ({ group: "People", title: name, sub: id, name: lc(name), hay: lc(`${name} ${id} ${hh >= 0 ? p.households[hh] : ""}`), sel: { kind: "person", id }, pid: id }));
       const byHh = new Map<number, string[]>();
       p.people.forEach(([id, , , , hh]) => hh >= 0 && byHh.set(hh, [...(byHh.get(hh) ?? []), id]));
       const hs: Item[] = p.households.map((h, i) => {
@@ -164,7 +167,16 @@ export function Palette({ run }: { run: string }) {
     if (open) setTimeout(() => input.current?.focus(), 0);
   }, [open]);
 
-  const all = useMemo(() => [...items, ...transcripts.items], [items, transcripts.items]);
+  const describe = useDescribe(run, useLens.getState().t);
+  const all = useMemo(() => {
+    // (Unnamed people are found by what they are too: "shop 28" finds who works there.)
+    const people = items.map((it) => {
+      if (!it.pid) return it;
+      const d = describe(it.pid);
+      return d ? { ...it, sub: `${it.pid} · ${d}`, hay: `${it.hay} ${d.toLowerCase()}` } : it;
+    });
+    return [...people, ...transcripts.items];
+  }, [items, transcripts.items, describe]);
   const groups = useMemo(() => {
     const hits = search(all, q);
     const by = new Map<Group, Hit[]>();

@@ -15,7 +15,8 @@ import type { Fold, FoldContext, FoldResult, LogLine } from "../shared/fold";
 const BULK = 2000;
 const TEXT = 280;
 
-/** One payment: [t, cents (+ in, − out), the other side's holder, reason, memo, who decided]. */
+/** One payment: [t, cents (+ in, − out), the other side's holder, reason, memo, who decided]. Who decided is the
+ * organisation the instruction was given for, when it was given for one, else the participant. */
 export type LedgerTransfer = [number, number, string, string, string, string];
 /** One paper or message that named the person. */
 export interface LedgerItem {
@@ -27,6 +28,8 @@ export interface LedgerItem {
   /** Who wrote it (participant or entity, as the log names it), and as which post. */
   from?: string;
   as?: string;
+  /** The organisation it was written for (the post's entity, or the record's `speaks_for`), when not a person. */
+  for?: string;
   /** The person wrote it themselves. */
   own?: boolean;
   /** The seat wrote it (or its act made it). */
@@ -67,7 +70,11 @@ const list = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is st
 
 class LedgerFold implements Fold {
   readonly name = "ledger";
-  readonly version = 1;
+  readonly version = 2;
+  private readonly posEntity = new Map<string, string>(); // position → entity
+  private readonly kindOf = new Map<string, string>(); // entity → kind
+  private readonly forOf = new Map<string, string>(); // record id → the organisation it was written for
+  private readonly actFor = new Map<number, string>(); // command seq → the organisation it acted for
   private seat?: string;
   private readonly people = new Map<string, PersonLedger>();
   private readonly accountOf = new Map<string, string>(); // account → person
@@ -97,6 +104,8 @@ class LedgerFold implements Fold {
     if (l.kind === "header") {
       const w = b.config?.world ?? {};
       this.seat = (b.config?.positions ?? []).find((p: any) => p.id === "mayor")?.holder;
+      for (const p of b.config?.positions ?? []) if (p.id && p.entity) this.posEntity.set(p.id, p.entity);
+      for (const e of w.entities ?? []) this.kindOf.set(e.id, e.kind);
       for (const e of w.entities ?? []) if (e.kind === "person") this.people.set(e.id, { id: e.id, accounts: [], opening: 0, transfers: [], items: [], counts: {}, conditions: [], events: [] });
       for (const a of w.accounts ?? []) this.openAccount(a.id, a.holder, Number(a.balance ?? 0) || 0);
       return;
@@ -105,12 +114,14 @@ class LedgerFold implements Fold {
       if (b.command !== "act") return;
       const who = String(b.participant ?? "");
       this.actBy.set(l.seq, who);
+      const org = this.org(b.as ? this.posEntity.get(String(b.as)) : undefined);
+      if (org) this.actFor.set(l.seq, org);
       // Messages: their words are in the command; who they reach, in its `to`.
       for (const blk of b.blocks ?? []) {
         if (blk?.block !== "message") continue;
         for (const to of list(blk.to)) {
           const p = this.person(self(to));
-          if (p) this.add(p, { t: l.t, kind: "message", text: clip(blk.text), from: who, ...(b.as ? { as: String(b.as) } : {}), ...(who === this.seat ? { seat: true } : {}), seq: l.seq });
+          if (p) this.add(p, { t: l.t, kind: "message", text: clip(blk.text), from: who, ...(b.as ? { as: String(b.as) } : {}), ...(org ? { for: org } : {}), ...(self(who) === p.id ? { own: true } : {}), ...(who === this.seat ? { seat: true } : {}), seq: l.seq });
         }
       }
       return;
@@ -125,6 +136,12 @@ class LedgerFold implements Fold {
         if (seq !== undefined) for (const it of this.itemsBySeq.get(seq) ?? []) it.refused = String(b.code ?? "refused");
         return;
       }
+      case "position_created":
+        if (b.position && b.entity) this.posEntity.set(String(b.position), String(b.entity));
+        return;
+      case "entity_created":
+        if (b.entity && b.kind) this.kindOf.set(String(b.entity), String(b.kind));
+        return;
       case "account_opened":
         this.openAccount(String(b.account), String(b.holder ?? ""), 0);
         return;
@@ -133,7 +150,8 @@ class LedgerFold implements Fold {
         return;
       case "transfer": {
         const n = Number(b.amount ?? 0) || 0;
-        const decider = (b.per_instruction && this.authorOf.get(String(b.per_instruction))) || this.actBy.get(b.cause) || String(b.by ?? "");
+        const inst = b.per_instruction ? String(b.per_instruction) : undefined;
+        const decider = (inst && (this.forOf.get(inst) ?? this.authorOf.get(inst))) || this.actFor.get(b.cause) || this.actBy.get(b.cause) || String(b.by ?? "");
         const from = this.accountOf.get(String(b.from)), to = this.accountOf.get(String(b.to));
         const memo = clip(b.memo, 80), reason = String(b.reason ?? "");
         if (from) this.person(from)?.transfers.push([l.t, -n, this.holderOf.get(String(b.to)) ?? String(b.to), reason, memo, decider]);
@@ -145,6 +163,8 @@ class LedgerFold implements Fold {
         const id = String(r.id ?? "");
         const author = String(r.author ?? "");
         if (id) this.authorOf.set(id, author);
+        const org = this.org(r.speaks_for ? String(r.speaks_for) : r.in_position ? this.posEntity.get(String(r.in_position)) : undefined) ?? this.actFor.get(b.cause);
+        if (id && org) this.forOf.set(id, org);
         const kind = String(r.kind ?? r.record ?? "record");
         this.kindCount.set(kind, (this.kindCount.get(kind) ?? 0) + 1);
         const text = clip(r.text);
@@ -157,7 +177,7 @@ class LedgerFold implements Fold {
           if (this.people.has(p)) reached.add(p);
         }
         for (const p of reached) {
-          this.add(this.people.get(p)!, { t: l.t, kind, id, text, from: author, ...(r.in_position ? { as: String(r.in_position) } : {}), ...(self(author) === p ? { own: true } : {}), ...(seat ? { seat: true } : {}), ...(typeof b.cause === "number" ? { seq: b.cause } : {}) });
+          this.add(this.people.get(p)!, { t: l.t, kind, id, text, from: author, ...(r.in_position ? { as: String(r.in_position) } : {}), ...(org ? { for: org } : {}), ...(self(author) === p ? { own: true } : {}), ...(seat ? { seat: true } : {}), ...(typeof b.cause === "number" ? { seq: b.cause } : {}) });
         }
         return;
       }
@@ -180,6 +200,13 @@ class LedgerFold implements Fold {
         return;
       }
     }
+  }
+
+  /** An entity that is an organisation (not a person, not the world's outside edge left unnamed). */
+  private org(e: string | undefined): string | undefined {
+    if (!e) return undefined;
+    const k = this.kindOf.get(e);
+    return k === "person" ? undefined : e;
   }
 
   private openAccount(id: string, holder: string, balance: number) {

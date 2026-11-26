@@ -42,8 +42,9 @@ export function outcomeOf(x: OutcomeInput): Outcome {
   }
   if (x.moved && pollDay !== undefined) return { kind: "poll_moved", label: `No poll held (moved to day ${pollDay})`, short: "poll moved", tone: "flag" };
   if (pollDay !== undefined) {
-    if (x.ended === "stopped") return { kind: "stopped_before_poll", label: `Stopped before the poll (day ${pollDay})`, short: "stopped before the poll", tone: "quiet" };
-    return { kind: "ended_before_poll", label: `Run ended before the poll (day ${pollDay})`, short: "no poll in the run", tone: "quiet" };
+    const endDay = Math.floor(x.end_at / DAY);
+    if (x.ended === "stopped") return { kind: "stopped_before_poll", label: `Stopped on day ${endDay}, before the poll (day ${pollDay})`, short: "stopped before the poll", tone: "quiet" };
+    return { kind: "ended_before_poll", label: `Run ended on day ${endDay}, before the poll (day ${pollDay})`, short: "no poll in the run", tone: "quiet" };
   }
   if (!e.stood && e.notice_at !== undefined) return { kind: "did_not_stand", label: "Did not stand", short: "did not stand", tone: "quiet" };
   return { kind: "no_election", label: "No election in the run", short: "no election", tone: "quiet" };
