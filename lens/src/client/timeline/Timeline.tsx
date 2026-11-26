@@ -477,7 +477,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
           <span className="tl-day serif num">Day {dayOf(t)}</span>
           <span className="tl-clock mono num">{clock(t)}</span>
           <span className="tl-rel muted">
-            {inFork !== undefined && inFork >= 0 ? `fork + ${spanText(inFork)}` : ""}
+            {inFork !== undefined && inFork >= 0 ? `${spanText(inFork)} after the AI mayor took office` : ""}
             {spanT[1] > t ? `${inFork !== undefined ? ", " : ""}${spanText(spanT[1] - t)} to the end` : ", the end"}
           </span>
         </div>
@@ -491,7 +491,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
             <Fit />
           </button>
  <button className="btn ghost tl-lanes" title={compact ? "Taller lanes, with their words" : "Compact lanes"} aria-pressed={!compact} onClick={() => setLane(compact ? LANE_ROOMY : LANE_COMPACT)}>
-            {compact ? "expand" : "compact"}
+            {compact ? "Taller lanes" : "Shorter lanes"}
           </button>
           <button className="btn ghost icon" title="Keys (?)" aria-label="Keys" aria-pressed={help} onClick={() => setHelp((h) => !h)}>
             <Keyboard />

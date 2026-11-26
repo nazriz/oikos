@@ -337,8 +337,16 @@
     padding: 10px 0;
   }
   .lib-nav {
-    flex-wrap: wrap;
-    gap: 6px;
+    gap: 2px;
+    width: 100%;
+    justify-content: space-between;
+  }
+  .lib-nav .help-btn {
+    padding: 0 6px;
+    font-size: 13px;
+  }
+  .lib-nav .seg button {
+    padding: 0 8px;
   }
   .lib-hero h1 {
     font-size: 32px;
