@@ -921,18 +921,15 @@ export class WorldEngine {
   };
 
   /** The hour the town is lit by: the clock's, except that while time races (more than a few hours a second) the
-   * light holds, and across a jump (a scrub, a click on the timeline) it eases over, so day and night never strobe. */
+   * light holds, and once time slows it takes the true hour at once (as lens-smooth's LightClock: easing a lone jump
+   * re-lit the town every frame for a second), so day and night never strobe. */
   private lightHour(t: number, tWas: number, dt: number): number {
     const target = (((t % DAY) + DAY) % DAY) / 3600;
     if (this.shownHour < 0) return (this.shownHour = target);
     const rate = dt > 0 ? Math.abs(t - tWas) / dt : 0;
     if (rate > 4 * 3600) return this.shownHour;
-    let d = target - this.shownHour;
-    if (d > 12) d -= 24; else if (d < -12) d += 24;
-    if (Math.abs(d) > 0.25) this.shownHour = (this.shownHour + d * Math.min(1, dt * 4) + 24) % 24;
-    else this.shownHour = target;
-    if (Math.abs(d) > 0.01) this.dirty = true;
-    return this.shownHour;
+    if (Math.abs(target - this.shownHour) > 0.01) this.dirty = true;
+    return (this.shownHour = target);
   }
   private shownHour = -1;
   private lastT = NaN;

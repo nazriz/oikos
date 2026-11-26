@@ -16323,7 +16323,7 @@ Naz saw flicker, and set the rule "a professional research tool that is a joy to
   screen-space noise shimmered on thin things far off. Tree detail switches with 120 m of hysteresis; labels and
   captions fade, with hysteresis on distance and on which of two overlapping labels is shown.
 - **Quiet:** it draws only while the clock, the camera, the selection or the mode changes (and 4 s after, as the water
-  and leaves settle); the hour it is lit by holds while time races (over 4 h a second) and eases across a jump; the
+  and leaves settle); the hour it is lit by holds while time races (over 4 h a second) and takes the true hour once it slows (as lens-smooth's LightClock); the
   camera moves only when asked (a click, a selection, a tour); the key is on request.
 - Measured in headful Chrome (GPU) on the run page, blinking pixels per frame (A-B-A) at 480x300, the camera orbiting
   at 80/300/900 m: 39/27/110 on main, 32/18/6 after; playing slow/fast (320x200): 5.7/4.5 before, 1.2/0.1 after; WebKit
