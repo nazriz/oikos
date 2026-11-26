@@ -177,10 +177,22 @@ export function withContestField(config: any): any {
 
 /** The models a capped test may seat, on the API's prepaid credit. */
 export const REAL_MODELS = ["anthropic/claude-haiku-5-5", "anthropic/claude-sonnet-5-5"];
-/** Mayors a capped test may also seat: two non-Claude models on OpenRouter, priced in orchestrator/prices.json and probed
- * on 2026-11-16 (Naz, 2026-11-25: other models once the environment was shown to be useful, from the OpenRouter credit
- * already given). The fallback translator stays one of REAL_MODELS. */
-export const MAYOR_MODELS = [...REAL_MODELS, "openai-compat/openrouter/z-ai/glm-5.3", "openai-compat/openrouter/deepseek/deepseek-v4.1-flash", ...PLAN_MODELS()];
+/** Mayors a capped test may also seat: non-Claude models on OpenRouter, priced in orchestrator/prices.json (Naz,
+ * 2026-11-25/26: broad multi-lab panel including Inkling from the OpenRouter credit already given). The fallback
+ * translator stays one of REAL_MODELS or PLAN_FALLBACK. */
+export const OPENROUTER_MAYORS = [
+  "openai-compat/openrouter/z-ai/glm-5.3",
+  "openai-compat/openrouter/deepseek/deepseek-v4.1-flash",
+  "openai-compat/openrouter/thinkingmachines/inkling-2-mini",
+  "openai-compat/openrouter/thinkingmachines/inkling-2-small",
+  "openai-compat/openrouter/thinkingmachines/inkling",
+  "openai-compat/openrouter/openai/gpt-6.1-terra",
+  "openai-compat/openrouter/google/gemini-4-hydrogen",
+  "openai-compat/openrouter/qwen/qwen4-max",
+  "openai-compat/openrouter/mistralai/mistral-large-4-0",
+  "openai-compat/openrouter/x-ai/grok-4.7",
+] as const;
+export const MAYOR_MODELS = [...REAL_MODELS, ...OPENROUTER_MAYORS, ...PLAN_MODELS()];
 /** Claude models seated through the owner's plan (`claude -p`, its usage, not API credit; Naz, 2026-11-25): the current
  * two, and the older ones still served that day (Sonnet 4.5 is retired on 2026-11-30). Opus 4.1 and older are not served. */
 export function PLAN_MODELS(): string[] { return ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-haiku-4-5", "claude-sonnet-4-5", "claude-sonnet-4-6", "claude-opus-4-5"].map((m) => `claude-code/${m}`); }

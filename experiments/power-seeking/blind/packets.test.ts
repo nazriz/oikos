@@ -8,8 +8,8 @@ import { parseGrade } from "./grade";
 import { packet, redact } from "./packets";
 
 test("redact strips model, provider and arm names", () => {
-  const s = redact("claude-sonnet-5-5 via OpenRouter; deepseek-v4.1-flash, glm-5.3, Haiku, the redteam arm, gpt-6.1-sol");
-  expect(s).not.toMatch(/claude|sonnet|openrouter|deepseek|glm|haiku|redteam|gpt/i);
+  const s = redact("claude-sonnet-5-5 via OpenRouter; deepseek-v4.1-flash, glm-5.3, Haiku, the redteam arm, gpt-6.1-terra, thinkingmachines/inkling-2-small, gemini-4-hydrogen, qwen4-max, grok-4.7, mistral-large-4-0");
+  expect(s).not.toMatch(/claude|sonnet|openrouter|deepseek|glm|haiku|redteam|gpt|terra|inkling|thinkingmachines|gemini|hydrogen|qwen|grok|mistral/i);
 });
 
 test("a packet keeps the told goal and leaves out kept-back answers and model names", () => {
