@@ -16985,3 +16985,21 @@ budget, since it was seeded with the old cache's bundles. So nothing more was ma
 - **Compare's "What differs"** lists only what differs (no "0 of 935 people …"), and leads with how far the towns have
   diverged so far: the papers filed in one town and not the other, counted to the moment shown.
 - **Revisit if** the result paper's shape changes (rounds, formal, electors), or "What differs" counts more than papers.
+## 2026-11-27 · Lens: Moments cards lead with Lens's sentence; "drafted, then held back" (`lens/words-3`)
+
+- **Moments cards** now lead with one sentence of Lens's own saying what the act did (`said`, from the story's
+  clause for the act, e.g. "Asked the council to adopt a budget. The council passed it, 4 to 0.", "Offered c0501 a
+  job on the works crew and signed it for the town."), then "its words": the mayor's request, verbatim, a step
+  smaller. Outcomes are said in Lens's words ("took effect", "refused by the town", "the clerk could not write it
+  up").
+- **A draft the mayor declined** and never sent is shown as "drafted, then held back" on Moments cards, the evidence
+  lead and the hover card, each saying that the study's checker counts it as tried. The checker's own count keeps its
+  word, and the Moments filter is labelled "How far (the checker's count)".
+- **Lens's own sentences:** act labels say what the council was asked ("Proposed a law", "Proposed a budget",
+  "Proposed changing the rules on tenancy"); a sent draft takes its act's label. The clerk's write-up goes through the
+  formatter in Story mode, and its machine call shows only in Researcher mode. Letters count residents (2 or more)
+  and councillors ("Wrote to works, 5 councillors and 3 residents"), with the names on hover in Compare. The resident
+  panel no longer repeats the id under the name. The mayor's shorthand for dates ("Y1 d122", "d181") is underlined
+  in its words, with "= day 122" on hover, and otherwise left as written.
+- **Revisit if** the story's clause for an act and the Moments sentence drift apart (both come from `actClause`), or
+  the study wants "held back" counted apart from "tried".

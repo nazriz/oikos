@@ -50,7 +50,7 @@ function councilVerdict(seat: SeatJson, recordId: string): string | undefined {
 }
 
 /** One act as a clause ("proposed changing the election law so ..."), and a follow-up sentence if the log says more. */
-function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string | undefined): { clause: string; after?: string; kind: string; noun?: string; proposal?: string } | undefined {
+export function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string | undefined): { clause: string; after?: string; kind: string; noun?: string; proposal?: string } | undefined {
   const b = a.blocks[0] ?? {};
   const rec = a.records[0]?.id;
   if (a.status === "refused") return { clause: `tried to ${a.label.charAt(0).toLowerCase() + a.label.slice(1)}, but it was refused (${a.detail ?? a.code})`, kind: "refused" };
