@@ -1,5 +1,5 @@
 /* Story mode's rail: an account in plain sentences (docs/design/lens-look.md: Overpass for Lens, serif for the mayor). */
-.sm { height: 100%; overflow-y: auto; background: var(--st-panel); color: var(--st-text); font-family: var(--st-sans); border-left: 1px solid var(--st-line); }
+.sm { position: relative; height: 100%; overflow-y: auto; background: var(--st-panel); color: var(--st-text); font-family: var(--st-sans); border-left: 1px solid var(--st-line); }
 .sm-head { padding: 18px 18px 14px; border-bottom: 1px solid var(--st-line); }
 .sm-head h2 { font-size: 19px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 8px; line-height: 1.2; }
 .sm-head p { font-size: 13.5px; line-height: 1.55; margin: 0 0 6px; color: var(--st-text); }
