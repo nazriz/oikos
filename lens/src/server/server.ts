@@ -29,8 +29,6 @@ function fileResponse(req: Request, path: string, type: string): Response {
   const takesGzip = (req.headers.get("accept-encoding") ?? "").includes("gzip");
   // (A bundle never changes under its name: a changed log makes a new bundle. The client may keep it.)
   const headers: Record<string, string> = { "content-type": type, "cache-control": "private, max-age=3600" };
-  // (No filename: Bun names a file response after the file, "x.bin.gz", and Safari then keeps the gzip bytes as they are
-  // instead of decoding them, so the client got gzip where it expected the columns: the 3D town and the map failed.)
   if (takesGzip && existsSync(gz)) return new Response(Bun.file(gz), { headers: { ...headers, "content-encoding": "gzip", vary: "accept-encoding", "content-disposition": "inline" } });
   if (!existsSync(path)) return notFound("file");
   return new Response(Bun.file(path), { headers });
