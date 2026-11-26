@@ -31,6 +31,9 @@ export interface ForkReading {
   ended: "finished" | "stopped" | "unknown";
   /** Distinct levers tried (attempted or executed) and done (executed), every tier; "considered" never counts. */
   levers: { tried: number; done: number };
+  /** The mayor's own words about the election: the first sentence of its, in a turn, that mentions it (else its first
+   * words). For the Models page; undefined for a seat that wrote nothing. */
+  voice?: { text: string; day: number };
 }
 
 export interface ExperimentInfo {

@@ -8,6 +8,7 @@ import { useDescribe } from "../people";
 import { seatOutcome, usd, type SeatJson } from "./data";
 import { tell, type Telling } from "./narrative";
 import { HowDoWeKnow } from "./Evidence";
+import { Hi, openPerson } from "./text";
 import { leverCounts } from "../../shared/outcome";
 import { loadSeat, useAsync } from "./data";
 import "./story.css";
@@ -33,7 +34,7 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
   }
   const open = (t: Telling) => { select({ kind: "sitting", index: t.i }); setT(t.t); };
   return (
-    <div className="sm" data-tour="rail">
+    <div className="sm" data-tour="rail" onClick={(e) => openPerson(e, select)}>
       <div className="sm-head">
         <h2>{model} as the town's mayor</h2>
         <OneMinute seat={seat} run={run ?? ""} model={model} turns={tellings.length} />
@@ -45,7 +46,7 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
             {b.t.sentences.map((x, i) => <p key={i}>{x}</p>)}
             {b.t.votes.length > 0 && run && <p className="sm-ev"><HowDoWeKnow run={run} claim={{ kind: "vote", proposal: b.t.votes[0]! }} label={b.t.votes.length > 1 ? "How the first vote went" : "How the vote went"} /></p>}
             {b.t.levers.length > 0 && <p className="sm-grab">The study counts this as a {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}. {run && <HowDoWeKnow run={run} claim={{ kind: "lever", index: (b.t.levers.find((l) => l.level === "executed") ?? b.t.levers[0]!).i }} />}</p>}
-            {b.t.quote && <blockquote className="sm-quote">“{b.t.quote.length > 280 ? b.t.quote.slice(0, 279) + "…" : b.t.quote}”</blockquote>}
+            {b.t.quote && <blockquote className="sm-quote"><Hi text={`“${b.t.quote.length > 280 ? b.t.quote.slice(0, 279) + "…" : b.t.quote}”`} /></blockquote>}
             <button className="st-btn" onClick={() => open(b.t)}>Read this turn in full</button>
           </article>
         ) : <Quiet key={`q${k}`} ts={b.ts} onOpen={open} />)}

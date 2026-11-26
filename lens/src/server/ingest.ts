@@ -12,7 +12,8 @@ import { metaFold, type IngestStats } from "../folds/meta";
 import { FOLDS } from "./folds";
 import { lineBatches, LineSplitter, type Progress } from "./source";
 import type { RunRead } from "../../../experiments/power-seeking/reader";
-import { readerFor, readingOf, wanted, type ReadingInput } from "./reading";
+import { readerFor, readingOf, wanted, VoiceTracker, type ReadingInput } from "./reading";
+import { voiceOf } from "../client/story/moments-data";
 
 const DAY = 86_400;
 
@@ -207,7 +208,7 @@ export async function ingest(path: string, o: IngestOptions): Promise<IngestResu
       if (study) reading = readingOf(study.reader.result(), o.reading, end);
       else {
         const seat = outputs.find((x) => x.name === "seat")?.json as any;
-        if (seat?.levers) reading = readingOf({ events: seat.levers, tier: seat.tier, election: seat.election, elections: seat.elections ?? [seat.election], amendments: seat.amendments ?? [] } as unknown as RunRead, o.reading, end);
+        if (seat?.levers) reading = readingOf({ events: seat.levers, tier: seat.tier, election: seat.election, elections: seat.elections ?? [seat.election], amendments: seat.amendments ?? [] } as unknown as RunRead, o.reading, end, voiceOf(seat) ? { text: voiceOf(seat)!.text, day: voiceOf(seat)!.day } : undefined);
       }
     } catch (e) {
       errors["reading"] = String((e as Error).stack ?? e);
@@ -228,6 +229,7 @@ function finishResult(outputs: FoldOutput[], errors: IngestResult["errors"], lin
 export async function readOnly(path: string, x: ReadingInput, signal?: AbortSignal): Promise<ForkReading | undefined> {
   const study = readerFor(x);
   if (!study) return undefined;
+  const voice = new VoiceTracker(study.seat);
   let last: string | undefined;
   let end: { at: number; reason?: string } | undefined;
   for await (const batch of lineBatches(path)) {
@@ -242,10 +244,10 @@ export async function readOnly(path: string, x: ReadingInput, signal?: AbortSign
           if (l.kind === "end") end = { at: l.t, ...(l.body?.reason ? { reason: String(l.body.reason) } : {}) };
         } catch {}
       }
-      if (!isDebrief(raw) && wanted(raw, study.seat)) study.reader.see(JSON.parse(raw));
+      if (!isDebrief(raw) && wanted(raw, study.seat)) { const l = JSON.parse(raw); study.reader.see(l); voice.see(l); }
     }
   }
-  return readingOf(study.reader.result(), x, end ?? { at: last ? tailT(last) || 0 : 0 });
+  return readingOf(study.reader.result(), x, end ?? { at: last ? tailT(last) || 0 : 0 }, voice.voice);
 }
 
 export { LineSplitter };

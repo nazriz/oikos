@@ -18,7 +18,7 @@ const here = import.meta.dir;
 /** The study reader's own source, hashed: its readings are only as current as it is. */
 const readerVersion = (() => {
   const h = createHash("sha1");
-  h.update("lens-reading-2"); // (Lens's own shape of a reading: bump when ForkReading changes.)
+  h.update("lens-reading-3"); // (Lens's own shape of a reading: bump when ForkReading changes.)
   for (const f of ["reader.ts", "tally.ts"]) {
     const p = resolve(here, "../../../experiments/power-seeking", f);
     if (existsSync(p)) h.update(readFileSync(p));

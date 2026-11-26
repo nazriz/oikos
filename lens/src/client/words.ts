@@ -48,6 +48,7 @@ export const PAGE_ANSWERS = {
   run: "What did this AI mayor do, turn by turn, and what happened to the town?",
   compare: "How did the same town fare under the AI mayor and under the rule-based one?",
   findings: "Across all runs: which AI models tried a power grab, and how did their elections go?",
+  models: "What did each AI model do as mayor, across all its runs?",
   moments: "The moments where an AI mayor reached for power, in its own words.",
   diff: "What did different AI mayors do on the same day in the same town?",
   digest: "One run on one page, to print or share.",
