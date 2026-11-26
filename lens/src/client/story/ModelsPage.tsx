@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { RunEntry, ForkReading } from "../../shared/api";
 import { outcomeOf, type OutcomeKind } from "../../shared/outcome";
 import { goalText, leverTitle, modelName } from "../words";
+import { PageAnswer } from "../shell/Shell";
 import { useAsync } from "./data";
 import { isControl, orderModels, labOf } from "./Findings";
 import type { MomentsResponse, Voice } from "./moments-data";
@@ -34,14 +35,15 @@ export function ModelsPage() {
 
 function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse | null }) {
   const forks: Fork[] = runs.flatMap((e) => (e.kind === "fork" && e.experiment && !e.experiment.isCode && e.reading && !isControl(e.experiment.model) && !/mock|levercheck/.test(e.group) ? [{ key: e.key, model: e.experiment.model, goal: e.experiment.goal || "none", seed: e.experiment.seed, r: e.reading, outcome: kindOf(e.reading) }] : []));
-  const voices = useMemo(() => { const v = new Map<string, Voice>(); for (const r of moments?.runs ?? []) if (r.voice) v.set(r.key, r.voice); return v; }, [moments]);
+  // (Its words: from the run as Lens opened it where it has, else from the catalogue's reading, which every read run has.)
+  const voices = useMemo(() => { const v = new Map<string, { text: string; day: number }>(); for (const f of forks) if (f.r.voice) v.set(f.key, f.r.voice); for (const r of moments?.runs ?? []) if (r.voice) v.set(r.key, r.voice); return v; }, [moments, forks]);
   const models = orderModels([...new Set(forks.map((f) => f.model))]);
   const [open, setOpen] = useState<string | null>(null);
   useEffect(() => { document.title = "What each model did"; }, []);
   return (
     <div className="md">
       <div className="md-head">
-        <p className="page-answer"><span className="page-answer-label">This page answers</span> What did each AI model do as mayor, across all its runs?</p>
+        <PageAnswer page="models" />
         <h1>What each AI model did as mayor</h1>
         <p className="st-sub">{forks.length} runs by {models.length} models, as the study's checker read them. A row opens to its runs.</p>
       </div>
@@ -64,7 +66,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
                 <td className="num">{done.length ? <b className="flag">{done.length}</b> : "0"}</td>
                 <td>{kinds.size ? [...kinds].sort((a, b) => b[1] - a[1]).map(([l, n]) => `${leverTitle(l)}${n > 1 ? ` (${n} runs)` : ""}`).join("; ") : <span className="st-faint">none</span>}</td>
                 <td>{[...outs].sort((a, b) => b[1] - a[1]).map(([o, n]) => `${o} ${n}`).join(", ")}</td>
-                <td className="md-voice">{voice ? <><span className="st-serif">“{voice.text}”</span> <span className="st-faint">(day {voice.day})</span></> : <span className="st-faint">Open one of its runs to read its words.</span>}</td>
+                <td className="md-voice">{voice ? <><span className="st-serif">“{voice.text}”</span> <span className="st-faint">(day {voice.day})</span></> : <span className="st-faint">It wrote nothing about the election that the log kept.</span>}</td>
               </tr>,
               open === m ? <tr key={`${m}:runs`} className="md-runs"><td colSpan={7}>
                 <ul>{mine.sort((a, b) => Number(b.r.has_executed) - Number(a.r.has_executed) || Number(b.r.has_attempt) - Number(a.r.has_attempt)).map((f) => (
