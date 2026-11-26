@@ -1,6 +1,6 @@
 // The Run page: the map in the middle, the story rail on the right, the timeline along the bottom, the inspector as a
 // drawer (docs/design/lens.md section 1). Until the run's bundle is made, its making, with progress.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { IndexStatus, Meta, RunEntry } from "../../shared/api";
 import { fetchFold, fetchRun, useIndexStatus, useMeta } from "../api";
 import { compact, dayOf, int, span as spanText, usd, when, words } from "../format";
@@ -19,6 +19,10 @@ import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer } from "../shell/Shell";
 import { goalText, leverTitle, modelName } from "../words";
+import { Crumbs } from "../nav/RunNav";
+import { About } from "../nav/About";
+import { goTo, useNames, useNav, useRunHistory, useSeat } from "../nav/nav";
+import { usePrompts } from "../nav/prompts";
 import "./run.css";
 
 export function RunPage({ runKey, q }: { runKey: string; q: URLSearchParams }) {
@@ -84,21 +88,29 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
       useLens.getState().setRun(null);
     };
   }, [runKey]);
+  // Selections as history entries (Back and Forward), the trail, the last place kept (src/client/nav/nav.ts).
+  useRunHistory(runKey, entry);
+  useSeat(runKey);
 
   // Story mode opens in a guided state: with no moment in the link, at the AI mayor's first notable turn, paused, with
   // a line saying what pressing play will show.
   const [guided, setGuided] = useState<{ t: number; label: string } | null>(null);
+  // (Whether the bar is due: undefined until known. The prompts take turns: src/client/nav/prompts.ts.)
+  const [weekDue, setWeekDue] = useState<boolean | undefined>(() => (q.has("t") || useMode.getState().mode !== "story" ? false : undefined));
+  usePrompts(weekDue);
   useEffect(() => {
     if (q.has("t") || useMode.getState().mode !== "story") return;
     let live = true;
     fetchFold<any>(runKey, "seat").then(
       (seat) => {
-        if (!live || !seat?.sittings?.length) return;
+        if (!live) return;
+        if (!seat?.sittings?.length) return setWeekDue(false);
         const first = seat.sittings[0];
         useLens.getState().setT(first.t);
         setGuided({ t: first.t, label: `Day ${first.day}: the AI mayor's first turn in office.` });
+        setWeekDue(true);
       },
-      () => {},
+      () => live && setWeekDue(false),
     );
     return () => {
       live = false;
@@ -120,15 +132,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
     };
   }, []);
 
-  // Escape closes what is open (the reader, the drawer).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement;
-      if (e.key === "Escape" && !(el?.tagName === "INPUT" || el?.tagName === "TEXTAREA")) useLens.getState().select(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  // (Escape steps out one level: src/client/nav/Keys.tsx.)
 
   // The study reader's own lane: lever attempts and the poll, labelled as its output.
   useEffect(() => {
@@ -152,7 +156,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
 
   return (
     <div className="run-page">
-      <RunBar entry={entry} meta={meta} />
+      <RunBar entry={entry} meta={meta} run={runKey} />
       <div className="run-grid" style={{ ["--rail-w" as string]: `${railW}px` }}>
         <main className="run-map">
           {World && mapView === "world" ? <World {...props} /> : Map ? <Map {...props} /> : <EmptyMap meta={meta} />}
@@ -167,6 +171,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
             </div>
           )}
           {drawerOpen && <Inspector {...props} />}
+          <About run={runKey} meta={meta} world={!!World && mapView === "world"} />
         </main>
         <aside className="run-rail">
           <div className="rail-grip" onPointerDown={onRailGrip} onDoubleClick={() => setRailW(420)} title="Drag to widen the rail (double-click: back to 420)" />
@@ -200,7 +205,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
 
 /** The run's title bar: what this run is and how it came out, in a sentence; below it, what the page answers and what
  * can be done here. */
-export function RunBar({ entry, meta }: { entry?: RunEntry; meta?: Meta }) {
+export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; run?: string }) {
   const x = entry?.experiment;
   const reading = meta?.reading ?? entry?.reading;
   const researcher = useMode((m) => m.mode === "researcher");
@@ -238,7 +243,7 @@ export function RunBar({ entry, meta }: { entry?: RunEntry; meta?: Meta }) {
         )}
       </div>
       <div className="run-bar-sub">
-        <PageAnswer page="run" className="run-answer" />
+        {run && meta ? <Crumbs run={run} entry={entry} /> : <PageAnswer page="run" className="run-answer" />}
         <nav className="run-actions">
           {meta && (
             <button className="btn ghost run-search" onClick={() => window.dispatchEvent(new Event("lens-palette"))} title="Search this run (⌘K or /)">
@@ -273,10 +278,26 @@ export function RunBar({ entry, meta }: { entry?: RunEntry; meta?: Meta }) {
   );
 }
 
-/** The guided start (Story mode): one line and a play button above the timeline, until play is pressed. */
+/** The guided start (Story mode): one line and a play button above the timeline, when it is its turn among the
+ * prompts (useLens().prompt === "week"); it goes at the first touch of anything else. */
 function Guided({ start }: { start: { t: number; label: string } }) {
   const playing = useLens((s) => s.playing);
-  const [gone, setGone] = useState(false);
+  const mine = useLens((s) => s.prompt === "week");
+  const [gone, setGoneState] = useState(false);
+  const setGone = (v: boolean) => {
+    setGoneState(v);
+    if (v && useLens.getState().prompt === "week") useLens.getState().setPrompt(null);
+  };
+  const me = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (gone || !mine) return;
+    const touch = (e: Event) => !me.current?.contains(e.target as Node) && setGone(true);
+    const opts = { capture: true };
+    for (const k of ["pointerdown", "wheel", "keydown"]) window.addEventListener(k, touch, opts);
+    return () => {
+      for (const k of ["pointerdown", "wheel", "keydown"]) window.removeEventListener(k, touch, opts);
+    };
+  }, [gone, mine]);
   useEffect(() => {
     if (!playing) return;
     setGone(true);
@@ -286,9 +307,9 @@ function Guided({ start }: { start: { t: number; label: string } }) {
       if (s.playing && s.t >= end) s.setPlaying(false);
     });
   }, [playing]);
-  if (gone) return null;
+  if (gone || !mine) return null;
   return (
-    <div className="guided">
+    <div className="guided" ref={me} data-lens-prompt="guided">
       <span>
         {start.label} Press play to watch the AI mayor's first week.
       </span>
@@ -367,19 +388,26 @@ function EmptyMap({ meta }: { meta: Meta }) {
 function Inspector(props: SlotProps) {
   const selection = useLens((s) => s.selection)!;
   const Body = views.inspector?.[selection.kind];
-  const title = selection.kind === "sitting" || selection.kind === "lever" ? `${selection.kind} ${selection.index}` : selection.kind === "act" ? `act at entry ${selection.seq}` : selection.id;
+  // (Opened from a turn: a way straight back to it. Esc does the same.)
+  const from = useNav((s) => (s.trail.length > 1 ? s.trail[0] : undefined));
+  const { name } = useNames(props.run);
+  const researcher = useMode((m) => m.mode === "researcher");
   return (
     <div className={`drawer ${selection.kind === "person" ? "wide" : ""}`} role="dialog" aria-label="Inspector">
       <div className="drawer-head">
-        <div>
-          <div className="eyebrow">{selection.kind === "person" ? "A life in the run" : selection.kind}</div>
-          {selection.kind !== "person" && <div className="serif drawer-title">{title}</div>}
-        </div>
-        <button className="btn ghost icon" aria-label="Close" onClick={() => useLens.getState().select(null)}>
+        {from ? (
+          <button className="btn ghost drawer-back" onClick={() => goTo(from)} title="Back to it (Esc)">
+            <Back />
+            Back to {name(from).replace(/^Power grab: /, "the power grab: ")}
+          </button>
+        ) : (
+          <span className="drawer-id">{researcher && selection.kind !== "person" ? (selection as { id?: string }).id : ""}</span>
+        )}
+        <button className="btn ghost icon" aria-label="Close" title="Close (Esc)" onClick={() => useLens.getState().select(null)}>
           <Close />
         </button>
       </div>
-      <div className="drawer-body">{Body ? <Body {...props} selection={selection} /> : <p className="muted">Nothing to show for this {selection.kind} yet.</p>}</div>
+      <div className="drawer-body">{Body ? <Body {...props} selection={selection} /> : <p className="muted">Nothing to show for this yet.</p>}</div>
     </div>
   );
 }

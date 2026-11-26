@@ -11,6 +11,8 @@ import { runHref, useRoute } from "./router";
 import { views } from "./views";
 import { Glossary } from "./shell/Shell";
 import { Tour } from "./shell/Tour";
+import { Keys } from "./nav/Keys";
+import { Peek } from "./nav/Peek";
 
 function App() {
   const route = useRoute();
@@ -57,5 +59,7 @@ createRoot(document.getElementById("root")!).render(
     <App />
     <Glossary />
     <Tour />
+    <Keys />
+    <Peek />
   </>,
 );
