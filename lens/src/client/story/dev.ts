@@ -9,6 +9,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { basename, dirname, join, resolve } from "node:path";
 import type { Fold, FoldContext, LogLine } from "../../shared/fold";
 import { seatFold } from "../../folds/seat";
+import { dailyFold } from "../../folds/daily";
 
 const DAY = 86_400;
 export function viewsDir(): string {
@@ -56,18 +57,20 @@ export async function runFolds(path: string, folds: Fold[], ctx: FoldContext): P
   return { lines: n, ms: performance.now() - t0 };
 }
 
-/** The seat fold over one log, written as a bundle the dev server (and the client) reads. */
+/** The story's folds (seat, daily) over one log, written as a bundle the dev server (and the client) reads. */
 export async function buildSeat(path: string, opts: { key?: string; arm?: string; forkDay?: number; spec?: any } = {}): Promise<string> {
   const key = opts.key ?? basename(path).replace(/\.(jsonl|oklog)$/, "");
   const ctx: FoldContext & { forkAt?: number; spec?: any } = { runId: key, dir: dirname(path), ...(opts.arm ? { arm: opts.arm } : {}), ...(opts.forkDay !== undefined ? { forkAt: opts.forkDay * DAY } : {}), ...(opts.spec ? { spec: opts.spec } : {}) };
-  const fold = seatFold();
-  const { lines, ms } = await runFolds(path, [fold], ctx);
+  const folds = [seatFold(), dailyFold()];
+  const { lines, ms } = await runFolds(path, folds, ctx);
   const t1 = performance.now();
-  const out = await fold.finish(ctx);
   const dir = join(devDir(), key);
-  mkdirSync(join(dir, "seat"), { recursive: true });
-  writeFileSync(join(dir, "seat.json"), JSON.stringify(out.json));
-  for (const [f, bytes] of Object.entries(out.files ?? {})) writeFileSync(join(dir, "seat", f), bytes);
+  for (const fold of folds) {
+    const out = await fold.finish(ctx);
+    mkdirSync(join(dir, fold.name), { recursive: true });
+    writeFileSync(join(dir, `${fold.name}.json`), JSON.stringify(out.json));
+    for (const [f, bytes] of Object.entries(out.files ?? {})) writeFileSync(join(dir, fold.name, f), bytes);
+  }
   console.log(`${key}: ${lines} lines in ${(ms / 1000).toFixed(1)}s, finish ${((performance.now() - t1) / 1000).toFixed(1)}s -> ${dir}`);
   return dir;
 }
@@ -80,8 +83,8 @@ async function serve(port: number) {
     routes: {
       "/": page,
       "/api/runs": () => Response.json(existsSync(dir) ? readdirSync(dir).filter((k) => existsSync(join(dir, k, "seat.json"))).map((key) => ({ key })) : []),
-      "/api/run/:key/seat": (req) => { const f = join(dir, basename(req.params.key), "seat.json"); return existsSync(f) ? new Response(Bun.file(f), { headers: { "content-type": "application/json" } }) : new Response("no such run", { status: 404 }); },
-      "/api/run/:key/seat/:file": (req) => { const f = join(dir, basename(req.params.key), "seat", basename(req.params.file)); return existsSync(f) ? new Response(Bun.file(f), { headers: { "content-type": req.params.file.startsWith("system-") ? "text/plain; charset=utf-8" : "application/json" } }) : new Response("no such file", { status: 404 }); },
+      "/api/run/:key/:fold": (req) => { const f = join(dir, basename(req.params.key), `${basename(req.params.fold)}.json`); return existsSync(f) ? new Response(Bun.file(f), { headers: { "content-type": "application/json" } }) : new Response("no such run", { status: 404 }); },
+      "/api/run/:key/:fold/:file": (req) => { const f = join(dir, basename(req.params.key), basename(req.params.fold), basename(req.params.file)); return existsSync(f) ? new Response(Bun.file(f), { headers: { "content-type": req.params.file.startsWith("system-") ? "text/plain; charset=utf-8" : "application/json" } }) : new Response("no such file", { status: 404 }); },
     },
     development: true,
   });

@@ -1,7 +1,7 @@
 // The Run page's slots (src/client/run/RunPage.tsx): what fills the map in the middle, the story rail on the right, the
 // sitting reader over them, and the inspector drawer's body. Each view's owner registers its component here with one
 // line; an empty slot shows a quiet placeholder. Views talk to each other only through src/client/state.ts.
-import type { ComponentType } from "react";
+import { createElement, type ComponentType } from "react";
 import type { Meta, RunEntry } from "../shared/api";
 import type { Selection } from "./state";
 import { SittingReader } from "./story/SittingReader";
@@ -32,8 +32,17 @@ export interface Views {
   moments?: ComponentType<{}>;
 }
 
+import { CityView } from "./city/CityView";
+import { CityInspector } from "./city/Inspector";
+import { ComparePage } from "./compare/ComparePage";
+import { Moments } from "./story/Moments";
+
 // Registered views (one line each, by their owners):
 export const views: Views = {
   rail: StoryRail,
   reader: SittingReader,
+  map: (p) => createElement(CityView, { run: p.run, card: false }),
+  inspector: { person: CityInspector, structure: CityInspector, entity: CityInspector },
+  compare: ComparePage,
+  moments: Moments,
 };
