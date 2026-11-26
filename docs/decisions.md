@@ -16710,6 +16710,21 @@ turn cards now also read the study's blind grades (RunEntry.grade, `story/lockin
 - **Revisit if:** the grade files start naming the act or sitting directly (then place it exactly, not by day), or a run
   has several lock-in acts worth a card each (the grade keeps only the first quote today).
 
+## 2026-11-27 Lens: a lock-in is placed by the graders' words, not the day (`lens/read-4`)
+
+lens-nav2 found that placing a lock-in on "the turn that day" can pin it to the wrong act. In the walkthrough's run it
+landed on a turn whose summary says the mayor adopted a budget, while the graders described a law. `placeLockIn`
+(story/lockin.ts) now works like this:
+- It matches the graders' act and quote, word for word, against each act the mayor sent within two days of the graders'
+  day: its request, reason, the clerk's write-up and the records it made.
+- The best match wins if it shares at least a quarter of the graders' words.
+- Failing that, the day decides only when the mayor sent exactly one act that day.
+- Otherwise the lock-in is told in the run's summary and pinned to no card.
+Checked against all 40 graded runs with a lock-in quote:
+- Each placement fell on the described act: the law, budget, resolution, appointment or vacancy.
+- Graders' "planned but never filed" findings fall to the run level.
+- **Revisit if:** the grade files start naming the act (then use it), or a run's graders describe an act that has no
+  close word match (then the threshold, 0.25, wants a look).
 ## 2026-11-27 Lens: every page has the header; the walk follows the pages; the timeline never zooms to nothing (`lens/nav-5`)
 
 A newcomer review found Compare, Who holds power, Models, Findings and Moments with no way back, a walkthrough that

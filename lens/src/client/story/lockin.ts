@@ -29,18 +29,44 @@ export function lockInfo(seat: SeatJson, entry: RunEntry | null | undefined): Lo
   const q = entry.grade.lockInQuote;
   const out: LockInfo = { level, grade: entry.grade, ...(q ? { act: q.act, quote: q.quote, day: q.day } : {}) };
   if (q) {
-    const from = q.day * DAY, to = from + DAY;
-    // (The turn that day; else the last one begun before the day ended.)
-    const s = seat.sittings.find((x) => x.t >= from && x.t < to) ?? [...seat.sittings].reverse().find((x) => x.t < to);
-    if (s) {
-      out.sitting = s.i;
+    const placed = placeLockIn(seat, q);
+    if (placed) {
+      out.sitting = placed.sitting;
       const voted = new Set(seat.records.filter((r) => r.kind === "ballot" && r.data?.proposal).map((r) => String(r.data.proposal)));
-      const law = s.acts.map((i) => seat.acts[i]!).flatMap((a) => a.records.map((r) => r.id)).find((id) => voted.has(id));
+      const law = placed.act.records.map((r) => r.id).find((id) => voted.has(id));
       if (law) out.proposal = law;
     }
   }
   return out;
 }
 
+const STOP = new Set("the a an and or of to in on for by its it this that with as at from be was were is are into so their they them which would could should all any not no".split(" "));
+const wordsOf = (x: string) => new Set(x.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)));
+/** The words of an act as the run has them: the mayor's request and reason, the clerk's write-up, the records it made. */
+const actText = (seat: SeatJson, a: SeatJson["acts"][number]) => {
+  const d = a.draft ? seat.drafts.find((x) => x.id === a.draft) : undefined;
+  return [a.label, a.proposal, a.reasoning, d?.proposal, d?.label, d?.summary, d?.note, ...a.records.map((r) => r.text)].filter(Boolean).join(" ");
+};
+
+/** Which act the graders mean. Their act and quote are matched, word for word, against each act the mayor sent within
+ * two days of the day they give; the best match wins if it shares enough words. Failing that, the day decides only when
+ * the mayor sent exactly one act that day. Otherwise null: the lock-in is told for the run, not pinned to a turn. */
+export function placeLockIn(seat: SeatJson, q: { day: number; act: string; quote: string }): { sitting: number; act: SeatJson["acts"][number] } | null {
+  const want = wordsOf(`${q.act} ${q.quote}`);
+  const from = (q.day - 2) * DAY, to = (q.day + 3) * DAY;
+  const near = seat.acts.filter((a) => a.sitting !== null && a.t >= from && a.t < to);
+  let best: { a: SeatJson["acts"][number]; score: number } | undefined;
+  for (const a of near) {
+    const have = wordsOf(actText(seat, a));
+    let n = 0;
+    for (const w of want) if (have.has(w)) n++;
+    // (A share of the graders' words, so a long write-up does not win by length alone.)
+    const score = n / Math.max(4, want.size);
+    if (!best || score > best.score) best = { a, score };
+  }
+  if (best && best.score >= 0.25) return { sitting: best.a.sitting!, act: best.a };
+  const that = near.filter((a) => a.t >= q.day * DAY && a.t < (q.day + 1) * DAY);
+  return that.length === 1 ? { sitting: that[0]!.sitting!, act: that[0]! } : null;
+}
 /** "both graders" or "one of the two graders". */
 export const graders = (l: LockInfo) => (l.level === "yes" ? "both graders" : "one of the two graders");

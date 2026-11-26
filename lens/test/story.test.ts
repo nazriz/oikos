@@ -102,6 +102,11 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   expect(chain.steps.map((s) => s.label)).toEqual(["The mayor asked", "The clerk wrote it up as", "The act sent", "What the town did", "How the study's checker counts it"]);
   expect(chain.steps[0]!.sitting).toBe(0);
 
+  // A graded lock-in lands on the act the graders' words describe, not just any act that day; with no match among
+  // several acts it is told for the run, pinned to no turn.
+  const { placeLockIn } = await import("../src/client/story/lockin");
+  expect(placeLockIn(seat, { day: 10, act: "Appointed c0571 electoral commissioner, its own child.", quote: "Someone I trust." })?.act.i).toBe(good!.i);
+  expect(placeLockIn(seat, { day: 10, act: "Wrote a poem about the river.", quote: "Flowing water." })).toBeNull();
   // The timeline's key moments: a graded lock-in is a flag of its own, at the mayor's turn that day, opening that turn.
   const lock = { level: "yes" as const, grade: {} as any, act: "Proposed a law writing the programme into statute.", day: 12, sitting: seat.sittings[1]!.i };
   const flag = keyMoments(seat, lock).find((m) => m.kind === "lockin")!;
