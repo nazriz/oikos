@@ -21,6 +21,8 @@ export interface Moment {
   outcome: string; outcomeTone: "ok" | "no" | "wait";
   /** Other events of the same lever at the same act or draft, folded into this card. */
   also: SeatLever[];
+  /** The act came of a request the mayor sent again after its first was declined or could not be written up. */
+  redrafted?: boolean;
   election: string;
   /** Days before the election as first called (the reader counts to the date then in force, which a moved
    * election pushes thousands of days out). */
@@ -45,9 +47,26 @@ export function momentsOf(key: string, seat: SeatJson, withConsidered = false): 
     const k = `${l.lever}|${where}`;
     groups.set(k, [...(groups.get(k) ?? []), l]);
   }
+  // A request that never became an act (the clerk could not write it up, or the mayor declined the write-up) and that
+  // the mayor then sent again, as an act, is how that act came about: folded into its card, which says "after
+  // redrafting". Its status is the act's. (The unsent request alone would read "tried" beside graders who found the act
+  // carried out.)
+  const UNSENT = new Set(["seat_declined", "translator_failed", "asked_back"]);
+  const redrafted = new Set<string>();
+  for (const [k, ls] of [...groups]) {
+    const l = ls[0]!;
+    if (l.act !== undefined || l.level === "considered" || !ls.every((x) => x.act === undefined && x.stage && UNSENT.has(x.stage))) continue;
+    const later = seat.levers.filter((x) => x.lever === l.lever && x.act !== undefined && x.t >= l.t && x.level !== "considered").sort((a, b) => a.t - b.t)[0];
+    if (!later) continue;
+    const into = `${later.lever}|act:${later.act}`;
+    if (!groups.has(into)) continue;
+    groups.set(into, [...groups.get(into)!, ...ls]);
+    groups.delete(k);
+    redrafted.add(into);
+  }
   const election = outcomeOf({ election: seat.election, end_at: seat.end_at, ended: seat.ended ?? "unknown", moved: seat.amendments.some((a) => a.outcome === "applied") }).label.toLowerCase();
   const poll = firstPoll(seat);
-  return [...groups.values()].map((all) => {
+  return [...groups].map(([gk, all]) => {
     const top = all.reduce((a, b) => (rank[b.level] > rank[a.level] ? b : a));
     const act = top.act !== undefined ? seat.acts[top.act] : undefined;
     const draftId = act?.draft ?? /^draft (.+)$/.exec(top.source)?.[1];
@@ -57,7 +76,7 @@ export function momentsOf(key: string, seat: SeatJson, withConsidered = false): 
     const outcome = act ? (act.status === "applied" ? (top.stage && top.stage !== "applied" ? STAGE[top.stage] ?? top.stage : "applied") : act.status === "refused" ? `refused: ${act.code}` : "sent, no outcome in the log") : top.stage ? STAGE[top.stage] ?? top.stage : top.level === "considered" ? "words only" : "—";
     const tone: Moment["outcomeTone"] = top.level === "executed" || outcome === "applied" ? "ok" : /refused|declined|could not|rejected|asked back/.test(outcome) ? "no" : "wait";
     return { key, model: modelOf(seat), ...(seat.goal ? { goal: seat.goal } : {}), ...(seat.seed !== undefined ? { seed: seat.seed } : {}), lever: top, words,
-      ...(draft?.note ? { note: draft.note } : {}), ...(act?.reasoning ? { reason: act.reasoning } : {}), outcome, outcomeTone: tone, also: all.filter((x) => x !== top), election, ...(poll !== undefined ? { daysBefore: Math.round((poll - top.t) / 86_400) } : {}) };
+      ...(draft?.note ? { note: draft.note } : {}), ...(act?.reasoning ? { reason: act.reasoning } : {}), outcome, outcomeTone: tone, also: all.filter((x) => x !== top), ...(redrafted.has(gk) ? { redrafted: true } : {}), election, ...(poll !== undefined ? { daysBefore: Math.round((poll - top.t) / 86_400) } : {}) };
   });
 }
 

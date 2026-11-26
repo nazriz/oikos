@@ -1,7 +1,7 @@
 // An act of the seat in a line, from its blocks: shared by the seat fold (which writes each act's label) and the client
 // (which brings the labels of a copy prepared before a change up to date, by relabel). Types only beyond this file, so
 // the client can use it without the study reader.
-import type { SeatJson } from "./seat";
+import type { SeatAct, SeatJson } from "./seat";
 
 const DAY = 86_400;
 const human = (s: string) => s.replace(/[_-]+/g, " ");
@@ -34,7 +34,7 @@ export function blockLabel(b: any, act: any[] = []): string {
     }
     case "appoint": return b.participant ? `Appointed ${b.participant} as ${b.position}` : `Left ${b.position} empty`;
     case "withdraw": return `Withdrew ${b.record}`;
-    case "message": return `Wrote to ${[].concat(b.to ?? []).join(", ")}`;
+    case "message": return `Wrote to ${toWords([].concat(b.to ?? []))}`;
     case "propose_agreement": {
       const to = offerTo(b), w = offerWords(b);
       return `Offered ${w === "a job offer" ? "a job" : w.replace(/^an offer of /, "")}${to ? ` to ${to}` : ""}`;
@@ -53,6 +53,29 @@ export function blockLabel(b: any, act: any[] = []): string {
   }
 }
 
+const PERSON = /^c\d+(?:-self)?$/;
+/** Who a letter went to, in a line: named when a few, counted when many ("Wrote to works and 195 residents"); the
+ * names are a hover away (lettersTo). */
+export function toWords(to: string[]): string {
+  const people = to.filter((x) => PERSON.test(x)), others = to.filter((x) => !PERSON.test(x));
+  if (people.length <= 3) return to.join(", ");
+  const parts = [...others, `${people.length} residents`];
+  return parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+}
+/** Everyone a turn's letters went to, in order, once each (the hover list behind "Wrote to 195 residents"). */
+export function lettersTo(acts: SeatAct[]): string[] {
+  return [...new Set(acts.flatMap((a) => a.blocks.filter((b) => b?.block === "message").flatMap((b) => [].concat(b.to ?? []) as string[])))];
+}
+/** A turn's acts in a line, as the seat fold says them (its gist), with all its letters told as one: "Proposed: council
+ * proposal; Wrote to works and 195 residents". */
+export function actsGist(acts: SeatAct[]): string {
+  const letter = (a: SeatAct) => a.blocks.length > 0 && a.blocks.every((b) => b?.block === "message");
+  const weight = (a: SeatAct) => (a.levers.length ? 0 : 1);
+  const labels = [...new Set(acts.filter((a) => !letter(a)).sort((a, b) => weight(a) - weight(b) || a.i - b.i).map((a) => a.label))];
+  if (acts.some(letter)) labels.push(`Wrote to ${toWords(lettersTo(acts.filter(letter)))}`);
+  return labels.length > 3 ? `${labels.slice(0, 3).join("; ")} and ${labels.length - 3} more` : labels.join("; ");
+}
+
 /** A copy prepared before actLabel filled "$ref"s, brought up to it where it is read (the client), so no prepared copy
  * needs making again: each act's label from its blocks, and the drafts and turn lines that carried the old one. */
 export function relabel(seat: SeatJson): SeatJson {
@@ -64,6 +87,10 @@ export function relabel(seat: SeatJson): SeatJson {
   }
   const swap = (s: string) => { for (const [from, to] of swaps) s = s.split(from).join(to); return s.replace(/\$[a-z]\w*/gi, "it"); };
   for (const d of seat.drafts) if (d.label?.includes("$")) d.label = swap(d.label);
-  for (const s of seat.sittings) if (s.gist?.includes("$")) s.gist = swap(s.gist);
+  for (const s of seat.sittings) {
+    const own = s.acts.map((i) => seat.acts[i]!).filter(Boolean);
+    if (own.length) s.gist = actsGist(own);
+    else if (s.gist?.includes("$")) s.gist = swap(s.gist);
+  }
   return seat;
 }

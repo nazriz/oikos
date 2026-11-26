@@ -10,6 +10,7 @@ import { leverTitle } from "../words";
 import { loadSeat, useAsync, when, human, seatOutcome, STAGE, type SeatJson, type SeatLever, type SeatAct } from "./data";
 import { firstPoll } from "./moments-data";
 import { graders, lockDay, type LockInfo } from "./lockin";
+import { usePlain } from "./text";
 import "./story.css";
 import "./evidence.css";
 import { dayNo, dayOf } from "../format";
@@ -59,10 +60,11 @@ export function HowDoWeKnow({ run, claim, label = "How do we know?" }: { run: st
 function Chain({ run, claim, onClose }: { run: string; claim: Claim; onClose: () => void }) {
   const seat = useAsync(() => loadSeat(run), [run]);
   const researcher = useResearcher();
+  const plain = usePlain();
   const select = useLens((s) => s.select), setT = useLens((s) => s.setT);
   if (seat === undefined) return <div className="ev-pop" role="dialog"><p className="st-faint">Reading the run…</p></div>;
   if (seat instanceof Error) return <div className="ev-pop" role="dialog"><p className="st-faint">Could not read the run.</p></div>;
-  const { title, steps, note } = chainOf(seat, claim);
+  const { title, steps, note } = chainOf(seat, claim, plain);
   const goto = (s: Step) => { if (s.sitting !== undefined) { select({ kind: "sitting", index: s.sitting }); if (s.t !== undefined) setT(s.t); onClose(); } };
   return (
     <div className="ev-pop" role="dialog" aria-label="How do we know?">
@@ -98,17 +100,21 @@ function leadOf(seat: SeatJson, claim: Claim): { text: string; tone: string } | 
 
 const q = (x: string, n = 320) => `“${x.length > n ? x.slice(0, n - 1) + "…" : x}”`;
 
+/** Lens's own words in a chain, said plainly (Story mode's formatter, usePlain); the mayor's quoted words never pass it. */
+type Say = (s: string) => string;
+const same: Say = (s) => s;
+
 /** The chain of evidence for a claim, from the seat bundle. */
-export function chainOf(seat: SeatJson, claim: Claim): { title: string; steps: Step[]; note?: string } {
-  if (claim.kind === "outcome") return outcomeChain(seat);
-  if (claim.kind === "vote") return voteChain(seat, claim.proposal);
-  if (claim.kind === "lockin") return lockinChain(seat, claim.lock);
+export function chainOf(seat: SeatJson, claim: Claim, say: Say = same): { title: string; steps: Step[]; note?: string } {
+  if (claim.kind === "outcome") return outcomeChain(seat, say);
+  if (claim.kind === "vote") return voteChain(seat, claim.proposal, say);
+  if (claim.kind === "lockin") return lockinChain(seat, claim.lock, say);
   const lever = claim.kind === "lever" ? seat.levers[claim.index] : undefined;
   const act = lever?.act !== undefined ? seat.acts[lever.act] : claim.kind === "act" ? seat.acts.find((a) => a.seq === claim.seq) : undefined;
-  return actChain(seat, act, lever);
+  return actChain(seat, act, lever, say);
 }
 
-function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | undefined): { title: string; steps: Step[]; note?: string } {
+function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | undefined, say: Say = same): { title: string; steps: Step[]; note?: string } {
   const steps: Step[] = [];
   const draftId = act?.draft ?? (lever ? /^draft (.+)$/.exec(lever.source)?.[1] : undefined);
   const draft = draftId ? seat.drafts.find((d) => d.id === draftId) : undefined;
@@ -117,11 +123,11 @@ function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | u
   const at = act?.t ?? lever?.t;
   const words = draft?.proposal ?? failure?.proposal ?? act?.proposal;
   if (words) steps.push({ label: "The mayor asked", text: <span className="st-serif">{q(words)}</span>, ...(sitting !== null && sitting !== undefined ? { sitting } : {}), ...(at !== undefined ? { t: at } : {}) });
-  if (draft) steps.push({ label: "The clerk wrote it up as", text: <>{draft.label ?? draft.summary?.split("\n")[0] ?? "a paper"}{draft.decision ? (draft.decision === "accept" ? ". The mayor signed it" : ". The mayor turned it down") : ""}{draft.note ? <>, saying <span className="st-serif">{q(draft.note, 200)}</span></> : ""}.</>, ...(draft.call ? { raw: `${draft.id}\n${draft.call}` } : { raw: draft.id }) });
-  if (failure) steps.push({ label: "The clerk could not write it up", text: <>{failure.reason}</>, raw: failure.call ?? failure.draft ?? "" });
+  if (draft) steps.push({ label: "The clerk wrote it up as", text: <>{say(draft.label ?? draft.summary?.split("\n")[0] ?? "a paper")}{draft.decision ? (draft.decision === "accept" ? ". The mayor signed it" : ". The mayor turned it down") : ""}{draft.note ? <>, saying <span className="st-serif">{q(draft.note, 200)}</span></> : ""}.</>, ...(draft.call ? { raw: `${draft.id}\n${draft.call}` } : { raw: draft.id }) });
+  if (failure) steps.push({ label: "The clerk could not write it up", text: <>{say(failure.reason)}</>, raw: failure.call ?? failure.draft ?? "" });
   if (act) {
-    steps.push({ label: "The act sent", text: <>{act.label}, on {when(act.t)}{act.as ? `, as ${act.as}` : ""}.</>, raw: `command ${act.seq}\n${JSON.stringify(act.blocks, null, 1)}` });
-    steps.push({ label: "What the town did", text: act.status === "applied" ? <>It went through{act.at !== undefined ? ` on ${when(act.at)}` : ""}.</> : act.status === "refused" ? <>It was refused: {human(act.code ?? "")}{act.detail ? ` (${act.detail})` : ""}.</> : <>No outcome was in the log by the end of the run.</> });
+    steps.push({ label: "The act sent", text: <>{say(act.label)}, on {when(act.t)}{act.as ? `, as ${say(act.as)}` : ""}.</>, raw: `command ${act.seq}\n${JSON.stringify(act.blocks, null, 1)}` });
+    steps.push({ label: "What the town did", text: act.status === "applied" ? <>It went through{act.at !== undefined ? ` on ${when(act.at)}` : ""}.</> : act.status === "refused" ? <>It was refused: {human(act.code ?? "")}{act.detail ? ` (${say(act.detail)})` : ""}.</> : <>No outcome was in the log by the end of the run.</> });
     if (act.records.length) steps.push({ label: "The record it made", text: <>{act.records.map((r) => <span key={r.id} className="ev-rec">{human(r.kind)}: <span className="st-serif">{q(r.text, 200)}</span></span>)}</>, raw: act.records.map((r) => r.id).join(", ") });
   }
   if (lever) {
@@ -129,35 +135,35 @@ function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | u
     steps.push({ label: "How the study's checker counts it", text: <>As a power grab ({leverTitle(lever.lever)}): the checker's rule is {rule}. Here it found this <b>{lever.level === "executed" ? "carried out" : lever.level === "attempted" ? "tried" : "mentioned (a word match, often wrong)"}</b>{lever.stage ? ` (${STAGE[lever.stage] ?? lever.stage})` : ""}{lever.tier ? `; the draft rubric rates it ${lever.tier} of 3 for seriousness` : ""}.</>, raw: `${lever.lever} · ${lever.level} · ${lever.source}${lever.detail ? `\n${lever.detail}` : ""}` });
   }
   const title = lever ? `${leverTitle(lever.lever).charAt(0).toUpperCase() + leverTitle(lever.lever).slice(1)}` : act?.label ?? "This act";
-  return { title, steps, note: lever ? "The checker is the study's own code (experiments/power-seeking/reader.ts); Lens shows what it found and does not judge it." : undefined };
+  return { title, steps, note: lever ? "The checker is the study's own program; Lens shows what it found and does not judge it." : undefined };
 }
 
 /** A lock-in: the mayor's request and the council's vote on it (where the graders' act was a law it put to the council),
  * then what the study's two blind graders found. */
-function lockinChain(seat: SeatJson, l: LockInfo): { title: string; steps: Step[]; note?: string } {
-  const steps: Step[] = l.proposal ? voteChain(seat, l.proposal).steps : [];
+function lockinChain(seat: SeatJson, l: LockInfo, say: Say = same): { title: string; steps: Step[]; note?: string } {
+  const steps: Step[] = l.proposal ? voteChain(seat, l.proposal, say).steps : [];
   if (!l.proposal && l.quote) steps.push({ label: "The mayor's words", text: <span className="st-serif">{q(l.quote, 240)}</span>, ...(l.sitting !== undefined ? { sitting: l.sitting, t: seat.sittings[l.sitting]!.t } : {}) });
   steps.push({
     label: "What the study's graders found",
     text: <>{l.level === "yes" ? "Both of the study's two independent graders, each reading the run blind," : "One of the study's two independent graders, reading the run blind,"} counted this as a lock-in: something lawful done to keep its programme in force beyond the next mayor.{l.act ? <> In the graders' words: {l.act}</> : null}{l.proposal && l.quote ? <> The mayor's words: <span className="st-serif">{q(l.quote, 240)}</span></> : null}</>,
     raw: `${l.grade.set}\nlock-in acts found: grader A ${l.grade.lockIn?.a ?? 0}, grader B ${l.grade.lockIn?.b ?? 0}`,
   });
-  return { title: "The lock-in", steps, note: "The grades are the study's (runs/ps-blind-grades-*); Lens shows them and does not grade." };
+  return { title: "The lock-in", steps, note: "The grades are the study's blind grades; Lens shows them and does not grade." };
 }
 
-function voteChain(seat: SeatJson, proposal: string): { title: string; steps: Step[] } {
+function voteChain(seat: SeatJson, proposal: string, say: Say = same): { title: string; steps: Step[] } {
   const steps: Step[] = [];
   const act = seat.acts.find((a) => a.records.some((r) => r.id === proposal));
-  if (act) { const c = actChain(seat, act, undefined); steps.push(...c.steps.filter((s) => s.label !== "What the town did")); }
+  if (act) { const c = actChain(seat, act, undefined, say); steps.push(...c.steps.filter((s) => s.label !== "What the town did")); }
   const ballot = seat.records.find((r) => r.kind === "ballot" && r.data?.proposal === proposal);
   if (ballot) steps.push({ label: "The council clerk put it to a vote", text: <><span className="st-serif">{q(ballot.text, 220)}</span>, {when(ballot.t)}.</>, raw: ballot.id });
   const res = ballot ? seat.records.find((r) => r.kind === "ballot_result" && r.data?.ballot === ballot.id) : undefined;
-  if (res) steps.push({ label: "How the council voted", text: <>{res.data?.passed ? "Passed" : "Voted down"}, {res.data?.yes} to {res.data?.no}. {Array.isArray(res.data?.voted_for) && res.data.voted_for.length ? `For: ${res.data.voted_for.join(", ")}. ` : ""}{Array.isArray(res.data?.voted_against) && res.data.voted_against.length ? `Against: ${res.data.voted_against.join(", ")}.` : ""}</>, raw: res.id });
+  if (res) steps.push({ label: "How the council voted", text: <>{res.data?.passed ? "Passed" : "Voted down"}, {res.data?.yes} to {res.data?.no}. {Array.isArray(res.data?.voted_for) && res.data.voted_for.length ? `For: ${say(res.data.voted_for.join(", "))}. ` : ""}{Array.isArray(res.data?.voted_against) && res.data.voted_against.length ? `Against: ${say(res.data.voted_against.join(", "))}.` : ""}</>, raw: res.id });
   else if (ballot) steps.push({ label: "How the council voted", text: <>No result in the log by the end of the run.</> });
   return { title: "The council's vote", steps };
 }
 
-function outcomeChain(seat: SeatJson): { title: string; steps: Step[]; note?: string } {
+function outcomeChain(seat: SeatJson, say: Say = same): { title: string; steps: Step[]; note?: string } {
   const steps: Step[] = [];
   const e = seat.election, first = firstPoll(seat);
   const notice = seat.records.find((r) => r.kind === "election_notice");
@@ -171,6 +177,6 @@ function outcomeChain(seat: SeatJson): { title: string; steps: Step[]; note?: st
   const result = seat.records.find((r) => r.kind === "ballot_result" && r.data?.office === "mayor");
   if (result) steps.push({ label: "The result", text: <><span className="st-serif">{q(result.text, 240)}</span> ({when(result.t)}).</>, raw: `${result.id}\n${JSON.stringify(result.data?.rounds ?? {})}` });
   else steps.push({ label: "The result", text: <>No result is in the log: {e.poll_at !== undefined && e.poll_at > seat.end_at ? `the election ${first !== e.poll_at ? `had been moved to day ${dayOf(e.poll_at)}` : `was due on day ${dayOf(e.poll_at)}`}, after the run ended on day ${dayOf(seat.end_at)}` : "the run ended first"}.</> });
-  if (e.seated_at !== undefined) steps.push({ label: "Who took office", text: <>{e.seated === seat.seat ? "The AI mayor" : e.seated}, on {when(e.seated_at)}.</> });
+  if (e.seated_at !== undefined) steps.push({ label: "Who took office", text: <>{e.seated === seat.seat ? "The AI mayor" : say(e.seated ?? "")}, on {when(e.seated_at)}.</> });
   return { title: "How the election went", steps, note: "Every step is a paper filed in the town; Lens reads them from the run's log." };
 }
