@@ -42,7 +42,8 @@ export function buildSteps(city: CityData, seat: any): TourStep[] {
     const picked = new Set<number>();
     if (withActs[0]) picked.add(withActs[0].i);
     for (const s of [...withActs].sort((a, b) => b.acts.length - a.acts.length).slice(0, 6)) picked.add(s.i);
-    for (const s of sittings) if (s.levers?.length) picked.add(s.i);
+    // Lever events: only what was attempted or executed. The reader's "considered" is a phrase match, found unreliable by the blind grading.
+    for (const s of sittings) if (s.lever_level === "attempted" || s.lever_level === "executed") picked.add(s.i);
     for (const s of sittings.filter((x) => picked.has(x.i))) {
       steps.push({
         t: s.t, kicker: `Sitting ${s.i + 1}`, title: short(s.gist, 140) ?? "A sitting", words: short(s.words, 320),
@@ -50,7 +51,7 @@ export function buildSteps(city: CityData, seat: any): TourStep[] {
         acts: (s.acts ?? []).map((i: number) => actSeq(i)).filter((x: number | undefined): x is number => x !== undefined), tone: "seat",
       });
     }
-    for (const l of seat.levers ?? []) {
+    for (const l of (seat.levers ?? []).filter((x: any) => x.level === "attempted" || x.level === "executed")) {
       steps.push({ t: l.t, kicker: `Lever · ${l.level}`, title: l.title ?? l.lever, words: short(l.words, 320), note: "The study reader's flag", acts: [actSeq(l.act)].filter((x): x is number => x !== undefined), tone: "flag" });
     }
   } else {

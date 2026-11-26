@@ -473,7 +473,37 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0 }: { city:
   const ev = useMemo(() => (town.elections.length ? electionView(city, t) : undefined), [city, tMin]);
   const candCol = useMemo(() => (ev ? candidateColours(ev.e, town.seats) : {}), [ev?.e, town]);
   const turnout = useMemo(() => (overlays.election && ev && ev.cast > 0 ? turnoutByBlock(city, blocks, ev, ev.e.notice?.poll_at ?? t) : []), [overlays.election, ev, blocks]);
-  const turnoutCells = useMemo(() => turnout.flatMap((b) => blocks.cells[b.block]!.map((j) => ({ j, f: b.voted / Math.max(1, b.roll) }))), [turnout, blocks]);
+  const townTurnout = useMemo(() => { let r = 0, v = 0; for (const b of turnout) { r += b.roll; v += b.voted; } return r ? v / r : 0; }, [turnout]);
+  // Only blocks with enough electors to say anything, and only where they differ from the town by 3 points or more.
+  const turnoutCells = useMemo(() => turnout.filter((b) => b.roll >= 8 && Math.abs(b.voted / b.roll - townTurnout) >= 0.03).flatMap((b) => blocks.cells[b.block]!.map((j) => ({ j, dev: b.voted / b.roll - townTurnout }))), [turnout, blocks, townTurnout]);
+  // Pies: per building, the votes cast there by first preference (the campaign: opinion-poll answers).
+  const { pies, pieRims } = useMemo(() => {
+    const out: { poly: [number, number, number][]; n: string; s: number; count: number; total: number; poll: boolean }[] = [];
+    const rims: { path: [number, number, number][] }[] = [];
+    if (!overlays.election || !ev) return { pies: out, pieRims: rims };
+    const poll = ev.phase === "campaign";
+    const by = new globalThis.Map<number, globalThis.Map<string, number>>();
+    for (const x of poll ? ev.polls : ev.votes) { if (x.s < 0) continue; const m = by.get(x.s) ?? by.set(x.s, new globalThis.Map()).get(x.s)!; m.set(x.n, (m.get(x.n) ?? 0) + 1); }
+    for (const [st, m] of by) {
+      const sh = B.shapes[st]!, total = [...m.values()].reduce((a, b) => a + b, 0);
+      const r = 2.6 + Math.sqrt(total) * 2.1, z = sh.top + 1.2, cx = sh.cx, cy = sh.cy;
+      let a0 = -Math.PI / 2;
+      for (const c of ev.e.candidates) {
+        const k = m.get(c.number);
+        if (!k) continue;
+        const a1 = a0 + (k / total) * Math.PI * 2;
+        const poly: [number, number, number][] = [[cx, cy, z]];
+        const steps = Math.max(2, Math.ceil((a1 - a0) / 0.2));
+        for (let i = 0; i <= steps; i++) { const a = a0 + ((a1 - a0) * i) / steps; poly.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r, z]); }
+        out.push({ poly, n: c.number, s: st, count: k, total, poll });
+        a0 = a1;
+      }
+      const ring: [number, number, number][] = [];
+      for (let i = 0; i <= 32; i++) { const a = (i / 32) * Math.PI * 2; ring.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r, z]); }
+      rims.push({ path: ring });
+    }
+    return { pies: out, pieRims: rims };
+  }, [overlays.election, ev, B]);
   const petitionSigners = useMemo(() => {
     if (!overlays.election || !ev || ev.phase !== "campaign") return [];
     const out: { s: number; person: string }[] = [];
@@ -617,20 +647,18 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0 }: { city:
       stroked: true, filled: true, getFillColor: hex(PAL.seat, 26), getLineColor: hex(PAL.seat, 150), getLineWidth: 1.2, lineWidthUnits: "pixels",
     }),
     // The election: turnout by block, each vote at the voter's home, the campaign, the candidates' homes.
+    // Turnout only where a block differs from the town's (diverging about the town's turnout so far).
     overlays.election && turnoutCells.length > 0 && new SolidPolygonLayer({
       id: "turnout", data: turnoutCells, getPolygon: (d: any) => { const x = d.j % town.ground.w, y = Math.floor(d.j / town.ground.w); return rect((x + 0.5) * cell, -(y + 0.5) * cell, cell, cell, 0.42); },
-      getFillColor: (d: any) => [180, 140, 242, 14 + Math.pow(d.f, 2) * 110], extruded: false, parameters: { depthWriteEnabled: false },
+      getFillColor: (d: any) => (d.dev >= 0 ? [120, 170, 255, Math.min(90, d.dev * 600)] : [235, 150, 90, Math.min(90, -d.dev * 600)]), extruded: false, parameters: { depthWriteEnabled: false },
     }),
-    overlays.election && ev && ev.votes.length > 0 && new ScatterplotLayer({
-      id: "votes", data: ev.votes.filter((v) => v.s >= 0), pickable: true,
-      getPosition: (v: any, { index }: any) => { const sh = B.shapes[v.s]!; const [dx, dy] = jit(index, 31, sh); return [sh.cx + dx, sh.cy + dy, sh.top + 3]; },
-      getFillColor: (v: any) => hex(candCol[v.n] ?? "#ffffff"), getRadius: 1.8, radiusUnits: "meters", radiusMinPixels: 2.6, radiusMaxPixels: 7, billboard: true,
-      parameters: { depthCompare: "always" }, updateTriggers: { getFillColor: [candCol] },
+    // Each building's votes (or, in the campaign, its opinion-poll answers): a pie by first preference on its roof, sized by count.
+    overlays.election && pies.length > 0 && new SolidPolygonLayer({
+      id: "pies", data: pies, getPolygon: (d: any) => d.poly, getFillColor: (d: any) => hex(candCol[d.n] ?? "#ffffff", d.poll ? 170 : 245),
+      extruded: false, material: false as any, pickable: true, parameters: { depthCompare: "always" }, updateTriggers: { getFillColor: [candCol] },
     }),
-    overlays.election && ev && ev.phase === "campaign" && ev.polls.length > 0 && new ScatterplotLayer({
-      id: "polls", data: ev.polls.filter((v) => v.s >= 0),
-      getPosition: (v: any, { index }: any) => { const sh = B.shapes[v.s]!; const [dx, dy] = jit(index, 41, sh); return [sh.cx + dx, sh.cy + dy, sh.top + 3]; },
-      getLineColor: (v: any) => hex(candCol[v.n] ?? "#ffffff"), filled: false, stroked: true, getRadius: 2, radiusUnits: "meters", radiusMinPixels: 3, lineWidthMinPixels: 1.6, billboard: true, parameters: { depthCompare: "always" },
+    overlays.election && pies.length > 0 && new PathLayer({
+      id: "pie-rims", data: pieRims, getPath: (d: any) => d.path, getColor: [11, 15, 23, 200], getWidth: 1, widthUnits: "pixels", parameters: { depthCompare: "always" },
     }),
     overlays.election && petitionSigners.length > 0 && new ScatterplotLayer({
       id: "signers", data: petitionSigners,
@@ -668,21 +696,21 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0 }: { city:
       parameters: { depthWriteEnabled: false, depthCompare: "always" },
     }),
     // People: crowds at a distance, points up close.
-    overlays.people && crowdF > 0.02 && new ScatterplotLayer({
+    overlays.people && !overlays.election && crowdF > 0.02 && new ScatterplotLayer({
       id: "crowds", data: crowds, getPosition: (d: any) => [d.p[0], d.p[1], 0.6], getRadius: (d: any) => 5 + Math.sqrt(d.n) * 3.4, radiusUnits: "meters", radiusMinPixels: 1.5,
       getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * (0.22 + 0.2 * sky.night) * (overlays.election || overlays.papers ? 0.3 : 1), parameters: { ...(sky.night > 0.5 ? ADDITIVE : { depthWriteEnabled: false }), depthCompare: "always" },
     }),
-    overlays.people && crowdF > 0.02 && new ScatterplotLayer({
+    overlays.people && !overlays.election && crowdF > 0.02 && new ScatterplotLayer({
       id: "crowds-core", data: crowds, getPosition: (d: any) => [d.p[0], d.p[1], 0.7], getRadius: (d: any) => 2 + Math.sqrt(d.n) * 1.5, radiusUnits: "meters", radiusMinPixels: 1,
       getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * 0.55 * (overlays.election || overlays.papers ? 0.3 : 1), parameters: { depthWriteEnabled: false, depthCompare: "always" },
     }),
-    overlays.people && new ScatterplotLayer({
+    overlays.people && !overlays.election && new ScatterplotLayer({
       id: "people-halo", data: { length: nP, attributes: { getPosition: { value: people.pos, size: 3 }, getFillColor: { value: people.col, size: 4, normalized: true } } },
       getRadius: 1.9, radiusUnits: "meters", radiusMinPixels: 2.2, radiusMaxPixels: 7, billboard: true, opacity: (0.16 + 0.22 * sky.night) * (1 - crowdF * 0.6) * (overlays.election || overlays.papers ? 0.35 : 1), parameters: ADDITIVE,
     }),
     overlays.people && new ScatterplotLayer({
       id: "people", data: { length: nP, attributes: { getPosition: { value: people.pos, size: 3 }, getFillColor: { value: people.col, size: 4, normalized: true } } },
-      getRadius: 0.7, radiusUnits: "meters", radiusMinPixels: 0.9, radiusMaxPixels: 3, billboard: true, pickable: true, opacity: overlays.election || overlays.papers ? 0.4 : 1, parameters: { depthWriteEnabled: false },
+      getRadius: 0.7, radiusUnits: "meters", radiusMinPixels: 0.9, radiusMaxPixels: 3, billboard: true, pickable: true, opacity: overlays.election ? 0.18 : overlays.papers ? 0.4 : 1, parameters: { depthWriteEnabled: false },
     }),
     // Selection.
     trail.length > 0 && new PathLayer({

@@ -261,6 +261,7 @@ export function Tooltip({ tip, city, t, name }: { tip: HoverInfo; city: CityData
   else if (tip.layer === "people") body = <PersonBody c={city} q={tip.index} t={t} name={name} />;
   else if (tip.layer === "acts" || tip.layer === "act-hits") body = <ActBody a={tip.object.act} target={tip.object.target} t={t} />;
   else if (tip.layer === "papers") body = <PaperBody p={tip.object.p} />;
+  else if (tip.layer === "pies") body = <><div className="lc-tip-title">{name(tip.object.s)}</div><div className="lc-tip-sub">{tip.object.poll ? "opinion-poll answers from here" : "votes cast from here"}: {tip.object.total} · candidate {tip.object.n}: {tip.object.count}</div></>;
   else if (tip.layer === "votes") body = <><div className="lc-tip-title">{tip.object.person}</div><div className="lc-tip-sub">voted · first preference: candidate {tip.object.n}</div></>;
   else if (tip.layer === "cand-homes") body = <><div className="lc-tip-title">{tip.object.name}</div><div className="lc-tip-sub">candidate {tip.object.number}{tip.object.seat ? " · the seat's candidacy" : ""} · home</div></>;
   else if (tip.layer === "networks") body = <><div className="lc-tip-title">{tip.object.id}</div><div className="lc-tip-sub">{tip.object.mode}{tip.object.capacity ? ` · capacity ${n0(tip.object.capacity)}` : ""}</div></>;
@@ -306,8 +307,8 @@ function electionNote(ev: ElectionView): string {
   const e = ev.e;
   const poll = e.notice?.poll_at ? ` Poll day ${fmtDay(e.notice.poll_at).day}.` : "";
   if (ev.phase === "before") return `Not yet called.${poll}`;
-  if (ev.phase === "campaign") return `The campaign: candidates' homes ringed; opinion-poll answers (hollow) and petition signatures at the homes they came from.${poll}`;
-  return "Each vote at the voter's home, coloured by its first preference; blocks shaded by turnout so far. The researcher's view: the ballot is secret in the world.";
+  if (ev.phase === "campaign") return `The campaign: candidates' homes ringed; a pie on each home of its opinion-poll answers by first choice; petition signatures as violet dots.${poll}`;
+  return "A pie on each home: the votes cast from it, by first preference, sized by how many. Blocks are shaded only where turnout differs from the town's by 3 points or more (blue above, orange below; 8+ electors). The researcher's view: the ballot is secret in the world.";
 }
 
 function ElectionLegend({ ev, col }: { ev: ElectionView; col: Record<string, string> }) {
