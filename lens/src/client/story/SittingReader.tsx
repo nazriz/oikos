@@ -477,9 +477,9 @@ function ActCard({ seat, draft, act, levers, focus }: { seat: SeatJson; draft?: 
           {act && act.reasoning && <div className="st-step seat"><span className="lbl">Its reason</span><Hi className="q" text={act.reasoning} /></div>}
           {draft && (draft.summary || draft.call) && (
             <div className="st-step inst"><span className="lbl">Written up by the clerk</span>{researcher && <span className="st-faint" style={{ fontSize: 11.5 }}>{draftBy(draft)}</span>}
-              <div className="st-drawn"><Hi text={draft.summary?.split("\n")[0] ?? draft.call ?? ""} /></div>
-              {draft.summary && draft.summary.includes("\n") ? <Md text={draft.summary.split("\n").slice(1).join("\n")} className="st-prose small" /> : null}
-              {draft.call && <div className="st-call"><Hi className="st-mono" text={draft.call} /></div>}
+              <div className="st-drawn"><Hi text={say(draft.summary?.split("\n")[0] ?? (researcher ? draft.call ?? "" : ""))} /></div>
+              {draft.summary && draft.summary.includes("\n") ? <Md text={say(draft.summary.split("\n").slice(1).join("\n"))} className="st-prose small" /> : null}
+              {researcher && draft.call && <div className="st-call"><Hi className="st-mono" text={draft.call} /></div>}
             </div>
           )}
           {draft && <div className={`st-step ${draft.decision === "accept" ? "ok" : draft.decision ? "declined" : "wait"}`}><span className="lbl">{draft.decision === "accept" ? "The mayor signed it" : draft.decision ? "The mayor declined it" : "The mayor did not answer"}</span>{draft.note && <Hi className="q" text={draft.note} />}</div>}

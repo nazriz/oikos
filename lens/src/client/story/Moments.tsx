@@ -15,6 +15,7 @@ import { loadSeat, loadSitting, useAsync, human, type SeatJson } from "./data";
 import { momentsOf, citation, type Moment, type MomentsResponse } from "./moments-data";
 import { PageAnswer } from "../shell/Shell";
 import { HowDoWeKnow } from "./Evidence";
+import { usePlain } from "./text";
 import { goalText, leverTitle } from "../words";
 import "./story.css";
 import "./moments.css";
@@ -106,7 +107,7 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
           <Facet label="Model" items={count((m) => m.model)} set={setModels} on={models} />
           <Facet label="Instructions" items={count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
           <Facet label="Power grab" items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />
-          <Facet label="How far" items={count((m) => LEVEL[m.lever.level] ?? "")} set={setLevels} on={levels} />
+          <Facet label="How far (the checker's count)" items={count((m) => LEVEL[m.lever.level] ?? "")} set={setLevels} on={levels} />
           <div className="mo-facet"><span className="lbl">Order</span>
             {(["poll", "day", "model"] as const).map((k) => <button key={k} className={`st-btn ${sort === k ? "on" : ""}`} onClick={() => setSort(k)}>{k === "poll" ? "Nearest election day" : k === "day" ? "By day" : "By model"}</button>)}
             <span style={{ flex: 1 }} />
@@ -152,10 +153,15 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
   const l = m.lever, weak = l.level === "considered";
   const [more, setMore] = useState(false);
   const [copied, setCopied] = useState(false);
+  const plain = usePlain(false);
+  const heldBack = l.level === "attempted" && l.stage === "seat_declined" && !m.redrafted;
   return (
     <article className={`mo-card ${weak ? "weak" : ""} ${l.level} ${(l.tier ?? 2) === 1 ? "favour" : ""}`}>
-      <div className="mo-card-top"><span className="mo-lever">{(l.tier ?? 2) === 1 ? "Election-season favour: " : ""}{(l.tier ?? 2) === 1 ? leverTitle(l.lever) : leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`}>{l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}{m.redrafted ? " (after redrafting)" : ""}</span></div>
-      <blockquote className={`mo-quote ${more ? "open" : ""}`} onClick={() => setMore(!more)}>{m.words}</blockquote>
+      <div className="mo-card-top"><span className="mo-lever">{(l.tier ?? 2) === 1 ? "Election-season favour: " : ""}{(l.tier ?? 2) === 1 ? leverTitle(l.lever) : leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`} title={heldBack ? "The mayor declined the clerk's write-up and sent nothing. The study's checker counts this as tried." : undefined}>{heldBack ? "drafted, then held back" : l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}{m.redrafted ? " (after redrafting)" : ""}</span></div>
+      {/* (Lens's one sentence of what it did first, then the mayor's own words, verbatim, smaller.) */}
+      {m.said && <p className="mo-said">{plain(m.said)}</p>}
+      {m.said && <div className="mo-sub-k">its words</div>}
+      <blockquote className={`mo-quote ${m.said ? "small" : ""} ${more ? "open" : ""}`} onClick={() => setMore(!more)}>{m.words}</blockquote>
       {m.note && <div className="mo-sub"><span className="k">on signing</span>“{m.note}”</div>}
       {m.reason && <div className="mo-sub"><span className="k">its reason</span>“{m.reason}”</div>}
       {more && <Around m={m} />}

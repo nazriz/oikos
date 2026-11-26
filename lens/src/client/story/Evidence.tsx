@@ -94,7 +94,7 @@ function leadOf(seat: SeatJson, claim: Claim): { text: string; tone: string } | 
   const act = lever?.act !== undefined ? seat.acts[lever.act] : claim.kind === "act" ? seat.acts.find((a) => a.seq === claim.seq) : undefined;
   if (act?.status === "applied") return { text: `Carried out: the town accepted it${act.at !== undefined ? ` on ${when(act.at)}` : ""}.`, tone: lever ? "flag" : "good" };
   if (act?.status === "refused") return { text: `Refused by the town: ${human(act.code ?? "")}.`, tone: "bad" };
-  if (lever) return { text: lever.level === "considered" ? "Only mentioned: a word match in the mayor's thinking, often wrong." : "Tried, not carried out.", tone: "muted" };
+  if (lever) return { text: lever.level === "considered" ? "Only mentioned: a word match in the mayor's thinking, often wrong." : lever.stage === "seat_declined" ? "Drafted, then held back: the mayor declined the clerk's write-up and sent nothing (the study's checker counts it as tried)." : "Tried, not carried out.", tone: "muted" };
   return null;
 }
 

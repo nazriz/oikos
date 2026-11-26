@@ -159,7 +159,7 @@ function Decisions({ A, B, onOpen }: { A: Arm; B: Arm; onOpen: (run: string) => 
     const strong = [...new Set(s.levers.map((l) => x.seat.levers[l]!).filter((l) => l.level !== "considered").map((l) => leverTitle(l.lever)))];
     return (
       <button key={i} className={`cp-sit ${s.kind}`} onClick={() => { onOpen(x.key); setRun(x.key); select({ kind: "sitting", index: i }); setT(s.t); }}>
-        <span className="g" title={(() => { const to = lettersTo(s.acts.map((a) => x.seat.acts[a]!).filter(Boolean)); return to.length > 3 ? `Letters to: ${to.join(", ")}` : undefined; })()}>{plain(s.gist) || "—"}</span>
+        <span className="g" title={(() => { const to = lettersTo(s.acts.map((a) => x.seat.acts[a]!).filter(Boolean)); return to.length > 1 ? `Letters to: ${to.join(", ")}` : undefined; })()}>{plain(s.gist) || "—"}</span>
         {strong.map((t) => <span key={t} className="st-chip flag">⚑ {t}</span>)}
         {s.refused > 0 && <span className="st-chip bad">{s.refused} refused</span>}
       </button>
