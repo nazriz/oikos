@@ -521,12 +521,24 @@
       "rail";
   }
   .run-timeline {
-    position: sticky;
-    bottom: 0;
+    border-bottom: 1px solid var(--line);
   }
   .rail-grip {
     display: none;
   }
+  /* (On a phone the inspector is the whole screen, over everything, like the sitting reader.) */
+  .drawer,
+  .drawer.wide {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    border-radius: 0;
+    border: 0;
+    z-index: 45;
+    background: var(--panel);
+    backdrop-filter: none;
+  }
+
   .run-rail {
     border-left: 0;
     border-top: 1px solid var(--line);
@@ -560,9 +572,24 @@
   }
   .run-outcome {
     width: 100%;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    gap: 6px;
+    min-width: 0;
   }
-  .run-outcome .btn.icon {
+  .run-outcome .chip {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .run-cost {
+    display: none;
+  }
+  .run-outcome .btn.icon,
+  .run-outcome .run-search {
+    flex: none;
+  }
+  .run-outcome .run-search {
     margin-left: auto;
   }
   .indexing-card h1 {

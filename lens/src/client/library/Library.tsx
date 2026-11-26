@@ -19,6 +19,9 @@ export function Library({ q }: { q: URLSearchParams }) {
   const [model, setModel] = useState(q.get("model") ?? "");
   const [goal, setGoal] = useState(q.get("goal") ?? "");
   const [outcome, setOutcome] = useState<Outcome>((q.get("outcome") as Outcome) ?? "any");
+  // (Folders newest first, a few at a time: all of runs/ at once is thousands of rows, slow on a phone.)
+  const [groupLimit, setGroupLimit] = useState(12);
+  useEffect(() => setGroupLimit(12), [text, kind, model, goal, outcome]);
 
   useEffect(() => {
     let live = true;
@@ -182,9 +185,14 @@ export function Library({ q }: { q: URLSearchParams }) {
               {shown.length.toLocaleString()} of {runs.length.toLocaleString()}
             </span>
           </div>
-          {groups.map((g) => (
+          {groups.slice(0, groupLimit).map((g) => (
             <Group key={g.name} name={g.name} list={g.list} newest={g.newest} />
           ))}
+          {groups.length > groupLimit && (
+            <button className="btn lib-more" onClick={() => setGroupLimit((n) => n + 15)}>
+              Show {Math.min(15, groups.length - groupLimit)} more folders <span className="faint">· {groups.length - groupLimit} not shown</span>
+            </button>
+          )}
           {!groups.length && <div className="lib-empty">No run matches.</div>}
         </section>
       )}
@@ -413,7 +421,7 @@ function StartHere({ runs }: { runs: RunEntry[] }) {
       <div className="start-head">
         <h2 className="serif">Start here</h2>
         <p className="muted">
-          Three moments, each opened where it happens. Scrub the timeline at the bottom, read each sitting in the rail on the right, click anyone on the map, or press <span className="kbd">⌘K</span> to search.
+          Three moments, each opened where it happens. Scrub the timeline, read each sitting in the story, pick anyone on the map, or press <span className="kbd">⌘K</span> to search.
         </p>
       </div>
       <div className="start-cards">

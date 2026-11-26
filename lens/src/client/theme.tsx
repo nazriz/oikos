@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Moon, Sun } from "./icons";
 
 type Theme = "dark" | "light";
-const system = (): Theme => (window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark");
+const system = (): Theme => (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 const chosen = (): Theme | undefined => {
   const t = document.documentElement.dataset.theme;
   return t === "light" || t === "dark" ? t : undefined;
@@ -13,14 +13,14 @@ const chosen = (): Theme | undefined => {
 export function useTheme(): [Theme, (t: Theme) => void] {
   const [theme, setTheme] = useState<Theme>(() => chosen() ?? system());
   useEffect(() => {
-    const mq = window.matchMedia?.("(prefers-color-scheme: light)");
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
     const f = () => !chosen() && setTheme(system());
     mq?.addEventListener("change", f);
     return () => mq?.removeEventListener("change", f);
   }, []);
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]');
-    meta?.setAttribute("content", theme === "light" ? "#f6f3ec" : "#0b0f17");
+    meta?.setAttribute("content", theme === "light" ? "#edf0f2" : "#16212b");
   }, [theme]);
   const set = (t: Theme) => {
     document.documentElement.dataset.theme = t;

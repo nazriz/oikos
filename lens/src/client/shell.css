@@ -564,6 +564,12 @@
   margin-top: 8px;
 }
 
+.lib-more {
+  display: flex;
+  margin: 28px auto 0;
+  height: 36px;
+  padding: 0 16px;
+}
 .lib-empty {
   padding: 60px 0;
   text-align: center;
@@ -645,8 +651,23 @@
     font-size: 36px;
   }
   .lib-figures {
-    grid-template-columns: repeat(2, 1fr);
-    row-gap: 18px;
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .lib-fig {
+    padding-left: 10px;
+  }
+  .lib-fig-v {
+    font-size: 24px;
+  }
+  .lib-fig-v .faint {
+    font-size: 13px !important;
+  }
+  .lib-fig .eyebrow {
+    font-size: 9.5px;
+    letter-spacing: 0.05em;
+  }
+  .lib-count {
+    display: none;
   }
   .lib-section-head {
     flex-direction: column;

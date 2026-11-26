@@ -197,6 +197,8 @@
   }
   .tl-rel,
   .tl-zoom,
+  .tl-lanes,
+  .tl-right .btn[aria-label="Fit"],
   .tl-right .btn[aria-label="Keys"] {
     display: none;
   }
