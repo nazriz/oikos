@@ -75,7 +75,7 @@ function markText(text: string, m: Marks, html: boolean): string {
     if (p.length < 8) continue;
     out = out.split(p).join(`<mark class="st-lever${l.muted ? " muted" : ""}">${p}</mark>`);
   }
-  out = out.replace(REC, '<span class="st-rec">$1</span>');
+  out = out.replace(REC, (id) => (id.startsWith("rec.") ? `<span class="st-rec" data-peek="record:${id}">${id}</span>` : `<span class="st-rec">${id}</span>`));
   // (A person's id opens their life: a link the page handles by delegation (openPerson), with nav's hover card.)
   out = out.replace(PERSON, '<button type="button" class="id-link" data-person="$1" data-peek="person:$1">$1</button>');
   if (m.query.trim().length >= 2) {
