@@ -106,3 +106,25 @@ Each fold is registered with one line in `src/server/folds.ts`. Each view contri
   mark), Home/End, `?`. Core's own lane, `zz-reader`, holds the study reader's lever attempts and the poll.
 - **Server**. Development mode is off by default: deck.gl's shaders break under Bun's HMR bundling. `oikos lens list`
   prints the catalogue, and `oikos lens index <key>` makes one bundle without a server.
+
+## 8. Wave 3 (core, 2026-11-26)
+
+- **`ledger` fold** (`src/folds/ledger.ts`). Each person's own record, in one file per person (`ledger/p-<id>`), fetched
+  when their page opens. It holds every payment into or out of their accounts, with who decided it: the author of the
+  instruction it was paid under, else the participant whose act caused it. It also holds every record and message
+  that named them (author, post, whether the seat wrote it, refused or not), their illnesses, and posts taken,
+  departures and deaths. Kinds of paper with more than 2,000 in a run (orders, delivery notes, requests, invoices) are
+  counted per person, not listed. `ledger.json` carries a search index of the other records. It adds about 10 s to a
+  4.6 M-line fork.
+- **A life in the run** (`src/client/life/PersonLife.tsx`, `views.inspector.person`), shown in a wide drawer: who they
+  are and their household, where they lived and spent their days (from the people fold's rows), their balance day by
+  day (click to jump), and everything that reached them. Each item is coloured by who decided it: the seat (amber),
+  an institution (periwinkle) or a person (teal). It can be filtered by that, and a seat's item opens its act.
+- **⌘K palette** (`src/client/palette/Palette.tsx`; also `/`, or the run bar's Search). It searches people,
+  households, posts, organisations, buildings, sittings, the ledger's records and the words of every model sitting's
+  transcript. It is indexed in the browser; transcripts are fetched four at a time the first time it opens.
+- **Pulse** (`src/client/pulse/Pulse.tsx`) is a foldable strip above the timeline, built from the `daily` and `people`
+  folds. It shows people in town, refusals, complaints (record kinds naming one), petitions, money moved and illnesses
+  begun, with the playhead's day marked; click a strip to jump.
+- **Deep links.** `#/run/<key>?t=<s>&sel=<kind>:<id>` opens any moment and selection. The run bar's "copy link", or
+  `L`, copies one.

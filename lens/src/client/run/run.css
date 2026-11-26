@@ -217,6 +217,9 @@
     transform: translateX(16px);
   }
 }
+.drawer.wide {
+  width: min(500px, calc(100% - 24px));
+}
 .drawer-head {
   display: flex;
   align-items: flex-start;
@@ -570,5 +573,19 @@
   }
   .empty-map-place {
     font-size: 32px;
+  }
+}
+
+.run-copy {
+  font-size: 12px;
+  height: 26px;
+  min-width: 82px;
+}
+.run-copy.done {
+  color: var(--good);
+}
+@media (max-width: 900px) {
+  .run-copy {
+    display: none !important;
   }
 }
