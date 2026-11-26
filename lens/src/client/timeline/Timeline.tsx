@@ -13,6 +13,7 @@ import { DAY, HOUR, clock, dayNo, dayOf, span as spanText, spanWords } from "../
 import { Fit, Keyboard, Pause, Play } from "../icons";
 import { useMode } from "../mode";
 import { useSeat } from "../nav/nav";
+import { useFold } from "../api";
 import { keyMoments, phases as phasesOf, type KeyMoment, type Phase } from "./moments";
 import { lockInfo } from "../story/lockin";
 import { usePlain } from "../story/text";
@@ -132,6 +133,9 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
   const selection = useLens((s) => s.selection);
   const run = useLens((s) => s.run);
   const seat = useSeat(run);
+  // (Still reading the run's own data, which brings the key moments: a run with none, or that failed, is not waiting.)
+  const seatState = useFold("seat", run);
+  const waiting = !!run && seatState.loading;
   // The key moments and the phases; a stopped run's axis runs on to its set length, hatched, so the loss shows.
   const moments = useMemo(() => (seat ? keyMoments(seat, lockInfo(seat, entry)) : []), [seat, entry]);
   const phases = useMemo<Phase[]>(() => (seat ? phasesOf(seat, spanT[0]) : []), [seat, spanT[0]]);
@@ -335,7 +339,9 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
         g.fillStyle = isDay ? p.line2 : p.line;
         g.fillRect(x, isDay ? axisTop : axisTop + AXIS - 6, 1, isDay ? height - axisTop : 6);
         g.fillStyle = isDay ? p.text : p.faint;
-        g.fillText(isDay ? `day ${dayOf(tt)}` : clock(tt), x + 4, axisTop + AXIS / 2);
+        const lab = isDay ? `day ${dayOf(tt)}` : clock(tt);
+        // (A label that would run off the right edge is left out, never cut.)
+        if (x + 4 + g.measureText(lab).width <= width - 2) g.fillText(lab, x + 4, axisTop + AXIS / 2);
       }
     } else {
       const ds = niceDayStep(pxPerDay);
@@ -347,7 +353,8 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
         g.fillStyle = withAlpha(p.line, 0.7);
         g.fillRect(x, axisTop + AXIS - 6, 1, height - axisTop - AXIS + 6);
         g.fillStyle = p.muted;
-        g.fillText(`${L === L0 ? "day " : ""}${L}`, x + 4, axisTop + AXIS / 2);
+        const lab = `${L === L0 ? "day " : ""}${L}`;
+        if (x + 4 + g.measureText(lab).width <= width - 2) g.fillText(lab, x + 4, axisTop + AXIS / 2);
       }
       if (pxPerDay > 6) {
         g.fillStyle = p.line;
@@ -450,6 +457,12 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
       g.setLineDash([]);
     }
 
+    // Until the run's own data is in, the key moments' row is a quiet placeholder (and the strip takes no clicks).
+    if (waiting) {
+      g.fillStyle = withAlpha(p.text, 0.06);
+      for (let r = 0; r < FLAG_ROWS; r++) g.fillRect(8 + r * 140, flagsTop + 3 + r * FLAG_ROW, Math.min(width * 0.18, 110), FLAG_ROW - 5);
+    }
+
     // Key moments: a pole through everything and a labelled flag on top. Labels are placed most important first, in
     // two rows; one that fits nowhere keeps its pole and a small head, and says itself on hover.
     const fl: FlagHit[] = [];
@@ -533,7 +546,7 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
       g.closePath();
       g.fill();
     }
-  }, [palette, width, height, v0, v1, t, sorted, ground, fork, selTok, hoverT, xOf, xAll, LANE, compact, moments, phases, ov]);
+  }, [palette, width, height, v0, v1, t, sorted, ground, fork, selTok, hoverT, xOf, xAll, LANE, compact, moments, phases, ov, waiting]);
 
   // Pointer: scrub, pick a mark or a flag, or move the window on the overview strip.
   const drag = useRef<{ startX: number; moved: boolean; hit?: Hit; flag?: KeyMoment; ov?: boolean } | null>(null);
@@ -701,10 +714,12 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
           {moments.length > 0 && (
             <div className="seg tl-moments" role="group" aria-label="Key moments">
               <button disabled={!hasPrev} onClick={() => stepMoment(-1)} title="The previous key moment: a power grab, an election date (,)">
-                Previous moment
+                <span className="tl-long">Previous moment</span>
+                <span className="tl-short" aria-hidden="true">‹ Moment</span>
               </button>
               <button disabled={!hasNext} onClick={() => stepMoment(1)} title="The next key moment: a power grab, an election date (.)">
-                Next moment
+                <span className="tl-long">Next moment</span>
+                <span className="tl-short" aria-hidden="true">Moment ›</span>
               </button>
             </div>
           )}
@@ -756,7 +771,8 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
         <div className="tl-canvas" ref={wrap}>
           <canvas
             ref={canvas}
-            style={{ width, height, cursor: hover ? "pointer" : "col-resize" }}
+            style={{ width, height, cursor: waiting ? "progress" : hover ? "pointer" : "col-resize", pointerEvents: waiting ? "none" : undefined }}
+            aria-busy={waiting}
             onPointerDown={onDown}
             onPointerMove={onMove}
             onPointerUp={onUp}

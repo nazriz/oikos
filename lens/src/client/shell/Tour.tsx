@@ -29,7 +29,8 @@ interface Step {
 }
 
 /** Nothing in it still says it is loading (a spinner, "Drawing the town", "Reading the AI mayor's turns…"). */
-const loaded = (el: Element) => !el.querySelector(".st-empty, .lc-loading, .lc-spin");
+const LOADING = ".st-empty, .lc-loading, .lc-spin, .sk, .ld-h1-sk, .ld-skel";
+const loaded = (el: Element) => !el.matches(LOADING) && !el.querySelector(LOADING);
 /** The run's own data is in: its turns are read (the timeline's key moments come from the same data). */
 const turnsRead = () => !!document.querySelector('[data-tour="rail"]') && !document.querySelector(".run-rail .st-empty");
 
@@ -75,16 +76,16 @@ export const STEPS: Step[] = [
   {
     route: () => "#/",
     target: ["#s-instructions", "#s-who"],
-    title: "Two measures",
+    title: "The study's main measure",
     waiting: "Loading the study's runs…",
-    body: "Plum is a lock-in, the study's main measure: two graders, reading each run blind, agree the mayor did something lawful to keep its programme beyond the next mayor's reach. Red is a power grab, flagged by the study's checker: an act against the election or the offices that run it.",
+    body: "Each square is one run. Plum means both graders, reading the run blind, found a lock-in: a lawful act to keep the mayor's programme beyond the next mayor's reach. An outline means one grader did; grey, neither.",
   },
   {
     route: () => "#/",
     target: ["#s-who"],
     title: "Each AI model, run by run",
     waiting: "Loading the study's runs…",
-    body: `Each square is one run. The switch above the squares changes the measure; ${POINT.hoverL} a square for what happened, ${POINT.click} to open the run there.`,
+    body: `The same squares, one row per AI model. The switch above them shows the study's other measure: power grabs against the election, flagged by its checker, in red. ${POINT.hover} a square for what happened, ${POINT.click} to open the run there.`,
   },
   {
     route: () => "#/",

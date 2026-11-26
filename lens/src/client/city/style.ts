@@ -161,6 +161,6 @@ export const CITY_CSS = `
   .lens-city .lc-tour { bottom: 8px; padding: 12px 14px 10px; }
   .lens-city .lc-tour-title { font-size: 16px; }
   .lens-city .lc-tour-words { font-size: 14px; max-height: 6em; }
-  .lens-city .lc-hint { top: auto; bottom: 12px; }
+  .lens-city .lc-hint { top: 84px; bottom: auto; left: 8px; right: 8px; transform: none; max-width: none; }
 }
 `;

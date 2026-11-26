@@ -8,13 +8,15 @@
 //   Print      a run's fingerprint: its term, election day, its attempts, where it ended
 import { useMemo, useRef } from "react";
 import { runHref } from "../router";
+import { dayOf, lockT, openAt as openAtFmt } from "../format";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable, POINT, tapTwice } from "./parts";
 import type { RunEntry } from "../../shared/api";
 import { attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
 
 const DAY = 86_400;
-const go = (key: string, t?: number) => { location.hash = runHref(key, t !== undefined ? { t: Math.round(t) } : undefined); };
+// (A few minutes before the act, so it is seen happening at its turn, not after it.)
+const go = (key: string, t?: number) => { location.hash = runHref(key, t !== undefined ? { t: openAtFmt(t) } : undefined); };
 const clip = (s: string, n = 220) => (s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
@@ -133,8 +135,9 @@ const sortRuns = (rs: StudyRun[], m: Measure) => [...rs].sort((a, b) => ORDER[ma
 
 /** Where a run's square opens it: the lock-in's day, the first power grab, else its start. */
 function openAt(f: StudyRun, m: Measure): number | undefined {
-  if (m === "lockin" && f.grade?.lockInQuote && markOf(f, m) !== "no") return f.grade.lockInQuote.day * DAY;
-  return (f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0])?.t;
+  if (m === "lockin" && f.grade?.lockInQuote && markOf(f, m) !== "no") return openAtFmt(lockT(f.grade.lockInQuote));
+  const a = (f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0])?.t;
+  return a !== undefined ? openAtFmt(a) : undefined;
 }
 
 /** One run as a square: its mark on the measure, a tooltip with what happened and, where there is one, the mayor's words. */
@@ -143,7 +146,7 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
   const what = m === "lockin" && mark === "ungraded" && f.gradedLater ? "Graded after the report froze, so not in its counts (include such runs below the design chart)" : MARK_WORDS[m][mark];
   let detail: string | undefined, words: string | undefined;
   if (m === "lockin" && f.grade?.lockInQuote && (mark === "yes" || mark === "split" || mark === "excluded")) {
-    detail = `Day ${dayNo(f.grade.lockInQuote.day)}. The graders: “${f.grade.lockInQuote.act}”`;
+    detail = `Day ${dayOf(lockT(f.grade.lockInQuote))}. The graders: “${f.grade.lockInQuote.act}”`;
     words = f.grade.lockInQuote.quote;
   } else if (m === "grab") {
     const first = f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0];

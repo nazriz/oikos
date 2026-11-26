@@ -33,6 +33,9 @@
   .mo-title { font-size: 26px; }
   .mo-grid { padding: 14px 12px 40px; columns: 1; }
   .mo-facet .lbl { width: 100%; }
+  .mo-view { flex-wrap: wrap; height: auto; }
+  .mo-view button { flex: 1 1 auto; }
+  .mo-facet .st-btn { max-width: 100%; white-space: normal; text-align: left; height: auto; min-height: 28px; line-height: 1.3; padding-top: 4px; padding-bottom: 4px; }
 }
 
 /* house style (docs/design/lens-look.md) */

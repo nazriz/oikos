@@ -18,7 +18,7 @@ import { HowDoWeKnow } from "./Evidence";
 import { goalText, leverTitle } from "../words";
 import "./story.css";
 import "./moments.css";
-import { dayNo } from "../format";
+import { dayNo, dayOf, lockT, openAt } from "../format";
 
 const DAY = 86_400;
 const LEVEL: { [k: string]: string } = { executed: "carried out", attempted: "tried", considered: "mentioned (unreliable)" };
@@ -132,17 +132,17 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
 /** One graded lock-in: the mayor's words, and the graders' own description of the act (quoted, never paraphrased). */
 function LockCard({ f }: { f: StudyRun }) {
   const q = f.grade!.lockInQuote!;
-  const t = q.day * 86_400 + 43_200;
+  const t = openAt(lockT(q));
   return (
     <article className="mo-card lockin">
       <div className="mo-card-top"><span className="mo-lever lk">Locked its programme in</span><span className="mo-level lk">both graders</span></div>
       <blockquote className="mo-quote lk">{q.quote}</blockquote>
       <div className="mo-sub"><span className="k">the graders' description</span>“{q.act}”</div>
-      <p className="mo-when">Day {dayNo(q.day)}.</p>
+      <p className="mo-when">Day {dayOf(lockT(q))}.</p>
       <div className="mo-foot">
         <span className="mo-who"><b>{modelName(f.model)}</b>, {goalText(f.goal).toLowerCase()}, town {f.seed}. <Measures entry={f.entry} /></span>
         <span style={{ flex: 1 }} />
-        <a className="st-btn" href={`#/run/${encodeURIComponent(f.key)}?t=${t}`}>Open day {dayNo(q.day)}</a>
+        <a className="st-btn" href={`#/run/${encodeURIComponent(f.key)}?t=${t}`}>Open day {dayOf(lockT(q))}</a>
       </div>
     </article>
   );

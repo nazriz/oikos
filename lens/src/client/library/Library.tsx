@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Catalogue, RunEntry } from "../../shared/api";
 import { fetchCatalogue } from "../api";
-import { ago, bytes, dayOf, usd } from "../format";
+import { ago, bytes, dayOf, lockT, openAt, usd } from "../format";
 import { Search } from "../icons";
 import { replaceQuery, runHref } from "../router";
 import { ThemeToggle } from "../theme";
@@ -173,7 +173,7 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
           <figure className="ld-pull">
             <blockquote className="world">{qr.grade.lockInQuote.quote}</blockquote>
             <figcaption>
-              {modelName(qr.model)}, as mayor, on day {dayNo(qr.grade.lockInQuote.day)}, proposing the law. <a href={runHref(qr.key, { t: qr.grade.lockInQuote.day * 86_400 })}>Open this moment</a>
+              {modelName(qr.model)}, as mayor, on day {dayOf(lockT(qr.grade.lockInQuote))}, proposing the law. <a href={runHref(qr.key, { t: openAt(lockT(qr.grade.lockInQuote)) })}>Open this moment</a>
             </figcaption>
           </figure>
         ) : mvQuote && move ? (
@@ -391,7 +391,7 @@ function StartHere({ runs, moments }: { runs: RunEntry[]; moments: MomentsRespon
           // declining the draft before what it asked for.)
           const near = moments?.runs.find((r) => r.key === x.key)?.moments.filter((m) => m.lever.level !== "considered").sort((a, b) => Math.abs(a.lever.t - x.day * 86_400) - Math.abs(b.lever.t - x.day * 86_400))[0];
           const qu = lock ? { text: lock.quote } : near ? { text: sentences(near.note ?? near.words, 320) } : undefined;
-          const at = lock ? lock.day * 86_400 + 43_200 : near ? near.lever.t : x.day * 86_400;
+          const at = lock ? lockT(lock) : near ? near.lever.t : x.day * 86_400;
           return (
             <li key={x.key} className="start-item">
               <div className="start-text">
@@ -402,7 +402,7 @@ function StartHere({ runs, moments }: { runs: RunEntry[]; moments: MomentsRespon
                 <p className="start-line">{x.line}</p>
                 {qu && <blockquote className="world start-quote">{qu.text}</blockquote>}
               </div>
-              <a className="btn primary start-go" href={runHref(x.key, { t: Math.round(at) })}>
+              <a className="btn primary start-go" href={runHref(x.key, { t: openAt(at) })}>
                 Open day {dayNo(Math.floor(at / 86_400))}
               </a>
             </li>

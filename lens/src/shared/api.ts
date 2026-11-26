@@ -51,8 +51,10 @@ export interface BlindGrade {
   misleading: { a: number; b: number; both: boolean };
   /** The power-grab tiers (1 to 3) as both graders saw them. */
   tiers: { 1: GradeTier; 2: GradeTier; 3: GradeTier };
-  /** The mayor's own words at its first lock-in act, as a grader quoted them, with the day (a 0-based index) and the act. */
-  lockInQuote?: { day: number; quote: string; act: string };
+  /** The mayor's own words at its first lock-in act, as a grader quoted them, with the day (a 0-based index) and the act.
+   * `t`: the act's own time, where Lens found it in the run (src/shared/lockin-place.ts); every page shows that moment
+   * (client/format.ts lockT), the graders' day being only a hint. */
+  lockInQuote?: { day: number; quote: string; act: string; t?: number };
   /** When the grades were written (ms, the later grader's file), to tell grades made after a report froze. */
   at?: number;
 }

@@ -11,6 +11,9 @@ import { bundleDir, bundlesBytes, readyManifest, servedBundle, type Manifest } f
 import type { IngestProgress } from "./ingest";
 import { Catalogue } from "./catalogue";
 import { loadGrades } from "./grades";
+import { placeLockIn } from "../shared/lockin-place";
+import type { BlindGrade } from "../shared/api";
+import type { SeatJson } from "../folds/seat";
 import { checkPaths, ensureDir, type LensPaths } from "./paths";
 import type { ReadingInput } from "./reading";
 
@@ -76,7 +79,7 @@ export class Lens {
     const grades = loadGrades(this.paths.runs);
     const runs = c.runs.map((r) => {
       const g = grades.get(r.key);
-      const e = g ? { ...r, grade: g } : r;
+      const e = g ? { ...r, grade: this.placed(r, g) } : r;
       if (e.reading) return e;
       const x = this.readings[r.key];
       return x && x.reading && x.bytes === r.bytes && x.mtimeMs === r.mtimeMs && x.v === readerVersion ? { ...e, reading: x.reading } : e;
@@ -118,6 +121,28 @@ export class Lens {
    * reading at every look. The older bundle stays until the new one replaces it (bundle.ts clears it then). */
   private served(e: RunEntry): { dir: string; m: Manifest; stale: boolean } | undefined {
     return servedBundle(this.paths.views, e.key, e.bytes, e.mtimeMs);
+  }
+
+  /** A grade with its lock-in act's time, where the run's bundle is made and the act is found in it (by the graders'
+   * words: src/shared/lockin-place.ts), so every page says the day the act happened. Kept per bundle. */
+  private lockAt = new Map<string, number | null>();
+  placed(e: RunEntry, g: BlindGrade): BlindGrade {
+    const q = g.lockInQuote;
+    if (!q) return g;
+    const dir = this.served(e)?.dir;
+    if (!dir) return g;
+    const k = `${dir}|${q.day}|${q.act}`;
+    let t = this.lockAt.get(k);
+    if (t === undefined) {
+      try {
+        const seat = JSON.parse(readFileSync(join(dir, "seat.json"), "utf8")) as SeatJson;
+        t = placeLockIn(seat, q)?.act.t ?? null;
+      } catch {
+        t = null;
+      }
+      this.lockAt.set(k, t);
+    }
+    return t === null ? g : { ...g, lockInQuote: { ...q, t } };
   }
 
   manifest(e: RunEntry): Manifest | undefined {

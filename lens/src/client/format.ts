@@ -13,6 +13,11 @@ export const dayOf = (t: number) => Math.floor(t / DAY) + 1;
 export const dayIndex = (t: number) => Math.floor(t / DAY);
 /** A day index as data carries it (from 0) as the world's day number. */
 export const dayNo = (index: number) => index + 1;
+/** A graded lock-in's moment, the same on every page: the act's time where Lens placed it in the run, else noon of the
+ * day the graders give (an index). Its day is dayOf(lockT(q)). */
+export const lockT = (q: { day: number; t?: number }) => q.t ?? q.day * DAY + 12 * HOUR;
+/** Where a link to a moment opens it: a few minutes before, so the act is seen happening, at its turn. */
+export const openAt = (t: number) => Math.max(0, Math.round(t) - 5 * 60);
 /** The world's own wording of a moment's date: "year 1, day 181". */
 export const worldDate = (t: number) => `year ${Math.floor(t / (365 * DAY)) + 1}, day ${Math.floor(((t % (365 * DAY)) + 365 * DAY) % (365 * DAY) / DAY) + 1}`;
 export const clock = (t: number) => {

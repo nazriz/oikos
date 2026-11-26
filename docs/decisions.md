@@ -16908,3 +16908,26 @@ budget, since it was seeded with the old cache's bundles. So nothing more was ma
 - **Small:** the faint squares are explained under each lock-in chart; a model with no graded run reads "4 runs, none
   graded yet"; the "include runs added since the report" count shows once the catalogue is read; Models quotes only a
   first-person sentence of the mayor's own (never a letter, a notebook header or a quoted paper), else "—".
+## 2026-11-27 Lens: one day for a lock-in everywhere; a third newcomer review, the shell's part (`lens/nav-7`)
+
+- **A lock-in's day is the act's day, everywhere.** The graders give a day index, read from packets by day, and can be
+  a day out (Sonnet 5.5, town 7: they wrote 122, the law was proposed on index 121, world day 122 at 09:00). The
+  run's Story placed the act by the graders' words and said day 122; the summary, the landing card and its tooltip read
+  the graders' day and said 123; the chart opened at day 123, 00:00, after the act. Now the server places the act
+  once per bundle (`src/shared/lockin-place.ts`, the same matcher the Story uses) and puts its time on the grade
+  (`lockInQuote.t`); every page shows `dayOf(lockT(q))` (client/format.ts), the graders' day only where the act is
+  not found.
+- **Every chart link opens a few minutes before its act** (`openAt`, 5 minutes): the act is seen happening, at its
+  turn, never just after.
+- **The walk** waits on the landing's skeletons too (the headline's placeholder was lit as step 1). Step 2 now says
+  what that chart shows, the lock-in squares (plum, outline, grey); the red power grabs are introduced on step 3, whose
+  chart has the switch to them.
+- **The timeline**: an axis label that would run off the right edge is left out, not cut ("19"); while the run's own
+  data is read the key moments' row shows a placeholder and the strip takes no clicks.
+- **Phone**: the map's first hint sits at the top, clear of "About this view"; the timeline's moment buttons say
+  "‹ Moment" / "Moment ›"; Moments' view switch and long filter chips wrap.
+- **Labels**: on the plan, the Story act notes are placed clear of the town hall's label, the place names and each
+  other (nudged a line, or left out for that moment; a note keeps last frame's place); in the 3D town a place's name
+  gives way to an act caption.
+- **Revisit if** the grade files carry the act's time or command seq (then no matching is needed), or a run has
+  several lock-in acts worth placing each.
