@@ -183,11 +183,11 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
           )}
           {World && (
             <div className="seg map-toggle" role="group" aria-label="How to show the town">
-              <button aria-pressed={mapView === "map"} onClick={() => setMapView("map")}>
-                Map
+              <button aria-pressed={mapView === "map"} onClick={() => setMapView("map")} title="The town as a plan: every building, who is in it now, and lines to what the mayor's acts reached">
+                Plan
               </button>
-              <button aria-pressed={mapView === "world"} onClick={() => setMapView("world")}>
-                Town in 3D
+              <button aria-pressed={mapView === "world"} onClick={() => setMapView("world")} title="The town in 3D: people walking between buildings, the light following the hour">
+                3D town
               </button>
             </div>
           )}
@@ -220,7 +220,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
         <footer className="run-timeline">
           {guided && <Guided start={guided} />}
           {researcher && <Pulse run={runKey} meta={meta} />}
-          <Timeline ground={ground} {...(meta.span.fork !== undefined ? { fork: meta.span.fork } : {})} />
+          <Timeline ground={ground} {...(entry ? { entry } : {})} {...(meta.span.fork !== undefined ? { fork: meta.span.fork } : {})} />
         </footer>
       </div>
     </div>
@@ -301,7 +301,7 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
             </a>
           )}
           {entry && views.power && (
-            <a className="btn ghost run-copy" href={`#/power/${encodeURIComponent(entry.key)}`} title="Who holds each office in the town, over the run">
+            <a className="btn ghost run-power" href={`#/power/${encodeURIComponent(entry.key)}`} title="Who holds each office in the town, over the run">
               Who holds power
             </a>
           )}

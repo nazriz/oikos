@@ -71,7 +71,7 @@ const Sep = () => (
 );
 
 let catalogue: Promise<Catalogue> | null = null;
-const getCatalogue = () => (catalogue ??= fetchCatalogue().catch((e) => ((catalogue = null), Promise.reject(e))));
+export const getCatalogue = () => (catalogue ??= fetchCatalogue().catch((e) => ((catalogue = null), Promise.reject(e))));
 
 interface Peer {
   key: string;

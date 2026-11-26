@@ -36,7 +36,11 @@ export const useMode = create<ModeState>((set) => ({
     write("lens.mode", mode);
     set({ mode });
   },
-  startTour: (step = 0) => set({ tour: step, glossary: false }),
+  // (Seen once it starts: the walk goes back to the library on its way, and must not start itself again there.)
+  startTour: (step = 0) => {
+    write("lens.toured", "1");
+    set({ tour: step, glossary: false });
+  },
   setTour: (tour) => {
     if (tour === null) write("lens.toured", "1");
     set({ tour });

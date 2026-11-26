@@ -2,6 +2,15 @@
 // place, record ids set apart. Everything is marked at render, never by editing the DOM React owns.
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { Marked } from "marked";
+import { useLens } from "../state";
+import { useCity } from "../city/CityView";
+
+/** The person ids the AI mayor holds office as, in the open run (from the town's records of its seats). */
+function useSeatIds(): Set<string> {
+  const run = useLens((s) => s.run);
+  const { city } = useCity(run ? `/api/run/${encodeURIComponent(run)}` : null);
+  return useMemo(() => new Set(Object.values(city?.town.power?.seats ?? {}).map((p) => p.replace(/-self$/, ""))), [city]);
+}
 
 // (As marked escapes text, quotes included, so a phrase escaped here matches the markdown's text.)
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -57,6 +66,7 @@ export function keySentences(text: string, re: RegExp): string[] {
 
 const reEsc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const REC = /\b((?:rec|draft|act|msg)\.[\w.-]*\d)\b/g;
+const NONE = new Set<string>();
 const PERSON = /\b(c\d{4,})\b(?![^<]*>)/g;
 
 /** Click delegation for the person links markText writes: put on the root of any view that shows marked text. */
@@ -67,7 +77,7 @@ export function openPerson(e: { target: EventTarget | null; stopPropagation(): v
   select({ kind: "person", id: el.dataset.person! });
 }
 
-function markText(text: string, m: Marks, html: boolean): string {
+function markText(text: string, m: Marks, html: boolean, seats: Set<string> = NONE): string {
   // (In HTML, the query is matched against the escaped text, so it is escaped the same way.)
   let out = html ? text : esc(text);
   for (const l of m.levers) {
@@ -77,7 +87,8 @@ function markText(text: string, m: Marks, html: boolean): string {
   }
   out = out.replace(REC, (id) => (id.startsWith("rec.") ? `<span class="st-rec" data-peek="record:${id}">${id}</span>` : `<span class="st-rec">${id}</span>`));
   // (A person's id opens their life: a link the page handles by delegation (openPerson), with nav's hover card.)
-  out = out.replace(PERSON, '<button type="button" class="id-link" data-person="$1" data-peek="person:$1">$1</button>');
+  // (The AI mayor's own person is said to be it, in square brackets: an editor's note, so a quote keeps its words.)
+  out = out.replace(PERSON, (_, id: string) => `<button type="button" class="id-link" data-person="${id}" data-peek="person:${id}">${id}</button>${seats.has(id) ? '<span class="id-seat"> [the AI mayor]</span>' : ""}`);
   if (m.query.trim().length >= 2) {
     const q = new RegExp(`(${reEsc(esc(m.query.trim()))})`, "gi");
     // (Only in text between tags: never inside an attribute or the record-id spans' markup.)
@@ -89,17 +100,19 @@ function markText(text: string, m: Marks, html: boolean): string {
 /** Markdown, marked. */
 export function Md({ text, className = "st-prose" }: { text: string; className?: string }) {
   const m = useContext(MarksContext);
+  const seats = useSeatIds();
   const html = useMemo(() => {
     const raw = md.parse(text) as string;
-    const html = raw.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part : markText(part, m, true))).join("");
+    const html = raw.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part : markText(part, m, true, seats))).join("");
     return m.keys ? keyWrap(html, m.keys) : html;
-  }, [text, m]);
+  }, [text, m, seats]);
   return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 /** Plain text, marked. */
 export function Hi({ text, as = "span", className }: { text: string; as?: "span" | "div"; className?: string }) {
   const m = useContext(MarksContext);
-  const html = useMemo(() => { const h = markText(text, m, false); return m.keys ? keyWrap(h, m.keys) : h; }, [text, m]);
+  const seats = useSeatIds();
+  const html = useMemo(() => { const h = markText(text, m, false, seats); return m.keys ? keyWrap(h, m.keys) : h; }, [text, m, seats]);
   const Tag = as;
   return <Tag className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }

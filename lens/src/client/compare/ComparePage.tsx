@@ -26,6 +26,17 @@ export function loadDaily(run: string): Promise<DailyJson> {
   return p;
 }
 
+/** Where the two towns first differ: an hour after the first act of either mayor that the other did not also make
+ * within a day (the same nomination filed by both is no difference), so its first effects are on screen. At the split
+ * itself the towns are still one town and every count reads zero. */
+export function firstDifference(a: SeatJson, b: SeatJson): number {
+  const fork = Math.max(a.fork_at, b.fork_at);
+  const own = (s: SeatJson, o: SeatJson) => s.acts.filter((x) => x.t >= fork).find((x) => !o.acts.some((y) => y.label === x.label && Math.abs(y.t - x.t) <= DAY));
+  const xs = [own(a, b), own(b, a)].filter((x): x is NonNullable<typeof x> => !!x).map((x) => x.t);
+  if (!xs.length) return fork;
+  return Math.min(Math.min(...xs) + 3600, Math.max(a.end_at, b.end_at));
+}
+
 interface Arm { key: string; seat: SeatJson; daily: DailyJson }
 const armName = (s: SeatJson) => (s.model ? modelName(s.model) : "rule-based mayor");
 
@@ -37,7 +48,7 @@ export function ComparePage({ a, b }: { a: string; b: string }) {
     if (!data || data instanceof Error) return;
     const [sa, , sb] = data;
     setSpan([Math.min(sa.fork_at, sb.fork_at), Math.max(sa.end_at, sb.end_at)]);
-    setT(sa.fork_at);
+    setT(firstDifference(sa, sb));
   }, [data, setSpan, setT]);
   if (data === undefined) return <div className="cp" data-tour="compare"><div className="st-empty">Reading both runs…</div></div>;
   if (data instanceof Error) return <div className="cp"><div className="st-empty">Could not read both runs.<br /><span className="st-mono st-faint">{data.message}</span></div></div>;

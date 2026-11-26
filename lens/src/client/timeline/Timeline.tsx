@@ -13,6 +13,8 @@ import { Fit, Keyboard, Pause, Play } from "../icons";
 import { useMode } from "../mode";
 import { useSeat } from "../nav/nav";
 import { keyMoments, phases as phasesOf, type KeyMoment, type Phase } from "./moments";
+import { lockInfo } from "../story/lockin";
+import type { RunEntry } from "../../shared/api";
 import "./timeline.css";
 
 export interface Ground {
@@ -24,6 +26,8 @@ export interface TimelineProps {
   ground?: Ground;
   /** The fork point, seconds: drawn as the start of the arm's own time. */
   fork?: number;
+  /** The run's catalogue entry: its blind grades put the lock-in among the key moments. */
+  entry?: RunEntry;
 }
 
 export const SPEEDS = [
@@ -63,14 +67,14 @@ const readLane = () => {
 };
 const PAD_B = 6;
 
-const PALETTE_KEYS = ["text", "muted", "faint", "line", "line2", "panel", "panel2", "ink", "seat", "flag", "election", "news", "inst", "citizen", "good", "bad", "mono", "body"] as const;
+const PALETTE_KEYS = ["text", "muted", "faint", "line", "line2", "panel", "panel2", "ink", "seat", "flag", "election", "lockin", "news", "inst", "citizen", "good", "bad", "mono", "body"] as const;
 type Palette = Record<(typeof PALETTE_KEYS)[number], string>;
 function readPalette(el: Element): Palette {
   const cs = getComputedStyle(el);
   const v = (n: string) => cs.getPropertyValue(n).trim();
   return {
     text: v("--text"), muted: v("--muted"), faint: v("--faint"), line: v("--line"), line2: v("--line-2"), panel: v("--panel"), panel2: v("--panel-2"), ink: v("--ink"),
-    seat: v("--seat"), flag: v("--flag"), election: v("--election"), news: v("--inst"), inst: v("--inst"), citizen: v("--citizen"), good: v("--good"), bad: v("--bad"),
+    seat: v("--seat"), flag: v("--flag"), election: v("--election"), lockin: v("--lockin"), news: v("--inst"), inst: v("--inst"), citizen: v("--citizen"), good: v("--good"), bad: v("--bad"),
     mono: v("--font-sans"),
     // (Read once with the palette: a style read on every frame of play forces the browser to recompute styles.)
     body: getComputedStyle(document.body).fontFamily,
@@ -116,7 +120,7 @@ function usePlayback() {
   }, [playing]);
 }
 
-export function Timeline({ ground, fork }: TimelineProps) {
+export function Timeline({ ground, fork, entry }: TimelineProps) {
   usePlayback();
   const t = useLens((s) => s.t);
   const spanT = useLens((s) => s.span);
@@ -127,7 +131,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
   const run = useLens((s) => s.run);
   const seat = useSeat(run);
   // The key moments and the phases; a stopped run's axis runs on to its set length, hatched, so the loss shows.
-  const moments = useMemo(() => (seat ? keyMoments(seat) : []), [seat]);
+  const moments = useMemo(() => (seat ? keyMoments(seat, lockInfo(seat, entry)) : []), [seat, entry]);
   const phases = useMemo<Phase[]>(() => (seat ? phasesOf(seat, spanT[0]) : []), [seat, spanT[0]]);
   const dom = useMemo<[number, number]>(() => [spanT[0], Math.max(spanT[1], seat?.ended === "stopped" ? (seat.until_at ?? 0) : 0)], [spanT[0], spanT[1], seat]);
   const [view, setView] = useState<[number, number]>(dom);
@@ -142,6 +146,8 @@ export function Timeline({ ground, fork }: TimelineProps) {
 
   // (A new run, a new span: show all of it.)
   useEffect(() => setView(dom), [dom[0], dom[1]]);
+  // (A window narrower than a few hours is no view: a span that arrived after the first moment was set made one.)
+  const MIN_VIEW = 3 * HOUR;
 
   // (Story mode: the key moments carry the power grabs and the election, so one lane stays: the mayor's turns.
   // Researcher mode: every lane.)
@@ -233,12 +239,17 @@ export function Timeline({ ground, fork }: TimelineProps) {
   // (Playing past the window's edge moves the window along; a jump out of it, to a key moment or a turn, brings the
   // window to it.)
   useEffect(() => {
-    const w = v1 - v0;
-    if (playing ? t > v1 - w * 0.04 || t < v0 : t > v1 || t < v0) {
-      const n0 = Math.max(dom[0], Math.min(dom[1] - w, playing ? t - w * 0.15 : t - w / 2));
-      setView([n0, n0 + w]);
-    }
-  }, [t, playing]);
+    setView(([a, b]) => {
+      const full = dom[1] - dom[0];
+      if (b - a < Math.min(MIN_VIEW, full)) return dom;
+      const w = b - a;
+      if (playing ? t > b - w * 0.04 || t < a : t > b || t < a) {
+        const n0 = Math.max(dom[0], Math.min(dom[1] - w, playing ? t - w * 0.15 : t - w / 2));
+        return [n0, n0 + w];
+      }
+      return [a, b];
+    });
+  }, [t, playing, dom[0], dom[1]]);
 
   const selTok = selToken(selection);
 
@@ -426,7 +437,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
     // two rows; one that fits nowhere keeps its pole and a small head, and says itself on hover.
     const fl: FlagHit[] = [];
     const rows: [number, number][][] = Array.from({ length: FLAG_ROWS }, () => []);
-    const prio = (m: KeyMoment) => (m.kind === "grab" ? (m.strong ? 0 : 1) : m.kind === "end" ? 2 : m.strong ? 3 : 4);
+    const prio = (m: KeyMoment) => (m.kind === "lockin" ? 0 : m.kind === "grab" ? (m.strong ? 0 : 1) : m.kind === "end" ? 2 : m.strong ? 3 : 4);
     const order = moments.map((m, i) => ({ m, i, x: xOf(m.t) })).filter((o) => o.x >= -2 && o.x <= width + 2).sort((a, b) => prio(a.m) - prio(b.m) || a.x - b.x);
     g.font = font(700, 11.5);
     const placed = new Map<KeyMoment, { row: number; bx: number; bw: number }>();
@@ -447,8 +458,9 @@ export function Timeline({ ground, fork }: TimelineProps) {
       const col = momentColor(p, m);
       const pl = placed.get(m);
       const top = pl ? flagsTop + 3 + pl.row * FLAG_ROW : flagsTop + FLAGS - 9;
-      g.strokeStyle = withAlpha(col, m.kind === "grab" ? 0.75 : 0.55);
-      g.lineWidth = m.kind === "grab" && m.strong ? 1.5 : 1;
+      const sharp = m.kind === "grab" || m.kind === "lockin";
+      g.strokeStyle = withAlpha(col, sharp ? 0.75 : 0.55);
+      g.lineWidth = sharp && m.strong ? 1.5 : 1;
       if (m.after) g.setLineDash([3, 3]);
       g.beginPath();
       g.moveTo(x, top + (pl ? FLAG_ROW - 3 : 6));
@@ -467,7 +479,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
           g.strokeStyle = col;
           g.lineWidth = 1.25;
           g.strokeRect(pl.bx + 0.5, top + 0.5, pl.bw - 1, h - 1);
-          g.fillStyle = m.kind === "grab" ? p.flag : col;
+          g.fillStyle = m.kind === "grab" ? p.flag : m.kind === "lockin" ? p.lockin : col;
         }
         g.fillText(m.label, pl.bx + 5, top + h / 2 + 0.5);
         fl.push({ x: pl.bx, x2: pl.bx + pl.bw, y: top, y2: top + h, m });
@@ -517,10 +529,13 @@ export function Timeline({ ground, fork }: TimelineProps) {
     const r = canvas.current!.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
+  /** On the whole-run strip: bring the window there, and the moment shown with it. */
   const centreOn = (x: number) => {
-    const w = v1 - v0, at = dom[0] + (x / width) * total;
+    const w = v1 - v0, at = dom[0] + (Math.max(0, Math.min(width, x)) / width) * total;
     const n0 = Math.max(dom[0], Math.min(dom[1] - w, at - w / 2));
     setView([n0, n0 + w]);
+    const s = useLens.getState();
+    s.setT(Math.max(s.span[0], Math.min(s.span[1], at)));
   };
   const openMoment = (m: KeyMoment) => {
     const s = useLens.getState();
@@ -756,7 +771,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
   );
 }
 
-const momentColor = (p: Palette, m: KeyMoment) => (m.kind === "grab" ? p.flag : m.kind === "election" ? p.election : p.text);
+const momentColor = (p: Palette, m: KeyMoment) => (m.kind === "lockin" ? p.lockin : m.kind === "grab" ? p.flag : m.kind === "election" ? p.election : p.text);
 
 /** Diagonal hatching over a box: what a stopped run never reached. */
 function hatch(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, col: string) {
