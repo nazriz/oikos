@@ -7,7 +7,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { Catalogue as CatalogueJson, ForkReading, IndexStatus, RunEntry } from "../shared/api";
 import type { FoldContext } from "../shared/fold";
-import { bundleDir, makeBundle, readyManifest, type Manifest } from "./bundle";
+import { bundleDir, readyManifest, type Manifest } from "./bundle";
+import type { IngestProgress } from "./ingest";
 import { Catalogue } from "./catalogue";
 import { ensureDir, type LensPaths } from "./paths";
 import type { ReadingInput } from "./reading";
@@ -17,6 +18,7 @@ const here = import.meta.dir;
 /** The study reader's own source, hashed: its readings are only as current as it is. */
 const readerVersion = (() => {
   const h = createHash("sha1");
+  h.update("lens-reading-2"); // (Lens's own shape of a reading: bump when ForkReading changes.)
   for (const f of ["reader.ts", "tally.ts"]) {
     const p = resolve(here, "../../../experiments/power-seeking", f);
     if (existsSync(p)) h.update(readFileSync(p));
@@ -32,6 +34,11 @@ export class Lens {
   readonly catalogue: Catalogue;
   private readings: ReadingsFile;
   private readonly queue: RunEntry[] = [];
+  /** Runs made ahead of being asked for (the showcase: forks whose seat tried a lever), after anything asked for. */
+  private readonly ahead: RunEntry[] = [];
+  private readonly aheadKeys = new Set<string>();
+  /** A bundle someone asked for is being made (the background reader waits for these, not for the ones made ahead). */
+  private asked = false;
   private readonly status = new Map<string, IndexStatus>();
   private readonly listeners = new Map<string, Set<Listener>>();
   private working = false;
@@ -39,6 +46,7 @@ export class Lens {
   private readingLoop = false;
   private stopped = false;
   private child?: { kill(): void };
+  private maker?: { kill(): void };
 
   constructor(readonly paths: LensPaths, readonly opts: { background?: boolean } = {}) {
     ensureDir(paths.views);
@@ -54,6 +62,7 @@ export class Lens {
   stop() {
     this.stopped = true;
     this.child?.kill();
+    this.maker?.kill();
   }
 
   async list(fresh = false): Promise<CatalogueJson> {
@@ -63,7 +72,10 @@ export class Lens {
       const x = this.readings[r.key];
       return x && x.reading && x.bytes === r.bytes && x.mtimeMs === r.mtimeMs && x.v === readerVersion ? { ...r, reading: x.reading } : r;
     });
-    if (this.opts.background !== false) this.startReading(runs);
+    if (this.opts.background !== false) {
+      for (const r of runs) if (r.reading?.levers?.tried && !r.indexed) this.makeAhead(r);
+      this.startReading(runs);
+    }
     return { runs, reading: this.reading, scannedAt: c.at, scanMs: c.ms };
   }
 
@@ -71,7 +83,7 @@ export class Lens {
   readingInput(e: RunEntry): ReadingInput | undefined {
     const x = e.experiment;
     if (!x || x.isCode || x.post !== "mayor") return undefined;
-    return { dir: join(this.paths.runs, x.dir), seed: x.seed, arm: x.arm, model: x.model, rawModel: x.rawModel, goal: x.goal, forkDay: x.forkDay ?? 0 };
+    return { dir: join(this.paths.runs, x.dir), seed: x.seed, arm: x.arm, model: x.model, rawModel: x.rawModel, goal: x.goal, forkDay: x.forkDay ?? 0, ...(x.untilDay !== undefined ? { untilDay: x.untilDay } : {}) };
   }
 
   ctxOf(e: RunEntry): FoldContext {
@@ -130,8 +142,11 @@ export class Lens {
     if (this.working) return;
     this.working = true;
     try {
-      while (this.queue.length && !this.stopped) {
-        const e = this.queue.shift()!;
+      while ((this.queue.length || this.ahead.length) && !this.stopped) {
+        const fromQueue = this.queue.length > 0;
+        const e = fromQueue ? this.queue.shift()! : this.ahead.shift()!;
+        this.asked = fromQueue;
+        if (!fromQueue && this.status.has(e.key)) continue; // (asked for meanwhile: it is in the queue)
         if (this.manifest(e)) {
           this.emit(e.key, this.statusOf(e));
           continue;
@@ -142,17 +157,11 @@ export class Lens {
         const endT = e.experiment?.t ?? (e.experiment?.untilDay ? e.experiment.untilDay * DAY : undefined);
         try {
           this.emit(e.key, { state: "indexing", key: e.key, lines: 0, t: 0, fraction: 0, elapsed: 0, rate: 0 });
-          const m = await makeBundle({
-            views: this.paths.views,
-            entry: e,
-            path: this.catalogue.abs(e),
-            ctx: this.ctxOf(e),
-            ...(reading ? { reading } : {}),
-            onProgress: (p) => {
-              const elapsed = (performance.now() - started) / 1000;
-              const fraction = endT ? Math.min(1, p.t / endT) : p.fileBytes && e.kind === "plain" ? Math.min(1, p.fileBytes / e.bytes) : null;
-              this.emit(e.key, { state: "indexing", key: e.key, lines: p.lines, t: p.t, fraction, elapsed, rate: elapsed > 0 ? p.lines / elapsed : 0 });
-            },
+          const job = { views: this.paths.views, entry: e, path: this.catalogue.abs(e), ctx: this.ctxOf(e), ...(reading ? { reading } : {}) };
+          const m = await this.makeInChild(job, (p) => {
+            const elapsed = (performance.now() - started) / 1000;
+            const fraction = endT ? Math.min(1, p.t / endT) : p.fileBytes && e.kind === "plain" ? Math.min(1, p.fileBytes / e.bytes) : null;
+            this.emit(e.key, { state: "indexing", key: e.key, lines: p.lines, t: p.t, fraction, elapsed, rate: elapsed > 0 ? p.lines / elapsed : 0 });
           });
           if (m.reading) this.remember(e, m.reading);
           this.emit(e.key, { state: "ready", key: e.key, seconds: m.seconds, lines: m.lines });
@@ -162,7 +171,40 @@ export class Lens {
       }
     } finally {
       this.working = false;
+      this.asked = false;
     }
+  }
+
+  /** makeBundle in a child process (src/server/make-one.ts): the server's own loop stays free to answer. */
+  private async makeInChild(job: object, onProgress: (p: IngestProgress) => void): Promise<Manifest> {
+    const p = Bun.spawn([process.execPath, join(here, "make-one.ts"), JSON.stringify(job)], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+    this.maker = p;
+    let manifest: Manifest | undefined;
+    const errP = new Response(p.stderr).text();
+    const dec = new TextDecoder();
+    let rest = "";
+    for await (const chunk of p.stdout) {
+      const lines = (rest + dec.decode(chunk, { stream: true })).split("\n");
+      rest = lines.pop()!;
+      for (const line of lines) {
+        if (!line) continue;
+        const x = JSON.parse(line);
+        if (x.p) onProgress(x.p);
+        if (x.m) manifest = x.m;
+      }
+    }
+    const code = await p.exited;
+    this.maker = undefined;
+    if (code !== 0 || !manifest) throw new Error((await errP).trim().split("\n").slice(-4).join(" | ") || `exit ${code}`);
+    return manifest;
+  }
+
+  /** Make this run's bundle ahead of being asked for, when nothing asked for is waiting. */
+  private makeAhead(e: RunEntry) {
+    if (this.opts.background === false || this.aheadKeys.has(e.key) || this.manifest(e)) return;
+    this.aheadKeys.add(e.key);
+    this.ahead.push(e);
+    void this.work();
   }
 
   private remember(e: RunEntry, reading: ForkReading | null, error?: string) {
@@ -181,30 +223,44 @@ export class Lens {
     const done = runs.filter((r) => this.readingInput(r)).length - todo.length;
     this.reading = { ...this.reading, done, total: done + todo.length };
     if (this.readingLoop || !todo.length) return;
+    // (Forks an older reading found a lever in go first: they are the ones most likely to be opened.)
+    const hint = (r: RunEntry) => {
+      const old = this.readings[r.key]?.reading as any;
+      return old ? (old.levers?.tried ?? old.levels?.attempted ?? 0) + (old.has_attempt ? 10 : 0) : 0;
+    };
+    todo.sort((a, b) => hint(b) - hint(a));
     this.readingLoop = true;
-    void (async () => {
+    const children = new Set<{ kill(): void }>();
+    this.child = { kill: () => children.forEach((c) => c.kill()) };
+    const readOne = async (r: RunEntry) => {
+      while (this.asked && !this.stopped) await Bun.sleep(500);
+      if (this.stopped) return;
+      this.reading = { ...this.reading, current: r.key };
       try {
-        for (const r of todo) {
-          if (this.stopped) break;
-          while (this.working && !this.stopped) await Bun.sleep(500);
-          this.reading = { ...this.reading, current: r.key };
-          try {
-            const p = Bun.spawn([process.execPath, join(here, "read-one.ts"), this.catalogue.abs(r), JSON.stringify(this.readingInput(r))], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
-            this.child = p;
-            const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
-            this.child = undefined;
-            if (this.stopped) break;
-            if (code !== 0) throw new Error(err.trim().split("\n").slice(-3).join(" | ") || `exit ${code}`);
-            this.remember(r, JSON.parse(out) as ForkReading | null);
-          } catch (err) {
-            this.remember(r, null, String((err as Error).message ?? err).slice(0, 500));
-          }
-          this.reading = { ...this.reading, done: this.reading.done + 1 };
-        }
-      } finally {
-        this.reading = { done: this.reading.done, total: this.reading.total };
-        this.readingLoop = false;
+        const p = Bun.spawn([process.execPath, join(here, "read-one.ts"), this.catalogue.abs(r), JSON.stringify(this.readingInput(r))], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+        children.add(p);
+        const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+        children.delete(p);
+        if (this.stopped) return;
+        if (code !== 0) throw new Error(err.trim().split("\n").slice(-3).join(" | ") || `exit ${code}`);
+        const reading = JSON.parse(out) as ForkReading | null;
+        this.remember(r, reading);
+        if (reading?.levers?.tried) this.makeAhead(r);
+      } catch (err) {
+        this.remember(r, null, String((err as Error).message ?? err).slice(0, 500));
       }
-    })();
+      this.reading = { ...this.reading, done: this.reading.done + 1 };
+    };
+    // (Two at a time: each is one core and the kernel's export.)
+    const lanes = 2;
+    let next = 0;
+    void Promise.all(
+      Array.from({ length: lanes }, async () => {
+        while (next < todo.length && !this.stopped) await readOne(todo[next++]!);
+      }),
+    ).finally(() => {
+      this.reading = { done: this.reading.done, total: this.reading.total };
+      this.readingLoop = false;
+    });
   }
 }

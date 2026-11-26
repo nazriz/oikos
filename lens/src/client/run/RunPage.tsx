@@ -11,6 +11,7 @@ import { ThemeToggle } from "../theme";
 import { Timeline } from "../timeline/Timeline";
 import { views, type SlotProps } from "../views";
 import { RunSummary } from "./RunSummary";
+import { LeverChip, OutcomeChip } from "../outcome";
 import "./run.css";
 
 export function RunPage({ runKey, q }: { runKey: string; q: URLSearchParams }) {
@@ -37,6 +38,30 @@ export function RunPage({ runKey, q }: { runKey: string; q: URLSearchParams }) {
 function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParams; entry?: RunEntry; meta: Meta }) {
   const selection = useLens((s) => s.selection);
   const [railTab, setRailTab] = useState<"story" | "run">(views.rail ? "story" : "run");
+  const [railW, setRailW] = useState(() => {
+    try {
+      const v = Number(localStorage.getItem("lens.rail.w"));
+      return v >= 300 && v <= 760 ? v : 420;
+    } catch {
+      return 420;
+    }
+  });
+  // (Drag the rail's edge to widen it; the width is kept in this browser.)
+  const onRailGrip = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const x0 = e.clientX, w0 = railW;
+    let w = w0;
+    const move = (ev: PointerEvent) => setRailW((w = Math.round(Math.max(300, Math.min(760, w0 + (x0 - ev.clientX))))));
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      try {
+        localStorage.setItem("lens.rail.w", String(w));
+      } catch {}
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
 
   // Open the run in the shared state, at the moment the URL names.
   useEffect(() => {
@@ -99,12 +124,13 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
   return (
     <div className="run-page">
       <RunBar entry={entry} meta={meta} />
-      <div className="run-grid">
+      <div className="run-grid" style={{ ["--rail-w" as string]: `${railW}px` }}>
         <main className="run-map">
           {Map ? <Map {...props} /> : <EmptyMap meta={meta} />}
           {drawerOpen && <Inspector {...props} />}
         </main>
         <aside className="run-rail">
+          <div className="rail-grip" onPointerDown={onRailGrip} onDoubleClick={() => setRailW(420)} title="Drag to widen the rail (double-click: back to 420)" />
           {Rail && (
             <div className="rail-tabs seg" role="tablist">
               <button aria-pressed={railTab === "story"} onClick={() => setRailTab("story")}>
@@ -163,19 +189,8 @@ export function RunBar({ entry, meta }: { entry?: RunEntry; meta?: Meta }) {
       </div>
       <div className="run-outcome">
         {x?.stopped && <span className="chip quiet" title={x.stopped}>stopped</span>}
-        {reading && (
-          <>
-            {reading.has_attempt ? (
-              <span className="chip flag" title="The study reader's tier-2/3 lever attempts">
-                <span className="dot" />
-                {reading.attempts.length} lever attempt{reading.attempts.length === 1 ? "" : "s"}
-              </span>
-            ) : (
-              <span className="chip quiet" title="The study reader found no tier-2/3 lever attempt">no lever attempt</span>
-            )}
-            {reading.stood && <span className={`chip ${reading.won ? "election" : "quiet"}`}>{reading.won ? "won the poll" : "lost the poll"}</span>}
-          </>
-        )}
+        <LeverChip reading={reading} />
+        <OutcomeChip reading={reading} />
         {seat?.model && <span className="chip seat run-model" title={`${seat.provider}/${seat.model}`}><span className="dot" />{seat.model.split("/").at(-1)}</span>}
         {cost !== undefined && cost > 0 && <span className="run-cost mono">{usd(cost)}</span>}
         {x?.twin && entry && (

@@ -82,6 +82,7 @@ export async function ingest(path: string, o: IngestOptions): Promise<IngestResu
   const study = o.reading ? readerFor(o.reading) : undefined;
   const progress: Progress = { fileBytes: 0 };
   let lastReport = 0;
+  let endLine: { t: number; reason?: string } | undefined;
 
   for await (const batch of lineBatches(path, progress)) {
     if (o.signal?.aborted) throw new Error("aborted");
@@ -119,6 +120,7 @@ export async function ingest(path: string, o: IngestOptions): Promise<IngestResu
       const b = l.body ?? {};
       const k = `${l.kind}:${b.event ?? b.command ?? b.annotation ?? ""}`;
       stats.counts[k] = (stats.counts[k] ?? 0) + 1;
+      if (l.kind === "end") endLine = { t: l.t, ...(b.reason ? { reason: String(b.reason) } : {}) };
       if (l.kind !== "header") {
         stats.lastT = l.t;
         const d = Math.floor(l.t / DAY);
@@ -149,7 +151,7 @@ export async function ingest(path: string, o: IngestOptions): Promise<IngestResu
   let reading: ForkReading | undefined;
   if (study && o.reading) {
     try {
-      reading = readingOf(study.reader.result(), o.reading);
+      reading = readingOf(study.reader.result(), o.reading, { at: endLine?.t ?? stats.lastT, ...(endLine?.reason ? { reason: endLine.reason } : {}) });
       const meta = outputs.find((x) => x.name === "meta");
       if (meta) (meta.json as any).reading = reading;
     } catch (e) {
@@ -163,9 +165,22 @@ export async function ingest(path: string, o: IngestOptions): Promise<IngestResu
 export async function readOnly(path: string, x: ReadingInput, signal?: AbortSignal): Promise<ForkReading | undefined> {
   const study = readerFor(x);
   if (!study) return undefined;
+  let last: string | undefined;
+  let end: { at: number; reason?: string } | undefined;
   for await (const batch of lineBatches(path)) {
     if (signal?.aborted) throw new Error("aborted");
-    for (const raw of batch) if (raw && !isDebrief(raw) && wanted(raw, study.seat)) study.reader.see(JSON.parse(raw));
+    for (const raw of batch) {
+      if (!raw) continue;
+      last = raw;
+      // (The end line: {"body":{"detail":…,"reason":…},…,"kind":"end",…}; its kind sits near the line's tail.)
+      if (raw.length < 4096 && raw.lastIndexOf('"kind":"end"') > 0) {
+        try {
+          const l = JSON.parse(raw);
+          if (l.kind === "end") end = { at: l.t, ...(l.body?.reason ? { reason: String(l.body.reason) } : {}) };
+        } catch {}
+      }
+      if (!isDebrief(raw) && wanted(raw, study.seat)) study.reader.see(JSON.parse(raw));
+    }
   }
-  return readingOf(study.reader.result(), x);
+  return readingOf(study.reader.result(), x, end ?? { at: last ? tailT(last) || 0 : 0 });
 }

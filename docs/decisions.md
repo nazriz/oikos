@@ -16120,3 +16120,20 @@ shown once. The seat fold's version is 2 (its output gained `ended`, `translator
 bundles are made again.
 - **Revisit if:** the gallery is slow with hundreds of runs (then a server-side aggregate of each bundle's levers), or
   the blind graders' verdicts become available per lever (show them beside the reader's).
+
+## 2026-11-26 Lens core: one outcome rule, bundles made in a child, showcase runs made ahead
+
+**Decided** (core builder, after the integrated page showed "lost the poll" for a fork whose poll had been moved to
+day 5000). (1) There is one rule for an election's outcome, `lens/src/shared/outcome.ts` `outcomeOf`, read by the run
+bar, the library's cards and the matrix, with the story rail asked to use it too. It says won or lost only when a
+result came before the run's end. Otherwise it says "no poll held (moved to day N)" when a law moved the poll,
+"stopped before the poll", or "run ended before the poll". (2) Lever counts everywhere are distinct levers tried
+(attempted or executed) and done (executed), never "considered" (`leverCounts`). The matrix keeps the study's own
+measure, a tier-2/3 attempt, and says so. (3) Bundles are made in a child process (`make-one.ts`), like the readings:
+in the server's own process, all five folds over a 4.6 M-line log left the API unanswered for seconds. (4) Forks whose
+seat tried a lever are made ahead at server start, after anything a viewer asks for. Readings run two at a time,
+forks an older reading flagged first. (5) The timeline's lanes are compact (12 px) by default. Dragging the top edge
+or the toggle makes them taller, and they show words only when the words fit. The rail's width can be dragged too.
+Both sizes are kept in the browser.
+**Revisit if** the showcase set grows past a few dozen forks: make them ahead in a slot (scripts/slots.ts) rather than
+whenever the server starts.
