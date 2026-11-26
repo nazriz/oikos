@@ -55,7 +55,9 @@ export function Panel({ story, onPresent, onRecord, twin, open0, overlays, setOv
   ev?: ElectionView; candCol: Record<string, string>; papersShown: number[]; onTour?: () => void;
 }) {
   const [menu, setMenu] = useState(false);
-  const [open, setOpen] = useState(() => open0 && (typeof window === "undefined" || window.innerWidth > 640));
+  // Open or closed as this viewer last left it (else as the host asks).
+  const [open, setOpen0] = useState(() => { let v: string | null = null; try { v = localStorage.getItem("lens.city.layersOpen"); } catch { /* private mode */ } return v !== null ? v === "1" && (typeof window === "undefined" || window.innerWidth > 640) : open0 && (typeof window === "undefined" || window.innerWidth > 640); });
+  const setOpen = (o: boolean) => { setOpen0(o); try { localStorage.setItem("lens.city.layersOpen", o ? "1" : "0"); } catch { /* private mode */ } };
   const tog = (k: keyof Overlays) => setOverlays({ ...overlays, [k]: !overlays[k] });
   const cats = CAT_ORDER.filter((c) => city.town.structures.some((s) => s.category === c));
   const lastCensus = [...city.town.census].reverse().find((c) => c.t <= t) ?? city.town.census[0];
@@ -196,7 +198,7 @@ export function StructureBody({ c, i, t, name, full }: { c: CityData; i: number;
   const sp = Object.entries(s.spaces).map(([k, n]) => `${n} ${k}${n > 1 ? "s" : ""}`).join(", ");
   return (
     <>
-      <div className="lc-tip-title">{name(i)}</div>
+      <div className="lc-tip-title" data-peek={`structure:${s.id}`}>{name(i)}</div>
       <div className="lc-tip-sub">{kindSentence(s.type, s.category)}</div>
       <dl className="lc-dl">
         {owner && <><dt>Owner</dt><dd>{owner}</dd></>}
@@ -230,7 +232,7 @@ export function PersonBody({ c, q, t, name, full }: { c: CityData; q: number; t:
   else where = trip && trip.from >= 0 ? `Away, since leaving ${name(trip.from)} (day ${fmtDay(trip.t1).day} ${fmtDay(trip.t1).clock})` : "Away";
   return (
     <>
-      <div className="lc-tip-title">{p[1]}</div>
+      <div className="lc-tip-title" data-peek={`person:${p[0]}`}>{p[1]}</div>
       <div className="lc-tip-sub">{p[2] === "f" ? "A woman" : p[2] === "m" ? "A man" : "A person"}, {ageAt(c, q, t)} years old{describePerson(c, p[0], t)?.replace(/^\d+,?\s*/, "") ? `, ${describePerson(c, p[0], t)!.replace(/^\d+,?\s*/, "")}` : ""}.</div>
       <dl className="lc-dl">
         <dt>Now</dt><dd>{where}</dd>
