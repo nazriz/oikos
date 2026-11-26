@@ -134,7 +134,7 @@ function Card({ m, onOpen }: { m: Moment; onOpen: () => void }) {
       {m.reason && <div className="mo-sub"><span className="k">its reason</span>“{m.reason}”</div>}
       {more && <Around m={m} />}
       <div className="mo-when"><b>day {l.day}</b>{l.days_to_poll !== null ? <> · {l.days_to_poll} days to the poll</> : null} · {human(l.phase)}</div>
-      <div className="mo-out"><span className={`st-pill ${m.outcomeTone}`}>{m.outcome}</span>{m.also.length > 0 && <span className="st-faint"> · {m.also.map((x) => x.level).join(", ")} too</span>}</div>
+      <div className="mo-out"><span className={`st-pill ${m.outcomeTone}`}>{m.outcome}</span></div>
       <div className="mo-foot">
         <span className="mo-who"><b>{m.model}</b>{m.goal ? ` · ${m.goal}` : ""}{m.seed !== undefined ? ` · seed ${m.seed}` : ""}<span className="st-faint"> · {m.election}</span></span>
         <span style={{ flex: 1 }} />
