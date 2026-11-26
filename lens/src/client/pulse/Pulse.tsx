@@ -83,7 +83,28 @@ export function Pulse({ run, meta }: { run: string; meta: Meta }) {
   // (The day, not the moment: while playing, the strip renders once a day, not every frame.)
   const day = useLens((s) => dayOf(s.t));
   const span = useLens((s) => s.span);
-  if (!daily) return null;
+  // (While the daily fold loads, the strip stands at its full height with its labels: the map above it does not jump
+  // when the numbers arrive.)
+  if (!daily)
+    return (
+      <div className={`pz ${open ? "open" : ""}`} aria-busy="true">
+        <button className="pz-toggle" onClick={toggle} aria-expanded={open}>
+          <span className="eyebrow">Pulse</span>
+          <span className="pz-chev">{open ? "▾" : "▸"}</span>
+        </button>
+        <div className="pz-cells">
+          {PLACEHOLDER.map((label) => (
+            <div key={label} className="pz-cell">
+              <div className="pz-head">
+                <span className="pz-label">{label}</span>
+                <span className="pz-value serif num">{"\u00a0"}</span>
+              </div>
+              {open && <svg viewBox="0 0 160 34" preserveAspectRatio="none" />}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   const d = Math.min(daily.days - 1, day);
   const d0 = Math.max(0, Math.floor(span[0] / DAY)), d1 = Math.min(daily.days - 1, Math.ceil(span[1] / DAY));
 
@@ -101,6 +122,8 @@ export function Pulse({ run, meta }: { run: string; meta: Meta }) {
     </div>
   );
 }
+
+const PLACEHOLDER = ["In town", "Refusals", "Complaints", "Petitions", "Money moved", "Fell ill"];
 
 const Cell = memo(function Cell({ x, d, d0, d1, open }: { x: Series; d: number; d0: number; d1: number; open: boolean }) {
   const view = x.values.slice(d0, d1 + 1);

@@ -1,5 +1,5 @@
 // `oikos lens [--runs DIR] [--port 4322] [--no-background] [--dev]`: serve Lens on 127.0.0.1 (docs/design/lens.md).
-//   --dev is Bun's development mode (hot reload): it breaks deck.gl's shaders, so the map does not draw under it.
+//   --dev builds the client unminified, again on each load of the page (a refresh shows a change).
 //   oikos lens index <key>   make one run's bundle and print its manifest (no server)
 //   oikos lens list          print the catalogue
 //   oikos lens inspect <experiment dir> [--with-code]   every fork's seat as an Inspect AI log, in <views>/inspect/<experiment>/
