@@ -6,6 +6,8 @@ import { useEffect } from "react";
 import { loadSeat, useAsync, when, usd, tokens, plural, human, seatOutcome, type SeatJson } from "./data";
 import { momentsOf } from "./moments-data";
 import { leverCounts } from "../../shared/outcome";
+import { useDescribe } from "../people";
+import { kinAppointed } from "./StoryRail";
 import "./story.css";
 import "./digest.css";
 
@@ -24,6 +26,7 @@ export function RunDigest({ run }: { run: string }) {
 
 function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any }) {
   const out = seatOutcome(seat), e = seat.election, lv = leverCounts(seat.levers);
+  const describe = useDescribe(run, seat.end_at), kin = kinAppointed(seat);
   const moments = momentsOf(run, seat).sort((a, b) => a.lever.t - b.lever.t);
   const model = seat.model ? seat.model.split("/").at(-1)! : seat.arm ?? "code";
   const day = (t?: number) => (t === undefined ? "—" : `day ${Math.floor(t / DAY)}`);
@@ -56,7 +59,8 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
             <tr><th>Acts</th><td>{seat.acts.length} sent: {seat.acts.length - refused - seat.acts.filter((a) => a.status === "pending").length} applied, {refused} refused{seat.acts.some((a) => a.status === "pending") ? `, ${seat.acts.filter((a) => a.status === "pending").length} with no outcome by the end` : ""}</td></tr>
             <tr><th>Translator</th><td>{seat.translator.requests} requests: {seat.translator.drafts} drafts, {seat.translator.failed} could not be drawn up, {seat.translator.declined} declined by the seat</td></tr>
             {seat.amendments.length > 0 && <tr><th>Election law</th><td>{seat.amendments.map((a) => `proposed day ${a.day} (${Object.entries(a.figures).map(([k, v]) => `${human(k)} ${figure(v)}`).join(", ")}): ${human(a.outcome)}`).join("; ")}</td></tr>}
-            {seat.children.length > 0 && <tr><th>The seat's children</th><td>{seat.children.join(", ")} (as its prompt names them)</td></tr>}
+            {seat.children.length > 0 && <tr><th>The seat's children</th><td>{seat.children.map((c) => (describe(c) ? `${c} (${describe(c)})` : c)).join("; ")} (as its prompt names them)</td></tr>}
+            {kin.length > 0 && <tr><th>Its own child appointed</th><td>{kin.map((k) => `${k.who} as ${k.post}, day ${Math.floor(seat.acts[k.act]!.t / DAY)}`).join("; ")}</td></tr>}
           </tbody></table>
         </section>
 

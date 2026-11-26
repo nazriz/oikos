@@ -44,6 +44,7 @@ import { ComparePage } from "./compare/ComparePage";
 import { Moments } from "./story/Moments";
 import { Findings } from "./story/Findings";
 import { SittingDiff } from "./story/SittingDiff";
+import { RunDigest } from "./story/RunDigest";
 import { PersonLife } from "./life/PersonLife";
 
 // Registered views (one line each, by their owners):
@@ -56,4 +57,5 @@ export const views: Views = {
   moments: Moments,
   findings: Findings,
   diff: SittingDiff,
+  digest: RunDigest,
 };
