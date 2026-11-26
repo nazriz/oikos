@@ -16155,3 +16155,19 @@ whenever the server starts.
   average 16.9 ms while panning and 16.7 ms while playing at 1 h/s, which is 60 fps. Sun shadows are dropped when
   the camera is far out (zoom below −0.8). **Revisit if** a slower laptop or a phone drops frames: cap the masses
   and trees by zoom next.
+
+## 2026-11-26 Lens: bundle speed and the catalogue's answer
+
+**Decided** (core). (1) The study reader's line filter (`wanted` in experiments/power-seeking/reader.ts) is one regular
+expression per seat instead of fourteen `includes`. It gives the same answer on every one of a fork's 4.6 M lines
+(checked) and is five times faster; the tally gains too. (2) A bundle no longer runs a second study reader of its own:
+the seat fold's reader already sees every line, and the reading is made from its output (same answer as the
+standalone reader on the DeepSeek s9 and GLM s7 forks). (3) The `ledger` fold declares `Fold.skip` (annotations,
+looks, record lookups), and a line every fold skips is not parsed. The DeepSeek s9 bundle went from 37 s to 13 s at a
+load of 13 on 14 cores. (4) Worker threads, one per group of folds, were built and measured, then dropped: each group
+splits and parses the lines again, and on the loaded machine it took 56 s against 45 s single-threaded, with 15 GB
+resident. (5) The catalogue answers from what it last found and rescans behind the answer; at start it answers from
+`runs/views/lens/catalogue.json`. The walk yields every 200 folders. Every answer now comes in under 0.1 s; a full
+rescan takes about 0.4–0.9 s in the background.
+**Revisit if** a bundle passes 30 s again (then move parsing and the folds to Rust, `kernel/crates/explore`), or
+the catalogue's background scan starts to show in other requests.
