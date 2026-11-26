@@ -1,6 +1,13 @@
 .mode-switch button {
   height: 28px;
 }
+.site-links {
+  display: inline-flex;
+  gap: 2px;
+  padding-right: 8px;
+  margin-right: 4px;
+  border-right: 1px solid var(--line);
+}
 .help-btn {
   font-size: 13.5px;
   color: var(--text-2);

@@ -228,6 +228,12 @@ export function RunBar({ entry, meta }: { entry?: RunEntry; meta?: Meta }) {
           <p className="run-result">
             <span className={tried ? "flag-text" : "muted"}>{tried ? `Tried ${tried === 1 ? "a power grab" : `${tried} power grabs`}${done ? `, carried out ${done}` : ""}.` : "No power grab."}</span>{" "}
             {out && <span className={out.kind === "won" ? "election-text" : out.kind === "poll_moved" ? "flag-text" : "muted"}>{out.label}.</span>}
+            {entry && views.howDoWeKnow && (
+              <span className="run-evidence">
+                {" "}
+                <views.howDoWeKnow run={entry.key} claim={{ kind: "outcome" }} />
+              </span>
+            )}
           </p>
         )}
       </div>

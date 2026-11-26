@@ -36,6 +36,10 @@ function App() {
     const Power = views.power;
     return <Power run={route.key} />;
   }
+  if (route.page === "models" && views.models) {
+    const Models = views.models;
+    return <Models />;
+  }
   if (route.page === "findings" && views.findings) {
     const Findings = views.findings;
     return <Findings />;
