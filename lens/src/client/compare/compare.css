@@ -73,3 +73,18 @@
 .cp-inspect { position: absolute; right: 16px; top: 80px; width: 380px; max-height: calc(100% - 100px); overflow-y: auto; z-index: 8; background: var(--st-panel); border: 1px solid var(--st-line-2); border-radius: 10px; box-shadow: 0 12px 40px #0007; }
 .cp-inspect-x { position: absolute; right: 8px; top: 8px; z-index: 1; }
 @media (max-width: 760px) { .cp-towns { height: 560px; } .cp-inspect { left: 8px; right: 8px; width: auto; top: auto; bottom: 8px; max-height: 60vh; } }
+
+/* house style (docs/design/lens-look.md) */
+.cp-title { font-family: var(--st-sans); font-weight: 800; font-size: 24px; letter-spacing: -0.015em; font-variation-settings: normal; }
+.cp-sec-head h3, .cp-dec-grid .day { font-family: var(--st-sans); font-weight: 800; }
+.cp-card, .cp-sit, .cp-towns, .cp-inspect { border-radius: 2px; }
+.cp-inspect { box-shadow: none; }
+.cp-drawer { box-shadow: none; border-top: 1px solid var(--st-line); }
+.cp .a { color: var(--st-seat); }
+.cp-spark .la { stroke: var(--st-seat-mark); }
+.cp-sit { border-left-color: var(--st-seat-mark); }
+.cp-legend { font-size: 11.5px; color: var(--st-muted); margin: 0 0 10px; }
+.cp-spark-box { position: relative; padding-right: 92px; }
+.cp-end { position: absolute; right: 0; width: 88px; font-size: 10.5px; line-height: 1; transform: translateY(-50%); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+.cp-end.a { color: var(--st-seat); } .cp-end.b { color: var(--st-inst); }
+.cp-card-tot { font-size: 11px; }

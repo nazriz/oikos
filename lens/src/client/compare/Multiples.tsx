@@ -24,7 +24,7 @@ export function Multiples({ panels, from, fork, cumulative, until, polls, names 
   }
   return (
     <>
-      <div className="cp-legend"><span className="sw a" />{names[0]}<span className="sw b" />{names[1]}<span className="sw f" />fork<span className="sw p" />poll</div>
+      <p className="cp-legend">Each line is labelled at its end. The dashed line is where the two runs split; the blue line is election day.</p>
       <div className="cp-grid">{out}</div>
     </>
   );
@@ -51,6 +51,9 @@ function Card({ p, from, fork, cumulative, until, polls, names }: { p: Panel; fr
   return (
     <div className="cp-card" title={p.note}>
       <div className="cp-card-head"><span className="t">{p.title}</span><span className="d">{d === 0 ? "same" : `${d > 0 ? "+" : "−"}${fmt(Math.abs(d), p.money)}`}</span></div>
+      <div className="cp-spark-box">
+      <span className="cp-end a" style={{ top: `${(y(a[n - 1] ?? 0) / H) * 100}%` }}>{names[0]}</span>
+      <span className="cp-end b" style={{ top: `${(y(b[n - 1] ?? 0) / H) * 100}%`, ...(Math.abs(y(a[n - 1] ?? 0) - y(b[n - 1] ?? 0)) < 9 ? { transform: "translateY(4px)" } : {}) }}>{names[1]}</span>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="cp-spark"
         onMouseMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); const i = Math.round(((e.clientX - r.left) / r.width) * (n - 1)); setHover(Math.max(0, Math.min(n - 1, i))); }}
         onMouseLeave={() => setHover(null)} onClick={() => hover !== null && setT((from + hover) * DAY)}>
@@ -63,11 +66,12 @@ function Card({ p, from, fork, cumulative, until, polls, names }: { p: Panel; fr
         {cursor >= 0 && cursor < n && <line x1={x(cursor)} x2={x(cursor)} y1={0} y2={H} className="cur" />}
         {hover !== null && <><circle cx={x(hover)} cy={y(a[hover]!)} r={2.5} className="da" /><circle cx={x(hover)} cy={y(b[hover]!)} r={2.5} className="db" /></>}
       </svg>
+      </div>
       <div className="cp-card-foot">
         <span className="st-faint">day {worldDay((from + at) * DAY)}{cumulative ? ", so far" : ""}</span>
         <span className="a">{fmt(a[at] ?? 0, p.money)}</span><span className="b">{fmt(b[at] ?? 0, p.money)}</span>
       </div>
-      <div className="cp-card-tot st-faint">after the fork: <span className="a">{fmt(ta, p.money)}</span> · <span className="b">{fmt(tb, p.money)}</span><span className="sr"> ({names[0]} · {names[1]})</span></div>
+      <div className="cp-card-tot st-faint">After the split: {names[0]} {fmt(ta, p.money)}, {names[1]} {fmt(tb, p.money)}.</div>
     </div>
   );
 }
