@@ -15,10 +15,11 @@ export const mix = (a: RGBA | RGB, b: RGBA | RGB, f: number): RGBA => [
  * architect's model, so the accents (people, acts) carry the meaning. */
 export const PAL = {
   ink: "#0b0f17", panel: "#111723", panel2: "#161d2b", hair: "#ffffff14", text: "#e8e6e1", muted: "#9aa3b2",
-  seat: "#f2b44b", citizen: "#5cc8c0", institution: "#8b9cf6", flag: "#f0647a", election: "#b48cf2",
+  // The town's own objects (docs/design/lens-look.md): road-marking yellow, stop-sign red, ballot-box blue, council green.
+  seat: "#E8B400", citizen: "#8C7B6B", institution: "#2F7D5B", flag: "#C8102E", election: "#1F5FAD",
   // Building walls by category: pale, slightly warm, told apart by hue rather than strength.
   category: {
-    residential: "#ddd6ca", commercial: "#d9b49a", industrial: "#a3aab4", civic: "#b3bcf0", health: "#e6c1c8",
+    residential: "#ddd6ca", commercial: "#d9b49a", industrial: "#a3aab4", civic: "#B7CDBF", health: "#e6c1c8",
     education: "#a9cbdc", utility: "#9aa1aa", green: "#7f9277", transport: "#5b6170", other: "#bdb8ae",
   } as Record<string, string>,
   roofs: ["#7f6a62", "#6f7279", "#86735f", "#706560", "#7b7f86"],
@@ -30,7 +31,9 @@ export const PAL = {
   water: "#557f94",
   lot: "#aeada5",
   // People by where they are.
-  where: { dwelling: "#ffd89a", workplace: "#5cc8c0", classroom: "#9fd3ff", hall: "#b9a3ff", waiting: "#ff9fb0", moving: "#ffffff", other: "#c8d0dc" } as Record<string, string>,
+  // People by where they are: by day in plan inks, at night the lamplit versions (whereNight).
+  where: { dwelling: "#8C5A3C", workplace: "#2F7D5B", classroom: "#3B6EA8", hall: "#5B6B78", waiting: "#B5523B", moving: "#1D2B36", other: "#5B6B78" } as Record<string, string>,
+  whereNight: { dwelling: "#F2D4A0", workplace: "#8FD1B0", classroom: "#A9C8EE", hall: "#C9D3DB", waiting: "#F0A493", moving: "#FFFFFF", other: "#C9D3DB" } as Record<string, string>,
   window: "#ffc677",
 };
 
@@ -277,7 +280,7 @@ function fbm(x: number, y: number, seed: number): number {
 
 /** Paint the ground like a model's base: covers in quiet tones with gentle variation, woodland stippled, fields in
  * soft strips, the river with a pale bank, and crisp pale lots under buildings. Returns a canvas. */
-export function paintGround(town: TownBundle, px = 10): HTMLCanvasElement | OffscreenCanvas {
+export function paintGround(town: TownBundle, px = 10, plan = false): HTMLCanvasElement | OffscreenCanvas {
   const { w, h } = town.ground;
   const W = w * px, H = h * px;
   const cover = new Uint8Array(w * h);
@@ -294,11 +297,14 @@ export function paintGround(town: TownBundle, px = 10): HTMLCanvasElement | Offs
   }
   const water = new Uint8Array(w * h);
   for (const chain of town.river) for (const [x, y] of chain) if (x >= 0 && y >= 0 && x < w && y < h) water[y * w + x] = 1;
-  const base = names.map((n) => hex(PAL.cover[n] ?? PAL.cover.ground!));
-  const wat = hex(PAL.water), bank = hex("#adb2a4");
-  const lotC = hex(PAL.lot), lotEdge = hex("#7e817b"), parkC = hex("#819478");
-  const crops = [hex("#9d9d86"), hex("#8e997b"), hex("#a49c84"), hex("#939d84"), hex("#a0957e")];
-  const fence = hex("#6f7a68");
+  // On the plan (light theme) the covers are washed toward survey paper, like a printed map's land tints.
+  const paper = hex("#EDF0F2");
+  const wash = (c: RGBA) => (plan ? mix(c, paper, 0.55) : c);
+  const base = names.map((n) => wash(hex(PAL.cover[n] ?? PAL.cover.ground!)));
+  const wat = plan ? hex("#9CC3D8") : hex(PAL.water), bank = wash(hex("#adb2a4"));
+  const lotC = plan ? hex("#F4F1EA") : hex(PAL.lot), lotEdge = plan ? hex("#B9B3A6") : hex("#7e817b"), parkC = wash(hex("#819478"));
+  const crops = [hex("#9d9d86"), hex("#8e997b"), hex("#a49c84"), hex("#939d84"), hex("#a0957e")].map(wash);
+  const fence = wash(hex("#6f7a68"));
   const inTown = townMask(town);
   const canvas: HTMLCanvasElement | OffscreenCanvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(W, H) : Object.assign(document.createElement("canvas"), { width: W, height: H });
   const ctx = canvas.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -325,7 +331,7 @@ export function paintGround(town: TownBundle, px = 10): HTMLCanvasElement | Offs
         const along = hb < 0.5 ? fx : fy;
         shade = 0.97 + 0.03 * Math.sin(along * Math.PI * 3) + (n - 0.5) * 0.06;
         const ex = (fx / 3) % 1, ey = (fy / 3) % 1;
-        if (ex < 0.02 || ey < 0.02) { c = hex("#66705f"); shade = 1; }
+        if (ex < 0.02 || ey < 0.02) { c = wash(hex("#66705f")); shade = 1; }
       } else if (k === iWet) {
         const t = noise2(fx * 1.4, fy * 1.4, 21);
         if (t > 0.68) { c = mix(c, wat, 0.6); shade = 1; }
@@ -367,12 +373,12 @@ export function paintGround(town: TownBundle, px = 10): HTMLCanvasElement | Offs
 
 /** The land beyond the district, a quiet field that fades into the backdrop (the world ends at its edge; this only
  * keeps the map from looking like a tile in space). The district fills the middle quarter. */
-export function paintBeyond(): HTMLCanvasElement | OffscreenCanvas {
+export function paintBeyond(plan = false): HTMLCanvasElement | OffscreenCanvas {
   const N = 256;
   const canvas: HTMLCanvasElement | OffscreenCanvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(N, N) : Object.assign(document.createElement("canvas"), { width: N, height: N });
   const ctx = canvas.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
   const img = ctx.createImageData(N, N);
-  const base = hex("#6f7d68");
+  const base = plan ? hex("#D3D9D2") : hex("#6f7d68");
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     // Distance from the district's square (the middle fifth), in the margin.
     const dx = Math.max(0, Math.abs(x / N - 0.5) - 0.125) / 0.375, dy = Math.max(0, Math.abs(y / N - 0.5) - 0.125) / 0.375;

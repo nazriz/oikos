@@ -18,6 +18,7 @@ import { blocksOf, candidateColours, electionView, homeAt, paintHeat, PAPER_GROU
 import { Tour, useSeat, useTourSteps } from "./Tour";
 import { captionAt, download, makeRecorder, PresentBar, PRESENT_CSS, type Caption } from "./Present";
 import { Minimap } from "./Minimap";
+import { actSentence, CITY_WORDS } from "./words";
 
 const DAY = 86_400;
 /** A gap between leaving one place and entering the next longer than this is not a walk: they are away. */
@@ -36,6 +37,8 @@ export interface CityViewProps {
   tour?: number;
   /** Start presenting ("show") or recording the tour ("record") once the run is read. */
   present?: "show" | "record";
+  /** Story mode (for newcomers): only who is where and the AI mayor's actions, written on the map in plain words. */
+  story?: boolean;
   /** Start with these overlays set (e.g. { election: true }). */
   overlays?: Partial<Overlays>;
   /** Where the bundle is served; defaults to `/api/run/<key>`. */
@@ -44,7 +47,7 @@ export interface CityViewProps {
   camera?: Partial<{ zoom: number; rotationX: number; rotationOrbit: number; target: [number, number, number] }>;
 }
 
-export function CityView({ runKey, run: runProp, base, camera, card = true, layers = false, tour, overlays, present }: CityViewProps) {
+export function CityView({ runKey, run: runProp, base, camera, card = true, layers = false, tour, overlays, present, story }: CityViewProps) {
   const open = useLens((s) => s.run);
   const key = runKey ?? runProp ?? open;
   const url = base ?? (key ? `/api/run/${encodeURIComponent(key)}` : null);
@@ -52,7 +55,7 @@ export function CityView({ runKey, run: runProp, base, camera, card = true, laye
   return (
     <div className="lens-city">
       <style>{CITY_CSS}{PRESENT_CSS}</style>
-      {city ? <Map city={city} camera={camera} card={card} layersOpen={layers} base={url} tour0={tour} overlays0={overlays} present0={present} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : url ? <><div className="lc-spin" />Drawing the town</> : "No run open"}</div>}
+      {city ? <Map city={city} camera={camera} card={card} layersOpen={layers} base={url} tour0={tour} overlays0={overlays} present0={present} story={story} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : url ? <><div className="lc-spin" />Drawing the town</> : "No run open"}</div>}
     </div>
   );
 }
@@ -78,7 +81,7 @@ interface Built {
   caps: { i: number; m: Mass }[];
 }
 
-function build(c: CityData): Built {
+function build(c: CityData, plan = false): Built {
   const town = c.town, cell = town.ground.cell;
   const shapes = town.structures.map((s) => shapeOf(s, cell));
   const boxes: number[] = [], parks: number[] = [];
@@ -124,8 +127,8 @@ function build(c: CityData): Built {
   const labels: Built["labels"] = [];
   for (const p of town.places) {
     const a = p.area;
-    if (p.kind === "district") labels.push({ pos: [(a.x + a.w * 0.5) * cell, -(a.y + a.h - 3) * cell, 0], text: p.name.toUpperCase(), size: 13, tier: 0, prio: 5 });
-    else labels.push({ pos: [(a.x + a.w / 2) * cell, -(a.y - 1.6) * cell, 0], text: p.name.toUpperCase(), size: 15, tier: 0, prio: 9 });
+    if (p.kind === "district") labels.push({ pos: [(a.x + a.w * 0.5) * cell, -(a.y + a.h - 3) * cell, 0], text: p.name, size: 14, tier: 0, prio: 5 });
+    else labels.push({ pos: [(a.x + a.w / 2) * cell, -(a.y - 1.6) * cell, 0], text: p.name, size: 17, tier: 0, prio: 9 });
   }
   town.structures.forEach((s, i) => {
     if (!["civic", "health", "education", "utility"].includes(s.category) && !(s.category === "commercial" && /office/.test(s.type))) return;
@@ -135,7 +138,7 @@ function build(c: CityData): Built {
   return {
     shapes, boxes, parks, masses, hips, caps,
     windows: { pos: new Float32Array(wp), owner: new Uint32Array(wo), h: new Float32Array(wh), n: wo.length },
-    lamps: new Float32Array(lamps), trees: treesOf(town), ground: paintGround(town), beyond: paintBeyond(), roads: new Roads(town), jx, jy, jz, disrepairMax, labels,
+    lamps: new Float32Array(lamps), trees: treesOf(town), ground: paintGround(town, 10, plan), beyond: paintBeyond(plan), roads: new Roads(town), jx, jy, jz, disrepairMax, labels,
   };
 }
 
@@ -182,6 +185,7 @@ export interface PaneProps {
   sharedOverlays?: [Overlays, (o: Overlays | ((o: Overlays) => Overlays)) => void];
   /** A name over the pane (Two towns). */
   label?: string;
+  story?: boolean;
   /** Leave out the panel, tour and clock (the second pane of Two towns). */
   bare?: boolean;
   present0?: "show" | "record";
@@ -192,7 +196,7 @@ export function CityPane(p: PaneProps) {
   return <div className="lens-city"><style>{CITY_CSS}</style><Map {...p} /></div>;
 }
 
-function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedView, sharedOverlays, twin, label, bare, present0 }: PaneProps) {
+function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedView, sharedOverlays, twin, label, bare, present0, story }: PaneProps) {
   const t = useLens((s) => s.t);
   const selection = useLens((s) => s.selection);
   const hovered = useLens((s) => s.hovered);
@@ -201,16 +205,19 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   const setTrack = useLens((s) => s.setTrack);
   const setSpan = useLens((s) => s.setSpan);
   const span = useLens((s) => s.span);
-  const B = useMemo(() => build(city), [city]);
+  const dark = useDark();
+  const B = useMemo(() => build(city, !dark), [city, dark]);
   const town = city.town, cell = town.ground.cell;
   const wrap = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 1200, h: 800 });
   const [ownOverlays, setOwnOverlays] = useState<Overlays>(() => {
     try { return { ...DEFAULT_OVERLAYS, ...JSON.parse(localStorage.getItem("lens.city.overlays") ?? "{}"), ...overlays0 }; } catch { return { ...DEFAULT_OVERLAYS, ...overlays0 }; }
   });
-  const overlays = sharedOverlays?.[0] ?? ownOverlays;
+  const overlaysRaw = sharedOverlays?.[0] ?? ownOverlays;
+  // Story mode shows only who is where and the AI mayor's actions, whatever the stored choices.
+  const overlays: Overlays = story ? { ...overlaysRaw, people: true, acts: true, election: false, papers: false, wildlife: false, networks: false, colour: "kind", diff: false, labels: true } : overlaysRaw;
   const setOverlays = (sharedOverlays?.[1] ?? setOwnOverlays) as (o: Overlays | ((o: Overlays) => Overlays)) => void;
-  useEffect(() => { if (sharedOverlays) return; try { localStorage.setItem("lens.city.overlays", JSON.stringify(overlays)); } catch { /* private mode */ } }, [overlays]);
+  useEffect(() => { if (sharedOverlays) return; try { localStorage.setItem("lens.city.overlays", JSON.stringify(overlaysRaw)); } catch { /* private mode */ } }, [overlaysRaw]);
   const [tip, setTip] = useState<HoverInfo | null>(null);
 
   // The span, when nothing else has set one (the shell does, from the meta fold).
@@ -252,7 +259,6 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   // Where everyone is, now.
   city.where.seek(t);
   const hour = ((t % DAY) + DAY) % DAY / 3600;
-  const dark = useDark();
   const sky = useMemo(() => skyAt(Math.round(hour * 12) / 12, dark), [Math.round(hour * 12), dark]);
   const effects = useMemo(() => [new LightingEffect({
     ambient: new AmbientLight({ color: sky.ambientColor, intensity: sky.ambientIntensity }),
@@ -300,7 +306,10 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   const nP = city.where.nP;
   const people = useMemo(() => ({ pos: new Float32Array(nP * 3), col: new Uint8Array(nP * 4), counts: {} as Record<string, number> }), [nP]);
   const kindNames = city.people.spaceKinds;
-  const whereCol = useMemo(() => kindNames.map((k) => hex(PAL.where[k] ?? PAL.where.other!)), [kindNames]);
+  const inkLight = !dark && sky.night < 0.5;
+  // Plan inks by day, lamplit at night (on the dark theme, always the lamplit ones).
+  const nightK = dark ? 1 : Math.round(sky.night * 8) / 8;
+  const whereCol = useMemo(() => kindNames.map((k) => mix(hex(PAL.where[k] ?? PAL.where.other!), hex(PAL.whereNight[k] ?? PAL.whereNight.other!), nightK)), [kindNames, nightK]);
   const movingCol = hex(PAL.where.moving!);
   {
     const W = city.where, pos = people.pos, col = people.col, counts: Record<string, number> = {};
@@ -402,6 +411,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     nets: town.networks.filter((l) => l.mode !== "road"),
     labels0: B.labels.filter((l) => l.tier === 0),
     labels1: B.labels,
+    labels1NoHall: B.labels.filter((l) => l.text !== "Town hall"),
   }), [town, cell, B]);
 
   const buildingColor = useCallback((i: number): RGBA => {
@@ -608,13 +618,13 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     }),
     new PathLayer({
       id: "roads-edge", data: B.roads.segments, getPath: ((d: any) => [[d.a[0], d.a[1], 0.25], [d.b[0], d.b[1], 0.25]]) as any,
-      getColor: mix(hex("#4a4e55"), hex("#1d2129"), sky.night) as any, getWidth: cell * 0.44, widthUnits: "meters", capRounded: true,
-      updateTriggers: { getColor: sky.night },
+      getColor: (dark ? mix(hex("#4a4e55"), hex("#1d2129"), sky.night) : mix(hex("#8E9BA6"), hex("#1d2129"), sky.night)) as any, getWidth: cell * 0.44, widthUnits: "meters", capRounded: true,
+      updateTriggers: { getColor: [sky.night, dark] },
     }),
     new PathLayer({
       id: "roads", data: B.roads.segments, getPath: ((d: any) => [[d.a[0], d.a[1], 0.3], [d.b[0], d.b[1], 0.3]]) as any,
-      getColor: mix(hex("#8f9296"), hex("#33373f"), sky.night) as any, getWidth: cell * 0.36, widthUnits: "meters", capRounded: true,
-      updateTriggers: { getColor: sky.night },
+      getColor: (dark ? mix(hex("#8f9296"), hex("#33373f"), sky.night) : mix(hex("#FFFFFF"), hex("#3A4652"), sky.night)) as any, getWidth: cell * 0.36, widthUnits: "meters", capRounded: true,
+      updateTriggers: { getColor: [sky.night, dark] },
     }),
     new PathLayer({
       id: "roads-line", data: B.roads.segments, getPath: ((d: any) => [[d.a[0], d.a[1], 0.35], [d.b[0], d.b[1], 0.35]]) as any,
@@ -748,7 +758,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     }),
     overlays.election && ev && ev.phase !== "before" && new TextLayer({
       id: "cand-labels", data: ev.homes.filter((h) => h.s >= 0), getPosition: (h: any) => [B.shapes[h.s]!.cx, B.shapes[h.s]!.cy, B.shapes[h.s]!.top + 8],
-      getText: (h: any) => `${h.number} · ${h.name}${h.seat ? " (seat)" : ""}`, getSize: 12, getColor: (h: any) => hex(candCol[h.number] ?? "#fff"),
+      getText: (h: any) => `${h.number}. ${h.name}${h.seat ? ", the AI mayor" : ""}`, getSize: 12, getColor: (h: any) => hex(candCol[h.number] ?? "#fff"),
       fontFamily: "Inter Variable, Inter, system-ui, sans-serif", fontWeight: 600, characterSet: "auto", billboard: true, getAlignmentBaseline: "bottom",
       fontSettings: { sdf: true, fontSize: 64, buffer: 6 }, outlineWidth: 3, outlineColor: [11, 15, 23, 220], parameters: { depthCompare: "always" }, updateTriggers: { getColor: [candCol] },
     }),
@@ -773,7 +783,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     // The difference from the other arm.
     diff && diff.moves.length > 0 && new ArcLayer({
       id: "diff-moves", data: diff.moves, getSourcePosition: (d: any) => d.from, getTargetPosition: (d: any) => d.to, getHeight: 0.25, greatCircle: false,
-      getSourceColor: [190, 160, 255, 40], getTargetColor: [190, 160, 255, 210], getWidth: 1.4, widthUnits: "pixels", parameters: { depthCompare: "always" },
+      getSourceColor: [47, 125, 91, 40], getTargetColor: [47, 125, 91, 220], getWidth: 1.4, widthUnits: "pixels", parameters: { depthCompare: "always" },
     }),
     diff && diff.onlyHere.length > 0 && new ScatterplotLayer({
       id: "diff-here", data: diff.onlyHere, getPosition: (d: any) => { const sh = B.shapes[d.s]!; return [sh.cx - sh.fw * 0.3, sh.cy + sh.fh * 0.3, sh.top + 4 + d.stack * 3]; },
@@ -794,7 +804,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     }),
     overlays.people && !overlays.election && new ScatterplotLayer({
       id: "people-halo", data: { length: nP, attributes: { getPosition: { value: people.pos, size: 3 }, getFillColor: { value: people.col, size: 4, normalized: true } } },
-      getRadius: 1.9, radiusUnits: "meters", radiusMinPixels: 2.2, radiusMaxPixels: 7, billboard: true, opacity: (0.16 + 0.22 * sky.night) * (1 - crowdF * 0.6) * (overlays.election || overlays.papers ? 0.35 : 1), parameters: ADDITIVE,
+      getRadius: 1.9, radiusUnits: "meters", radiusMinPixels: 2.2, radiusMaxPixels: 7, billboard: true, opacity: 0.38 * sky.night * (1 - crowdF * 0.6) * (overlays.election || overlays.papers ? 0.35 : 1), parameters: ADDITIVE,
     }),
     overlays.people && new ScatterplotLayer({
       id: "people", data: { length: nP, attributes: { getPosition: { value: people.pos, size: 3 }, getFillColor: { value: people.col, size: 4, normalized: true } } },
@@ -819,16 +829,18 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       updateTriggers: { getPosition: t },
     }),
     overlays.labels && new TextLayer({
-      id: "labels", data: (view.zoom as number) > 0.9 ? staticLayers.labels1 : staticLayers.labels0, getPosition: (l: any) => l.pos, getText: (l: any) => l.text, getSize: (l: any) => l.size,
-      getColor: (l: any) => (l.tier === 0 ? [232, 230, 225, 150] : [232, 230, 225, 215]), fontFamily: "Inter Variable, Inter, system-ui, sans-serif", fontWeight: 500,
+      id: "labels", data: (view.zoom as number) > 0.9 ? (story ? staticLayers.labels1NoHall : staticLayers.labels1) : staticLayers.labels0, getPosition: (l: any) => l.pos, getText: (l: any) => l.text, getSize: (l: any) => l.size,
+      // Written on the plan like a street map: drafting navy on paper by day, pale on slate at night.
+      getColor: (l: any) => (inkLight ? [29, 43, 54, l.tier === 0 ? 230 : 255] : [228, 234, 238, l.tier === 0 ? 200 : 235]), fontFamily: "Overpass Variable, Overpass, system-ui, sans-serif", fontWeight: 700,
       characterSet: "auto", billboard: true, getTextAnchor: "middle", getAlignmentBaseline: "bottom", fontSettings: { sdf: true, fontSize: 64, buffer: 6 },
-      outlineWidth: 3, outlineColor: [11, 15, 23, 200], parameters: { depthCompare: "always" },
+      outlineWidth: 4, outlineColor: inkLight ? [237, 240, 242, 230] : [22, 33, 43, 220], parameters: { depthCompare: "always" }, updateTriggers: { getColor: inkLight },
       // Names give way to each other, the town's first, then civic buildings.
       extensions: [COLLIDE], ...({ collisionEnabled: true, getCollisionPriority: (l: any) => l.prio, collisionTestProps: { sizeScale: 1.6 }, getPixelOffset: [0, -2] } as any),
     }),
   ];
 
   const onHover = useCallback((info: PickingInfo) => {
+    if (info.object !== undefined && info.object !== null) { try { if (!localStorage.getItem("lens.city.hinted")) { localStorage.setItem("lens.city.hinted", "1"); setHint(false); } } catch { /* private mode */ } }
     const s = pickToSelection(city, info);
     const cur = useLens.getState().hovered;
     if (JSON.stringify(cur) !== JSON.stringify(s)) hover(s);
@@ -839,8 +851,25 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     select(s);
   }, [city, select]);
 
+  // ---- Words on the map: the town hall, and in Story mode each action as it happens ----
+  const vp: any = useMemo(() => (ORBIT as any).makeViewport({ width: size.w, height: size.h, viewState: view }), [view, size.w, size.h]);
+  const onScreen = (x: number, y: number, z: number) => { const [px, py] = vp.project([x, y, z]); return px > -40 && py > -40 && px < size.w + 40 && py < size.h + 40 ? [px, py] as const : null; };
+  const hallAt = town.hall !== undefined && town.seats.length > 0 ? onScreen(B.shapes[town.hall]!.cx, B.shapes[town.hall]!.cy, B.shapes[town.hall]!.top + 4) : null;
+  const actNotes = useMemo(() => {
+    if (!story) return [];
+    const recent = town.acts.filter((a) => a.t <= t && t - a.t < 8 * 3600).slice(-2);
+    return recent.map((a) => {
+      const arc = arcs.find((x) => x.act.seq === a.seq);
+      return { seq: a.seq, text: actSentence(town, a), refused: a.status === "refused", age: (t - a.t) / (8 * 3600), at: arc ? arc.to : null };
+    });
+  }, [story, town, arcs, Math.floor(t / 300)]);
+  // A first hint, once per browser.
+  const [hint, setHint] = useState(() => { try { return !localStorage.getItem("lens.city.hinted"); } catch { return false; } });
+  const dropHint = () => { if (!hint) return; setHint(false); try { localStorage.setItem("lens.city.hinted", "1"); } catch { /* private mode */ } };
+  useEffect(() => { if (!hint) return; const id = setTimeout(dropHint, 12_000); return () => clearTimeout(id); }, [hint]);
+
   // ---- Presentation ----
-  const caption: Caption | null = present ? (tour !== null && steps[tour] ? { kicker: `${steps[tour]!.kicker} · ${fmtDay(steps[tour]!.t).clock}, day ${fmtDay(steps[tour]!.t).day}`, title: steps[tour]!.title, words: steps[tour]!.words, tone: steps[tour]!.tone === "flag" ? "flag" : steps[tour]!.tone === "election" ? "election" : "seat" } : captionAt(t, seat, town)) : null;
+  const caption: Caption | null = present ? (tour !== null && steps[tour] ? { kicker: `${steps[tour]!.kicker}, day ${fmtDay(steps[tour]!.t).day} at ${fmtDay(steps[tour]!.t).clock}`, title: steps[tour]!.title, words: steps[tour]!.words, tone: steps[tour]!.tone === "flag" ? "flag" : steps[tour]!.tone === "election" ? "election" : "seat" } : captionAt(t, seat, town)) : null;
   const captionRef = useRef<Caption | null>(null);
   captionRef.current = caption;
   const manual = useRef(0);
@@ -911,11 +940,11 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   // The panel only changes with the clock (by the minute), the overlays and the run: not on every camera frame.
   const canTour = steps.length > 0 && (town.acts.length > 0 || town.elections.some((e) => e.result));
   const panel = useMemo(() => (
-    <Panel twin={!!twin} open0={layersOpen} ev={ev} candCol={candCol} papersShown={papersShown} onTour={canTour ? () => setTour(0) : undefined} onPresent={() => startPresent(false)} onRecord={canTour && typeof MediaRecorder !== "undefined" ? () => startPresent(true) : undefined} overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />
-  ), [twin, layersOpen, ev, candCol, papersShown, canTour, overlays, ver, Math.floor(t / 60), arcs.length, city, home]); // eslint-disable-line react-hooks/exhaustive-deps
+    <Panel story={story} twin={!!twin} open0={layersOpen} ev={ev} candCol={candCol} papersShown={papersShown} onTour={canTour ? () => setTour(0) : undefined} onPresent={() => startPresent(false)} onRecord={canTour && typeof MediaRecorder !== "undefined" ? () => startPresent(true) : undefined} overlays={overlays} setOverlays={(o) => setOverlays(story ? { ...overlaysRaw, people: o.people, acts: o.acts, labels: o.labels } : o)} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />
+  ), [story, twin, layersOpen, ev, candCol, papersShown, canTour, overlays, ver, Math.floor(t / 60), arcs.length, city, home]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div ref={wrap} className={`lc-wrap${dark ? "" : " light"}`} style={{ background: `rgb(${sky.backdrop.join(",")})` }}>
+    <div ref={wrap} data-tour="city-map" id="city-map" className={`lc-wrap${dark ? "" : " light"}`} style={{ background: `rgb(${sky.backdrop.join(",")})` }}>
       <DeckGL
         ref={deckRef}
         onAfterRender={() => { const r = recorder.current; const cv = deckRef.current?.deck?.getCanvas?.() ?? deckRef.current?.deck?.canvas; if (r && cv && captionRef.current) r.frame(cv, captionRef.current); }}
@@ -933,9 +962,12 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       />
       <div className="lc-haze" style={{ opacity: Math.max(0, Math.min(1, (82 - (view.rotationX as number)) / 40)), background: `linear-gradient(to bottom, rgba(${sky.backdrop.join(",")},0.92) 0%, rgba(${sky.backdrop.join(",")},0.5) 16%, rgba(${sky.backdrop.join(",")},0) 44%)` }} />
       <div className="lc-vignette" />
-      {!present && selP >= 0 && <button className={`lc-follow ${follow ? "on" : ""}`} onClick={() => setFollow(!follow)}>{follow ? <>Following {city.people.people[selP]![1]}<span className="muted"> · stop</span></> : <>Follow {city.people.people[selP]![1]}</>}</button>}
+      {!present && selP >= 0 && <button className={`lc-follow ${follow ? "on" : ""}`} onClick={() => setFollow(!follow)}>{follow ? <>Stop following {city.people.people[selP]![1]}</> : <>Follow {city.people.people[selP]![1]}</>}</button>}
       {label && <div className={`lc-pane-label${bare ? " bare" : ""}`}>{label}</div>}
       {!bare && !present && <Clock t={t} sky={sky} town={town} />}
+      {hallAt && !present && <div className="lc-anno hall" data-tour="city-town-hall" id="city-town-hall" style={{ left: hallAt[0], top: hallAt[1] }}>{story ? CITY_WORDS.hall : "Town hall"}</div>}
+      {actNotes.map((n) => { const p = n.at ? onScreen(n.at[0], n.at[1], n.at[2] + 10) : null; return p && <div key={n.seq} className={`lc-anno act ${n.refused ? "refused" : ""}`} style={{ left: p[0], top: p[1], opacity: 1 - n.age * 0.7 }}><b />{n.text}</div>; })}
+      {hint && !present && !bare && <div className="lc-hint" onMouseEnter={dropHint}>{CITY_WORDS.hint} <button className="lc-ghost" onClick={dropHint}>Got it</button></div>}
       {diff && diff.ended !== undefined && <div className="lc-diff"><b>Difference from the other arm</b><span>An arm ended on day {Math.floor(diff.ended / DAY) + 1}: nothing to compare after it.</span></div>}
       {diff && diff.ended === undefined && <div className="lc-diff"><b>Difference from the other arm</b><span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people elsewhere now</span><span><i className="sw dot" />{diff.onlyHere.length} papers only here (7 d)</span><span><i className="sw ring" />{diff.onlyThere.length} only there</span></div>}
       {!present && <Minimap B={B} town={town} view={view} size={size} setView={setView} />}

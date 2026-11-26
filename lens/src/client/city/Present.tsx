@@ -15,21 +15,21 @@ const short = (s: string | undefined, n: number) => (!s ? undefined : s.length >
  * seat's current sitting while it is fresh, else the day. */
 export function captionAt(t: number, seat: any, town: TownBundle): Caption {
   const f = fmtDay(t);
-  const when = `year ${f.year}, day ${f.dayOfYear} · ${f.clock}`;
+  const when = `day ${f.dayOfYear} at ${f.clock}`;
   const lever = (seat?.levers ?? []).filter((l: any) => (l.level === "attempted" || l.level === "executed") && l.t <= t && t - l.t < 12 * H).at(-1);
-  if (lever) return { kicker: `Lever · ${lever.level} · ${when}`, title: lever.title ?? lever.lever, words: short(lever.words, 260), tone: "flag" };
-  for (const e of town.elections) if (e.result && e.result.t <= t && t - e.result.t < DAY) return { kicker: `The election · ${when}`, title: short(e.result.text, 200) ?? "The result", tone: "election" };
+  if (lever) return { kicker: `A power grab, ${lever.level}, ${when}`, title: lever.title ?? lever.lever, words: short(lever.words, 260), tone: "flag" };
+  for (const e of town.elections) if (e.result && e.result.t <= t && t - e.result.t < DAY) return { kicker: `The election, ${when}`, title: short(e.result.text, 200) ?? "The result", tone: "election" };
   const sittings: any[] = seat?.sittings ?? [];
   let s: any;
   for (const x of sittings) if (x.t <= t) s = x;
-  if (s && t - s.t < 1.5 * DAY) return { kicker: `Sitting ${s.i + 1} · ${when}`, title: short(s.gist, 160) ?? "The seat sits", words: short(s.words, 260), tone: "seat" };
+  if (s && t - s.t < 1.5 * DAY) return { kicker: `Turn ${s.i + 1} of the AI mayor, ${when}`, title: short(s.gist, 160) ?? "The seat sits", words: short(s.words, 260), tone: "seat" };
   return { kicker: when, title: `${town.name ?? "The town"}, ${f.clock < "06:00" || f.clock >= "21:00" ? "at night" : f.clock < "12:00" ? "in the morning" : f.clock < "18:00" ? "in the afternoon" : "in the evening"}`, tone: "town" };
 }
 
 export function PresentBar({ c, onExit, recording }: { c: Caption; onExit: () => void; recording: boolean }) {
   return (
     <div className={`lc-present tone-${c.tone}`}>
-      <div className="lc-present-k">{recording && <span className="rec">● REC</span>}{c.kicker}</div>
+      <div className="lc-present-k">{recording && <span className="rec">Recording</span>}{c.kicker}</div>
       <div className="lc-present-t" key={c.title}>{c.title}</div>
       {c.words && <div className="lc-present-w" key={c.words}>“{c.words}”</div>}
       <button className="lc-present-x" onClick={onExit} aria-label="Leave presentation">Esc</button>
@@ -84,7 +84,7 @@ export function makeRecorder(): { frame: (src: HTMLCanvasElement, c: Caption) =>
       const accent = c.tone === "flag" ? "#f0647a" : c.tone === "election" ? "#b48cf2" : "#f2b44b";
       let y = Hh - barH + pad * 0.6;
       ctx.fillStyle = accent; ctx.fillRect(pad, y - 14 * dpr, 36 * dpr, 2 * dpr);
-      ctx.font = `600 ${11.5 * dpr}px ${sans}`; ctx.fillStyle = "rgba(232,230,225,.7)"; ctx.fillText(c.kicker.toUpperCase(), pad, y);
+      ctx.font = `600 ${11.5 * dpr}px ${sans}`; ctx.fillStyle = "rgba(232,230,225,.7)"; ctx.fillText(c.kicker.charAt(0).toUpperCase() + c.kicker.slice(1), pad, y);
       y += 32 * dpr;
       ctx.font = `400 ${26 * dpr}px ${serif}`; ctx.fillStyle = "#e8e6e1";
       for (const l of titleL) { ctx.fillText(l, pad, y); y += 32 * dpr; }
