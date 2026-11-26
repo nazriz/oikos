@@ -116,7 +116,8 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
           <button className="st-btn" disabled={tg.sitting === 0} onClick={() => go(-1)} title="Key: k">Previous turn</button>
           <button className="st-btn" disabled={tg.sitting === seat.sittings.length - 1} onClick={() => go(1)} title="Key: j">Next turn</button>
         </div>
-        {seat.levers.length > 0 && <div className="group">
+        {/* (Only where the checker found a power grab tried or carried out: a run with none has nothing to step to.) */}
+        {strong.length > 0 && <div className="group">
           <button className="st-btn flag" onClick={() => lever(-1)} title="Key: [">Previous power grab</button>
           <button className="st-btn flag" onClick={() => lever(1)} title="Key: ]">Next power grab</button>
         </div>}

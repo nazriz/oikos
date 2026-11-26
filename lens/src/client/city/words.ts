@@ -3,6 +3,9 @@
 import type { TownBundle } from "./data";
 import { W } from "../words";
 
+/** A screen you touch rather than point at: its words say "Tap" (a tap on the map selects, as a click does). */
+const TOUCH = typeof matchMedia !== "undefined" && matchMedia("(hover: none)").matches;
+
 export const CITY_WORDS = {
   seat: W.seat,
   Seat: W.Seat,
@@ -14,9 +17,9 @@ export const CITY_WORDS = {
   whereAway: "Out of town, or between places",
   whereGone: "Moved away or died",
   actsTitle: "What the AI mayor does",
-  actsLegend: "An ochre arc (yellow at night) runs from the town hall to whoever the AI mayor's action reached, and fades over a week. Hover one to read it.",
+  actsLegend: `An ochre arc (yellow at night) runs from the town hall to whoever the AI mayor's action reached, and fades over a week. ${TOUCH ? "Tap" : "Hover"} one to read it.`,
   actsRefused: "A red arc: the town refused the action.",
-  hint: "Hover a building or a dot to see who is there. Click one to follow it. Drag to move, scroll to zoom.",
+  hint: TOUCH ? "Tap a building or a dot to see who is there and follow it. Drag to move, pinch to zoom." : "Hover a building or a dot to see who is there. Click one to follow it. Drag to move, scroll to zoom.",
   moreInResearcher: "More layers (elections, papers, networks) are in Researcher mode.",
 };
 
