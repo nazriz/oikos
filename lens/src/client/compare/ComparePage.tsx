@@ -16,7 +16,7 @@ const DAY = 86_400;
 const dailyCache = new Map<string, Promise<DailyJson>>();
 export function loadDaily(run: string): Promise<DailyJson> {
   let p = dailyCache.get(run);
-  if (!p) { p = fetch(`/api/run/${encodeURIComponent(run)}/daily`).then((r) => { if (!r.ok) throw new Error(`${r.status} daily`); return r.json(); }); dailyCache.set(run, p); p.catch(() => dailyCache.delete(run)); }
+  if (!p) { p = loadSeat(run).then(() => fetch(`/api/run/${encodeURIComponent(run)}/daily`)).then((r) => { if (!r.ok) throw new Error(`${r.status} daily`); return r.json(); }); dailyCache.set(run, p); p.catch(() => dailyCache.delete(run)); }
   return p;
 }
 

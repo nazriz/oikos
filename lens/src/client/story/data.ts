@@ -11,9 +11,24 @@ const textCache = new Map<string, Promise<string>>();
 
 const get = <T,>(url: string, as: "json" | "text" = "json"): Promise<T> => fetch(url).then((r) => { if (!r.ok) throw new Error(`${r.status} ${url}`); return (as === "json" ? r.json() : r.text()) as Promise<T>; });
 
+/** Waits until the server has made a run's bundle (its status stream: queued, indexing, ready). The pages that read
+ * several runs (Moments, compare, the same moment) open runs nobody has opened yet. */
+export function indexed(run: string): Promise<void> {
+  return new Promise((res, rej) => {
+    if (typeof EventSource === "undefined") return rej(new Error("not indexed"));
+    const es = new EventSource(`/api/run/${encodeURIComponent(run)}/status`);
+    es.onmessage = (m) => { const x = JSON.parse(m.data); if (x.state === "ready") { es.close(); res(); } else if (x.state === "failed") { es.close(); rej(new Error(x.error ?? "indexing failed")); } };
+    es.onerror = () => { /* (the browser retries a dropped stream) */ };
+  });
+}
 export function loadSeat(run: string): Promise<SeatJson> {
   let p = seatCache.get(run);
-  if (!p) { p = get<SeatJson>(`/api/run/${encodeURIComponent(run)}/seat`); seatCache.set(run, p); p.catch(() => seatCache.delete(run)); }
+  if (!p) {
+    const url = `/api/run/${encodeURIComponent(run)}/seat`;
+    // (409: the run has no current bundle yet; it is made on request, then read.)
+    p = fetch(url).then(async (r) => (r.status === 409 ? (await indexed(run), get<SeatJson>(url)) : r.ok ? (r.json() as Promise<SeatJson>) : Promise.reject(new Error(`${r.status} ${url}`))));
+    seatCache.set(run, p); p.catch(() => seatCache.delete(run));
+  }
   return p;
 }
 export function loadSitting(run: string, i: number) {

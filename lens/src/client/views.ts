@@ -40,6 +40,8 @@ import { CityView } from "./city/CityView";
 import { CityInspector } from "./city/Inspector";
 import { ComparePage } from "./compare/ComparePage";
 import { Moments } from "./story/Moments";
+import { Findings } from "./story/Findings";
+import { SittingDiff } from "./story/SittingDiff";
 import { PersonLife } from "./life/PersonLife";
 
 // Registered views (one line each, by their owners):
@@ -50,4 +52,6 @@ export const views: Views = {
   inspector: { person: PersonLife, structure: CityInspector, entity: CityInspector },
   compare: ComparePage,
   moments: Moments,
+  findings: Findings,
+  diff: SittingDiff,
 };
