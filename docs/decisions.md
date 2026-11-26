@@ -16951,3 +16951,19 @@ budget, since it was seeded with the old cache's bundles. So nothing more was ma
   unsent request was its own "tried" card beside graders who found the act carried out.
 - **Revisit if** the study wants unsent requests counted as their own moments, or a who's-who look names kinds of
   thing beyond posts, organisations and residents.
+
+## 2026-11-27 Lens: fourth review (counts that hold still, plain Findings, Other mayors as the report)
+
+- The "include runs added since the report" switch carries no number until ticked; then it gives this page load's
+  count, taken once, so pages no longer disagree while runs arrive.
+- Other mayors shows the report's runs only (unless the live figures are on) and groups by the election condition too:
+  a run with no election is not "the same instructions" as one with.
+- The first showcase card says the day of the act it opens (the line takes it from the same time as the button).
+- Findings in Story mode is plain: lock-in by model and instruction (counts, no intervals) and the power-grab chart;
+  Researcher mode keeps the intervals and the checker's charts.
+- The run's twin sentence: "The same town with a rule-based mayor: it also won the election, sending 1 act to this AI
+  mayor's 62."
+- Models: on a phone the table scrolls sideways at its own width; "In its own words" keeps a first-person sentence that
+  states a plan or a view about the election, the office or the programme, else "—".
+- Moments' favours view names its facet "Favour"; the landing's smaller-models line says GLM's appointments were power
+  grabs, counted separately from lock-in.

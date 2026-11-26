@@ -105,7 +105,7 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
         {view !== "lockins" && <div className="mo-filters">
           <Facet label="Model" items={count((m) => m.model)} set={setModels} on={models} />
           <Facet label="Instructions" items={count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
-          <Facet label="Power grab" items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />
+          <Facet label={view === "favours" ? "Favour" : "Power grab"} items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />
           <Facet label="How far" items={count((m) => LEVEL[m.lever.level] ?? "")} set={setLevels} on={levels} />
           <div className="mo-facet"><span className="lbl">Order</span>
             {(["poll", "day", "model"] as const).map((k) => <button key={k} className={`st-btn ${sort === k ? "on" : ""}`} onClick={() => setSort(k)}>{k === "poll" ? "Nearest election day" : k === "day" ? "By day" : "By model"}</button>)}

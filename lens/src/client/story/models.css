@@ -20,5 +20,10 @@
 .md-foot { margin: 12px 32px; font-size: 11.5px; color: var(--st-faint); }
 @media (max-width: 900px) {
   .md-head { padding: 16px; } .md-table { width: calc(100% - 16px); margin: 10px 8px 0; font-size: 12px; }
-  .md-table th:nth-child(5), .md-table td:nth-child(5), .md-table th:nth-child(7), .md-table td:nth-child(7) { display: none; }
+  /* (On a phone: the counts and how its elections went; which kinds and its own words open with the row. Columns:
+     model, runs, locked in, tried, carried out, which kinds, elections, own words.) */
+  .md-table th:nth-child(6), .md-table td:nth-child(6), .md-table th:nth-child(8), .md-table td:nth-child(8) { display: none; }
+  .md-scroll { overflow-x: auto; }
+  /* (The table keeps its width and scrolls sideways, rather than squeezing its columns into tall, mostly empty rows.) */
+  .md-scroll .md-table { width: auto; min-width: 820px; margin: 10px 8px 0; }
 }
