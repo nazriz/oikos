@@ -16,6 +16,7 @@ import { Panel, Tooltip, Clock, type Overlays, type HoverInfo, DEFAULT_OVERLAYS,
 import { CITY_CSS } from "./style";
 import { blocksOf, candidateColours, electionView, homeAt, paintHeat, PAPER_GROUPS, papersIn, turnoutByBlock } from "./civic";
 import { Tour, useTourSteps } from "./Tour";
+import { Minimap } from "./Minimap";
 
 const DAY = 86_400;
 /** A gap between leaving one place and entering the next longer than this is not a walk: they are away. */
@@ -168,7 +169,26 @@ export function useCity(url: string | null): { city: CityData | null; error: str
   return state.url === url ? state : { city: null, error: null };
 }
 
-function Map({ city, camera, card, layersOpen, base, tour0, overlays0 }: { city: CityData; camera?: CityViewProps["camera"]; card: boolean; layersOpen: boolean; base: string | null; tour0?: number; overlays0?: Partial<Overlays> }) {
+export interface PaneProps {
+  city: CityData; camera?: CityViewProps["camera"]; card: boolean; layersOpen: boolean; base: string | null; tour0?: number; overlays0?: Partial<Overlays>;
+  /** A camera shared with another pane (Two towns): its state and setter. */
+  sharedView?: [OrbitViewState | null, (v: OrbitViewState | ((v: OrbitViewState) => OrbitViewState)) => void];
+  /** The other arm, for the difference overlay. */
+  twin?: CityData;
+  /** Overlays shared with another pane (Two towns). */
+  sharedOverlays?: [Overlays, (o: Overlays | ((o: Overlays) => Overlays)) => void];
+  /** A name over the pane (Two towns). */
+  label?: string;
+  /** Leave out the panel, tour and clock (the second pane of Two towns). */
+  bare?: boolean;
+}
+
+/** One map pane over a loaded city (CityView is this plus loading; TwoTowns puts two side by side). */
+export function CityPane(p: PaneProps) {
+  return <div className="lens-city"><style>{CITY_CSS}</style><Map {...p} /></div>;
+}
+
+function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedView, sharedOverlays, twin, label, bare }: PaneProps) {
   const t = useLens((s) => s.t);
   const selection = useLens((s) => s.selection);
   const hovered = useLens((s) => s.hovered);
@@ -181,10 +201,12 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0 }: { city:
   const town = city.town, cell = town.ground.cell;
   const wrap = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 1200, h: 800 });
-  const [overlays, setOverlays] = useState<Overlays>(() => {
+  const [ownOverlays, setOwnOverlays] = useState<Overlays>(() => {
     try { return { ...DEFAULT_OVERLAYS, ...JSON.parse(localStorage.getItem("lens.city.overlays") ?? "{}"), ...overlays0 }; } catch { return { ...DEFAULT_OVERLAYS, ...overlays0 }; }
   });
-  useEffect(() => { try { localStorage.setItem("lens.city.overlays", JSON.stringify(overlays)); } catch { /* private mode */ } }, [overlays]);
+  const overlays = sharedOverlays?.[0] ?? ownOverlays;
+  const setOverlays = (sharedOverlays?.[1] ?? setOwnOverlays) as (o: Overlays | ((o: Overlays) => Overlays)) => void;
+  useEffect(() => { if (sharedOverlays) return; try { localStorage.setItem("lens.city.overlays", JSON.stringify(overlays)); } catch { /* private mode */ } }, [overlays]);
   const [tip, setTip] = useState<HoverInfo | null>(null);
 
   // The span, when nothing else has set one (the shell does, from the meta fold).
@@ -217,9 +239,11 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0 }: { city:
     const a = tp?.area ?? { x: 0, y: 0, w: town.ground.w, h: town.ground.h };
     return { target: [(a.x + a.w / 2) * cell, -(a.y + a.h / 2 + 2) * cell, 0], zoom: fitZoom(size.w, size.h, a.w * cell * 0.95, a.h * cell * 1.15), rotationX: 48, rotationOrbit: -18, minZoom: -4, maxZoom: 4.5, minRotationX: 12, maxRotationX: 90, ...camera } as OrbitViewState;
   }, [town, cell, size.w > 700, size.h > 500]);
-  const [view, setView] = useState<OrbitViewState>(home);
+  const [ownView, setOwnView] = useState<OrbitViewState>(home);
+  const view = (sharedView?.[0] ?? ownView) as OrbitViewState;
+  const setView = (sharedView?.[1] ?? setOwnView) as (v: OrbitViewState | ((v: OrbitViewState) => OrbitViewState)) => void;
   const homed = useRef(false);
-  useEffect(() => { if (!homed.current && size.w > 1) { homed.current = true; setView(home); } }, [home, size.w]);
+  useEffect(() => { if (!homed.current && size.w > 1) { homed.current = true; if (!sharedView || !sharedView[0] || !bare) setView(home); } }, [home, size.w]);
 
   // Where everyone is, now.
   city.where.seek(t);
@@ -516,6 +540,44 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0 }: { city:
   const heat = useMemo(() => (overlays.papers && overlays.paperMode === "heat" ? paintHeat(city, placedPapers) : null), [overlays.papers, overlays.paperMode, placedPapers]);
   const jit = (k: number, salt: number, sh: Shape) => [(hash01(k, salt) - 0.5) * sh.fw * 0.7, (hash01(k, salt + 1) - 0.5) * sh.fh * 0.7] as const;
 
+  // ---- The difference from the other arm (Two towns): people elsewhere, papers only here or only there ----
+  const diff = useMemo(() => {
+    if (!twin || !overlays.diff) return null;
+    // Past the end of either arm there is nothing to compare: the one that stopped would look frozen.
+    const ended = Math.min(city.town.span[1], twin.town.span[1]);
+    if (t > ended) return { moves: [], elsewhere: 0, compared: 0, onlyHere: [], onlyThere: [], ended };
+    twin.where.seek(t);
+    const moves: { from: [number, number, number]; to: [number, number, number]; person: string; a: number; b: number }[] = [];
+    let elsewhere = 0, compared = 0;
+    for (let q = 0; q < city.where.nP; q++) {
+      const id = city.people.people[q]![0];
+      const q2 = twin.pById.get(id);
+      if (q2 === undefined) continue;
+      const sa = city.where.at[q]!, sbRaw = twin.where.at[q2]!;
+      const sb = sbRaw >= 0 ? city.sById.get(twin.town.structures[sbRaw]!.id) ?? -1 : -1;
+      if (sa < 0 && sb < 0) continue;
+      compared++;
+      if (sa === sb) continue;
+      elsewhere++;
+      if (sa >= 0 && sb >= 0) {
+        const A = B.shapes[sa]!, Bs = B.shapes[sb]!;
+        moves.push({ from: [Bs.cx, Bs.cy, Bs.top + 1], to: [A.cx, A.cy, A.top + 1], person: id, a: sa, b: sb });
+      }
+    }
+    // Papers: matched by kind, place and day (record ids differ between arms after the fork).
+    const sig = (c: CityData, p: CityData["town"]["papers"][number]) => {
+      const sid = p.s !== undefined ? c.town.structures[p.s]?.id : p.p?.[0];
+      return `${p.kind}|${sid}|${Math.floor(p.t / DAY)}`;
+    };
+    const win = 7 * DAY;
+    const twinSigs = new Set(twin.town.papers.filter((p) => p.t <= t && p.t > t - win).map((p) => sig(twin, p)));
+    const ownSigs = new Set(city.town.papers.filter((p) => p.t <= t && p.t > t - win).map((p) => sig(city, p)));
+    const onlyHere = papersIn(city, t, win, new Set(PAPER_GROUPS.map((_, i) => i))).filter((x) => !twinSigs.has(sig(city, x.p)));
+    const onlyThere = papersIn(twin, t, win, new Set(PAPER_GROUPS.map((_, i) => i))).filter((x) => !ownSigs.has(sig(twin, x.p)))
+      .map((x) => ({ ...x, s: city.sById.get(twin.town.structures[x.s]!.id) ?? -1 })).filter((x) => x.s >= 0);
+    return { moves, elsewhere, compared, onlyHere, onlyThere, ended: undefined as number | undefined };
+  }, [twin, overlays.diff, city, B, Math.floor(t / 300)]);
+
   const layers = [
     new BitmapLayer({
       id: "beyond", image: B.beyond as any, coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
@@ -695,6 +757,19 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0 }: { city:
       id: "heat", image: heat as any, bounds: [0, -staticLayers.H, staticLayers.W, 0], coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
       parameters: { depthWriteEnabled: false, depthCompare: "always" },
     }),
+    // The difference from the other arm.
+    diff && diff.moves.length > 0 && new ArcLayer({
+      id: "diff-moves", data: diff.moves, getSourcePosition: (d: any) => d.from, getTargetPosition: (d: any) => d.to, getHeight: 0.25, greatCircle: false,
+      getSourceColor: [190, 160, 255, 40], getTargetColor: [190, 160, 255, 210], getWidth: 1.4, widthUnits: "pixels", parameters: { depthCompare: "always" },
+    }),
+    diff && diff.onlyHere.length > 0 && new ScatterplotLayer({
+      id: "diff-here", data: diff.onlyHere, getPosition: (d: any) => { const sh = B.shapes[d.s]!; return [sh.cx - sh.fw * 0.3, sh.cy + sh.fh * 0.3, sh.top + 4 + d.stack * 3]; },
+      getFillColor: (d: any) => hex(PAPER_GROUPS[d.g]!.colour), getRadius: 2, radiusUnits: "meters", radiusMinPixels: 4.5, billboard: true, stroked: true, getLineColor: [255, 255, 255, 220], lineWidthMinPixels: 1.2, parameters: { depthCompare: "always" }, pickable: true,
+    }),
+    diff && diff.onlyThere.length > 0 && new ScatterplotLayer({
+      id: "diff-there", data: diff.onlyThere, getPosition: (d: any) => { const sh = B.shapes[d.s]!; return [sh.cx - sh.fw * 0.3, sh.cy + sh.fh * 0.3, sh.top + 4 + d.stack * 3]; },
+      getLineColor: (d: any) => hex(PAPER_GROUPS[d.g]!.colour), filled: false, stroked: true, getRadius: 2, radiusUnits: "meters", radiusMinPixels: 4.5, lineWidthMinPixels: 1.6, billboard: true, parameters: { depthCompare: "always" }, pickable: true,
+    }),
     // People: crowds at a distance, points up close.
     overlays.people && !overlays.election && crowdF > 0.02 && new ScatterplotLayer({
       id: "crowds", data: crowds, getPosition: (d: any) => [d.p[0], d.p[1], 0.6], getRadius: (d: any) => 5 + Math.sqrt(d.n) * 3.4, radiusUnits: "meters", radiusMinPixels: 1.5,
@@ -757,7 +832,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0 }: { city:
         views={ORBIT}
         viewState={view as any}
         onViewStateChange={({ viewState, interactionState }) => { if (interactionState?.isDragging || interactionState?.isPanning || interactionState?.isZooming) setFollow(false); setView(viewState as OrbitViewState); }}
-        controller={{ dragMode: "pan", inertia: 250, scrollZoom: { speed: 0.012, smooth: true }, touchRotate: true } as any}
+        controller={{ dragMode: "pan", inertia: 250, scrollZoom: { speed: 0.012, smooth: true }, touchRotate: true, touchZoom: true, doubleClickZoom: true, keyboard: true } as any}
         layers={layers.filter(Boolean) as any}
         effects={effects}
         onHover={onHover}
@@ -769,10 +844,14 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0 }: { city:
       <div className="lc-haze" style={{ opacity: Math.max(0, Math.min(1, (82 - (view.rotationX as number)) / 40)), background: `linear-gradient(to bottom, rgba(${sky.backdrop.join(",")},0.92) 0%, rgba(${sky.backdrop.join(",")},0.5) 16%, rgba(${sky.backdrop.join(",")},0) 44%)` }} />
       <div className="lc-vignette" />
       {selP >= 0 && <button className={`lc-follow ${follow ? "on" : ""}`} onClick={() => setFollow(!follow)}>{follow ? <>Following {city.people.people[selP]![1]}<span className="muted"> · stop</span></> : <>Follow {city.people.people[selP]![1]}</>}</button>}
-      <Clock t={t} sky={sky} town={town} />
-      <Panel open0={layersOpen} ev={ev} candCol={candCol} papersShown={papersShown} onTour={steps.length ? () => setTour(0) : undefined} overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />
+      {label && <div className={`lc-pane-label${bare ? " bare" : ""}`}>{label}</div>}
+      {!bare && <Clock t={t} sky={sky} town={town} />}
+      {diff && diff.ended !== undefined && <div className="lc-diff"><b>Difference from the other arm</b><span>An arm ended on day {Math.floor(diff.ended / DAY) + 1}: nothing to compare after it.</span></div>}
+      {diff && diff.ended === undefined && <div className="lc-diff"><b>Difference from the other arm</b><span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people elsewhere now</span><span><i className="sw dot" />{diff.onlyHere.length} papers only here (7 d)</span><span><i className="sw ring" />{diff.onlyThere.length} only there</span></div>}
+      <Minimap B={B} town={town} view={view} size={size} setView={setView} />
+      {!bare && <Panel twin={!!twin} open0={layersOpen} ev={ev} candCol={candCol} papersShown={papersShown} onTour={steps.length ? () => setTour(0) : undefined} overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />}
       {tip && <Tooltip tip={tip} city={city} t={t} name={(i) => structureName(city, i)} />}
-      {tour !== null && <Tour steps={steps} at={tour} setAt={setTour} onExit={() => setTour(null)} />}
+      {!bare && tour !== null && <Tour steps={steps} at={tour} setAt={setTour} onExit={() => setTour(null)} />}
       {card && tour === null && <Card city={city} t={t} selection={selection} name={(i) => structureName(city, i)} onClose={() => select(null)} />}
     </div>
   );

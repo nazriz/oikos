@@ -16195,3 +16195,23 @@ another day): what each thought and said and what it did, one search marking eve
   to the seat's busiest days. It does not set the shared selection, so story's reader does not open over the map; it
   lights its acts on the map only. **Revisit if** the lead wants the tour to drive the story rail too: then select
   the sitting.
+
+## 2026-11-26 Lens city: two towns, the phone, the mini-map
+
+**Decided:**
+- **Two towns (`TwoTowns`, hosted by story's ComparePage)** puts the two arms side by side: one camera, one clock and
+  one set of layers. The first pane draws its difference from the second:
+  - Violet arcs: people who are in a different building in the other arm at this moment (matched by person id, and
+    structures by id).
+  - Papers of the last 7 days that only one arm has. They are matched by kind, place and day, because record ids
+    differ between arms after the fork.
+
+  Past the end of either arm the overlay says so instead of comparing a frozen town. On the sample pair (GLM seed 7
+  and its code twin) whereabouts are identical to the end of the GLM arm. The seat's acts changed papers, not where
+  people were. That is shown as it is.
+- **Phone.** The Layers panel opens as a bottom sheet with a handle, larger rows and switches. The pill and clock are
+  compact, and the mini-map moves to the top right. Touch zoom, rotation and double-tap zoom are on.
+- **Mini-map.** When zoomed in (zoom > 0.9), the whole district appears in a corner, with the town's outline and the
+  ground the camera sees: the screen's corners cast onto z = 0 and clamped near the horizon. Clicking or dragging on
+  it moves the camera.
+- The loader waits on `/status` when a bundle answers 409, as story's does.
