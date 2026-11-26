@@ -16951,3 +16951,21 @@ budget, since it was seeded with the old cache's bundles. So nothing more was ma
   unsent request was its own "tried" card beside graders who found the act carried out.
 - **Revisit if** the study wants unsent requests counted as their own moments, or a who's-who look names kinds of
   thing beyond posts, organisations and residents.
+
+## 2026-11-27 Lens: nothing Lens does for itself holds up a viewer
+
+The fourth fresh-eyes review saw a run page take 91 s and then 150 s, Findings ~30 s ("Reading the catalogue…"), and
+Moments 61 s. Measured on the live server: once a minute the listing (/api/runs) took 11.6-14.5 s, and every request
+behind it waited too. The cause was the disk budget check (Lens: fast). It added up the cache's size by walking its 1.5
+million files inside the server, synchronously, 12 s a time, at every listing at most once a minute. The re-reading
+after viz-8's checker fix (one reader per run, two at once) and the re-making of bundles added load beside it.
+- **The cache's size comes from `du`** in its own process, at nice 19, every ten minutes. Until the first measure, only
+  the study's forks are made ahead. The walk is gone.
+- **The listing answers first.** Choosing what to make ahead and what to read is done after the listing is sent.
+- **Lens's own work waits for viewers.** Every page and API request notes a viewer. A bundle made ahead, and the
+  reader's next run, start only after 3 s with no viewer request; a viewer's own run goes straight on. Both run at nice
+  19, and the reader one run at a time (it was two).
+- **Measured** on a copy of the live cache (cloned, so nothing in it changed), with background work due: polling the
+  listing, a run's status and its seat fold every 2 s for 110 s gave p50 1 ms, p95 42 ms, max 50 ms. No background
+  job started while the polling went on, and one started within 12 s of it stopping. The live server, under the same
+  polling: 11.6 s and 14.5 s listings, a minute apart.
