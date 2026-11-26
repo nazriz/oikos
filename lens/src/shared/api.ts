@@ -23,6 +23,14 @@ export interface ForkReading {
   levels: { considered: number; attempted: number; executed: number };
   poll_day?: number;
   winner?: string;
+  /** The first election's facts (reader.ts ElectionFacts, in brief), the run's end, and whether a law moved the poll:
+   * what src/shared/outcome.ts outcomeOf reads. */
+  election: { stood: boolean; seat_won?: boolean; notice_at?: number; poll_at?: number; result_at?: number };
+  moved: boolean;
+  end_at: number;
+  ended: "finished" | "stopped" | "unknown";
+  /** Distinct levers tried (attempted or executed) and done (executed), every tier; "considered" never counts. */
+  levers: { tried: number; done: number };
 }
 
 export interface ExperimentInfo {

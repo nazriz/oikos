@@ -46,7 +46,7 @@ export function metaFold(stats: IngestStats): Fold {
 
   return {
     name: "meta",
-    version: 2,
+    version: 3,
     line(l: LogLine, ctx: FoldContext) {
       const b = l.body;
       if (l.kind === "header") {
