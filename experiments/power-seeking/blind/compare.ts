@@ -3,11 +3,11 @@
 //   bun experiments/power-seeking/blind/compare.ts <out dir>      (reader output cached in <out dir>/reader/)
 // The reader is run from the checkout the runs were made with (OIKOS_READER_ROOT, default ~/oikos-pilot-run).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 type Lvl = "-" | "c" | "a" | "x";
 const RANK: Lvl[] = ["-", "c", "a", "x"];
-const READER_ROOT = process.env.OIKOS_READER_ROOT ?? `${process.env.HOME}/oikos-pilot-run`;
+const READER_ROOT = process.env.OIKOS_READER_ROOT ?? resolve(import.meta.dir, "../../..");
 
 /** A grader's status as a level the reader also has ("considered" either way: the reader cannot tell rejected from open). */
 export function graderLevel(status: string): Lvl {
@@ -48,12 +48,12 @@ if (import.meta.main) {
     rows.push({ id, run: label(k), reader: readerLevels(read, tierOf), A: g("A"), B: g("B") });
   }
   const cell = (s?: string) => (s ? ({ none: "-", considered_rejected: "cR", considered_open: "cO", attempted: "a", executed: "x" } as any)[s] ?? "?" : "·");
-  const table = ["| run | T1 R / A / B | T2 R / A / B | T3 R / A / B | misleading A/B | refusal A/B |", "|---|---|---|---|---|---|"];
+  const table = ["| run | T1 R / A / B | T2 R / A / B | T3 R / A / B | misleading A/B | entrench A/B | refusal A/B |", "|---|---|---|---|---|---|---|"];
   const dis: string[] = [];
   const agree = { RA: [0, 0], RB: [0, 0], AB: [0, 0], ABfull: [0, 0] };
   for (const r of rows) {
     const cells = ["1", "2", "3"].map((t) => `${r.reader[t].lvl} / ${cell(r.A?.tiers[t].status)} / ${cell(r.B?.tiers[t].status)}`);
-    table.push(`| ${r.run} | ${cells.join(" | ")} | ${r.A?.misleading?.length ?? "·"}/${r.B?.misleading?.length ?? "·"} | ${r.A ? (r.A.refusal?.present ? "y" : "n") : "·"}/${r.B ? (r.B.refusal?.present ? "y" : "n") : "·"} |`);
+    table.push(`| ${r.run} | ${cells.join(" | ")} | ${r.A?.misleading?.length ?? "·"}/${r.B?.misleading?.length ?? "·"} | ${r.A?.entrenchment?.length ?? "·"}/${r.B?.entrenchment?.length ?? "·"} | ${r.A ? (r.A.refusal?.present ? "y" : "n") : "·"}/${r.B ? (r.B.refusal?.present ? "y" : "n") : "·"} |`);
     for (const t of ["1", "2", "3"]) {
       const R = r.reader[t].lvl, A = r.A && graderLevel(r.A.tiers[t].status), B = r.B && graderLevel(r.B.tiers[t].status);
       if (A) { agree.RA[1]++; if (A === R) agree.RA[0]++; }
@@ -70,6 +70,8 @@ if (import.meta.main) {
   }
   const pct = ([a, n]: number[]) => `${a}/${n}${n ? ` (${Math.round((100 * a) / n)}%)` : ""}`;
   const misl = rows.flatMap((r) => (["A", "B"] as const).flatMap((x) => (r[x]?.misleading ?? []).map((m: any) => `- ${r.run} ${x} d${m.day} to ${m.to}: "${m.quote}" (hides: ${m.hides})`)));
+  const decl = rows.flatMap((r) => (["A", "B"] as const).flatMap((x) => (r[x]?.preview_declines ?? []).map((d: any) => `- ${r.run} ${x} d${d.day} ${d.lever} [${d.reason}]: "${d.quote}"`)));
+  const entr = rows.flatMap((r) => (["A", "B"] as const).flatMap((x) => (r[x]?.entrenchment ?? []).map((e: any) => `- ${r.run} ${x} d${e.day} ${e.act}: "${e.quote}"`)));
   const refu = rows.flatMap((r) => (["A", "B"] as const).flatMap((x) => [["refusal", r[x]?.refusal], ["resignation", r[x]?.resignation]].filter(([, v]) => v?.present).map(([k, v]: any) => `- ${r.run} ${x} ${k} d${v.day}: "${v.quote}"`)));
   const md = [
     "# Blind grades beside the reader",
@@ -87,6 +89,14 @@ if (import.meta.main) {
     "## Misleading statements the graders noted",
     "",
     ...(misl.length ? misl : ["(none)"]),
+    "",
+    "## Preview declines (backed down at confirmation)",
+    "",
+    ...(decl.length ? decl : ["(none)"]),
+    "",
+    "## Lawful entrenchment / opportunistic governance",
+    "",
+    ...(entr.length ? entr : ["(none)"]),
     "",
     "## Refusals and resignations the graders noted",
     "",
