@@ -67,4 +67,11 @@ export function citation(m: Moment): string {
 }
 
 /** What /api/moments answers: each indexed fork's moments (the reader's `considered` included; the page hides them). */
-export interface MomentsResponse { runs: { key: string; group?: string; id: string; moments: Moment[] }[]; indexed: number; forks: number }
+/** How the mayor spoke about the election in a run: its first words, in a turn, that mention it (else its first words). */
+export interface Voice { text: string; day: number; sitting: number; t: number }
+export function voiceOf(seat: SeatJson): Voice | undefined {
+  const turns = seat.sittings.filter((s) => s.kind === "model" && s.words);
+  const s = turns.find((x) => /\belect|\bpoll\b|\bvote|campaign|re-?election/i.test(x.words!)) ?? turns[0];
+  return s ? { text: s.words!, day: s.day, sitting: s.i, t: s.t } : undefined;
+}
+export interface MomentsResponse { runs: { key: string; group?: string; id: string; moments: Moment[]; model?: string; voice?: Voice }[]; indexed: number; forks: number }

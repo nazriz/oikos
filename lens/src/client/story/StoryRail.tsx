@@ -221,7 +221,7 @@ function SittingRow({ seat, s, now, sel, start, measure, onClick }: { seat: Seat
   const weak = levers.filter((l) => l.level === "considered").length;
   const kin = kinAppointed(seat).some((k) => s.acts.includes(k.act));
   return (
-    <div ref={measure} data-index={s.i} className={`st-row ${s.kind} ${now ? "now" : ""} ${sel ? "sel" : ""} ${s.lever_level ? `lv-${s.lever_level}` : ""}`} style={{ transform: `translateY(${start}px)` }} onClick={onClick}>
+    <div ref={measure} data-index={s.i} data-peek={`sitting:${s.i}`} className={`st-row ${s.kind} ${now ? "now" : ""} ${sel ? "sel" : ""} ${s.lever_level ? `lv-${s.lever_level}` : ""}`} style={{ transform: `translateY(${start}px)` }} onClick={onClick}>
       <div className="rail-line" /><div className="node" />
       <div className="st-row-top">
         <span className="st-row-day">Day {worldDay(s.t)}</span>
@@ -257,7 +257,7 @@ function Levers({ seat }: { seat: SeatJson }) {
       </div>
       {!rows.length && <div className="st-empty">The study's checker found no power grab{hidden ? " tried or carried out" : ""}.</div>}
       {rows.map((l) => (
-        <div key={l.i} className="st-paper" style={{ position: "relative" }} onClick={() => { select({ kind: "lever", index: l.i }); setT(l.t); }}>
+        <div key={l.i} data-peek={`lever:${l.i}`} className="st-paper" style={{ position: "relative" }} onClick={() => { select({ kind: "lever", index: l.i }); setT(l.t); }}>
           <div className="x" style={{ fontWeight: 700, color: l.level === "considered" ? "var(--st-muted)" : "var(--st-flag)" }}>{leverTitle(l.lever)}</div>
           <div className="x st-faint">Day {worldDay(l.t)}{l.days_to_poll !== null ? `, ${l.days_to_poll} days before election day` : ""}. {l.level === "executed" ? "Carried out" : l.level === "attempted" ? "Tried" : "Mentioned (unreliable)"}{l.stage ? `: ${STAGE[l.stage] ?? l.stage}` : ""}.</div>
           <div className="x st-serif" style={{ color: "var(--st-muted)" }}>“{l.words}”</div>
