@@ -63,4 +63,6 @@ test("making a run's bundle changes nothing in the run's folder", async () => {
   expect(snapshot(runDir)).toEqual(before);
   // Lens's own files are all under its views folder.
   expect(readdirSync(runs).sort()).toEqual(["lens-ro"]);
-}, 60_000);
+  // (Three seconds on a quiet machine; the mock run it makes first slows with the machine's load, as other agents' runs
+  // share it: the suite's own limit, not a tighter one.)
+}, 120_000);
