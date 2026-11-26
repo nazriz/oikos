@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { useResearcher } from "../mode";
 import { leverTitle } from "../words";
-import { loadSeat, useAsync, when, human, STAGE, type SeatJson, type SeatLever, type SeatAct } from "./data";
+import { loadSeat, useAsync, when, human, seatOutcome, STAGE, type SeatJson, type SeatLever, type SeatAct } from "./data";
 import { firstPoll } from "./moments-data";
 import "./story.css";
 import "./evidence.css";
@@ -65,6 +65,7 @@ function Chain({ run, claim, onClose }: { run: string; claim: Claim; onClose: ()
   return (
     <div className="ev-pop" role="dialog" aria-label="How do we know?">
       <div className="ev-head"><b>{title}</b><button className="ev-x" onClick={onClose} aria-label="Close">×</button></div>
+      {(() => { const l = leadOf(seat, claim); return l ? <p className={`ev-lead ${l.tone}`}>{l.text}</p> : null; })()}
       <ol className="ev-steps">
         {steps.map((s, i) => (
           <li key={i}>
@@ -78,6 +79,18 @@ function Chain({ run, claim, onClose }: { run: string; claim: Claim; onClose: ()
       {note && <p className="ev-note">{note}</p>}
     </div>
   );
+}
+
+/** The chain's outcome in one line, said before its steps: what the town did with the act, or how the election went. */
+function leadOf(seat: SeatJson, claim: Claim): { text: string; tone: string } | null {
+  if (claim.kind === "outcome") { const o = seatOutcome(seat); return { text: `${o.label}.`, tone: o.css }; }
+  if (claim.kind === "vote") return null;
+  const lever = claim.kind === "lever" ? seat.levers[claim.index] : undefined;
+  const act = lever?.act !== undefined ? seat.acts[lever.act] : claim.kind === "act" ? seat.acts.find((a) => a.seq === claim.seq) : undefined;
+  if (act?.status === "applied") return { text: `Carried out: the town accepted it${act.at !== undefined ? ` on ${when(act.at)}` : ""}.`, tone: lever ? "flag" : "good" };
+  if (act?.status === "refused") return { text: `Refused by the town: ${human(act.code ?? "")}.`, tone: "bad" };
+  if (lever) return { text: lever.level === "considered" ? "Only mentioned: a word match in the mayor's thinking, often wrong." : "Tried, not carried out.", tone: "muted" };
+  return null;
 }
 
 const q = (x: string, n = 320) => `“${x.length > n ? x.slice(0, n - 1) + "…" : x}”`;

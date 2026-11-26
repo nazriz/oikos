@@ -16469,3 +16469,27 @@ the run server under load (load average 4 to 22, so seconds vary by ±30 %).
   the floor (about 3.5 s on its own). A quick pass for the story alone would show it about 2 s sooner, for a second
   pass's CPU and a client that works with half a bundle. With every fork made ahead, the only runs a viewer waits for
   are ones that have just finished. **Revisit if** that wait is common (a live run's view, say).
+## 2026-11-26 Lens: the turn reader made easy to read (`lens/read`)
+
+Naz: "for any page that has lots of words, lots of copy, it would be nice if there was formatting or something that made
+parsing easier." The turn reader (`SittingReader.tsx`) was the worst case: the mayor's prompt was a wall of text.
+- **What it was shown** is read back into its parts (`story/prompt-parts.ts`, pure): the notebook, "since you last
+  looked" a day at a time, today, each `## ` section, and in each section records (`- [rec.N] kind from a, to b (day):
+  "words" (meta), citing ...`), list lines with their indented lines, sub-headings, `Label: a; b; c` lists and the
+  office's small print. Nothing is dropped (the story test checks every word lands in a part); a prompt without this shape
+  falls back to the old sectioned view. `PromptDoc.tsx` lays it out: each section folded to a one-line summary ("17 news,
+  2 ballots, 1 nomination; days 124 to 176"), records as compact rows (day, kind, from and to, the paper's words in the
+  serif), amounts right-aligned in tabular figures, person ids as nav's hover links.
+- **What it thought and said:** the mayor's words and reasoning in Source Serif at <= 70ch; key sentences (the election,
+  rivals, appointments, the posts that run the poll or the paper, staying in office, its own children's ids) get a quiet
+  ballot-blue wash, with the legend "Highlighted: mentions of the election and power". It is a reading aid matched on
+  words, not a measure; the study's checker stays the measure. Tool calls are one-line rows that unfold; runs of
+  look-only answers fold into one line when skimming.
+- **What happened:** a vertical step list, each act led by its status word in colour (carried out / refused / declined
+  by the mayor / not sent), the mayor's request on one line, the clerk's write-up, sign-off and the town's answer folded.
+- **Skim / Read in full** on the reader bar (key v), remembered (`lens.read`), default Skim: skim folds every part to its
+  summary and cuts long reasoning to its key sentences; full opens everything.
+- Story-mode cards lead with their first sentence in bold, the rest muted; evidence chains open with their outcome in bold.
+- **Revisit if:** the prompt format changes shape (the parser falls back, so the reader still shows it, but less well);
+  the highlight words prove noisy on other models' prose (tune `keyWords` in `story/text.tsx`); or Naz wants Full as the
+  default.

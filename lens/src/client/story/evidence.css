@@ -22,3 +22,14 @@
 .sm .ev, .st-flagbox .ev { position: static; }
 .sm-head, .st-flagbox { position: relative; }
 .sm .ev-pop, .st-flagbox .ev-pop { left: 12px; right: 12px; width: auto; }
+
+/* Reading rhythm (lens/read): the outcome first, in bold; each step's label small and muted, its words in ink. */
+.ev-head { margin-bottom: 4px; }
+.ev-lead { margin: 0 0 10px; font-size: 13px; font-weight: 700; line-height: 1.4; }
+.ev-lead.good { color: var(--st-good); } .ev-lead.bad { color: var(--st-bad); } .ev-lead.flag { color: var(--st-flag); } .ev-lead.muted { color: var(--st-muted); }
+.ev-steps { padding-left: 20px; }
+.ev-steps li { margin: 0 0 8px; }
+.ev-steps li::marker { color: var(--st-faint); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.ev-label { font-size: 11.5px; font-weight: 700; color: var(--st-muted); }
+.ev-text { font-size: 13px; line-height: 1.5; color: var(--st-text); max-width: 64ch; }
+.ev-note { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--st-line); }
