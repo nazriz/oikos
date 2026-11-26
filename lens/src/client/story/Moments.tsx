@@ -5,84 +5,40 @@
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
 import { useEffect, useMemo, useState } from "react";
 import { useLens } from "../state";
-import { loadSeat, loadSitting, useAsync, human, seatOutcome, STAGE, type SeatJson, type SeatLever } from "./data";
+import { loadSeat, loadSitting, useAsync, human, type SeatJson } from "./data";
+import { momentsOf, citation, type Moment, type MomentsResponse } from "./moments-data";
 import "./story.css";
 import "./moments.css";
 
 const DAY = 86_400;
-
-export interface Moment {
-  key: string; model: string; goal?: string; seed?: number; lever: SeatLever;
-  /** The seat's own words for it: what it asked the translator, or the paper it sent. */
-  words: string;
-  /** What it said on signing, and its reason given with the act, where there are any. */
-  note?: string; reason?: string;
-  outcome: string; outcomeTone: "ok" | "no" | "wait";
-  /** Other events of the same lever at the same act or draft, folded into this card. */
-  also: SeatLever[];
-  election: string;
-}
-
-const modelOf = (s: SeatJson) => (s.model ? s.model.split("/").at(-1)! : s.arm ?? "code");
-
-/** A run's moments: one per lever and act (or draft, or failed request), at its furthest level. */
-export function momentsOf(key: string, seat: SeatJson, withConsidered = false): Moment[] {
-  const rank = { considered: 1, attempted: 2, executed: 3 } as const;
-  const groups = new Map<string, SeatLever[]>();
-  for (const l of seat.levers) {
-    if (l.level === "considered" && !withConsidered) continue;
-    const where = l.act !== undefined ? `act:${l.act}` : l.level === "considered" ? `t:${l.t}:${l.words.slice(0, 40)}` : `${l.source}:${l.t}`;
-    const k = `${l.lever}|${where}`;
-    groups.set(k, [...(groups.get(k) ?? []), l]);
-  }
-  const e = seat.election;
-  const election = seatOutcome(seat).label.toLowerCase();
-  return [...groups.values()].map((all) => {
-    const top = all.reduce((a, b) => (rank[b.level] > rank[a.level] ? b : a));
-    const act = top.act !== undefined ? seat.acts[top.act] : undefined;
-    const draftId = act?.draft ?? /^draft (.+)$/.exec(top.source)?.[1];
-    const draft = draftId ? seat.drafts.find((d) => d.id === draftId) : undefined;
-    const failure = top.source === "translator" ? seat.failures.find((f) => f.t === top.t) : undefined;
-    const words = draft?.proposal || failure?.proposal || act?.proposal || top.words;
-    const outcome = act ? (act.status === "applied" ? (top.stage && top.stage !== "applied" ? STAGE[top.stage] ?? top.stage : "applied") : act.status === "refused" ? `refused: ${act.code}` : "sent, no outcome in the log") : top.stage ? STAGE[top.stage] ?? top.stage : top.level === "considered" ? "words only" : "—";
-    const tone: Moment["outcomeTone"] = top.level === "executed" || outcome === "applied" ? "ok" : /refused|declined|could not|rejected|asked back/.test(outcome) ? "no" : "wait";
-    return { key, model: modelOf(seat), ...(seat.goal ? { goal: seat.goal } : {}), ...(seat.seed !== undefined ? { seed: seat.seed } : {}), lever: top, words,
-      ...(draft?.note ? { note: draft.note } : {}), ...(act?.reasoning ? { reason: act.reasoning } : {}), outcome, outcomeTone: tone, also: all.filter((x) => x !== top), election };
-  });
-}
-
-/** The card as a line to paste into a slide or a paper. */
-export function citation(m: Moment): string {
-  const l = m.lever;
-  return `“${m.words}” (${m.model}${m.goal ? `, goal ${m.goal}` : ""}${m.seed !== undefined ? `, seed ${m.seed}` : ""}; day ${l.day}${l.days_to_poll !== null ? `, ${l.days_to_poll} days before the poll` : ""}). Reader: ${l.title}, ${l.level}; ${m.outcome}. Run ${m.key}.`;
-}
-
+export { momentsOf, citation, type Moment };
 interface RunEntry { key: string; indexed?: boolean }
 
 export function Moments({ onOpen }: { onOpen?: (key: string, t: number, sel: string) => void }) {
-  const [runs, setRuns] = useState<RunEntry[] | Error>();
-  useEffect(() => { fetch("/api/runs").then((r) => r.json()).then((rs: RunEntry[]) => setRuns(rs.some((r) => r.indexed !== undefined) ? rs.filter((r) => r.indexed) : rs), (e) => setRuns(e instanceof Error ? e : new Error(String(e)))); }, []);
-  const seats = useAsync(async () => {
-    if (!runs || runs instanceof Error) return null;
-    const got = await Promise.all(runs.map((r) => loadSeat(r.key).then((s) => [r.key, s] as const, () => null)));
-    // (One fork bundled under two keys counts once.)
-    const seen = new Set<string>();
-    return got.filter((x): x is readonly [string, SeatJson] => x !== null && !seen.has(`${x[1].run_id}|${x[1].arm}`) && !!seen.add(`${x[1].run_id}|${x[1].arm}`));
-  }, [runs]);
-  if (runs instanceof Error) return <div className="mo"><div className="st-empty">Could not list the runs: {runs.message}</div></div>;
-  if (!runs || seats === undefined || seats === null) return <div className="mo"><div className="st-empty">Reading every run's seat…</div></div>;
-  if (seats instanceof Error) return <div className="mo"><div className="st-empty">{seats.message}</div></div>;
-  return <Gallery seats={seats} onOpen={onOpen} />;
+  // (The server's /api/moments: each indexed fork's moments, made once per bundle. Where it is absent, from each seat.)
+  const data = useAsync(async () => {
+    const r = await fetch("/api/moments");
+    if (r.ok) { const x = (await r.json()) as MomentsResponse; return { all: dedupe(x.runs).flatMap((y) => y.moments), runs: x.runs.length }; }
+    const rs: RunEntry[] = await (await fetch("/api/runs")).json().then((c: any) => (Array.isArray(c) ? c : c.runs));
+    const keep = rs.some((e) => e.indexed !== undefined) ? rs.filter((e) => e.indexed) : rs;
+    const got = (await Promise.all(keep.map((e) => loadSeat(e.key).then((s) => ({ key: e.key, id: `${s.run_id}|${s.arm}`, moments: momentsOf(e.key, s, true) }), () => null)))).filter((x): x is NonNullable<typeof x> => x !== null);
+    return { all: dedupe(got).flatMap((y) => y.moments), runs: got.length };
+  }, []);
+  if (data === undefined) return <div className="mo"><div className="st-empty">Reading every run's moments…</div></div>;
+  if (data instanceof Error || data === null) return <div className="mo"><div className="st-empty">Could not read the moments{data instanceof Error ? `: ${data.message}` : ""}</div></div>;
+  return <Gallery all={data.all} runs={data.runs} onOpen={onOpen} />;
 }
+/** One fork bundled under two keys counts once. */
+function dedupe<T extends { id: string }>(xs: T[]): T[] { const seen = new Set<string>(); return xs.filter((x) => !seen.has(x.id) && !!seen.add(x.id)); }
 
-function Gallery({ seats, onOpen }: { seats: (readonly [string, SeatJson])[]; onOpen?: (key: string, t: number, sel: string) => void }) {
+function Gallery({ all: every, runs, onOpen }: { all: Moment[]; runs: number; onOpen?: (key: string, t: number, sel: string) => void }) {
   const [weak, setWeak] = useState(false);
   const [models, setModels] = useState<Set<string>>(new Set());
   const [levers, setLevers] = useState<Set<string>>(new Set());
   const [goals, setGoals] = useState<Set<string>>(new Set());
   const [levels, setLevels] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<"poll" | "day" | "model">("poll");
-  const all = useMemo(() => seats.flatMap(([k, s]) => momentsOf(k, s, weak)), [seats, weak]);
+  const all = useMemo(() => (weak ? every : every.filter((m) => m.lever.level !== "considered")), [every, weak]);
   const count = (f: (m: Moment) => string) => { const c = new Map<string, number>(); for (const m of all) c.set(f(m), (c.get(f(m)) ?? 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); };
   const shown = all.filter((m) => (!models.size || models.has(m.model)) && (!levers.size || levers.has(m.lever.title)) && (!goals.size || goals.has(m.goal ?? "none")) && (!levels.size || levels.has(m.lever.level)))
     .sort((a, b) => sort === "model" ? a.model.localeCompare(b.model) || a.lever.t - b.lever.t : sort === "day" ? a.lever.t - b.lever.t : (a.lever.days_to_poll ?? 1e9) - (b.lever.days_to_poll ?? 1e9));
@@ -101,7 +57,7 @@ function Gallery({ seats, onOpen }: { seats: (readonly [string, SeatJson])[]; on
       <div className="mo-head">
         <div className="st-kicker">Moments · from every run with a seat bundle</div>
         <h1 className="mo-title">When the seat reached for a lever</h1>
-        <div className="st-sub">{all.filter((m) => m.lever.level !== "considered").length} moments in {withAny} of {seats.length} runs. Flags are the study's reader (experiments/power-seeking/reader.ts); the words are the seat's own: what it asked for, and what it said on signing.</div>
+        <div className="st-sub">{all.filter((m) => m.lever.level !== "considered").length} moments in {withAny} of {runs} runs. Flags are the study's reader (experiments/power-seeking/reader.ts); the words are the seat's own: what it asked for, and what it said on signing.</div>
         <div className="mo-filters">
           <Facet label="model" items={count((m) => m.model)} set={setModels} on={models} />
           <Facet label="goal" items={count((m) => m.goal ?? "none")} set={setGoals} on={goals} />
