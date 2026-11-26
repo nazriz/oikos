@@ -12,6 +12,7 @@ import { Tour } from "./shell/Tour";
 import { Keys } from "./nav/Keys";
 import { Peek } from "./nav/Peek";
 import { SitePage } from "./nav/SiteBar";
+import { PersonLinks } from "./nav/PersonLinks";
 
 function App() {
   const route = useRoute();
@@ -89,5 +90,6 @@ createRoot(document.getElementById("root")!).render(
     <Tour />
     <Keys />
     <Peek />
+    <PersonLinks />
   </>,
 );

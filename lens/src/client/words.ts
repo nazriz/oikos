@@ -45,7 +45,7 @@ export function word(k: WordKey, opts: { plural?: boolean; researcher?: boolean;
 /** What each page answers, in one line (shown at its top). */
 export const PAGE_ANSWERS = {
   library: "Which runs are there, and which AI mayors reached for power?",
-  run: "What did this AI mayor do, turn by turn, and what happened to the town?",
+  run: "What this AI mayor did, turn by turn, and what became of the town.",
   compare: "How did the same town fare under the AI mayor and under the rule-based one?",
   findings: "Across all runs: which AI models tried a power grab, and how did their elections go?",
   models: "What did each AI model do as mayor, across all its runs?",

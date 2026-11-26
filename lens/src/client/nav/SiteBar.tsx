@@ -6,6 +6,7 @@ import { runHref } from "../router";
 import { ThemeToggle } from "../theme";
 import { HelpButtons, ModeSwitch, SiteLinks } from "../shell/Shell";
 import { getCatalogue } from "./RunNav";
+import { useLens } from "../state";
 import { runLabel } from "./nav";
 import "./nav.css";
 
@@ -26,6 +27,15 @@ export function useEntry(key: string | undefined): RunEntry | undefined {
 /** The page under a site bar: `run` is the run the page is about (a link back to it), `here` names the page. */
 export function SitePage({ run, here, children }: { run?: string; here: string; children: ReactNode }) {
   const entry = useEntry(run);
+  // (The run the page is about is the open one, where the page has not said otherwise: the hover cards name its people
+  // and buildings from it.)
+  useEffect(() => {
+    if (!run || useLens.getState().run) return;
+    useLens.getState().setRun(run);
+    return () => {
+      if (useLens.getState().run === run) useLens.getState().setRun(null);
+    };
+  }, [run]);
   return (
     <div className="site-page">
       <header className="site-bar">

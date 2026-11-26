@@ -7,7 +7,7 @@ import { PAL, WHERE_LABEL } from "./scene";
 import type { Sky } from "./sky";
 import { PAPER_GROUPS, paperGroup, structureStory, type ElectionView } from "./civic";
 import { actSentence, CITY_WORDS } from "./words";
-import { describePerson } from "../people";
+import { describePerson, isSeatPerson } from "../people";
 
 export interface Overlays {
   people: boolean;
@@ -232,7 +232,7 @@ export function PersonBody({ c, q, t, name, full }: { c: CityData; q: number; t:
   else where = trip && trip.from >= 0 ? `Away, since leaving ${name(trip.from)} (day ${fmtDay(trip.t1).day} ${fmtDay(trip.t1).clock})` : "Away";
   return (
     <>
-      <div className="lc-tip-title" data-peek={`person:${p[0]}`}>{p[1]}</div>
+      <div className="lc-tip-title" data-peek={`person:${p[0]}`}>{isSeatPerson(c, p[0]) ? `The AI mayor (${p[0]})` : p[1]}</div>
       <div className="lc-tip-sub">{p[2] === "f" ? "A woman" : p[2] === "m" ? "A man" : "A person"}, {ageAt(c, q, t)} years old{describePerson(c, p[0], t)?.replace(/^\d+,?\s*/, "") ? `, ${describePerson(c, p[0], t)!.replace(/^\d+,?\s*/, "")}` : ""}.</div>
       <dl className="lc-dl">
         <dt>Now</dt><dd>{where}</dd>

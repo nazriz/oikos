@@ -7,7 +7,7 @@ import type { LedgerItem, LedgerJson, PersonLedger } from "../../folds/ledger";
 import { fetchFold, foldFile } from "../api";
 import { useCity, structureName } from "../city/CityView";
 import { personRows, type CityData } from "../city/data";
-import { describePerson } from "../people";
+import { describePerson, personLabel } from "../people";
 import { DAY, clock, dayIndex, dayOf, words } from "../format";
 import { useLens } from "../state";
 import type { InspectorProps } from "../views";
@@ -66,13 +66,8 @@ export function PersonLife({ run, selection }: InspectorProps) {
   };
   const nameOf = (x?: string): string => {
     if (!x) return "—";
-    if (x === seat) return "the seat";
-    const p = city?.pById.get(x.replace(/-self$/, ""));
-    if (p !== undefined) {
-      const [pid, name] = city!.people.people[p]!;
-      const d = describePerson(city, pid, t);
-      return name !== pid ? name : d ? `${pid} (${d})` : pid;
-    }
+    if (x === seat) return "the AI mayor";
+    if (city?.pById.get(x.replace(/-self$/, "")) !== undefined) return personLabel(city, x, t);
     const e = city?.town.entities[x.replace(/-system$/, "")];
     return e?.name ?? words(x.replace(/-system$/, ""));
   };

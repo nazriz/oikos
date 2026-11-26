@@ -319,8 +319,17 @@ button.crumb:hover {
     left: 8px;
     bottom: 8px;
   }
+  /* (Folded, the panel sits bottom left and the Plan | 3D town switch bottom right, side by side; open, the panel
+     stands above the switch, never over it.) */
   .about.open {
     width: calc(100% - 16px);
+    bottom: 52px;
+  }
+  .run-map .map-toggle {
+    left: auto;
+    right: 8px;
+    bottom: 8px;
+    transform: none;
   }
   .peek {
     display: none;
@@ -347,6 +356,12 @@ button.crumb:hover {
 .id-link:hover {
   color: var(--text);
   text-decoration-color: currentColor;
+}
+.id-seat {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: 0.86em;
+  color: var(--muted);
 }
 
 /* The inspector's head: back to the turn it was opened from */

@@ -16731,3 +16731,22 @@ no longer matched the landing, and a timeline that opened zoomed to zero width. 
   turn on the first act the graders name, solid when both found it, outlined when one did; it opens that turn.
 - **Revisit if** a page wants its own header again (then it drops the wrapper in main.tsx), or the grade files name the
   lock-in's act exactly (place the flag there, not by day).
+
+The rest of the same review, in the same branch:
+- **Every person's id opens their life** (`nav/PersonLinks.tsx`): one click handler for `[data-person]` anywhere; in a
+  run it selects the person (the inspector opens, Escape steps back to the turn); on a page with no inspector (Who
+  holds power, Compare, the digest) it opens the run at the moment shown with the person selected. The power chips
+  get the hover card too: the site bar makes the page's run the open one where the page has not.
+- **The AI mayor's own person is named as such**: "the AI mayor (c0572)" in names (the trail, the hover card, the life
+  page, Who holds power, the map's card), via `people.ts` `personLabel`/`isSeatPerson`, from the town's record of its
+  seats. Inside the mayor's or anyone's quoted words the id stays as written and "[the AI mayor]" follows it, the
+  square brackets of an editor's note: Lens does not change a quotation.
+- **A hover card never stays behind**: it goes whenever its thing is no longer under the pointer (moved by a scroll or
+  a re-render, or gone), on a change of page and on a new selection.
+- **Plan | 3D town** (was "Map | Town in 3D"; the map is drawn at an angle, so "3D" told nothing apart). Titles say what
+  each shows.
+- **On a phone** the switch sits bottom right and "About this view" bottom left; opened, the panel stands above it.
+- **"This page answers: …" is gone** where the title already says it (every page but a run still opening, where it is
+  a quiet line). The site bar says where you are.
+- **Compare opens where the towns first differ**: an hour after the first act of either mayor the other did not also
+  make within a day, not at the split, where every count is zero.

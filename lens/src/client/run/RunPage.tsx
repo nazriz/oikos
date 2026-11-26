@@ -183,11 +183,11 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
           )}
           {World && (
             <div className="seg map-toggle" role="group" aria-label="How to show the town">
-              <button aria-pressed={mapView === "map"} onClick={() => setMapView("map")}>
-                Map
+              <button aria-pressed={mapView === "map"} onClick={() => setMapView("map")} title="The town as a plan: every building, who is in it now, and lines to what the mayor's acts reached">
+                Plan
               </button>
-              <button aria-pressed={mapView === "world"} onClick={() => setMapView("world")}>
-                Town in 3D
+              <button aria-pressed={mapView === "world"} onClick={() => setMapView("world")} title="The town in 3D: people walking between buildings, the light following the hour">
+                3D town
               </button>
             </div>
           )}
