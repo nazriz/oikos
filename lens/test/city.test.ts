@@ -48,6 +48,10 @@ test("town and people folds over a mock run: one row per move, nobody in two pla
   expect(T.hall).toBeDefined();
   expect(T.seats.length).toBeGreaterThan(0);
   for (const a of T.acts) expect(T.seats).toContain(a.participant);
+  // Papers point at a structure that exists, or at people.
+  for (const p of T.papers) expect(p.s !== undefined ? p.s >= 0 && p.s < T.structures.length : true).toBe(true);
+  // Every vote counted belongs to an election's ballot, and none comes before the ballot was issued.
+  for (const e of T.elections) for (const [vt] of e.votes) expect(vt >= e.t).toBe(true);
 
   // Nobody is in two structures at once: a plain replay, checking every occupied row finds its person nowhere.
   const at = new Int32Array(P.people.length).fill(-1);

@@ -92,6 +92,26 @@ export const CITY_CSS = `
 .lens-city .lc-pill.applied { color: #9fe0b0; } .lens-city .lc-pill.refused { color: var(--lc-flag); }
 .lens-city .lc-quote { margin-top: 8px; padding-left: 9px; border-left: 2px solid color-mix(in srgb, var(--lc-seat) 60%, transparent); color: #d9d6cf; font-size: 12px; line-height: 1.45; white-space: pre-line; max-height: 9em; overflow: hidden; }
 
+.lens-city .lc-rowbtn { width: 100%; border: 0; background: none; font: inherit; text-align: left; padding: 1px 0; cursor: pointer; }
+.lens-city .lc-rowbtn.off { color: var(--lc-muted); }
+.lens-city .lc-tour { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); width: min(620px, calc(100% - 32px)); z-index: 4;
+  background: color-mix(in srgb, var(--lc-panel) 90%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--lc-hair); border-top: 2px solid var(--lc-seat); border-radius: 14px; padding: 16px 20px 12px; box-shadow: 0 18px 50px rgba(0,0,0,.45);
+  animation: lc-rise .5s ease-out; }
+.lens-city .lc-tour.tone-flag { border-top-color: var(--lc-flag); }
+.lens-city .lc-tour.tone-election { border-top-color: #b48cf2; }
+@keyframes lc-rise { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.lens-city .lc-tour-kicker { display: flex; gap: 8px; align-items: center; color: var(--lc-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.lens-city .lc-tour-title { font-family: var(--lc-serif); font-size: 20px; line-height: 1.25; margin-top: 6px; }
+.lens-city .lc-tour-words { font-family: var(--lc-serif); font-style: italic; font-size: 14.5px; line-height: 1.5; margin-top: 8px; color: color-mix(in srgb, var(--lc-text) 88%, transparent); max-height: 7.5em; overflow: hidden; }
+.lens-city .lc-tour-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
+.lens-city .lc-tour-dots { display: flex; gap: 5px; flex-wrap: wrap; }
+.lens-city .lc-tour-dots button { width: 7px; height: 7px; border-radius: 50%; border: 0; padding: 0; background: #ffffff2a; cursor: pointer; }
+.lens-city .lc-tour-dots button.on { background: var(--lc-seat); transform: scale(1.3); }
+.lens-city .lc-tour-dots button.tone-flag.on { background: var(--lc-flag); }
+.lens-city .lc-tour-ctl { display: flex; gap: 4px; }
+.lens-city .lc-tour-ctl button { border: 1px solid var(--lc-hair); background: #ffffff0a; color: var(--lc-text); font: inherit; font-size: 12px; border-radius: 7px; padding: 3px 10px; cursor: pointer; }
+.lens-city .lc-wrap.light .lc-tour { background: color-mix(in srgb, var(--panel, #f3f0e8) 92%, transparent); }
 .lens-city.lc-insp { position: static; height: auto; background: transparent; overflow: visible; }
 .lens-city .lc-today { display: grid; gap: 3px; margin-top: 4px; }
 .lens-city .lc-today .lc-row { font-size: 12px; }

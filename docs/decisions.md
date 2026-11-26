@@ -16155,3 +16155,28 @@ whenever the server starts.
   average 16.9 ms while panning and 16.7 ms while playing at 1 h/s, which is 60 fps. Sun shadows are dropped when
   the camera is far out (zoom below −0.8). **Revisit if** a slower laptop or a phone drops frames: cap the masses
   and trees by zoom next.
+
+## 2026-11-26 Lens city: the election, papers, a building's story, and the tour
+
+**Decided:**
+- **What the town fold reads now (v2).** It reads three more things:
+  - Elections: a ballot with candidates, with every vote, the roll, nominations, the paper's opinion-poll replies,
+    the notice and the result.
+  - Petitions, with who signed them and when.
+  - Papers of a civic kind (`PAPER_KINDS` in town.ts: complaints, tribunal orders, warrants, notices to vacate,
+    benefit claims and decisions, departures, building notices, rates notices…). Each paper is placed at the
+    structure it concerns: by `data.structure` / `space` / `at` cell / `lot`, else at its people (placed by the client
+    at their home then).
+  - Work done at each structure, by task.
+
+  Trade papers (orders, invoices, delivery notes) are left out: there are 150k of them, and they are commerce, not
+  the town's civic life.
+- **The researcher's view of the ballot.** Votes are drawn at the voter's home, coloured by first preference. In the
+  world the ballot is secret (visible only to the electoral commission); Lens is the researcher's instrument and says
+  so on the legend. Turnout is read block by block: a block is the land between the town's roads, found by flood
+  fill. A block's turnout is the electors living there at the poll who have voted by now.
+- **The tour** reads the story fold (`seat`): its sittings that sent the most acts, every sitting with a lever event,
+  and the reader's lever events. It also reads the town fold's election result. Without the story fold it falls back
+  to the seat's busiest days. It does not set the shared selection, so story's reader does not open over the map; it
+  lights its acts on the map only. **Revisit if** the lead wants the tour to drive the story rail too: then select
+  the sitting.

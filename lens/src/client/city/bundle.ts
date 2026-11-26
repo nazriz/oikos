@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Dev only: run the city's folds (town, people) over a JSONL log and write their bundle files, as the ingest will:
 //   bun lens/src/client/city/bundle.ts <log.jsonl> <out dir>
-// Writes <out>/town.json, <out>/people.json, <out>/people.<file>.bin. Never writes beside the log (Lens is read-only).
+// Writes <out>/town.json, <out>/people.json, <out>/people.<file>.bin (with --all, every registered fold's files). Never writes beside the log (Lens is read-only).
 // Reports the time spent inside the folds apart from reading and parsing, which is the ingest's.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -42,8 +42,10 @@ export async function bundleLog(log: string, out: string, folds: Fold[] = [townF
 }
 
 if (import.meta.main) {
-  const [log, out] = process.argv.slice(2);
-  if (!log || !out) { console.log("usage: bun lens/src/client/city/bundle.ts <log.jsonl> <out dir>"); process.exit(2); }
-  const r = await bundleLog(log, out);
+  const args = process.argv.slice(2);
+  const [log, out] = args.filter((a) => !a.startsWith("--"));
+  if (!log || !out) { console.log("usage: bun lens/src/client/city/bundle.ts <log.jsonl> <out dir> [--all (every registered fold, for the tour)]"); process.exit(2); }
+  const folds = args.includes("--all") ? (await import("../../server/folds")).FOLDS.map((f) => f()) : undefined;
+  const r = await bundleLog(log, out, folds);
   console.log(`${r.lines} lines; folds ${(r.foldMs / 1000).toFixed(2)} s of ${(r.totalMs / 1000).toFixed(1)} s`);
 }
