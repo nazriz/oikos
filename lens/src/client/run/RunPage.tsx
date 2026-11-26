@@ -216,6 +216,11 @@ export function RunBar({ entry, meta }: { entry?: RunEntry; meta?: Meta }) {
             <span className="kbd">⌘K</span>
           </button>
         )}
+        {entry && views.digest && (
+          <a className="btn ghost run-copy" href={`#/digest/${encodeURIComponent(entry.key)}`} title="A printable digest of this run">
+            digest
+          </a>
+        )}
         <CopyLink />
         <ThemeToggle />
       </div>

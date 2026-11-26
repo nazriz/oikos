@@ -34,6 +34,8 @@ export interface Views {
   findings?: ComponentType<{}>;
   /** One day's sittings side by side across forks, #/diff/<a>,<b>[,<c>]?day=<n> (story's SittingDiff). */
   diff?: ComponentType<{ keys: string[]; day?: number }>;
+  /** A printable digest of one run, #/digest/<key> (story's RunDigest): the top bar and nothing else around it. */
+  digest?: ComponentType<{ run: string }>;
 }
 
 import { CityView } from "./city/CityView";
