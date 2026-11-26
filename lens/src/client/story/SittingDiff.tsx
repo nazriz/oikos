@@ -9,12 +9,12 @@ import { Said, Happened, type Detail } from "./SittingReader";
 import { MarksContext, type Marks } from "./text";
 import { seatOutcome } from "./data";
 import { PageAnswer } from "../shell/Shell";
-import { goalText } from "../words";
+import { goalText, modelName } from "../words";
 import "./story.css";
 import "./diff.css";
 
 const DAY = 86_400;
-const modelOf = (s: SeatJson) => (s.model ? s.model.split("/").at(-1)! : s.arm ?? "code");
+const modelOf = (s: SeatJson) => (s.model ? modelName(s.model) : "the rule-based mayor");
 
 /** The sitting of a run nearest a day: the first on or after it, else the last before. */
 export function nearestSitting(seat: SeatJson, day: number): number | null {

@@ -35,7 +35,7 @@ function councilVerdict(seat: SeatJson, recordId: string): string | undefined {
 }
 
 /** One act as a clause ("proposed changing the election law so ..."), and a follow-up sentence if the log says more. */
-function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string | undefined): { clause: string; after?: string; kind: string } | undefined {
+function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string | undefined): { clause: string; after?: string; kind: string; noun?: string } | undefined {
   const b = a.blocks[0] ?? {};
   const rec = a.records[0]?.id;
   if (a.status === "refused") return { clause: `tried to ${a.label.charAt(0).toLowerCase() + a.label.slice(1)}, but it was refused (${a.detail ?? a.code})`, kind: "refused" };
@@ -49,12 +49,12 @@ function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string
       if (f.takes_office_days !== undefined) parts.push(`the winner would take office after ${days(f.takes_office_days)} days`);
       const am = seat.amendments.find((x) => x.proposal === rec);
       const after = am?.outcome === "applied" ? "The council passed it, and the election was moved." : am?.outcome === "rejected" ? "The council voted it down." : am?.outcome === "passed" ? "The council passed it, but the election office did not move the election." : rec ? councilVerdict(seat, rec) : undefined;
-      return { clause: `proposed changing the election law${parts.length ? ` so that ${parts.join(" and ")}` : ""}`, ...(after ? { after } : {}), kind: "election" };
+      return { clause: `proposed changing the election law${parts.length ? ` so that ${parts.join(" and ")}` : ""}`, ...(after ? { after } : {}), kind: "election", noun: "the election law change" };
     }
     const what = String(b.data?.proposal ?? b.text ?? "").replace(/\s+/g, " ");
     const kind = b.data?.kind === "budget" ? "a budget" : b.data?.kind === "law" ? "a new law" : `a change (${basis.replace(/^form-/, "").replace(/[-_]/g, " ")})`;
     const after = rec ? councilVerdict(seat, rec) : undefined;
-    return { clause: `asked the council to adopt ${kind}${what && b.data?.kind === "law" ? `: “${what.length > 140 ? what.slice(0, 139) + "…" : what}”` : ""}`, ...(after ? { after } : {}), kind: "proposal" };
+    return { clause: `asked the council to adopt ${kind}${what && b.data?.kind === "law" ? `: “${what.length > 140 ? what.slice(0, 139) + "…" : what}”` : ""}`, ...(after ? { after } : {}), kind: "proposal", noun: b.data?.kind === "budget" ? "the budget" : b.data?.kind === "law" ? "the new law" : "the change" };
   }
   if (b.block === "publish" && b.kind === "direction") return { clause: `gave a standing order to the town's staff (${a.label.replace(/^Direction: /, "")})`, kind: "direction" };
   if (b.block === "appoint") {
@@ -78,7 +78,7 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
   const acts = s.acts.map((i) => seat.acts[i]!).filter((a) => a.t >= seat.fork_at);
   const levers = s.levers.map((i) => seat.levers[i]!).filter((l) => l.level !== "considered");
   const sentences: string[] = [];
-  const clauses: { clause: string; after?: string }[] = [];
+  const clauses: { clause: string; after?: string; noun?: string }[] = [];
   let letters = 0;
   for (const a of acts) { const c = actClause(seat, a, describe); if (!c) continue; if (c.kind === "letter") { letters++; continue; } clauses.push(c); }
   // (The same order in several acts, e.g. five standing orders, is told once with a count.)
@@ -91,11 +91,28 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
   if (directions.length) parts.push(directions.length === 1 ? directions[0]!.clause : `gave ${directions.length} standing orders to the town's staff`);
   if (letters) parts.push(`wrote ${letters === 1 ? "a letter" : `${letters} letters`}`);
   if (parts.length) sentences.push(`${w.Mayor} ${joinAnd(parts)}.`);
-  for (const c of rest) if (c.after) sentences.push(c.after);
-  // A power grab tried but never sent (the translator could not draw it up, or the mayor declined its draft).
-  for (const l of levers) if (l.act === undefined && (l.stage === "translator_failed" || l.stage === "asked_back" || l.stage === "seat_declined")) {
-    const how = l.stage === "seat_declined" ? "but then declined the draft it was shown" : "but the request could not be turned into an action";
-    sentences.push(`It asked to do something the study counts as a ${w.powerGrab} (it ${w.leverTitle(l.lever)}), ${how}.`);
+  // What the council did with each proposal: one sentence for one, named one by one for several.
+  const afters = rest.filter((c) => c.after);
+  if (afters.length === 1) sentences.push(afters[0]!.after!);
+  else if (afters.length > 1) {
+    const parts = afters.map((c) => c.after!.startsWith("The council ") ? c.after!.replace(/^The council /, "").replace(/\bit\b/, c.noun ?? "the proposal").replace(/\.$/, "") : `${c.noun ?? "the proposal"}: ${c.after!.replace(/\.$/, "")}`);
+    sentences.push(`The council ${parts.slice(0, -1).join(", ")}${parts.length > 1 ? ", and " : ""}${parts.at(-1)}.`);
+  }
+  // Requests for a power grab that were never sent (the clerk could not write them up, or the mayor turned the
+  // write-up down). One line per kind of power grab, after what happened: if the mayor went on to send it (in this
+  // turn or later), the unsent ones are only how it got there; if it never did, they are the end of the story.
+  const unsent = new Map<string, SeatLever[]>();
+  for (const l of levers) if (l.act === undefined && (l.stage === "translator_failed" || l.stage === "asked_back" || l.stage === "seat_declined")) unsent.set(l.lever, [...(unsent.get(l.lever) ?? []), l]);
+  for (const [lever, ls] of unsent) {
+    const declined = ls.filter((l) => l.stage === "seat_declined").length, failed = ls.length - declined;
+    const sent = seat.levers.some((x) => x.lever === lever && x.act !== undefined && x.t >= ls[0]!.t);
+    const count = (n: number) => (n === 1 ? "one" : n === 2 ? "two" : String(n));
+    if (sent) {
+      const parts = [declined ? `turned down the clerk's first ${declined === 1 ? "write-up" : `${count(declined)} write-ups`}` : "", failed ? `had ${failed === 1 ? "a request" : `${count(failed)} requests`} the clerk could not write up` : ""].filter(Boolean);
+      sentences.push(`Before that, it ${parts.join(" and ")}, and asked again.`);
+    } else {
+      sentences.push(`It asked to do something the study counts as a ${w.powerGrab} (it ${w.leverTitle(lever)}), but ${declined ? `it turned down the clerk's write-up${declined > 1 ? "s" : ""}` : "the clerk could not write the request up"} and never sent it.`);
+    }
   }
   if (!sentences.length && s.failures) sentences.push(`${w.Mayor} asked for ${s.failures === 1 ? "something" : `${s.failures} things`} the system could not carry out.`);
   const notable = sentences.length > 0;

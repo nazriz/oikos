@@ -2,6 +2,7 @@
 // makes them once per bundle for /api/moments; the page makes them itself where that route is absent (the dev harness).
 import type { SeatJson, SeatLever } from "../../folds/seat";
 import { outcomeOf } from "../../shared/outcome";
+import { modelName } from "../words";
 
 /** What became of a lever event, in words (the reader's stages). */
 export const STAGE: { [k: string]: string } = {
@@ -20,9 +21,18 @@ export interface Moment {
   /** Other events of the same lever at the same act or draft, folded into this card. */
   also: SeatLever[];
   election: string;
+  /** Days before the election as first called (the reader counts to the date then in force, which a moved
+   * election pushes thousands of days out). */
+  daysBefore?: number;
 }
 
-export const modelOf = (s: SeatJson) => (s.model ? s.model.split("/").at(-1)! : s.arm ?? "code");
+/** When the election was first called for: the first notice's date, else the one on file. */
+export function firstPoll(seat: SeatJson): number | undefined {
+  const n = seat.records.find((r) => r.kind === "election_notice" && typeof r.data?.poll_at === "number");
+  return (n?.data?.poll_at as number | undefined) ?? seat.election.poll_at;
+}
+
+export const modelOf = (s: SeatJson) => (s.model ? modelName(s.model) : "the rule-based mayor");
 
 /** A run's moments: one per lever and act (or draft, or failed request), at its furthest level. */
 export function momentsOf(key: string, seat: SeatJson, withConsidered = false): Moment[] {
@@ -35,6 +45,7 @@ export function momentsOf(key: string, seat: SeatJson, withConsidered = false): 
     groups.set(k, [...(groups.get(k) ?? []), l]);
   }
   const election = outcomeOf({ election: seat.election, end_at: seat.end_at, ended: seat.ended ?? "unknown", moved: seat.amendments.some((a) => a.outcome === "applied") }).label.toLowerCase();
+  const poll = firstPoll(seat);
   return [...groups.values()].map((all) => {
     const top = all.reduce((a, b) => (rank[b.level] > rank[a.level] ? b : a));
     const act = top.act !== undefined ? seat.acts[top.act] : undefined;
@@ -45,7 +56,7 @@ export function momentsOf(key: string, seat: SeatJson, withConsidered = false): 
     const outcome = act ? (act.status === "applied" ? (top.stage && top.stage !== "applied" ? STAGE[top.stage] ?? top.stage : "applied") : act.status === "refused" ? `refused: ${act.code}` : "sent, no outcome in the log") : top.stage ? STAGE[top.stage] ?? top.stage : top.level === "considered" ? "words only" : "—";
     const tone: Moment["outcomeTone"] = top.level === "executed" || outcome === "applied" ? "ok" : /refused|declined|could not|rejected|asked back/.test(outcome) ? "no" : "wait";
     return { key, model: modelOf(seat), ...(seat.goal ? { goal: seat.goal } : {}), ...(seat.seed !== undefined ? { seed: seat.seed } : {}), lever: top, words,
-      ...(draft?.note ? { note: draft.note } : {}), ...(act?.reasoning ? { reason: act.reasoning } : {}), outcome, outcomeTone: tone, also: all.filter((x) => x !== top), election };
+      ...(draft?.note ? { note: draft.note } : {}), ...(act?.reasoning ? { reason: act.reasoning } : {}), outcome, outcomeTone: tone, also: all.filter((x) => x !== top), election, ...(poll !== undefined ? { daysBefore: Math.round((poll - top.t) / 86_400) } : {}) };
   });
 }
 

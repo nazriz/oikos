@@ -7,7 +7,7 @@ import { useLens, type TimelineMark } from "../state";
 import { loadSeat, useAsync, when, worldDay, usd, tokens, plural, human, seatOutcome, STAGE, type SeatJson, type SittingSummary, type SeatLever, type SeatRecord } from "./data";
 import { leverCounts } from "../../shared/outcome";
 import { useDescribe } from "../people";
-import { useWords, leverTitle } from "../words";
+import { useWords, leverTitle, modelName } from "../words";
 import { useResearcher } from "../mode";
 import { StoryAccount } from "./StoryMode";
 import "./story.css";
@@ -78,7 +78,6 @@ export function kinAppointed(seat: SeatJson): { act: number; who: string; post: 
   const kids = new Set(seat.children.flatMap((c) => [c, `${c}-self`]));
   return seat.acts.flatMap((a) => (a.status !== "applied" ? [] : a.blocks.filter((b) => b?.block === "appoint" && kids.has(b.participant)).map((b) => ({ act: a.i, who: String(b.participant).replace(/-self$/, ""), post: String(b.position) }))));
 }
-function modelName(m?: string) { return m ? m.split("/").at(-1)! : "code"; }
 function pollMoved(seat: SeatJson) { return seat.amendments.find((a) => a.outcome === "applied"); }
 function outcomeOf(seat: SeatJson): { label: string; tone: string } { const o = seatOutcome(seat); return { label: o.label, tone: o.css }; }
 
@@ -94,7 +93,7 @@ function HeaderLine({ seat, onOpen }: { seat: SeatJson; onOpen: () => void }) {
   return (
     <div className="st-head line">
       <div className="st-line1">
-        <span className="st-title small">{modelName(seat.model)} as mayor</span>
+        <span className="st-title small">{seat.model ? `${modelName(seat.model)} as mayor` : "The rule-based mayor"}</span>
         <span style={{ flex: 1 }} />
         <button className="st-btn" onClick={onOpen}>Show details</button>
       </div>
@@ -127,7 +126,7 @@ function Header({ seat, onClose }: { seat: SeatJson; onClose: () => void }) {
   const describe = useDescribe(useLens((s) => s.run), seat.end_at);
   return (
     <div className="st-head">
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><div className="st-title">{modelName(seat.model)} as mayor</div><span style={{ flex: 1 }} /><button className="st-btn" onClick={onClose}>Hide details</button></div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><div className="st-title">{seat.model ? `${modelName(seat.model)} as mayor` : "The rule-based mayor"}</div><span style={{ flex: 1 }} /><button className="st-btn" onClick={onClose}>Hide details</button></div>
       <p className="st-sub">{seat.goal ? `Given the “${seat.goal}” instructions. ` : ""}{seat.seed !== undefined ? `Town seed ${seat.seed}. ` : ""}The run began on day {Math.round(seat.fork_at / DAY)} and {seat.ended === "stopped" ? <span style={{ color: "var(--st-bad)" }}>stopped early on day {Math.round(seat.end_at / DAY)}{seat.until_at ? ` (it was set to run to day ${Math.round(seat.until_at / DAY)})` : ""}</span> : `ended on day ${Math.round(seat.end_at / DAY)}`}. The model is {seat.model ?? "a rule-based program"}.</p>
       <div className={`st-outcome ${out.tone}`}><span className="st-big">{out.label}</span>{seat.election.stood ? <span className="st-faint" style={{ fontSize: 12 }}>It stood for re-election.</span> : null}</div>
       {kin.length > 0 && <div className="st-kin">Appointed its own child: {kin.map((k) => <button key={k.act} className="st-linkish" onClick={() => select({ kind: "act", seq: seat.acts[k.act]!.seq })}>{k.who}{describe(k.who) ? ` (${describe(k.who)})` : ""} as {k.post} (day {worldDay(seat.acts[k.act]!.t)})</button>)}<span className="st-faint">. Its children as its own instructions name them.</span></div>}

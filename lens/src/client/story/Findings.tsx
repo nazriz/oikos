@@ -14,7 +14,7 @@ import { outcomeOf, type OutcomeKind } from "../../shared/outcome";
 import { LEVERS } from "./levers";
 import { PageAnswer } from "../shell/Shell";
 import { useResearcher } from "../mode";
-import { goalText } from "../words";
+import { goalText, modelName } from "../words";
 import "./story.css";
 import "./findings.css";
 
@@ -88,8 +88,8 @@ function Page({ all }: { all: Fork[] }) {
         <PageAnswer page="findings" />
         <h1 className="fi-title">How often the AI mayor reached for a power grab</h1>
         {researcher && <p className="st-sub">{inView.length} runs from {on.size} run sets, as the study's checker reads them (experiments/power-seeking/reader.ts, through tally.ts). Intervals are Wilson 95%. Exploratory unless a run set was pre-registered.</p>}
-        <div className="fi-groups"><span className="lbl">Test runs</span><button className={`st-btn ${controls ? "on" : ""}`} onClick={() => setControls(!controls)} title="Rope tests and scripted controls, which are not AI models">{controls ? "Shown below the models" : "Hidden"} <span className="n">{[...new Set(all.filter((f) => on.has(f.group) && isControl(f.model)).map((f) => f.model))].join(", ") || "none"}</span></button></div>
-        <div className="fi-groups"><span className="lbl">Run sets</span>{groups.map((g) => <button key={g} className={`st-btn ${on.has(g) ? "on" : ""}`} onClick={() => { const n = new Set(on); n.has(g) ? n.delete(g) : n.add(g); setOn(n); }}>{g} <span className="n">{all.filter((f) => f.group === g).length}</span></button>)}</div>
+        {researcher && <div className="fi-groups"><span className="lbl">Test runs</span><button className={`st-btn ${controls ? "on" : ""}`} onClick={() => setControls(!controls)} title="Rope tests and scripted controls, which are not AI models">{controls ? "Test mayors shown below the models" : "Test mayors hidden"} <span className="n">{[...new Set(all.filter((f) => on.has(f.group) && isControl(f.model)).map((f) => f.model))].join(", ") || "none"}</span></button></div>}
+        {researcher && <div className="fi-groups"><span className="lbl">Run sets</span>{groups.map((g) => <button key={g} className={`st-btn ${on.has(g) ? "on" : ""}`} onClick={() => { const n = new Set(on); n.has(g) ? n.delete(g) : n.add(g); setOn(n); }}>{g} <span className="n">{all.filter((f) => f.group === g).length}</span></button>)}</div>}
       </div>
       {!researcher && <StoryFindings forks={inView} models={models} pal={pal} />}
       {researcher && <div className="fi-grid">
@@ -205,7 +205,7 @@ function KofN({ refEl, forks, models, goals, pal, onDrill }: { refEl: React.RefO
           return (
             <g key={m}>
               <Sep models={models} mi={mi} y={top + mi * RH} W={W} pal={pal} />
-              <text x={L - 10} y={y + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{m}</text>
+              <text x={L - 10} y={y + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{modelName(m)}</text>
               {goals.map((g, gi) => {
                 const cell = forks.filter((f) => f.model === m && f.goal === g);
                 if (!cell.length) return <text key={g} x={x(gi, 0)} y={y + 4} fontSize={10} fill={pal.faint}>—</text>;
@@ -306,7 +306,7 @@ function When({ refEl, forks, models, pal }: { refEl: React.RefObject<SVGSVGElem
           return (
             <g key={m}>
               <Sep models={models} mi={mi} y={top + mi * RH} W={W} pal={pal} />
-              <text x={L - 10} y={y + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{m}</text>
+              <text x={L - 10} y={y + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{modelName(m)}</text>
               {shown.filter((p) => p.f.model === m).map((p, i) => {
                 const jitter = ((p.f.seed * 7 + i * 3) % 9) - 4;
                 return <circle key={i} className="fi-hit" cx={x(p.before!)} cy={y + jitter} r={4.5} fill={p.a.executed ? pal.flag : pal.bg} stroke={p.a.executed ? pal.bg : pal.flag} strokeWidth={p.a.executed ? 1.5 : 2}
@@ -341,7 +341,7 @@ function Outcomes({ refEl, forks, models, pal, onDrill }: { refEl: React.RefObje
           return (
             <g key={m}>
               <Sep models={models} mi={mi} y={top + mi * RH} W={W} pal={pal} />
-              <text x={L - 10} y={y + RH / 2 + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{m}</text>
+              <text x={L - 10} y={y + RH / 2 + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{modelName(m)}</text>
               {OUTCOMES.map((o, oi) => {
                 const these = mine.filter((f) => outcomeIndex(f.outcome) === oi);
                 if (!these.length) return null;
@@ -385,7 +385,7 @@ function Cost({ refEl, forks, models, pal }: { refEl: React.RefObject<SVGSVGElem
           return (
             <g key={m}>
               <Sep models={models} mi={mi} y={top + mi * RH} W={W} pal={pal} />
-              <text x={L - 10} y={y + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{m}</text>
+              <text x={L - 10} y={y + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{modelName(m)}</text>
               {priced.filter((f) => f.model === m).map((f, i) => <circle key={i} className="fi-hit" cx={x(f.usd!)} cy={y + (((f.seed * 5 + i) % 7) - 3)} r={4} fill={pal.seat} fillOpacity={0.75} stroke={pal.bg} strokeWidth={1}
                 onMouseMove={(e) => tip.show(e, <><b>{m} · goal {f.goal} · seed {f.seed}</b><div>${f.usd!.toFixed(2)}</div><div className="st-faint">{f.key}</div></>)} onMouseLeave={tip.hide} onClick={() => open(f.key)} />)}
               {med !== undefined && <><line x1={x(med)} x2={x(med)} y1={y - 9} y2={y + 9} stroke={pal.text} strokeWidth={2} /><text x={W - 8} y={y + 4} fontSize={10} fill={pal.muted} textAnchor="end" fontFamily={pal.mono}>${med.toFixed(2)}</text></>}
@@ -456,7 +456,7 @@ function StoryFindings({ forks, models, pal }: { forks: Fork[]; models: string[]
               return (
                 <g key={r.m} className="fi-hit" onClick={() => location.hash = "#/moments"}>
                   <Sep models={rows.map((z) => z.m)} mi={i} y={y} W={W} pal={pal} />
-                  <text x={L - 10} y={y + RH / 2 + 4} fontSize={12} fill={pal.text} textAnchor="end">{r.m}</text>
+                  <text x={L - 10} y={y + RH / 2 + 4} fontSize={12} fill={pal.text} textAnchor="end">{modelName(r.m)}</text>
                   <rect x={L} y={y + 6} width={Math.max(2, x(r.n) - L)} height={RH - 12} rx={2} fill={pal.grid} />
                   {r.t > 0 && <rect x={L} y={y + 6} width={Math.max(2, x(r.t) - L)} height={RH - 12} rx={2} fill={pal.flagSoft} />}
                   {r.d > 0 && <rect x={L} y={y + 6} width={Math.max(2, x(r.d) - L)} height={RH - 12} rx={2} fill={pal.flag} />}
