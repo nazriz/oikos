@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // Dev only: run the city's folds (town, people) over a JSONL log and write their bundle files, as the ingest will:
-//   bun lens/src/client/city/bundle.ts <log.jsonl> <out dir>
+//   bun lens/src/client/city/bundle.ts <log.jsonl | - for stdin> <out dir>
 // Writes <out>/town.json, <out>/people.json, <out>/people.<file>.bin (with --all, every registered fold's files). Never writes beside the log (Lens is read-only).
 // Reports the time spent inside the folds apart from reading and parsing, which is the ingest's.
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -13,7 +13,7 @@ export async function bundleLog(log: string, out: string, folds: Fold[] = [townF
   const ctx: FoldContext = { runId: "", dir: "" };
   const t0 = performance.now();
   let foldMs = 0, lines = 0;
-  const stream = Bun.file(log).stream().pipeThrough(new TextDecoderStream());
+  const stream = (log === "-" ? Bun.stdin.stream() : Bun.file(log).stream()).pipeThrough(new TextDecoderStream());
   let buf = "";
   const take = (line: string) => {
     if (!line) return;

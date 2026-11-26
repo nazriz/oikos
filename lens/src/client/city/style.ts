@@ -92,6 +92,7 @@ export const CITY_CSS = `
 .lens-city .lc-pill.applied { color: #9fe0b0; } .lens-city .lc-pill.refused { color: var(--lc-flag); }
 .lens-city .lc-quote { margin-top: 8px; padding-left: 9px; border-left: 2px solid color-mix(in srgb, var(--lc-seat) 60%, transparent); color: #d9d6cf; font-size: 12px; line-height: 1.45; white-space: pre-line; max-height: 9em; overflow: hidden; }
 
+.lens-city .lc-short { display: none; }
 .lens-city .lc-rowbtn { width: 100%; border: 0; background: none; font: inherit; text-align: left; padding: 1px 0; cursor: pointer; }
 .lens-city .lc-rowbtn.off { color: var(--lc-muted); }
 .lens-city .lc-tour { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); width: min(620px, calc(100% - 32px)); z-index: 4;
@@ -112,15 +113,57 @@ export const CITY_CSS = `
 .lens-city .lc-tour-ctl { display: flex; gap: 4px; }
 .lens-city .lc-tour-ctl button { border: 1px solid var(--lc-hair); background: #ffffff0a; color: var(--lc-text); font: inherit; font-size: 12px; border-radius: 7px; padding: 3px 10px; cursor: pointer; }
 .lens-city .lc-wrap.light .lc-tour { background: color-mix(in srgb, var(--panel, #f3f0e8) 92%, transparent); }
+.lens-city .lc-pane-label { position: absolute; top: 112px; left: 12px; z-index: 3; padding: 5px 12px; border-radius: 14px;
+  background: color-mix(in srgb, var(--lc-panel) 84%, transparent); backdrop-filter: blur(10px); border: 1px solid var(--lc-hair);
+  font-family: var(--lc-serif); font-size: 14px; pointer-events: none; white-space: nowrap; }
+.lens-city .lc-pane-label.bare { top: 12px; }
+.lens-city .lc-diff { position: absolute; left: 12px; bottom: 12px; z-index: 3; display: grid; gap: 3px; padding: 9px 12px; border-radius: 10px; font-size: 11.5px;
+  background: color-mix(in srgb, var(--lc-panel) 88%, transparent); backdrop-filter: blur(10px); border: 1px solid var(--lc-hair); color: var(--lc-text); }
+.lens-city .lc-diff b { font-weight: 600; margin-bottom: 2px; }
+.lens-city .lc-diff span { display: flex; align-items: center; gap: 7px; color: var(--lc-muted); }
+.lens-city .lc-diff .sw { display: inline-block; width: 12px; height: 8px; }
+.lens-city .lc-diff .sw.arc { border-top: 2px solid #bea0ff; border-radius: 8px 8px 0 0; }
+.lens-city .lc-diff .sw.dot { width: 8px; border-radius: 50%; background: #e8c46a; border: 1px solid #fff; }
+.lens-city .lc-diff .sw.ring { width: 8px; border-radius: 50%; border: 1.5px solid #e8c46a; }
+.lens-city .lc-mini { position: absolute; right: 14px; bottom: 14px; z-index: 3; border-radius: 8px; border: 1px solid var(--lc-hair);
+  box-shadow: 0 8px 24px rgba(0,0,0,.4); cursor: crosshair; touch-action: none; }
 .lens-city.lc-insp { position: static; height: auto; background: transparent; overflow: visible; }
 .lens-city .lc-today { display: grid; gap: 3px; margin-top: 4px; }
 .lens-city .lc-today .lc-row { font-size: 12px; }
 @media (max-width: 640px) {
-  .lens-city .lc-clock { top: 10px; left: 12px; }
-  .lens-city .lc-clock-time { font-size: 26px; }
-  .lens-city .lc-panel { right: 10px; top: 10px; width: min(292px, calc(100% - 20px)); max-height: 60%; }
-  .lens-city .lc-card { left: 10px; right: 10px; bottom: 10px; width: auto; }
+  .lens-city { font-size: 13.5px; }
+  .lens-city .lc-clock { top: 8px; left: 8px; padding: 7px 10px; }
+  .lens-city .lc-clock-time { font-size: 24px; }
+  .lens-city .lc-clock-place { display: none; }
+  .lens-city .lc-clock-sub { font-size: 11.5px; margin-top: 4px; }
+  /* Layers: a pill at the top right; open, a bottom sheet. */
+  .lens-city .lc-panel.closed { right: 8px; top: 8px; }
+  .lens-city .lc-long { display: none; }
+  .lens-city .lc-short { display: inline; }
+  .lens-city .lc-panel.closed .lc-ghost { padding: 7px 7px; }
+  .lens-city .lc-panel:not(.closed) { left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 64%; border-radius: 16px 16px 0 0; z-index: 6;
+    border-bottom: 0; box-shadow: 0 -12px 40px rgba(0,0,0,.45); padding-bottom: env(safe-area-inset-bottom); }
+  .lens-city .lc-panel:not(.closed) .lc-panel-head::before { content: ""; position: absolute; left: 50%; top: 6px; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--lc-hair); }
+  .lens-city .lc-panel:not(.closed) .lc-panel-head { position: relative; padding-top: 14px; }
+  .lens-city .lc-panel-body { padding: 0 16px 16px; }
+  .lens-city .lc-ghost { padding: 9px 10px; }
+  .lens-city .lc-row { padding: 3px 0; font-size: 13.5px; }
+  .lens-city .lc-num { font-size: 12.5px; }
+  .lens-city .lc-note { font-size: 12.5px; }
+  .lens-city .lc-switch { width: 36px; height: 21px; border-radius: 11px; }
+  .lens-city .lc-switch span { width: 17px; height: 17px; }
+  .lens-city .lc-switch.on span { transform: translateX(15px); }
+  .lens-city .lc-seg button { padding: 6px 10px; font-size: 12.5px; }
+  .lens-city .lc-card { left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 52%; }
   .lens-city .lc-tip { display: none; }
+  .lens-city .lc-mini { top: 56px; bottom: auto; right: 8px; }
+  .lens-city .lc-pane-label { top: 74px; left: 8px; font-size: 12.5px; padding: 4px 10px; }
+  .lens-city .lc-pane-label.bare { top: 8px; }
+  .lens-city .lc-follow { top: auto; bottom: 14px; }
+  .lens-city .lc-diff { font-size: 11px; left: 8px; bottom: 8px; padding: 7px 9px; }
+  .lens-city .lc-tour { bottom: 8px; padding: 12px 14px 10px; }
+  .lens-city .lc-tour-title { font-size: 17px; }
+  .lens-city .lc-tour-words { font-size: 13px; max-height: 6em; }
 }
 /* Light: the shell's tokens carry the panels; the map keeps its own ground and loses the dark edge. */
 .lens-city .lc-wrap.light .lc-vignette { background: radial-gradient(120% 90% at 50% 45%, transparent 62%, rgba(120,110,90,.18) 100%); }
