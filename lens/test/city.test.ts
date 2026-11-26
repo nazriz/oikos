@@ -101,6 +101,9 @@ test("town and people folds on a hand-made log: one row per move, nobody in two 
   expect(T.seats).toEqual(["mayor-system"]);
   expect(T.acts.map((a) => a.status)).toEqual(["applied"]);
   expect(T.targets.works).toMatchObject({ kind: "person", person: "p1" });
+  // Who holds power: the town's posts with their first holders, and each participant's person.
+  expect(T.power.history).toContainEqual([0, "works", "p1-self", null]);
+  expect(T.power.bodies["p1-self"]).toBe("p1");
   // A structure begun mid-run is placed, with when it began and was completed.
   expect(T.structures.find((x) => x.id === "str.1")).toMatchObject({ x: 7, y: 1, started: DAY + 8 * H, completed: 2 * DAY + 12 * H });
 

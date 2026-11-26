@@ -16215,3 +16215,22 @@ whenever the server starts.
   layer and the hall ring are hidden, and the tour shows only when there is something to tour. Measured in GPU
   Chrome at 3,000 people: panning 16.7 ms/frame (p95 17.1), playing 16.6 ms. Panning had a 25 ms p95 until the panel
   stopped re-rendering on camera frames.
+
+## 2026-11-26 Lens city: who holds power
+
+**Decided:** `PowerView` (lens/src/client/city/Power.tsx) is a chart, not a force graph. Institutions are cards: the
+government first, two columns wide; then by number of posts. Each post is a row: its holder now (a chip) and, if it
+changed hands, a strip of its holders over the run and who appointed or vacated it. Lines join holders who are kin.
+Ties to the seat (rose) always show. Other ties show on request, or for the holder pointed at. A person holding
+several posts carries ×n. A force layout was rejected: it moves as time scrubs, and the reader loses the place.
+The data is in the town fold (v4, `power`):
+- the posts of the town's own organisations (not the outside's), with first holders;
+- every `appointed` event (a holder of null is a vacancy);
+- each participant's person, the seat's person included (`participants[].person`);
+- parents (from entities and households), couples and households.
+
+Kin are parent/child, siblings (a shared parent), partners (couples) and one household. Appointments go on the shared
+timeline as track `power.appointments`; an appointment of kin of the seat is marked as a flag. On GLM seed 7 the
+seat's child c0571 is appointed editor and electoral commissioner on day 155, and the chart ties both posts to the
+mayor in rose. **Revisit if** the world records ties beyond family and household (employment, debts): add them as
+further kinds of line.

@@ -88,6 +88,26 @@ export interface TownBundle {
   papers: TownPaper[];
   /** Work done at each structure (index): task → [times, last t]. */
   work: Record<number, Record<string, [number, number]>>;
+  /** Who holds power: the posts, their holders over time, and the ties between people. */
+  power: TownPower;
+}
+
+export interface TownPower {
+  /** Every post of an organisation of the town (not the outside's), in the header's order. */
+  posts: { id: string; entity: string; title: string }[];
+  institutions: Record<string, { name: string; kind: string }>;
+  /** Holder changes: [t, post, holder participant or null (vacated), by participant or null]; t = 0 rows are the start. */
+  history: [number, string, string | null, string | null][];
+  /** A participant's person: "c0066-self" → "c0066"; a seat → the person whose body it shares. */
+  bodies: Record<string, string>;
+  /** Parents of each person who has them on record, and couples (partners). */
+  parents: Record<string, string[]>;
+  couples: [string, string][];
+  /** Household of each person (record id), at the start. */
+  household: Record<string, string>;
+  names: Record<string, string>;
+  /** The seats' persons (participant → person). */
+  seats: Record<string, string>;
 }
 
 export interface TownElection {
@@ -163,6 +183,7 @@ export function townFold(): Fold {
       moments: [],
       span: [0, 0],
       elections: [], petitions: [], papers: [], work: {},
+      power: { posts: [], institutions: {}, history: [], bodies: {}, parents: {}, couples: [], household: {}, names: {}, seats: {} },
     };
     for (const st of cat.structure_types ?? []) {
       const spaces: Record<string, number> = {};
@@ -221,12 +242,35 @@ export function townFold(): Fold {
     // Entities, positions, and where each organisation is.
     for (const e of w.entities ?? []) { if (e.kind !== "person") b.entities[e.id] = { kind: e.kind, name: e.name ?? e.id }; else persons.add(e.id); }
     for (const p of cfg.positions ?? []) b.positions[p.id] = { entity: p.entity, title: p.title ?? p.id, holder: p.holder };
+    // Power: the town's own organisations' posts (the outside's are left out), their first holders, and kin.
+    const P = b.power;
+    for (const e of w.entities ?? []) {
+      if (e.kind === "person") { if (Array.isArray(e.parents)) P.parents[e.id] = e.parents; P.names[e.id] = e.name ?? e.id; }
+    }
+    for (const p of cfg.positions ?? []) {
+      const ent = b.entities[p.entity];
+      if (!ent || ent.kind === "boundary") continue;
+      P.posts.push({ id: p.id, entity: p.entity, title: p.title ?? p.id });
+      P.institutions[p.entity] ??= { name: ent.name, kind: ent.kind };
+      P.history.push([0, p.id, p.holder ?? null, null]);
+    }
+    for (const r of w.records ?? []) {
+      if (r.kind !== "household") continue;
+      for (const m of r.data?.members ?? []) { P.household[m.person] = r.id; if (Array.isArray(m.parents)) P.parents[m.person] ??= m.parents; }
+      for (const c of r.data?.couples ?? []) if (Array.isArray(c) && c.length === 2) P.couples.push([c[0], c[1]]);
+    }
+    for (const p of cfg.participants ?? []) {
+      if (typeof p.id !== "string") continue;
+      if (typeof p.person === "string") P.bodies[p.id] = p.person;
+      else if (p.id.endsWith("-self")) P.bodies[p.id] = p.id.slice(0, -5);
+    }
     placeEntities();
     // Seats: a model in the chair, or a person-kind participant that is no citizen's own (a code twin of the chair).
     for (const p of cfg.participants ?? []) {
       if (p.controller?.type === "llm" || (p.kind === "person" && typeof p.id === "string" && !p.id.endsWith("-self"))) seatSet.add(p.id);
     }
     b.seats = [...seatSet];
+    for (const s of b.seats) if (b.power.bodies[s]) b.power.seats[s] = b.power.bodies[s]!;
     // The hall: the government's civic structure.
     const gov = Object.entries(b.entities).find(([, e]) => e.kind === "government");
     if (gov) b.hall = gov[1].structure;
@@ -338,7 +382,7 @@ export function townFold(): Fold {
 
   return {
     name: "town",
-    version: 3,
+    version: 4,
     line(l: LogLine) {
       if (l.t > tMax) tMax = l.t;
       if (l.kind === "header") return header(l.body);
@@ -378,9 +422,23 @@ export function townFold(): Fold {
           case "appointed": {
             const p = b.positions[body.position];
             if (p) p.holder = body.holder;
+            if (b.power.posts.some((x) => x.id === body.position)) b.power.history.push([l.t, body.position, body.holder ?? null, body.by ?? null]);
             return;
           }
-          case "person_created": persons.add(body.person); return;
+          case "position_created": {
+            const ent = b.entities[body.entity];
+            if (ent && ent.kind !== "boundary" && !b.power.posts.some((x) => x.id === body.position)) {
+              b.power.posts.push({ id: body.position, entity: body.entity, title: body.title ?? body.position });
+              b.power.institutions[body.entity] ??= { name: ent.name, kind: ent.kind };
+            }
+            return;
+          }
+          case "person_created":
+            persons.add(body.person);
+            b.power.names[body.person] = body.name ?? body.person;
+            if (Array.isArray(body.parents)) b.power.parents[body.person] = body.parents;
+            if (body.participant) b.power.bodies[body.participant] = body.person;
+            return;
           case "entity_created":
             b.entities[body.entity] = { kind: body.kind ?? "entity", name: body.name ?? body.entity };
             return;
