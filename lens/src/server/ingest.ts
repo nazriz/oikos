@@ -191,7 +191,9 @@ export async function ingest(path: string, o: IngestOptions): Promise<IngestResu
   const run = new Runner(folds, o.ctx, stats, study);
   const progress: Progress = { fileBytes: 0 };
   let lastReport = 0;
-  for await (const batch of lineBatches(path, progress)) {
+  // (Lean: the folds read neither the hash chain nor the bulk lines' bodies. A reading of our own, below, may want an
+  // observation naming the seat, so then the lines come whole.)
+  for await (const batch of lineBatches(path, progress, { lean: !study })) {
     if (o.signal?.aborted) throw new Error("aborted");
     for (const raw of batch) run.line(raw);
     const now = performance.now();

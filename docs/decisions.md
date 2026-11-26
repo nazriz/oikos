@@ -16614,3 +16614,20 @@ the reader's columns mean: then a "?" in the reader's own header, not a floating
   offices later do, which no single event ties back to the act. A count of direct addressees would be cheap but would
   rank a letter above a law, and it needs a seat or ledger fold version bump, which re-makes every bundle. Revisit with
   a design for "an act's effects" (the offices' acts citing the direction or law as their basis) in the seat fold.
+
+## 2026-11-26 Kernel: a lean export for readers that need no hash chain (`oikos-kernel export --lean`)
+
+Lens's ingest spends most of its time in JSON.parse (Lens: fast). `export --lean` (kernel/src/blog.rs `Shape::Lean`,
+read-only like every export) writes each entry as `{"body":…,"kind":…,"seq":…,"t":…}`, with no `hash` or `prev`. The
+bulk entries are cut to their names: `observe` and `advance_to_news` commands, and `observation` events, which keep
+their `cause`. Every other body stays whole. A 4.66 M-line fork is 1.06 GB lean against 1.92 GB exact. `verify`,
+`replay` and every other tool still read the exact export, which is unchanged; Lens's folds alone ask for lean (not the
+study's own reader, which may want an observation naming the seat). An export straight to stdout is now buffered too.
+Without a buffer it wrote one system call per line, 3.0 s of a fork's export against 1.4 s.
+- **Same result:** every fold's output over that fork is byte-for-byte the same from either export (checked on all seven
+  folds). A kernel test holds the lean shape: every entry has a line, kind, seq and t are kept, any non-bulk body is
+  whole, and a bulk one keeps its name.
+- **Speed:** a whole ingest of that fork took 5.2-5.6 s lean against 6.0-6.7 s exact, measured back to back at load
+  average 15-26. Lens passes `--lean` to whatever kernel it finds, and a kernel built before the flag ignores it and
+  exports whole lines, which read the same. So the gain comes once main's kernel is rebuilt.
+- **Revisit if** a fold needs a bulk body or the hash chain: drop `--lean` for it (`lens/src/server/source.ts`).

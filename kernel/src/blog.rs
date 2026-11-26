@@ -125,6 +125,46 @@ pub fn write_line(p: &Parts, out: &mut Vec<u8>) {
     out.extend_from_slice(format!("\",\"seq\":{},\"t\":{}}}\n", p.seq, p.t).as_bytes());
 }
 
+/// How an export writes each entry: as the JSONL log has it (`Exact`, byte for byte, for `verify`, `replay` and every
+/// tool), or `Lean`, for a reader that needs neither the hash chain nor what the bulk entries say (Lens, read-only):
+/// `{"body":…,"kind":…,"seq":…,"t":…}` with no `hash` or `prev`, and the bodies of `observe` and `advance_to_news`
+/// commands and `observation` events cut to their names (and an observation's `cause`). About half a fork's bytes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Shape {
+    #[default]
+    Exact,
+    Lean,
+}
+
+/// One entry as a lean line (see `Shape::Lean`).
+pub fn write_lean_line(p: &Parts, out: &mut Vec<u8>) {
+    out.extend_from_slice(b"{\"body\":");
+    out.extend_from_slice(&lean_body(p.body));
+    out.extend_from_slice(b",\"kind\":\"");
+    out.extend_from_slice(kind_name(p.kind).as_bytes());
+    out.extend_from_slice(format!("\",\"seq\":{},\"t\":{}}}\n", p.seq, p.t).as_bytes());
+}
+
+/// A bulk entry's body cut to what says what it is; any other body as it is. Bodies are canonical JSON (keys sorted),
+/// so a bulk entry's name is at its start.
+fn lean_body(b: &[u8]) -> std::borrow::Cow<'_, [u8]> {
+    let ends = |at: usize| matches!(b.get(at), Some(b',') | Some(b'}'));
+    for name in [&b"{\"command\":\"observe\""[..], b"{\"command\":\"advance_to_news\""] {
+        if b.starts_with(name) && ends(name.len()) {
+            return std::borrow::Cow::Owned([name, b"}"].concat());
+        }
+    }
+    let ev = b",\"event\":\"observation\"";
+    if b.starts_with(b"{\"cause\":") {
+        if let Some(i) = b[..b.len().min(64)].windows(ev.len()).position(|w| w == ev) {
+            if ends(i + ev.len()) {
+                return std::borrow::Cow::Owned([&b[..i + ev.len()], b"}"].concat());
+            }
+        }
+    }
+    std::borrow::Cow::Borrowed(b)
+}
+
 fn put_varint(mut x: u64, out: &mut Vec<u8>) {
     while x >= 0x80 {
         out.push((x as u8) | 0x80);
@@ -393,11 +433,19 @@ impl<'a> Read<'a> {
 
     /// The JSONL log's lines for these entries (up to `until`), byte for byte.
     pub fn export(&self, until: Option<u64>, out: &mut dyn Write) -> io::Result<u64> {
+        self.export_shaped(until, Shape::Exact, out)
+    }
+
+    /// The entries (up to `until`) as lines of the given shape.
+    pub fn export_shaped(&self, until: Option<u64>, shape: Shape, out: &mut dyn Write) -> io::Result<u64> {
         let mut line = Vec::with_capacity(4096);
         let mut n = 0;
         self.each(until, |p| {
             line.clear();
-            write_line(p, &mut line);
+            match shape {
+                Shape::Exact => write_line(p, &mut line),
+                Shape::Lean => write_lean_line(p, &mut line),
+            }
             n += 1;
             out.write_all(&line)
         })?;
@@ -424,23 +472,28 @@ impl<'a> Read<'a> {
 /// `about.parent`, relative to the directory of the log that names it): the whole run, from its header, as one log
 /// that `verify` and `replay` read.
 pub fn export_file(path: &std::path::Path, out: &mut dyn Write) -> io::Result<u64> {
-    export_until(path, None, out)
+    export_until(path, None, Shape::Exact, out)
 }
 
-fn export_until(path: &std::path::Path, until: Option<u64>, out: &mut dyn Write) -> io::Result<u64> {
+/// `export_file` in the given shape (`Shape::Lean`: see there).
+pub fn export_file_shaped(path: &std::path::Path, shape: Shape, out: &mut dyn Write) -> io::Result<u64> {
+    export_until(path, None, shape, out)
+}
+
+fn export_until(path: &std::path::Path, until: Option<u64>, shape: Shape, out: &mut dyn Write) -> io::Result<u64> {
     let bytes = std::fs::read(path)?;
     let r = Read::of(&bytes)?;
     let mut n = 0;
     if let Some(parent) = &r.about.parent {
         let p = path.parent().unwrap_or(std::path::Path::new(".")).join(parent);
-        n += export_until(&p, Some(r.first_seq), out)?;
+        n += export_until(&p, Some(r.first_seq), shape, out)?;
         if n != r.first_seq {
             return Err(bad(&format!("{} carries on from entry {} of {}, which has only {n}", path.display(), r.first_seq, p.display())));
         }
     } else if r.first_seq != 0 {
         return Err(bad("a log that does not begin at its header names no parent"));
     }
-    n += r.export(until, out)?;
+    n += r.export_shaped(until, shape, out)?;
     Ok(n)
 }
 
