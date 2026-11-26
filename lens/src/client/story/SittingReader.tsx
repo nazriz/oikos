@@ -4,7 +4,7 @@
 // lever flags sit beside the act or the words they came from. Opens on selection of a sitting, an act or a lever.
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
-import { loadSeat, loadSitting, loadSystem, useAsync, when, worldDay, usd, tokens, plural, human, STAGE, type SeatAct, type SeatDraft, type SeatJson, type SeatLever, type SittingDetail, type SittingTurn } from "./data";
+import { actLabel, loadSeat, loadSitting, loadSystem, useAsync, when, worldDay, usd, tokens, plural, human, STAGE, type SeatAct, type SeatDraft, type SeatJson, type SeatLever, type SittingDetail, type SittingTurn } from "./data";
 import { Hi, Md, MarksContext, hasQuery, openPerson, keyWords, keySentences, plainWords, plainReason, type Marks } from "./text";
 import { leverTitle } from "../words";
 import { useResearcher } from "../mode";
@@ -450,11 +450,11 @@ function ActCard({ seat, draft, act, levers, focus }: { seat: SeatJson; draft?: 
   const full = useFull();
   const researcher = useResearcher();
   const request = draft?.proposal ?? act?.proposal;
-  const title = act && !draft ? act.label : request ? firstClause(request) : act?.label ?? draft?.label ?? "A request";
+  const title = act && !draft ? actLabel(act) : request ? firstClause(request) : act?.label ?? draft?.label ?? "A request";
   const declined = !!draft?.decision && draft.decision !== "accept";
   const status = act ? (act.status === "applied" ? { cls: "ok", word: "Carried out" } : act.status === "refused" ? { cls: "no", word: "Refused" } : { cls: "wait", word: "No outcome yet" }) : declined ? { cls: "declined", word: "Declined by the mayor" } : { cls: "wait", word: "Not sent" };
   const kids = act ? seat.children.filter((c) => act.blocks.some((b) => b?.participant === c || b?.participant === `${c}-self`)) : [];
-  const writeUp = draft?.label ? lower(draft.label) : act?.label ? lower(act.label) : undefined;
+  const writeUp = draft?.label ? lower(draft.label) : act?.label ? lower(actLabel(act)) : undefined;
   const say = (x: string) => (researcher ? x : plainWords(x));
   const fold = act?.status === "refused" ? `Refused: ${human(act.code ?? "")}${act.detail ? `, ${act.detail}` : ""}` : writeUp ? `The clerk wrote it up as: ${writeUp}` : "How it went";
   return (

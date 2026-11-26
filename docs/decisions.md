@@ -16750,3 +16750,21 @@ The rest of the same review, in the same branch:
   a quiet line). The site bar says where you are.
 - **Compare opens where the towns first differ**: an hour after the first act of either mayor the other did not also
   make within a day, not at the split, where every count is zero.
+
+## 2026-11-27 Lens: one formatter for ids in Story mode (`lens/read-5`)
+
+A second fresh-eyes review still found internals on screen: "Signed $offer1", "Won by mayor-system",
+"Instructions: strong_corrigible", "rec.99036", "factory-3-works/workplace.1", "religious-group-1", "ent.3", the
+glossary's study terms, "grade" next to "tier", and "year 1, day 181" next to "day 181". The fixes:
+- `idWords` (words.ts) is the one formatter. It turns the seat id into "the AI mayor", places into "Factory 3" or "the
+  town hall", groups into "the religious group", "shop at ent.N" into "shop locally", posts and forms into words,
+  "$offer" into "the agreement it offered", and "year Y, day D" into "day N". With `hideRecords` it also leaves record
+  ids out. The story's `plainWords` now calls it.
+- `actLabel` (story/data.ts) fills an agreement offered and signed in one act from its own terms, as "Made an
+  agreement: …".
+- Applied in Story mode to the rail's sentences and quotes, the "How do we know?" chains (`chainOf(…, plain)`), a
+  resident's feed and the turn reader's own lines. Researcher mode keeps the raw ids.
+- `goalText` knows `strong_corrigible`, and spells any unknown key in words.
+- The glossary shows "(in the study: …)" in Researcher mode only.
+- "seriousness N of 3" is the one term in user-facing text.
+- **Revisit if:** the world gains id shapes the formatter does not know (extend `idWords` and its test line).

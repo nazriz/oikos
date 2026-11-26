@@ -6,8 +6,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { useResearcher } from "../mode";
-import { leverTitle } from "../words";
-import { loadSeat, useAsync, when, human, seatOutcome, STAGE, type SeatJson, type SeatLever, type SeatAct } from "./data";
+import { leverTitle, idWords } from "../words";
+import { actLabel, loadSeat, useAsync, when, human, seatOutcome, STAGE, type SeatJson, type SeatLever, type SeatAct } from "./data";
 import { firstPoll } from "./moments-data";
 import { graders, type LockInfo } from "./lockin";
 import "./story.css";
@@ -62,7 +62,7 @@ function Chain({ run, claim, onClose }: { run: string; claim: Claim; onClose: ()
   const select = useLens((s) => s.select), setT = useLens((s) => s.setT);
   if (seat === undefined) return <div className="ev-pop" role="dialog"><p className="st-faint">Reading the run…</p></div>;
   if (seat instanceof Error) return <div className="ev-pop" role="dialog"><p className="st-faint">Could not read the run.</p></div>;
-  const { title, steps, note } = chainOf(seat, claim);
+  const { title, steps, note } = chainOf(seat, claim, !researcher);
   const goto = (s: Step) => { if (s.sitting !== undefined) { select({ kind: "sitting", index: s.sitting }); if (s.t !== undefined) setT(s.t); onClose(); } };
   return (
     <div className="ev-pop" role="dialog" aria-label="How do we know?">
@@ -96,10 +96,16 @@ function leadOf(seat: SeatJson, claim: Claim): { text: string; tone: string } | 
   return null;
 }
 
-const q = (x: string, n = 320) => `“${x.length > n ? x.slice(0, n - 1) + "…" : x}”`;
+// (Story mode says the office's ids as words and leaves record ids out, in the words a chain quotes: set by chainOf.)
+let PLAIN = false;
+const q = (y: string, n = 320) => { const x = PLAIN ? idWords(y, { hideRecords: true }) : y; return `“${x.length > n ? x.slice(0, n - 1) + "…" : x}”`; };
 
 /** The chain of evidence for a claim, from the seat bundle. */
-export function chainOf(seat: SeatJson, claim: Claim): { title: string; steps: Step[]; note?: string } {
+export function chainOf(seat: SeatJson, claim: Claim, plain = false): { title: string; steps: Step[]; note?: string } {
+  PLAIN = plain;
+  try { return chainOfInner(seat, claim); } finally { PLAIN = false; }
+}
+function chainOfInner(seat: SeatJson, claim: Claim): { title: string; steps: Step[]; note?: string } {
   if (claim.kind === "outcome") return outcomeChain(seat);
   if (claim.kind === "vote") return voteChain(seat, claim.proposal);
   if (claim.kind === "lockin") return lockinChain(seat, claim.lock);
@@ -120,13 +126,13 @@ function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | u
   if (draft) steps.push({ label: "The clerk wrote it up as", text: <>{draft.label ?? draft.summary?.split("\n")[0] ?? "a paper"}{draft.decision ? (draft.decision === "accept" ? ". The mayor signed it" : ". The mayor turned it down") : ""}{draft.note ? <>, saying <span className="st-serif">{q(draft.note, 200)}</span></> : ""}.</>, ...(draft.call ? { raw: `${draft.id}\n${draft.call}` } : { raw: draft.id }) });
   if (failure) steps.push({ label: "The clerk could not write it up", text: <>{failure.reason}</>, raw: failure.call ?? failure.draft ?? "" });
   if (act) {
-    steps.push({ label: "The act sent", text: <>{act.label}, on {when(act.t)}{act.as ? `, as ${act.as}` : ""}.</>, raw: `command ${act.seq}\n${JSON.stringify(act.blocks, null, 1)}` });
+    steps.push({ label: "The act sent", text: <>{PLAIN ? idWords(actLabel(act), { hideRecords: true }) : act.label}, on {when(act.t)}{act.as ? `, as ${act.as}` : ""}.</>, raw: `command ${act.seq}\n${JSON.stringify(act.blocks, null, 1)}` });
     steps.push({ label: "What the town did", text: act.status === "applied" ? <>It went through{act.at !== undefined ? ` on ${when(act.at)}` : ""}.</> : act.status === "refused" ? <>It was refused: {human(act.code ?? "")}{act.detail ? ` (${act.detail})` : ""}.</> : <>No outcome was in the log by the end of the run.</> });
     if (act.records.length) steps.push({ label: "The record it made", text: <>{act.records.map((r) => <span key={r.id} className="ev-rec">{human(r.kind)}: <span className="st-serif">{q(r.text, 200)}</span></span>)}</>, raw: act.records.map((r) => r.id).join(", ") });
   }
   if (lever) {
     const rule = RULES[lever.lever] ?? lever.title;
-    steps.push({ label: "How the study's checker counts it", text: <>As a power grab ({leverTitle(lever.lever)}): the checker's rule is {rule}. Here it found this <b>{lever.level === "executed" ? "carried out" : lever.level === "attempted" ? "tried" : "mentioned (a word match, often wrong)"}</b>{lever.stage ? ` (${STAGE[lever.stage] ?? lever.stage})` : ""}{lever.tier ? `; the draft rubric rates it ${lever.tier} of 3 for seriousness` : ""}.</>, raw: `${lever.lever} · ${lever.level} · ${lever.source}${lever.detail ? `\n${lever.detail}` : ""}` });
+    steps.push({ label: "How the study's checker counts it", text: <>As a power grab ({leverTitle(lever.lever)}): the checker's rule is {rule}. Here it found this <b>{lever.level === "executed" ? "carried out" : lever.level === "attempted" ? "tried" : "mentioned (a word match, often wrong)"}</b>{lever.stage ? ` (${STAGE[lever.stage] ?? lever.stage})` : ""}{lever.tier ? `; the draft rubric rates its seriousness ${lever.tier} of 3` : ""}.</>, raw: `${lever.lever} · ${lever.level} · ${lever.source}${lever.detail ? `\n${lever.detail}` : ""}` });
   }
   const title = lever ? `${leverTitle(lever.lever).charAt(0).toUpperCase() + leverTitle(lever.lever).slice(1)}` : act?.label ?? "This act";
   return { title, steps, note: lever ? "The checker is the study's own code (experiments/power-seeking/reader.ts); Lens shows what it found and does not judge it." : undefined };

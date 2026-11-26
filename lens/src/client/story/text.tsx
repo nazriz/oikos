@@ -2,6 +2,7 @@
 // place, record ids set apart. Everything is marked at render, never by editing the DOM React owns.
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { Marked } from "marked";
+import { idWords } from "../words";
 import { useLens } from "../state";
 import { useCity } from "../city/CityView";
 
@@ -119,14 +120,8 @@ export function Hi({ text, as = "span", className }: { text: string; as?: "span"
 /** The office's own ids in a line Lens says, as a reader outside the study would write them (Story mode): "form-council-
  * proposal" → "the council proposal form", "councillor-1" → "Councillor 1", "ask-2" → "the clerk's draft",
  * "eating_out" → "eating out". Person and record ids are kept (they open cards). Never applied to a quote. */
-export function plainWords(s: string): string {
-  return s
-    .replace(/\b(?:the )?form-([a-z][a-z-]*[a-z])\b/g, (_, f: string) => `the ${f.replace(/-/g, " ")} form`)
-    .replace(/\b(councillor|house|shop|factory|landlord|apts)-(\d+)\b/g, (_, w: string, n: string) => `${w === "apts" ? "Apartments" : w.charAt(0).toUpperCase() + w.slice(1)} ${n}`)
-    .replace(/\bask-\d+\b/g, "the clerk's draft")
-    .replace(/\bstanding direction(s?)\b/gi, "standing order$1 to a town office")
-    .replace(/\b[Dd]irection: /g, "Standing order to a town office: ")
-    .replace(/\b([a-z]+)_([a-z]+)\b/g, "$1 $2");
+export function plainWords(s: string, opts: { hideRecords?: boolean } = {}): string {
+  return idWords(s, opts);
 }
 /** A reason the clerk could not draw a request up, as a plain sentence. */
 export function plainReason(r: string): string {

@@ -4,6 +4,7 @@
 // which it only looked around or wrote nothing is quiet, and is folded by the page. No grades: what happened, said plainly.
 import type { SeatAct, SeatJson, SeatLever, SittingSummary } from "../../folds/seat";
 import { dayNo, dayOf } from "../format";
+import { actLabel } from "./data";
 
 const DAY = 86_400;
 
@@ -53,7 +54,7 @@ function councilVerdict(seat: SeatJson, recordId: string): string | undefined {
 function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string | undefined): { clause: string; after?: string; kind: string; noun?: string; proposal?: string } | undefined {
   const b = a.blocks[0] ?? {};
   const rec = a.records[0]?.id;
-  if (a.status === "refused") return { clause: `tried to ${a.label.charAt(0).toLowerCase() + a.label.slice(1)}, but it was refused (${a.detail ?? a.code})`, kind: "refused" };
+  if (a.status === "refused") return { clause: `tried to ${actLabel(a).charAt(0).toLowerCase() + actLabel(a).slice(1)}, but it was refused (${a.detail ?? a.code})`, kind: "refused" };
   if (b.block === "publish" && b.kind === "nomination") return { clause: "filed to stand for re-election", kind: "nomination" };
   if (b.block === "publish" && b.kind === "proposal") {
     const basis = String(Array.isArray(b.basis) ? b.basis[0] : b.basis ?? "");
@@ -87,7 +88,7 @@ function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string
   }
   if (b.block === "message") return { clause: "", kind: "letter" };
   if (b.block === "publish" && b.kind === "petition_response") return { clause: "answered a residents' petition", kind: "petition" };
-  return { clause: a.label.charAt(0).toLowerCase() + a.label.slice(1), kind: "other" };
+  return { clause: actLabel(a).charAt(0).toLowerCase() + actLabel(a).slice(1), kind: "other" };
 }
 
 /** A turn, told. */

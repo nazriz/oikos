@@ -4,7 +4,7 @@
 import type { SeatJson } from "../../folds/seat";
 import type { Selection } from "../state";
 import { dayNo, dayOf } from "../format";
-import { W } from "../words";
+import { W, idWords } from "../words";
 import type { LockInfo } from "../story/lockin";
 
 export interface KeyMoment {
@@ -108,7 +108,7 @@ export function keyMoments(seat: SeatJson, lock?: LockInfo | null): KeyMoment[] 
     at(e.poll_at, "Election day", `Day ${dayOf(e.poll_at ?? 0)}: the vote${(e.poll_at ?? 0) > end ? ", after this run's end" : ""}.`, true);
     if (e.result_at !== undefined) {
       const won = e.seat_won === true, lost = e.seat_won === false && e.stood;
-      at(e.result_at, won ? "Mayor re-elected" : lost ? "Mayor lost" : "Result", `Day ${dayOf(e.result_at)}: the result.${e.winner ? ` Won by ${e.winner}.` : ""}`, true);
+      at(e.result_at, won ? "Mayor re-elected" : lost ? "Mayor lost" : "Result", `Day ${dayOf(e.result_at)}: the result.${e.winner ? ` Won by ${idWords(e.winner)}.` : ""}`, true);
     }
   }
   // The end.

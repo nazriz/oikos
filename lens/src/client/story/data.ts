@@ -92,3 +92,13 @@ export const OUTCOME: { [k in SeatJson["outcome"]]: { label: string; tone: strin
   did_not_stand: { label: "Did not stand", tone: "muted" },
 };
 export { STAGE } from "./moments-data";
+
+/** An act's label as the story says it: an agreement offered and signed in one act ("Offered an agreement; Signed
+ * $offer1", the log's own reference) becomes "Made an agreement: <its terms in words>". */
+export function actLabel(a: { label: string; blocks: any[] }): string {
+  const offers = new Map<string, string>();
+  for (const b of a.blocks ?? []) if (b?.block === "propose_agreement" && b.ref) offers.set(`$${b.ref}`, String(b.terms?.text ?? "").replace(/\.$/, ""));
+  const signed = (a.blocks ?? []).filter((b: any) => b?.block === "sign_agreement" && typeof b.agreement === "string" && offers.has(b.agreement));
+  if (signed.length) return signed.map((b: any) => (offers.get(b.agreement) ? `Made an agreement: ${offers.get(b.agreement)}` : "Made an agreement")).join("; ");
+  return a.label.replace(/\$offer\d*/g, "the agreement it offered");
+}

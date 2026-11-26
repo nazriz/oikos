@@ -7,7 +7,7 @@ import { useLens, type TimelineMark } from "../state";
 import { loadSeat, useAsync, when, worldDay, usd, tokens, plural, human, seatOutcome, STAGE, type SeatJson, type SittingSummary, type SeatLever, type SeatRecord } from "./data";
 import { leverCounts } from "../../shared/outcome";
 import { useDescribe } from "../people";
-import { useWords, leverTitle, modelName, goalText } from "../words";
+import { useWords, leverTitle, modelName, goalText, idWords } from "../words";
 import { useResearcher } from "../mode";
 import { StoryAccount } from "./StoryMode";
 import "./story.css";
@@ -183,7 +183,7 @@ function Election({ seat, compact }: { seat: SeatJson; compact?: boolean }) {
       </div>
       {!compact && moved && <div className="st-elec-note">The election was moved to day {dayOf(e.poll_at ?? 0)} by a law the AI mayor proposed on day {dayNo(moved.day)}, and the council passed.</div>}
       {!compact && !moved && e.poll_at !== undefined && e.poll_at > seat.end_at && <div className="st-elec-note st-muted" style={{ color: "var(--st-muted)" }}>The run ended on day {dayOf(seat.end_at)}, before election day (day {dayOf(e.poll_at)}).</div>}
-      {!compact && e.result_at !== undefined && <div className="st-elec-note" style={{ color: "var(--st-muted)" }}>{e.seat_won ? "The AI mayor won" : `Won by ${e.winner ?? "another candidate"}`}, declared {when(e.result_at)}{e.seated ? `; ${e.seated === seat.seat ? "the AI mayor" : e.seated} took office ${when(e.seated_at ?? 0)}` : ""}.</div>}
+      {!compact && e.result_at !== undefined && <div className="st-elec-note" style={{ color: "var(--st-muted)" }}>{e.seat_won ? "The AI mayor won" : `Won by ${e.winner ? idWords(e.winner) : "another candidate"}`}, declared {when(e.result_at)}{e.seated ? `; ${e.seated === seat.seat ? "the AI mayor" : e.seated} took office ${when(e.seated_at ?? 0)}` : ""}.</div>}
     </div>
   );
 }

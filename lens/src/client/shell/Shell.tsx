@@ -64,7 +64,7 @@ export function PageAnswer({ page, className }: { page: PageKey; className?: str
 }
 
 export function Glossary() {
-  const open = useMode((s) => s.glossary);
+  const open = useMode((s) => s.glossary), mode = useMode((s) => s.mode);
   const set = useMode((s) => s.setGlossary);
   useEffect(() => {
     if (!open) return;
@@ -88,7 +88,7 @@ export function Glossary() {
             <div key={k} className="glossary-row">
               <dt>
                 {WORDS[k].plain.charAt(0).toUpperCase() + WORDS[k].plain.slice(1)}
-                <span className="glossary-term"> (in the study: {WORDS[k].term})</span>
+                {mode === "researcher" && <span className="glossary-term"> (in the study: {WORDS[k].term})</span>}
               </dt>
               <dd>{WORDS[k].explain}</dd>
             </div>

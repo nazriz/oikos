@@ -151,6 +151,11 @@ test("the reader's prompt document keeps every line, and key-sentence highlights
   const words = input.replace(/^Your notebook: /, "").replace(/^(Since you last looked|Now):$/gm, "").replace(/^It is year \d+, day \d+\.$/gm, "");
   for (const w of words.match(/[\w$.,-]{4,}/g)!) expect(kept).toContain(w.replace(/[.,]$/, ""));
 
+  // Story mode's one formatter: the office's ids as words, record ids left out, nothing else changed.
+  const { idWords } = await import("../src/client/words");
+  expect(idWords("Won by mayor-system on year 1, day 181: c0595 to factory-3-works/workplace.1, follows religious-group-1, signed $offer1 (rec.99036).", { hideRecords: true }))
+    .toBe("Won by the AI mayor on day 181: c0595 to Factory 3, follows the religious group, signed the agreement it offered.");
+
   const re = keyWords(["c0571"]);
   const html = keyWrap('<p>Rates are fine. I will appoint <button data-person="c0571">c0571</button>. Waste is <em>late. Again</em>. The poll is day 181.</p>', re);
   expect(html).toBe('<p>Rates are fine. <span class="st-key">I will appoint <button data-person="c0571">c0571</button>.</span> Waste is <em>late. Again</em>. <span class="st-key">The poll is day 181.</span></p>');
