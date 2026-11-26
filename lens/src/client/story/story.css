@@ -1,43 +1,47 @@
 /* The story view: the rail and the sitting reader. Reads the shell's tokens where it sets them (docs/design/lens.md
    section 4), with the brief's values as the fallback. Everything is scoped under .st-*. */
+/* House style (docs/design/lens-look.md): a surveyor's plan by day, the town at night. Light is the default. Reads the
+   shell's tokens where it sets them. Overpass for everything Lens says; Source Serif 4 only for words someone in the
+   world wrote (the mayor's turns, quotes, papers). */
 :root {
-  --st-ink: var(--ink, #0b0f17);
-  --st-panel: var(--panel, #111723);
-  --st-panel-2: var(--panel-2, #161d2b);
-  --st-panel-3: #1c2435;
-  --st-line: var(--line, #ffffff14);
-  --st-line-2: #ffffff24;
-  --st-text: var(--text, #e8e6e1);
-  --st-muted: var(--muted, #9aa3b2);
-  --st-faint: #6b7486;
-  --st-seat: var(--seat, #f2b44b);
-  --st-citizen: var(--citizen, #5cc8c0);
-  --st-inst: var(--inst, #8b9cf6);
-  --st-flag: var(--flag, #f0647a);
-  --st-election: var(--election, #b48cf2);
-  --st-good: #7bc88f;
-  --st-bad: #e8875f;
-  --st-serif: var(--font-serif, "Fraunces Variable", "Fraunces", Georgia, serif);
-  --st-sans: var(--font-sans, "Inter Variable", "Inter", system-ui, sans-serif);
-  --st-mono: var(--font-mono, "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace);
-  --st-seat-wash: #f2b44b1a;
-  --st-flag-wash: #f0647a1c;
-  --st-election-wash: #b48cf21c;
-  --st-mark: #f2b44b55;
+  --st-ink: var(--ink, #EDF0F2);
+  --st-panel: var(--panel, #F8F9FA);
+  --st-panel-2: var(--panel-2, #E6EAED);
+  --st-panel-3: #DDE2E6;
+  --st-line: var(--line, #C3CCD3);
+  --st-line-2: #AEB9C2;
+  --st-text: var(--text, #1D2B36);
+  --st-muted: var(--muted, #5B6B78);
+  --st-faint: #7B8A96;
+  --st-seat: var(--seat-text, #8A6A00);
+  --st-seat-mark: var(--seat, #E8B400);
+  --st-citizen: var(--people, #8C7B6B);
+  --st-inst: var(--inst, #2F7D5B);
+  --st-flag: var(--flag, #C8102E);
+  --st-election: var(--election, #1F5FAD);
+  --st-good: #2F7D5B;
+  --st-bad: #A8481F;
+  --st-serif: var(--font-serif, "Source Serif 4 Variable", "Source Serif 4", Georgia, serif);
+  --st-sans: var(--font-sans, "Overpass Variable", "Overpass", system-ui, sans-serif);
+  --st-mono: var(--font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+  --st-seat-wash: #E8B40024;
+  --st-flag-wash: #C8102E14;
+  --st-election-wash: #1F5FAD14;
+  --st-mark: #E8B40066;
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --st-ink: var(--ink, #f6f3ec); --st-panel: var(--panel, #fbf9f4); --st-panel-2: var(--panel-2, #f1ede4); --st-panel-3: #e9e4d8;
-    --st-line: var(--line, #1b1a1716); --st-line-2: #1b1a1726; --st-text: var(--text, #1d1f24); --st-muted: var(--muted, #5d6472); --st-faint: #8a8f99;
-    --st-seat: var(--seat, #b97a12); --st-citizen: var(--citizen, #23877f); --st-inst: var(--inst, #4f5fcf); --st-flag: var(--flag, #c8324c); --st-election: var(--election, #7a4fc4);
-    --st-good: #2f8a4a; --st-bad: #b4542a; --st-seat-wash: #b97a1214; --st-flag-wash: #c8324c12; --st-election-wash: #7a4fc414; --st-mark: #f2b44b80;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --st-ink: var(--ink, #16212B); --st-panel: var(--panel, #1E2B37); --st-panel-2: var(--panel-2, #243240); --st-panel-3: #2B3A49;
+    --st-line: var(--line, #33424F); --st-line-2: #435463; --st-text: var(--text, #E4EAEE); --st-muted: var(--muted, #8FA0AD); --st-faint: #6F808D;
+    --st-seat: var(--seat-text, #E8B400); --st-seat-mark: var(--seat, #E8B400); --st-citizen: var(--people, #B3A391); --st-inst: var(--inst, #4FA67F); --st-flag: var(--flag, #E8485F); --st-election: var(--election, #6FA0E0);
+    --st-good: #5FB58C; --st-bad: #E08A5F; --st-seat-wash: #E8B4001F; --st-flag-wash: #E8485F1F; --st-election-wash: #6FA0E01F; --st-mark: #E8B40055;
   }
 }
-:root[data-theme="light"] {
-  --st-ink: var(--ink, #f6f3ec); --st-panel: var(--panel, #fbf9f4); --st-panel-2: var(--panel-2, #f1ede4); --st-panel-3: #e9e4d8;
-  --st-line: var(--line, #1b1a1716); --st-line-2: #1b1a1726; --st-text: var(--text, #1d1f24); --st-muted: var(--muted, #5d6472); --st-faint: #8a8f99;
-  --st-seat: var(--seat, #b97a12); --st-citizen: var(--citizen, #23877f); --st-inst: var(--inst, #4f5fcf); --st-flag: var(--flag, #c8324c); --st-election: var(--election, #7a4fc4);
-  --st-good: #2f8a4a; --st-bad: #b4542a; --st-seat-wash: #b97a1214; --st-flag-wash: #c8324c12; --st-election-wash: #7a4fc414; --st-mark: #f2b44b80;
+:root[data-theme="dark"] {
+  --st-ink: var(--ink, #16212B); --st-panel: var(--panel, #1E2B37); --st-panel-2: var(--panel-2, #243240); --st-panel-3: #2B3A49;
+  --st-line: var(--line, #33424F); --st-line-2: #435463; --st-text: var(--text, #E4EAEE); --st-muted: var(--muted, #8FA0AD); --st-faint: #6F808D;
+  --st-seat: var(--seat-text, #E8B400); --st-seat-mark: var(--seat, #E8B400); --st-citizen: var(--people, #B3A391); --st-inst: var(--inst, #4FA67F); --st-flag: var(--flag, #E8485F); --st-election: var(--election, #6FA0E0);
+  --st-good: #5FB58C; --st-bad: #E08A5F; --st-seat-wash: #E8B4001F; --st-flag-wash: #E8485F1F; --st-election-wash: #6FA0E01F; --st-mark: #E8B40055;
 }
 
 .st-rail, .st-reader { font-family: var(--st-sans); color: var(--st-text); font-feature-settings: "tnum" 1, "cv11" 1; -webkit-font-smoothing: antialiased; }
@@ -274,7 +278,14 @@ mark.st-lever.muted { border-bottom-style: dashed; border-bottom-color: color-mi
   .st-col-head { display: none; }
   .st-col-body { padding: 14px 16px 60px; }
   .st-rtabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--st-line); background: var(--st-panel); }
-  .st-rbar { padding: 10px 14px; gap: 8px; }
+  .st-rbar { padding: 10px 14px; gap: 8px; position: relative; }
+  .st-rbar > div:first-child { flex: 1 1 100%; padding-right: 40px; }
+  .st-rbar .grow { display: none; }
+  .st-rbar .st-close { position: absolute; top: 10px; right: 12px; }
+  .st-rbar .group { order: 2; }
+  .st-rbar .group .st-btn:first-child { border-radius: 6px 0 0 6px; } .st-rbar .group .st-btn:last-child { border-radius: 0 6px 6px 0; margin-left: -5px; }
+  .st-rbar .st-search { order: 3; flex: 1 1 100%; }
+  .st-rbar .st-search input { width: 100%; }
   .st-rbar h2 { font-size: 18px; }
   .st-search input { width: 110px; }
   .st-kin { margin-top: 8px; font-size: 12.5px; line-height: 1.55; color: var(--st-flag); }
@@ -283,3 +294,30 @@ mark.st-lever.muted { border-bottom-style: dashed; border-bottom-color: color-mi
 }
 .st-levers button.st-chip { background: transparent; }
 .st-levers button.st-chip.flag { background: var(--st-flag-wash); }
+
+/* ---- house style layer (docs/design/lens-look.md), over the rules above, for every story page ---- */
+.st-mono { font-family: var(--st-sans); font-size: inherit; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.st-kicker { font-size: 12.5px; letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--st-muted); }
+.st-title, .st-rbar h2, .st-col-head h3, .st-row-day, .st-outcome .st-big, .st-outword, .st-stat .v, .st-prose h1, .st-prose h2, .st-prose h3, .st-prose h4 { font-family: var(--st-sans); font-weight: 800; letter-spacing: -0.01em; font-variation-settings: normal; }
+.st-title .st-goal { color: var(--st-muted); font-style: normal; font-weight: 600; }
+.st-row-words, .st-think, .st-step .q, .st-flagbox .words, .st-tool-body .why, .st-prelude { font-family: var(--st-serif); }
+.st-btn, .st-search, .st-sec, .st-tool, .st-act, .st-chip, .st-pill, .st-stats, .st-unseen, .st-call, .st-prose pre, .st-prose code { border-radius: 2px; }
+.st-turn-head, .st-step .lbl, .st-flagbox .who, .st-pill { text-transform: none; letter-spacing: 0; }
+.st-act.lever { box-shadow: none; }
+.st-row .node { border-color: var(--st-seat-mark); }
+.st-row.now .node { background: var(--st-seat-mark); }
+.st-row.sel::after { background: var(--st-seat-mark); }
+.st-btn.on { color: #1D2B36; background: var(--st-seat-mark); border-color: var(--st-seat-mark); }
+.st-tab.on { border-bottom-color: var(--st-seat-mark); }
+.st-tool-name { color: var(--st-text); background: var(--st-panel-2); }
+.st-grabline { font: inherit; font-size: 12px; font-weight: 700; color: var(--st-flag); background: none; border: none; padding: 0; margin: 0 12px 2px 0; cursor: pointer; text-align: left; display: block; }
+.st-grabline:hover { text-decoration: underline; }
+.st-grabline.weak { color: var(--st-muted); font-weight: 500; }
+.st-row-grab { margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--st-flag); line-height: 1.4; }
+.st-h3 { font-size: 13px; font-weight: 800; margin: 0 0 2px; }
+.st-sub { margin: 4px 0 0; line-height: 1.5; }
+.st-turn-head .u { font-family: var(--st-sans); font-size: 11px; }
+.st-rbar p.meta { margin: 3px 0 0; }
+@media (max-width: 900px) { .st-rbar { align-items: flex-start; } .st-rbar .group { margin-top: 0; } }
+.st-clerk { margin: 0 13px 8px; font-size: 12.5px; line-height: 1.5; color: var(--st-muted); }
+.st-clerk b { color: var(--st-text); font-weight: 700; }

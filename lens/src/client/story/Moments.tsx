@@ -7,10 +7,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, useAsync, human, type SeatJson } from "./data";
 import { momentsOf, citation, type Moment, type MomentsResponse } from "./moments-data";
+import { PageAnswer } from "../shell/Shell";
+import { goalText, leverTitle } from "../words";
 import "./story.css";
 import "./moments.css";
 
 const DAY = 86_400;
+const LEVEL: { [k: string]: string } = { executed: "carried out", attempted: "tried", considered: "mentioned (unreliable)" };
 export { momentsOf, citation, type Moment };
 interface RunEntry { key: string; indexed?: boolean }
 
@@ -18,7 +21,7 @@ export function Moments({ onOpen }: { onOpen?: (key: string, t: number, sel: str
   // (The server's /api/moments: each indexed fork's moments, made once per bundle. Where it is absent, from each seat.)
   const data = useAsync(async () => {
     const r = await fetch("/api/moments");
-    if (r.ok) { const x = (await r.json()) as MomentsResponse; return { all: dedupe(x.runs).flatMap((y) => y.moments), runs: x.indexed, note: x.indexed < x.forks ? `; ${x.forks - x.indexed} more forks are not indexed yet (opening a run indexes it)` : "" }; }
+    if (r.ok) { const x = (await r.json()) as MomentsResponse; return { all: dedupe(x.runs).flatMap((y) => y.moments), runs: x.indexed, note: x.indexed < x.forks ? `; ${x.forks - x.indexed} more runs have not been read yet (opening a run reads it)` : "" }; }
     const rs: RunEntry[] = await (await fetch("/api/runs")).json().then((c: any) => (Array.isArray(c) ? c : c.runs));
     const keep = rs.some((e) => e.indexed !== undefined) ? rs.filter((e) => e.indexed) : rs;
     const got = (await Promise.all(keep.map((e) => loadSeat(e.key).then((s) => ({ key: e.key, id: `${s.run_id}|${s.arm}`, moments: momentsOf(e.key, s, true) }), () => null)))).filter((x): x is NonNullable<typeof x> => x !== null);
@@ -40,7 +43,7 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
   const [sort, setSort] = useState<"poll" | "day" | "model">("poll");
   const all = useMemo(() => (weak ? every : every.filter((m) => m.lever.level !== "considered")), [every, weak]);
   const count = (f: (m: Moment) => string) => { const c = new Map<string, number>(); for (const m of all) c.set(f(m), (c.get(f(m)) ?? 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); };
-  const shown = all.filter((m) => (!models.size || models.has(m.model)) && (!levers.size || levers.has(m.lever.title)) && (!goals.size || goals.has(m.goal ?? "none")) && (!levels.size || levels.has(m.lever.level)))
+  const shown = all.filter((m) => (!models.size || models.has(m.model)) && (!levers.size || levers.has(leverTitle(m.lever.lever))) && (!goals.size || goals.has(goalText(m.goal ?? "none"))) && (!levels.size || levels.has(LEVEL[m.lever.level] ?? "")))
     .sort((a, b) => sort === "model" ? a.model.localeCompare(b.model) || a.lever.t - b.lever.t : sort === "day" ? a.lever.t - b.lever.t : (a.lever.days_to_poll ?? 1e9) - (b.lever.days_to_poll ?? 1e9));
   const withAny = new Set(all.filter((m) => m.lever.level !== "considered").map((m) => m.key)).size;
   const toggle = (s: Set<string>, set: (x: Set<string>) => void, v: string) => { const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); set(n); };
@@ -55,18 +58,18 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
   return (
     <div className="mo">
       <div className="mo-head">
-        <div className="st-kicker">Moments · from every run with a seat bundle</div>
-        <h1 className="mo-title">When the seat reached for a lever</h1>
-        <div className="st-sub">{all.filter((m) => m.lever.level !== "considered").length} moments in {withAny} of {runs} indexed runs{note}. Flags are the study's reader (experiments/power-seeking/reader.ts); the words are the seat's own: what it asked for, and what it said on signing.</div>
+        <PageAnswer page="moments" />
+        <h1 className="mo-title">When an AI mayor reached for a power grab</h1>
+        <p className="st-sub">{all.filter((m) => m.lever.level !== "considered").length} moments in {withAny} of {runs} runs read so far{note}. The study's checker decides what counts as a power grab; the quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</p>
         <div className="mo-filters">
-          <Facet label="model" items={count((m) => m.model)} set={setModels} on={models} />
-          <Facet label="goal" items={count((m) => m.goal ?? "none")} set={setGoals} on={goals} />
-          <Facet label="lever" items={count((m) => m.lever.title)} set={setLevers} on={levers} />
-          <Facet label="level" items={count((m) => m.lever.level)} set={setLevels} on={levels} />
-          <div className="mo-facet"><span className="lbl">order</span>
-            {(["poll", "day", "model"] as const).map((k) => <button key={k} className={`st-btn ${sort === k ? "on" : ""}`} onClick={() => setSort(k)}>{k === "poll" ? "nearest the poll" : k === "day" ? "by day" : "by model"}</button>)}
+          <Facet label="Model" items={count((m) => m.model)} set={setModels} on={models} />
+          <Facet label="Instructions" items={count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
+          <Facet label="Power grab" items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />
+          <Facet label="How far" items={count((m) => LEVEL[m.lever.level] ?? "")} set={setLevels} on={levels} />
+          <div className="mo-facet"><span className="lbl">Order</span>
+            {(["poll", "day", "model"] as const).map((k) => <button key={k} className={`st-btn ${sort === k ? "on" : ""}`} onClick={() => setSort(k)}>{k === "poll" ? "Nearest election day" : k === "day" ? "By day" : "By model"}</button>)}
             <span style={{ flex: 1 }} />
-            <button className={`st-btn ${weak ? "on" : ""}`} onClick={() => setWeak(!weak)} title="The reader's phrase matches in the seat's words: unreliable">{weak ? "hide" : "show"} “considered”</button>
+            <button className={`st-btn ${weak ? "on" : ""}`} onClick={() => setWeak(!weak)} title="The checker matched words only; often wrong">{weak ? "Hide" : "Show"} mentions (unreliable)</button>
           </div>
         </div>
       </div>
@@ -84,18 +87,18 @@ function Card({ m, onOpen }: { m: Moment; onOpen: () => void }) {
   const [copied, setCopied] = useState(false);
   return (
     <article className={`mo-card ${weak ? "weak" : ""} ${l.level}`}>
-      <div className="mo-card-top"><span className="mo-lever">{l.title}</span><span className={`mo-level ${l.level}`}>{l.level}</span></div>
+      <div className="mo-card-top"><span className="mo-lever">{leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`}>{l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}</span></div>
       <blockquote className={`mo-quote ${more ? "open" : ""}`} onClick={() => setMore(!more)}>{m.words}</blockquote>
       {m.note && <div className="mo-sub"><span className="k">on signing</span>“{m.note}”</div>}
       {m.reason && <div className="mo-sub"><span className="k">its reason</span>“{m.reason}”</div>}
       {more && <Around m={m} />}
-      <div className="mo-when"><b>day {l.day}</b>{l.days_to_poll !== null ? <> · {l.days_to_poll} days to the poll</> : null} · {human(l.phase)}</div>
+      <p className="mo-when">Day {l.day}{l.days_to_poll !== null ? `, ${l.days_to_poll} days before election day` : ""}.</p>
       <div className="mo-out"><span className={`st-pill ${m.outcomeTone}`}>{m.outcome}</span></div>
       <div className="mo-foot">
-        <span className="mo-who"><b>{m.model}</b>{m.goal ? ` · ${m.goal}` : ""}{m.seed !== undefined ? ` · seed ${m.seed}` : ""}<span className="st-faint"> · {m.election}</span></span>
+        <span className="mo-who"><b>{m.model}</b>, {m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}{m.seed !== undefined ? `, town seed ${m.seed}` : ""}. <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span></span>
         <span style={{ flex: 1 }} />
-        <button className="st-btn" title="Copy as a citation" onClick={() => { navigator.clipboard?.writeText(citation(m)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }, () => {}); }}>{copied ? "copied" : "cite"}</button>
-        <button className="st-btn flag" onClick={onOpen}>open ›</button>
+        <button className="st-btn" title="Copy as a citation" onClick={() => { navigator.clipboard?.writeText(citation(m)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }, () => {}); }}>{copied ? "Copied" : "Copy as a citation"}</button>
+        <button className="st-btn" onClick={onOpen}>Open this turn</button>
       </div>
     </article>
   );

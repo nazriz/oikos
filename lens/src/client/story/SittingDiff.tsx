@@ -8,6 +8,8 @@ import { loadSeat, loadSitting, useAsync, when, usd, plural, type SeatJson } fro
 import { Said, Happened, type Detail } from "./SittingReader";
 import { MarksContext, type Marks } from "./text";
 import { seatOutcome } from "./data";
+import { PageAnswer } from "../shell/Shell";
+import { goalText } from "../words";
 import "./story.css";
 import "./diff.css";
 
@@ -43,14 +45,15 @@ function Diff({ keys, seats, initial }: { keys: string[]; seats: SeatJson[]; ini
     <div className="df">
       <div className="df-head">
         <div>
-          <div className="st-kicker">The same moment · {seats.length} seats{seeds.size === 1 ? ` · seed ${[...seeds][0]}` : " · different seeds!"}</div>
-          <h1 className="df-title">Day {day}{poll !== undefined ? <span className="st-faint" style={{ fontSize: 16, fontWeight: 400 }}> · {Math.floor(poll / DAY) - day} days before the poll was due</span> : null}</h1>
+          <PageAnswer page="diff" />
+          <h1 className="df-title">Day {day}, {seats.length} AI mayors side by side</h1>
+          <p className="st-sub">{seeds.size === 1 ? `The same town (seed ${[...seeds][0]}) in every column.` : "These runs are not the same town."}{poll !== undefined ? ` Election day was due on day ${Math.floor(poll / DAY)}, ${Math.floor(poll / DAY) - day} days later.` : ""}</p>
         </div>
         <span style={{ flex: 1 }} />
         <div className="st-search"><span className="st-faint">⌕</span><input placeholder="Mark in every column" value={query} onChange={(e) => setQuery(e.target.value)} /></div>
-        <button className="st-btn" disabled={at <= 0} onClick={() => setDay(days[at - 1]!)}>‹ earlier</button>
+        <button className="st-btn" disabled={at <= 0} onClick={() => setDay(days[at - 1]!)}>Earlier day</button>
         <select className="df-day" value={day} onChange={(e) => setDay(Number(e.target.value))}>{days.map((d) => <option key={d} value={d}>day {d}</option>)}</select>
-        <button className="st-btn" disabled={at < 0 || at >= days.length - 1} onClick={() => setDay(days[at + 1]!)}>later ›</button>
+        <button className="st-btn" disabled={at < 0 || at >= days.length - 1} onClick={() => setDay(days[at + 1]!)}>Later day</button>
       </div>
       <div className="df-days">{days.map((d) => {
         const who = seats.filter((s) => s.sittings.some((x) => x.day === d && x.kind === "model")).length;
@@ -75,11 +78,11 @@ function Column({ runKey, seat, day }: { runKey: string; seat: SeatJson; day: nu
   return (
     <div className="df-col">
       <div className="df-col-head">
-        <div className="df-model">{modelOf(seat)}{seat.goal ? <i> · {seat.goal}</i> : null}</div>
-        <div className="st-faint" style={{ fontSize: 11.5 }}>{seatOutcome(seat).label} · {usd(seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0))}</div>
-        {s ? <div className="df-when">sitting {s.i + 1}, {when(s.t)}{off !== 0 ? <span className="df-off"> ({off > 0 ? `${off} days later` : `${-off} days earlier`}: none on day {day})</span> : null} · {plural(s.turns, "call")}{s.acts.length ? ` · ${plural(s.acts.length, "act")}` : ""}</div> : <div className="df-when">no sittings</div>}
+        <div className="df-model">{modelOf(seat)}</div>
+        <p className="st-faint" style={{ fontSize: 11.5, margin: 0 }}>{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seatOutcome(seat).label}. Cost {usd(seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0))}.</p>
+        {s ? <p className="df-when">Turn {s.i + 1}, {when(s.t)}{off !== 0 ? <span className="df-off"> (it took no turn on day {day}; this is {off > 0 ? `${off} days later` : `${-off} days earlier`})</span> : null}. {s.acts.length ? `${plural(s.acts.length, "act")}.` : "No acts."}</p> : <p className="df-when">No turns.</p>}
         {s && <div className="df-gist">{s.gist}</div>}
-        {s && <a className="st-btn" href={`#/run/${encodeURIComponent(runKey)}?t=${Math.round(s.t)}&sel=sitting:${s.i}`}>open in its run ›</a>}
+        {s && <a className="st-btn" href={`#/run/${encodeURIComponent(runKey)}?t=${Math.round(s.t)}&sel=sitting:${s.i}`}>Open this turn in its run</a>}
       </div>
       <div className="df-col-body">
         {d === undefined ? <div className="st-faint">…</div> : d === null || d instanceof Error ? <div className="st-faint">—</div> : (
