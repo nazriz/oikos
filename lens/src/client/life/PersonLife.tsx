@@ -122,7 +122,7 @@ function Who_({ c, q, id, t }: { c: CityData; q: number | undefined; id: string;
             return (
               <button key={p[0]} className="life-chip" title={d} onClick={() => select({ kind: "person", id: p[0] })}>
                 {p[1]}
-                {d && p[1] === p[0] && <span className="faint"> · {d}</span>}
+                {d && p[1] === p[0] && <span className="faint">, {d}</span>}
               </button>
             );
           })}
@@ -188,7 +188,7 @@ function Places({ c, q, t }: { c: CityData; q: number | undefined; t: number }) 
               {structureName(c, o.s)}
             </button>
             <span className="faint">
-              {words(o.kind)} · {Math.round(o.hours).toLocaleString()} h over {o.visits} visit{o.visits === 1 ? "" : "s"}
+              {words(o.kind)}, {Math.round(o.hours).toLocaleString()} hours over {o.visits} visit{o.visits === 1 ? "" : "s"}
             </span>
           </li>
         ))}
@@ -231,7 +231,7 @@ function Money({ ledger, t, nameOf, whoOf }: { ledger: PersonLedger; t: number; 
       <div className="life-money">
         <div>
           <div className="life-big serif num">{money(days[Math.min(days.length - 1, dayOf(t))] ?? ledger.opening)}</div>
-          <div className="faint life-small">on day {dayOf(t)} · {ledger.accounts.length} account{ledger.accounts.length === 1 ? "" : "s"}</div>
+          <div className="faint life-small">on day {dayOf(t)}, in {ledger.accounts.length} account{ledger.accounts.length === 1 ? "" : "s"}</div>
         </div>
         <div className="life-io num">
           <span className="good">+{money(inc)}</span>
@@ -303,7 +303,7 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
   return (
     <section className="life-sec">
       <div className="life-reached-head">
-        <div className="eyebrow">What reached them · {rows.length}</div>
+        <div className="eyebrow">What reached them ({rows.length})</div>
         <div className="seg">
           {(["all", "seat", "inst", "person"] as const).map((f) => (
             <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>
@@ -316,7 +316,7 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
         {shown.map((r, i) => [
           forkIdx === i && fork > 0 ? (
             <li key={`fork${i}`} className="life-fork">
-              fork · day {dayOf(fork)} <span className="faint">the arm's own time begins</span>
+              Day {dayOf(fork)}: the AI mayor takes office
             </li>
           ) : null,
           <li key={i} className={`life-row ${r.who} ${nowIdx === i ? "now" : ""} ${r.t > t ? "later" : ""}`}>
@@ -327,14 +327,14 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
                 if (r.it?.seat && r.it.seq !== undefined) s.select({ kind: "act", seq: r.it.seq });
               }}
             >
-              <span className="life-when mono">
+              <span className="life-when num">
                 day {dayOf(r.t)} <span className="faint">{clock(r.t)}</span>
               </span>
               <span className="life-what">
                 <span className="life-kind">
                   {words(r.kind)}
-                  {r.from && <span className={`life-who ${r.who}`}> · {nameOf(r.from)}</span>}
-                  {r.it?.refused && <span className="bad"> · refused ({words(r.it.refused)})</span>}
+                  {r.from && <span className={`life-who ${r.who}`}>, from {nameOf(r.from)}</span>}
+                  {r.it?.refused && <span className="bad">, refused ({words(r.it.refused)})</span>}
                 </span>
                 <span className="life-text">{r.text}</span>
               </span>

@@ -55,3 +55,14 @@
   .dg-break { break-before: auto; }
   .dg h2 { break-after: avoid; }
 }
+
+/* house style (docs/design/lens-look.md) */
+.dg-head h1, .dg h2, .dg-out .v { font-family: var(--st-sans); font-weight: 800; letter-spacing: -0.012em; font-variation-settings: normal; }
+.dg-lede { margin: 4px 0 6px; font-size: 13.5px; color: var(--st-muted); }
+.dg-out .k { text-transform: none; letter-spacing: 0; font-size: 11.5px; font-weight: 700; }
+.dg-page, .dg-band { border-radius: 2px; }
+.dg-note { display: block; margin: -4px 0 10px; font-size: 11.5px; }
+.dg-sub span { text-transform: none; letter-spacing: 0; font-size: 11px; }
+.dg-tl .lane { text-transform: none; letter-spacing: 0; }
+.dg-id { font-family: var(--st-sans); }
+.dg-tl .sit, .dg-acts .ok { fill: var(--st-seat-mark); }

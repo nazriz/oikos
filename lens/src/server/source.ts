@@ -10,7 +10,7 @@ export interface Progress {
   fileBytes: number;
 }
 
-async function* bytesOf(path: string, progress: Progress): AsyncGenerator<Uint8Array> {
+export async function* bytesOf(path: string, progress: Progress): AsyncGenerator<Uint8Array> {
   if (path.endsWith(".oklog")) {
     const p = Bun.spawn([kernelPath(), "export", path], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
     try {
@@ -28,29 +28,41 @@ async function* bytesOf(path: string, progress: Progress): AsyncGenerator<Uint8A
   for await (const chunk of input) yield chunk as Uint8Array;
 }
 
-/** The log's lines in batches, in order. The last line may lack its newline. */
-export async function* lineBatches(path: string, progress: Progress = { fileBytes: 0 }): AsyncGenerator<string[]> {
-  const dec = new TextDecoder();
-  // (A line longer than a chunk, the header's 33 MB of config above all, is gathered in pieces and joined once: adding
-  // each chunk to it and splitting again would read it hundreds of times.)
-  let pieces: string[] = [];
-  for await (const chunk of bytesOf(path, progress)) {
-    const s = dec.decode(chunk, { stream: true });
-    const nl = s.indexOf("\n");
-    if (nl < 0) {
-      pieces.push(s);
-      continue;
+/** Bytes into lines. A line longer than a chunk (the header's 33 MB of config above all) is gathered in pieces and
+ * joined once: adding each chunk to it and splitting again would read it hundreds of times. */
+export class LineSplitter {
+  private readonly dec = new TextDecoder();
+  private pieces: string[] = [];
+  push(chunk: Uint8Array): string[] {
+    const s = this.dec.decode(chunk, { stream: true });
+    if (s.indexOf("\n") < 0) {
+      this.pieces.push(s);
+      return [];
     }
     const lines = s.split("\n");
     const tail = lines.pop()!;
-    if (pieces.length) {
-      pieces.push(lines[0]!);
-      lines[0] = pieces.join("");
+    if (this.pieces.length) {
+      this.pieces.push(lines[0]!);
+      lines[0] = this.pieces.join("");
     }
-    pieces = tail ? [tail] : [];
-    yield lines;
+    this.pieces = tail ? [tail] : [];
+    return lines;
   }
-  pieces.push(dec.decode());
-  const last = pieces.join("");
-  if (last.length) yield [last];
+  end(): string[] {
+    this.pieces.push(this.dec.decode());
+    const last = this.pieces.join("");
+    this.pieces = [];
+    return last.length ? [last] : [];
+  }
+}
+
+/** The log's lines in batches, in order. The last line may lack its newline. */
+export async function* lineBatches(path: string, progress: Progress = { fileBytes: 0 }): AsyncGenerator<string[]> {
+  const split = new LineSplitter();
+  for await (const chunk of bytesOf(path, progress)) {
+    const lines = split.push(chunk);
+    if (lines.length) yield lines;
+  }
+  const last = split.end();
+  if (last.length) yield last;
 }

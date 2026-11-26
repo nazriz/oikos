@@ -21,7 +21,7 @@ export function homeAt(c: CityData, person: string, t: number): number {
 }
 
 /** Candidate colours: the seat's own candidacy in the seat's amber, the others in quiet, distinct hues. */
-const CAND = ["#8fb8ff", "#e58fb0", "#9fd99a", "#c9a0ff", "#7fd6d0", "#e6c07a"];
+const CAND = ["#1F5FAD", "#2F7D5B", "#8C5A3C", "#5B6B78", "#B5523B", "#1D2B36"];
 export function candidateColours(e: Election, seats: string[]): Record<string, string> {
   const out: Record<string, string> = {};
   let k = 0;
@@ -111,7 +111,7 @@ export const PAPER_GROUPS: { id: string; label: string; colour: string; kinds: s
   { id: "housing", label: "Tenancy and eviction", colour: "#ef9a72", kinds: ["notice_to_vacate", "tribunal_order", "warrant", "warrant_executed", "rent_statement", "rental_application", "stay_request", "tribunal_application", "hearing_notice"] },
   { id: "complaints", label: "Complaints", colour: "#e8c46a", kinds: ["complaint", "complaint_notice", "venue_decision"] },
   { id: "benefits", label: "Benefits", colour: "#7fc2e6", kinds: ["benefit_claim", "benefit_decision", "benefit_change", "care_request"] },
-  { id: "civic", label: "Petitions and nominations", colour: "#b48cf2", kinds: ["petition", "nomination"] },
+  { id: "civic", label: "Petitions and nominations", colour: "#1F5FAD", kinds: ["petition", "nomination"] },
   { id: "building", label: "Building and permits", colour: "#a9b4c2", kinds: ["building_notice", "building_inspection", "permit_application", "permit_decision"] },
   { id: "money", label: "Rates, debts, closures", colour: "#c7b28f", kinds: ["rates_notice", "loan_arrears", "garnishee_order", "enforcement_request", "insolvency", "closure"] },
   { id: "life", label: "Departures, deaths, welfare", colour: "#cfd3da", kinds: ["departure", "death_registration", "death_notification", "welfare_check_request"] },

@@ -2,6 +2,7 @@
 import type { Meta, RunEntry, UsageTotals } from "../../shared/api";
 import { compact, dayOf, int, usd, words } from "../format";
 import { useLens } from "../state";
+import { goalText } from "../words";
 import { readingOutcome } from "../outcome";
 
 const DAY = 86_400;
@@ -23,9 +24,9 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
           <>
             <div className="sum-hero serif">{seat.model ? seat.model.split("/").at(-1) : seat.id}</div>
             <div className="muted sum-sub">
-              {seat.provider ? `${seat.provider} · ` : ""}
-              {seat.post ? `holds ${seat.post}` : seat.id}
-              {entry?.experiment ? ` · goal ${entry.experiment.goal}` : ""}
+              {seat.provider ? `Through ${seat.provider}. ` : ""}
+              {seat.post ? `Holds the post ${seat.post}.` : seat.id}
+              {entry?.experiment ? ` ${goalText(entry.experiment.goal)}.` : ""}
             </div>
             <dl className="facts">
               <dt>wakes</dt>
@@ -48,7 +49,7 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
       {r && (
         <section>
           <div className="eyebrow">
-            The study reader <span className="faint">· experiments/power-seeking/reader.ts</span>
+            The study's checker <span className="faint">(experiments/power-seeking/reader.ts)</span>
           </div>
           <div className="levels">
             <Level label="considered" n={r.levels.considered} tier={r.tier.considered} />
@@ -57,8 +58,8 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
           </div>
           <div className="sum-sub muted">
             {readingOutcome(r)?.label ?? (r.stood ? "Stood" : "Did not stand")}
-            {r.levers ? ` · ${r.levers.tried} lever${r.levers.tried === 1 ? "" : "s"} tried, ${r.levers.done} done` : ""}
-            {r.stopped_before_poll ? ` · stopped before the poll (day ${r.stopped_day ?? "?"})` : ""}
+            {r.levers ? `. Power grabs tried: ${r.levers.tried}, carried out: ${r.levers.done}.` : ""}
+            {r.stopped_before_poll ? ` Stopped before the election (day ${r.stopped_day ?? "?"}).` : ""}
           </div>
           {r.attempts.length > 0 && (
             <ol className="attempts">
@@ -68,7 +69,7 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
                     <span className="attempt-head">
                       <span className="chip flag">tier {a.tier}</span>
                       <b>{words(a.lever)}</b>
-                      <span className="mono faint">day {a.day}</span>
+                      <span className="faint">day {a.day}</span>
                     </span>
                     {a.stage && <span className="muted attempt-stage">{words(a.stage)}</span>}
                     <q className="serif attempt-words">{a.words}</q>
@@ -101,7 +102,7 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
           <dd className="num">
             {int(meta.people.initial)}
             {meta.people.created ? ` + ${meta.people.created} born or arrived` : ""}
-            {meta.people.left ? ` · ${meta.people.left} left` : ""}
+            {meta.people.left ? `, ${meta.people.left} left` : ""}
           </dd>
           <dt>span</dt>
           <dd className="num">
@@ -110,7 +111,7 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
           <dt>ended</dt>
           <dd>
             {meta.ended === "finished" ? `reached its set length, day ${dayOf(meta.span.end)}` : meta.ended === "stopped" ? `stopped on day ${dayOf(meta.span.end)}` : "no end line (cut short?)"}
-            {meta.end?.reason && <span className="faint"> · {meta.end.reason}</span>}
+            {meta.end?.reason && <span className="faint"> ({meta.end.reason})</span>}
           </dd>
           <dt>kernel</dt>
           <dd className="mono">{meta.kernel ? `${meta.kernel.version ?? ""} ${meta.kernel.build ?? ""}` : "–"}</dd>
@@ -120,7 +121,7 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
       </section>
 
       <section>
-        <div className="eyebrow">The log · {int(meta.lines)} lines</div>
+        <div className="eyebrow">The log, {int(meta.lines)} lines</div>
         <div className="bars">
           {counts.map(([k, n]) => (
             <Bar key={k} label={k} value={compact(n)} frac={n / maxC} mono />
@@ -131,7 +132,7 @@ export function RunSummary({ meta, entry }: { meta: Meta; entry?: RunEntry }) {
   );
 }
 
-const usageTitle = (u: UsageTotals) => `${u.calls} calls · ${u.input.toLocaleString()} in · ${u.cacheRead.toLocaleString()} cached · ${u.output.toLocaleString()} out`;
+const usageTitle = (u: UsageTotals) => `${u.calls} calls, ${u.input.toLocaleString()} in, ${u.cacheRead.toLocaleString()} cached, ${u.output.toLocaleString()} out`;
 
 function Level({ label, n, tier, flag }: { label: string; n: number; tier: number; flag?: boolean }) {
   const hot = flag && tier >= 2;
@@ -151,7 +152,7 @@ function Bar({ label, value, frac, tone, mono, title }: { label: string; value: 
       <span className="bar-track">
         <span className={`bar-fill ${tone ?? ""}`} style={{ width: `${Math.max(1.5, frac * 100)}%` }} />
       </span>
-      <span className="bar-value mono num">{value}</span>
+      <span className="bar-value num">{value}</span>
     </div>
   );
 }
@@ -170,7 +171,7 @@ function Spark({ values, from }: { values: number[]; from: number }) {
         <polyline points={pts.join(" ")} className="spark-line" />
       </svg>
       <figcaption className="faint">
-        per day, day {from} to {from + v.length - 1} · peak {usd(max / 1e6)}
+        Per day, day {from} to {from + v.length - 1}; the most in one day {usd(max / 1e6)}
       </figcaption>
     </figure>
   );

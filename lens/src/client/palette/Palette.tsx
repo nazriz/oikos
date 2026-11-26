@@ -13,8 +13,8 @@ import { useLens, type Selection } from "../state";
 import { useDescribe } from "../people";
 import "./palette.css";
 
-type Group = "People" | "Households" | "Buildings" | "Organisations" | "Posts" | "Sittings" | "Records" | "Transcripts";
-const ORDER: Group[] = ["People", "Households", "Posts", "Organisations", "Buildings", "Sittings", "Records", "Transcripts"];
+type Group = "People" | "Households" | "Buildings" | "Organisations" | "Posts" | "Turns" | "Records" | "Transcripts";
+const ORDER: Group[] = ["People", "Households", "Posts", "Organisations", "Buildings", "Turns", "Records", "Transcripts"];
 
 interface Item {
   group: Group;
@@ -68,20 +68,20 @@ function useIndex(run: string, open: boolean) {
       const xs: Item[] = [];
       for (const s of tw.structures) {
         const org = s.houses ? tw.entities[s.houses]?.name : undefined;
-        xs.push({ group: "Buildings", title: org ?? s.id, sub: `${words(s.type)}${org ? ` · ${s.id}` : ""}`, name: lc(org ?? s.id), hay: lc(`${s.id} ${s.type} ${s.category} ${org ?? ""} ${s.owner ?? ""}`), sel: { kind: "structure", id: s.id } });
+        xs.push({ group: "Buildings", title: org ?? s.id, sub: `${words(s.type)}${org ? `, ${s.id}` : ""}`, name: lc(org ?? s.id), hay: lc(`${s.id} ${s.type} ${s.category} ${org ?? ""} ${s.owner ?? ""}`), sel: { kind: "structure", id: s.id } });
       }
       for (const [id, e] of Object.entries(tw.entities)) if (e.kind !== "person") xs.push({ group: "Organisations", title: e.name, sub: `${words(e.kind)} · ${id}`, name: lc(e.name), hay: lc(`${e.name} ${id} ${e.kind}`), sel: { kind: "entity", id } });
       for (const [id, p] of Object.entries(tw.positions)) {
         const holder = p.holder?.replace(/-self$/, "");
-        xs.push({ group: "Posts", title: p.title, sub: `${id}${p.holder ? ` · held by ${p.holder}` : " · vacant"}`, name: lc(p.title), hay: lc(`${p.title} ${id} ${p.entity} ${p.holder ?? ""}`), sel: holder && !holder.endsWith("-system") ? { kind: "person", id: holder } : { kind: "entity", id: p.entity } });
+        xs.push({ group: "Posts", title: p.title, sub: `${id}, ${p.holder ? `held by ${p.holder}` : "vacant"}`, name: lc(p.title), hay: lc(`${p.title} ${id} ${p.entity} ${p.holder ?? ""}`), sel: holder && !holder.endsWith("-system") ? { kind: "person", id: holder } : { kind: "entity", id: p.entity } });
       }
       push(xs);
     }, () => {});
     fetchFold<LedgerJson>(run, "ledger").then((l) => {
-      push(l.records.map(([id, kind, t, author, text]) => ({ group: "Records", title: `${words(kind)} · ${id}`, sub: text, name: lc(id), hay: lc(`${id} ${kind} ${author} ${text}`), t })));
+      push(l.records.map(([id, kind, t, author, text]) => ({ group: "Records", title: `${words(kind)} ${id}`, sub: text, name: lc(id), hay: lc(`${id} ${kind} ${author} ${text}`), t })));
     }, () => {});
     fetchFold<SeatJson>(run, "seat").then(async (seat) => {
-      push(seat.sittings.map((s) => ({ group: "Sittings", title: `Day ${s.day} · ${s.gist}`, sub: s.words, name: lc(`day ${s.day}`), hay: lc(`day ${s.day} ${s.gist} ${s.words ?? ""} ${s.woke_for ?? ""}`), t: s.t, sel: { kind: "sitting", index: s.i } })));
+      push(seat.sittings.map((s) => ({ group: "Turns", title: `Day ${s.day}: ${s.gist}`, sub: s.words, name: lc(`day ${s.day}`), hay: lc(`day ${s.day} ${s.gist} ${s.words ?? ""} ${s.woke_for ?? ""}`), t: s.t, sel: { kind: "sitting", index: s.i } })));
       // The transcripts: fetched a few at a time, each sitting's words joined into one searchable text.
       const todo = seat.sittings.filter((s) => s.kind === "model");
       setTranscripts({ done: 0, total: todo.length, items: [] });
@@ -98,7 +98,7 @@ function useIndex(run: string, open: boolean) {
               if (turn.purpose === "participant") strings(turn.input, ws);
             }
             const text = ws.join("\n");
-            got.push({ group: "Transcripts", title: `Day ${s.day} · sitting ${s.i}`, name: "", hay: lc(text), t: s.t, sel: { kind: "sitting", index: s.i }, sub: text });
+            got.push({ group: "Transcripts", title: `Day ${s.day}, turn ${s.i + 1}`, name: "", hay: lc(text), t: s.t, sel: { kind: "sitting", index: s.i }, sub: text });
           } catch {}
           if (live) setTranscripts({ done: got.length, total: todo.length, items: [...got] });
         }
@@ -173,7 +173,7 @@ export function Palette({ run }: { run: string }) {
     const people = items.map((it) => {
       if (!it.pid) return it;
       const d = describe(it.pid);
-      return d ? { ...it, sub: `${it.pid} · ${d}`, hay: `${it.hay} ${d.toLowerCase()}` } : it;
+      return d ? { ...it, sub: `${it.pid}, ${d}`, hay: `${it.hay} ${d.toLowerCase()}` } : it;
     });
     return [...people, ...transcripts.items];
   }, [items, transcripts.items, describe]);
@@ -226,7 +226,7 @@ export function Palette({ run }: { run: string }) {
               <p>Type a name, an id (c0018, house-198, rec.94835), a post, or any words the seat wrote or read.</p>
               <p className="faint">
                 {items.length.toLocaleString()} things indexed
-                {transcripts.total ? ` · transcripts ${transcripts.done} of ${transcripts.total}` : ""}
+                {transcripts.total ? `, and the words of ${transcripts.done} of ${transcripts.total} turns` : ""}
               </p>
             </div>
           )}
@@ -244,7 +244,7 @@ export function Palette({ run }: { run: string }) {
                     <span className="pal-title">{h.title}</span>
                     {(h.snippet ?? h.sub) && <span className="pal-sub">{h.snippet ?? h.sub}</span>}
                     {h.t !== undefined && (
-                      <span className="pal-t mono">
+                      <span className="pal-t num">
                         d{dayOf(h.t)} {clock(h.t)}
                       </span>
                     )}

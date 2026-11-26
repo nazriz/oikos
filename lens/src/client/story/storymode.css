@@ -1,0 +1,19 @@
+/* Story mode's rail: an account in plain sentences (docs/design/lens-look.md: Overpass for Lens, serif for the mayor). */
+.sm { height: 100%; overflow-y: auto; background: var(--st-panel); color: var(--st-text); font-family: var(--st-sans); border-left: 1px solid var(--st-line); }
+.sm-head { padding: 18px 18px 14px; border-bottom: 1px solid var(--st-line); }
+.sm-head h2 { font-size: 19px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 8px; line-height: 1.2; }
+.sm-head p { font-size: 13.5px; line-height: 1.55; margin: 0 0 6px; color: var(--st-text); }
+.sm-out { font-weight: 700; }
+.sm-out.good { color: var(--st-good); } .sm-out.bad { color: var(--st-bad); } .sm-out.flag { color: var(--st-flag); } .sm-out.muted { color: var(--st-muted); }
+.sm-list { padding: 6px 0 40px; }
+.sm-card { padding: 14px 18px 14px 20px; border-bottom: 1px solid var(--st-line); position: relative; }
+.sm-card.grab::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--st-flag); }
+.sm-card h3 { margin: 0 0 4px; font-size: 14.5px; font-weight: 800; }
+.sm-card p { margin: 0 0 6px; font-size: 13.5px; line-height: 1.55; }
+.sm-grab { color: var(--st-flag); font-weight: 600; }
+.sm-quote { margin: 8px 0 10px; padding-left: 10px; border-left: 2px solid var(--st-seat-mark); font-family: var(--st-serif); font-size: 14px; line-height: 1.55; color: var(--st-text); }
+.sm-quiet { padding: 8px 18px; border-bottom: 1px solid var(--st-line); font-size: 12.5px; color: var(--st-muted); }
+.sm-quiet p { margin: 4px 0; line-height: 1.5; }
+.sm-quiet-toggle { font: inherit; color: var(--st-muted); background: none; border: none; padding: 0; cursor: pointer; text-align: left; }
+.sm-quiet-toggle:hover { color: var(--st-text); text-decoration: underline; }
+.sm-link { font: inherit; color: var(--st-text); background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }

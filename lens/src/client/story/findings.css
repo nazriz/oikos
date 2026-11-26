@@ -41,3 +41,10 @@
   .fi-drill { margin: 0 8px; } .fi-drill-row { grid-template-columns: 1fr; gap: 2px; }
 }
 .fi-card.wide .fi-svg { max-width: 1240px; }
+
+/* house style (docs/design/lens-look.md) */
+.fi-title, .fi-card h2 { font-family: var(--st-sans); font-weight: 800; letter-spacing: -0.015em; font-variation-settings: normal; }
+.fi-groups .lbl { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 700; }
+.fi-card, .fi-drill, .fi-tip { border-radius: 2px; }
+.fi-drill, .fi-tip { box-shadow: none; }
+.fi-takeaway { font-size: 17px; line-height: 1.5; max-width: 760px; margin: 0 0 14px; }

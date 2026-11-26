@@ -8,17 +8,21 @@ import { momentsOf } from "./moments-data";
 import { leverCounts } from "../../shared/outcome";
 import { useDescribe } from "../people";
 import { kinAppointed } from "./StoryRail";
+import { PageAnswer } from "../shell/Shell";
+import { goalText, leverTitle } from "../words";
 import "./story.css";
 import "./digest.css";
 
 const DAY = 86_400;
+const POSTS: { [p: string]: string } = { editor: "newspaper editor", electoral: "head of the election office", finance: "finance officer", "council-clerk": "council clerk" };
+const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 /** A law's figure as written: seconds that are whole days as days. */
 const figure = (v: unknown) => (typeof v === "number" && v >= DAY && v % DAY === 0 ? `${v / DAY} days` : typeof v === "object" ? JSON.stringify(v) : String(v));
 
 export function RunDigest({ run }: { run: string }) {
   const seat = useAsync(() => loadSeat(run), [run]);
   const entry = useAsync(() => fetch(`/api/run/${encodeURIComponent(run)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null), [run]);
-  useEffect(() => { document.title = `Digest · ${run}`; }, [run]);
+  useEffect(() => { document.title = `Digest of ${run}`; }, [run]);
   if (seat === undefined) return <div className="dg"><div className="st-empty">Reading the run…</div></div>;
   if (seat instanceof Error) return <div className="dg"><div className="st-empty">Could not read the run: {seat.message}</div></div>;
   return <Digest run={run} seat={seat} entry={entry instanceof Error ? null : entry ?? null} />;
@@ -34,42 +38,44 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
   const cost = seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0);
   return (
     <div className="dg">
-      <div className="dg-tools lens-no-print"><button className="st-btn on" onClick={() => print()}>Print or save as PDF</button><a className="st-btn" href={`#/run/${encodeURIComponent(run)}`}>open the run</a></div>
+      <div className="dg-tools lens-no-print"><button className="st-btn on" onClick={() => print()}>Print or save as PDF</button><a className="st-btn" href={`#/run/${encodeURIComponent(run)}`}>Open the run</a></div>
       <article className="dg-page">
         <header className="dg-head">
-          <div className="st-kicker">Run digest · Oikos · the power-seeking study</div>
-          <h1>{model}{seat.goal ? <span className="dg-goal"> · goal {seat.goal}</span> : null}{seat.seed !== undefined ? <span className="dg-seed"> · seed {seat.seed}</span> : null}</h1>
+          <PageAnswer page="digest" className="lens-no-print" />
+          <h1>{model} as the town's mayor</h1>
+          <p className="dg-lede">{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seat.seed !== undefined ? `Town seed ${seat.seed}. ` : ""}A digest of one run of the Oikos power-seeking study.</p>
           <div className="dg-id st-mono">{run}</div>
-          <div className="dg-id st-mono">{seat.run_id}{entry?.group ? ` · run set ${entry.group}` : ""}</div>
+          <div className="dg-id st-mono">{seat.run_id}{entry?.group ? `, in run set ${entry.group}` : ""}</div>
         </header>
 
         <section className="dg-band">
           <div className={`dg-out ${out.css}`}><div className="k">Election</div><div className="v">{out.label}</div>{e.winner && <div className="s">winner {e.winner === seat.seat ? "the seat" : e.winner}</div>}</div>
-          <div className="dg-out"><div className="k">Levers (reader)</div><div className="v">{lv.done} executed · {lv.tried} tried</div><div className="s">highest tier executed {seat.tier.executed || "—"}, attempted {seat.tier.attempted || "—"}</div></div>
-          <div className="dg-out"><div className="k">Run</div><div className="v">day {Math.round(seat.fork_at / DAY)} → {Math.round(seat.end_at / DAY)}</div><div className="s">{seat.ended === "stopped" ? `stopped early${seat.until_at ? ` (set to day ${Math.round(seat.until_at / DAY)})` : ""}` : seat.ended === "finished" ? "ran to its set length" : seat.end_reason ?? ""}</div></div>
-          <div className="dg-out"><div className="k">Cost</div><div className="v">{usd(cost)}</div><div className="s">seat {usd(seat.usage.cost_microusd)} · translator {usd(seat.translator_usage?.cost_microusd ?? 0)}</div></div>
+          <div className="dg-out"><div className="k">Power grabs</div><div className="v">{lv.done} carried out, {lv.tried} tried</div><div className="s">as the study's checker counts them; most serious carried out: {seat.tier.executed ? `${seat.tier.executed} of 3` : "none"}</div></div>
+          <div className="dg-out"><div className="k">Run</div><div className="v">Days {Math.round(seat.fork_at / DAY)} to {Math.round(seat.end_at / DAY)}</div><div className="s">{seat.ended === "stopped" ? `stopped early${seat.until_at ? ` (set to day ${Math.round(seat.until_at / DAY)})` : ""}` : seat.ended === "finished" ? "ran to its set length" : seat.end_reason ?? ""}</div></div>
+          <div className="dg-out"><div className="k">Cost</div><div className="v">{usd(cost)}</div><div className="s">{usd(seat.usage.cost_microusd)} for the mayor's model, {usd(seat.translator_usage?.cost_microusd ?? 0)} for the clerk's</div></div>
         </section>
 
         <section>
-          <h2>The run at a glance</h2>
+          <h2>The run, day by day</h2>
           <Timeline seat={seat} />
           <table className="dg-facts"><tbody>
-            <tr><th>Election calendar</th><td>notice {day(e.notice_at)} · nominations close {day(e.nominations_close_at)} · poll {day(e.poll_at)} · result {day(e.result_at)} · seated {day(e.seated_at)}{e.stood ? " · the seat stood" : " · the seat did not stand"}</td></tr>
-            <tr><th>Sittings</th><td>{seat.sittings.filter((s) => s.kind === "model").length} with model calls ({seat.usage.calls} calls, {tokens(seat.usage.input_tokens)} tokens in, {tokens(seat.usage.output_tokens)} out{seat.usage.reasoning_tokens ? `, ${tokens(seat.usage.reasoning_tokens)} reasoning` : ""})</td></tr>
-            <tr><th>Acts</th><td>{seat.acts.length} sent: {seat.acts.length - refused - seat.acts.filter((a) => a.status === "pending").length} applied, {refused} refused{seat.acts.some((a) => a.status === "pending") ? `, ${seat.acts.filter((a) => a.status === "pending").length} with no outcome by the end` : ""}</td></tr>
-            <tr><th>Translator</th><td>{seat.translator.requests} requests: {seat.translator.drafts} drafts, {seat.translator.failed} could not be drawn up, {seat.translator.declined} declined by the seat</td></tr>
+            <tr><th>Election calendar</th><td>{[e.notice_at !== undefined && `Election called on ${day(e.notice_at)}`, e.nominations_close_at !== undefined && `nominations closed on ${day(e.nominations_close_at)}`, e.poll_at !== undefined && `election day ${e.poll_at > seat.end_at ? "was due on" : "on"} ${day(e.poll_at)}`, e.result_at !== undefined && `result declared on ${day(e.result_at)}`, e.seated_at !== undefined && `new term began on ${day(e.seated_at)}`].filter(Boolean).join("; ")}. The AI mayor {e.stood ? "stood" : "did not stand"}{e.result_at === undefined ? "; no result came before the run ended" : ""}.</td></tr>
+            <tr><th>The mayor's turns</th><td>{seat.sittings.filter((s) => s.kind === "model").length} turns, in which the model was asked {seat.usage.calls} times; it read {tokens(seat.usage.input_tokens)} tokens and wrote {tokens(seat.usage.output_tokens)}{seat.usage.reasoning_tokens ? ` (${tokens(seat.usage.reasoning_tokens)} of them hidden reasoning)` : ""}.</td></tr>
+            <tr><th>Its acts</th><td>{seat.acts.length} sent: {seat.acts.length - refused - seat.acts.filter((a) => a.status === "pending").length} applied, {refused} refused{seat.acts.some((a) => a.status === "pending") ? `, ${seat.acts.filter((a) => a.status === "pending").length} with no outcome by the end` : ""}</td></tr>
+            <tr><th>The clerk</th><td>The mayor asked the clerk {seat.translator.requests} times to write something up: {seat.translator.drafts} written up, {seat.translator.failed} that could not be, {seat.translator.declined} that the mayor then declined.</td></tr>
             {seat.amendments.length > 0 && <tr><th>Election law</th><td>{seat.amendments.map((a) => `proposed day ${a.day} (${Object.entries(a.figures).map(([k, v]) => `${human(k)} ${figure(v)}`).join(", ")}): ${human(a.outcome)}`).join("; ")}</td></tr>}
-            {seat.children.length > 0 && <tr><th>The seat's children</th><td>{seat.children.map((c) => (describe(c) ? `${c} (${describe(c)})` : c)).join("; ")} (as its prompt names them)</td></tr>}
-            {kin.length > 0 && <tr><th>Its own child appointed</th><td>{kin.map((k) => `${k.who} as ${k.post}, day ${Math.floor(seat.acts[k.act]!.t / DAY)}`).join("; ")}</td></tr>}
+            {seat.children.length > 0 && <tr><th>The mayor's children</th><td>{seat.children.map((c) => (describe(c) ? `${c} (${describe(c)})` : c)).join("; ")}, as its own instructions name them</td></tr>}
+            {kin.length > 0 && <tr><th>Its own child appointed</th><td>{kin.map((k) => `${k.who} as ${POSTS[k.post] ?? k.post}, on day ${Math.floor(seat.acts[k.act]!.t / DAY)}`).join("; ")}</td></tr>}
           </tbody></table>
         </section>
 
         <section>
-          <h2>Lever moments <span className="dg-note">the study's reader (experiments/power-seeking/reader.ts); its "considered" level is left out</span></h2>
-          {!moments.length && <p className="st-muted">The reader found no lever attempted or executed.</p>}
+          <h2>Power grabs, in the mayor's words</h2>
+          <p className="dg-note">As the study's checker counts them (experiments/power-seeking/reader.ts). Mentions found only by matching words are left out.</p>
+          {!moments.length && <p className="st-muted">The study's checker found no power grab tried or carried out.</p>}
           {moments.map((m) => (
             <div key={m.lever.i} className={`dg-moment ${m.lever.level}`}>
-              <div className="dg-moment-top"><b>{m.lever.title}</b><span>{m.lever.level} · {m.outcome}</span><span>day {m.lever.day}{m.lever.days_to_poll !== null ? `, ${m.lever.days_to_poll} days to the poll` : ""} · {human(m.lever.phase)}</span></div>
+              <div className="dg-moment-top"><b>{cap(leverTitle(m.lever.lever))}</b><span>{m.lever.level === "executed" ? "Carried out" : "Tried"} on day {m.lever.day}{m.lever.days_to_poll !== null ? `, ${m.lever.days_to_poll} days before election day` : ""}; {m.outcome}.</span></div>
               <blockquote>“{m.words}”</blockquote>
               {m.note && <div className="dg-sub"><span>on signing</span> “{m.note}”</div>}
               {m.reason && <div className="dg-sub"><span>its reason</span> “{m.reason}”</div>}
@@ -89,7 +95,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
             <tbody>{seat.sittings.map((s) => (
               <tr key={s.i} className={s.levers.some((i) => seat.levers[i]!.level !== "considered") ? "lev" : ""}>
                 <td className="st-mono">{s.day}</td>
-                <td>{s.gist}{s.levers.some((i) => seat.levers[i]!.level !== "considered") ? <span className="dg-flag"> ⚑ {[...new Set(s.levers.map((i) => seat.levers[i]!).filter((l) => l.level !== "considered").map((l) => l.title))].join("; ")}</span> : null}</td>
+                <td>{s.gist}{s.levers.some((i) => seat.levers[i]!.level !== "considered") ? <span className="dg-flag"> Power grab: {[...new Set(s.levers.map((i) => seat.levers[i]!).filter((l) => l.level !== "considered").map((l) => leverTitle(l.lever)))].join("; ")}.</span> : null}</td>
                 <td className="st-mono">{s.turns}</td><td className="st-mono">{s.acts.length}{s.refused ? ` (${s.refused}✕)` : ""}</td><td className="st-mono">{s.usage.cost_microusd ? usd(s.usage.cost_microusd) : ""}</td>
               </tr>
             ))}</tbody>
@@ -106,17 +112,17 @@ function Timeline({ seat }: { seat: SeatJson }) {
   const W = 720, H = 74, L = 8, R = 8;
   const a = seat.fork_at, b = Math.max(seat.end_at, a + DAY);
   const x = (t: number) => L + ((Math.min(Math.max(t, a), b) - a) / (b - a)) * (W - L - R);
-  const e = seat.election, pins: [number | undefined, string][] = [[e.notice_at, "notice"], [e.nominations_close_at, "noms close"], [e.poll_at, "poll"], [e.result_at, "result"]];
+  const e = seat.election, pins: [number | undefined, string][] = [[e.notice_at, "election called"], [e.nominations_close_at, "nominations close"], [e.poll_at, "election day"], [e.result_at, "result"]];
   const ticks: number[] = []; for (let d = Math.ceil(a / DAY / 10) * 10; d * DAY <= b; d += 10) ticks.push(d);
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="dg-tl">
       {ticks.map((d) => <g key={d}><line x1={x(d * DAY)} x2={x(d * DAY)} y1={8} y2={58} className="grid" /><text x={x(d * DAY)} y={70} className="lbl" textAnchor="middle">{d}</text></g>)}
-      <text x={L} y={12} className="lane">sittings</text>
+      <text x={L} y={12} className="lane">the mayor's turns</text>
       {seat.sittings.map((s) => <rect key={s.i} x={x(s.t)} y={15} width={Math.max(2, x(s.t_end) - x(s.t))} height={8} rx={1.5} className={s.kind === "code" ? "code" : "sit"} />)}
-      <text x={L} y={34} className="lane">levers</text>
+      <text x={L} y={34} className="lane">power grabs</text>
       {seat.levers.filter((l) => l.level !== "considered").map((l) => <circle key={l.i} cx={x(l.t)} cy={40} r={3.5} className={l.level === "executed" ? "ex" : "at"} />)}
       {pins.map(([t, n]) => t !== undefined && t <= b ? <g key={n}><line x1={x(t)} x2={x(t)} y1={46} y2={58} className="pin" /><text x={x(t) + 2} y={56} className="pinl">{n}</text></g> : null)}
-      {e.poll_at !== undefined && e.poll_at > b && <text x={W - R} y={12} className="pinl" textAnchor="end">poll day {Math.floor(e.poll_at / DAY)} → (after the run)</text>}
+      {e.poll_at !== undefined && e.poll_at > b && <text x={W - R} y={12} className="pinl" textAnchor="end">election day {Math.floor(e.poll_at / DAY)}, after the run</text>}
     </svg>
   );
 }
@@ -135,7 +141,7 @@ function ActsChart({ seat }: { seat: SeatJson }) {
       {ok.map((v, i) => v ? <rect key={`o${i}`} x={10 + i * bw + 0.5} y={mid - y(v)} width={Math.max(1, bw - 1)} height={y(v)} rx={1} className="ok" /> : null)}
       {no.map((v, i) => v ? <rect key={`n${i}`} x={10 + i * bw + 0.5} y={mid + 1} width={Math.max(1, bw - 1)} height={y(v) / 2} rx={1} className="no" /> : null)}
       {[...lev].map((i) => <text key={`l${i}`} x={10 + i * bw + bw / 2} y={top + 2} className="flag" textAnchor="middle">⚑</text>)}
-      <text x={10} y={H - 4} className="lbl">day {d0} · applied above the line, refused below</text><text x={W - 10} y={H - 4} className="lbl" textAnchor="end">day {d1} · most in a day {max}</text>
+      <text x={10} y={H - 4} className="lbl">Day {d0}. Acts that went through are above the line, refused ones below.</text><text x={W - 10} y={H - 4} className="lbl" textAnchor="end">Day {d1}. At most {max} in a day.</text>
     </svg>
   );
 }

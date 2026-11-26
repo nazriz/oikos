@@ -1,0 +1,164 @@
+.mode-switch button {
+  height: 28px;
+}
+.help-btn {
+  font-size: 13.5px;
+  color: var(--text-2);
+  padding: 0 8px;
+}
+.page-answer {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-2);
+}
+.page-answer-label {
+  font-weight: 700;
+  color: var(--text);
+}
+.page-answer-label::after {
+  content: ":";
+}
+
+/* Glossary: a sheet on the right, like a page of a handbook. */
+.glossary-back {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: var(--shade);
+}
+.glossary {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(520px, 100%);
+  overflow: auto;
+  padding: 22px 26px 40px;
+  background: var(--panel);
+  border-left: 1px solid var(--line-2);
+}
+.glossary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--text);
+}
+.glossary-head h2 {
+  margin: 0;
+  font-size: 24px;
+}
+.glossary-list {
+  margin: 0;
+}
+.glossary-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.glossary-row dt {
+  font-weight: 800;
+  font-size: 16px;
+}
+.glossary-term {
+  font-weight: 500;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.glossary-row dd {
+  margin: 4px 0 0;
+  color: var(--text-2);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.glossary-sub {
+  margin: 24px 0 8px;
+  font-size: 17px;
+}
+.glossary-colours {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 14.5px;
+  color: var(--text-2);
+}
+.glossary-colours li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.swatch {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 1px;
+  transform: translateY(2px);
+}
+
+/* The walkthrough: a hole cut in a shade around one thing, and a note beside it. */
+.tour-shade {
+  position: fixed;
+  z-index: 80;
+  border-radius: 2px;
+  box-shadow: 0 0 0 9999px var(--shade);
+  outline: 2px solid var(--seat);
+  pointer-events: none;
+  transition: top 220ms var(--ease), left 220ms var(--ease), width 220ms var(--ease), height 220ms var(--ease);
+}
+.tour-shade.none {
+  width: 0;
+  height: 0;
+  outline: 0;
+}
+.tour-block {
+  position: fixed;
+  inset: 0;
+  z-index: 79;
+}
+.tour-note {
+  position: fixed;
+  z-index: 81;
+  width: min(380px, calc(100vw - 24px));
+  padding: 16px 18px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-top: 4px solid var(--seat);
+  border-radius: var(--r-2);
+}
+.tour-step {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.tour-note h3 {
+  margin: 4px 0 6px;
+  font-size: 19px;
+  line-height: 1.2;
+}
+.tour-note p {
+  margin: 0 0 6px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.tour-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.tour-foot .spacer {
+  flex: 1;
+}
+.tour-skip {
+  font-size: 13.5px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

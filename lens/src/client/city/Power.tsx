@@ -4,9 +4,11 @@
 // written under each post that changed hands. It follows the shared clock: scrub, and the posts change hands.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLens } from "../state";
-import { useCity } from "./CityView";
+import { useCity, useDark } from "./CityView";
+import { describePerson } from "../people";
 import type { CityData, TownBundle } from "./data";
 import { fmtDay } from "./Panel";
+import { actSentence, CITY_WORDS } from "./words";
 import { CITY_CSS } from "./style";
 
 type Power = TownBundle["power"];
@@ -17,7 +19,7 @@ const CIVIC = ["government", "electoral_commission", "firm", "police", "tribunal
 export function PowerView({ run }: { run: string }) {
   const { city, error } = useCity(`/api/run/${encodeURIComponent(run)}`);
   return (
-    <div className="lens-city">
+    <div className="lens-city pw-root">
       <style>{CITY_CSS}{POWER_CSS}</style>
       {city ? <Chart city={city} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : <><div className="lc-spin" />Reading the town's offices</>}</div>}
     </div>
@@ -124,23 +126,24 @@ function Chart({ city }: { city: CityData }) {
 
   // What a kin holder is to the seat, written at their post (not across the chart).
   const seatKinLabel = (pp: string) => {
-    for (const sp of seatPeople) { const r = relation(P, pp, sp); if (r) return `${r.replace(/ of$/, "")} of ${name(sp)}, the seat`; }
-    return "kin of the seat";
+    for (const sp of seatPeople) { const r = relation(P, pp, sp); if (r) return `${r.replace(/ of$/, "")} of ${name(sp)}, the AI mayor`; }
+    return "a relative of the AI mayor";
   };
   const f = fmtDay(t);
+  const dark = useDark();
   const seatList = Object.entries(P.seats);
   return (
-    <div className="pw" ref={wrap}>
+    <div className={`pw lc-wrap${dark ? "" : " light"}`} ref={wrap} style={{ background: "var(--lc-ink)" }}>
       <div className="pw-head">
         <div>
-          <div className="pw-kicker">Who holds power · year {f.year}, day {f.dayOfYear}</div>
+          <div className="pw-kicker">Who holds which post on day {f.dayOfYear}{f.year > 1 ? ` of year ${f.year}` : ""}</div>
           <h2 className="pw-title">{city.town.name ? `${city.town.name}'s offices` : "The town's offices"}</h2>
-          <div className="pw-sub">Each post with its holder now and its holders over the run. Lines join holders who are kin; <span className="rose">rose</span> marks kin of the seat. Raw records; nothing judged.</div>
+          <div className="pw-sub">Each post with its holder now and its holders over the run. Lines join holders who are family. <span className="rose">Red</span> marks a relative of the AI mayor. These are the town's own records; Lens judges nothing.</div>
         </div>
         <div className="pw-side">
-          {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />The seat: <b>{name(pp)}</b><span className="muted"> ({part})</span></div>)}
-          <label className="lc-check"><input type="checkbox" checked={allTies} onChange={() => setAllTies(!allTies)} /> Every kin tie between holders ({now.ties.length})</label>
-          <label className="lc-check"><input type="checkbox" checked={all} onChange={() => setAll(!all)} /> Firms, shops and landlords too</label>
+          {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />The AI mayor's body in the town is <b>{name(pp)}</b>.</div>)}
+          <label className="lc-check"><input type="checkbox" checked={allTies} onChange={() => setAllTies(!allTies)} /> Show every family tie between holders ({now.ties.length})</label>
+          <label className="lc-check"><input type="checkbox" checked={all} onChange={() => setAll(!all)} /> Show firms, shops and landlords too</label>
         </div>
       </div>
       <svg className="pw-lines" width="100%" height="100%">
@@ -160,11 +163,11 @@ function Chart({ city }: { city: CityData }) {
                 <div key={p.id} className="pw-post">
                   <div className="pw-row">
                     <span className="pw-post-title" title={p.id}>{p.title}</span>
-                    {pp ? <button data-holder={pp} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => select({ kind: "person", id: pp })} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">×{now.holders.get(pp)!.length}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
+                    {pp ? <button data-holder={pp} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => select({ kind: "person", id: pp })} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">×{now.holders.get(pp)!.length}</span>}{describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
                   </div>
                   {kin && <div className="pw-kin">{seatKinLabel(pp!)}</div>}
                   {!kin && focus && pp && focus !== pp && relation(P, pp, focus) && <div className="pw-kin muted">{relation(P, pp, focus)} {name(focus)}</div>}
-                  {changed && <div className="pw-by">{h!.holder ? "appointed" : "vacated"} by {name(person(h!.by)!)}{seatOf(person(h!.by)) ? " (the seat)" : ""} · day {fmtDay(h!.from).day}</div>}
+                  {changed && <div className="pw-by">{h!.holder ? "appointed" : "vacated"} by {name(person(h!.by)!)}{seatOf(person(h!.by)) ? `, ${CITY_WORDS.seat}` : ""}, on day {fmtDay(h!.from).day}</div>}
                   {list.length > 1 && (
                     <div className="pw-strip" title="Holders over the run">
                       {list.map((x, i) => { const w = (Math.min(x.to, end) - x.from) / Math.max(1, end); const xp = person(x.holder); return <span key={i} style={{ width: `${Math.max(0.5, w * 100)}%` }} className={`${!x.holder ? "vac" : seatOf(xp) ? "seat" : xp && Object.values(P.seats).some((sp) => relation(P, xp, sp)) ? "kin" : ""}`} title={`${x.holder ? name(xp!) : "vacant"} from day ${fmtDay(x.from).day}`} />; })}
@@ -182,48 +185,46 @@ function Chart({ city }: { city: CityData }) {
 }
 
 const POWER_CSS = `
-.lens-city .pw { position: absolute; inset: 0; overflow: auto; padding: 22px 24px 40px; }
+/* The page flows with its content (the shell gives it no sized box): never a zero-height absolute layer. */
+.lens-city.pw-root { height: auto; min-height: 100vh; overflow: visible; }
+.lens-city .pw { position: relative; min-height: 100vh; padding: 22px 24px 40px; }
 .lens-city .pw-head { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 18px; position: relative; z-index: 2; }
-.lens-city .pw-kicker { color: var(--lc-muted); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
-.lens-city .pw-title { font-family: var(--lc-serif); font-weight: 400; font-size: 28px; margin: 6px 0 4px; }
+.lens-city .pw-kicker { color: var(--lc-muted); font-size: 13px; }
+.lens-city .pw-title { font-weight: 800; font-size: 26px; letter-spacing: -.01em; margin: 4px 0 6px; }
 .lens-city .pw-sub { color: var(--lc-muted); max-width: 640px; line-height: 1.45; }
-.lens-city .pw-sub .rose { color: var(--lc-flag); }
+.lens-city .pw-sub .rose { color: var(--lc-flag); font-weight: 700; }
 .lens-city .pw-side { display: grid; gap: 8px; align-content: start; }
 .lens-city .pw-seat { display: flex; align-items: center; gap: 7px; }
-.lens-city .pw-seat .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--lc-seat); box-shadow: 0 0 8px var(--lc-seat); }
-.lens-city .pw-grid { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; align-items: start; }
-.lens-city .pw-card { position: relative; z-index: 1; background: color-mix(in srgb, var(--lc-panel) 86%, transparent); border: 1px solid var(--lc-hair); border-radius: 12px; padding: 10px 12px 8px; }
-.lens-city .pw-card.gov { grid-column: span 2; border-color: color-mix(in srgb, var(--lc-seat) 30%, var(--lc-hair)); }
-.lens-city .pw-card-head { display: flex; justify-content: space-between; gap: 8px; font-family: var(--lc-serif); font-size: 15px; padding-bottom: 6px; border-bottom: 1px solid var(--lc-hair); margin-bottom: 4px; }
-.lens-city .pw-card-head .muted { font-family: var(--lc-ui); font-size: 11px; text-transform: capitalize; align-self: center; }
-.lens-city .pw-card.gov .pw-posts, .lens-city .pw-card.gov { columns: 2 240px; column-gap: 18px; }
-.lens-city .pw-card.gov .pw-card-head { column-span: all; }
-.lens-city .pw-post { break-inside: avoid; padding: 4px 0; }
-.lens-city .pw-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.lens-city .pw-post-title { color: var(--lc-text); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lens-city .pw-chip { border: 1px solid var(--lc-hair); background: #ffffff0a; color: var(--lc-text); font-family: var(--lc-mono); font-size: 11px; border-radius: 10px; padding: 2px 8px; cursor: pointer; flex: none; }
-.lens-city .pw-chip:hover { border-color: #ffffff40; }
-.lens-city .pw-chip.seat { border-color: var(--lc-seat); color: #ffe2a6; box-shadow: 0 0 0 2px color-mix(in srgb, var(--lc-seat) 18%, transparent); }
-.lens-city .pw-chip.kin { border-color: var(--lc-flag); color: #ffc2cc; box-shadow: 0 0 0 2px color-mix(in srgb, var(--lc-flag) 20%, transparent); }
-.lens-city .pw-chip.vacant { border-style: dashed; color: var(--lc-muted); cursor: default; }
-.lens-city .pw-by { color: var(--lc-muted); font-size: 11px; margin-top: 2px; }
-.lens-city .pw-strip { position: relative; display: flex; height: 4px; margin-top: 4px; border-radius: 2px; overflow: hidden; background: #ffffff08; }
-.lens-city .pw-strip span { height: 100%; background: #9aa3b260; border-right: 1px solid var(--lc-ink); }
+.lens-city .pw-seat .dot { width: 10px; height: 10px; background: var(--lc-seat); }
+.lens-city .pw-grid { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 22px 22px; align-items: start; }
+.lens-city .pw-card { position: relative; z-index: 1; background: var(--lc-ink); border-top: 2px solid var(--lc-text); padding: 6px 0 4px; }
+.lens-city .pw-card.gov { grid-column: span 2; border-top-color: var(--lc-seat); columns: 2 240px; column-gap: 22px; }
+.lens-city .pw-card-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 800; font-size: 15px; padding-bottom: 6px; margin-bottom: 2px; column-span: all; }
+.lens-city .pw-card-head .muted { font-weight: 400; font-size: 12px; align-self: center; }
+.lens-city .pw-post { break-inside: avoid; padding: 4px 0; border-bottom: 1px solid var(--lc-hair); }
+.lens-city .pw-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.lens-city .pw-post-title { color: var(--lc-text); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lens-city .pw-chip { border: 0; background: none; color: var(--lc-text); font: inherit; font-size: 13px; font-weight: 700; padding: 0 0 1px; cursor: pointer; flex: none; border-bottom: 1px solid transparent; }
+.lens-city .pw-chip:hover, .lens-city .pw-chip.focus { border-bottom-color: currentColor; }
+.lens-city .pw-chip.seat { color: var(--lc-seat-text); border-bottom: 3px solid var(--lc-seat); }
+.lens-city .pw-chip.kin { color: var(--lc-flag); border-bottom: 3px solid var(--lc-flag); }
+.lens-city .pw-chip.vacant { color: var(--lc-muted); font-weight: 400; font-style: italic; cursor: default; }
+.lens-city .pw-desc { display: block; font-weight: 400; color: var(--lc-muted); font-size: 11.5px; text-align: right; }
+.lens-city .pw-n { margin-left: 5px; color: var(--lc-muted); font-size: 11.5px; font-weight: 400; }
+.lens-city .pw-by { color: var(--lc-muted); font-size: 12px; margin-top: 2px; }
+.lens-city .pw-kin { color: var(--lc-flag); font-size: 12px; font-weight: 700; margin-top: 2px; text-align: right; }
+.lens-city .pw-kin.muted { color: var(--lc-text); font-weight: 400; }
+.lens-city .pw-strip { position: relative; display: flex; height: 4px; margin-top: 5px; background: color-mix(in srgb, var(--lc-text) 6%, transparent); }
+.lens-city .pw-strip span { height: 100%; background: color-mix(in srgb, var(--lc-muted) 55%, transparent); border-right: 1px solid var(--lc-ink); }
 .lens-city .pw-strip span.seat { background: var(--lc-seat); }
 .lens-city .pw-strip span.kin { background: var(--lc-flag); }
 .lens-city .pw-strip span.vac { background: transparent; }
-.lens-city .pw-strip i { position: absolute; top: -2px; bottom: -2px; width: 1px; background: #fff; }
+.lens-city .pw-strip i { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--lc-text); }
 .lens-city .pw-lines { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 0; overflow: visible; }
-.lens-city .pw-kin { color: #ffc2cc; font-size: 11px; margin-top: 2px; text-align: right; }
-.lens-city .pw-kin.muted { color: var(--lc-text); opacity: .8; }
-.lens-city .pw-lines path { fill: none; stroke: #9aa3b2; stroke-opacity: .55; stroke-width: 1.2; }
-.lens-city .pw-lines path.same { stroke: #5cc8c0; stroke-dasharray: 2 3; stroke-opacity: .5; }
-.lens-city .pw-lines path.seat { stroke: var(--lc-flag); stroke-opacity: .95; stroke-width: 2.2; }
-.lens-city .pw-lines path.focus { stroke: #e8e6e1; stroke-opacity: .9; stroke-width: 1.6; }
-.lens-city .pw-rel.muted { fill: #e8e6e1; }
-.lens-city .pw-chip.focus { border-color: #ffffffa0; }
-.lens-city .pw-n { margin-left: 5px; color: var(--lc-muted); font-size: 10px; }
-.lens-city .pw-rel { fill: #ffc2cc; font-size: 11px; text-anchor: middle; paint-order: stroke; stroke: var(--lc-ink); stroke-width: 4px; }
+.lens-city .pw-lines path { fill: none; stroke: var(--lc-muted); stroke-opacity: .6; stroke-width: 1.2; }
+.lens-city .pw-lines path.same { stroke: var(--lc-inst); stroke-dasharray: 2 3; }
+.lens-city .pw-lines path.seat { stroke: var(--lc-flag); stroke-opacity: 1; stroke-width: 2.5; }
+.lens-city .pw-lines path.focus { stroke: var(--lc-text); stroke-opacity: .9; stroke-width: 1.6; }
 @media (max-width: 640px) { .lens-city .pw { padding: 14px 12px 30px; } .lens-city .pw-card.gov { grid-column: auto; columns: 1; } }
 `;
 
