@@ -24,6 +24,18 @@ export interface Telling {
   notable: boolean;
 }
 
+/** An amendment form in plain words: what the mayor asked the council to do, and what to call the change after. */
+const FORMS: { [form: string]: { ask: string; noun: string } } = {
+  "amend-rent-increases": { ask: "limit rent increases", noun: "the rent change" },
+  "amend-tenancy": { ask: "give tenants longer notice before a tenancy ends", noun: "the tenancy change" },
+};
+function formWords(basis: string): { ask: string; noun: string } {
+  const f = basis.replace(/^form-/, "");
+  if (FORMS[f]) return FORMS[f]!;
+  const what = f.replace(/^amend-/, "").replace(/[-_]/g, " ");
+  return { ask: `change the rules on ${what}`, noun: `the ${what} change` };
+}
+
 /** What became of a proposal it filed: the council's vote on it, if any. */
 function councilVerdict(seat: SeatJson, recordId: string): string | undefined {
   const ballot = seat.records.find((r) => r.kind === "ballot" && r.data?.proposal === recordId);
@@ -52,9 +64,11 @@ function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string
       return { clause: `proposed changing the election law${parts.length ? ` so that ${parts.join(" and ")}` : ""}`, ...(after ? { after } : {}), kind: "election", noun: "the election law change" };
     }
     const what = String(b.data?.proposal ?? b.text ?? "").replace(/\s+/g, " ");
-    const kind = b.data?.kind === "budget" ? "a budget" : b.data?.kind === "law" ? "a new law" : `a change (${basis.replace(/^form-/, "").replace(/[-_]/g, " ")})`;
     const after = rec ? councilVerdict(seat, rec) : undefined;
-    return { clause: `asked the council to adopt ${kind}${what && b.data?.kind === "law" ? `: “${what.length > 140 ? what.slice(0, 139) + "…" : what}”` : ""}`, ...(after ? { after } : {}), kind: "proposal", noun: b.data?.kind === "budget" ? "the budget" : b.data?.kind === "law" ? "the new law" : "the change" };
+    if (b.data?.kind === "budget") return { clause: "asked the council to adopt a budget", ...(after ? { after } : {}), kind: "proposal", noun: "the budget" };
+    if (b.data?.kind === "law") return { clause: `asked the council to adopt a new law${what ? `: “${what.length > 140 ? what.slice(0, 139) + "…" : what}”` : ""}`, ...(after ? { after } : {}), kind: "proposal", noun: "the new law" };
+    const form = formWords(basis);
+    return { clause: `asked the council to ${form.ask}`, ...(after ? { after } : {}), kind: "proposal", noun: form.noun };
   }
   if (b.block === "publish" && b.kind === "direction") return { clause: `gave a standing order to the town's staff (${a.label.replace(/^Direction: /, "")})`, kind: "direction" };
   if (b.block === "appoint") {
@@ -95,9 +109,18 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
   const afters = rest.filter((c) => c.after);
   if (afters.length === 1) sentences.push(afters[0]!.after!);
   else if (afters.length > 1) {
-    const parts = afters.map((c) => c.after!.startsWith("The council ") ? c.after!.replace(/^The council /, "").replace(/\bit\b/, c.noun ?? "the proposal").replace(/\.$/, "") : `${c.noun ?? "the proposal"}: ${c.after!.replace(/\.$/, "")}`);
-    sentences.push(`The council ${parts.slice(0, -1).join(", ")}${parts.length > 1 ? ", and " : ""}${parts.at(-1)}.`);
+    // ("The council voted down the rent change, 2 to 3, and the tenancy change, 2 to 3": the verb once where it is shared.)
+    // (Several of the same kind are told apart by order: "the first new law", "the second".)
+    const ORD = ["first", "second", "third", "fourth", "fifth", "sixth"];
+    const seenNoun = new Map<string, number>(), total = new Map<string, number>();
+    for (const c of afters) total.set(c.noun ?? "", (total.get(c.noun ?? "") ?? 0) + 1);
+    for (const c of afters) if ((total.get(c.noun ?? "") ?? 0) > 1) { const k = seenNoun.get(c.noun ?? "") ?? 0; seenNoun.set(c.noun ?? "", k + 1); c.noun = (c.noun ?? "the proposal").replace(/^the /, `the ${ORD[k] ?? `${k + 1}th`} `); }
+    const parts = afters.map((c) => { const m = /^The council (passed|voted) it( down)?(.*)\.$/.exec(c.after!); return m ? { verb: m[1] === "passed" ? "passed" : "voted down", rest: `${c.noun ?? "the proposal"}${m[3]}`.replace(/, and the election was moved$/, "") } : { verb: "", rest: `${c.noun ?? "the proposal"}: ${c.after!.replace(/\.$/, "")}` }; });
+    const same = parts.every((x) => x.verb && x.verb === parts[0]!.verb);
+    const items = same ? parts.map((x) => x.rest) : parts.map((x) => (x.verb ? `${x.verb} ${x.rest}` : x.rest));
+    sentences.push(`The council ${same ? `${parts[0]!.verb} ` : ""}${items.slice(0, -1).join(", ")}, and ${items.at(-1)}.`);
   }
+
   // Requests for a power grab that were never sent (the clerk could not write them up, or the mayor turned the
   // write-up down). One line per kind of power grab, after what happened: if the mayor went on to send it (in this
   // turn or later), the unsent ones are only how it got there; if it never did, they are the end of the story.
