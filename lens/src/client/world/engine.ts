@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
 import { Sky } from "three/examples/jsm/objects/Sky.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
@@ -45,8 +46,11 @@ export interface EngineEvents {
   caption?(seq: number): string | undefined;
   onMode?(m: Mode): void;
   onInfo?(s: Info): void;
+  /** The first frame is drawn. */
+  onReady?(): void;
 }
 
+const tmpV2 = new THREE.Vector2();
 const tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), tmpS = new THREE.Vector3(), tmpM = new THREE.Matrix4(), tmpC = new THREE.Color(), tmpC2 = new THREE.Color();
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -105,7 +109,7 @@ export class WorldEngine {
   private polling?: { group: THREE.Group; at: number; from: number; to: number; t: number[]; who: number[]; label: HTMLDivElement; p: THREE.Vector3; box: THREE.Vector3 };
   private ring: THREE.Mesh;
   private lotBox: THREE.LineLoop;
-  private labels: { el: HTMLDivElement; p: THREE.Vector3; i: number; hidden?: boolean }[] = [];
+  private labels: { el: HTMLDivElement; p: THREE.Vector3; i: number; hidden?: boolean; on?: boolean }[] = [];
   private labelLayer: HTMLDivElement;
   private acts: { t: number; to: number; refused: boolean; seq: number }[] = [];
   private hall?: number;
@@ -119,6 +123,10 @@ export class WorldEngine {
   private lastInfo = 0;
   private composer?: EffectComposer;
   private gtao?: GTAOPass;
+  private aoScale = 0.5;
+  private lightDir = new THREE.Vector3();
+  private lightRight = new THREE.Vector3();
+  private lightUp = new THREE.Vector3();
   private fpsAcc = { n: 0, t: 0, fps: 60 };
   private mode: Mode = "fly";
   private swoop?: { t0: number; dur: number; p0: THREE.Vector3; p1: THREE.Vector3; q0: THREE.Vector3; q1: THREE.Vector3 };
@@ -133,6 +141,7 @@ export class WorldEngine {
   private pollAt?: number;
   /** For the dev page: show this weather whatever the run's. */
   forceWeather?: Weather;
+  private still = /[?&]still=1/.test(location.search);
   private sat = 1;
 
   constructor(private host: HTMLDivElement, input: WorldInput, private ev: EngineEvents = {}) {
@@ -145,7 +154,7 @@ export class WorldEngine {
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 0.6;
-    r.shadowMap.enabled = true;
+    r.shadowMap.enabled = !/[?&]shadows=0/.test(location.search);
     r.shadowMap.type = THREE.PCFShadowMap;
     r.domElement.style.display = "block";
     r.domElement.style.touchAction = "none";
@@ -160,16 +169,20 @@ export class WorldEngine {
     this.hall = town.hall;
     const W = town.ground.w * town.ground.cell, H = town.ground.h * town.ground.cell;
 
-    this.camera = new THREE.PerspectiveCamera(42, 1, 1.5, 24000);
+    this.camera = new THREE.PerspectiveCamera(42, 1, 1.5, 20000);
     // Ambient occlusion (desktop): the soft shade where walls meet the ground and roofs meet walls, which is most of
-    // what makes a model read as solid. Phones draw without it. \`?ao=0\` on the dev page turns it off.
-    if (!this.phone && !/[?&]ao=0/.test(location.search)) {
+    // what makes a model read as solid. Phones never draw it.
+    // Off by default since 2026-11-26: at a distance its screen-space noise shimmered on thin things (lamp posts,
+    // markings) as the camera moved, the flicker Naz saw. `?ao=1` turns it on for close looks.
+    if (!this.phone && /[?&]ao=1/.test(location.search)) {
       const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
       this.composer = new EffectComposer(r, rt);
       this.composer.addPass(new RenderPass(this.scene, this.camera));
       this.gtao = new GTAOPass(this.scene, this.camera, 1, 1);
-      this.gtao.updateGtaoMaterial({ radius: 3.5, distanceExponent: 1.4, thickness: 3, scale: 1.1, samples: 12, distanceFallOff: 1, screenSpaceRadius: false });
-      this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, rings: 2, samples: 12 });
+      const qn = (k: string, d: number) => { const m = new RegExp(`[?&]${k}=([0-9.]+)`).exec(location.search); return m ? +m[1]! : d; };
+      this.aoScale = qn("aores", 0.5);
+      this.gtao.updateGtaoMaterial({ radius: 3.5, distanceExponent: 1.4, thickness: 3, scale: 1.1, samples: qn("aos", 12), distanceFallOff: 1, screenSpaceRadius: false });
+      this.gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: qn("aor", 5), rings: qn("aorings", 2), samples: qn("aops", 12) });
       this.gtao.blendIntensity = 0.85;
       this.composer.addPass(this.gtao);
       this.composer.addPass(new OutputPass());
@@ -254,13 +267,19 @@ export class WorldEngine {
     this.unsub = useLens.subscribe((s) => { if (s.selection !== this.lastSel) { this.lastSel = s.selection; this.onSelection(s.selection); } });
     this.lastSel = useLens.getState().selection;
     if (this.lastSel) this.onSelection(this.lastSel);
-    this.raf = requestAnimationFrame(this.frame);
+    // Compile every shader before the first frame, in parallel where the browser can (KHR_parallel_shader_compile), so
+    // switching to the town does not freeze the page; the view's cover stays up until the first frame is drawn.
+    const start = () => { if (this.disposed) return; this.raf = requestAnimationFrame((n) => { this.frame(n); this.ev.onReady?.(); }); };
+    this.renderer.compileAsync(this.scene, this.camera).then(start, start);
   }
 
   // ---------------------------------------------------------------- building the scene
 
   private buildGround(W: number, H: number) {
-    const tex = new THREE.CanvasTexture(paintGround(this.city.town, this.phone ? 6 : 10));
+    // The painted ground is the slowest thing to make: made once per town and kept (switching back and forth is free).
+    let canvas = groundCache.get(this.city.town);
+    if (!canvas) { canvas = paintGround(this.city.town, this.phone ? 6 : 8); groundCache.set(this.city.town, canvas); }
+    const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     tex.minFilter = THREE.LinearMipmapLinearFilter;
@@ -270,9 +289,17 @@ export class WorldEngine {
     this.scene.add(ground);
     // The land beyond: a quiet meadow that the haze takes.
     const bt = beyondTexture(2400);
-    bt.repeat.set(60000 / 2400, 60000 / 2400);
+    bt.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
     const beyondMat = new THREE.MeshStandardMaterial({ map: bt, roughness: 1, envMapIntensity: 0.3 });
-    const beyond = new THREE.Mesh(new THREE.PlaneGeometry(60000, 60000).rotateX(-Math.PI / 2).translate(W / 2, -0.6, H / 2), beyondMat);
+    // Four strips round the district, not one plane under it: two coplanar-ish grounds fight in the depth buffer far off.
+    const R = 30000;
+    const strip = (x0: number, z0: number, x1: number, z1: number) => {
+      const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0).rotateX(-Math.PI / 2).translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
+      const uv = g.attributes.uv as THREE.BufferAttribute, pos = g.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / 2400, -pos.getZ(i) / 2400);
+      return g;
+    };
+    const beyond = new THREE.Mesh(mergeGeometries([strip(-R, -R, W + R, 0), strip(-R, H, W + R, H + R), strip(-R, 0, 0, H), strip(W, 0, W + R, H)])!, beyondMat);
     beyond.receiveShadow = false;
     this.scene.add(beyond);
     // The river: a ribbon of moving water along its chain of cells.
@@ -321,7 +348,8 @@ export class WorldEngine {
 
   private buildStatic() {
     const M = this.model;
-    const mat = (rough: number, env = 0.5) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough, metalness: 0, envMapIntensity: env });
+    const mat = (rough: number, env = 0.5, offset = 0) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: rough, metalness: 0, envMapIntensity: env,
+      ...(offset ? { polygonOffset: true, polygonOffsetFactor: -offset, polygonOffsetUnits: -offset * 2 } : {}) });
     const add = (g: THREE.BufferGeometry, m: THREE.Material, cast = true, recv = true) => {
       const mesh = new THREE.Mesh(g, m);
       mesh.castShadow = cast; mesh.receiveShadow = recv;
@@ -329,11 +357,12 @@ export class WorldEngine {
       return mesh;
     };
     this.buildingsMesh = add(M.buildings, mat(0.86, 0.45));
-    add(M.ground, mat(0.95, 0.3), true, true);
-    this.asphaltMat = mat(0.9, 0.35);
+    // The ground's thin layers are centimetres apart, and also pushed forward in depth, the uppermost most.
+    add(M.ground, mat(0.95, 0.3, 1), true, true);
+    this.asphaltMat = mat(0.9, 0.35, 2);
     add(M.asphalt, this.asphaltMat, false, true);
     add(M.pavement, mat(0.92, 0.3), false, true);
-    add(M.markings, mat(0.7, 0.3), false, true);
+    add(M.markings, mat(0.7, 0.3, 4), false, true);
     add(M.hedges, mat(1, 0.25), true, true);
     for (const L of M.later) {
       const mesh = new THREE.Mesh(L.geo, mat(0.86, 0.45));
@@ -352,7 +381,7 @@ export class WorldEngine {
       const geo = new THREE.PlaneGeometry(1, 1);
       const lit = new THREE.InstancedBufferAttribute(new Float32Array(n), 1);
       geo.setAttribute("aLit", lit);
-      const m = new THREE.MeshStandardMaterial({ color: glassCol, roughness: 0.12, metalness: 0.4, envMapIntensity: 1.1 });
+      const m = new THREE.MeshStandardMaterial({ color: glassCol, roughness: 0.12, metalness: 0.4, envMapIntensity: 1.1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
       m.onBeforeCompile = (sh) => {
         sh.uniforms.uNight = this.uNight;
         sh.uniforms.uWarm = { value: warm };
@@ -562,7 +591,7 @@ export class WorldEngine {
     this.slips.count = 0;
     this.slips.frustumCulled = false;
     this.scene.add(this.slips);
-    this.notices = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.62, 0.82), new THREE.MeshStandardMaterial({ map: paperTex, roughness: 0.9 }), 400);
+    this.notices = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.62, 0.82), new THREE.MeshStandardMaterial({ map: paperTex, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }), 400);
     this.notices.count = 0;
     this.notices.frustumCulled = false;
     this.scene.add(this.notices);
@@ -721,6 +750,7 @@ export class WorldEngine {
 
   setMode(m: Mode) {
     if (m === this.mode) return;
+    this.dirty = true;
     const prev = this.mode;
     this.mode = m;
     if (prev === "walk") { this.look?.unlock(); this.controls.enabled = true; this.keys.clear(); this.walkTarget = undefined; }
@@ -822,6 +852,7 @@ export class WorldEngine {
   }
 
   private onSelection(sel: Selection) {
+    this.dirty = true;
     this.ring.visible = false;
     this.lotBox.visible = false;
     if (sel?.kind === "structure") {
@@ -837,8 +868,6 @@ export class WorldEngine {
     }
     if (sel?.kind === "person" && this.mode === "follow") this.followSnap = true;
     if (sel && (sel.kind === "structure" || sel.kind === "person") && !this.fromOwnClick(sel)) this.swoopTo(sel);
-    // An act picked in the story: frame what it reached.
-    if (sel?.kind === "act" && this.mode === "fly") this.tourTo([sel.seq], false, false);
   }
   private followSnap = false;
   /** A selection that came from a click in this view is already in sight; one from elsewhere (the story) is flown to. */
@@ -847,7 +876,7 @@ export class WorldEngine {
   // ---------------------------------------------------------------- the frame
 
   private frame = (now: number) => {
-    if (this.disposed) return;
+    if (this.disposed || !this.active) return;
     this.raf = requestAnimationFrame(this.frame);
     const dt = Math.min(0.1, (now - this.lastReal) / 1000);
     this.lastReal = now;
@@ -855,20 +884,33 @@ export class WorldEngine {
     if (this.fpsAcc.t > 1) { this.fpsAcc.fps = this.fpsAcc.n / this.fpsAcc.t; this.fpsAcc = { n: 0, t: 0, fps: this.fpsAcc.fps }; }
     const st = useLens.getState();
     const t = st.t;
-    this.uTime.value = now / 1000;
-    const hour = (((t % DAY) + DAY) % DAY) / 3600;
+    // Render on demand: only while the clock, the camera, the selection or the view changes, and for a few seconds
+    // after (the water and the leaves settle); a still town costs nothing.
+    this.updateCamera(dt);
+    const m = this.camera.matrixWorld.elements;
+    let moved = false;
+    for (let i = 0; i < 16; i++) if (m[i] !== this.lastCam[i]) { moved = true; this.lastCam[i] = m[i]!; }
+    if (moved || t !== this.lastT || st.selection !== this.lastSelDrawn || this.dirty || this.rain.visible) {
+      this.lastChange = now; this.dirty = false; this.lastSelDrawn = st.selection;
+    }
+    const tWas = this.lastT;
+    this.lastT = t;
+    if (now - this.lastChange > 4000) return;
+    // ?still=1 (dev, for measuring flicker): everything that moves by itself stands still.
+    const anim = this.still ? 0 : now / 1000;
+    this.uTime.value = anim;
+    const hour = this.lightHour(t, tWas, dt);
     const day = Math.floor(t / DAY);
     this.weather = this.forceWeather ?? weatherOn(this.world, day);
 
     this.updateLight(hour, now);
     this.city.where.seek(t);
-    this.updateCamera(dt);
     const counts = this.updatePeople(t, st.speed, st.playing, now);
-    this.updateWindows(hour);
-    this.updateSmoke(now / 1000);
+    this.updateWindows((((t % DAY) + DAY) % DAY) / 3600);
+    this.updateSmoke(anim);
     this.updateActs(t, st.speed);
     this.updateLater(t);
-    this.updateClock(hour);
+    this.updateClock((((t % DAY) + DAY) % DAY) / 3600);
     this.updateSelection();
     this.updateTrees();
     this.updatePolling(t, st.speed);
@@ -878,17 +920,56 @@ export class WorldEngine {
     if (now - this.lastInfo > 400) this.lastInfo = now, this.ev.onInfo?.({ hour, weather: this.weather, walking: counts.walking, driving: counts.driving, fps: this.fpsAcc.fps, who: this.whoInfo(st.selection, t) });
   };
 
+  /** The hour the town is lit by: the clock's, except that while time races (more than a few hours a second) the
+   * light holds, and once time slows it takes the true hour at once (as lens-smooth's LightClock: easing a lone jump
+   * re-lit the town every frame for a second), so day and night never strobe. */
+  private lightHour(t: number, tWas: number, dt: number): number {
+    const target = (((t % DAY) + DAY) % DAY) / 3600;
+    if (this.shownHour < 0) return (this.shownHour = target);
+    const rate = dt > 0 ? Math.abs(t - tWas) / dt : 0;
+    if (rate > 4 * 3600) return this.shownHour;
+    if (Math.abs(target - this.shownHour) > 0.01) this.dirty = true;
+    return (this.shownHour = target);
+  }
+  private shownHour = -1;
+  private lastT = NaN;
+  private lastChange = 0;
+  private lastCam = new Array<number>(16).fill(NaN);
+  private lastSelDrawn: Selection = null;
+  private dirty = true;
+  private active = true;
+  /** Pause everything while the view is hidden (the shell keeps it mounted under the map); resume where it was. */
+  setActive(on: boolean) {
+    if (on === this.active || this.disposed) return;
+    this.active = on;
+    if (on) { this.dirty = true; this.lastReal = performance.now(); this.raf = requestAnimationFrame(this.frame); }
+    else cancelAnimationFrame(this.raf);
+  }
+  /** Draw now (after a change made from outside, such as the tour). */
+  invalidate() { this.dirty = true; }
+
   private updateLight(hour: number, now: number) {
     const L = (this.light = lightAt(hour, this.weather, this.light));
     const sunUp = L.sun.y > -0.02;
-    const dir = sunUp ? L.sun : L.moon;
+    // The light's direction in steps of about a quarter of a degree: while the clock runs slowly the shadows hold still
+    // and then move a whisker, rather than re-rasterising (and crawling) every frame.
+    const q = 0.004;
+    const raw = sunUp ? L.sun : L.moon;
+    const dir = this.lightDir.set(Math.round(raw.x / q) * q, Math.round(raw.y / q) * q, Math.round(raw.z / q) * q).normalize();
     // The shadow-casting light sits over what the camera looks at, its box fitted to the view's reach.
     const focus = this.mode === "walk" ? this.camera.position.clone().setY(0) : this.controls.target.clone().setY(0);
-    const reach = this.mode === "walk" ? 140 : Math.min(1500, Math.max(110, this.camera.position.distanceTo(this.controls.target) * 0.95));
+    // The shadow box's size in steps (a quarter-octave), so zooming does not make shadows swim.
+    const want = this.mode === "walk" ? 140 : Math.min(1500, Math.max(110, this.camera.position.distanceTo(this.controls.target) * 0.95));
+    const reach = Math.pow(2, Math.ceil(Math.log2(want) * 4) / 4);
     const sc = this.sun.shadow.camera;
-    // Snap the focus to the shadow map's texels, so shadows do not shimmer as the camera moves.
+    // Snap the focus to the shadow map's texel grid, in the light's own axes, so shadows do not shimmer as the camera
+    // moves: the shadow camera then only ever moves by whole texels.
     const texel = (reach * 2) / this.sun.shadow.mapSize.x;
-    focus.x = Math.round(focus.x / texel) * texel; focus.z = Math.round(focus.z / texel) * texel;
+    const fwd = tmpV.copy(dir).negate();
+    const right = this.lightRight.crossVectors(fwd, Math.abs(fwd.y) > 0.99 ? tmpS.set(1, 0, 0) : UP).normalize();
+    const up = this.lightUp.crossVectors(right, fwd).normalize();
+    const sr = Math.round(focus.dot(right) / texel) * texel, su = Math.round(focus.dot(up) / texel) * texel, sf = focus.dot(fwd);
+    focus.copy(right).multiplyScalar(sr).addScaledVector(up, su).addScaledVector(fwd, sf);
     this.sun.position.copy(focus).addScaledVector(dir, 1500);
     this.sun.target.position.copy(focus);
     if (sc.right !== reach) { sc.left = -reach; sc.right = reach; sc.top = reach; sc.bottom = -reach; sc.near = 10; sc.far = 3200; sc.updateProjectionMatrix(); }
@@ -903,7 +984,7 @@ export class WorldEngine {
     u.sunPosition!.value.copy(L.sun).multiplyScalar(10000);
     u.turbidity!.value = L.turbidity; u.rayleigh!.value = L.rayleigh;
     u.cloudCoverage!.value = L.clouds; u.cloudDensity!.value = this.weather === "heavy_rain" ? 0.9 : 0.45;
-    u.time!.value = now / 1000;
+    u.time!.value = this.still ? 0 : now / 1000;
     this.sky.visible = L.night < 0.98;
     this.scene.background = tmpC.copy(L.fog);
     (this.starField.material as THREE.ShaderMaterial).uniforms.uOpacity!.value = L.night * (this.weather === "heavy_rain" ? 0.1 : 0.9);
@@ -926,14 +1007,15 @@ export class WorldEngine {
     this.asphaltMat.roughness = rainy ? 0.55 : 0.9;
     this.asphaltMat.color.setScalar(rainy ? 0.72 : 1);
     // The environment map, from the same sky, when the hour or weather has moved on.
-    const gap = this.phone ? 4000 : 1200;
-    if ((Math.abs(hour - this.envAt.hour) > 0.25 && now - this.envAt.real > gap) || this.envAt.weather !== this.weather) {
+    // Small steps (every 5 minutes of the hour, at most a few times a second), so the skylight never jumps.
+    const gap = this.phone ? 1500 : 400;
+    if ((Math.abs(hour - this.envAt.hour) > 0.08 && now - this.envAt.real > gap) || this.envAt.weather !== this.weather) {
       const es = this.skyScene.children[0] as Sky;
       const eu = es.material.uniforms;
       eu.sunPosition!.value.copy(L.sun).multiplyScalar(10000);
       eu.turbidity!.value = L.turbidity; eu.rayleigh!.value = L.rayleigh; eu.cloudCoverage!.value = L.clouds;
       this.skyScene.background = L.night > 0.7 ? tmpC.copy(L.fog).multiplyScalar(0.4) : null;
-      const rt = this.pmrem.fromScene(this.skyScene, 0, 1, 20000, { size: this.phone ? 64 : 128 } as any);
+      const rt = this.pmrem.fromScene(this.skyScene, 0, 1, 20000, { size: 64 } as any);
       this.envRT?.dispose();
       this.envRT = rt;
       this.scene.environment = rt.texture;
@@ -972,6 +1054,7 @@ export class WorldEngine {
         else this.camera.position.addScaledVector(to.normalize(), Math.min(l, 4 * dt));
       }
       this.camera.position.y = 1.7;
+      this.fitDepth();
       return;
     }
     if (this.mode === "follow") {
@@ -990,6 +1073,15 @@ export class WorldEngine {
     // Keep the camera above the ground and the target in the district.
     this.controls.update();
     if (this.camera.position.y < 1.2) this.camera.position.y = 1.2;
+    this.fitDepth();
+  }
+
+  /** The near plane as far out as the camera's height allows: depth precision is what keeps the ground's thin layers
+   * (lawn, verge, paving, road, markings) from fighting at a distance. Stepped, so it does not change every frame. */
+  private fitDepth() {
+    const h = this.camera.position.y;
+    const near = h < 6 ? 0.3 : Math.min(40, Math.pow(2, Math.floor(Math.log2(h * 0.12))));
+    if (near !== this.camera.near) { this.camera.near = Math.max(0.3, near); this.camera.updateProjectionMatrix(); }
   }
 
   private updatePeople(t: number, speed: number, playing: boolean, now: number) {
@@ -1179,10 +1271,10 @@ export class WorldEngine {
     const cast = lo;
     tmpV.copy(P.p).project(this.camera);
     const d = this.camera.position.distanceTo(P.p);
-    if (!open || tmpV.z > 1 || d > 900) P.label.style.display = "none";
+    if (!open || tmpV.z > 1 || d > 900) P.label.style.opacity = "0";
     else {
       const w = this.renderer.domElement.clientWidth, h = this.renderer.domElement.clientHeight;
-      P.label.style.display = "";
+      P.label.style.opacity = "1";
       const text = `Polling station: ${cast} ${cast === 1 ? "vote" : "votes"} in`;
       if (P.label.textContent !== text) P.label.textContent = text;
       P.label.style.transform = `translate(-50%, -100%) translate(${((tmpV.x + 1) / 2) * w}px, ${((1 - tmpV.y) / 2) * h}px)`;
@@ -1232,13 +1324,13 @@ export class WorldEngine {
       let el = this.captions[k];
       if (!el) { el = document.createElement("div"); el.className = "lw-caption"; this.labelLayer.appendChild(el); this.captions.push(el); }
       const c = shown[k];
-      if (!c) { el.style.display = "none"; continue; }
+      if (!c) { el.style.opacity = "0"; continue; }
       const L = this.plan.lots[c.a.to];
       tmpV.set(this.model.centres[c.a.to * 2]!, (this.model.tops[c.a.to] ?? 6) + 6, this.model.centres[c.a.to * 2 + 1]!);
-      if (!L) { el.style.display = "none"; continue; }
+      if (!L) { el.style.opacity = "0"; continue; }
       tmpV.project(this.camera);
-      if (tmpV.z > 1 || Math.abs(tmpV.x) > 1.05 || Math.abs(tmpV.y) > 1.05) { el.style.display = "none"; continue; }
-      el.style.display = "";
+      if (tmpV.z > 1 || Math.abs(tmpV.x) > 1.05 || Math.abs(tmpV.y) > 1.05) { el.style.opacity = "0"; continue; }
+      el.style.opacity = "1";
       if (el.textContent !== c.text) el.textContent = c.text;
       el.classList.toggle("refused", c.a.refused);
       // Kept inside the view: a sign near the edge slides in rather than being cut off.
@@ -1310,7 +1402,9 @@ export class WorldEngine {
     const near = this.phone ? 420 : 750;
     for (const c of this.treeChunks) {
       const d = Math.hypot(c.c.x - cam.x, c.c.z - cam.z) - 320;
-      const hi = d < near;
+      // Hysteresis: a chunk turns detailed inside `near` and plain again only past near + 120 m.
+      const was = c.hi[0]!.visible;
+      const hi = was ? d < near + 120 : d < near;
       for (const o of c.hi) o.visible = hi;
       for (const o of c.lo) o.visible = !hi;
     }
@@ -1321,23 +1415,26 @@ export class WorldEngine {
     const cam = this.camera.position;
     const walk = this.mode === "walk";
     this.labelTick = (this.labelTick + 1) % 6;
-    const order = this.labels.map((L) => ({ L, d: cam.distanceTo(L.p) })).sort((a, b) => a.d - b.d);
+    // Labels shown last frame go first (a head start of 150 m), so two near each other do not take turns.
+    const order = this.labels.map((L) => ({ L, d: cam.distanceTo(L.p) })).sort((a, b) => (a.d - (a.L.on ? 150 : 0)) - (b.d - (b.L.on ? 150 : 0)));
     const placed: [number, number, number, number][] = [];
     for (const { L, d } of order) {
       tmpV.copy(L.p).project(this.camera);
       const minor = L.el.dataset.kind === "industrial" || L.el.dataset.kind === "utility";
-      let show = tmpV.z < 1 && Math.abs(tmpV.x) < 1.1 && Math.abs(tmpV.y) < 1.1 && d < (walk ? 260 : minor ? 420 : 1100) && d > 12;
-      // Hidden behind another building (checked every few frames against the buildings' boxes).
+      // Hysteresis on distance: shown until 15% past the reach it appears at.
+      const reach = (walk ? 260 : minor ? 420 : 1100) * (L.on ? 1.15 : 1);
+      let show = tmpV.z < 1 && Math.abs(tmpV.x) < 1.1 && Math.abs(tmpV.y) < 1.1 && d < reach && d > 12;
       if (show && this.labelTick === 0) L.hidden = this.occluded(L.p, L.i);
       if (L.hidden) show = false;
       const x = ((tmpV.x + 1) / 2) * w, y = ((1 - tmpV.y) / 2) * h;
       const lw = L.el.textContent!.length * 7 + 14;
       if (show && placed.some(([a, b, c, e]) => x - lw / 2 < c && x + lw / 2 > a && y - 18 < e && y > b)) show = false;
-      if (!show) { if (L.el.style.display !== "none") L.el.style.display = "none"; continue; }
+      L.on = show;
+      // Labels fade (CSS transition on opacity) rather than pop.
+      if (!show) { if (L.el.style.opacity !== "0") L.el.style.opacity = "0"; if (tmpV.z < 1) L.el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`; continue; }
       placed.push([x - lw / 2, y - 18, x + lw / 2, y]);
-      L.el.style.display = "";
       L.el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;
-      L.el.style.opacity = String(Math.max(0.4, Math.min(1, 1.6 - d / 1100)));
+      L.el.style.opacity = String(Math.round(Math.max(0.5, Math.min(1, 1.6 - d / 1100)) * 10) / 10);
     }
   }
   private labelTick = 0;
@@ -1366,18 +1463,27 @@ export class WorldEngine {
 
   private resize() {
     const w = this.host.clientWidth || 1, h = this.host.clientHeight || 1;
+    // The screen's pixel ratio can change (a window dragged to another display).
+    const pr = Math.min(devicePixelRatio, this.phone ? 1.5 : 2);
+    if (pr !== this.renderer.getPixelRatio()) this.renderer.setPixelRatio(pr);
+    const cur = this.renderer.getSize(tmpV2);
+    if (cur.x === w && cur.y === h && this.sized) return;
+    this.sized = true;
     this.renderer.setSize(w, h, false);
     if (this.composer) {
       this.composer.setSize(w, h);
       // Ambient occlusion at half resolution: soft contact shade does not need every pixel.
       const pr = this.renderer.getPixelRatio();
-      this.gtao!.setSize(Math.round((w * pr) / 2), Math.round((h * pr) / 2));
+      this.gtao!.setSize(Math.round(w * pr * this.aoScale), Math.round(h * pr * this.aoScale));
     }
     this.renderer.domElement.style.width = "100%";
     this.renderer.domElement.style.height = "100%";
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    // Resizing the canvas clears it: draw now, before the browser paints, so a panel opening never flashes it blank.
+    if (!this.disposed) this.composer ? this.composer.render() : this.renderer.render(this.scene, this.camera);
   }
+  private sized = false;
 
   /** For the dev page and tests: place the camera. */
   setView(target: [number, number, number], dist: number, tilt: number, turn: number) {
@@ -1412,6 +1518,7 @@ export class WorldEngine {
 }
 
 const now = () => performance.now();
+const groundCache = new WeakMap<object, HTMLCanvasElement>();
 
 function weatherOn(w: WorldBundle | undefined, day: number): Weather {
   for (const e of w?.weather ?? []) if (day >= e.from_day && day < e.from_day + e.days) return (e.kind as Weather) ?? "clear";

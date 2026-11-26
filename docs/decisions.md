@@ -16311,3 +16311,21 @@ Naz asked for "a really crazy interactive thing in the browser" and chose the im
   **Revisit if** the world gains voting in person.
 - **A dev page of its own** (`bun lens/src/client/world/dev.ts`, port 4331) serves a bundle folder with the world fold
   beside the city's files, as the city's dev page does.
+
+## 2026-11-26 Lens: the 3D town without flicker, and quiet until asked
+
+Naz saw flicker, and set the rule "a professional research tool that is a joy to use, but also doesn't get in the way".
+**Decided** (lens/src/client/world/engine.ts):
+- **Depth:** the near plane follows the camera's height (in powers of two), the ground's layers sit centimetres apart
+  and are pushed forward with polygon offset, and the land beyond the district is four strips round it, not a plane
+  under it. **Shadows:** the box is sized in quarter-octave steps and snapped to its texels in the light's own axes; the
+  light's direction moves in quarter-degree steps. **Ambient occlusion is off** (`?ao=1` turns it on): its
+  screen-space noise shimmered on thin things far off. Tree detail switches with 120 m of hysteresis; labels and
+  captions fade, with hysteresis on distance and on which of two overlapping labels is shown.
+- **Quiet:** it draws only while the clock, the camera, the selection or the mode changes (and 4 s after, as the water
+  and leaves settle); the hour it is lit by holds while time races (over 4 h a second) and takes the true hour once it slows (as lens-smooth's LightClock); the
+  camera moves only when asked (a click, a selection, a tour); the key is on request.
+- Measured in headful Chrome (GPU) on the run page, blinking pixels per frame (A-B-A) at 480x300, the camera orbiting
+  at 80/300/900 m: 39/27/110 on main, 32/18/6 after; playing slow/fast (320x200): 5.7/4.5 before, 1.2/0.1 after; WebKit
+  after: 0/0.5/0 orbiting, 2.3/3.8/0.3 playing slow/normal/fast. The remaining blinks are sub-pixel detail far off.
+- **Revisit if** the shell gains one shared "light clock" (lens-smooth's light.ts): use it in place of the engine's own.
