@@ -11,7 +11,11 @@ import { describePerson } from "../people";
 import { DAY, clock, dayIndex, dayOf, words } from "../format";
 import { useLens } from "../state";
 import type { InspectorProps } from "../views";
+import { plainWords } from "../story/text";
 import "./life.css";
+
+/** A line from the world, its raw tokens as words: "let_go by offer:employment" → "let go by offer of employment". */
+const plain = (x: string) => plainWords(x).replace(/\b([a-z]+):([a-z]+)\b/g, "$1 of $2");
 
 const ledgerCache = new Map<string, Promise<PersonLedger>>();
 function loadLedger(run: string, id: string): Promise<PersonLedger> {
@@ -307,7 +311,7 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
         <div className="seg">
           {(["all", "seat", "inst", "person"] as const).map((f) => (
             <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>
-              {f === "all" ? "All" : f === "seat" ? `Seat ${counts.seat}` : f === "inst" ? `Organisations ${counts.inst}` : `People ${counts.person}`}
+              {f === "all" ? "All" : f === "seat" ? `AI mayor ${counts.seat}` : f === "inst" ? `Organisations ${counts.inst}` : `People ${counts.person}`}
             </button>
           ))}
         </div>
@@ -336,7 +340,7 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
                   {r.from && <span className={`life-who ${r.who}`}>, from {nameOf(r.from)}</span>}
                   {r.it?.refused && <span className="bad">, refused ({words(r.it.refused)})</span>}
                 </span>
-                <span className="life-text">{r.text}</span>
+                <span className="life-text">{plain(r.text)}</span>
               </span>
             </button>
           </li>,

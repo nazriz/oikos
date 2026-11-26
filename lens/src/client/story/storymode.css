@@ -34,3 +34,7 @@
 .sm-card .sm-quote { margin: 8px 0 12px; font-size: 14px; line-height: 1.5; max-width: 60ch; }
 .sm-card > .st-btn { margin-top: 4px; }
 .sm-quiet { padding: 8px 16px 8px 20px; }
+/* (Blocks that hold a "How do we know?" chain are divs, not paragraphs: the chain holds a list.) */
+.sm-minute .sm-p { font-size: 13.5px; line-height: 1.55; margin: 0 0 6px; }
+.sm-card div.sm-ev, .sm-card div.sm-grab { font-size: 13px; line-height: 1.5; margin: 0 0 4px; max-width: 64ch; }
+.sm-card div.sm-grab { color: var(--st-flag); font-weight: 700; margin-top: 8px; }

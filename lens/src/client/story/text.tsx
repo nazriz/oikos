@@ -103,5 +103,23 @@ export function Hi({ text, as = "span", className }: { text: string; as?: "span"
   const Tag = as;
   return <Tag className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
+/** The office's own ids in a line Lens says, as a reader outside the study would write them (Story mode): "form-council-
+ * proposal" → "the council proposal form", "councillor-1" → "Councillor 1", "ask-2" → "the clerk's draft",
+ * "eating_out" → "eating out". Person and record ids are kept (they open cards). Never applied to a quote. */
+export function plainWords(s: string): string {
+  return s
+    .replace(/\b(?:the )?form-([a-z][a-z-]*[a-z])\b/g, (_, f: string) => `the ${f.replace(/-/g, " ")} form`)
+    .replace(/\b(councillor|house|shop|factory|landlord|apts)-(\d+)\b/g, (_, w: string, n: string) => `${w === "apts" ? "Apartments" : w.charAt(0).toUpperCase() + w.slice(1)} ${n}`)
+    .replace(/\bask-\d+\b/g, "the clerk's draft")
+    .replace(/\bstanding direction(s?)\b/gi, "standing order$1 to a town office")
+    .replace(/\b[Dd]irection: /g, "Standing order to a town office: ")
+    .replace(/\b([a-z]+)_([a-z]+)\b/g, "$1 $2");
+}
+/** A reason the clerk could not draw a request up, as a plain sentence. */
+export function plainReason(r: string): string {
+  const m = /^You don't know of anyone or anything called (.+?)\.?$/.exec(r.trim());
+  if (m) return `the mayor named ${m[1]}, which the office has no record of.`;
+  return plainWords(r);
+}
 export function hasQuery(text: string, q: string) { return q.trim().length >= 2 && text.toLowerCase().includes(q.trim().toLowerCase()); }
 export function Label({ children }: { children: ReactNode }) { return <span className="lbl">{children}</span>; }
