@@ -16286,3 +16286,28 @@ further kinds of line.
   tour ends. The sample tour is 70 s, 1280×720 H.264, about 65 MB.
 - **Measured.** In GPU Chrome presentation holds 60 frames a second. The headless software renderer cannot keep up
   with it (screenshots time out), so presentation is checked in a real window.
+
+## 2026-11-26 Lens: the town in 3D (`src/client/world`, the `world` fold)
+
+Naz asked for "a really crazy interactive thing in the browser" and chose the immersive 3D town. **Decided:**
+- **WebGL2 (`THREE.WebGLRenderer`), not WebGPU.** The sky, the river, the windows, the walking figures and the rain are
+  small GLSL patches on Three's standard materials; WebGPU would need them rewritten in TSL for no gain at this size
+  (60 fps at DPR 2 on an M4 Pro in headful Chrome, idle, panning and playing), and WebGL2 runs on every phone. **Revisit
+  if** a scene grows past what WebGL2 holds at 60 fps (tens of thousands of people), or Lens moves to TSL elsewhere.
+- **What is drawn is read, what is shaped is convention.** Buildings take their kind from the structure type and their
+  facing from the street beside the lot (or the nearest one, reached by a footpath); people walk door to door along the
+  pavements between the `vacated` and the next `occupied` row (the map's rule: at most 3 h apart); the polling station is
+  where people went into a hall on polling day; lit windows follow the count of people inside. The street's
+  cross-section, the right-hand side people walk on, the sun's path (sunrise and sunset as on the map), the late-night
+  dimming of house lights and "a walk of over 650 m is driven by someone allowed to drive the household's car" are
+  display conventions, not the world's figures, and are named as such in `layout.ts` and `engine.ts`. **Revisit if** the
+  log gains travel events with a mode, or a calendar with a place's sun.
+- **The `world` fold** (lens/src/folds/world.ts) keeps the header's vehicles and their drivers, the weather bureau's
+  events (heavy rain, heatwave, drought by day), the river's inflow, and every `vote` block in a citizen's act.
+- **Votes are papers, not walks.** In these towns an elector votes by a paper sent while the ballot is open
+  (docs/behaviour/elections.md); nobody goes into a hall on polling day. So the view draws each ranked vote on the
+  election's ballot (the one with the most ranked votes) as a slip carried from where the voter was to the polling place
+  (the electoral body's premises, else the town hall), with the boxes and a running count set out while it is open.
+  **Revisit if** the world gains voting in person.
+- **A dev page of its own** (`bun lens/src/client/world/dev.ts`, port 4331) serves a bundle folder with the world fold
+  beside the city's files, as the city's dev page does.

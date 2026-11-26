@@ -5,5 +5,6 @@ import { peopleFold } from "../folds/people";
 import { seatFold } from "../folds/seat";
 import { dailyFold } from "../folds/daily";
 import { ledgerFold } from "../folds/ledger";
+import { worldFold } from "../folds/world";
 
-export const FOLDS: FoldFactory[] = [townFold, peopleFold, seatFold, dailyFold, ledgerFold];
+export const FOLDS: FoldFactory[] = [townFold, peopleFold, seatFold, dailyFold, ledgerFold, worldFold];

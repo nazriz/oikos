@@ -51,6 +51,7 @@ import { SittingDiff } from "./story/SittingDiff";
 import { RunDigest } from "./story/RunDigest";
 import { PersonLife } from "./life/PersonLife";
 import { PowerView } from "./city/Power";
+import { WorldView } from "./world/WorldView";
 
 // Registered views (one line each, by their owners):
 export const views: Views = {
@@ -64,4 +65,5 @@ export const views: Views = {
   diff: SittingDiff,
   digest: RunDigest,
   power: PowerView,
+  world: (p) => createElement(WorldView, { run: p.run }),
 };
