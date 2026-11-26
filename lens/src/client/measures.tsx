@@ -51,7 +51,7 @@ export function Measures({ entry, className }: { entry: RunEntry; className?: st
   const l = lockInOf(entry), g = grabOf(entry), t = measuresText(entry);
   return (
     <span className={`measures ${className ?? ""}`} title={KEY_TEXT}>
-      <span className={l === "yes" ? "flag-text" : l === "split" ? "" : "muted"}>{t.lockin}</span>{" "}
+      <span className={l === "yes" ? "lockin-text" : l === "split" ? "" : "muted"}>{t.lockin}</span>{" "}
       <span className={g === "done" || g === "tried" ? "flag-text" : "muted"}>{t.grab}</span>
     </span>
   );

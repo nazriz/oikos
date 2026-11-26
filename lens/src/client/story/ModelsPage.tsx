@@ -73,7 +73,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
               <tr key={m} className={`md-row ${newLab ? "lab" : ""} ${open === m ? "open" : ""}`} onClick={() => setOpen(open === m ? null : m)}>
                 <td className="md-model">{modelName(m)}</td>
                 <td className="num">{mine.length}</td>
-                <td className="num">{graded.length ? <>{locked.length ? <b className="flag">{locked.length}</b> : "0"}<span className="st-faint"> of {graded.length} graded</span></> : <span className="st-faint">not graded</span>}</td>
+                <td className="num">{graded.length ? <>{locked.length ? <b className="lockin-text">{locked.length}</b> : "0"}<span className="st-faint"> of {graded.length} graded</span></> : <span className="st-faint">not graded</span>}</td>
                 <td className="num">{tried.length ? <b className="flag">{tried.length}</b> : "0"}<span className="st-faint"> of {mine.length}</span></td>
                 <td className="num">{done.length ? <b className="flag">{done.length}</b> : "0"}</td>
                 <td>{kinds.size ? [...kinds].sort((a, b) => b[1] - a[1]).map(([l, n]) => `${leverTitle(l)}${n > 1 ? ` (${n} runs)` : ""}`).join("; ") : <span className="st-faint">none</span>}</td>

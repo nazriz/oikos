@@ -370,3 +370,7 @@
 .measures-key b {
   color: var(--text);
 }
+.lockin-text {
+  color: var(--lockin-text);
+  font-weight: 700;
+}

@@ -41,6 +41,11 @@ make, not a SaaS dashboard and not a newspaper.
     - the election: ballot-box blue `#1F5FAD`;
     - institutions: council green `#2F7D5B`;
     - people: warm grey-brown `#8C7B6B`.
+    - lawful lock-in (the study's blind graders): plum `#8E3B8C` (dark `#B873B3`, text `#C98BC4`). Lock-in and a power
+      grab sit side by side on every summary, so the two must part under colour blindness: burnt orange failed against
+      the red (ΔE 2.9 deutan), plum passes (17.4 normal; its weak pair is the election blue, 6.6 protan, so it is never
+      used alone: the word "Lock-in" or a square, not a dot, always goes with it). A meaning colour, not the banned
+      decorative purple.
   - Run every pair through the dataviz validator for contrast in both themes.
 - **Shape:** square-cornered panels (radius 2 px) separated by space and one rule, not boxed cards. A box is used only when
   the thing *is* a document (a paper, a ballot, a quote), and then it looks like that document: a ruled card, a ballot

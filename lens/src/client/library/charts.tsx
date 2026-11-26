@@ -162,7 +162,7 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
       <span className="muted">Click to open this run{t !== undefined ? " at that moment" : ""}.</span>
     </>
   );
-  const cls = `sq m-${mark}${mark === "excluded" && f.grade?.lockIn?.both ? " was-yes" : ""}`;
+  const cls = `sq ${m === "lockin" ? "lk " : ""}m-${mark}${mark === "excluded" && f.grade?.lockIn?.both ? " was-yes" : ""}`;
   return <a className={cls} href={runHref(f.key, t !== undefined ? { t: Math.round(t) } : undefined)} aria-label={`${modelName(f.model)}, town ${f.seed}: ${what}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} />;
 }
 
