@@ -638,7 +638,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     if (!twin || !overlays.diff) return null;
     // Past the end of either arm there is nothing to compare: the one that stopped would look frozen.
     const ended = Math.min(city.town.span[1], twin.town.span[1]);
-    if (t > ended) return { moves: [], elsewhere: 0, compared: 0, onlyHere: [], onlyThere: [], ended };
+    if (t > ended) return { moves: [], elsewhere: 0, compared: 0, onlyHere: [], onlyThere: [], soFar: 0, ended };
     twin.where.seek(t);
     const moves: { from: [number, number, number]; to: [number, number, number]; person: string; a: number; b: number }[] = [];
     let elsewhere = 0, compared = 0;
@@ -668,7 +668,11 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     const onlyHere = papersIn(city, t, win, new Set(PAPER_GROUPS.map((_, i) => i))).filter((x) => !twinSigs.has(sig(city, x.p)));
     const onlyThere = papersIn(twin, t, win, new Set(PAPER_GROUPS.map((_, i) => i))).filter((x) => !ownSigs.has(sig(twin, x.p)))
       .map((x) => ({ ...x, s: city.sById.get(twin.town.structures[x.s]!.id) ?? -1 })).filter((x) => x.s >= 0);
-    return { moves, elsewhere, compared, onlyHere, onlyThere, ended: undefined as number | undefined };
+    // All the papers so far that only one town has (by kind, place and day): how far the towns have come apart.
+    const allTwin = new Set(twin.town.papers.filter((p) => p.t <= t).map((p) => sig(twin, p)));
+    const allOwn = new Set(city.town.papers.filter((p) => p.t <= t).map((p) => sig(city, p)));
+    const soFar = city.town.papers.filter((p) => p.t <= t && !allTwin.has(sig(city, p))).length + twin.town.papers.filter((p) => p.t <= t && !allOwn.has(sig(twin, p))).length;
+    return { moves, elsewhere, compared, onlyHere, onlyThere, soFar, ended: undefined as number | undefined };
   }, [twin, overlays.diff, city, B, Math.floor(t / 300)]);
 
   const layers = [
@@ -1115,7 +1119,12 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       {placeNotes().map((n) => <div key={n.seq} className={`lc-anno act ${n.refused ? "refused" : ""}${inkLight ? "" : " night"}`} style={{ left: n.x, top: n.y, opacity: 1 - n.age * 0.7 }}><b />{n.text}</div>)}
       {hint && !present && !bare && <div className="lc-hint" data-lens-prompt="city-hint" onMouseEnter={dropHint}>{CITY_WORDS.hint} <button className="lc-ghost" onClick={dropHint}>Got it</button></div>}
       {diff && diff.ended !== undefined && <div className="lc-diff"><b>What differs from the other town</b><span>One town's run ended on day {Math.floor(diff.ended / DAY) + 1}, so there is nothing to compare after it.</span></div>}
-      {diff && diff.ended === undefined && <div className="lc-diff"><b>What differs from the other town</b><span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people are somewhere else there right now</span><span><i className="sw dot" />{diff.onlyHere.length} {diff.onlyHere.length === 1 ? "paper" : "papers"} in the last 7 days only in this town</span><span><i className="sw ring" />{diff.onlyThere.length} only in the other town</span></div>}
+      {/* (Only what differs is listed; a line that would say 0 is left out, and the total so far says how far apart they are.) */}
+      {diff && diff.ended === undefined && <div className="lc-diff"><b>What differs from the other town</b>
+        <span>{diff.soFar ? `The towns have diverged in ${diff.soFar.toLocaleString("en-US")} ${diff.soFar === 1 ? "way" : "ways"} so far: papers filed in one town and not the other.` : "The towns have not diverged yet: so far they have the same papers."}</span>
+        {diff.elsewhere > 0 && <span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people are somewhere else there right now</span>}
+        {diff.onlyHere.length > 0 && <span><i className="sw dot" />{diff.onlyHere.length} {diff.onlyHere.length === 1 ? "paper" : "papers"} in the last 7 days only in this town</span>}
+        {diff.onlyThere.length > 0 && <span><i className="sw ring" />{diff.onlyThere.length} in the last 7 days only in the other town</span>}</div>}
       {!present && paint && <Minimap B={paint} town={town} view={view} size={size} setView={setView} />}
       {!bare && !present && panel}
       {present && caption && <PresentBar c={caption} recording={recording} onExit={() => stopPresent()} />}

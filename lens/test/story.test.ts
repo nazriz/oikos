@@ -10,6 +10,7 @@ import { momentsOf } from "../src/client/story/Moments";
 import { chainOf } from "../src/client/story/Evidence";
 import { keyMoments } from "../src/client/timeline/moments";
 import { dayOf, lockT } from "../src/client/format";
+import { electionCard } from "../src/client/story/election-card";
 
 const D = 86_400, SEAT = "mayor-system";
 function run(): LogLine[] {
@@ -222,4 +223,13 @@ test("the reader's prompt document keeps every line, and key-sentence highlights
   const re = keyWords(["c0571"]);
   const html = keyWrap('<p>Rates are fine. I will appoint <button data-person="c0571">c0571</button>. Waste is <em>late. Again</em>. The poll is day 181.</p>', re);
   expect(html).toBe('<p>Rates are fine. <span class="st-key">I will appoint <button data-person="c0571">c0571</button>.</span> Waste is <em>late. Again</em>. <span class="st-key">The poll is day 181.</span></p>');
+});
+
+test("the election's card is the commission's result: turnout, the winner, the AI mayor's share at first and last count", () => {
+  const rounds = [{ "mayor-system": 288, "c0094-self": 158, "c0750-self": 155 }, { "mayor-system": 396, "c0094-self": 205 }];
+  const seat = (winner: string) => ({ seat: "mayor-system", records: [{ id: "rec.9", kind: "ballot_result", t: 180.8 * 86_400, text: "", data: { office: "mayor", electors: 714, formal: 601, turnout_bps: 8417, rounds, winner } }] }) as unknown as SeatJson;
+  const won = electionCard(seat("mayor-system"))!;
+  expect([won.day, won.won]).toEqual([181, true]);
+  expect(won.sentences.join(" ")).toBe("The town voted for mayor: 601 of the 714 on the roll cast a valid vote (turnout 84%). The AI mayor won, with 288 first choices (48%), and 396 (66%) at the last of 2 counts, as voters' later choices passed on.");
+  expect(electionCard(seat("c0094-self"))!.sentences[1]).toMatch(/^The AI mayor lost, .* Resident c0094 won\.$/);
 });

@@ -786,7 +786,7 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
         </div>
       </div>
       {hover && createPortal(
-        <div className="tip" style={{ left: Math.max(8, Math.min(window.innerWidth - 330, hover.cx + 12)), bottom: window.innerHeight - (root.current?.getBoundingClientRect().top ?? hover.cy - 70) + 6 }}>
+        <div className="tip" style={{ left: tipLeft(hover.cx), bottom: window.innerHeight - (root.current?.getBoundingClientRect().top ?? hover.cy - 70) + 6 }}>
           {hover.flag ? (
             <>
               <b>{hover.flag.label}</b>
@@ -810,6 +810,14 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
       )}
     </div>
   );
+}
+
+/** Where the timeline's card goes: over the town, never over the story beside it (the rail is what one is reading). */
+function tipLeft(cx: number): number {
+  const lim = document.querySelector(".run-map")?.getBoundingClientRect().right ?? window.innerWidth;
+  const W = 330;
+  if (cx + 12 + W <= lim) return Math.max(8, cx + 12);
+  return Math.max(8, Math.min(lim, cx) - W - 12);
 }
 
 const momentColor = (p: Palette, m: KeyMoment) => (m.kind === "lockin" ? p.lockin : m.kind === "grab" ? p.flag : m.kind === "election" ? p.election : p.text);

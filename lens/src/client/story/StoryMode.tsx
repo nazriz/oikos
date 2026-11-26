@@ -11,6 +11,7 @@ import { HowDoWeKnow } from "./Evidence";
 import { Hi, openPerson, usePlain } from "./text";
 import { fetchRun } from "../api";
 import { lockInfo, lockDay, graders, type LockInfo } from "./lockin";
+import { electionCard, type ElectionCard } from "./election-card";
 import { leverCounts } from "../../shared/outcome";
 import { loadSeat, useAsync } from "./data";
 import "./story.css";
@@ -34,11 +35,16 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
   const entry = useAsync(() => (run ? fetchRun(run).catch(() => null) : null), [run]);
   const lock = useMemo(() => lockInfo(seat, entry instanceof Error ? null : entry), [seat, entry]);
   // Notable turns as cards; runs of quiet turns between them as one folded line.
-  const blocks: ({ kind: "card"; t: Telling } | { kind: "quiet"; ts: Telling[] })[] = [];
+  const blocks: ({ kind: "card"; t: Telling } | { kind: "quiet"; ts: Telling[] } | { kind: "election"; e: ElectionCard })[] = [];
+  // (The election's result as a card of its own, in its place among the turns: src/client/story/election-card.ts.)
+  const elec = useMemo(() => electionCard(seat), [seat]);
+  let elecPlaced = !elec;
   for (const t of tellings) {
+    if (!elecPlaced && elec && t.t > elec.t) { blocks.push({ kind: "election", e: elec }); elecPlaced = true; }
     if (t.notable || t.i === lock?.sitting) blocks.push({ kind: "card", t });
     else { const last = blocks.at(-1); if (last?.kind === "quiet") last.ts.push(t); else blocks.push({ kind: "quiet", ts: [t] }); }
   }
+  if (!elecPlaced && elec) blocks.push({ kind: "election", e: elec });
   const open = (t: Telling) => { select({ kind: "sitting", index: t.i }); setT(t.t); };
   // When the page opens at a moment (a link, the timeline, a turn chosen elsewhere), bring that turn's card to the top;
   // the summary stays just above it. On a fresh open at the run's start, nothing moves.
@@ -69,7 +75,14 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
         <OneMinute seat={seat} run={run ?? ""} model={model} turns={tellings.length} lock={lock} />
       </div>
       <div className="sm-list">
-        {blocks.map((b, k) => b.kind === "card" ? (
+        {blocks.map((b, k) => b.kind === "election" ? (
+          <article key="election" className={`sm-card election ${b.e.won ? "won" : ""}`} data-election={b.e.t}>
+            <h3>Day {b.e.day}: the election</h3>
+            {b.e.sentences.map((x, i) => <p key={i} className={i === 1 ? "sm-lead" : undefined}>{x}</p>)}
+            {run && <div className="sm-ev"><HowDoWeKnow run={run} claim={{ kind: "outcome" }} /></div>}
+            <button className="st-btn" onClick={() => setT(b.e.t)}>Go to the result</button>
+          </article>
+        ) : b.kind === "card" ? (
           <article key={b.t.i} data-turns={String(b.t.i)} data-peek={`sitting:${b.t.i}`} className={`sm-card ${b.t.levers.length ? "grab" : ""} ${b.t.i === lock?.sitting ? "lockin" : ""}`} data-tour={k === 0 ? "turn" : undefined}>
             <h3>Day {b.t.day}</h3>
             {b.t.sentences.map((x, i) => <p key={i} className={i === 0 ? "sm-lead" : undefined}>{plain(x)}</p>)}

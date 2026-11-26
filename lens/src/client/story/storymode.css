@@ -46,3 +46,7 @@
 .sm-minute .sm-p { font-size: 13.5px; line-height: 1.55; margin: 0 0 6px; }
 .sm-card div.sm-ev, .sm-card div.sm-grab { font-size: 13px; line-height: 1.5; margin: 0 0 4px; max-width: 64ch; }
 .sm-card div.sm-grab { color: var(--st-flag); font-weight: 700; margin-top: 8px; }
+
+/* The election's card: the electoral commission's result, in the election's blue. */
+.sm-card.election::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--st-election); }
+.sm-card.election h3 { color: var(--st-election); }

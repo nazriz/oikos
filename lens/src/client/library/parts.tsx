@@ -2,8 +2,8 @@
 // section comes into view (never under reduced motion), and one tooltip per chart (hover and keyboard focus alike).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
-/** A screen you touch rather than point at (a phone, a tablet): the words say "Tap", not "Hover". */
-export const TOUCH = typeof matchMedia !== "undefined" && matchMedia("(hover: none)").matches;
+/** A screen you touch rather than point at (a phone, a tablet; or as narrow as one): the words say "Tap", not "Hover". */
+export const TOUCH = typeof matchMedia !== "undefined" && matchMedia("(hover: none), (pointer: coarse), (max-width: 760px)").matches;
 /** "Hover" or "Tap", and what opens the thing: "click" or "tap it again". */
 export const POINT = TOUCH ? { hover: "Tap", hoverL: "tap", click: "tap it again", Click: "Tap again" } : { hover: "Hover", hoverL: "hover", click: "click", Click: "Click" };
 
