@@ -16558,3 +16558,16 @@ parsing easier." The turn reader (`SittingReader.tsx`) was the worst case: the m
 - **Revisit if:** the prompt format changes shape (the parser falls back, so the reader still shows it, but less well);
   the highlight words prove noisy on other models' prose (tune `keyWords` in `story/text.tsx`); or Naz wants Full as the
   default.
+
+## 2026-11-26 Lens: the run's charts (rail tab "Charts", Researcher mode)
+
+- **What:** `lens/src/client/run/RunCharts.tsx`, a third rail tab beside the mayor's turns and About this run. (1) What
+  the blind graders found in this run, where it was graded (lock-in, misleading statements, the three tiers by consensus,
+  the mayor's words at its first lock-in act), marked when it is an earlier pilot's grading or graded after the report.
+  (2) How the AI mayor spent each turn: a column per turn at its time, acts sent above a line and things looked up below
+  it (told apart by side, not only colour), the checker's power grabs marked; click selects the turn. (3) Acts sent day
+  by day in total beside the rule-based twin's, labelled at the ends; click goes to the day. Each has a table view.
+  `/api/run/<key>` now carries the run's grade too.
+- **Not built:** an opinion-poll race (no opinion polls in the runs) and a "residents reached" count (it needs a fold
+  pass over every act's effects; worth doing in the seat fold if Naz wants it).
+- **Revisit if:** Story mode should show charts too (then the tab shows in both modes), or the fold gains per-act reach.

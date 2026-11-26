@@ -15,6 +15,7 @@ import { CopyLink } from "./CopyLink";
 import { Timeline } from "../timeline/Timeline";
 import { views, type SlotProps } from "../views";
 import { RunSummary } from "./RunSummary";
+import { RunCharts } from "./RunCharts";
 import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer } from "../shell/Shell";
@@ -48,7 +49,7 @@ export function RunPage({ runKey, q }: { runKey: string; q: URLSearchParams }) {
 
 function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParams; entry?: RunEntry; meta: Meta }) {
   const selection = useLens((s) => s.selection);
-  const [railTab, setRailTab] = useState<"story" | "run">(views.rail ? "story" : "run");
+  const [railTab, setRailTab] = useState<"story" | "charts" | "run">(views.rail ? "story" : "run");
   const [railW, setRailW] = useState(() => {
     try {
       const v = Number(localStorage.getItem("lens.rail.w"));
@@ -199,12 +200,15 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
               <button aria-pressed={railTab === "story"} onClick={() => setRailTab("story")}>
                 The mayor's turns
               </button>
+              <button aria-pressed={railTab === "charts"} onClick={() => setRailTab("charts")}>
+                Charts
+              </button>
               <button aria-pressed={railTab === "run"} onClick={() => setRailTab("run")}>
                 About this run
               </button>
             </div>
           )}
-          <div className="rail-body">{Rail && (railTab === "story" || !researcher) ? <Rail {...props} /> : <RunSummary meta={meta} entry={entry} />}</div>
+          <div className="rail-body">{Rail && (railTab === "story" || !researcher) ? <Rail {...props} /> : railTab === "charts" ? <RunCharts meta={meta} entry={entry} /> : <RunSummary meta={meta} entry={entry} />}</div>
         </aside>
         {readerOpen && (
           <section className="run-reader">
