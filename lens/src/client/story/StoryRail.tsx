@@ -77,6 +77,13 @@ function outcomeOf(seat: SeatJson): { label: string; tone: string } {
   return OUTCOME[seat.outcome];
 }
 
+/** Short names for the reader's levers, for a chip on one line (the full title is its tooltip). */
+const SHORT: { [lever: string]: string } = {
+  fines_off: "fines off", rates_interest_off: "rates interest off", budget_push: "budget push", vacate_editor: "editor vacated", replace_editor: "editor replaced",
+  vacate_electoral: "electoral vacated", replace_electoral: "electoral replaced", vacate_finance: "finance vacated", replace_finance: "finance replaced",
+  amend_election_rules: "election date or rules", vacate_clerk: "clerk vacated", replace_clerk: "clerk replaced", withdraw_law: "withdrew a law/paper", successor_agreement: "binding the successor",
+};
+
 /** The header in a line or two: who, under which goal, how it went, and the counts that matter. */
 function HeaderLine({ seat, onOpen }: { seat: SeatJson; onOpen: () => void }) {
   const select = useLens((s) => s.select);
@@ -100,8 +107,8 @@ function HeaderLine({ seat, onOpen }: { seat: SeatJson; onOpen: () => void }) {
       </div>
       {(top.size > 0 || kin.length > 0) && (
         <div className="st-line3">
-          {[...top.values()].sort((a, b) => rank[b.level] - rank[a.level]).map((l) => <button key={l.lever} className="st-chip flag" onClick={() => select({ kind: "lever", index: l.i })} title={`${l.title}: ${l.level}`}>⚑ {l.title}{l.level === "attempted" ? " (tried)" : ""}</button>)}
-          {kin.length > 0 && <button className="st-chip flag" onClick={() => select({ kind: "act", seq: seat.acts[kin[0]!.act]!.seq })}>own child appointed ×{kin.length}</button>}
+          {[...top.values()].sort((a, b) => rank[b.level] - rank[a.level]).map((l) => <button key={l.lever} className="st-chip flag" onClick={() => select({ kind: "lever", index: l.i })} title={`${l.title}: ${l.level} (the study's reader)`}>⚑ {SHORT[l.lever] ?? l.title}{l.level === "attempted" ? " (tried)" : ""}</button>)}
+          {kin.length > 0 && <button className="st-chip flag" onClick={() => select({ kind: "act", seq: seat.acts[kin[0]!.act]!.seq })} title="Appointed one of its own children (as its prompt names them)">own child ×{kin.length}</button>}
         </div>
       )}
     </div>
@@ -176,7 +183,7 @@ function Election({ seat, compact }: { seat: SeatJson; compact?: boolean }) {
       <div className="st-elec-bar">
         <div className="axis" />
         {e.notice_at !== undefined && <div className="span" style={{ left: x(e.notice_at), width: `calc(${x(Math.min(e.poll_at ?? to, to))} - ${x(e.notice_at)})` }} />}
-        {pins.map((p, k) => <div key={p.label} className={`pin ${p.moved ? "moved" : ""} ${p.off ? "off" : ""}`} style={{ left: x(p.t) }} title={`${p.label}: ${when(p.t)}`} onClick={() => !p.off && setT(p.t)}><span className={`r${rows[k]} ${pct(p.t) > 85 ? "end" : pct(p.t) < 10 ? "start" : ""}`}>{p.off ? `${p.label} → day ${worldDay(p.t) + Math.floor(p.t / (365 * DAY)) * 365}` : `${p.label} ${worldDay(p.t)}`}</span></div>)}
+        {pins.map((p, k) => <div key={p.label} className={`pin ${p.moved ? "moved" : ""} ${p.off ? "off" : ""}`} style={{ left: x(p.t) }} title={`${p.label}: ${when(p.t)}`} onClick={() => !p.off && setT(p.t)}><span className={`r${compact ? 0 : rows[k]} ${compact && rows[k] ? "hide" : ""} ${pct(p.t) > 85 ? "end" : pct(p.t) < 10 ? "start" : ""}`}>{p.off ? `${p.label} → day ${worldDay(p.t) + Math.floor(p.t / (365 * DAY)) * 365}` : `${p.label} ${worldDay(p.t)}`}</span></div>)}
         {t >= from && t <= to && <div className="now" style={{ left: x(t) }} />}
       </div>
       {!compact && moved && <div className="st-elec-note">The poll was moved to day {Math.round((e.poll_at ?? 0) / DAY)} by a law the seat proposed on day {moved.day} ({STAGE[moved.outcome] ?? moved.outcome}).</div>}
@@ -196,7 +203,7 @@ export function sittingAt(sittings: SittingSummary[], t: number): number {
 function Sittings({ seat, onScrolled }: { seat: SeatJson; onScrolled?: () => void }) {
   const t = useLens((s) => s.t), setT = useLens((s) => s.setT), select = useLens((s) => s.select), selection = useLens((s) => s.selection);
   const ref = useRef<HTMLDivElement>(null);
-  const v = useVirtualizer({ count: seat.sittings.length, getScrollElement: () => ref.current, estimateSize: () => 92, overscan: 8 });
+  const v = useVirtualizer({ count: seat.sittings.length, getScrollElement: () => ref.current, estimateSize: () => 76, overscan: 8 });
   const now = sittingAt(seat.sittings, t);
   const selIndex = selection?.kind === "sitting" ? selection.index : selection?.kind === "lever" ? seat.levers[selection.index]?.sitting ?? -1 : selection?.kind === "act" ? seat.acts.find((a) => a.seq === selection.seq)?.sitting ?? -1 : -1;
   const follow = selIndex >= 0 ? selIndex : now;
@@ -220,27 +227,28 @@ function SittingRow({ seat, s, now, sel, start, measure, onClick }: { seat: Seat
   const levers = s.levers.map((i) => seat.levers[i]!);
   const strong = [...new Map(levers.filter((l) => l.level !== "considered").map((l) => [l.lever, l])).values()];
   const weak = levers.filter((l) => l.level === "considered").length;
+  const kin = kinAppointed(seat).some((k) => s.acts.includes(k.act));
   return (
     <div ref={measure} data-index={s.i} className={`st-row ${s.kind} ${now ? "now" : ""} ${sel ? "sel" : ""} ${s.lever_level ? `lv-${s.lever_level}` : ""}`} style={{ transform: `translateY(${start}px)` }} onClick={onClick}>
       <div className="rail-line" /><div className="node" />
       <div className="st-row-top">
         <span className="st-row-day">Day {worldDay(s.t)}</span>
-        <span className="st-row-time st-mono">{when(s.t).split(", ").at(-1)}{s.woke_for ? ` · ${human(s.woke_for)}` : ""}{s.kind === "code" ? " · code" : ""}</span>
+        <span className="st-row-time st-mono">{when(s.t).split(", ").at(-1)}{s.kind === "code" ? " · code" : ""}</span>
+        <span className="st-row-meta" title={[`${plural(s.turns, "call")}`, s.woke_for ? `woke for ${human(s.woke_for)}` : "", s.declined ? `${s.declined} declined` : "", s.failures ? plural(s.failures, "translator failure") : "", s.notebook ? "notebook" : "", weak ? `reader "considered" ×${weak} (a phrase match, unreliable)` : ""].filter(Boolean).join(" · ")}>
+          {acts.length > 0 && <span className="m seat">{plural(acts.length, "act")}{applied < acts.length ? ` (${applied} applied)` : ""}</span>}
+          {s.refused > 0 && <span className="m bad">{s.refused} refused</span>}
+          {s.failures > 0 && <span className="m bad">{s.failures} unsent</span>}
+          {s.declined > 0 && <span className="m">{s.declined} declined</span>}
+          {weak > 0 && <span className="m weak">≈{weak}</span>}
+        </span>
         {s.usage.cost_microusd > 0 && <span className="st-row-cost st-mono">{usd(s.usage.cost_microusd)}</span>}
       </div>
       <div className="st-row-gist">{s.gist || <span className="st-muted">—</span>}</div>
       {s.words && <div className="st-row-words">“{s.words}”</div>}
-      <div className="st-row-chips">
+      {(strong.length > 0 || kin) && <div className="st-row-chips">
         {strong.map((l) => <span key={l.lever} className="st-chip flag" title={l.title}>⚑ {l.title}</span>)}
-        {weak > 0 && <span className="st-chip flag-muted" title="The reader's phrase match: unreliable">considered ×{weak}</span>}
-        {acts.length > 0 && <span className="st-chip seat"><b style={{ color: "inherit" }}>{acts.length}</b> {acts.length === 1 ? "act" : "acts"}{applied < acts.length ? ` · ${applied} applied` : ""}</span>}
-        {kinAppointed(seat).some((k) => s.acts.includes(k.act)) && <span className="st-chip flag">own child appointed</span>}
-        {s.refused > 0 && <span className="st-chip bad">{s.refused} refused</span>}
-        {s.declined > 0 && <span className="st-chip">{s.declined} declined</span>}
-        {s.failures > 0 && <span className="st-chip bad">{plural(s.failures, "translator failure")}</span>}
-        {s.turns > 0 && <span className="st-chip">{plural(s.turns, "call")}</span>}
-        {s.notebook > 0 && <span className="st-chip" style={{ color: "var(--st-citizen)" }}>notebook</span>}
-      </div>
+        {kin && <span className="st-chip flag">own child appointed</span>}
+      </div>}
     </div>
   );
 }
