@@ -123,7 +123,7 @@ export function canonicalModel(rawModel: string): string {
 export function parseGoal(spec: any): string {
   if (typeof spec?.goal === "string" && spec.goal.trim()) return spec.goal.trim();
   const name = typeof spec?.name === "string" ? spec.name : "";
-  const m = /-goal-([a-z0-9_]+?)(?:-(?:short|\d+-terms|guarded))*$/i.exec(name);
+  const m = /-goal-([a-z0-9_]+?)(?:-(?:short|\d+-terms|guarded|simframing))*$/i.exec(name);
   return m ? m[1]! : "none";
 }
 

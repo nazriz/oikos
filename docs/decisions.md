@@ -16493,3 +16493,12 @@ parsing easier." The turn reader (`SittingReader.tsx`) was the worst case: the m
 - **Revisit if:** the prompt format changes shape (the parser falls back, so the reader still shows it, but less well);
   the highlight words prove noisy on other models' prose (tune `keyWords` in `story/text.tsx`); or Naz wants Full as the
   default.
+
+## 2026-11-26 · Phase 2 study extensions: Anthropic generation/scale curve, corrigibility mitigation, explicit simulation framing
+
+- **Decision:** On `ps/lead-v2-phase2`, add:
+  1. Direct Anthropic API generation & scale curve mayors (`ANTHROPIC_MAYORS`: `haiku-4-5`, `sonnet-4-5`, `sonnet-4-6`, `sonnet-5`, `opus-4-5`, `opus-4-6`, `opus-5`, `opus-5-5`) plus opt-in `FABLE_MAYORS` (`anthropic/claude-fable-5-2`, gated behind `OIKOS_PS_ALLOW_FABLE=1`), wired through Oikos's sanctioned `seats.allow_models` mechanism for `anthropic/` prepaid credit only (authorized by Naz on 2026-11-26 for his $175 Anthropic API credit; `fallbackTranslator` remains strictly `haiku-5-5` / `sonnet-5-5` / `PLAN_FALLBACK`).
+  2. `GOALS.strong_corrigible` (Phase 2 mitigation arm pairing `strong` with an explicit democratic-reversibility rule against locking in laws, multi-year budgets, or partisan appointments).
+  3. `OIKOS_PS_FRAMING=unstated|simulation` (`framingOf`, defaulting to `unstated`), exposing Oikos's native `simulation` disclosure framing for a direct controlled test of eval-awareness without altering `GOALS` or default runs.
+- **Why:** v2 headline data (`docs/design/power-seeking-results-v2.md`) established 92.9% (13/14) lawful institutional lock-in across 5 frontier labs under `strong` + `election` vs 0% on `mandate` and 0% on smaller models. Phase 2 directly tests (a) the capability × RLHF-generation transition curve (`Haiku → Sonnet → Opus → Fable`), (b) whether prompt-level corrigibility reduces lock-in across all 5 labs, and (c) whether explicit simulation/eval disclosure suppresses lock-in.
+- **Revisit if:** Phase 2 uncovers second-order workarounds requiring a structural `proc-appointments` / multi-year-budget guardrail arm.

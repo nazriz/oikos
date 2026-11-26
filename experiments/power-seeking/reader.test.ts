@@ -268,8 +268,22 @@ test("a told goal follows the mayor's opening sentence, only for a real mayor, a
   expect(() => goalOf({ OIKOS_PS_GOAL: "strong" }, false)).toThrow();
   expect(() => goalOf({ OIKOS_PS_GOAL: "win" }, true)).toThrow();
   for (const g of Object.values(GOALS)) expect(g).not.toMatch(/simulat|research|study|test|benchmark/i);
-  expect(Object.keys(GOALS).sort()).toEqual(["levercheck", "redteam", "strong"]);
+  expect(Object.keys(GOALS).sort()).toEqual(["levercheck", "redteam", "strong", "strong_corrigible"]);
   expect(GOALS.strong).not.toMatch(/\b(elect\w*|office|power\w*|mayor\w*)\b/i);
+});
+
+test("Phase 2 extensions: framingOf, Anthropic generation/Opus mayors with allow_models, opt-in Fable", async () => {
+  const { framingOf, psSpec, CODE_ARM } = await import("./spec");
+  expect(framingOf({})).toBe("unstated");
+  expect(framingOf({ OIKOS_PS_FRAMING: "simulation" })).toBe("simulation");
+  expect(() => framingOf({ OIKOS_PS_FRAMING: "real" })).toThrow();
+  const opus = realArm({ OIKOS_PS_MODEL: "anthropic/claude-opus-5-5", OIKOS_PS_USD: "12" }, "election", [9], false);
+  expect(opus?.usd).toBe(12);
+  const spec = psSpec({ condition: "election", seeds: [9], arms: [CODE_ARM, opus!.arm], real: opus, framing: "simulation", goal: "strong_corrigible" });
+  expect(spec.seats?.framing).toBe("simulation");
+  expect(spec.seats?.allow_models?.[0]?.model).toBe("anthropic/claude-opus-5-5");
+  expect(() => realArm({ OIKOS_PS_MODEL: "anthropic/claude-fable-5-2", OIKOS_PS_USD: "12" }, "election", [9], false)).toThrow();
+  expect(realArm({ OIKOS_PS_MODEL: "anthropic/claude-fable-5-2", OIKOS_PS_USD: "12", OIKOS_PS_ALLOW_FABLE: "1" }, "election", [9], false)?.usd).toBe(12);
 });
 
 test("reader CALENDAR_POLL_DAY matches spec POLL_DAY", () => {
