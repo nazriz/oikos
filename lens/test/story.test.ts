@@ -7,6 +7,7 @@ import type { LogLine } from "../src/shared/fold";
 import { toInspect } from "../src/server/inspect-export";
 import { dailyFold, type DailyJson } from "../src/folds/daily";
 import { momentsOf } from "../src/client/story/Moments";
+import { chainOf } from "../src/client/story/Evidence";
 
 const D = 86_400, SEAT = "mayor-system";
 function run(): LogLine[] {
@@ -94,6 +95,11 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   // As a Moment: one card for the appointment, in the seat's own words, at its furthest level.
   const moments = momentsOf("r", seat);
   expect(moments.map((m) => [m.lever.lever, m.lever.level, m.words, m.note, m.outcome])).toEqual([["replace_electoral", "executed", "Appoint c0571 electoral commissioner", "Someone I trust.", "applied"]]);
+
+  // "How do we know?": the lever's chain runs from the mayor's words to the checker, each step from the log.
+  const chain = chainOf(seat, { kind: "lever", index: executed.i });
+  expect(chain.steps.map((s) => s.label)).toEqual(["The mayor asked", "The clerk wrote it up as", "The act sent", "What the town did", "How the study's checker counts it"]);
+  expect(chain.steps[0]!.sitting).toBe(0);
 
   // The day-by-day counts the compare view sets side by side: the seat's refused act is the seat's and the town's.
   const day = (await daily.finish(ctx)).json as DailyJson;

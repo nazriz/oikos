@@ -56,6 +56,8 @@ import { Moments } from "./story/Moments";
 import { Findings } from "./story/Findings";
 import { SittingDiff } from "./story/SittingDiff";
 import { RunDigest } from "./story/RunDigest";
+import { ModelsPage } from "./story/ModelsPage";
+import { HowDoWeKnow } from "./story/Evidence";
 import { PersonLife } from "./life/PersonLife";
 import { PowerView } from "./city/Power";
 import { WorldView } from "./world/WorldView";
@@ -71,6 +73,8 @@ export const views: Views = {
   findings: Findings,
   diff: SittingDiff,
   digest: RunDigest,
+  models: ModelsPage,
+  howDoWeKnow: HowDoWeKnow,
   power: PowerView,
   world: (p) => createElement(WorldView, { run: p.run }),
 };

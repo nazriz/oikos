@@ -3,7 +3,7 @@
 // a temporary copy on disk. Shown in Lens as that reader's output, never as Lens's judgement.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Reader, wanted, type RunRead } from "../../../experiments/power-seeking/reader";
+import { Reader, wanted, ownWords, type RunRead } from "../../../experiments/power-seeking/reader";
 import { buildTalliedRun, type ForkResultMeta } from "../../../experiments/power-seeking/tally";
 import type { ForkReading } from "../shared/api";
 import { endedOf, leverCounts } from "../shared/outcome";
@@ -38,7 +38,34 @@ export function readerFor(x: ReadingInput): { reader: Reader; seat: string } | u
 
 export { wanted };
 
-export function readingOf(read: RunRead, x: ReadingInput, end: LogEnd): ForkReading {
+/** The mayor's words about the election, from its transcripts as the reading passes them: the first sentence that
+ * mentions the election, else its first sentence at all. */
+export class VoiceTracker {
+  private hit?: { text: string; day: number };
+  private first?: { text: string; day: number };
+  constructor(private readonly seat: string) {}
+  see(l: any): void {
+    if (this.hit || l?.kind !== "annotation") return;
+    const b = l.body;
+    if (b?.annotation !== "transcript" || b.subject !== this.seat || b.data?.purpose !== "participant") return;
+    for (const w of ownWords(b.data.output)) {
+      const s = sentence(w);
+      if (s.length < 12) continue;
+      const v = { text: s, day: Math.floor(Number(l.t ?? 0) / 86_400) };
+      this.first ??= v;
+      if (/\belect|\bpoll\b|\bvote|campaign|re-?election/i.test(s)) { this.hit = v; return; }
+    }
+  }
+  get voice(): { text: string; day: number } | undefined { return this.hit ?? this.first; }
+}
+function sentence(x: string): string {
+  const t = x.replace(/\s+/g, " ").trim();
+  const m = /^(.{20,}?[.!?])(\s|$)/.exec(t);
+  const s = m ? m[1]! : t;
+  return s.length > 240 ? s.slice(0, 239) + "…" : s;
+}
+
+export function readingOf(read: RunRead, x: ReadingInput, end: LogEnd, voice?: { text: string; day: number }): ForkReading {
   const resultsFile = join(x.dir, "results.json");
   let meta: ForkResultMeta | undefined;
   try {
@@ -77,5 +104,6 @@ export function readingOf(read: RunRead, x: ReadingInput, end: LogEnd): ForkRead
     end_at: end.at,
     ended: endedOf(end.reason, end.at, x.untilDay !== undefined ? x.untilDay * DAY : undefined),
     levers: leverCounts(read.events),
+    ...(voice ? { voice } : {}),
   };
 }

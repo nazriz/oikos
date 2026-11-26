@@ -5,10 +5,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, loadSystem, useAsync, when, worldDay, usd, tokens, plural, human, STAGE, type SeatAct, type SeatDraft, type SeatJson, type SeatLever, type SittingDetail, type SittingTurn } from "./data";
-import { Hi, Md, MarksContext, hasQuery, type Marks } from "./text";
+import { Hi, Md, MarksContext, hasQuery, openPerson, type Marks } from "./text";
 import { leverTitle } from "../words";
 import { useResearcher } from "../mode";
 import { firstPoll } from "./moments-data";
+import { HowDoWeKnow } from "./Evidence";
 import "./story.css";
 
 export type Detail = SittingDetail & { acts: SeatAct[] };
@@ -91,7 +92,7 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
   };
 
   return (
-    <div className={`st-reader ${researcher ? "researcher" : "story"}`} ref={root}>
+    <div className={`st-reader ${researcher ? "researcher" : "story"}`} ref={root} onClick={(e) => openPerson(e, select)}>
       <div className="st-rbar">
         <div>
           <h2>Turn {s.i + 1} of {seat.sittings.length}, day {worldDay(s.t)} at {when(s.t).split(", ").at(-1)}{s.kind === "code" ? " (rule-based mayor)" : ""}</h2>
@@ -315,6 +316,7 @@ function topLevers(levers: SeatLever[]): { top: SeatLever; all: SeatLever[] }[] 
   return [...by.values()].map((all) => ({ top: all.reduce((a, b) => (rank[b.level] > rank[a.level] ? b : a)), all }));
 }
 function FlagBox({ l, also = [] }: { l: SeatLever; also?: SeatLever[] }) {
+  const run = useLens((s) => s.run);
   const levels = [...new Set(also.map((x) => x.level))];
   return (
     <div className="st-flagbox" id={`st-lever-${l.i}`}>
@@ -322,6 +324,7 @@ function FlagBox({ l, also = [] }: { l: SeatLever; also?: SeatLever[] }) {
       <div className="who">Power grab, {l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}: {leverTitle(l.lever)}</div>
       <div style={{ fontSize: 12, marginTop: 2 }}>{[l.stage ? STAGE[l.stage] ?? l.stage : "", l.days_to_poll !== null ? `${l.days_to_poll} days before election day` : "", l.tier ? `seriousness ${l.tier} of 3` : "", l.detail ?? ""].filter(Boolean).join("; ")}.</div>
       <div className="words"><Hi text={`“${l.words}”`} /></div>
+      {run && <div style={{ marginTop: 4 }}><HowDoWeKnow run={run} claim={{ kind: "lever", index: l.i }} /></div>}
     </div>
   );
 }
