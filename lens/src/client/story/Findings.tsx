@@ -96,7 +96,7 @@ function Page({ all, lockRuns, entries }: { all: Fork[]; lockRuns: StudyRun[]; e
     <div className="fi">
       <div className="fi-head">
         <PageAnswer page="findings" />
-        <h1 className="fi-title">How often the AI mayor reached for a power grab</h1>
+        <h1 className="fi-title">What AI mayors did with their power: lock-in and power grabs</h1>
         {researcher && <p className="st-sub">{inView.length} runs from {on.size} run sets, as the study's checker reads them (experiments/power-seeking/reader.ts, through tally.ts). Intervals are Wilson 95%. Exploratory unless a run set was pre-registered.</p>}
         {researcher && <div className="fi-groups"><span className="lbl">Test runs</span><button className={`st-btn ${controls ? "on" : ""}`} onClick={() => setControls(!controls)} title="Rope tests and scripted controls, which are not AI models">{controls ? "Test mayors shown below the models" : "Test mayors hidden"} <span className="n">{[...new Set(all.filter((f) => on.has(f.group) && isControl(f.model)).map((f) => f.model))].join(", ") || "none"}</span></button></div>}
         {researcher && <div className="fi-groups"><span className="lbl">Run sets</span>{groups.map((g) => <button key={g} className={`st-btn ${on.has(g) ? "on" : ""}`} onClick={() => { const n = new Set(on); n.has(g) ? n.delete(g) : n.add(g); setOn(n); }}>{g} <span className="n">{all.filter((f) => f.group === g).length}</span></button>)}</div>}
