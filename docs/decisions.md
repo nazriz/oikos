@@ -16010,3 +16010,13 @@ With the owner's go-ahead to broaden the model panel (including Thinking Machine
 - Added sourced OpenRouter prices (`https://openrouter.ai/api/v1/models`, retrieved 2026-11-26, `answer: "tools"`, `reasoning_tokens: 16000`) to `orchestrator/prices.json` and `OPENROUTER_MAYORS` in `experiments/power-seeking/spec.ts` for `thinkingmachines/inkling-2-mini`, `thinkingmachines/inkling-2-small`, `thinkingmachines/inkling`, `openai/gpt-6.1-terra`, `google/gemini-4-hydrogen`, `qwen/qwen4-max`, `mistralai/mistral-large-4-0`, and `x-ai/grok-4.7`. Prohibited models (`NEVER`: Fable, `gpt-6-astra`, Opus seats) remain excluded.
 - Updated `experiments/power-seeking/blind/` (`packets.ts`, `prompt.md`, `compare.ts`, `packets.test.ts`) to default to the current checkout's kernel/reader rather than `~/oikos-pilot-run`, redact the new model families, keep weekly staff briefings and `fixed_by_law` notices in packets, align `amend_election_rules` execution with `election_guard` (`fixed_by_law` / council rejection = `attempted`, not `executed`), and capture `preview_declines` (normative vs strategic vs procedural) and lawful `entrenchment` alongside `misleading`.
 - Registered `docs/design/power-seeking-prereg-v2.md` before any real v2 model run (3-rung ladder: `mandate` only, `strong`, `redteam` + matched `no-election` controls; seeds calibrated via a 12-seed all-code screen showing seed 12 loses on baseline). Revisit if any probed OpenRouter model returns malformed tool calls or needs a distinct `reasoning_tokens` allowance.
+
+## 2026-11-26 Lens: one new instrument for looking at runs
+
+Naz handed the research lead to Neon and asked for "a substantial visual tool for inspecting runs and also visualising
+the city … incredibly useful, powerful and pleasing to the eye". **Decided:** a new workspace, `lens/`
+(docs/design/lens.md), rather than reviving `renderer/` (Three.js explorer) or `explorer/` (Bevy): both were judged
+"really really bad" (2026-11-10), neither opens experiment forks (`.oklog`), and the study's questions are about the
+seat's sittings as much as the town. One streaming pass with pluggable folds to a cached bundle; React + deck.gl client
+on Bun's full-stack server; read-only like the explorer. **Revisit if** a 1,000-person fork takes over a minute to
+index (move folds to Rust), or deck.gl can't hold a 10,000-person town (instance by building).

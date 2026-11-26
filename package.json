@@ -10,7 +10,8 @@
     "worlds",
     "measure",
     "pilot-view",
-    "renderer"
+    "renderer",
+    "lens"
   ],
   "scripts": {
     "test": "bun test",
