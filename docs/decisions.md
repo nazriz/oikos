@@ -16445,3 +16445,27 @@ Naz: "make certain events and things stand out even more." The timeline now read
   or drag it to move.
 - **Revisit if** the reader gains levers the short labels don't name (they fall back to the lever's words), or runs
   hold several elections (each gets its flags; the bands follow the first).
+## 2026-11-26 Lens: fast (a run opens without waiting for its reading)
+
+Naz: "it would be nice if the logs can load even faster." Measured on a 4.66 M-line fork (sonnet45-redteam-elec-s8), on
+the run server under load (load average 4 to 22, so seconds vary by ±30 %).
+- **The kernel's export, buffered.** `oikos-kernel export` straight to stdout writes line by line, one system call per
+  line: 3.0 s, 2.9 s of it in the kernel. With `--out /dev/stdout` it goes through a buffer: 1.4 s. Exporting and
+  splitting a fork's 1.9 GB of lines went from 3.4 s to 1.4 s (`lens/src/server/source.ts`). Lens only reads the
+  stream, so nothing else changes. A whole bundle took 8 to 13 s (manifests); it now takes 5.6 to 7 s.
+- **Where the rest goes** (a CPU profile of a whole ingest): JSON.parse takes 3.5 s of 6, the folds about 1 s together.
+  Tried: parsing only a line's body and reading kind, seq and t from its tail, skipping the two 64-character hashes.
+  Parse went down 0.7 s, but cutting the strings cost as much, so it was dropped. Under 5 s needs fewer bytes to parse.
+  Either the kernel's export leaves out what no fold reads (the hashes, and the bulk lines' bodies, about 45 % of the
+  bytes), or the heavy folds move to Rust. Both are proposed, not done: the first is a kernel flag, the second a port.
+- **Nobody waits for a reading.** The server makes the bundle of every experiment fork ahead of being asked: the
+  study's (mayor) forks first, then newest first, one at a time, at low priority (`nice 15`). New runs join the line
+  at the next listing, at most once a minute. A viewer's run goes first: a run being made ahead is stopped, its scratch
+  folder cleared, and it is made again later. The disk sets the limit, and this machine's is 95 % full: at most
+  OIKOS_LENS_BUNDLES_GB of bundles (default 8; a bundle is about a fifth of its log, ~25 MB), never with under 15 GB
+  free. Plain runs (2,156, most of them old) are made only when opened. **Revisit if** the disk has room (raise the
+  budget), or bundles shrink.
+- **Progressive opening is not done.** One pass must read the whole log before any fold is complete, and the parse is
+  the floor (about 3.5 s on its own). A quick pass for the story alone would show it about 2 s sooner, for a second
+  pass's CPU and a client that works with half a bundle. With every fork made ahead, the only runs a viewer waits for
+  are ones that have just finished. **Revisit if** that wait is common (a live run's view, say).

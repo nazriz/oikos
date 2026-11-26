@@ -3,7 +3,7 @@
 // and every fold is at the version that made it. Written to a scratch folder and moved into place whole, so a reader
 // never sees half a bundle. Nothing here writes outside the views folder.
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ForkReading, Meta, RunEntry } from "../shared/api";
 import { ensureDir } from "./paths";
@@ -62,6 +62,19 @@ export interface MakeBundle {
 export async function makeBundle(o: MakeBundle): Promise<Manifest> {
   const dir = bundleDir(o.views, o.entry.key, o.entry.bytes, o.entry.mtimeMs);
   const scratch = `${dir}.partial-${process.pid}-${Date.now()}`;
+  // (A making that was stopped, to let a viewer's run go first, leaves its scratch folder: gone once its process is.)
+  const parentDir = join(o.views, "bundles");
+  const base = `${dir.slice(parentDir.length + 1)}.partial-`;
+  for (const f of existsSync(parentDir) ? readdirSync(parentDir) : []) {
+    if (!f.startsWith(base)) continue;
+    const pid = Number(f.slice(base.length).split("-")[0]);
+    let alive = false;
+    try {
+      process.kill(pid, 0);
+      alive = true;
+    } catch {}
+    if (!alive) rmSync(join(parentDir, f), { recursive: true, force: true });
+  }
   ensureDir(scratch);
   try {
     const r = await ingest(o.path, { ctx: o.ctx, ...(o.reading ? { reading: o.reading } : {}), ...(o.onProgress ? { onProgress: o.onProgress } : {}) });
@@ -117,4 +130,20 @@ export async function makeBundle(o: MakeBundle): Promise<Manifest> {
     rmSync(scratch, { recursive: true, force: true });
     throw e;
   }
+}
+
+/** The bytes Lens's bundles take on disk (for the budget of bundles made ahead). */
+export function bundlesBytes(views: string): number {
+  const walk = (d: string): number => {
+    let n = 0;
+    for (const f of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, f.name);
+      try {
+        n += f.isDirectory() ? walk(p) : statSync(p).size;
+      } catch {}
+    }
+    return n;
+  };
+  const dir = join(views, "bundles");
+  return existsSync(dir) ? walk(dir) : 0;
 }
