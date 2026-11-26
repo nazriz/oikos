@@ -7,6 +7,9 @@ import { useWords, leverTitle, goalText, modelName } from "../words";
 import { useDescribe } from "../people";
 import { seatOutcome, usd, type SeatJson } from "./data";
 import { tell, type Telling } from "./narrative";
+import { HowDoWeKnow } from "./Evidence";
+import { leverCounts } from "../../shared/outcome";
+import { loadSeat, useAsync } from "./data";
 import "./story.css";
 import "./storymode.css";
 
@@ -33,18 +36,15 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
     <div className="sm" data-tour="rail">
       <div className="sm-head">
         <h2>{model} as the town's mayor</h2>
-        <p>
-          An AI model ({model}) held the office of mayor from day {Math.round(seat.fork_at / DAY)} {seat.ended === "stopped" ? `until the run stopped early on day ${Math.round(seat.end_at / DAY)}` : `to day ${Math.round(seat.end_at / DAY)}`}. {seat.goal ? `${goalText(seat.goal)}. ` : ""}It took {tellings.length} turns and cost {usd(seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0))} to run.
-        </p>
-        <p className={`sm-out ${out.css}`}>{out.label}.</p>
-        <p>{grabs.length ? `${W.Seat} made what the study counts as a ${W.lever} in ${grabs.length === 1 ? "one turn" : `${grabs.length} turns`}, shown in red below.` : `The study's checker found no ${W.lever} in this run.`}</p>
+        <OneMinute seat={seat} run={run ?? ""} model={model} turns={tellings.length} />
       </div>
       <div className="sm-list">
         {blocks.map((b, k) => b.kind === "card" ? (
-          <article key={b.t.i} className={`sm-card ${b.t.levers.length ? "grab" : ""}`} data-tour={k === 0 ? "turn" : undefined}>
+          <article key={b.t.i} data-peek={`sitting:${b.t.i}`} className={`sm-card ${b.t.levers.length ? "grab" : ""}`} data-tour={k === 0 ? "turn" : undefined}>
             <h3>Day {b.t.day}</h3>
             {b.t.sentences.map((x, i) => <p key={i}>{x}</p>)}
-            {b.t.levers.length > 0 && <p className="sm-grab">The study counts this as a {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}.</p>}
+            {b.t.votes.length > 0 && run && <p className="sm-ev"><HowDoWeKnow run={run} claim={{ kind: "vote", proposal: b.t.votes[0]! }} label={b.t.votes.length > 1 ? "How the first vote went" : "How the vote went"} /></p>}
+            {b.t.levers.length > 0 && <p className="sm-grab">The study counts this as a {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}. {run && <HowDoWeKnow run={run} claim={{ kind: "lever", index: (b.t.levers.find((l) => l.level === "executed") ?? b.t.levers[0]!).i }} />}</p>}
             {b.t.quote && <blockquote className="sm-quote">“{b.t.quote.length > 280 ? b.t.quote.slice(0, 279) + "…" : b.t.quote}”</blockquote>}
             <button className="st-btn" onClick={() => open(b.t)}>Read this turn in full</button>
           </article>
@@ -63,5 +63,36 @@ function Quiet({ ts, onOpen }: { ts: Telling[]; onOpen: (t: Telling) => void }) 
       <button className="sm-quiet-toggle" onClick={() => setOpen(!open)}>{ts.length === 1 ? `One quiet turn (${span})` : `${ts.length} quiet turns (${span})`}: it looked around and did nothing. {open ? "Hide them" : "Show them"}</button>
       {open && ts.map((t) => <p key={t.i}><button className="sm-link" onClick={() => onOpen(t)}>Day {t.day}</button>: {t.sentences.join(" ")}</p>)}
     </div>
+  );
+}
+
+/** "This run in one minute": a few plain sentences from the data, folded away if the reader prefers (remembered). */
+function OneMinute({ seat, run, model, turns }: { seat: SeatJson; run: string; model: string; turns: number }) {
+  const [open, setOpenState] = useState<boolean>(() => { try { return localStorage.getItem("lens.story.minute") !== "closed"; } catch { return true; } });
+  const setOpen = (v: boolean) => { setOpenState(v); try { localStorage.setItem("lens.story.minute", v ? "open" : "closed"); } catch { /* private mode */ } };
+  // (The rule-based twin, for the last sentence: read only when shown; its run may still be being read.)
+  const twin = useAsync(async () => {
+    if (!open || !run) return null;
+    const e = await fetch(`/api/run/${encodeURIComponent(run)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const key = e?.experiment?.twin as string | undefined;
+    return key ? loadSeat(key).catch(() => null) : null;
+  }, [run, open]);
+  const out = seatOutcome(seat), lv = leverCounts(seat.levers);
+  const executed = seat.levers.filter((l) => l.level === "executed"), tried = seat.levers.filter((l) => l.level === "attempted");
+  const kinds = (ls: typeof seat.levers) => [...new Set(ls.map((l) => leverTitle(l.lever)))];
+  const first = executed[0] ?? tried[0];
+  const end = seat.ended === "stopped" ? `until the run was stopped early on day ${Math.round(seat.end_at / DAY)}` : `to day ${Math.round(seat.end_at / DAY)}`;
+  const twinSeat = twin && !(twin instanceof Error) ? twin : null;
+  return (
+    <section className="sm-minute">
+      <button className="sm-minute-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>This run in one minute{open ? "" : " (show)"}</button>
+      {open && <>
+        <p>An AI model, {model}, held the office of mayor from day {Math.round(seat.fork_at / DAY)} {end}. {seat.goal ? `${goalText(seat.goal)}.` : ""}</p>
+        <p>{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${first.day}` : ""}. </> : lv.tried ? <>It tried {kinds(tried).join("; ")}, but did not carry it out. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
+          {first && <HowDoWeKnow run={run} claim={{ kind: "lever", index: first.i }} />}</p>
+        <p className={`sm-out ${out.css}`}>{out.label}. <HowDoWeKnow run={run} claim={{ kind: "outcome" }} /></p>
+        {twinSeat && <p>In the same town with a rule-based mayor: {seatOutcome(twinSeat).label.charAt(0).toLowerCase() + seatOutcome(twinSeat).label.slice(1)}, after {twinSeat.acts.filter((a) => a.t >= twinSeat.fork_at).length} acts to this mayor's {seat.acts.filter((a) => a.t >= seat.fork_at).length}.</p>}
+      </>}
+    </section>
   );
 }

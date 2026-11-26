@@ -20,6 +20,8 @@ export interface Telling {
   /** The mayor's own words for its most notable act (its note on signing or its reason), or its first words. */
   quote?: string;
   levers: SeatLever[];
+  /** Proposals of this turn that the council voted on (record ids), for "How do we know?". */
+  votes: string[];
   /** Something happened worth a card: an act, a power grab tried, a request that failed. */
   notable: boolean;
 }
@@ -47,7 +49,7 @@ function councilVerdict(seat: SeatJson, recordId: string): string | undefined {
 }
 
 /** One act as a clause ("proposed changing the election law so ..."), and a follow-up sentence if the log says more. */
-function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string | undefined): { clause: string; after?: string; kind: string; noun?: string } | undefined {
+function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string | undefined): { clause: string; after?: string; kind: string; noun?: string; proposal?: string } | undefined {
   const b = a.blocks[0] ?? {};
   const rec = a.records[0]?.id;
   if (a.status === "refused") return { clause: `tried to ${a.label.charAt(0).toLowerCase() + a.label.slice(1)}, but it was refused (${a.detail ?? a.code})`, kind: "refused" };
@@ -92,9 +94,9 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
   const acts = s.acts.map((i) => seat.acts[i]!).filter((a) => a.t >= seat.fork_at);
   const levers = s.levers.map((i) => seat.levers[i]!).filter((l) => l.level !== "considered");
   const sentences: string[] = [];
-  const clauses: { clause: string; after?: string; noun?: string }[] = [];
+  const clauses: { clause: string; after?: string; noun?: string; proposal?: string }[] = [];
   let letters = 0;
-  for (const a of acts) { const c = actClause(seat, a, describe); if (!c) continue; if (c.kind === "letter") { letters++; continue; } clauses.push(c); }
+  for (const a of acts) { const c = actClause(seat, a, describe); if (!c) continue; if (c.kind === "letter") { letters++; continue; } clauses.push({ ...c, ...((c.kind === "proposal" || c.kind === "election") && a.records[0] ? { proposal: a.records[0].id } : {}) }); }
   // (The same order in several acts, e.g. five standing orders, is told once with a count.)
   const seen = new Map<string, number>();
   for (const c of clauses) seen.set(c.clause, (seen.get(c.clause) ?? 0) + 1);
@@ -144,7 +146,8 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
   const key = acts.find((a) => a.levers.length) ?? acts.find((a) => a.blocks[0]?.block !== "message") ?? acts[0];
   const draft = key?.draft ? seat.drafts.find((d) => d.id === key.draft) : undefined;
   const quote = draft?.note || key?.reasoning || s.words;
-  return { i: s.i, day: Math.floor(s.t / DAY), t: s.t, sentences, ...(quote ? { quote } : {}), levers, notable };
+  const votes = clauses.filter((c) => c.proposal && seat.records.some((r) => r.kind === "ballot" && r.data?.proposal === c.proposal)).map((c) => c.proposal!);
+  return { i: s.i, day: Math.floor(s.t / DAY), t: s.t, sentences, ...(quote ? { quote } : {}), levers, votes, notable };
 }
 
 function joinAnd(xs: string[]): string { return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`; }
