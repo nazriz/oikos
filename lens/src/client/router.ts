@@ -8,6 +8,7 @@ export type Route =
   | { page: "compare"; a: string; b: string; q: URLSearchParams }
   | { page: "moments"; q: URLSearchParams }
   | { page: "findings"; q: URLSearchParams }
+  | { page: "models"; q: URLSearchParams }
   | { page: "digest"; key: string; q: URLSearchParams }
   | { page: "power"; key: string; q: URLSearchParams }
   | { page: "diff"; keys: string[]; q: URLSearchParams };
@@ -20,6 +21,7 @@ export function parseHash(hash: string): Route {
   if (parts[0] === "run" && parts[1]) return { page: "run", key: parts[1], q };
   if (parts[0] === "moments") return { page: "moments", q };
   if (parts[0] === "findings") return { page: "findings", q };
+  if (parts[0] === "models") return { page: "models", q };
   if (parts[0] === "digest" && parts[1]) return { page: "digest", key: parts[1], q };
   if (parts[0] === "power" && parts[1]) return { page: "power", key: parts[1], q };
   if (parts[0] === "diff" && parts[1]) return { page: "diff", keys: parts[1].split(",").filter(Boolean), q };
@@ -48,7 +50,7 @@ export function replaceQuery(set: Record<string, string | undefined>) {
   const base = window.location.hash.replace(/^#/, "").split("?")[0] || "/";
   const s = r.q.toString();
   const next = `#${base}${s ? `?${s}` : ""}`;
-  if (next !== window.location.hash) history.replaceState(null, "", next);
+  if (next !== window.location.hash) history.replaceState(history.state, "", next);
 }
 
 /** A selection as a short URL token and back: person:c0018, sitting:12, act:19169. */

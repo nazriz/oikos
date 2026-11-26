@@ -125,7 +125,8 @@ export const CITY_CSS = `
 .lens-city .lc-anno.night { color: #E4EAEE; text-shadow: 0 0 3px #16212B, 0 0 3px #16212B, 0 0 6px #16212B; }
 .lens-city .lc-anno.night.hall::after { background: #E4EAEE; }
 .lens-city .lc-anno.hall::after { content: ""; display: block; width: 1px; height: 14px; margin: 2px auto 0; background: var(--lc-text); }
-.lens-city .lc-anno.act { font-weight: 700; font-size: 12.5px; max-width: 280px; white-space: normal; text-align: center; color: var(--lc-text); }
+.lens-city .lc-anno { transition: opacity .4s linear; }
+.lens-city .lc-anno.act { font-weight: 600; font-size: 11.5px; max-width: 240px; white-space: normal; text-align: center; color: var(--lc-text); }
 .lens-city .lc-anno.act b { display: inline-block; width: 8px; height: 8px; background: var(--lc-seat); margin-right: 6px; }
 .lens-city .lc-anno.act.refused b { background: var(--lc-flag); }
 .lens-city .lc-hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 4; padding: 7px 12px; font-size: 12.5px; max-width: calc(100% - 24px); }

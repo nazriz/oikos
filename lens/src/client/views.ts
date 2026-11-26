@@ -1,11 +1,14 @@
 // The Run page's slots (src/client/run/RunPage.tsx): what fills the map in the middle, the story rail on the right, the
 // sitting reader over them, and the inspector drawer's body. Each view's owner registers its component here with one
 // line; an empty slot shows a quiet placeholder. Views talk to each other only through src/client/state.ts.
-import { createElement, type ComponentType } from "react";
+import { createElement, useContext, type ComponentType } from "react";
 import type { Meta, RunEntry } from "../shared/api";
-import type { Selection } from "./state";
+import { ViewActive, type Selection } from "./state";
 import { SittingReader } from "./story/SittingReader";
 import { StoryRail } from "./story/StoryRail";
+
+/** What a "How do we know?" link explains. */
+export type EvidenceClaim = { kind: "outcome" } | { kind: "lever"; index: number } | { kind: "act"; seq: number } | { kind: "vote"; proposal: string };
 
 export interface SlotProps {
   /** The open run's key. */
@@ -30,6 +33,10 @@ export interface Views {
   compare?: ComponentType<{ a: string; b: string }>;
   /** The cross-run Moments gallery, #/moments (story's Moments). */
   moments?: ComponentType<{}>;
+  /** One row per AI model across all runs, #/models (story's ModelsPage). */
+  models?: ComponentType<{}>;
+  /** "How do we know?" beside a claim: the evidence from the mayor's words to the checker's call (story's HowDoWeKnow). */
+  howDoWeKnow?: ComponentType<{ run: string; claim: EvidenceClaim }>;
   /** The study across runs, #/findings (story's Findings). */
   findings?: ComponentType<{}>;
   /** One day's sittings side by side across forks, #/diff/<a>,<b>[,<c>]?day=<n> (story's SittingDiff). */
@@ -49,6 +56,8 @@ import { Moments } from "./story/Moments";
 import { Findings } from "./story/Findings";
 import { SittingDiff } from "./story/SittingDiff";
 import { RunDigest } from "./story/RunDigest";
+import { ModelsPage } from "./story/ModelsPage";
+import { HowDoWeKnow } from "./story/Evidence";
 import { PersonLife } from "./life/PersonLife";
 import { PowerView } from "./city/Power";
 import { WorldView } from "./world/WorldView";
@@ -64,6 +73,13 @@ export const views: Views = {
   findings: Findings,
   diff: SittingDiff,
   digest: RunDigest,
+  models: ModelsPage,
+  howDoWeKnow: HowDoWeKnow,
   power: PowerView,
-  world: (p) => createElement(WorldView, { run: p.run }),
+  // (Kept mounted by the run page once opened: it runs only while it is the view on screen.)
+  world: (p) => createElement(WorldSlot, p),
 };
+
+function WorldSlot(p: SlotProps) {
+  return createElement(WorldView, { run: p.run, active: useContext(ViewActive) });
+}

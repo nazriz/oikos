@@ -9,6 +9,8 @@ import { runHref, useRoute } from "./router";
 import { views } from "./views";
 import { Glossary } from "./shell/Shell";
 import { Tour } from "./shell/Tour";
+import { Keys } from "./nav/Keys";
+import { Peek } from "./nav/Peek";
 
 function App() {
   const route = useRoute();
@@ -34,6 +36,10 @@ function App() {
     const Power = views.power;
     return <Power run={route.key} />;
   }
+  if (route.page === "models" && views.models) {
+    const Models = views.models;
+    return <Models />;
+  }
   if (route.page === "findings" && views.findings) {
     const Findings = views.findings;
     return <Findings />;
@@ -51,5 +57,7 @@ createRoot(document.getElementById("root")!).render(
     <App />
     <Glossary />
     <Tour />
+    <Keys />
+    <Peek />
   </>,
 );

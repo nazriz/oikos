@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import type { SeatJson } from "../folds/seat";
-import { momentsOf, type MomentsResponse } from "../client/story/moments-data";
+import { momentsOf, voiceOf, type MomentsResponse } from "../client/story/moments-data";
 import type { Lens } from "./service";
 
 const cache = new Map<string, MomentsResponse["runs"][number] | null>();
@@ -30,11 +30,11 @@ export async function momentsResponse(lens: Lens, req: Request): Promise<Respons
     if (!cache.has(dir)) {
       try {
         const seat = readSeat(dir);
-        cache.set(dir, seat ? { key: e.key, group: e.group, id: `${seat.run_id}|${seat.arm}`, moments: momentsOf(e.key, seat, true) } : null);
+        cache.set(dir, seat ? { key: e.key, group: e.group, id: `${seat.run_id}|${seat.arm}`, moments: momentsOf(e.key, seat, true), ...(seat.model ? { model: seat.model } : {}), ...(voiceOf(seat) ? { voice: voiceOf(seat)! } : {}) } : null);
       } catch { cache.set(dir, null); }
     }
     const x = cache.get(dir);
-    if (x && x.moments.length) runs.push(x);
+    if (x) runs.push(x);
   }
   const body: MomentsResponse = { runs, indexed, forks: forks.length };
   const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", vary: "accept-encoding" };

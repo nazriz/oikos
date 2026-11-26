@@ -119,7 +119,6 @@ export function Timeline({ ground, fork }: TimelineProps) {
   const [palette, setPalette] = useState<Palette | null>(null);
   const [hover, setHover] = useState<{ hit: Hit; cx: number; cy: number } | null>(null);
   const [hoverT, setHoverT] = useState<number | null>(null);
-  const [help, setHelp] = useState(false);
 
   // (A new run, a new span: show all of it.)
   useEffect(() => setView(spanT), [spanT[0], spanT[1]]);
@@ -467,15 +466,14 @@ export function Timeline({ ground, fork }: TimelineProps) {
         e.preventDefault();
         const dir = e.key === "ArrowRight" ? 1 : -1;
         s.setT(s.t + dir * (e.shiftKey ? DAY : HOUR));
-      } else if (e.key === "]") s.setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, (i < 0 ? 1 : i) + 1)]!.s);
-      else if (e.key === "[") s.setSpeed(SPEEDS[Math.max(0, (i < 0 ? 1 : i) - 1)]!.s);
+      } else if (e.key === "=" || e.key === "+") s.setSpeed(SPEEDS[Math.min(SPEEDS.length - 1, (i < 0 ? 1 : i) + 1)]!.s);
+      else if (e.key === "-") s.setSpeed(SPEEDS[Math.max(0, (i < 0 ? 1 : i) - 1)]!.s);
       else if (e.key === "Home") s.setT(s.span[0]);
       else if (e.key === "End") s.setT(s.span[1]);
       else if (e.key === "." || e.key === ",") {
         const next = e.key === "." ? allMarks.find((m) => m > s.t + 1) : [...allMarks].reverse().find((m) => m < s.t - 1);
         if (next !== undefined) s.setT(next);
-      } else if (e.key === "?") setHelp((h) => !h);
-      else return;
+      } else return;
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -531,7 +529,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
             {compact ? "Taller lanes" : "Shorter lanes"}
           </button>
           {researcher && (
-          <button className="btn ghost icon" title="Keys (?)" aria-label="Keys" aria-pressed={help} onClick={() => setHelp((h) => !h)}>
+          <button className="btn ghost icon" title="Keys (?)" aria-label="Keys" onClick={() => window.dispatchEvent(new Event("lens-keys"))}>
             <Keyboard />
           </button>
           )}
@@ -578,35 +576,6 @@ export function Timeline({ ground, fork }: TimelineProps) {
           </div>
         </div>
       )}
-      {help && <KeysHelp onClose={() => setHelp(false)} />}
-    </div>
-  );
-}
-
-function KeysHelp({ onClose }: { onClose: () => void }) {
-  const rows: [string[], string][] = [
-    [["space"], "play / pause"],
-    [["←", "→"], "an hour back / on"],
-    [["⇧", "←→"], "a day"],
-    [["[", "]"], "slower / faster"],
-    [[",", "."], "previous / next mark"],
-    [["Home", "End"], "start / end"],
-    [["wheel"], "zoom (with shift: move along)"],
-  ];
-  return (
-    <div className="tl-help" onClick={onClose}>
-      {rows.map(([ks, what]) => (
-        <div key={what} className="tl-help-row">
-          <span>
-            {ks.map((k) => (
-              <span key={k} className="kbd">
-                {k}
-              </span>
-            ))}
-          </span>
-          <span className="muted">{what}</span>
-        </div>
-      ))}
     </div>
   );
 }

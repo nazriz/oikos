@@ -1,0 +1,391 @@
+/* Way-finding: the trail in the run bar, the switcher, hover cards, "About this view", the keyboard sheet, Carry on.
+   House style (docs/design/lens-look.md): Overpass, sentence case, rules not boxes, square corners. */
+
+/* The trail */
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.crumb {
+  font: inherit;
+  color: var(--text-2);
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+a.crumb:hover,
+button.crumb:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.crumb.here {
+  color: var(--text);
+  font-weight: 700;
+  cursor: default;
+}
+.crumb-sep {
+  width: 6px;
+  height: 10px;
+  flex: none;
+  color: var(--faint);
+}
+
+/* Same town, other mayors */
+.switcher {
+  position: relative;
+  flex: none;
+}
+.switcher-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 7px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-1);
+  cursor: pointer;
+}
+.switcher-btn:hover,
+.switcher-btn[aria-expanded="true"] {
+  color: var(--text);
+  border-color: var(--line-2);
+}
+.switcher-btn svg {
+  width: 9px;
+  height: 6px;
+}
+.switcher-pop {
+  position: fixed;
+  z-index: 60;
+  margin-top: 6px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  max-height: 70vh;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-map);
+  padding: 10px 0 6px;
+  white-space: normal;
+}
+.switcher-lead {
+  margin: 0 14px 6px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.switcher-h {
+  margin: 10px 14px 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+.switcher-pop ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.switcher-pop a {
+  display: block;
+  padding: 6px 14px;
+  color: var(--text);
+  text-decoration: none;
+  border-top: 1px solid var(--line);
+}
+.switcher-pop a:hover,
+.switcher-pop a:focus-visible {
+  background: var(--panel-2);
+  outline: none;
+}
+.switcher-pop a b {
+  display: block;
+  font-weight: 700;
+  font-size: 14.5px;
+}
+.switcher-pop a span {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Hover cards */
+.peek {
+  position: fixed;
+  z-index: 70;
+  width: 300px;
+  padding: 10px 12px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-left: 3px solid var(--text);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-map);
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--text-2);
+  animation: peek-in 120ms ease-out;
+}
+@keyframes peek-in {
+  from {
+    opacity: 0;
+  }
+}
+.peek-title {
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.peek p {
+  margin: 0 0 3px;
+}
+.peek-words {
+  font-family: var(--font-serif);
+  font-size: 14px;
+}
+.peek-go {
+  margin-top: 6px;
+  height: 26px;
+  font-size: 13px;
+}
+
+/* About this view */
+.about {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 17;
+  width: 340px;
+  max-width: calc(100% - 24px);
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-map);
+}
+.about:not(.open) {
+  width: auto;
+}
+.about-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.about-head svg {
+  width: 10px;
+  height: 6px;
+  color: var(--muted);
+}
+.about-body {
+  padding: 0 12px 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-2);
+  max-height: 34vh;
+  overflow: auto;
+}
+.about-body p {
+  margin: 8px 0 0;
+}
+
+/* The keyboard sheet */
+.keys-back {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--shade);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.keys {
+  width: 860px;
+  max-width: 100%;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  padding: 16px 20px 18px;
+}
+.keys-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--text);
+  padding-bottom: 8px;
+}
+.keys-head h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.keys-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px 28px;
+}
+.keys-h {
+  margin: 14px 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.keys dl {
+  margin: 0;
+}
+.keys-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.keys-row dt {
+  min-width: 52px;
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.keys-row dd {
+  margin: 0;
+  color: var(--text-2);
+}
+.keys .kbd {
+  font-family: var(--font-sans);
+}
+
+/* Carry on (the library) */
+.carry-on {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14.5px;
+}
+.carry-on a {
+  font-weight: 700;
+  color: var(--text);
+}
+.carry-on .muted {
+  font-size: 13.5px;
+}
+
+@media (max-width: 760px) {
+  .crumbs {
+    font-size: 13.5px;
+    flex-basis: 100%;
+  }
+  .crumbs {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .switcher-pop {
+    left: 8px;
+    width: calc(100vw - 16px);
+    max-width: none;
+  }
+  .crumbs > .crumb:first-child,
+  .crumbs > .crumb:first-child + .crumb-sep {
+    display: none;
+  }
+  .about {
+    left: 8px;
+    bottom: 8px;
+  }
+  .about.open {
+    width: calc(100% - 16px);
+  }
+  .peek {
+    display: none;
+  }
+}
+.about-body p:first-child {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* A person's id in the world's words, as a way in (Linked.tsx) */
+.id-link {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--citizen);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 2px;
+}
+.id-link:hover {
+  color: var(--text);
+  text-decoration-color: currentColor;
+}
+
+/* The inspector's head: back to the turn it was opened from */
+.drawer-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 8px 0 4px;
+  font-size: 13.5px;
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drawer-back svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.drawer-kind {
+  align-self: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+}
+.drawer-id {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* On a phone the inspector and the turn reader fill the screen below the run bar, not over it: the trail and "Other
+   mayors" stay in reach (the bar's height is measured into --run-bar-h). */
+@media (max-width: 760px) {
+  .run-page .drawer,
+  .run-page .drawer.wide,
+  .run-page .run-reader {
+    top: var(--run-bar-h, 0px);
+  }
+}

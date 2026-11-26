@@ -29,7 +29,7 @@ function fileResponse(req: Request, path: string, type: string): Response {
   const takesGzip = (req.headers.get("accept-encoding") ?? "").includes("gzip");
   // (A bundle never changes under its name: a changed log makes a new bundle. The client may keep it.)
   const headers: Record<string, string> = { "content-type": type, "cache-control": "private, max-age=3600" };
-  if (takesGzip && existsSync(gz)) return new Response(Bun.file(gz), { headers: { ...headers, "content-encoding": "gzip", vary: "accept-encoding" } });
+  if (takesGzip && existsSync(gz)) return new Response(Bun.file(gz), { headers: { ...headers, "content-encoding": "gzip", vary: "accept-encoding", "content-disposition": "inline" } });
   if (!existsSync(path)) return notFound("file");
   return new Response(Bun.file(path), { headers });
 }

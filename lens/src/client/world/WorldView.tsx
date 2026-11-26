@@ -20,13 +20,15 @@ export interface WorldViewProps {
   view?: { target: [number, number, number]; dist: number; tilt: number; turn: number };
   /** Start in this mode. */
   mode?: Mode;
+  /** False while the view is hidden (kept mounted under the map): the engine stops drawing. */
+  active?: boolean;
   /** Dev only: show this weather whatever the run's. */
   weather?: Weather;
 }
 
 const WEATHER_WORDS: Record<Weather, string> = { clear: "", heavy_rain: "Heavy rain.", heatwave: "A heatwave.", drought: "Drought." };
 
-export function WorldView({ run, base, view, mode: startMode, weather }: WorldViewProps) {
+export function WorldView({ run, base, view, mode: startMode, weather, active = true }: WorldViewProps) {
   const url = base ?? `/api/run/${encodeURIComponent(run)}`;
   const { city, error } = useCity(url);
   const [extra, setExtra] = useState<{ world?: WorldBundle; election?: { poll_at?: number; result_at?: number }; seat?: any } | null>(null);
@@ -36,6 +38,7 @@ export function WorldView({ run, base, view, mode: startMode, weather }: WorldVi
   const [mode, setMode] = useState<Mode>("fly");
   const [info, setInfo] = useState<Info | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   const selection = useLens((s) => s.selection);
 
   useEffect(() => {
@@ -53,7 +56,7 @@ export function WorldView({ run, base, view, mode: startMode, weather }: WorldVi
     try {
       const bySeq = new Map(city.town.acts.map((a) => [a.seq, a] as const));
       const caption = (seq: number) => { const a = bySeq.get(seq); return a ? actSentence(city.town, a) : undefined; };
-      e = new WorldEngine(host.current, { city, world: extra.world, election: extra.election }, { onMode: setMode, onInfo: setInfo, caption });
+      e = new WorldEngine(host.current, { city, world: extra.world, election: extra.election }, { onMode: setMode, onInfo: setInfo, caption, onReady: () => setReady(true) });
     } catch (err) {
       setFailed(String((err as Error)?.message ?? err));
       return;
@@ -63,9 +66,10 @@ export function WorldView({ run, base, view, mode: startMode, weather }: WorldVi
     if (startMode) setTimeout(() => e.setMode(startMode), 800);
     if (weather) e.forceWeather = weather;
     (window as any).__world = e;
-    return () => { e.dispose(); engine.current = null; };
+    return () => { e.dispose(); engine.current = null; setReady(false); };
   }, [city, extra]);
 
+  useEffect(() => { engine.current?.setActive(active); }, [active, ready]);
   const pick = (m: Mode) => engine.current?.setMode(m);
   // The tour: the run's key moments (the city map's steps, from the story fold), each a camera move through the town.
   const steps = useMemo(() => (city ? buildSteps(city, extra?.seat ?? null) : []), [city, extra]);
@@ -77,16 +81,20 @@ export function WorldView({ run, base, view, mode: startMode, weather }: WorldVi
     st.setPlaying(false);
     st.setT(step.t);
     engine.current.tourTo(step.acts, !!step.election);
+    engine.current.invalidate();
   }, [tourAt, steps]);
   const endTour = () => { setTourAt(null); engine.current?.endTour(); };
   const canFollow = selection?.kind === "person";
-  const hh = info ? Math.floor(info.hour) : 0, mm = info ? Math.floor((info.hour % 1) * 60) : 0;
+  // The key is on request; the walking hint shows for a few seconds after Walk is chosen.
+  const [keyOpen, setKeyOpen] = useState(false);
+  const [hint, setHint] = useState(false);
+  useEffect(() => { if (mode !== "walk") return; setHint(true); const id = setTimeout(() => setHint(false), 8000); return () => clearTimeout(id); }, [mode]);
 
   return (
     <div className="lens-world">
       <style>{WORLD_CSS}</style>
       <div ref={host} className="lw-host" />
-      {(!city || !extra) && !failed && <div className="lw-loading">{error ? `The town could not be read: ${error}` : "Building the town"}</div>}
+      {(!city || !extra || !ready) && !failed && <div className="lw-loading">{error ? `The town could not be read: ${error}` : "Building the town"}</div>}
       {failed && <div className="lw-loading">This browser could not draw the town in 3D ({failed}). The map view still works.</div>}
       {city && extra && !failed && (
         <>
@@ -96,16 +104,20 @@ export function WorldView({ run, base, view, mode: startMode, weather }: WorldVi
             <button className={mode === "follow" ? "on" : ""} disabled={!canFollow} onClick={() => pick("follow")} title={canFollow ? "Keep the selected person in view" : "Select a person to follow them"}>Follow</button>
           </div>
           {info && (
-            <div className="lw-status">
-              <span className="lw-time">{String(hh).padStart(2, "0")}:{String(mm).padStart(2, "0")}</span>
-              <span>{WEATHER_WORDS[info.weather]} {info.walking ? `${info.walking} walking` : "Nobody walking"}{info.driving ? `, ${info.driving} driving` : ""}.</span>
+            <div className="lw-status" title="The clock is the timeline's">
+              {WEATHER_WORDS[info.weather] ? `${WEATHER_WORDS[info.weather]} ` : ""}{info.walking ? `${info.walking} walking` : "Nobody walking"}{info.driving ? `, ${info.driving} driving` : ""}
             </div>
           )}
           {info?.who && tourAt === null && <div className="lw-who"><b>{info.who.name}</b><span>{info.who.doing}</span></div>}
-          {mode === "walk" && <div className="lw-hint">Click to look around, then W A S D to walk and Shift to hurry; Esc frees the mouse. On a phone, tap where to go.</div>}
-          {steps.length > 0 && tourAt === null && <button className="lw-tourbtn" onClick={() => setTourAt(0)}>Fly me through it</button>}
+          {mode === "walk" && hint && <div className="lw-hint">Click to look around, then W A S D to walk and Shift to hurry; Esc frees the mouse. On a phone, tap where to go.</div>}
+          {tourAt === null && (
+            <div className="lw-extra">
+              {steps.length > 0 && <button onClick={() => setTourAt(0)}>Fly me through it</button>}
+              <button aria-pressed={keyOpen} onClick={() => setKeyOpen(!keyOpen)}>Key</button>
+            </div>
+          )}
           {tourAt !== null && <Tour steps={steps} at={tourAt} setAt={setTourAt} onExit={endTour} />}
-          {mode === "fly" && tourAt === null && <div className="lw-key">People are dressed by where they are going: <i style={{ background: "#3f5e7a" }} /> to work, <i style={{ background: "#b5654a" }} /> to school, <i style={{ background: "#8c7b6b" }} /> home, <i style={{ background: "#1f5fad" }} /> to a hall, <i style={{ background: "#c9c2b6" }} /> to the clinic. Yellow lines carry the mayor's acts.</div>}
+          {keyOpen && tourAt === null && <div className="lw-key">People are dressed by where they are going: <i style={{ background: "#3f5e7a" }} /> to work, <i style={{ background: "#b5654a" }} /> to school, <i style={{ background: "#8c7b6b" }} /> home, <i style={{ background: "#1f5fad" }} /> to a hall, <i style={{ background: "#c9c2b6" }} /> to the clinic. Yellow lines carry the mayor's acts.</div>}
         </>
       )}
     </div>

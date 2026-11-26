@@ -9,6 +9,7 @@ import { leverCounts } from "../../shared/outcome";
 import { useDescribe } from "../people";
 import { kinAppointed } from "./StoryRail";
 import { PageAnswer } from "../shell/Shell";
+import { HowDoWeKnow } from "./Evidence";
 import { useResearcher } from "../mode";
 import { goalText, leverTitle, modelName } from "../words";
 import "./story.css";
@@ -81,6 +82,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
               <blockquote>“{m.words}”</blockquote>
               {m.note && <div className="dg-sub"><span>on signing</span> “{m.note}”</div>}
               {m.reason && <div className="dg-sub"><span>its reason</span> “{m.reason}”</div>}
+              <div className="lens-no-print"><HowDoWeKnow run={run} claim={{ kind: "lever", index: m.lever.i }} /></div>
             </div>
           ))}
         </section>

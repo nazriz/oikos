@@ -13,6 +13,15 @@ export const MarksContext = createContext<Marks>({ query: "", levers: [] });
 
 const reEsc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const REC = /\b((?:rec|draft|act|msg)\.[\w.-]*\d)\b/g;
+const PERSON = /\b(c\d{4,})\b(?![^<]*>)/g;
+
+/** Click delegation for the person links markText writes: put on the root of any view that shows marked text. */
+export function openPerson(e: { target: EventTarget | null; stopPropagation(): void }, select: (s: { kind: "person"; id: string }) => void): void {
+  const el = (e.target as HTMLElement | null)?.closest?.("[data-person]") as HTMLElement | null;
+  if (!el) return;
+  e.stopPropagation();
+  select({ kind: "person", id: el.dataset.person! });
+}
 
 function markText(text: string, m: Marks, html: boolean): string {
   // (In HTML, the query is matched against the escaped text, so it is escaped the same way.)
@@ -23,6 +32,8 @@ function markText(text: string, m: Marks, html: boolean): string {
     out = out.split(p).join(`<mark class="st-lever${l.muted ? " muted" : ""}">${p}</mark>`);
   }
   out = out.replace(REC, '<span class="st-rec">$1</span>');
+  // (A person's id opens their life: a link the page handles by delegation (openPerson), with nav's hover card.)
+  out = out.replace(PERSON, '<button type="button" class="id-link" data-person="$1" data-peek="person:$1">$1</button>');
   if (m.query.trim().length >= 2) {
     const q = new RegExp(`(${reEsc(esc(m.query.trim()))})`, "gi");
     // (Only in text between tags: never inside an attribute or the record-id spans' markup.)

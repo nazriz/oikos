@@ -8,6 +8,7 @@ import { useLens } from "../state";
 import { loadSeat, loadSitting, useAsync, human, type SeatJson } from "./data";
 import { momentsOf, citation, type Moment, type MomentsResponse } from "./moments-data";
 import { PageAnswer } from "../shell/Shell";
+import { HowDoWeKnow } from "./Evidence";
 import { goalText, leverTitle } from "../words";
 import "./story.css";
 import "./moments.css";
@@ -98,6 +99,7 @@ function Card({ m, onOpen }: { m: Moment; onOpen: () => void }) {
         <span className="mo-who"><b>{m.model}</b>, {m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}{m.seed !== undefined ? `, town seed ${m.seed}` : ""}. <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span></span>
         <span style={{ flex: 1 }} />
         <button className="st-btn" title="Copy as a citation" onClick={() => { navigator.clipboard?.writeText(citation(m)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }, () => {}); }}>{copied ? "Copied" : "Copy as a citation"}</button>
+        <HowDoWeKnow run={m.key} claim={{ kind: "lever", index: m.lever.i }} />
         <button className="st-btn" onClick={onOpen}>Open this turn</button>
       </div>
     </article>

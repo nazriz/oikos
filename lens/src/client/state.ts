@@ -32,6 +32,11 @@ export interface LensState {
   selection: Selection;
   hovered: Selection;
   tracks: TimelineTrack[];
+  /** The one prompt a run page may show at a time (src/client/nav/prompts.ts decides): the walkthrough, the "Play the
+   * first week" bar, the map's first-use hint, or none. Each goes at the first interaction; whoever shows one clears it
+   * with setPrompt(null) when it goes, and the next in line follows. */
+  prompt: "walk" | "week" | "maphint" | null;
+  setPrompt(p: LensState["prompt"]): void;
   setRun(run: string | null): void;
   setT(t: number): void;
   setSpan(span: [number, number]): void;
@@ -52,6 +57,8 @@ export const useLens = create<LensState>((set) => ({
   selection: null,
   hovered: null,
   tracks: [],
+  prompt: null,
+  setPrompt: (prompt) => set({ prompt }),
   setRun: (run) => set({ run, selection: null, hovered: null, tracks: [] }),
   setT: (t) => set((s) => ({ t: Math.max(s.span[0], Math.min(s.span[1] || t, t)) })),
   setSpan: (span) => set({ span }),

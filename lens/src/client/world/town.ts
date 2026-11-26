@@ -119,11 +119,11 @@ export function buildTown(town: TownBundle, plan: Plan): TownModel {
     const [x, z] = plan.centre(id);
     A.who = -1; PV.who = -1; M.who = -1;
     // Carriageway: the middle square and an arm toward each street it joins.
-    A.flat(x - cw, z - cw, x + cw, z + cw, 0.04, P.asphalt);
-    if (j & 1) A.flat(x + cw, z - cw, x + c2, z + cw, 0.04, P.asphalt);
-    if (j & 4) A.flat(x - c2, z - cw, x - cw, z + cw, 0.04, P.asphalt);
-    if (j & 2) A.flat(x - cw, z + cw, x + cw, z + c2, 0.04, P.asphalt);
-    if (j & 8) A.flat(x - cw, z - c2, x + cw, z - cw, 0.04, P.asphalt);
+    A.flat(x - cw, z - cw, x + cw, z + cw, 0.06, P.asphalt);
+    if (j & 1) A.flat(x + cw, z - cw, x + c2, z + cw, 0.06, P.asphalt);
+    if (j & 4) A.flat(x - c2, z - cw, x - cw, z + cw, 0.06, P.asphalt);
+    if (j & 2) A.flat(x - cw, z + cw, x + cw, z + c2, 0.06, P.asphalt);
+    if (j & 8) A.flat(x - cw, z - c2, x + cw, z - cw, 0.06, P.asphalt);
     // Pavements, raised a kerb's height: along every arm's sides, across the end of a side with no street.
     const kerb = (x0: number, z0: number, x1: number, z1: number) => {
       const Fw = new Frame((x0 + x1) / 2, (z0 + z1) / 2, 0, 1);
@@ -145,19 +145,19 @@ export function buildTown(town: TownBundle, plan: Plan): TownModel {
       if (!ex && !ez) slab(bx[0], bz[0], bx[1], bz[1]);
       else if (ex && ez) slab(bx[0], bz[0], bx[1], bz[1]);
       // Kerb stones along the carriageway's edge, a shade lighter than the paving.
-      const kz = [z + sz * cw, z + sz * (cw + 0.28)].sort((a, b) => a - b) as [number, number];
-      const kx = [x + sx * cw, x + sx * (cw + 0.28)].sort((a, b) => a - b) as [number, number];
+      const kz = [z + sz * (cw - 0.02), z + sz * (cw + 0.28)].sort((a, b) => a - b) as [number, number];
+      const kx = [x + sx * (cw - 0.02), x + sx * (cw + 0.28)].sort((a, b) => a - b) as [number, number];
       if (ex) kerb(ax[0], kz[0], ax[1], kz[1]);
       if (ez) kerb(kx[0], az[0], kx[1], az[1]);
       if (!ex && !ez) { kerb(bx[0], kz[0], bx[1], kz[1]); kerb(kx[0], bz[0], kx[1], bz[1]); }
     }
-    if (!(j & 1)) kerb(x + cw, z - cw, x + cw + 0.28, z + cw);
-    if (!(j & 4)) kerb(x - cw - 0.28, z - cw, x - cw, z + cw);
-    if (!(j & 2)) kerb(x - cw, z + cw, x + cw, z + cw + 0.28);
-    if (!(j & 8)) kerb(x - cw, z - cw - 0.28, x + cw, z - cw);
+    if (!(j & 1)) kerb(x + cw - 0.02, z - cw, x + cw + 0.28, z + cw);
+    if (!(j & 4)) kerb(x - cw - 0.28, z - cw, x - cw + 0.02, z + cw);
+    if (!(j & 2)) kerb(x - cw, z + cw - 0.02, x + cw, z + cw + 0.28);
+    if (!(j & 8)) kerb(x - cw, z - cw - 0.28, x + cw, z - cw + 0.02);
     // The verge: mown grass between the pavement and the lots.
     G.who = -1;
-    G.flat(x - c2, z - c2, x + c2, z + c2, 0.015, P.verge);
+    G.flat(x - c2, z - c2, x + c2, z + c2, 0.02, P.verge);
     // Ends with no street: pavement across the end of the carriageway.
     if (!(j & 1)) slab(x + cw, z - cw, x + pw, z + cw);
     if (!(j & 4)) slab(x - pw, z - cw, x - cw, z + cw);
@@ -166,7 +166,7 @@ export function buildTown(town: TownBundle, plan: Plan): TownModel {
     // Markings: a dashed centre line along straight runs; a stop line where a street meets a junction.
     const n = [j & 1, j & 2, j & 4, j & 8].filter(Boolean).length;
     const straightEW = j === 5, straightNS = j === 10;
-    const dash = (x0: number, z0: number, x1: number, z1: number) => M.flat(Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1), 0.06, P.marking);
+    const dash = (x0: number, z0: number, x1: number, z1: number) => M.flat(Math.min(x0, x1), Math.min(z0, z1), Math.max(x0, x1), Math.max(z0, z1), 0.11, P.marking);
     if (straightEW) for (let k = -c2 + 1.5; k < c2; k += 6) dash(x + k, z - 0.08, x + k + 3, z + 0.08);
     if (straightNS) for (let k = -c2 + 1.5; k < c2; k += 6) dash(x - 0.08, z + k, x + 0.08, z + k + 3);
     if (n >= 3 || (n === 2 && !straightEW && !straightNS)) {
@@ -309,9 +309,9 @@ function row(c: Ctx, side: "front" | "back" | "left" | "right", wall: number, u0
 function garden(c: Ctx, doorX: number, frontZ: number, drive?: [number, number]) {
   const { F, G, half } = c;
   const W = c.w / 2 - 0.3;
-  G.flatF(F, -W, W, -half + 0.3, half - 0.3, 0.025, pick(P.lawns, h01(c.i, 9)));
-  G.flatF(F, doorX - 0.7, doorX + 0.7, frontZ, half, 0.035, P.paving);
-  if (drive) G.flatF(F, drive[0], drive[1], frontZ - 4, half, 0.035, P.gravel);
+  G.flatF(F, -W, W, -half + 0.3, half - 0.3, 0.04, pick(P.lawns, h01(c.i, 9)));
+  G.flatF(F, doorX - 0.7, doorX + 0.7, frontZ, half, 0.08, P.paving);
+  if (drive) G.flatF(F, drive[0], drive[1], frontZ - 4, half, 0.08, P.gravel);
   const hedge = h01(c.i, 10) < 0.6;
   const seg = (x0: number, x1: number) => {
     if (x1 - x0 < 0.3) return;
@@ -420,8 +420,8 @@ function apartments(c: Ctx): Built {
     row(c, "right", w / 2, back + 1, front - 1, y, 3, 1.2, 1.4);
   }
   // Grounds: a lawn round it, paved forecourt, bins store.
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.025, P.lawn2);
-  G.flatF(F, -3.5, 3.5, front, half, 0.035, P.paving);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.04, P.lawn2);
+  G.flatF(F, -3.5, 3.5, front, half, 0.08, P.paving);
   G.box(F, 7.5, 10, 0, 1.5, front + 1, front + 2.5, P.concrete);
   return { door: [0, front], height: h + 0.7, cz: (front + back) / 2 };
 }
@@ -452,7 +452,7 @@ function shop(c: Ctx): Built {
   B.poly([Pz(ax0, 2.3, front + 2.0), Pz(ax1, 2.3, front + 2.0), Pz(ax1, 2.0, front + 2.02), Pz(ax0, 2.0, front + 2.02)], shade(awning, 0.8), inside);
   if (floors > 1) row(c, "front", front, -w / 2 + 1, w / 2 - 1, 3.3 + 1.6, 3, 1.3, 1.5);
   for (let f = 0; f < floors; f++) row(c, "back", back, -w / 2 + 1, w / 2 - 1, f * 3.3 + 1.6, 2, 1.2, 1.3);
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.025, P.forecourt);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.04, P.forecourt);
   return { door: [0, front], height: h + (r2 < 0.6 ? 2.6 : 0.9), cz: (front + back) / 2 };
 }
 
@@ -465,7 +465,7 @@ function shopUnit(c: Ctx): Built {
   B.box(F, -7, -1.5, 0.05, 3.8, front, front + 0.06, col("#c3c5c1"));
   B.box(F, 1, 2.2, 0.05, 2.2, front, front + 0.06, col("#30363d"));
   c.shopGlass.add(F, 5.2, 1.6, front + 0.07, 4.6, 2.4, "front", c.i, h01(c.i, 3));
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.025, P.yard);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.04, P.yard);
   return { door: [1.6, front], height: h, cz: (front + back) / 2 };
 }
 
@@ -486,7 +486,7 @@ function offices(c: Ctx): Built {
     row(c, "left", -w / 2, back + 0.8, front - 0.8, y, 5, 1.9, 1.9);
     row(c, "right", w / 2, back + 0.8, front - 0.8, y, 5, 1.9, 1.9);
   }
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.025, P.forecourt);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.04, P.forecourt);
   return { door: [0, front], height: h + 2.2, cz: (front + back) / 2 };
 }
 
@@ -518,13 +518,13 @@ function factory(c: Ctx): Built {
   B.prism(F, sx, sz, 1.4, 0, sh, pick(P.brick, r * 3), 10, col("#3a3a3a"), 1.0);
   B.prism(F, sx, sz, 1.2, sh, sh + 0.8, col("#5a4a40"), 10, col("#262626"), 1.2);
   c.chimneys.push({ x: F.x(sx, sz), y: sh + 0.8, z: F.z(sx, sz), owner: c.i, scale: 1 });
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.025, P.yard);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.04, P.yard);
   return { door: [5.6, front + 4.5], height: h + 2.6, cz: (front + back) / 2 };
 }
 
 function yard(c: Ctx): Built {
   const { F, B, G, half } = c;
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.025, P.yard);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.04, P.yard);
   B.box(F, -9, 1, 0, 4.5, -8, 2, P.metal);
   B.gable(F, -9, 1, -8, 2, 4.5, 1.4, P.slate[1]!, P.metal, false, 0.3);
   B.box(F, -7, -3, 0.05, 3.5, 2, 2.06, col("#5d6468"));
@@ -580,8 +580,8 @@ function townHall(c: Ctx): Built {
     faces.push({ x: F.x(ox * 1.02, tz + oz * 1.02), y: cy, z: F.z(ox * 1.02, tz + oz * 1.02), heading: ang });
   }
   // Forecourt: paving, a flagpole.
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.025, P.lawn);
-  G.flatF(F, -9, 9, front, half, 0.035, P.paving);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.04, P.lawn);
+  G.flatF(F, -9, 9, front, half, 0.08, P.paving);
   B.prism(F, 8, front + 4.5, 0.08, 0, 11, col("#d8d8d8"), 6);
   void r;
   return { door: [0, front + 4.6], height: tt + 7, cz: (front + back) / 2, clock: { faces, r: cr } };
@@ -599,7 +599,7 @@ function station(c: Ctx): Built {
   B.box(F, -w / 2 - 2, w / 2 + 2, 0, 0.9, back - 7, back - 4.8, P.concrete);
   B.box(F, -1.2, 1.2, 0.05, 2.6, front, front + 0.08, col("#2b3036"));
   row(c, "front", front, -w / 2 + 1, w / 2 - 1, 1.7, 6, 1.4, 1.8, (k) => k === 2 || k === 3);
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.025, P.forecourt);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.04, P.forecourt);
   return { door: [0, front], height: h + 2.6, cz: (front + back) / 2 };
 }
 
@@ -622,8 +622,8 @@ function clinic(c: Ctx): Built {
     row(c, "left", -w / 2, back + 1, front - 1, y, 4, 1.5, 1.5);
     row(c, "right", w / 2, back + 1, front - 1, y, 4, 1.5, 1.5);
   }
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.025, P.lawn);
-  G.flatF(F, -6, 6, front, half, 0.035, P.paving);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.04, P.lawn);
+  G.flatF(F, -6, 6, front, half, 0.08, P.paving);
   return { door: [0, front], height: h + 0.6, cz: (front + back) / 2 };
 }
 
@@ -647,11 +647,11 @@ function school(c: Ctx): Built {
   B.box(F, 1.2, 3.4, 0.05, 2.6, front, front + 0.06, col("#2c3a52"));
   B.box(F, 0.6, 4.0, 2.8, 3.0, front, front + 1.6, P.darkConcrete);
   // A playground in front, marked out, behind railings.
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.025, P.lawn);
-  G.flatF(F, -10, 10, front + 0.5, half - 1, 0.035, P.playground);
-  G.flatF(F, -6, -5.8, front + 1.5, half - 2, 0.045, P.marking);
-  G.flatF(F, 5.8, 6, front + 1.5, half - 2, 0.045, P.marking);
-  G.flatF(F, -6, 6, front + 4.9, front + 5.1, 0.045, P.marking);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.04, P.lawn);
+  G.flatF(F, -10, 10, front + 0.5, half - 1, 0.08, P.playground);
+  G.flatF(F, -6, -5.8, front + 1.5, half - 2, 0.12, P.marking);
+  G.flatF(F, 5.8, 6, front + 1.5, half - 2, 0.12, P.marking);
+  G.flatF(F, -6, 6, front + 4.9, front + 5.1, 0.12, P.marking);
   G.box(F, -c.w / 2 + 0.5, -1.2, 0, 1.4, half - 0.6, half - 0.5, col("#2b3a33"));
   G.box(F, 1.2, c.w / 2 - 0.5, 0, 1.4, half - 0.6, half - 0.5, col("#2b3a33"));
   return { door: [2.3, front], height: h + 0.6, cz: (front + back) / 2 };
@@ -667,13 +667,13 @@ function works(c: Ctx): Built {
   row(c, "front", front, 4, 9, 4.8, 2, 1.4, 1.0);
   // Tanks.
   B.prism(F, 8.5, back + 1, 2.6, 0, 6.5, col("#b8bdb7"), 14, col("#9aa09a"));
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.025, P.yard);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.04, P.yard);
   return { door: [5.6, front], height: h + 1.8, cz: (front + back) / 2 };
 }
 
 function substation(c: Ctx): Built {
   const { F, B, G, half } = c;
-  G.flatF(F, -9, 9, -9, 9, 0.03, P.gravel);
+  G.flatF(F, -9, 9, -9, 9, 0.06, P.gravel);
   for (const x of [-5, 0, 5]) {
     B.box(F, x - 1.6, x + 1.6, 0, 2.6, -2.5, 1, col("#7a8580"));
     for (let k = 0; k < 3; k++) B.prism(F, x - 1 + k, -0.8, 0.14, 2.6, 3.6, col("#c9c2b0"), 6);
@@ -687,7 +687,7 @@ function substation(c: Ctx): Built {
 
 function park(c: Ctx): Built {
   const { F, G, half } = c;
-  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.03, P.lawn);
-  G.flatF(F, -0.9, 0.9, -half + 0.3, half - 0.3, 0.04, P.gravel);
+  G.flatF(F, -c.w / 2 + 0.3, c.w / 2 - 0.3, -half + 0.3, half - 0.3, 0.05, P.lawn);
+  G.flatF(F, -0.9, 0.9, -half + 0.3, half - 0.3, 0.09, P.gravel);
   return { door: [0, half - 1], height: 1 };
 }
