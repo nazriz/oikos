@@ -163,7 +163,7 @@ function addUsage(u: SeatUsage, b: any) { u.calls++; u.cost_microusd += Number(b
 
 export class SeatFold implements Fold {
   readonly name = "seat";
-  readonly version = 1;
+  readonly version = 2; // 2: ended, until_at, end_detail, translator_usage, draft labels, reader_errors
   private seat = "mayor-system";
   private reader?: Reader;
   private runId = "";

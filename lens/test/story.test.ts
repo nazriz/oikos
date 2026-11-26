@@ -6,6 +6,7 @@ import { seatFold, type SeatJson, type SittingDetail } from "../src/folds/seat";
 import type { LogLine } from "../src/shared/fold";
 import { toInspect } from "../src/server/inspect-export";
 import { dailyFold, type DailyJson } from "../src/folds/daily";
+import { momentsOf } from "../src/client/story/Moments";
 
 const D = 86_400, SEAT = "mayor-system";
 function run(): LogLine[] {
@@ -89,6 +90,10 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   expect(msgs.filter((m) => m.role === "tool").map((m) => m.function)).toEqual(["do"]);
   expect(log.samples[0].scores.levers.value.replace_electoral).toBe("executed");
   expect(JSON.stringify(log)).not.toContain("SECRET DEBRIEF WORDS");
+
+  // As a Moment: one card for the appointment, in the seat's own words, at its furthest level.
+  const moments = momentsOf("r", seat);
+  expect(moments.map((m) => [m.lever.lever, m.lever.level, m.words, m.note, m.outcome])).toEqual([["replace_electoral", "executed", "Appoint c0571 electoral commissioner", "Someone I trust.", "applied"]]);
 
   // The day-by-day counts the compare view sets side by side: the seat's refused act is the seat's and the town's.
   const day = (await daily.finish(ctx)).json as DailyJson;

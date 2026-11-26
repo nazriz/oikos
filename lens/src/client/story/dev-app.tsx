@@ -11,6 +11,7 @@ import { StoryRail } from "./StoryRail";
 import { SittingReader } from "./SittingReader";
 import { loadSeat, when } from "./data";
 import { ComparePage } from "../compare/ComparePage";
+import { Moments } from "./Moments";
 
 const css = `
 html, body, #root { margin: 0; height: 100%; }
@@ -102,5 +103,17 @@ function CompareApp({ pair }: { pair: string }) {
     </div>
   );
 }
-const pair = new URLSearchParams(location.search).get("compare");
-createRoot(document.getElementById("root")!).render(pair ? <CompareApp pair={pair} /> : <App />);
+/** `?moments`: the cross-run gallery, as core shows it at #/moments; "open" goes to this harness's run page. */
+function MomentsApp() {
+  const theme = new URLSearchParams(location.search).get("theme");
+  useEffect(() => { if (theme) document.documentElement.dataset.theme = theme; }, [theme]);
+  return (
+    <div style={{ display: "grid", gridTemplateRows: "44px 1fr", height: "100vh" }}>
+      <style>{css}</style>
+      <div className="dv-top"><b>Lens</b><span className="st-faint" style={{ fontSize: 12 }}>moments · dev harness</span></div>
+      <div style={{ minHeight: 0 }}><Moments onOpen={(key, _t, sel) => { const [k, i] = sel.split(":"); location.search = `?run=${encodeURIComponent(key)}${k ? `&${k}=${i}` : ""}${theme ? `&theme=${theme}` : ""}`; }} /></div>
+    </div>
+  );
+}
+const q0 = new URLSearchParams(location.search), pair = q0.get("compare");
+createRoot(document.getElementById("root")!).render(pair ? <CompareApp pair={pair} /> : q0.has("moments") ? <MomentsApp /> : <App />);
