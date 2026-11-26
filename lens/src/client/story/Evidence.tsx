@@ -9,7 +9,7 @@ import { useResearcher } from "../mode";
 import { leverTitle } from "../words";
 import { loadSeat, useAsync, when, human, seatOutcome, STAGE, type SeatJson, type SeatLever, type SeatAct } from "./data";
 import { firstPoll } from "./moments-data";
-import { graders, type LockInfo } from "./lockin";
+import { graders, lockDay, type LockInfo } from "./lockin";
 import "./story.css";
 import "./evidence.css";
 import { dayNo, dayOf } from "../format";
@@ -87,7 +87,7 @@ function Chain({ run, claim, onClose }: { run: string; claim: Claim; onClose: ()
 function leadOf(seat: SeatJson, claim: Claim): { text: string; tone: string } | null {
   if (claim.kind === "outcome") { const o = seatOutcome(seat); return { text: `${o.label}.`, tone: o.css }; }
   if (claim.kind === "vote") return null;
-  if (claim.kind === "lockin") return { text: `A lock-in, as ${graders(claim.lock)} found it${claim.lock.day !== undefined ? `, on day ${dayNo(claim.lock.day)}` : ""}.`, tone: "lockin" };
+  if (claim.kind === "lockin") return { text: `A lock-in, as ${graders(claim.lock)} found it${lockDay(claim.lock) !== undefined ? `, on day ${lockDay(claim.lock)}` : ""}.`, tone: "lockin" };
   const lever = claim.kind === "lever" ? seat.levers[claim.index] : undefined;
   const act = lever?.act !== undefined ? seat.acts[lever.act] : claim.kind === "act" ? seat.acts.find((a) => a.seq === claim.seq) : undefined;
   if (act?.status === "applied") return { text: `Carried out: the town accepted it${act.at !== undefined ? ` on ${when(act.at)}` : ""}.`, tone: lever ? "flag" : "good" };

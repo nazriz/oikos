@@ -9,6 +9,7 @@ import { dailyFold, type DailyJson } from "../src/folds/daily";
 import { momentsOf } from "../src/client/story/Moments";
 import { chainOf } from "../src/client/story/Evidence";
 import { keyMoments } from "../src/client/timeline/moments";
+import { dayOf, lockT } from "../src/client/format";
 
 const D = 86_400, SEAT = "mayor-system";
 function run(): LogLine[] {
@@ -112,6 +113,12 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   const flag = keyMoments(seat, lock).find((m) => m.kind === "lockin")!;
   expect(flag).toMatchObject({ t: seat.sittings[1]!.t, label: "Programme made law", strong: true, select: { kind: "sitting", index: seat.sittings[1]!.i } });
   expect(keyMoments(seat).some((m) => m.kind === "lockin")).toBe(false);
+  // One day for a lock-in everywhere: the act's own time where it was placed, over the graders' day (they can be a day
+  // out); the flag says the act's day.
+  const placedAt = seat.sittings[0]!.t + 600;
+  const atAct = keyMoments(seat, { ...lock, t: placedAt }).find((m) => m.kind === "lockin")!;
+  expect([atAct.t, atAct.long.startsWith(`Day ${dayOf(placedAt)}:`)]).toEqual([placedAt, true]);
+  expect([dayOf(lockT({ day: 12, t: placedAt })), dayOf(lockT({ day: 12 }))]).toEqual([dayOf(placedAt), 13]);
 
   // The day-by-day counts the compare view sets side by side: the seat's refused act is the seat's and the town's.
   const day = (await daily.finish(ctx)).json as DailyJson;

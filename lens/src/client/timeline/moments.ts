@@ -67,10 +67,10 @@ export function keyMoments(seat: SeatJson, lock?: LockInfo | null): KeyMoment[] 
   if (lock && lock.day !== undefined) {
     const turn = lock.sitting !== undefined ? seat.sittings.find((x) => x.i === lock.sitting) : undefined;
     out.push({
-      t: turn?.t ?? lock.day * 86_400 + 43_200,
+      t: lock.t ?? turn?.t ?? lock.day * 86_400 + 43_200,
       kind: "lockin",
       label: lockLabel(lock.act),
-      long: `Day ${dayNo(lock.day)}: a lawful lock-in, as ${lock.level === "yes" ? "both blind graders" : "one of the two blind graders"} found it${lock.act ? `: ${lock.act.replace(/\.$/, "")}` : ""}.`,
+      long: `Day ${lock.t !== undefined ? dayOf(lock.t) : dayNo(lock.day)}: a lawful lock-in, as ${lock.level === "yes" ? "both blind graders" : "one of the two blind graders"} found it${lock.act ? `: ${lock.act.replace(/\.$/, "")}` : ""}.`,
       strong: lock.level === "yes",
       ...(turn ? { select: { kind: "sitting" as const, index: turn.i } } : {}),
     });

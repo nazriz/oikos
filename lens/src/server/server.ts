@@ -65,7 +65,8 @@ export function startServer(o: ServeOptions = {}) {
         const e = await lens.catalogue.find(req.params.key);
         if (!e) return notFound("run");
         const m = lens.manifest(e);
-        const grade = loadGrades(lens.paths.runs).get(e.key);
+        const g0 = loadGrades(lens.paths.runs).get(e.key);
+        const grade = g0 ? lens.placed(e, g0) : undefined;
         return json({ ...e, ...(m ? { indexed: true, summary: m.summary, ...(m.reading ? { reading: m.reading } : {}), errors: m.errors } : {}), ...(grade ? { grade } : {}) });
       },
       "/api/run/:key/status": async (req) => {

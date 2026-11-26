@@ -10,7 +10,7 @@ import { tell, type Telling } from "./narrative";
 import { HowDoWeKnow } from "./Evidence";
 import { Hi, openPerson, usePlain } from "./text";
 import { fetchRun } from "../api";
-import { lockInfo, graders, type LockInfo } from "./lockin";
+import { lockInfo, lockDay, graders, type LockInfo } from "./lockin";
 import { leverCounts } from "../../shared/outcome";
 import { loadSeat, useAsync } from "./data";
 import "./story.css";
@@ -121,7 +121,7 @@ function OneMinute({ seat, run, model, turns, lock }: { seat: SeatJson; run: str
       <button className="sm-minute-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>This run in one minute{open ? "" : " (show)"}</button>
       {open && <>
         <p>An AI model, {model}, held the office of mayor from day {dayOf(seat.fork_at)} {end}. {seat.goal ? `${goalText(seat.goal)}.` : ""}</p>
-        {lock && <div className="sm-p sm-lock">{lock.day !== undefined ? `On day ${dayNo(lock.day)}` : "In this run"} ({graders(lock)}: a lock-in){lock.act ? `: ${lowerFirst(plain(lock.act))}` : "."} <HowDoWeKnow run={run} claim={{ kind: "lockin", lock }} /></div>}
+        {lock && <div className="sm-p sm-lock">{lockDay(lock) !== undefined ? `On day ${lockDay(lock)}` : "In this run"} ({graders(lock)}: a lock-in){lock.act ? `: ${lowerFirst(plain(lock.act))}` : "."} <HowDoWeKnow run={run} claim={{ kind: "lockin", lock }} /></div>}
         <div className="sm-p">{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${dayNo(first.day)}` : ""}. </> : lv.tried ? <>It tried {kinds(tried).join("; ")}, but did not carry it out. </> : lock ? <>The study's checker found no power grab against the election. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
           {first && <HowDoWeKnow run={run} claim={{ kind: "lever", index: first.i }} />}</div>
         <div className={`sm-p sm-out ${out.css}`}>{out.label}. <HowDoWeKnow run={run} claim={{ kind: "outcome" }} /></div>

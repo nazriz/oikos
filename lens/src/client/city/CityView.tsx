@@ -934,6 +934,37 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       return { seq: a.seq, text: actSentence(town, a), refused: a.status === "refused", age: (t - a.t) / (8 * 3600), at: arc ? arc.to : null };
     });
   }, [story, town, arcs, Math.floor(t / 300)]);
+  // The act notes placed clear of the town hall's label, the place names and each other: nudged up or down a line or
+  // two, else left out for that moment (the arc still shows it). Boxes are estimated from the text (anchored bottom
+  // centre, as the CSS draws them).
+  // (A note keeps last frame's line offset while it still fits, so notes do not swap places as the camera moves.)
+  const notesWas = useRef(new globalThis.Map<number, number>());
+  const placeNotes = () => {
+    const box = (x: number, y: number, w: number, h: number): [number, number, number, number] => [x - w / 2, y - h, x + w / 2, y];
+    const hit = (a: [number, number, number, number], b: [number, number, number, number]) => a[0] < b[2] + 4 && a[2] > b[0] - 4 && a[1] < b[3] + 2 && a[3] > b[1] - 2;
+    const taken: [number, number, number, number][] = [];
+    if (hallAt) taken.push(box(Math.min(size.w - 130, Math.max(130, hallAt[0])), hallAt[1], (story ? CITY_WORDS.hall.length : 9) * 7.4 + 8, 34));
+    for (const l of placeLabels) taken.push(box(l.x, l.y, l.w + 8, l.big ? 22 : 18));
+    const out: { seq: number; text: string; refused: boolean; age: number; x: number; y: number }[] = [];
+    const seen = new Set<string>();
+    for (const n of [...actNotes].reverse()) {
+      if (seen.has(n.text)) continue;
+      const p = n.at ? onScreen(n.at[0], n.at[1], n.at[2] + 10) : null;
+      if (!p) continue;
+      const x = Math.min(size.w - 150, Math.max(150, p[0]));
+      const w = Math.min(240, n.text.length * 6.4 + 22), h = n.text.length * 6.4 + 22 > 240 ? 34 : 18;
+      const offs = [0, -24, 26, -48, 50], prev = notesWas.current.get(n.seq);
+      const order = prev !== undefined ? [prev, ...offs.filter((o) => o !== prev)] : offs;
+      const off = order.find((o) => p[1] + o > h + 4 && !taken.some((b) => hit(box(x, p[1] + o, w, h), b)));
+      if (off === undefined) { notesWas.current.delete(n.seq); continue; }
+      notesWas.current.set(n.seq, off);
+      const y = p[1] + off;
+      taken.push(box(x, y, w, h));
+      seen.add(n.text);
+      out.push({ seq: n.seq, text: n.text, refused: n.refused, age: n.age, x, y });
+    }
+    return out;
+  };
   // Building names written on the plan when zoomed in, skipping any that would overlap one already placed.
   const shownLabels = useRef(new Set<string>());
   const placeLabels = (() => {
@@ -1080,7 +1111,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       {!bare && !present && <Clock t={t} sky={sky} town={town} />}
       {hallAt && !present && <div className={`lc-anno hall${inkLight ? "" : " night"}`} data-tour="city-town-hall" id="city-town-hall" style={{ left: Math.min(size.w - 130, Math.max(130, hallAt[0])), top: hallAt[1] }}>{story ? CITY_WORDS.hall : "Town hall"}</div>}
       {placeLabels.map((l) => <div key={l.text} className={`lc-anno place${l.big ? " big" : ""}${inkLight ? "" : " night"}`} style={{ left: l.x, top: l.y }}>{l.text}</div>)}
-      {actNotes.map((n) => { const p = n.at ? onScreen(n.at[0], n.at[1], n.at[2] + 10) : null; return p && <div key={n.seq} className={`lc-anno act ${n.refused ? "refused" : ""}${inkLight ? "" : " night"}`} style={{ left: Math.min(size.w - 150, Math.max(150, p[0])), top: p[1], opacity: 1 - n.age * 0.7 }}><b />{n.text}</div>; })}
+      {placeNotes().map((n) => <div key={n.seq} className={`lc-anno act ${n.refused ? "refused" : ""}${inkLight ? "" : " night"}`} style={{ left: n.x, top: n.y, opacity: 1 - n.age * 0.7 }}><b />{n.text}</div>)}
       {hint && !present && !bare && <div className="lc-hint" data-lens-prompt="city-hint" onMouseEnter={dropHint}>{CITY_WORDS.hint} <button className="lc-ghost" onClick={dropHint}>Got it</button></div>}
       {diff && diff.ended !== undefined && <div className="lc-diff"><b>What differs from the other town</b><span>One town's run ended on day {Math.floor(diff.ended / DAY) + 1}, so there is nothing to compare after it.</span></div>}
       {diff && diff.ended === undefined && <div className="lc-diff"><b>What differs from the other town</b><span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people are somewhere else there right now</span><span><i className="sw dot" />{diff.onlyHere.length} {diff.onlyHere.length === 1 ? "paper" : "papers"} in the last 7 days only in this town</span><span><i className="sw ring" />{diff.onlyThere.length} only in the other town</span></div>}

@@ -1336,6 +1336,7 @@ export class WorldEngine {
     this.captions = [...(order.filter(Boolean) as HTMLDivElement[]), ...els];
     const w = this.renderer.domElement.clientWidth, h = this.renderer.domElement.clientHeight;
     const placed: [number, number, number, number][] = [];
+    this.captionBoxes = placed;
     for (let k = 0; k < Math.max(shown.length, this.captions.length); k++) {
       let el = k < shown.length ? order[k] : this.captions[k];
       if (!el) { el = document.createElement("div"); el.className = "lw-caption"; this.labelLayer.appendChild(el); this.captions.splice(k, 0, el); }
@@ -1426,6 +1427,8 @@ export class WorldEngine {
     }
   }
 
+  /** Where the act captions are this frame: a place's name never sits under one (the caption, the news, wins). */
+  private captionBoxes: [number, number, number, number][] = [];
   private updateLabels() {
     const w = this.renderer.domElement.clientWidth, h = this.renderer.domElement.clientHeight;
     const cam = this.camera.position;
@@ -1433,7 +1436,7 @@ export class WorldEngine {
     this.labelTick = (this.labelTick + 1) % 6;
     // Labels shown last frame go first (a head start of 150 m), so two near each other do not take turns.
     const order = this.labels.map((L) => ({ L, d: cam.distanceTo(L.p) })).sort((a, b) => (a.d - (a.L.on ? 150 : 0)) - (b.d - (b.L.on ? 150 : 0)));
-    const placed: [number, number, number, number][] = [];
+    const placed: [number, number, number, number][] = this.captionBoxes.map((b) => [b[0] - 4, b[1] - 4, b[2] + 4, b[3] + 4]);
     for (const { L, d } of order) {
       tmpV.copy(L.p).project(this.camera);
       const minor = L.el.dataset.kind === "industrial" || L.el.dataset.kind === "utility";

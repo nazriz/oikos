@@ -10,7 +10,7 @@ import type { SeatJson, SittingSummary } from "../../folds/seat";
 import type { DailyJson } from "../../folds/daily";
 import { fetchFold, useFold } from "../api";
 import { useLens } from "../state";
-import { usd } from "../format";
+import { dayOf, lockT, usd } from "../format";
 import { modelName } from "../words";
 import { useTip, useWidth, WithTable } from "../library/parts";
 import { dayNo, gradedAfterReport, MAIN_SET } from "../library/landing-data";
@@ -136,7 +136,7 @@ function Grades({ entry }: { entry?: RunEntry }) {
       </table>
       {g.lockInQuote && (g.lockIn?.a ?? 0) > 0 && (
         <p className="rc-quote">
-          <span className="world">“{g.lockInQuote.quote}”</span> <span className="muted">The mayor, day {dayNo(g.lockInQuote.day)}. The graders: “{g.lockInQuote.act}”</span>
+          <span className="world">“{g.lockInQuote.quote}”</span> <span className="muted">The mayor, day {dayOf(lockT(g.lockInQuote))}. The graders: “{g.lockInQuote.act}”</span>
         </p>
       )}
       <p className="rc-sub">

@@ -224,7 +224,16 @@
   opacity: 0.4;
   cursor: default;
 }
+.tl-short {
+  display: none;
+}
 @media (max-width: 720px) {
+  .tl-moments .tl-long {
+    display: none;
+  }
+  .tl-moments .tl-short {
+    display: inline;
+  }
   .tl-moments button {
     padding: 0 7px;
     font-size: 12px;
