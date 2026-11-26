@@ -27,7 +27,13 @@ export function blockLabel(b: any, act: any[] = []): string {
     case "publish": {
       const basis = Array.isArray(b.basis) ? b.basis[0] : b.basis;
       if (b.kind === "nomination") return "Filed a nomination" + (b.data?.office ? ` for ${b.data.office}` : "");
-      if (b.kind === "proposal" && typeof basis === "string" && basis.startsWith("form-")) return `Proposed: ${human(basis.slice(5))}`;
+      if (b.kind === "proposal" && typeof basis === "string" && basis.startsWith("form-")) {
+        // (What the council is asked for: "Proposed a law", "Proposed a budget", "Proposed changing the rules on tenancy".)
+        if (b.data?.kind === "law") return "Proposed a law";
+        if (b.data?.kind === "budget") return "Proposed a budget";
+        const f = basis.slice(5);
+        return f.startsWith("amend-") ? `Proposed changing the rules on ${human(f.slice(6))}` : `Proposed: ${human(f)}`;
+      }
       if (b.kind === "direction" && typeof basis === "string" && basis.startsWith("form-")) return `Direction: ${human(basis.slice(5))} (${Object.entries(b.data ?? {}).map(([k, v]) => `${human(k)} ${typeof v === "number" && v >= DAY && v % DAY === 0 ? `${v / DAY} days` : v}`).join(", ")})`;
       const to = Array.isArray(b.addressed_to) ? b.addressed_to.join(", ") : b.addressed_to;
       return `Published ${kind || "a statement"}${to ? ` to ${to}` : ""}`;
@@ -57,9 +63,10 @@ const PERSON = /^c\d+(?:-self)?$/;
 /** Who a letter went to, in a line: named when a few, counted when many ("Wrote to works and 195 residents"); the
  * names are a hover away (lettersTo). */
 export function toWords(to: string[]): string {
-  const people = to.filter((x) => PERSON.test(x)), others = to.filter((x) => !PERSON.test(x));
-  if (people.length <= 3) return to.join(", ");
-  const parts = [...others, `${people.length} residents`];
+  const people = to.filter((x) => PERSON.test(x)), councillors = to.filter((x) => /^councillor-\d+$/.test(x));
+  const others = to.filter((x) => !PERSON.test(x) && !(councillors.length > 1 && councillors.includes(x)));
+  if (people.length <= 1 && councillors.length <= 1) return to.join(", ");
+  const parts = [...others, ...(councillors.length > 1 ? [`${councillors.length} councillors`] : []), ...(people.length > 1 ? [`${people.length} residents`] : people)];
   return parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
 /** Everyone a turn's letters went to, in order, once each (the hover list behind "Wrote to 195 residents"). */
@@ -86,7 +93,12 @@ export function relabel(seat: SeatJson): SeatJson {
     if (label && label !== a.label) { swaps.set(a.label, label); a.label = label; }
   }
   const swap = (s: string) => { for (const [from, to] of swaps) s = s.split(from).join(to); return s.replace(/\$[a-z]\w*/gi, "it"); };
-  for (const d of seat.drafts) if (d.label?.includes("$")) d.label = swap(d.label);
+  // (A draft that was sent says what its act says; one never sent keeps its own line.)
+  const sent = new Map(seat.acts.filter((a) => a.draft).map((a) => [a.draft!, a.label]));
+  for (const d of seat.drafts) {
+    if (sent.has(d.id)) d.label = sent.get(d.id)!;
+    else if (d.label?.includes("$")) d.label = swap(d.label);
+  }
   for (const s of seat.sittings) {
     const own = s.acts.map((i) => seat.acts[i]!).filter(Boolean);
     if (own.length) s.gist = actsGist(own);

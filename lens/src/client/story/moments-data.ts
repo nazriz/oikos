@@ -1,14 +1,15 @@
 // Moments as data, with no React: what the gallery shows, made from a seat bundle. The server (lens/src/server/moments.ts)
 // makes them once per bundle for /api/moments; the page makes them itself where that route is absent (the dev harness).
-import type { SeatJson, SeatLever } from "../../folds/seat";
+import type { SeatAct, SeatDraft, SeatJson, SeatLever } from "../../folds/seat";
+import { actClause } from "./narrative";
 import { outcomeOf } from "../../shared/outcome";
 import { modelName } from "../words";
 import { dayNo } from "../format";
 
 /** What became of a lever event, in words (the reader's stages). */
 export const STAGE: { [k: string]: string } = {
-  applied: "applied", refused: "refused by the world", not_applied: "sent, no outcome yet", translator_failed: "translator could not draw it up",
-  asked_back: "asked back (nothing sent)", seat_declined: "the mayor declined the clerk's draft", proposed: "filed", rejected: "rejected by the council", passed: "passed, not applied",
+  applied: "took effect", refused: "refused by the town", not_applied: "sent, no outcome yet", translator_failed: "the clerk could not write it up",
+  asked_back: "the clerk asked back; nothing was sent", seat_declined: "drafted, then held back", proposed: "filed", rejected: "rejected by the council", passed: "passed, not applied",
   insufficient_notice: "refused: too little notice", date_passed: "refused: date passed", ballot_open: "refused: ballot open", fixed_by_law: "refused: fixed by law",
 };
 
@@ -16,6 +17,8 @@ export interface Moment {
   key: string; model: string; goal?: string; seed?: number; lever: SeatLever;
   /** The seat's own words for it: what it asked the translator, or the paper it sent. */
   words: string;
+  /** What it did, in one sentence of Lens's own ("Proposed a law: …"), said before its words. */
+  said: string;
   /** What it said on signing, and its reason given with the act, where there are any. */
   note?: string; reason?: string;
   outcome: string; outcomeTone: "ok" | "no" | "wait";
@@ -73,11 +76,36 @@ export function momentsOf(key: string, seat: SeatJson, withConsidered = false): 
     const draft = draftId ? seat.drafts.find((d) => d.id === draftId) : undefined;
     const failure = top.source === "translator" ? seat.failures.find((f) => f.t === top.t) : undefined;
     const words = draft?.proposal || failure?.proposal || act?.proposal || top.words;
-    const outcome = act ? (act.status === "applied" ? (top.stage && top.stage !== "applied" ? STAGE[top.stage] ?? top.stage : "applied") : act.status === "refused" ? `refused: ${act.code}` : "sent, no outcome in the log") : top.stage ? STAGE[top.stage] ?? top.stage : top.level === "considered" ? "words only" : "—";
-    const tone: Moment["outcomeTone"] = top.level === "executed" || outcome === "applied" ? "ok" : /refused|declined|could not|rejected|asked back/.test(outcome) ? "no" : "wait";
-    return { key, model: modelOf(seat), ...(seat.goal ? { goal: seat.goal } : {}), ...(seat.seed !== undefined ? { seed: seat.seed } : {}), lever: top, words,
+    const said = saidOf(seat, act, draft, top);
+    const outcome = act ? (act.status === "applied" ? (top.stage && top.stage !== "applied" ? STAGE[top.stage] ?? top.stage : "took effect") : act.status === "refused" ? `refused by the town: ${(act.code ?? "").replace(/_/g, " ")}` : "sent, no outcome in the log") : top.stage ? STAGE[top.stage] ?? top.stage : top.level === "considered" ? "words only" : "—";
+    const tone: Moment["outcomeTone"] = top.level === "executed" || outcome === "took effect" ? "ok" : /refused|held back|could not|rejected|asked back/.test(outcome) ? "no" : "wait";
+    return { key, model: modelOf(seat), ...(seat.goal ? { goal: seat.goal } : {}), ...(seat.seed !== undefined ? { seed: seat.seed } : {}), lever: top, words, said,
       ...(draft?.note ? { note: draft.note } : {}), ...(act?.reasoning ? { reason: act.reasoning } : {}), outcome, outcomeTone: tone, also: all.filter((x) => x !== top), ...(redrafted.has(gk) ? { redrafted: true } : {}), election, ...(poll !== undefined ? { daysBefore: Math.round((poll - top.t) / 86_400) } : {}) };
   });
+}
+
+/** What a moment's act did, in one sentence of Lens's own: the story's clause for an act ("Appointed c0571 as newspaper
+ * editor"), else what became of the request ("Drafted the appointment of c0571 as editor, then held it back"). */
+function saidOf(seat: SeatJson, act: SeatAct | undefined, draft: SeatDraft | undefined, top: SeatLever): string {
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+  if (act) {
+    // (A job offered and signed in one act: who to, and the work, which the story's grouped clause leaves out.)
+    const offer = act.blocks.find((b) => b?.block === "propose_agreement" && b.terms?.template === "employment");
+    if (offer) {
+      const to = (offer.terms.parties ?? []).filter((x: string) => x !== offer.speaks_for).join(", ");
+      const task = (offer.terms.commitments ?? []).map((c: any) => c?.does?.outcome?.work?.task).find(Boolean);
+      return `Offered ${to || "someone"} a job${task ? ` on the ${String(task).replace(/_/g, " ")}` : ""}${act.blocks.some((b) => b?.block === "sign_agreement") ? " and signed it for the town" : ""}.`;
+    }
+    const c = actClause(seat, act);
+    const clause = c?.clause || (act.label ? act.label.charAt(0).toLowerCase() + act.label.slice(1) : "acted");
+    return `${cap(clause)}.${c?.after ? ` ${c.after}` : ""}`;
+  }
+  const what = draft?.label ? `: ${draft.label.charAt(0).toLowerCase()}${draft.label.slice(1)}` : "";
+  if (top.stage === "seat_declined") return `The clerk drew it up${what}; the mayor held it back and sent nothing.`;
+  if (top.stage === "translator_failed") return "It asked the clerk for this, but the clerk could not write it up; nothing was sent.";
+  if (top.stage === "asked_back") return "It asked the clerk for this; the clerk asked back, and nothing was sent.";
+  if (top.level === "considered") return "The idea came up in its thinking; it did nothing about it here.";
+  return "It asked for this; nothing was sent.";
 }
 
 /** The card as a line to paste into a slide or a paper. */

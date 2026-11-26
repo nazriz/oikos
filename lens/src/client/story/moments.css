@@ -17,6 +17,10 @@
 .mo-level { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--st-flag-wash); color: var(--st-flag); }
 .mo-level.considered { background: none; color: var(--st-muted); border: 1px dashed var(--st-line-2); }
 .mo-quote { margin: 12px 0 10px; font-family: var(--st-serif); font-size: 18px; line-height: 1.45; font-weight: 400; font-variation-settings: "opsz" 24; letter-spacing: -0.003em; cursor: pointer; display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; }
+/* Lens's own sentence of what the act did, before the mayor's words; the words then a step smaller. */
+.mo-said { margin: 12px 0 8px; font-size: 15px; line-height: 1.45; font-weight: 600; color: var(--st-text, inherit); }
+.mo-sub-k { font-size: 11px; color: var(--st-faint); font-weight: 600; }
+.mo-quote.small { margin-top: 2px; font-size: 15.5px; -webkit-line-clamp: 4; }
 .mo-quote::before { content: "“"; color: var(--st-flag); margin-right: 1px; }
 .mo-quote::after { content: "”"; color: var(--st-flag); }
 .mo-quote.open { -webkit-line-clamp: unset; display: block; }
