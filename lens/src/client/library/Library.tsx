@@ -10,7 +10,7 @@ import { ThemeToggle } from "../theme";
 import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer, useFirstVisitTour } from "../shell/Shell";
-import { goalText, leverTitle } from "../words";
+import { goalText, leverTitle, modelName } from "../words";
 import { Masthead } from "./Masthead";
 
 type Outcome = "any" | "attempt" | "won" | "lost" | "stopped" | "indexed";
@@ -236,7 +236,7 @@ function Matrix({ study, models, goals, researcher }: { study: RunEntry[]; model
             return (
               <tr key={m}>
                 <td className="model">
-                  <span className="model-name">{m}</span>
+                  <span className="model-name">{modelName(m)}</span>
                   {researcher && raw && raw !== m && <span className="model-raw">{raw.split("/").slice(0, -1).join("/")}</span>}
                 </td>
                 {usedGoals.map((g) => {
@@ -347,7 +347,7 @@ function RunRow({ r, researcher }: { r: RunEntry; researcher: boolean }) {
     <tr className={x.isCode ? "code" : ""}>
       <td>
         <a href={runHref(r.key)} className="run-link">
-          {x.isCode ? "Rule-based mayor (comparison)" : x.model}
+          {x.isCode ? "Rule-based mayor (comparison)" : modelName(x.model)}
         </a>
       </td>
       <td className="muted">{goalText(x.goal)}</td>

@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLens, type Selection, type TimelineMark, type TimelineTrack } from "../state";
 import { selToken } from "../router";
-import { DAY, HOUR, clock, dayOf, span as spanText } from "../format";
+import { DAY, HOUR, clock, dayOf, span as spanText, spanWords } from "../format";
 import { Fit, Keyboard, Pause, Play } from "../icons";
 import { useMode } from "../mode";
 import "./timeline.css";
@@ -22,11 +22,17 @@ export interface TimelineProps {
 }
 
 export const SPEEDS = [
-  { s: 600, label: "10 min/s" },
-  { s: HOUR, label: "1 h/s" },
-  { s: 6 * HOUR, label: "6 h/s" },
-  { s: DAY, label: "1 d/s" },
-  { s: 7 * DAY, label: "1 wk/s" },
+  { s: 600, label: "10 min/s", title: "Ten minutes a second" },
+  { s: HOUR, label: "1 h/s", title: "An hour a second" },
+  { s: 6 * HOUR, label: "6 h/s", title: "Six hours a second" },
+  { s: DAY, label: "1 d/s", title: "A day a second" },
+  { s: 7 * DAY, label: "1 wk/s", title: "A week a second" },
+];
+/** Story mode's three speeds, in words. */
+const STORY_SPEEDS = [
+  { s: HOUR, label: "Slow", title: "An hour a second" },
+  { s: 6 * HOUR, label: "Normal", title: "Six hours a second" },
+  { s: DAY, label: "Fast", title: "A day a second" },
 ];
 
 const AXIS = 22;
@@ -466,8 +472,8 @@ export function Timeline({ ground, fork }: TimelineProps) {
             {playing ? <Pause /> : <Play />}
           </button>
           <div className="seg tl-speeds" role="group" aria-label="Speed">
-            {SPEEDS.map((x) => (
-              <button key={x.s} aria-pressed={speed === x.s} onClick={() => useLens.getState().setSpeed(x.s)}>
+            {(researcher ? SPEEDS : STORY_SPEEDS).map((x) => (
+              <button key={x.s} aria-pressed={speed === x.s} onClick={() => useLens.getState().setSpeed(x.s)} title={x.title}>
                 {x.label}
               </button>
             ))}
@@ -477,8 +483,8 @@ export function Timeline({ ground, fork }: TimelineProps) {
           <span className="tl-day serif num">Day {dayOf(t)}</span>
           <span className="tl-clock mono num">{clock(t)}</span>
           <span className="tl-rel muted">
-            {inFork !== undefined && inFork >= 0 ? `${spanText(inFork)} after the AI mayor took office` : ""}
-            {spanT[1] > t ? `${inFork !== undefined ? ", " : ""}${spanText(spanT[1] - t)} to the end` : ", the end"}
+            {inFork !== undefined && inFork >= 0 ? `${spanWords(inFork)} after the AI mayor took office` : ""}
+            {spanT[1] > t ? `${inFork !== undefined ? ", " : ""}${spanWords(spanT[1] - t)} to the end` : ", the end"}
           </span>
         </div>
         <div className="tl-right">
@@ -493,9 +499,11 @@ export function Timeline({ ground, fork }: TimelineProps) {
  <button className="btn ghost tl-lanes" title={compact ? "Taller lanes, with their words" : "Compact lanes"} aria-pressed={!compact} onClick={() => setLane(compact ? LANE_ROOMY : LANE_COMPACT)}>
             {compact ? "Taller lanes" : "Shorter lanes"}
           </button>
+          {researcher && (
           <button className="btn ghost icon" title="Keys (?)" aria-label="Keys" aria-pressed={help} onClick={() => setHelp((h) => !h)}>
             <Keyboard />
           </button>
+          )}
         </div>
       </div>
       <div className="tl-body">

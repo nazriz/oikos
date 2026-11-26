@@ -18,7 +18,7 @@ import { RunSummary } from "./RunSummary";
 import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer } from "../shell/Shell";
-import { goalText, leverTitle } from "../words";
+import { goalText, leverTitle, modelName } from "../words";
 import "./run.css";
 
 export function RunPage({ runKey, q }: { runKey: string; q: URLSearchParams }) {
@@ -207,7 +207,7 @@ export function RunBar({ entry, meta }: { entry?: RunEntry; meta?: Meta }) {
   const cost = meta ? meta.cost.all.microusd / 1e6 : x?.usd;
   const out = readingOutcome(reading);
   const tried = reading?.levers?.tried ?? 0, done = reading?.levers?.done ?? 0;
-  const name = x ? (x.isCode ? "The rule-based mayor" : x.model) : (entry?.title.split("/").at(-1) ?? "");
+  const name = x ? (x.isCode ? "The rule-based mayor" : modelName(x.model)) : (entry?.title.split("/").at(-1) ?? "");
   return (
     <header className="run-bar">
       <div className="run-bar-top">
