@@ -40,21 +40,25 @@ export function StoryRail({ run: runProp }: { run?: string }) {
 
 function Rail({ seat }: { seat: SeatJson }) {
   const [tab, setTab] = useState<"sittings" | "levers" | "papers">("sittings");
+  // (The header is a line by default so the sittings have the height; its details open on demand and close again
+  // once the list is scrolled. The choice is remembered per viewer.)
+  const [open, setOpenState] = useState<boolean>(() => { try { return localStorage.getItem("lens.story.head") === "open"; } catch { return false; } });
+  const setOpen = (v: boolean) => { setOpenState(v); try { localStorage.setItem("lens.story.head", v ? "open" : "line"); } catch { /* private mode */ } };
   const strong = seat.levers.filter((l) => l.level !== "considered").length;
   const papers = useMemo(() => seat.records.filter((r) => r.t >= seat.fork_at - DAY && ["news", "ballot_result", "election_notice", "nomination", "law", "notice", "ballot"].includes(r.kind) && (r.kind !== "ballot" || r.data?.office === "mayor")).reverse(), [seat]);
   return (
     <div className="st-rail">
-      <Header seat={seat} />
-      <Election seat={seat} />
+      {open ? <Header seat={seat} onClose={() => setOpen(false)} /> : <HeaderLine seat={seat} onOpen={() => setOpen(true)} />}
+      <Election seat={seat} compact={!open} />
       <div className="st-tabs">
         <button className={`st-tab ${tab === "sittings" ? "on" : ""}`} onClick={() => setTab("sittings")}>Sittings<span className="n">{seat.sittings.length}</span></button>
         <button className={`st-tab ${tab === "levers" ? "on" : ""}`} onClick={() => setTab("levers")} style={strong ? { color: tab === "levers" ? undefined : "var(--st-flag)" } : undefined}>Levers<span className="n">{seat.levers.length}</span></button>
         <button className={`st-tab ${tab === "papers" ? "on" : ""}`} onClick={() => setTab("papers")}>Papers<span className="n">{papers.length}</span></button>
       </div>
-      {tab === "sittings" && <Sittings seat={seat} />}
+      {tab === "sittings" && <Sittings seat={seat} onScrolled={() => open && setOpen(false)} />}
       {tab === "levers" && <Levers seat={seat} />}
       {tab === "papers" && <Papers seat={seat} papers={papers} />}
-      <div className="st-foot">Lever flags are the study's reader (experiments/power-seeking/reader.ts), shown as it reads them. Its <i>considered</i> level is a phrase match and often wrong.</div>
+      {tab === "levers" && <div className="st-foot">Lever flags are the study's reader (experiments/power-seeking/reader.ts), shown as it reads them. Its <i>considered</i> level is a phrase match and often wrong.</div>}
     </div>
   );
 }
@@ -73,7 +77,38 @@ function outcomeOf(seat: SeatJson): { label: string; tone: string } {
   return OUTCOME[seat.outcome];
 }
 
-function Header({ seat }: { seat: SeatJson }) {
+/** The header in a line or two: who, under which goal, how it went, and the counts that matter. */
+function HeaderLine({ seat, onOpen }: { seat: SeatJson; onOpen: () => void }) {
+  const select = useLens((s) => s.select);
+  const out = outcomeOf(seat);
+  const rank = { considered: 1, attempted: 2, executed: 3 };
+  const top = new Map<string, SeatLever>();
+  for (const l of seat.levers) if (l.level !== "considered") { const x = top.get(l.lever); if (!x || rank[l.level] > rank[x.level]) top.set(l.lever, l); }
+  const kin = kinAppointed(seat);
+  const cost = seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0);
+  return (
+    <div className="st-head line">
+      <div className="st-line1">
+        <span className="st-title small">{modelName(seat.model)}{seat.goal ? <span className="st-goal"> · {seat.goal}</span> : null}</span>
+        {seat.seed !== undefined && <span className="st-faint">s{seat.seed}</span>}
+        <span style={{ flex: 1 }} />
+        <button className="st-btn" onClick={onOpen} title="Show the run's details">details ▾</button>
+      </div>
+      <div className="st-line2">
+        <span className={`st-outword ${out.tone}`}>{out.label}</span>
+        <span className="st-faint">· {seat.sittings.length} sittings · {seat.acts.length} acts{seat.ended === "stopped" ? " · stopped early" : ""} · {usd(cost)}</span>
+      </div>
+      {(top.size > 0 || kin.length > 0) && (
+        <div className="st-line3">
+          {[...top.values()].sort((a, b) => rank[b.level] - rank[a.level]).map((l) => <button key={l.lever} className="st-chip flag" onClick={() => select({ kind: "lever", index: l.i })} title={`${l.title}: ${l.level}`}>⚑ {l.title}{l.level === "attempted" ? " (tried)" : ""}</button>)}
+          {kin.length > 0 && <button className="st-chip flag" onClick={() => select({ kind: "act", seq: seat.acts[kin[0]!.act]!.seq })}>own child appointed ×{kin.length}</button>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Header({ seat, onClose }: { seat: SeatJson; onClose: () => void }) {
   const select = useLens((s) => s.select);
   const out = outcomeOf(seat);
   const lv = { executed: 0, attempted: 0, considered: 0 };
@@ -87,7 +122,7 @@ function Header({ seat }: { seat: SeatJson }) {
   const tried = new Set(seat.levers.filter((l) => l.level !== "considered").map((l) => l.lever)).size;
   return (
     <div className="st-head">
-      <div className="st-kicker">The seat · {seat.seat}</div>
+      <div className="st-kicker" style={{ display: "flex", alignItems: "center" }}>The seat · {seat.seat}<span style={{ flex: 1 }} /><button className="st-btn" onClick={onClose} title="Fold the details into a line">fold ▴</button></div>
       <div className="st-title">{modelName(seat.model)}{seat.goal ? <> <span className="st-goal">· {seat.goal}</span></> : null}</div>
       <div className="st-sub">
         {seat.seed !== undefined && <span>seed {seat.seed}</span>}
@@ -116,7 +151,7 @@ function Header({ seat }: { seat: SeatJson }) {
   );
 }
 
-function Election({ seat }: { seat: SeatJson }) {
+function Election({ seat, compact }: { seat: SeatJson; compact?: boolean }) {
   const t = useLens((s) => s.t), setT = useLens((s) => s.setT);
   const e = seat.election, moved = pollMoved(seat);
   // (The scale is the run, from the fork to its end or the seating if that is near; a date beyond it is shown at the edge.)
@@ -136,17 +171,17 @@ function Election({ seat }: { seat: SeatJson }) {
   let lastAt = -100, lastRow = 1;
   const rows = pins.map((p) => { const at = pct(p.t), row = at - lastAt < 16 && lastRow === 0 ? 1 : 0; lastAt = at; lastRow = row; return row; });
   return (
-    <div className={`st-elec ${moved ? "moved" : ""}`}>
-      <div className="st-kicker" style={{ color: "var(--st-election)" }}>Election for mayor</div>
+    <div className={`st-elec ${moved ? "moved" : ""} ${compact ? "compact" : ""}`}>
+      {!compact && <div className="st-kicker" style={{ color: "var(--st-election)" }}>Election for mayor</div>}
       <div className="st-elec-bar">
         <div className="axis" />
         {e.notice_at !== undefined && <div className="span" style={{ left: x(e.notice_at), width: `calc(${x(Math.min(e.poll_at ?? to, to))} - ${x(e.notice_at)})` }} />}
         {pins.map((p, k) => <div key={p.label} className={`pin ${p.moved ? "moved" : ""} ${p.off ? "off" : ""}`} style={{ left: x(p.t) }} title={`${p.label}: ${when(p.t)}`} onClick={() => !p.off && setT(p.t)}><span className={`r${rows[k]} ${pct(p.t) > 85 ? "end" : pct(p.t) < 10 ? "start" : ""}`}>{p.off ? `${p.label} → day ${worldDay(p.t) + Math.floor(p.t / (365 * DAY)) * 365}` : `${p.label} ${worldDay(p.t)}`}</span></div>)}
         {t >= from && t <= to && <div className="now" style={{ left: x(t) }} />}
       </div>
-      {moved && <div className="st-elec-note">The poll was moved to day {Math.round((e.poll_at ?? 0) / DAY)} by a law the seat proposed on day {moved.day} ({STAGE[moved.outcome] ?? moved.outcome}).</div>}
-      {!moved && e.poll_at !== undefined && e.poll_at > seat.end_at && <div className="st-elec-note st-muted" style={{ color: "var(--st-muted)" }}>The run ended on day {Math.round(seat.end_at / DAY)}, before the poll on day {Math.round(e.poll_at / DAY)}.</div>}
-      {e.result_at !== undefined && <div className="st-elec-note" style={{ color: "var(--st-muted)" }}>{e.seat_won ? "The seat won" : `Won by ${e.winner ?? "another candidate"}`}, result {when(e.result_at)}{e.seated ? `; ${e.seated === seat.seat ? "the seat was" : `${e.seated} was`} seated ${when(e.seated_at ?? 0)}` : ""}.</div>}
+      {!compact && moved && <div className="st-elec-note">The poll was moved to day {Math.round((e.poll_at ?? 0) / DAY)} by a law the seat proposed on day {moved.day} ({STAGE[moved.outcome] ?? moved.outcome}).</div>}
+      {!compact && !moved && e.poll_at !== undefined && e.poll_at > seat.end_at && <div className="st-elec-note st-muted" style={{ color: "var(--st-muted)" }}>The run ended on day {Math.round(seat.end_at / DAY)}, before the poll on day {Math.round(e.poll_at / DAY)}.</div>}
+      {!compact && e.result_at !== undefined && <div className="st-elec-note" style={{ color: "var(--st-muted)" }}>{e.seat_won ? "The seat won" : `Won by ${e.winner ?? "another candidate"}`}, result {when(e.result_at)}{e.seated ? `; ${e.seated === seat.seat ? "the seat was" : `${e.seated} was`} seated ${when(e.seated_at ?? 0)}` : ""}.</div>}
     </div>
   );
 }
@@ -158,17 +193,17 @@ export function sittingAt(sittings: SittingSummary[], t: number): number {
   return k;
 }
 
-function Sittings({ seat }: { seat: SeatJson }) {
+function Sittings({ seat, onScrolled }: { seat: SeatJson; onScrolled?: () => void }) {
   const t = useLens((s) => s.t), setT = useLens((s) => s.setT), select = useLens((s) => s.select), selection = useLens((s) => s.selection);
   const ref = useRef<HTMLDivElement>(null);
-  const v = useVirtualizer({ count: seat.sittings.length, getScrollElement: () => ref.current, estimateSize: () => 104, overscan: 8 });
+  const v = useVirtualizer({ count: seat.sittings.length, getScrollElement: () => ref.current, estimateSize: () => 92, overscan: 8 });
   const now = sittingAt(seat.sittings, t);
   const selIndex = selection?.kind === "sitting" ? selection.index : selection?.kind === "lever" ? seat.levers[selection.index]?.sitting ?? -1 : selection?.kind === "act" ? seat.acts.find((a) => a.seq === selection.seq)?.sitting ?? -1 : -1;
   const follow = selIndex >= 0 ? selIndex : now;
   useEffect(() => { if (follow >= 0) v.scrollToIndex(follow, { align: "auto" }); }, [follow]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!seat.sittings.length) return <div className="st-empty">The seat sat no sittings after the fork.</div>;
   return (
-    <div className="st-list" ref={ref}>
+    <div className="st-list" ref={ref} onWheel={() => onScrolled?.()} onTouchMove={() => onScrolled?.()}>
       <div style={{ height: v.getTotalSize(), position: "relative" }}>
         {v.getVirtualItems().map((it) => {
           const s = seat.sittings[it.index]!;

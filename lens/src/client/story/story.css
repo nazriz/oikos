@@ -68,6 +68,16 @@
 /* ---------------- the rail ---------------- */
 .st-rail { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--st-panel); border-left: 1px solid var(--st-line); }
 .st-head { padding: 18px 18px 12px; border-bottom: 1px solid var(--st-line); }
+.st-head.line { padding: 12px 16px 10px; }
+.st-line1 { display: flex; align-items: baseline; gap: 8px; }
+.st-title.small { font-size: 17px; margin: 0; }
+.st-line2 { margin-top: 3px; font-size: 12px; display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: baseline; }
+.st-outword { font-family: var(--st-serif); font-size: 13.5px; font-weight: 560; }
+.st-outword.good { color: var(--st-good); } .st-outword.bad { color: var(--st-bad); } .st-outword.flag { color: var(--st-flag); } .st-outword.muted { color: var(--st-muted); }
+.st-line3 { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 4px; }
+.st-line3 button.st-chip { font: inherit; font-size: 11px; cursor: pointer; }
+.st-elec.compact { padding: 2px 16px 4px; }
+.st-elec.compact .st-elec-bar { margin-top: 0; }
 .st-kicker { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--st-faint); font-weight: 600; }
 .st-title { font-family: var(--st-serif); font-size: 22px; line-height: 1.15; font-weight: 520; margin: 4px 0 2px; letter-spacing: -0.01em; font-variation-settings: "opsz" 48; }
 .st-title .st-goal { color: var(--st-seat); font-style: italic; font-weight: 420; }
@@ -115,7 +125,7 @@
 
 /* the list */
 .st-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--st-line-2) transparent; }
-.st-row { position: absolute; left: 0; right: 0; padding: 11px 16px 11px 30px; cursor: pointer; border-bottom: 1px solid var(--st-line); }
+.st-row { position: absolute; left: 0; right: 0; padding: 9px 16px 9px 30px; cursor: pointer; border-bottom: 1px solid var(--st-line); }
 .st-row:hover { background: var(--st-panel-2); }
 .st-row.sel { background: var(--st-seat-wash); }
 .st-row.sel::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--st-seat); }
@@ -129,8 +139,8 @@
 .st-row-time { font-size: 11px; color: var(--st-faint); }
 .st-row-cost { margin-left: auto; font-size: 11px; color: var(--st-faint); }
 .st-row-gist { font-size: 13px; line-height: 1.45; margin-top: 3px; color: var(--st-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.st-row-words { font-family: var(--st-serif); font-style: italic; font-size: 12.5px; line-height: 1.45; color: var(--st-muted); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-variation-settings: "opsz" 14; }
-.st-row-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+.st-row-words { font-family: var(--st-serif); font-style: italic; font-size: 12.5px; line-height: 1.45; color: var(--st-muted); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; font-variation-settings: "opsz" 14; }
+.st-row-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .st-paper { position: absolute; left: 0; right: 0; padding: 9px 16px 9px 16px; border-bottom: 1px solid var(--st-line); cursor: pointer; }
 .st-paper:hover { background: var(--st-panel-2); }
 .st-paper .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
