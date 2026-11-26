@@ -21,14 +21,23 @@ export interface TourStep {
 const short = (s: string | undefined, n: number) => (!s ? undefined : s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s);
 
 /** The steps, from the story fold when the server has it, else from the town's acts. */
-export function useTourSteps(base: string | null, city: CityData): TourStep[] {
+/** The story fold's JSON for the run (null until read, or when the run has none). Read once per run. */
+const seatCache = new Map<string, Promise<any>>();
+export function useSeat(base: string | null): any {
   const [seat, setSeat] = useState<any>(null);
   useEffect(() => {
     if (!base) return;
     let live = true;
-    fetch(`${base}/seat`).then((r) => (r.ok ? r.json() : null)).then((j) => { if (live) setSeat(j); }, () => {});
+    let p = seatCache.get(base);
+    if (!p) { p = fetch(`${base}/seat`).then((r) => (r.ok ? r.json() : null), () => null); seatCache.set(base, p); }
+    p.then((j) => { if (live) setSeat(j); });
     return () => { live = false; };
   }, [base]);
+  return seat;
+}
+
+export function useTourSteps(base: string | null, city: CityData): TourStep[] {
+  const seat = useSeat(base);
   return useMemo(() => buildSteps(city, seat), [city, seat]);
 }
 
@@ -72,7 +81,7 @@ export function buildSteps(city: CityData, seat: any): TourStep[] {
   return steps.filter((s, i) => i === 0 || s.t - steps[i - 1]!.t > 3600 || s.tone !== steps[i - 1]!.tone);
 }
 
-export function Tour({ steps, at, setAt, onExit }: { steps: TourStep[]; at: number; setAt: (i: number) => void; onExit: () => void }) {
+export function Tour({ steps, at, setAt, onExit, hidden }: { steps: TourStep[]; at: number; setAt: (i: number) => void; onExit: () => void; hidden?: boolean }) {
   const [paused, setPaused] = useState(false);
   const step = steps[at];
   useEffect(() => {
@@ -91,7 +100,7 @@ export function Tour({ steps, at, setAt, onExit }: { steps: TourStep[]; at: numb
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [at, steps.length]);
-  if (!step) return null;
+  if (!step || hidden) return null;
   const f = fmtDay(step.t);
   return (
     <div className={`lc-tour tone-${step.tone ?? "seat"}`} key={at}>

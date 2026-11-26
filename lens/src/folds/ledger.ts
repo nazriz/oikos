@@ -71,6 +71,8 @@ const list = (x: unknown): string[] => (Array.isArray(x) ? x.filter((v): v is st
 class LedgerFold implements Fold {
   readonly name = "ledger";
   readonly version = 2;
+  // (It reads no annotations, looks or record lookups: those lines are not parsed for it.)
+  readonly skip = (raw: string) => raw.startsWith('{"body":{"annotation"') || raw.startsWith('{"body":{"command":"look"') || raw.startsWith('{"body":{"command":"entity_record"');
   private readonly posEntity = new Map<string, string>(); // position → entity
   private readonly kindOf = new Map<string, string>(); // entity → kind
   private readonly forOf = new Map<string, string>(); // record id → the organisation it was written for

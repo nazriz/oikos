@@ -13,7 +13,6 @@ export async function bundleLog(log: string, out: string, folds: Fold[] = [townF
   const ctx: FoldContext = { runId: "", dir: "" };
   const t0 = performance.now();
   let foldMs = 0, lines = 0;
-  const stream = (log === "-" ? Bun.stdin.stream() : Bun.file(log).stream()).pipeThrough(new TextDecoderStream());
   let buf = "";
   const take = (line: string) => {
     if (!line) return;
@@ -23,13 +22,20 @@ export async function bundleLog(log: string, out: string, folds: Fold[] = [townF
     for (const f of folds) f.line(l, ctx);
     foldMs += performance.now() - a;
   };
-  for await (const chunk of stream) {
-    buf += chunk;
-    let i, start = 0;
-    while ((i = buf.indexOf("\n", start)) >= 0) { take(buf.slice(start, i)); start = i + 1; }
-    buf = buf.slice(start);
+  if (log.endsWith(".zst") || log.endsWith(".oklog")) {
+    // Compressed logs and experiment forks, through the orchestrator's reader (zstd; the kernel's export).
+    const { logLines } = await import("../../../../orchestrator/src/logs");
+    for await (const line of logLines(log)) take(line);
+  } else {
+    const stream = (log === "-" ? Bun.stdin.stream() : Bun.file(log).stream()).pipeThrough(new TextDecoderStream());
+    for await (const chunk of stream) {
+      buf += chunk;
+      let i, start = 0;
+      while ((i = buf.indexOf("\n", start)) >= 0) { take(buf.slice(start, i)); start = i + 1; }
+      buf = buf.slice(start);
+    }
+    take(buf);
   }
-  take(buf);
   mkdirSync(out, { recursive: true });
   const a = performance.now();
   for (const f of folds) {

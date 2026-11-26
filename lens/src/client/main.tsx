@@ -1,6 +1,6 @@
 // Lens's client: the shell. Fonts are served from this machine (no CDN), the theme is set before paint (index.html).
-import "@fontsource-variable/inter/opsz.css";
-import "@fontsource-variable/fraunces/full.css";
+import "@fontsource-variable/overpass/index.css";
+import "@fontsource-variable/source-serif-4/opsz.css";
 import "@fontsource-variable/jetbrains-mono/index.css";
 import "./theme.css";
 import "./shell.css";
@@ -9,6 +9,8 @@ import { Library } from "./library/Library";
 import { RunPage } from "./run/RunPage";
 import { runHref, useRoute } from "./router";
 import { views } from "./views";
+import { Glossary } from "./shell/Shell";
+import { Tour } from "./shell/Tour";
 
 function App() {
   const route = useRoute();
@@ -30,6 +32,10 @@ function App() {
     const Digest = views.digest;
     return <Digest run={route.key} />;
   }
+  if (route.page === "power" && views.power) {
+    const Power = views.power;
+    return <Power run={route.key} />;
+  }
   if (route.page === "findings" && views.findings) {
     const Findings = views.findings;
     return <Findings />;
@@ -42,4 +48,10 @@ function App() {
   return <Library q={route.q} />;
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <>
+    <App />
+    <Glossary />
+    <Tour />
+  </>,
+);

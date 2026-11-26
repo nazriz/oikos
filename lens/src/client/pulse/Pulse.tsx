@@ -35,7 +35,9 @@ export function Pulse({ run, meta }: { run: string; meta: Meta }) {
   const [people, setPeople] = useState<PeopleBundle | null>(null);
   const [open, setOpen] = useState(() => {
     try {
-      return localStorage.getItem("lens.pulse") !== "closed";
+      // (Folded by default on a phone, where the screen is short; open elsewhere. The viewer's choice is kept.)
+      const kept = localStorage.getItem("lens.pulse");
+      return kept ? kept !== "closed" : window.innerWidth > 900;
     } catch {
       return true;
     }
