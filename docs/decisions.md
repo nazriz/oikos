@@ -16311,3 +16311,13 @@ Naz asked for "a really crazy interactive thing in the browser" and chose the im
   **Revisit if** the world gains voting in person.
 - **A dev page of its own** (`bun lens/src/client/world/dev.ts`, port 4331) serves a bundle folder with the world fold
   beside the city's files, as the city's dev page does.
+
+## 2026-11-26 · Memory growth budget raised from 1,700 to 1,800 bytes/person/day
+
+- **Symptom:** `orchestrator/test/memory-budget.test.ts` failed `merge.ts` twice on Lens-only branches (`lens/wave2`: `1,704`; `lens/safari-gz`: `1,726`, day 30 345 MB -> day 180 604 MB) against the `1,700` ceiling set on 2026-11-02 (`96f805ce`, 8% above the `1,410–1,570` measured then).
+- **Measured on `origin/main` (`58e47010`, 5 standalone runs on the Mini, 4 threads):**
+  - Release kernel (2 runs): day 30 `334–336 MB` (`223.7–225.8 KB/p`), day 180 `579 MB` -> **`1,624` and `1,633` B/p/d**.
+  - Gate kernel (3 runs): day 30 `338–351 MB` (`228.2–240.9 KB/p`), day 180 `574–589 MB` -> **`1,485`, `1,589`, and `1,620` B/p/d**.
+- **Diagnosis:** Over three weeks of legitimate world/feature merges since `96f805ce`, `main`'s steady half-year growth rose by ~`70–140 B/p/d` (day 180 peak `533–557 MB` -> `579 MB`), shrinking headroom to ~`4%` (`1,633` vs `1,700`) — below the `8%` rule set on 2026-10-26. Under 12-way parallel test load in `merge-bot`, ±`15 MB` allocator/RSS variance on day 180 (`589 -> 604 MB`) pushes unrelated merges over `1,700`.
+- **Decision (`scripts/memory-budget.json`):** raise `growth_bytes_per_person_day` from `1,700` to **`1,800`** (~10% over `main`'s `1,633` release measure, keeping the month ceiling `bytes_per_person` unchanged at `270 KB`, where `main` is `224–241 KB`). Still catches any real tiered-storage regression (`2,450` un-tiered).
+- **Revisit if:** growth on `main` approaches `1,700` alone (then profile with `scripts/heapprof.ts --components` and cut per-record cold footprint) or a tiered-storage cut lowers it below `1,500` (lower the ceiling to ~8% above the new measure).
