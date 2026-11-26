@@ -675,3 +675,12 @@
   display: block;
   margin: 12px 0 0;
 }
+
+/* Lock-in squares wear the lock-in colour; power grabs keep the red (src/client/theme.css --lockin). */
+.sq.lk.m-yes,
+.sq.lk.m-excluded.was-yes {
+  background: var(--lockin);
+}
+.sq.lk.m-split {
+  box-shadow: inset 0 0 0 2px var(--lockin);
+}
