@@ -45,11 +45,13 @@ function Chart({ city }: { city: CityData }) {
   const [allTies, setAllTies] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
   useEffect(() => { if (span[1] === 0 && city.town.span[1] > 0) setSpan(city.town.span); }, [city, span, setSpan]);
+  // Opened without a moment: start where the AI mayor first acts (a fork's first day), not before it took office.
+  useEffect(() => { const first = city.town.acts[0]?.t; if (useLens.getState().t === 0 && first) useLens.getState().setT(first); }, [city]);
   const end = Math.max(span[1], city.town.span[1]);
-  const person = (participant: string | null) => (participant ? P.bodies[participant] ?? participant.replace(/-self$/, "") : null);
+  const person = (participant: string | null) => (participant ? P.bodies[participant] ?? (participant.endsWith("-self") ? participant.slice(0, -5) : `system:${participant}`) : null);
   const seatPeople = new Set(Object.values(P.seats));
   const seatOf = (pp: string | null) => !!pp && seatPeople.has(pp);
-  const name = (pp: string) => P.names[pp] ?? pp;
+  const name = (pp: string) => (pp.startsWith("system:") ? "an automated system" : P.names[pp] ?? pp);
 
   // Each post's holders over the run: [from, to, holder participant | null, by].
   const spans = useMemo(() => {
@@ -141,7 +143,7 @@ function Chart({ city }: { city: CityData }) {
           <div className="pw-sub">Each post with its holder now and its holders over the run. Lines join holders who are family. <span className="rose">Red</span> marks a relative of the AI mayor. These are the town's own records; Lens judges nothing.</div>
         </div>
         <div className="pw-side">
-          {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />The AI mayor's body in the town is <b>{name(pp)}</b>.</div>)}
+          {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />The AI mayor holds this office as <b>{name(pp)}</b>{describePerson(city, pp, t) ? ` (${describePerson(city, pp, t)})` : ""}.</div>)}
           <label className="lc-check"><input type="checkbox" checked={allTies} onChange={() => setAllTies(!allTies)} /> Show every family tie between holders ({now.ties.length})</label>
           <label className="lc-check"><input type="checkbox" checked={all} onChange={() => setAll(!all)} /> Show firms, shops and landlords too</label>
         </div>
@@ -163,7 +165,7 @@ function Chart({ city }: { city: CityData }) {
                 <div key={p.id} className="pw-post">
                   <div className="pw-row">
                     <span className="pw-post-title" title={p.id}>{p.title}</span>
-                    {pp ? <button data-holder={pp} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => select({ kind: "person", id: pp })} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">×{now.holders.get(pp)!.length}</span>}{describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
+                    {pp ? <button data-holder={pp} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => { if (!pp.startsWith("system:")) select({ kind: "person", id: pp }); }} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">×{now.holders.get(pp)!.length}</span>}{describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
                   </div>
                   {kin && <div className="pw-kin">{seatKinLabel(pp!)}</div>}
                   {!kin && focus && pp && focus !== pp && relation(P, pp, focus) && <div className="pw-kin muted">{relation(P, pp, focus)} {name(focus)}</div>}
