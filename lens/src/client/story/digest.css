@@ -66,3 +66,6 @@
 .dg-tl .lane { text-transform: none; letter-spacing: 0; }
 .dg-id { font-family: var(--st-sans); }
 .dg-tl .sit, .dg-acts .ok { fill: var(--st-seat-mark); }
+
+.st-btn.primary { background: var(--st-text); color: var(--st-panel); border-color: var(--st-text); font-weight: 700; }
+.st-btn.primary:hover { opacity: 0.9; color: var(--st-panel); }

@@ -10,7 +10,7 @@ import { kinAppointed } from "../story/StoryRail";
 import type { DailyJson } from "../../folds/daily";
 import { Multiples, type Panel } from "./Multiples";
 import "../story/story.css";
-import { leverTitle, goalText } from "../words";
+import { leverTitle, goalText, modelName } from "../words";
 import { PageAnswer } from "../shell/Shell";
 import "./compare.css";
 import { TwoTowns } from "../city/TwoTowns";
@@ -26,7 +26,7 @@ export function loadDaily(run: string): Promise<DailyJson> {
 }
 
 interface Arm { key: string; seat: SeatJson; daily: DailyJson }
-const armName = (s: SeatJson) => (s.model ? s.model.split("/").at(-1)! : "rule-based mayor");
+const armName = (s: SeatJson) => (s.model ? modelName(s.model) : "rule-based mayor");
 
 export function ComparePage({ a, b }: { a: string; b: string }) {
   const data = useAsync(() => Promise.all([loadSeat(a), loadDaily(a), loadSeat(b), loadDaily(b)]), [a, b]);
@@ -157,7 +157,7 @@ function Decisions({ A, B, onOpen }: { A: Arm; B: Arm; onOpen: (run: string) => 
  * the arms differ most after the fork (the rest are alike by construction before it). */
 function panels(A: Arm, B: Arm): Panel[] {
   const fork = Math.floor(Math.min(A.seat.fork_at, B.seat.fork_at) / DAY);
-  const head: [string, string][] = [["seat_acts", "The mayor's acts"], ["seat_refused", "The mayor's acts refused"], ["acts", "All acts"], ["refused", "All acts refused"], ["transfers", "Payments"], ["transfer_cents", "Money paid (cents)"], ["town_net", "The town's account, net (cents)"], ["records", "Records filed"], ["left", "People who left"], ["ill", "Illnesses begun"], ["died", "Deaths"]];
+  const head: [string, string][] = [["seat_acts", "The mayor's acts"], ["seat_refused", "The mayor's acts refused"], ["acts", "All acts"], ["refused", "All acts refused"], ["transfers", "Payments"], ["transfer_cents", "Money paid"], ["town_net", "Into the town's account, less out"], ["records", "Records filed"], ["left", "People who left"], ["ill", "Illnesses begun"], ["died", "Deaths"]];
   const out: Panel[] = head.map(([k, title]) => ({ id: k, title, note: A.daily.legend[k] ?? "", a: A.daily.series[k] ?? [], b: B.daily.series[k] ?? [], money: k.includes("cents") }));
   const diff = (a: number[] = [], b: number[] = []) => { let s = 0, ta = 0, tb = 0; for (let i = fork; i < Math.max(a.length, b.length); i++) { ta += a[i] ?? 0; tb += b[i] ?? 0; s = Math.abs(ta - tb); } return s; };
   const kinds = [...new Set([...Object.keys(A.daily.records), ...Object.keys(B.daily.records)])].map((k) => ({ k, d: diff(A.daily.records[k], B.daily.records[k]) })).filter((x) => x.d > 0).sort((x, y) => y.d - x.d).slice(0, 15);

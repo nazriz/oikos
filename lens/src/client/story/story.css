@@ -321,3 +321,9 @@ mark.st-lever.muted { border-bottom-style: dashed; border-bottom-color: color-mi
 @media (max-width: 900px) { .st-rbar { align-items: flex-start; } .st-rbar .group { margin-top: 0; } }
 .st-clerk { margin: 0 13px 8px; font-size: 12.5px; line-height: 1.5; color: var(--st-muted); }
 .st-clerk b { color: var(--st-text); font-weight: 700; }
+
+/* audit: pills are plain coloured words; Story mode hides raw ids */
+.st-pill { background: none !important; padding: 0; text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 700; }
+.st-pill.ok { color: var(--st-good); } .st-pill.no { color: var(--st-bad); } .st-pill.wait { color: var(--st-muted); }
+.st-reader.story .st-rec { font: inherit; color: inherit; }
+.st-reader.story .st-call { display: none; }

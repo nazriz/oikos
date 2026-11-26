@@ -3,7 +3,7 @@
 // words beside them; quiet turns are folded into one line. The full reader is one click away on every card.
 import { useMemo, useState } from "react";
 import { useLens } from "../state";
-import { useWords, leverTitle, goalText } from "../words";
+import { useWords, leverTitle, goalText, modelName } from "../words";
 import { useDescribe } from "../people";
 import { seatOutcome, usd, type SeatJson } from "./data";
 import { tell, type Telling } from "./narrative";
@@ -20,7 +20,7 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
   const words = useMemo(() => ({ mayor: W.seat, Mayor: W.Seat, powerGrab: W.lever, leverTitle }), [W]);
   const tellings = useMemo(() => seat.sittings.filter((s) => s.kind === "model" || seat.sittings.every((x) => x.kind === "code")).map((s) => tell(seat, s, words, describe)), [seat, words, describe]);
   const out = seatOutcome(seat);
-  const model = seat.model ? seat.model.split("/").at(-1)! : "a rule-based program";
+  const model = seat.model ? modelName(seat.model) : "a rule-based program";
   const grabs = tellings.filter((t) => t.levers.length);
   // Notable turns as cards; runs of quiet turns between them as one folded line.
   const blocks: ({ kind: "card"; t: Telling } | { kind: "quiet"; ts: Telling[] })[] = [];

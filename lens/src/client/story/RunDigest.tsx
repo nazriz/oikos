@@ -9,7 +9,8 @@ import { leverCounts } from "../../shared/outcome";
 import { useDescribe } from "../people";
 import { kinAppointed } from "./StoryRail";
 import { PageAnswer } from "../shell/Shell";
-import { goalText, leverTitle } from "../words";
+import { useResearcher } from "../mode";
+import { goalText, leverTitle, modelName } from "../words";
 import "./story.css";
 import "./digest.css";
 
@@ -31,21 +32,22 @@ export function RunDigest({ run }: { run: string }) {
 function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any }) {
   const out = seatOutcome(seat), e = seat.election, lv = leverCounts(seat.levers);
   const describe = useDescribe(run, seat.end_at), kin = kinAppointed(seat);
+  const researcher = useResearcher(), moved = seat.amendments.some((a) => a.outcome === "applied") && (e.poll_at ?? 0) > seat.end_at;
   const moments = momentsOf(run, seat).sort((a, b) => a.lever.t - b.lever.t);
-  const model = seat.model ? seat.model.split("/").at(-1)! : seat.arm ?? "code";
+  const model = seat.model ? modelName(seat.model) : "The rule-based mayor";
   const day = (t?: number) => (t === undefined ? "—" : `day ${Math.floor(t / DAY)}`);
   const refused = seat.acts.filter((a) => a.status === "refused").length;
   const cost = seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0);
   return (
     <div className="dg">
-      <div className="dg-tools lens-no-print"><button className="st-btn on" onClick={() => print()}>Print or save as PDF</button><a className="st-btn" href={`#/run/${encodeURIComponent(run)}`}>Open the run</a></div>
+      <div className="dg-tools lens-no-print"><button className="st-btn primary" onClick={() => print()}>Print or save as PDF</button><a className="st-btn" href={`#/run/${encodeURIComponent(run)}`}>Open the run</a></div>
       <article className="dg-page">
         <header className="dg-head">
           <PageAnswer page="digest" className="lens-no-print" />
           <h1>{model} as the town's mayor</h1>
           <p className="dg-lede">{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seat.seed !== undefined ? `Town seed ${seat.seed}. ` : ""}A digest of one run of the Oikos power-seeking study.</p>
-          <div className="dg-id st-mono">{run}</div>
-          <div className="dg-id st-mono">{seat.run_id}{entry?.group ? `, in run set ${entry.group}` : ""}</div>
+          {researcher && <div className="dg-id">{run}</div>}
+          {researcher && <div className="dg-id">{seat.run_id}{entry?.group ? `, in run set ${entry.group}` : ""}</div>}
         </header>
 
         <section className="dg-band">
@@ -59,11 +61,11 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
           <h2>The run, day by day</h2>
           <Timeline seat={seat} />
           <table className="dg-facts"><tbody>
-            <tr><th>Election calendar</th><td>{[e.notice_at !== undefined && `Election called on ${day(e.notice_at)}`, e.nominations_close_at !== undefined && `nominations closed on ${day(e.nominations_close_at)}`, e.poll_at !== undefined && `election day ${e.poll_at > seat.end_at ? "was due on" : "on"} ${day(e.poll_at)}`, e.result_at !== undefined && `result declared on ${day(e.result_at)}`, e.seated_at !== undefined && `new term began on ${day(e.seated_at)}`].filter(Boolean).join("; ")}. The AI mayor {e.stood ? "stood" : "did not stand"}{e.result_at === undefined ? "; no result came before the run ended" : ""}.</td></tr>
+            <tr><th>Election calendar</th><td>{moved ? `The election was called on ${day(e.notice_at)}, then moved to ${day(e.poll_at)}, after the run ended; so there was no result. The AI mayor ${e.stood ? "had stood" : "had not stood"}.` : [e.notice_at !== undefined && `Election called on ${day(e.notice_at)}`, e.nominations_close_at !== undefined && `nominations closed on ${day(e.nominations_close_at)}`, e.poll_at !== undefined && `election day ${e.poll_at > seat.end_at ? "was due on" : "on"} ${day(e.poll_at)}`, e.result_at !== undefined && `result declared on ${day(e.result_at)}`, e.seated_at !== undefined && `new term began on ${day(e.seated_at)}`].filter(Boolean).join("; ") + `. The AI mayor ${e.stood ? "stood" : "did not stand"}${e.result_at === undefined ? "; no result came before the run ended" : ""}.`}</td></tr>
             <tr><th>The mayor's turns</th><td>{seat.sittings.filter((s) => s.kind === "model").length} turns, in which the model was asked {seat.usage.calls} times; it read {tokens(seat.usage.input_tokens)} tokens and wrote {tokens(seat.usage.output_tokens)}{seat.usage.reasoning_tokens ? ` (${tokens(seat.usage.reasoning_tokens)} of them hidden reasoning)` : ""}.</td></tr>
-            <tr><th>Its acts</th><td>{seat.acts.length} sent: {seat.acts.length - refused - seat.acts.filter((a) => a.status === "pending").length} applied, {refused} refused{seat.acts.some((a) => a.status === "pending") ? `, ${seat.acts.filter((a) => a.status === "pending").length} with no outcome by the end` : ""}</td></tr>
+            <tr><th>Its acts</th><td>{actsSentence(seat)}</td></tr>
             <tr><th>The clerk</th><td>The mayor asked the clerk {seat.translator.requests} times to write something up: {seat.translator.drafts} written up, {seat.translator.failed} that could not be, {seat.translator.declined} that the mayor then declined.</td></tr>
-            {seat.amendments.length > 0 && <tr><th>Election law</th><td>{seat.amendments.map((a) => `proposed day ${a.day} (${Object.entries(a.figures).map(([k, v]) => `${human(k)} ${figure(v)}`).join(", ")}): ${human(a.outcome)}`).join("; ")}</td></tr>}
+            {seat.amendments.length > 0 && <tr><th>Election law</th><td>{seat.amendments.map((a) => `Proposed on day ${a.day} (${Object.entries(a.figures).map(([k, v]) => `${human(k).replace(/\bpoll\b/g, "election")} ${figure(v)}`).join(", ")}): ${a.outcome === "applied" ? "passed by the council and applied" : human(a.outcome)}.`).join(" ")}</td></tr>}
             {seat.children.length > 0 && <tr><th>The mayor's children</th><td>{seat.children.map((c) => (describe(c) ? `${c} (${describe(c)})` : c)).join("; ")}, as its own instructions name them</td></tr>}
             {kin.length > 0 && <tr><th>Its own child appointed</th><td>{kin.map((k) => `${k.who} as ${POSTS[k.post] ?? k.post}, on day ${Math.floor(seat.acts[k.act]!.t / DAY)}`).join("; ")}</td></tr>}
           </tbody></table>
@@ -75,7 +77,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
           {!moments.length && <p className="st-muted">The study's checker found no power grab tried or carried out.</p>}
           {moments.map((m) => (
             <div key={m.lever.i} className={`dg-moment ${m.lever.level}`}>
-              <div className="dg-moment-top"><b>{cap(leverTitle(m.lever.lever))}</b><span>{m.lever.level === "executed" ? "Carried out" : "Tried"} on day {m.lever.day}{m.lever.days_to_poll !== null ? `, ${m.lever.days_to_poll} days before election day` : ""}; {m.outcome}.</span></div>
+              <div className="dg-moment-top"><b>{cap(leverTitle(m.lever.lever))}</b><span>{m.lever.level === "executed" ? "Carried out" : "Tried"} on day {m.lever.day}{m.daysBefore !== undefined ? `, ${m.daysBefore} days before the election was due` : ""}; {m.outcome}.</span></div>
               <blockquote>“{m.words}”</blockquote>
               {m.note && <div className="dg-sub"><span>on signing</span> “{m.note}”</div>}
               {m.reason && <div className="dg-sub"><span>its reason</span> “{m.reason}”</div>}
@@ -144,4 +146,12 @@ function ActsChart({ seat }: { seat: SeatJson }) {
       <text x={10} y={H - 4} className="lbl">Day {d0}. Acts that went through are above the line, refused ones below.</text><text x={W - 10} y={H - 4} className="lbl" textAnchor="end">Day {d1}. At most {max} in a day.</text>
     </svg>
   );
+}
+
+/** Its acts in a sentence: "19 acts, all carried out." */
+function actsSentence(seat: SeatJson): string {
+  const n = seat.acts.length, refused = seat.acts.filter((a) => a.status === "refused").length, pending = seat.acts.filter((a) => a.status === "pending").length, done = n - refused - pending;
+  if (!n) return "None.";
+  if (done === n) return `${n === 1 ? "One act" : `${n} acts`}, ${n === 1 ? "carried out" : "all carried out"}.`;
+  return `${n} acts: ${done} carried out${refused ? `, ${refused} refused` : ""}${pending ? `, ${pending} with no outcome by the end` : ""}.`;
 }

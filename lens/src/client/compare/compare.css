@@ -88,3 +88,8 @@
 .cp-end { position: absolute; right: 0; width: 88px; font-size: 10.5px; line-height: 1; transform: translateY(-50%); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
 .cp-end.a { color: var(--st-seat); } .cp-end.b { color: var(--st-inst); }
 .cp-card-tot { font-size: 11px; }
+
+/* audit */
+.cp-end.both { color: var(--st-muted); }
+.cp-card-head .d, .cp-glance td.d, .cp-card-foot, .cp-card-foot span { font-family: var(--st-sans); font-variant-numeric: tabular-nums; }
+.cp-spark-box { padding-right: 76px; } .cp-end { width: 72px; }
