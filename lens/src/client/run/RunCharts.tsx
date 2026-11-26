@@ -57,6 +57,55 @@ export function RunCharts({ meta, entry }: { meta?: Meta; entry?: RunEntry }) {
   );
 }
 
+// ---------------------------------------------------------------- the Story rail's strip
+
+/** Story mode's one picture of the run, above the mayor's turns: a mark per turn, its height the acts it sent, red where
+ * the checker found a power grab, the playhead's day marked. Click a mark to read that turn. */
+export function TurnStrip() {
+  const seat = useFold<SeatJson>("seat");
+  const [ref, W] = useWidth<HTMLDivElement>(380);
+  const tip = useTip();
+  const select = useLens((s) => s.select);
+  const setT = useLens((s) => s.setT);
+  const nowDay = useLens((s) => Math.floor(s.t / DAY));
+  const sel = useLens((s) => (s.selection?.kind === "sitting" ? s.selection.index : -1));
+  const s = seat.data;
+  const turns = s ? s.sittings.filter((x) => x.kind === "model") : [];
+  if (!s || turns.length < 2) return <div className="ts" ref={ref} />;
+  const H = 46, base = 34, top = 6;
+  const max = Math.max(2, ...turns.map((x) => x.acts.length));
+  const x = (t: number) => 6 + ((t - s.fork_at) / Math.max(1, s.end_at - s.fork_at)) * (W - 12);
+  const h = (n: number) => 3 + ((base - top - 3) * n) / max;
+  const go = (t: SittingSummary) => { setT(t.t); select({ kind: "sitting", index: t.i }); };
+  const acts = turns.reduce((n, t) => n + t.acts.length, 0);
+  return (
+    <div className="ts" ref={ref}>
+      <p className="ts-title">
+        {turns.length} turns, {acts} acts sent. <span className="muted">Each mark is a turn; taller sent more; red: a power grab.</span>
+      </p>
+      <div ref={tip.box} className="ld-box">
+        <svg width={W} height={H} role="img" aria-label={`${turns.length} turns, ${acts} acts sent`}>
+          <line x1={6} x2={W - 6} y1={base} y2={base} className="act-grid" />
+          <line x1={x(nowDay * DAY)} x2={x(nowDay * DAY)} y1={top - 4} y2={base + 2} className="rc-now" />
+          {turns.map((t, n) => {
+            const flag = t.lever_level === "attempted" || t.lever_level === "executed";
+            const body = <><b>Turn {n + 1}, day {dayNo(t.day)}</b><span>{t.acts.length} {t.acts.length === 1 ? "act" : "acts"} sent{flag ? "; a power grab, as the study's checker reads it" : ""}.</span>{t.gist && <span className="muted">{t.gist}</span>}<span className="muted">Click to read this turn.</span></>;
+            return (
+              <g key={t.i} className={`rc-turn ${sel === t.i ? "on" : ""}`} tabIndex={0} role="button" aria-label={`Turn ${n + 1}, day ${dayNo(t.day)}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={() => go(t)} onKeyDown={(e) => e.key === "Enter" && go(t)}>
+                <rect x={x(t.t) - 7} y={0} width={14} height={H} className="hit" />
+                <rect x={x(t.t) - 2.5} y={base - h(t.acts.length)} width={5} height={h(t.acts.length)} className={flag ? "rc-acts flagged" : "rc-acts"} />
+              </g>
+            );
+          })}
+          <text x={6} y={H - 1} className="cal-num">day {dayNo(Math.floor(s.fork_at / DAY))}</text>
+          <text x={W - 6} y={H - 1} className="cal-num" textAnchor="end">day {dayNo(Math.floor(s.end_at / DAY))}</text>
+        </svg>
+        {tip.el}
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- what the graders found
 
 function Grades({ entry }: { entry?: RunEntry }) {

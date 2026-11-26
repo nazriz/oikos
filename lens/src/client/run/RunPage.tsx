@@ -15,7 +15,7 @@ import { CopyLink } from "./CopyLink";
 import { Timeline } from "../timeline/Timeline";
 import { views, type SlotProps } from "../views";
 import { RunSummary } from "./RunSummary";
-import { RunCharts } from "./RunCharts";
+import { RunCharts, TurnStrip } from "./RunCharts";
 import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer } from "../shell/Shell";
@@ -208,7 +208,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
               </button>
             </div>
           )}
-          <div className="rail-body">{Rail && (railTab === "story" || !researcher) ? <Rail {...props} /> : railTab === "charts" ? <RunCharts meta={meta} entry={entry} /> : <RunSummary meta={meta} entry={entry} />}</div>
+          <div className="rail-body">{Rail && (railTab === "story" || !researcher) ? <>{!researcher && <TurnStrip />}<Rail {...props} /></> : railTab === "charts" ? <RunCharts meta={meta} entry={entry} /> : <RunSummary meta={meta} entry={entry} />}</div>
         </aside>
         {readerOpen && (
           <section className="run-reader">

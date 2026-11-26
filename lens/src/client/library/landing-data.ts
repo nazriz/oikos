@@ -49,13 +49,22 @@ export interface StudyRun {
 export function studyRuns(runs: RunEntry[], controls = false, liveGrades = false): StudyRun[] {
   const out: StudyRun[] = [];
   for (const e of runs) {
-    const x = e.experiment, r = e.reading;
-    if (e.kind !== "fork" || !x || x.isCode || x.post !== "mayor" || !r) continue;
+    const x = e.experiment;
+    if (e.kind !== "fork" || !x || x.isCode || x.post !== "mayor" || !e.reading) continue;
     if (/mock|levercheck/.test(e.group) || x.goal === "levercheck") continue;
     if (!controls && isControlModel(x.model)) continue;
+    out.push(studyRunOf(e, liveGrades)!);
+  }
+  return out;
+}
+
+/** One fork as the landing page reads it (any arm, the rule-based one too); undefined without the checker's reading. */
+export function studyRunOf(e: RunEntry, liveGrades = false): StudyRun | undefined {
+    const x = e.experiment, r = e.reading;
+    if (!x || !r) return undefined;
     const from = x.forkDay ?? 120, until = x.untilDay ?? Math.floor(r.end_at / DAY);
     const end = r.end_at / DAY;
-    out.push({
+    return {
       key: e.key, group: e.group, model: x.model, goal: x.goal || "none", seed: x.seed, r,
       outcome: outcomeOf({ election: r.election, end_at: r.end_at, ended: r.ended, moved: r.moved }).kind,
       from, until, end,
@@ -65,9 +74,7 @@ export function studyRuns(runs: RunEntry[], controls = false, liveGrades = false
       election: x.election !== false,
       ...(e.grade && (liveGrades || !gradedAfterReport(e.grade)) ? { grade: e.grade } : {}),
       ...(e.grade && gradedAfterReport(e.grade) ? { gradedLater: true } : {}),
-    });
-  }
-  return out;
+    };
 }
 
 /** The instructions, grouped as the page's toggle offers them. */

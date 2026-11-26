@@ -16571,3 +16571,17 @@ parsing easier." The turn reader (`SittingReader.tsx`) was the worst case: the m
 - **Not built:** an opinion-poll race (no opinion polls in the runs) and a "residents reached" count (it needs a fold
   pass over every act's effects; worth doing in the seat fold if Naz wants it).
 - **Revisit if:** Story mode should show charts too (then the tab shows in both modes), or the fold gains per-act reach.
+
+## 2026-11-26 Lens: a picture in Story mode, fingerprints in Other mayors
+
+- **Story mode:** the rail now opens with one strip of the run (run/RunCharts.tsx `TurnStrip`): a mark per turn at its
+  time, its height the acts it sent, red where the study's checker found a power grab, the playhead's day marked; hover
+  for the turn, click to read it. One plain line says what it shows. Researcher mode keeps the full Charts tab.
+- **Other mayors:** each AI mayor in the switcher shows the run's fingerprint (library/charts.tsx `RunPrint`, the same
+  one the landing's run list uses): its term, election day (filled where it won), its power grabs, an early stop, a
+  moved election.
+- **Residents reached, not built:** it is not cheap to do honestly. A record's `visible_to` makes a published paper
+  "reach" the whole town, and the acts that matter most (standing directions, laws) reach people only through what the
+  offices later do, which no single event ties back to the act. A count of direct addressees would be cheap but would
+  rank a letter above a law, and it needs a seat or ledger fold version bump, which re-makes every bundle. Revisit with
+  a design for "an act's effects" (the offices' acts citing the direction or law as their basis) in the seat fold.

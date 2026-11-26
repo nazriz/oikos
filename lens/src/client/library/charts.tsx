@@ -10,7 +10,8 @@ import { useMemo, useRef } from "react";
 import { runHref } from "../router";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable } from "./parts";
-import { attempts, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
+import type { RunEntry } from "../../shared/api";
+import { attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
 
 const DAY = 86_400;
 const go = (key: string, t?: number) => { location.hash = runHref(key, t !== undefined ? { t: Math.round(t) } : undefined); };
@@ -420,6 +421,12 @@ export function Print({ run, w = 120, from = 120, to = 200 }: { run: StudyRun; w
     </svg>
   );
 }
+/** A catalogue entry's fingerprint, where the checker has read it (Other mayors, lists). */
+export function RunPrint({ entry, w = 96 }: { entry: RunEntry; w?: number }) {
+  const f = studyRunOf(entry);
+  return f ? <Print run={f} w={w} /> : null;
+}
+
 export const PrintKey = () => (
   <span className="print-key">
     Each run's line runs from the day the AI mayor took office to the run's end. <svg width={10} height={10} aria-hidden><rect x={2} y={2} width={6} height={6} className="pr-poll" /></svg> election day (filled where the AI mayor won),{" "}

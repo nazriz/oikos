@@ -76,3 +76,26 @@
 .rc-quote .muted {
   font-size: 12.5px;
 }
+/* Story mode's strip above the mayor's turns. */
+.ts {
+  padding: 10px 14px 6px;
+  border-bottom: 1px solid var(--line);
+  min-height: 74px;
+}
+.ts-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.ts-title .muted {
+  font-weight: 400;
+}
+.rc-acts.flagged {
+  fill: var(--flag);
+}
+/* Fingerprints in Other mayors. */
+.switcher-pop a .print {
+  display: block;
+  margin: 3px 0 2px;
+}
