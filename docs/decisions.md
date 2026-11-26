@@ -16120,3 +16120,23 @@ shown once. The seat fold's version is 2 (its output gained `ended`, `translator
 bundles are made again.
 - **Revisit if:** the gallery is slow with hundreds of runs (then a server-side aggregate of each bundle's levers), or
   the blind graders' verdicts become available per lever (show them beside the reader's).
+
+## 2026-11-26 Lens: the town in 3D (`src/client/world`, the `world` fold)
+
+Naz asked for "a really crazy interactive thing in the browser" and chose the immersive 3D town. **Decided:**
+- **WebGL2 (`THREE.WebGLRenderer`), not WebGPU.** The sky, the river, the windows, the walking figures and the rain are
+  small GLSL patches on Three's standard materials; WebGPU would need them rewritten in TSL for no gain at this size
+  (60 fps at DPR 2 on an M4 Pro in headful Chrome, idle, panning and playing), and WebGL2 runs on every phone. **Revisit
+  if** a scene grows past what WebGL2 holds at 60 fps (tens of thousands of people), or Lens moves to TSL elsewhere.
+- **What is drawn is read, what is shaped is convention.** Buildings take their kind from the structure type and their
+  facing from the street beside the lot (or the nearest one, reached by a footpath); people walk door to door along the
+  pavements between the `vacated` and the next `occupied` row (the map's rule: at most 3 h apart); the polling station is
+  where people went into a hall on polling day; lit windows follow the count of people inside. The street's
+  cross-section, the right-hand side people walk on, the sun's path (sunrise and sunset as on the map), the late-night
+  dimming of house lights and "a walk of over 650 m is driven by someone allowed to drive the household's car" are
+  display conventions, not the world's figures, and are named as such in `layout.ts` and `engine.ts`. **Revisit if** the
+  log gains travel events with a mode, or a calendar with a place's sun.
+- **The `world` fold** (lens/src/folds/world.ts) keeps the header's vehicles and their drivers, the weather bureau's
+  events (heavy rain, heatwave, drought by day) and the river's inflow, for rain, haze and cars.
+- **A dev page of its own** (`bun lens/src/client/world/dev.ts`, port 4331) serves a bundle folder with the world fold
+  beside the city's files, as the city's dev page does.
