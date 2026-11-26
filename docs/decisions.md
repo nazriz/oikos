@@ -16781,3 +16781,30 @@ The rest of the same review, in the same branch:
   frozen set unless the live figures are asked for) and keeps each run once by its key. Power grabs: 34 acts in 6 runs,
   the same 6 runs Findings counts. The explanatory line is gone.
 - **Server:** runs the graders found a lock-in in are prepared first too, beside the ones the checker flagged.
+## 2026-11-27 Lens: a second newcomer review, the shell's part (`lens/nav-6`)
+
+- **Plan is a plan**: straight down, north up, the tilt held (`minRotationX` 90, passed by views.ts); the 3D town is
+  the view to look around in. The framing straight down is lens-city's `home` (lens/city-smooth); this branch only
+  passes the camera and widens its type.
+- **"How do we know?" in the run bar explains the verdict it follows**: the lock-in chain where the graders found one,
+  else the power grab's, else the election's (it always opened the election's).
+- **The walk waits for real content**: a step is shown lit only once its thing has stopped loading (no spinner, no
+  "Reading…"; the timeline step also waits for the run's turns, which carry its key moments), and says what it waits
+  for meanwhile ("Drawing the town…"). On step 1 it has the server make the run it will open and fetches its first
+  data, so by step 5 it is warm. Its patience is 90 s before it says the thing is not there.
+- **The landing's headline never swaps**: the one this browser last saw shows at once; a first visit shows a quiet
+  block of its size until the runs are read (lens-viz's hero, a small change).
+- **Overlaps**: the run bar sits above the map's panels (Other mayors over About); the timeline's poles, playhead and
+  phase names are drawn under the flags' words, every pole before any flag; the timeline's hover card goes to the page
+  (a portal) above the timeline, never over its buttons or under the map's panels; Story's three speeds all show on a
+  phone (the phone rule meant for Researcher's five hid "Slow").
+- **Other mayors** always says something: the rule-based mayor what it is, an unread run that it is not read yet.
+- **No "Previous/Next power grab" in a run without one** (only tries or carried-out grabs count, not mentions).
+- **Touch screens say "Tap"**, and on the landing's charts the first tap shows the card and the second opens the run.
+- **Compare's first difference is one the towns show**: the first unmatched act that went through and left a paper
+  ("What differs" counts papers and where people are; a letter to an office leaves nothing it counts), else any
+  unmatched act. Before it, a line says the towns have not diverged yet, with a jump to it.
+- **The 3D town's captions**: one per act and per sentence (an act that reached five people was five signs), each
+  keeping its element while shown (a sign moving up the list faded out and in, drawn twice), in the shared plain words.
+- **Revisit if** the grade files name the lock-in act exactly, or touch screens gain hover (pens), or "What differs"
+  counts more than papers and places.

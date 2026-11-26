@@ -6,6 +6,7 @@
 // in, a strip of the whole run sits on top. Keys: space play/pause, ←/→ an hour (shift: a day), - = slower/faster,
 // , . previous/next key moment (< > any mark), Home/End. Drawn on one canvas: thousands of marks stay smooth.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLens, type Selection, type TimelineMark, type TimelineTrack } from "../state";
 import { selToken } from "../router";
 import { DAY, HOUR, clock, dayNo, dayOf, span as spanText, spanWords } from "../format";
@@ -136,6 +137,7 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
   const dom = useMemo<[number, number]>(() => [spanT[0], Math.max(spanT[1], seat?.ended === "stopped" ? (seat.until_at ?? 0) : 0)], [spanT[0], spanT[1], seat]);
   const [view, setView] = useState<[number, number]>(dom);
   const wrap = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const hits = useRef<Hit[]>([]);
   const flagHits = useRef<FlagHit[]>([]);
@@ -310,6 +312,14 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
       if (ph.kind === "stopped") hatch(g, x, flagsTop, x2 - x, height - flagsTop, withAlpha(p.text, 0.14));
     }
 
+    // The playhead's line, under the axis labels, the phases' names and the flags (they stay readable where it passes);
+    // its head is drawn last, on top.
+    const px = Math.round(xOf(t)) + 0.5;
+    if (px >= -2 && px <= width + 2) {
+      g.fillStyle = withAlpha(p.seat, 0.85);
+      g.fillRect(px - 0.5, axisTop + AXIS - 2, 2, height - axisTop - AXIS + 2);
+    }
+
     // Axis: day ticks, or hour ticks when close in.
     const pxPerDay = (DAY / Math.max(1, v1 - v0)) * width;
     g.font = font(600, 11);
@@ -364,14 +374,19 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
         g.fill();
       }
     }
-    // The phases' names, at the left of each band, where they fit.
-    g.font = font(600, 10.5);
-    for (const ph of phases) {
-      const x = Math.max(0, xOf(ph.t)) + 5, x2 = Math.min(width, xOf(ph.t2)) - 4;
-      if (ph.kind === "before" || g.measureText(ph.label).width > x2 - x) continue;
-      g.fillStyle = ph.kind === "stopped" ? p.text : ph.kind === "after" ? p.muted : p.election;
-      g.fillText(ph.label, x, groundTop + GROUND / 2 + 0.5);
-    }
+    // (The phases' names are drawn with the flags, over the poles and the playhead, so nothing runs through them.)
+    const phaseNames = () => {
+      g.font = font(600, 10.5);
+      for (const ph of phases) {
+        const x = Math.max(0, xOf(ph.t)) + 5, x2 = Math.min(width, xOf(ph.t2)) - 4;
+        const tw = g.measureText(ph.label).width;
+        if (ph.kind === "before" || tw > x2 - x) continue;
+        g.fillStyle = withAlpha(p.panel, 0.85);
+        g.fillRect(x - 2, groundTop + 3, tw + 4, GROUND - 6);
+        g.fillStyle = ph.kind === "stopped" ? p.text : ph.kind === "after" ? p.muted : p.election;
+        g.fillText(ph.label, x, groundTop + GROUND / 2 + 0.5);
+      }
+    };
 
     // Lanes: quiet. A point mark is a thin tick; the selected one a ringed dot; spans as soft bars.
     const out: Hit[] = [];
@@ -453,6 +468,7 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
           break find;
         }
     }
+    // (Every pole first, then the phases' names, then every flag: a pole never runs through another flag's words.)
     for (const o of [...order].reverse()) {
       const m = o.m, x = Math.round(o.x) + 0.5;
       const col = momentColor(p, m);
@@ -467,6 +483,14 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
       g.lineTo(x, height - PAD_B);
       g.stroke();
       g.setLineDash([]);
+    }
+    phaseNames();
+    g.font = font(700, 11.5);
+    for (const o of [...order].reverse()) {
+      const m = o.m, x = Math.round(o.x) + 0.5;
+      const col = momentColor(p, m);
+      const pl = placed.get(m);
+      const top = pl ? flagsTop + 3 + pl.row * FLAG_ROW : flagsTop + FLAGS - 9;
       if (pl) {
         const h = FLAG_ROW - 3;
         if (m.strong) {
@@ -497,11 +521,9 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
       g.fillStyle = p.line2;
       g.fillRect(x, flagsTop, 1, height - flagsTop);
     }
-    // Playhead.
-    const px = Math.round(xOf(t)) + 0.5;
+    // The playhead's head.
     if (px >= -2 && px <= width + 2) {
       g.fillStyle = p.seat;
-      g.fillRect(px - 0.5, axisTop + AXIS - 2, 2, height - axisTop - AXIS + 2);
       g.beginPath();
       g.moveTo(px - 5.5, axisTop + 3);
       g.lineTo(px + 6.5, axisTop + 3);
@@ -651,7 +673,7 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
   const hasPrev = keyTimes.some((x) => x < t - 1), hasNext = keyTimes.some((x) => x > t + 1);
 
   return (
-    <div className={`tl ${compact ? "compact" : ""}`}>
+    <div className={`tl ${compact ? "compact" : ""}`} ref={root}>
       <div className="tl-grip" onPointerDown={onGrip} title="Drag to make the lanes taller or shorter" />
       <div className="tl-bar">
         <div className="tl-controls">
@@ -745,8 +767,8 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
           {!sorted.length && <div className="tl-empty faint">The map and the story add their lanes here.</div>}
         </div>
       </div>
-      {hover && (
-        <div className="tip" style={{ left: Math.min(window.innerWidth - 330, hover.cx + 12), top: hover.cy - 70 }}>
+      {hover && createPortal(
+        <div className="tip" style={{ left: Math.max(8, Math.min(window.innerWidth - 330, hover.cx + 12)), bottom: window.innerHeight - (root.current?.getBoundingClientRect().top ?? hover.cy - 70) + 6 }}>
           {hover.flag ? (
             <>
               <b>{hover.flag.label}</b>
@@ -765,7 +787,8 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
               </div>
             </>
           ) : null}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

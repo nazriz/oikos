@@ -9,7 +9,7 @@
 import { useMemo, useRef } from "react";
 import { runHref } from "../router";
 import { goalText, leverTitle, modelName } from "../words";
-import { useReveal, useTip, useWidth, WithTable } from "./parts";
+import { useReveal, useTip, useWidth, WithTable, POINT, tapTwice } from "./parts";
 import type { RunEntry } from "../../shared/api";
 import { attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
 
@@ -159,11 +159,11 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
       {detail && <span>{clip(detail, 200)}</span>}
       {words && <q className="world">{clip(words)}</q>}
       <span className="muted">{goalText(f.goal)}{f.election ? "" : " No election fell in the run"}.</span>
-      <span className="muted">Click to open this run{t !== undefined ? " at that moment" : ""}.</span>
+      <span className="muted">{POINT.Click} to open this run{t !== undefined ? " at that moment" : ""}.</span>
     </>
   );
   const cls = `sq ${m === "lockin" ? "lk " : ""}m-${mark}${mark === "excluded" && f.grade?.lockIn?.both ? " was-yes" : ""}`;
-  return <a className={cls} href={runHref(f.key, t !== undefined ? { t: Math.round(t) } : undefined)} aria-label={`${modelName(f.model)}, town ${f.seed}: ${what}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} />;
+  return <a className={cls} href={runHref(f.key, t !== undefined ? { t: Math.round(t) } : undefined)} aria-label={`${modelName(f.model)}, town ${f.seed}: ${what}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={(e) => tapTwice(e, () => tip.show(e, body))} />;
 }
 
 /** "13 of 14", with what is shown but not counted. */

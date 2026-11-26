@@ -186,7 +186,8 @@
     gap: 10px;
     padding: 0 8px;
   }
-  .tl-speeds button:nth-child(1),
+  /* (Researcher's five speeds lose the slowest and fastest; Story's three, Slow, Normal, Fast, all stay.) */
+  .tl-speeds button:nth-child(1):nth-last-child(5),
   .tl-speeds button:nth-child(5) {
     display: none;
   }

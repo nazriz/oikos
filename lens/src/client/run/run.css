@@ -11,6 +11,9 @@
   flex: none;
   background: var(--panel);
   border-bottom: 2px solid var(--text);
+  /* (Above the map's own panels, so what opens from the bar, Other mayors, is never under "About this view".) */
+  position: relative;
+  z-index: 30;
 }
 .run-bar-top {
   display: flex;

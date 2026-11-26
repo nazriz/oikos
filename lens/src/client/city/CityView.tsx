@@ -46,8 +46,9 @@ export interface CityViewProps {
   overlays?: Partial<Overlays>;
   /** Where the bundle is served; defaults to `/api/run/<key>`. */
   base?: string;
-  /** Start the camera here instead of framed on the town (zoom, rotationX = tilt, rotationOrbit = turn, target in metres). */
-  camera?: Partial<{ zoom: number; rotationX: number; rotationOrbit: number; target: [number, number, number] }>;
+  /** Start the camera here instead of framed on the town (zoom, rotationX = tilt, rotationOrbit = turn, target in metres).
+   * minRotationX 90 holds it straight down: a plan, north up (the run page's "Plan"). */
+  camera?: Partial<{ zoom: number; rotationX: number; rotationOrbit: number; target: [number, number, number]; minRotationX: number }>;
 }
 
 export function CityView({ runKey, run: runProp, base, camera, card = true, layers = false, tour, overlays, present, story: storyProp }: CityViewProps) {

@@ -9,6 +9,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMode } from "../mode";
 import { runHref } from "../router";
 import { views } from "../views";
+import { fetchFold } from "../api";
+import { POINT } from "../library/parts";
 
 /** Where the walk goes when the landing's first moment is not on the page to follow: the lock-in run, its first turn. */
 const FALLBACK_RUN = runHref("ps-v2-claude-2026-11-26~sonnet55-strong-elec-s7~seed-7~claude-sonnet-5-5", { t: Math.round(121.4 * 86_400) });
@@ -20,7 +22,16 @@ interface Step {
   target: string[];
   title: string;
   body: string;
+  /** What the step says while its thing is still loading. */
+  waiting?: string;
+  /** Whether the thing is ready to be shown (beyond being on the page): by default, nothing in it is still loading. */
+  ready?: (el: Element) => boolean;
 }
+
+/** Nothing in it still says it is loading (a spinner, "Drawing the town", "Reading the AI mayor's turns…"). */
+const loaded = (el: Element) => !el.querySelector(".st-empty, .lc-loading, .lc-spin");
+/** The run's own data is in: its turns are read (the timeline's key moments come from the same data). */
+const turnsRead = () => !!document.querySelector('[data-tour="rail"]') && !document.querySelector(".run-rail .st-empty");
 
 /** The run the walk opens: the landing's first moment, as its own button links it (read while still on the landing). */
 let walkRun: string | null = null;
@@ -30,6 +41,29 @@ const onRun = () => {
   const want = firstMoment();
   return window.location.hash.split("?")[0] === want.split("?")[0] ? window.location.hash : want;
 };
+
+/** While the first step is read, have the server make the run the walk will open, and fetch what its page draws first,
+ * so the run's steps find it painted rather than loading. Best effort: failures are left to the run page. */
+function prewarm() {
+  const key = decodeURIComponent(((document.querySelector<HTMLAnchorElement>("#s-moments .start-go")?.getAttribute("href") ?? FALLBACK_RUN).match(/^#\/run\/([^?]+)/) ?? [])[1] ?? "");
+  if (!key) return;
+  const base = `/api/run/${encodeURIComponent(key)}`;
+  try {
+    const es = new EventSource(`${base}/status`);
+    const warm = () => {
+      for (const f of ["meta", "seat"]) fetchFold(key, f).catch(() => {});
+      for (const f of ["town", "people"]) fetch(`${base}/${f}`).catch(() => {});
+    };
+    es.onmessage = (m) => {
+      const x = JSON.parse(m.data) as { state?: string };
+      if (x.state === "ready" || x.state === "failed") {
+        es.close();
+        if (x.state === "ready") warm();
+      }
+    };
+    setTimeout(() => es.close(), 120_000);
+  } catch {}
+}
 
 export const STEPS: Step[] = [
   {
@@ -42,48 +76,57 @@ export const STEPS: Step[] = [
     route: () => "#/",
     target: ["#s-instructions", "#s-who"],
     title: "Two measures",
+    waiting: "Loading the study's runs…",
     body: "Plum is a lock-in, the study's main measure: two graders, reading each run blind, agree the mayor did something lawful to keep its programme beyond the next mayor's reach. Red is a power grab, flagged by the study's checker: an act against the election or the offices that run it.",
   },
   {
     route: () => "#/",
     target: ["#s-who"],
     title: "Each AI model, run by run",
-    body: "Each square is one run. The switch above the squares changes the measure; hover a square for what happened, click it to open the run there.",
+    waiting: "Loading the study's runs…",
+    body: `Each square is one run. The switch above the squares changes the measure; ${POINT.hoverL} a square for what happened, ${POINT.click} to open the run there.`,
   },
   {
     route: () => "#/",
     target: ["#s-moments"],
     title: "Three moments to start with",
+    waiting: "Loading the study's runs…",
     body: "Each opens a run at the moment something happened. Next, we open the first of them together.",
   },
   {
     route: onRun,
     target: [".run-bar"],
     title: "One run",
+    waiting: "Opening the run…",
     body: "The top line says which AI model was the mayor and what it was told; on the right, how the run came out on both measures and at the election.",
   },
   {
     route: onRun,
     target: ['[data-tour="city-map"]', ".run-map"],
     title: "The town",
+    waiting: "Drawing the town…",
     body: "Each block is a building and the dots on it are the people inside at this moment. Yellow lines run from the town hall to whatever the mayor's acts reached. Click anything to open it.",
   },
   {
     route: onRun,
     target: [".map-toggle"],
     title: "Plan or 3D town",
+    waiting: "Drawing the town…",
     body: "The plan is the town from above, quickest to read. The 3D town is the same town to look around in.",
   },
   {
     route: onRun,
     target: [".run-timeline .tl"],
     title: "Time and its key moments",
+    waiting: "Reading the run's key moments…",
+    ready: (el) => loaded(el) && turnsRead(),
     body: "Drag along the strip to move through the run, or press play. The flags are the key moments, plum for a lock-in, red for a power grab, blue for the election: click one to go there.",
   },
   {
     route: onRun,
     target: ['[data-tour="rail"]', ".run-rail"],
     title: "The mayor's turns",
+    waiting: "Reading the AI mayor's turns…",
     body: "Each entry is one of the AI mayor's turns: what it did, in its own words. Open a turn to read everything it read, thought and sent.",
   },
   {
@@ -102,6 +145,7 @@ export const STEPS: Step[] = [
     route: () => (views.findings ? "#/findings" : "#/"),
     target: ['[data-tour="findings"]', "#s-who"],
     title: "All the runs together",
+    waiting: "Loading the study's runs…",
     body: "Findings sums up every run by AI model and instruction, on both measures.",
   },
   {
@@ -123,7 +167,7 @@ function find(sel: string[]): Element | null {
 }
 
 /** How long a step waits for its thing before it says so (a run opening for the first time can take a while). */
-const WAIT_MS = 45_000;
+const WAIT_MS = 90_000;
 
 export function Tour() {
   const step = useMode((s) => s.tour);
@@ -134,7 +178,10 @@ export function Tour() {
   // Go where the step is, then find what to light; keep the light on it as it moves or grows.
   useEffect(() => {
     if (step === null) return;
-    if (step === 0) walkRun = null;
+    if (step === 0) {
+      walkRun = null;
+      prewarm();
+    }
     const s = STEPS[step]!;
     const want = s.route?.();
     if (want && window.location.hash.split("?")[0] !== want.split("?")[0]) window.location.hash = want;
@@ -146,6 +193,7 @@ export function Tour() {
     let last = "";
     const tick = () => {
       if (!el || !el.isConnected) el = find(s.target);
+      if (el && !(s.ready ?? loaded)(el)) el = null;
       if (!el) {
         if (Date.now() - t0 > WAIT_MS) setLost(true);
         return;
@@ -222,7 +270,7 @@ export function Tour() {
         </div>
         <h3 className="head">{s.title}</h3>
         <p>{s.body}</p>
-        {!r && <p className="tour-wait">{lost ? "This is not on the page just now; Next goes on." : "Opening…"}</p>}
+        {!r && <p className="tour-wait">{lost ? "This is not on the page just now; Next goes on." : (s.waiting ?? "Opening…")}</p>}
         <div className="tour-foot">
           <button className="tour-skip" onClick={() => setTour(null)}>
             Close the walk

@@ -2,6 +2,20 @@
 // section comes into view (never under reduced motion), and one tooltip per chart (hover and keyboard focus alike).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
+/** A screen you touch rather than point at (a phone, a tablet): the words say "Tap", not "Hover". */
+export const TOUCH = typeof matchMedia !== "undefined" && matchMedia("(hover: none)").matches;
+/** "Hover" or "Tap", and what opens the thing: "click" or "tap it again". */
+export const POINT = TOUCH ? { hover: "Tap", hoverL: "tap", click: "tap it again", Click: "Tap again" } : { hover: "Hover", hoverL: "hover", click: "click", Click: "Click" };
+
+/** On a touch screen the first tap on a chart's link shows its card and the second opens it (a tap is not a hover). */
+let armed: Element | null = null;
+export function tapTwice(e: React.MouseEvent<Element>, show: () => void): void {
+  if (!TOUCH || armed === e.currentTarget) return;
+  e.preventDefault();
+  armed = e.currentTarget;
+  show();
+}
+
 /** Where a section lives: `#/?at=<id>`. */
 export const sectionHref = (id: string) => `${location.origin}${location.pathname}#/?at=${id}`;
 
