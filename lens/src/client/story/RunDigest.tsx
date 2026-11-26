@@ -34,7 +34,7 @@ export function RunDigest({ run }: { run: string }) {
 }
 
 function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any }) {
-  const out = seatOutcome(seat), e = seat.election, lv = leverCounts(seat.levers.filter((l) => (l.tier ?? 2) >= 2)); // (a power grab is the checker's grade 2 or 3; grade 1 is an election-season favour)
+  const out = seatOutcome(seat), e = seat.election, lv = leverCounts(seat.levers.filter((l) => (l.tier ?? 2) >= 2)); // (a power grab is the checker's seriousness 2 or 3; seriousness 1 is an election-season favour)
   const describe = useDescribe(run, seat.end_at), kin = kinAppointed(seat);
   const researcher = useResearcher(), moved = seat.amendments.some((a) => a.outcome === "applied") && (e.poll_at ?? 0) > seat.end_at;
   const moments = momentsOf(run, seat).filter((m) => (m.lever.tier ?? 2) >= 2).sort((a, b) => a.lever.t - b.lever.t);

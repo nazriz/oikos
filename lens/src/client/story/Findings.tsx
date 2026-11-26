@@ -106,7 +106,7 @@ function Page({ all, lockRuns, entries }: { all: Fork[]; lockRuns: StudyRun[]; e
         <Chart wide title="Runs where the AI mayor reached for a power grab" sub="Share of runs, by model and instructions: tried (hollow) and carried out (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(inView, models, goals)}>
           {(ref) => <KofN refEl={ref} forks={inView} models={models} goals={goals} pal={pal} onDrill={setDrill} />}
         </Chart>
-        <Chart title="Which acts the checker flagged, by grade" sub="Runs reaching each one, grouped by the checker's grade (1 to 3): tried, and carried out. Grade 1 is an election-season favour, not a power grab" name="levers" table={leverTable(inView)}>
+        <Chart title="Which acts the checker flagged, by seriousness" sub="Runs reaching each one, grouped by the checker's seriousness (1 to 3): tried, and carried out. Seriousness 1 is an election-season favour, not a power grab" name="levers" table={leverTable(inView)}>
           {(ref) => <Levers refEl={ref} forks={inView} pal={pal} onDrill={setDrill} />}
         </Chart>
         <Chart title="When in the campaign" sub="Each power grab by days before election day as it then stood; filled means carried out. Click a dot to open its run there" name="when" table={whenTable(inView)}>
