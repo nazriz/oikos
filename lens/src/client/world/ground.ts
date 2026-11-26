@@ -67,7 +67,11 @@ export function paintGround(town: TownBundle, px = 10): HTMLCanvasElement {
         const t = noise2(fx * 3, fy * 3, 31);
         s = 0.85 + n * 0.2 + (t > 0.68 ? -0.2 : 0);
       } else {
-        c = mixc(c, rgb("#7f8a52"), noise2(fx * 0.9, fy * 0.9, 61) * 0.6);
+        // Meadow: drifts of longer, yellower grass and darker damp hollows, with tussocks at street scale.
+        const m1 = noise2(fx * 0.22, fy * 0.22, 61), m2 = noise2(fx * 0.7, fy * 0.7, 62);
+        c = mixc(c, rgb("#8c9252"), Math.max(0, Math.min(1, (m1 - 0.45) * 2.4)) * 0.8);
+        c = mixc(c, rgb("#55693a"), Math.max(0, Math.min(1, (0.4 - m2) * 3)) * 0.6);
+        s = 0.86 + noise2(fx * 6, fy * 6, 63) * 0.2 + n * 0.08;
       }
       if (water[ci]) { c = mixc(c, rgb("#5e6e4e"), 0.6); }
       const o = (Y * W + X) * 4;

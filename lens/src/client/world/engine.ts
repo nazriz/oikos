@@ -20,6 +20,7 @@ import { beyondTexture, detailTexture, groundMaterial, paintGround } from "./gro
 import { lightAt, stars, type Light, type Weather } from "./sky";
 import { carGeometry, carMaterial, CLOTHES, PAINT, personGeometry, personMaterial, SKIN } from "./figures";
 import { Buf, Frame, col } from "./geo";
+import { crownGeometries, foliageMaterial } from "./trees";
 
 const DAY = 86_400;
 /** A gap between leaving one place and entering the next longer than this is not a walk: they are away (as the map). */
@@ -37,9 +38,11 @@ export interface WorldInput {
   election?: { poll_at?: number; result_at?: number };
 }
 
+export interface Info { hour: number; weather: Weather; walking: number; driving: number; fps: number; who?: { name: string; doing: string } }
+
 export interface EngineEvents {
   onMode?(m: Mode): void;
-  onInfo?(s: { hour: number; weather: Weather; walking: number; driving: number; fps: number }): void;
+  onInfo?(s: Info): void;
 }
 
 const tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), tmpS = new THREE.Vector3(), tmpM = new THREE.Matrix4(), tmpC = new THREE.Color(), tmpC2 = new THREE.Color();
@@ -293,16 +296,17 @@ export class WorldEngine {
       g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
       g.setIndex(idx);
       g.computeVertexNormals();
-      const m = new THREE.MeshStandardMaterial({ color: 0x2f4a52, roughness: 0.06, metalness: 0.0, envMapIntensity: 1.3 });
+      const m = new THREE.MeshStandardMaterial({ color: 0x2c4248, roughness: 0.14, metalness: 0.0, envMapIntensity: 0.9 });
       m.onBeforeCompile = (sh) => {
         sh.uniforms.uTime = this.uTime;
         sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec2 vRiv;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvRiv = uv;");
         sh.fragmentShader = sh.fragmentShader
           .replace("#include <common>", "#include <common>\nvarying vec2 vRiv;\nuniform float uTime;")
           .replace("#include <normal_fragment_begin>", `#include <normal_fragment_begin>
-            float fl = vRiv.x * 0.9 - uTime * 1.6;
+            float fl = vRiv.x * 0.6 - uTime * 1.2;
+            float near = 1.0 / (1.0 + length(vViewPosition) / 120.0);
             float ac = vRiv.y * 6.2832;
-            vec3 nw = vec3(sin(fl + sin(ac * 1.7 + uTime * 0.7) * 1.3) * 0.06 + sin(fl * 2.7 + ac) * 0.03, 1.0, cos(fl * 1.9 - ac * 0.6) * 0.05);
+            vec3 nw = vec3((sin(fl + sin(ac * 1.7 + uTime * 0.7) * 1.3) * 0.05 + sin(fl * 2.7 + ac) * 0.02) * near, 1.0, cos(fl * 1.9 - ac * 0.6) * 0.04 * near);
             normal = normalize((viewMatrix * vec4(normalize(nw), 0.0)).xyz);
             float edge = smoothstep(0.0, 0.12, vRiv.y) * smoothstep(1.0, 0.88, vRiv.y);
             diffuseColor.rgb = mix(vec3(0.34, 0.37, 0.28), diffuseColor.rgb, edge);`);
@@ -353,7 +357,7 @@ export class WorldEngine {
         sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute float aLit;\nvarying float vLit;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvLit = aLit;");
         sh.fragmentShader = sh.fragmentShader
           .replace("#include <common>", "#include <common>\nuniform float uNight;\nuniform vec3 uWarm;\nvarying float vLit;")
-          .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += uWarm * vLit * (0.08 + uNight * 1.25);");
+          .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\nvec3 wc = mix(uWarm, vec3(1.0, 0.78, 0.52), fract(vLit * 13.7));\ntotalEmissiveRadiance += wc * vLit * (0.04 + uNight * 0.95);");
       };
       const mesh = new THREE.InstancedMesh(geo, m, n);
       const fr = frameCol !== null ? new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ color: frameCol, roughness: 0.7 }), n) : undefined;
@@ -370,8 +374,8 @@ export class WorldEngine {
       if (fr) { fr.receiveShadow = true; this.scene.add(fr); }
       return [mesh, lit];
     };
-    [this.windows, this.wLit] = panels(M.windows, 0xe9e4d8, 0x2a333c, new THREE.Color(1.0, 0.74, 0.42));
-    [this.shopGlass, this.gLit] = panels(M.shopGlass, null, 0x323b42, new THREE.Color(1.0, 0.86, 0.62));
+    [this.windows, this.wLit] = panels(M.windows, 0xe9e4d8, 0x2a333c, new THREE.Color(1.0, 0.52, 0.2));
+    [this.shopGlass, this.gLit] = panels(M.shopGlass, null, 0x323b42, new THREE.Color(1.0, 0.7, 0.42));
 
     // Street lamps: a pole with an arm, a lantern that lights at dusk, and the pool of light it casts.
     const n = M.lamps.length;
@@ -379,11 +383,11 @@ export class WorldEngine {
     const arm = new THREE.BoxGeometry(0.08, 0.08, 1.3).translate(0, 5.95, 0.6);
     const poleGeo = mergeSimple([pole, arm]);
     const poles = new THREE.InstancedMesh(poleGeo, new THREE.MeshStandardMaterial({ color: 0x2d3338, roughness: 0.6, metalness: 0.4 }), n);
-    this.lampHeads = new THREE.MeshStandardMaterial({ color: 0xd9d4c4, emissive: new THREE.Color(1.0, 0.78, 0.48), emissiveIntensity: 0, roughness: 0.4 });
+    this.lampHeads = new THREE.MeshStandardMaterial({ color: 0xd9d4c4, emissive: new THREE.Color(1.0, 0.66, 0.34), emissiveIntensity: 0, roughness: 0.4 });
     const heads = new THREE.InstancedMesh(new THREE.BoxGeometry(0.42, 0.16, 0.7).translate(0, 5.84, 1.15), this.lampHeads, n);
     const poolTex = radialTexture();
-    this.pools = new THREE.MeshBasicMaterial({ map: poolTex, color: new THREE.Color(1.0, 0.72, 0.42), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-    const pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(13, 13).rotateX(-Math.PI / 2).translate(0, 0.2, 1.4), this.pools, n);
+    this.pools = new THREE.MeshBasicMaterial({ map: poolTex, color: new THREE.Color(1.0, 0.6, 0.28), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+    const pools = new THREE.InstancedMesh(new THREE.PlaneGeometry(17, 17).rotateX(-Math.PI / 2).translate(0, 0.2, 1.6), this.pools, n);
     M.lamps.forEach((l, k) => {
       tmpQ.setFromAxisAngle(UP, l.heading);
       tmpM.compose(tmpV.set(l.x, 0, l.z), tmpQ, tmpS.set(1, 1, 1));
@@ -429,24 +433,27 @@ export class WorldEngine {
       const k = `${Math.floor(t.x / chunk)},${Math.floor(t.z / chunk)}`;
       (groups.get(k) ?? groups.set(k, []).get(k)!).push(t);
     }
-    const crownHi = new THREE.IcosahedronGeometry(1, 1), crownLo = new THREE.IcosahedronGeometry(1, 0);
-    const coneHi = new THREE.ConeGeometry(1, 1, 9).translate(0, 0.5, 0), coneLo = new THREE.ConeGeometry(1, 1, 5).translate(0, 0.5, 0);
-    const trunk = new THREE.CylinderGeometry(0.12, 0.2, 1, 5).translate(0, 0.5, 0);
-    const leaf = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, envMapIntensity: 0.35, flatShading: true });
+    const G = crownGeometries();
+    const trunk = new THREE.CylinderGeometry(0.12, 0.22, 1, 6).translate(0, 0.5, 0);
+    const leaf = foliageMaterial(this.uTime);
     const bark = new THREE.MeshStandardMaterial({ color: 0x4a3c30, roughness: 1 });
-    const broadA = new THREE.Color("#4c6a37"), broadB = new THREE.Color("#748a45"), conA = new THREE.Color("#2f4530"), conB = new THREE.Color("#44593a");
+    // Greens by kind, varied tree to tree: broad trees warmer, columnar ones cooler, conifers dark.
+    const tint = { broad: [new THREE.Color("#55743a"), new THREE.Color("#7d9148")], column: [new THREE.Color("#4d6b3c"), new THREE.Color("#66804a")], cone: [new THREE.Color("#2f4a32"), new THREE.Color("#45603c")] };
     this.treeChunks = [];
+    const shape = (t: (typeof T)[number]) => (t.kind === 1 ? "cone" : t.tone > 0.84 ? "column" : "broad") as "broad" | "column" | "cone";
     for (const [k, list] of groups) {
       const [cx, cz] = k.split(",").map(Number) as [number, number];
-      const broad = list.filter((t) => t.kind === 0), con = list.filter((t) => t.kind === 1);
-      const mk = (geo: THREE.BufferGeometry, items: typeof T, conifer: boolean) => {
+      const mk = (geo: THREE.BufferGeometry, kind: "broad" | "column" | "cone") => {
+        const items = list.filter((t) => shape(t) === kind);
         const m = new THREE.InstancedMesh(geo, leaf, Math.max(1, items.length));
         m.count = items.length;
         items.forEach((t, i) => {
-          if (conifer) tmpM.compose(tmpV.set(t.x, t.h * 0.25, t.z), tmpQ.identity(), tmpS.set(t.r, t.h * 0.8, t.r));
-          else tmpM.compose(tmpV.set(t.x, t.h - t.r * 0.9, t.z), tmpQ.setFromAxisAngle(UP, t.tone * 6), tmpS.set(t.r, t.r * 0.95, t.r));
+          if (kind === "cone") tmpM.compose(tmpV.set(t.x, t.h * 0.22, t.z), tmpQ.setFromAxisAngle(UP, t.tone * 6), tmpS.set(t.r, t.h * 0.82, t.r));
+          else if (kind === "column") tmpM.compose(tmpV.set(t.x, t.h + 2 - t.r * 1.5, t.z), tmpQ.setFromAxisAngle(UP, t.tone * 6), tmpS.set(t.r * 0.62, t.r * 1.55, t.r * 0.62));
+          else tmpM.compose(tmpV.set(t.x, t.h - t.r * 0.85, t.z), tmpQ.setFromAxisAngle(UP, t.tone * 17), tmpS.set(t.r, t.r * 0.88, t.r));
           m.setMatrixAt(i, tmpM);
-          m.setColorAt(i, tmpC.copy(conifer ? conA : broadA).lerp(conifer ? conB : broadB, t.tone));
+          const [a, b] = tint[kind];
+          m.setColorAt(i, tmpC.copy(a!).lerp(b!, h01(Math.round(t.x * 13 + t.z * 7), 3)));
         });
         m.castShadow = true; m.receiveShadow = true;
         m.computeBoundingSphere();
@@ -455,13 +462,13 @@ export class WorldEngine {
       };
       const tr = new THREE.InstancedMesh(trunk, bark, Math.max(1, list.length));
       tr.count = list.length;
-      list.forEach((t, i) => tr.setMatrixAt(i, tmpM.compose(tmpV.set(t.x, 0, t.z), tmpQ.identity(), tmpS.set(1.2, t.kind ? t.h * 0.3 : t.h - t.r * 1.2, 1.2))));
+      list.forEach((t, i) => tr.setMatrixAt(i, tmpM.compose(tmpV.set(t.x, 0, t.z), tmpQ.identity(), tmpS.set(1.2, shape(t) === "cone" ? t.h * 0.3 : t.h - t.r * 1.1, 1.2))));
       tr.castShadow = true;
       tr.computeBoundingSphere();
       this.scene.add(tr);
       this.treeChunks.push({
         c: new THREE.Vector3((cx + 0.5) * chunk, 0, (cz + 0.5) * chunk),
-        hi: [mk(crownHi, broad, false), mk(coneHi, con, true), tr], lo: [mk(crownLo, broad, false), mk(coneLo, con, true)],
+        hi: [mk(G.broadHi, "broad"), mk(G.columnHi, "column"), mk(G.coneHi, "cone"), tr], lo: [mk(G.broadLo, "broad"), mk(G.columnLo, "column"), mk(G.coneLo, "cone")],
       });
     }
   }
@@ -721,8 +728,23 @@ export class WorldEngine {
         this.look = new PointerLockControls(this.camera, this.renderer.domElement);
         this.look.addEventListener("unlock", () => { /* stays in walk; click to look again */ });
       }
-      // Stand on the street nearest the point being looked at.
+      // Stand behind someone walking near the point being looked at, if anyone is, else on the nearest street.
       const tg = this.controls.target.clone();
+      let best = -1, bd = 300 * 300;
+      for (let k = 0; k < this.people.count; k++) {
+        const q = this.pickP[k]!;
+        const d2 = (this.personPos[q * 3]! - tg.x) ** 2 + (this.personPos[q * 3 + 2]! - tg.z) ** 2;
+        if (d2 < bd) { bd = d2; best = q; }
+      }
+      if (best >= 0) {
+        const hd = this.personHead[best]!, px = this.personPos[best * 3]!, pz = this.personPos[best * 3 + 2]!;
+        this.camera.position.set(px - Math.sin(hd) * 9 + Math.cos(hd) * 1.5, 1.7, pz - Math.cos(hd) * 9 - Math.sin(hd) * 1.5);
+        this.yawPitch.yaw = hd + Math.PI;
+        this.yawPitch.pitch = -0.05;
+        this.applyLook();
+        this.ev.onMode?.(m);
+        return;
+      }
       const road = this.plan.nearestRoad(tg.x, tg.z);
       const [rx, rz] = road >= 0 ? this.plan.centre(road) : [tg.x, tg.z];
       const fromCam = new THREE.Vector3().subVectors(tg, this.camera.position).setY(0).normalize();
@@ -767,6 +789,26 @@ export class WorldEngine {
       const p = this.whereIs(q);
       this.flyTo(p, 22, 0.4);
     }
+  }
+
+  /** The selected person, in words: where they are or where they are going. */
+  private whoInfo(sel: Selection, _t: number): Info["who"] {
+    if (sel?.kind !== "person") return undefined;
+    const q = this.city.pById.get(sel.id);
+    if (q === undefined) return undefined;
+    const P = this.city.people.people[q]!;
+    const name = P[1] && P[1] !== P[0] ? P[1] : P[0];
+    const s = this.city.where.at[q]!;
+    if (s >= 0) return { name, doing: `In ${this.placeWords(s)}` };
+    const trip = tripOf(this.city, q);
+    if (this.personVisible[q] && trip && trip.to >= 0) return { name, doing: `${this.carUsedBy.has(q) ? "Driving" : "Walking"} to ${this.placeWords(trip.to)}` };
+    return { name, doing: "Out of town, or somewhere the log does not say" };
+  }
+  private carUsedBy = new Set<number>();
+  private placeWords(i: number): string {
+    const st = this.city.town.structures[i]!;
+    const n = nameOf(this.city, i);
+    return st.houses && this.city.town.entities[st.houses] ? (n === "Town hall" ? "the town hall" : n) : n.charAt(0).toLowerCase() + n.slice(1);
   }
 
   private whereIs(q: number): THREE.Vector3 {
@@ -828,7 +870,7 @@ export class WorldEngine {
     this.updatePolling(t, st.speed);
     if (this.composer) this.composer.render(); else this.renderer.render(this.scene, this.camera);
     this.updateLabels();
-    if (now - this.lastInfo > 400) this.lastInfo = now, this.ev.onInfo?.({ hour, weather: this.weather, walking: counts.walking, driving: counts.driving, fps: this.fpsAcc.fps });
+    if (now - this.lastInfo > 400) this.lastInfo = now, this.ev.onInfo?.({ hour, weather: this.weather, walking: counts.walking, driving: counts.driving, fps: this.fpsAcc.fps, who: this.whoInfo(st.selection, t) });
   };
 
   private updateLight(hour: number, now: number) {
@@ -865,12 +907,11 @@ export class WorldEngine {
     this.moon.visible = L.night > 0.2 && this.weather !== "heavy_rain";
     this.renderer.toneMappingExposure = L.exposure;
     this.uNight.value = L.night;
-    // By moonlight colours fade: the canvas is desaturated with the night (cheaper than a pass of our own).
-    const sat = Math.round((1 - 0.5 * L.night) * 50) / 50;
-    if (sat !== this.sat) { this.sat = sat; this.renderer.domElement.style.filter = sat < 1 ? `saturate(${sat})` : ""; }
     this.uSky.value.copy(L.fog);
     this.lampHeads.emissiveIntensity = L.night * 3.2;
-    this.pools.opacity = L.night * 0.5;
+    this.pools.opacity = L.night * 0.55;
+    const nightLabels = L.night > 0.5;
+    if (nightLabels !== this.labelLayer.classList.contains("night")) this.labelLayer.classList.toggle("night", nightLabels);
     for (const d of this.dials) d.emissiveIntensity = L.night * 0.9;
     // Rain, and wet streets.
     const rainy = this.weather === "heavy_rain";
@@ -951,6 +992,7 @@ export class WorldEngine {
     const pos = { x: 0, z: 0, heading: 0 };
     let k = 0, kc = 0, walking = 0, driving = 0;
     const carUsed = new Int32Array(this.vehicles.length).fill(-1);
+    this.carUsedBy.clear();
     const kinds = c.people.spaceKinds;
     this.personVisible.fill(0);
     for (let q = 0; q < nP; q++) {
@@ -965,6 +1007,7 @@ export class WorldEngine {
       if (v >= 0 && route.len > DRIVE_OVER && carUsed[v]! < 0 && (this.vehicles[v]!.home === trip.from || this.vehicles[v]!.home === trip.to)) {
         drive = true;
         carUsed[v] = q;
+        this.carUsedBy.add(q);
         route = this.plan.drive(trip.from, trip.to);
       }
       const d = f * route.len;
@@ -1039,7 +1082,7 @@ export class WorldEngine {
       const n = W.count[s]!;
       const cap = Math.max(1, Object.values(st.spaces).reduce((a, b) => a + b, 0) * (st.category === "residential" ? 2.2 : 6));
       const frac = n > 0 ? Math.min(1, 0.25 + (n / cap) * 0.9) : 0;
-      this.wLit.setX(k, P.seed[k]! < frac * (st.category === "residential" ? awake : 1) ? 1 : 0);
+      this.wLit.setX(k, P.seed[k]! < frac * (st.category === "residential" ? awake : 1) ? 0.45 + 0.55 * h01(k, 99) : 0);
     }
     this.wLit.needsUpdate = true;
     const G = this.model.shopGlass;
@@ -1216,7 +1259,8 @@ export class WorldEngine {
     const placed: [number, number, number, number][] = [];
     for (const { L, d } of order) {
       tmpV.copy(L.p).project(this.camera);
-      let show = tmpV.z < 1 && Math.abs(tmpV.x) < 1.1 && Math.abs(tmpV.y) < 1.1 && d < (walk ? 260 : 1700) && d > 12;
+      const minor = L.el.dataset.kind === "industrial" || L.el.dataset.kind === "utility";
+      let show = tmpV.z < 1 && Math.abs(tmpV.x) < 1.1 && Math.abs(tmpV.y) < 1.1 && d < (walk ? 260 : minor ? 420 : 1100) && d > 12;
       // Hidden behind another building (checked every few frames against the buildings' boxes).
       if (show && this.labelTick === 0) L.hidden = this.occluded(L.p, L.i);
       if (L.hidden) show = false;

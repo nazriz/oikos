@@ -31,8 +31,11 @@ const P = {
   hedge: col("#3f5a32"),
   fence: col("#8b7d6a"),
   asphalt: col("#57554f"),
-  pavement: col("#a8a59e"),
+  pavement: col("#9f9b92"),
   kerb: col("#c9c5bb"),
+  kerbTop: col("#cfcbc1"),
+  verge: col("#6f8749"),
+  lawns: ["#62793f", "#5c7240", "#6a8045", "#587039"].map(col),
   marking: col("#e9e5d8"),
   playground: col("#6d6c70"),
 };
@@ -122,6 +125,10 @@ export function buildTown(town: TownBundle, plan: Plan): TownModel {
     if (j & 2) A.flat(x - cw, z + cw, x + cw, z + c2, 0.04, P.asphalt);
     if (j & 8) A.flat(x - cw, z - c2, x + cw, z - cw, 0.04, P.asphalt);
     // Pavements, raised a kerb's height: along every arm's sides, across the end of a side with no street.
+    const kerb = (x0: number, z0: number, x1: number, z1: number) => {
+      const Fw = new Frame((x0 + x1) / 2, (z0 + z1) / 2, 0, 1);
+      PV.box(Fw, -(x1 - x0) / 2, (x1 - x0) / 2, 0, kh + 0.012, -(z1 - z0) / 2, (z1 - z0) / 2, P.kerb, P.kerbTop);
+    };
     const slab = (x0: number, z0: number, x1: number, z1: number) => {
       const Fw = new Frame((x0 + x1) / 2, (z0 + z1) / 2, 0, 1);
       PV.box(Fw, -(x1 - x0) / 2, (x1 - x0) / 2, 0, kh, -(z1 - z0) / 2, (z1 - z0) / 2, P.kerb, P.pavement);
@@ -137,7 +144,20 @@ export function buildTown(town: TownBundle, plan: Plan): TownModel {
       if (ez) slab(bx[0], az[0], bx[1], az[1]);
       if (!ex && !ez) slab(bx[0], bz[0], bx[1], bz[1]);
       else if (ex && ez) slab(bx[0], bz[0], bx[1], bz[1]);
+      // Kerb stones along the carriageway's edge, a shade lighter than the paving.
+      const kz = [z + sz * cw, z + sz * (cw + 0.28)].sort((a, b) => a - b) as [number, number];
+      const kx = [x + sx * cw, x + sx * (cw + 0.28)].sort((a, b) => a - b) as [number, number];
+      if (ex) kerb(ax[0], kz[0], ax[1], kz[1]);
+      if (ez) kerb(kx[0], az[0], kx[1], az[1]);
+      if (!ex && !ez) { kerb(bx[0], kz[0], bx[1], kz[1]); kerb(kx[0], bz[0], kx[1], bz[1]); }
     }
+    if (!(j & 1)) kerb(x + cw, z - cw, x + cw + 0.28, z + cw);
+    if (!(j & 4)) kerb(x - cw - 0.28, z - cw, x - cw, z + cw);
+    if (!(j & 2)) kerb(x - cw, z + cw, x + cw, z + cw + 0.28);
+    if (!(j & 8)) kerb(x - cw, z - cw - 0.28, x + cw, z - cw);
+    // The verge: mown grass between the pavement and the lots.
+    G.who = -1;
+    G.flat(x - c2, z - c2, x + c2, z + c2, 0.015, P.verge);
     // Ends with no street: pavement across the end of the carriageway.
     if (!(j & 1)) slab(x + cw, z - cw, x + pw, z + cw);
     if (!(j & 4)) slab(x - pw, z - cw, x - cw, z + cw);
@@ -289,7 +309,7 @@ function row(c: Ctx, side: "front" | "back" | "left" | "right", wall: number, u0
 function garden(c: Ctx, doorX: number, frontZ: number, drive?: [number, number]) {
   const { F, G, half } = c;
   const W = c.w / 2 - 0.3;
-  G.flatF(F, -W, W, -half + 0.3, half - 0.3, 0.025, h01(c.i, 9) < 0.5 ? P.lawn : P.lawn2);
+  G.flatF(F, -W, W, -half + 0.3, half - 0.3, 0.025, pick(P.lawns, h01(c.i, 9)));
   G.flatF(F, doorX - 0.7, doorX + 0.7, frontZ, half, 0.035, P.paving);
   if (drive) G.flatF(F, drive[0], drive[1], frontZ - 4, half, 0.035, P.gravel);
   const hedge = h01(c.i, 10) < 0.6;

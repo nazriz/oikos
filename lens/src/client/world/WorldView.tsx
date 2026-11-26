@@ -6,7 +6,7 @@ import { useCity } from "../city/CityView";
 import { fetchFold } from "../api";
 import { useLens } from "../state";
 import type { WorldBundle } from "../../folds/world";
-import { WorldEngine, type Mode } from "./engine";
+import { WorldEngine, type Info, type Mode } from "./engine";
 import type { Weather } from "./sky";
 import { WORLD_CSS } from "./style";
 
@@ -31,7 +31,7 @@ export function WorldView({ run, base, view, mode: startMode, weather }: WorldVi
   const host = useRef<HTMLDivElement>(null);
   const engine = useRef<WorldEngine | null>(null);
   const [mode, setMode] = useState<Mode>("fly");
-  const [info, setInfo] = useState<{ hour: number; weather: Weather; walking: number; driving: number; fps: number } | null>(null);
+  const [info, setInfo] = useState<Info | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const selection = useLens((s) => s.selection);
 
@@ -55,7 +55,7 @@ export function WorldView({ run, base, view, mode: startMode, weather }: WorldVi
     }
     engine.current = e;
     if (view) e.setView(view.target, view.dist, view.tilt, view.turn);
-    if (startMode) e.setMode(startMode);
+    if (startMode) setTimeout(() => e.setMode(startMode), 800);
     if (weather) e.forceWeather = weather;
     (window as any).__world = e;
     return () => { e.dispose(); engine.current = null; };
@@ -84,6 +84,7 @@ export function WorldView({ run, base, view, mode: startMode, weather }: WorldVi
               <span>{WEATHER_WORDS[info.weather]} {info.walking ? `${info.walking} walking` : "Nobody walking"}{info.driving ? `, ${info.driving} driving` : ""}.</span>
             </div>
           )}
+          {info?.who && <div className="lw-who"><b>{info.who.name}</b><span>{info.who.doing}</span></div>}
           {mode === "walk" && <div className="lw-hint">Click to look around, then W A S D to walk and Shift to hurry; Esc frees the mouse. On a phone, tap where to go.</div>}
           {mode === "fly" && <div className="lw-key">People are dressed by where they are going: <i style={{ background: "#3f5e7a" }} /> to work, <i style={{ background: "#b5654a" }} /> to school, <i style={{ background: "#8c7b6b" }} /> home, <i style={{ background: "#1f5fad" }} /> to a hall, <i style={{ background: "#c9c2b6" }} /> to the clinic. Yellow lines carry the mayor's acts.</div>}
         </>

@@ -30,8 +30,8 @@ const C = (h: string) => new THREE.Color(h);
 
 /** Keyed by the sun's height (sine of elevation, -0.3 .. 1): sunlight, sky, haze. */
 const KEYS: { e: number; sun: THREE.Color; sky: THREE.Color; ground: THREE.Color; fog: THREE.Color }[] = [
-  { e: -0.3, sun: C("#8fa3d6"), sky: C("#3a4a6c"), ground: C("#1c2330"), fog: C("#202a3b") },
-  { e: -0.08, sun: C("#9e8fb5"), sky: C("#3a4462"), ground: C("#252630"), fog: C("#3b4058") },
+  { e: -0.3, sun: C("#8fa3d6"), sky: C("#2e4170"), ground: C("#141b29"), fog: C("#14213d") },
+  { e: -0.08, sun: C("#9e8fb5"), sky: C("#3a4a78"), ground: C("#20232f"), fog: C("#2c3658") },
   { e: 0.0, sun: C("#ff9a5c"), sky: C("#8a8fb0"), ground: C("#4a4038"), fog: C("#c49a86") },
   { e: 0.12, sun: C("#ffbf80"), sky: C("#a9bdd6"), ground: C("#6a5e48"), fog: C("#d8bfa4") },
   { e: 0.35, sun: C("#ffe2bd"), sky: C("#b5cbe2"), ground: C("#76705a"), fog: C("#ccd2d4") },

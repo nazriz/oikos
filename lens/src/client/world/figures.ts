@@ -18,11 +18,11 @@ const box = (w: number, h: number, d: number, x: number, y: number, z: number) =
 export function personGeometry(): THREE.BufferGeometry {
   const trousers: [number, number, number] = [0.22, 0.24, 0.28];
   const g = mergeGeometries([
-    part(box(0.42, 0.6, 0.24, 0, 1.16, 0), 0, [1, 1, 1]),
+    part(box(0.38, 0.6, 0.24, 0, 1.16, 0), 0, [1, 1, 1]),
     part(box(0.16, 0.86, 0.18, -0.105, 0.43, 0), 1, trousers),
     part(box(0.16, 0.86, 0.18, 0.105, 0.43, 0), 2, trousers),
-    part(box(0.1, 0.6, 0.12, -0.27, 1.15, 0), 3, [1, 1, 1]),
-    part(box(0.1, 0.6, 0.12, 0.27, 1.15, 0), 4, [1, 1, 1]),
+    part(box(0.1, 0.6, 0.12, -0.25, 1.15, 0), 3, [0.85, 0.85, 0.85]),
+    part(box(0.1, 0.6, 0.12, 0.25, 1.15, 0), 4, [0.85, 0.85, 0.85]),
     part(new THREE.IcosahedronGeometry(0.12, 1).scale(1, 1.12, 1).translate(0, 1.6, 0), 5, [1, 1, 1]),
     part(box(0.25, 0.08, 0.25, 0, 1.73, -0.01), 6, [0.18, 0.14, 0.11]),
   ])!;
@@ -63,12 +63,15 @@ export function personMaterial(): THREE.MeshStandardMaterial {
         vColor = vec4(1.0);
         vColor.rgb = color;
         #ifdef USE_INSTANCING_COLOR
-          if (aPart < 0.5 || (aPart > 2.5 && aPart < 4.5)) vColor.rgb = instanceColor.rgb;
+          if (aPart < 0.5 || (aPart > 2.5 && aPart < 4.5)) vColor.rgb = instanceColor.rgb * color;
         #endif
         if (aPart > 4.5 && aPart < 5.5) vColor.rgb = aSkin;`)
       .replace("#include <begin_vertex>", `
         vec3 transformed = vec3(position);
         float sw = sin(aWalk.x) * aWalk.y;
+        // A step's rise and fall, twice a stride, and a slight lean into the walk.
+        transformed.y += abs(cos(aWalk.x)) * 0.04 * aWalk.y;
+        transformed.z += position.y * 0.025 * aWalk.y;
         if (aPart > 0.5 && aPart < 2.5) {
           float a = (aPart < 1.5 ? sw : -sw) * 0.5; float py = 0.86;
           float yy = transformed.y - py; float zz = transformed.z;
@@ -119,5 +122,5 @@ export const CLOTHES = {
   other: ["#8c7b6b", "#7a7f72"],
 } as Record<string, string[]>;
 
-export const SKIN = ["#e8c4a8", "#d9a985", "#c08a64", "#9a6a48", "#6e4a33", "#f0d2bb"].map((h) => new THREE.Color(h));
+export const SKIN = ["#d4a888", "#c4926e", "#a87552", "#86593b", "#5e3f2b", "#dcb699"].map((h) => new THREE.Color(h));
 export const PAINT = ["#2f3a45", "#7c2a2a", "#c8c6c0", "#3e4f43", "#1f2a3a", "#8a8d90", "#5a4a3a", "#e4e1da", "#30466b", "#6b6f72"].map((h) => new THREE.Color(h));
