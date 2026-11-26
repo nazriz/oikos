@@ -8,8 +8,8 @@ import { AmbientLight, COORDINATE_SYSTEM, DirectionalLight, LightingEffect, Line
 import type { OrbitViewState, PickingInfo } from "@deck.gl/core";
 import { ArcLayer, BitmapLayer, ColumnLayer, LineLayer, PathLayer, ScatterplotLayer, SolidPolygonLayer, TextLayer } from "@deck.gl/layers";
 import { useLens } from "../state";
-import { hash01, loadCity, strHash, tripOf, type CityData, type TownStructure } from "./data";
-import { along, hex, mix, PAL, paintGround, rect, Roads, shapeOf, treesOf, WHERE_LABEL, type RGBA, type Shape } from "./scene";
+import { hash01, loadCity, personRows, placeAt, strHash, tripOf, type CityData } from "./data";
+import { along, hex, mix, PAL, paintBeyond, paintGround, rect, Roads, shapeOf, treesOf, WHERE_LABEL, type RGBA, type Shape } from "./scene";
 import { skyAt } from "./sky";
 import { Panel, Tooltip, Clock, type Overlays, type HoverInfo, DEFAULT_OVERLAYS, Card } from "./Panel";
 import { CITY_CSS } from "./style";
@@ -20,31 +20,26 @@ const MAX_TRIP = 3 * 3600;
 const ACT_WINDOW = 7 * DAY;
 
 export interface CityViewProps {
-  /** The run's key; defaults to the open run in the shared state. */
+  /** The run's key; defaults to the open run in the shared state. (`run` is the same, as the shell's map slot passes it.) */
   runKey?: string;
+  run?: string;
+  /** Show the selection card on the map (default true; the shell's inspector drawer may stand in for it). */
+  card?: boolean;
   /** Where the bundle is served; defaults to `/api/run/<key>`. */
   base?: string;
   /** Start the camera here instead of framed on the town (zoom, rotationX = tilt, rotationOrbit = turn, target in metres). */
   camera?: Partial<{ zoom: number; rotationX: number; rotationOrbit: number; target: [number, number, number] }>;
 }
 
-export function CityView({ runKey, base, camera }: CityViewProps) {
-  const run = useLens((s) => s.run);
-  const key = runKey ?? run;
+export function CityView({ runKey, run: runProp, base, camera, card = true }: CityViewProps) {
+  const open = useLens((s) => s.run);
+  const key = runKey ?? runProp ?? open;
   const url = base ?? (key ? `/api/run/${encodeURIComponent(key)}` : null);
-  const [city, setCity] = useState<CityData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!url) return;
-    let live = true;
-    setCity(null); setError(null);
-    loadCity(url).then((c) => { if (live) setCity(c); }, (e) => { if (live) setError(String(e?.message ?? e)); });
-    return () => { live = false; };
-  }, [url]);
+  const { city, error } = useCity(url);
   return (
     <div className="lens-city">
       <style>{CITY_CSS}</style>
-      {city ? <Map city={city} camera={camera} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : url ? <><div className="lc-spin" />Drawing the town</> : "No run open"}</div>}
+      {city ? <Map city={city} camera={camera} card={card} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : url ? <><div className="lc-spin" />Drawing the town</> : "No run open"}</div>}
     </div>
   );
 }
@@ -58,6 +53,8 @@ interface Built {
   lamps: Float32Array;
   trees: Float32Array;
   ground: HTMLCanvasElement | OffscreenCanvas | ImageBitmap;
+  /** The land beyond the district: fades out to the backdrop. */
+  beyond: HTMLCanvasElement | OffscreenCanvas;
   roads: Roads;
   /** Per person: jitter inside their building (fractions of footprint). */
   jx: Float32Array; jy: Float32Array; jz: Float32Array;
@@ -111,7 +108,7 @@ function build(c: CityData): Built {
   return {
     shapes, boxes, parks,
     windows: { pos: new Float32Array(wp), owner: new Uint32Array(wo), h: new Float32Array(wh), n: wo.length },
-    lamps: new Float32Array(lamps), trees: treesOf(town), ground: paintGround(town), roads: new Roads(town), jx, jy, jz, disrepairMax, labels,
+    lamps: new Float32Array(lamps), trees: treesOf(town), ground: paintGround(town), beyond: paintBeyond(), roads: new Roads(town), jx, jy, jz, disrepairMax, labels,
   };
 }
 
@@ -133,7 +130,22 @@ function fitZoom(w: number, h: number, metresW: number, metresH: number) {
   return Math.log2(Math.min(w / metresW, h / metresH));
 }
 
-function Map({ city, camera }: { city: CityData; camera?: CityViewProps["camera"] }) {
+/** The city's data for a bundle URL, loaded once and shared (the map and the inspector read the same). */
+const cityCache = new globalThis.Map<string, Promise<CityData>>();
+export function useCity(url: string | null): { city: CityData | null; error: string | null } {
+  const [state, setState] = useState<{ city: CityData | null; error: string | null; url: string | null }>({ city: null, error: null, url: null });
+  useEffect(() => {
+    if (!url) return;
+    let live = true;
+    let p = cityCache.get(url);
+    if (!p) { p = loadCity(url); cityCache.set(url, p); p.catch(() => cityCache.delete(url)); }
+    p.then((c) => { if (live) setState({ city: c, error: null, url }); }, (e) => { if (live) setState({ city: null, error: String(e?.message ?? e), url }); });
+    return () => { live = false; };
+  }, [url]);
+  return state.url === url ? state : { city: null, error: null };
+}
+
+function Map({ city, camera, card }: { city: CityData; camera?: CityViewProps["camera"]; card: boolean }) {
   const t = useLens((s) => s.t);
   const selection = useLens((s) => s.selection);
   const hovered = useLens((s) => s.hovered);
@@ -270,16 +282,21 @@ function Map({ city, camera }: { city: CityData; camera?: CityViewProps["camera"
     const pools: { p: [number, number]; r: number; a: number }[] = [];
     for (const i of B.boxes) {
       const k = W.count[i]!;
-      if (k > 0) pools.push({ p: [B.shapes[i]!.cx, B.shapes[i]!.cy], r: 14 + Math.min(30, Math.sqrt(k) * 6), a: Math.min(1, 0.3 + k / 12) });
+      if (k > 0) pools.push({ p: [B.shapes[i]!.cx, B.shapes[i]!.cy], r: 10 + Math.min(20, Math.sqrt(k) * 4.5), a: Math.min(1, 0.3 + k / 12) });
     }
-    return { col, pools };
+    return { col, pools, data: { length: n, attributes: { getPosition: { value: B.windows.pos, size: 3 }, getFillColor: { value: col, size: 4, normalized: true } } } };
   }, [ver, sky.night, B, city]);
 
-  // ---- Static layers ----
-  const staticLayers = useMemo(() => {
-    const W = town.ground.w * cell, H = town.ground.h * cell;
-    return { W, H };
-  }, [town, cell]);
+  // ---- Static data (kept by reference, so deck.gl does not recompute it each frame) ----
+  const staticLayers = useMemo(() => ({
+    W: town.ground.w * cell, H: town.ground.h * cell,
+    trees: { length: B.trees.length / 4 },
+    lamps: { length: B.lamps.length / 3, attributes: { getPosition: { value: B.lamps, size: 3 } } },
+    wildlife: { length: town.wildlife.cells.length / 4 },
+    nets: town.networks.filter((l) => l.mode !== "road"),
+    labels0: B.labels.filter((l) => l.tier === 0),
+    labels1: B.labels,
+  }), [town, cell, B]);
 
   const buildingColor = useCallback((i: number): RGBA => {
     const s = town.structures[i]!;
@@ -296,6 +313,32 @@ function Map({ city, camera }: { city: CityData; camera?: CityViewProps["camera"
 
   const visibleBoxes = useMemo(() => B.boxes.filter((i) => { const s = town.structures[i]!; return s.started === undefined || s.started <= t; }), [B, town, Math.floor(t / 3600)]);
   const underWay = (i: number) => { const s = town.structures[i]!; return s.started !== undefined && (s.completed === undefined || s.completed > t); };
+  const roofBoxes = useMemo(() => visibleBoxes.filter((i) => !underWay(i)), [visibleBoxes]);
+
+  // The selected person's day so far: each move since midnight, along the roads.
+  const trail = useMemo(() => {
+    if (selP < 0) return [];
+    const rows = personRows(city)[selP]!;
+    const day0 = Math.floor(t / DAY) * DAY;
+    const out: { path: [number, number, number][]; done: boolean }[] = [];
+    const tmp: [number, number] = [0, 0];
+    for (const r of rows) {
+      if (city.rows.k[r]! >= 0 || city.rows.t[r]! > t) continue;
+      const nx = city.nextIn[r]!;
+      if (nx < 0 || city.rows.t[nx]! < day0) continue;
+      const a = city.rows.s[r]!, b = city.rows.s[nx]!;
+      if (a < 0 || b < 0 || a === b) continue;
+      const route = B.roads.route(town.structures[a]!, town.structures[b]!);
+      const t1 = city.rows.t[r]!, t2 = city.rows.t[nx]!;
+      const f = t >= t2 ? 1 : (t - t1) / Math.max(1, t2 - t1);
+      const path: [number, number, number][] = [];
+      for (let i = 0; i < route.pts.length && route.cum[i]! <= f * route.len; i++) path.push([route.pts[i]![0], route.pts[i]![1], 1.2]);
+      along(route, f, tmp);
+      path.push([tmp[0], tmp[1], 1.2]);
+      if (path.length > 1) out.push({ path, done: f >= 1 });
+    }
+    return out;
+  }, [selP, city, B, town, Math.floor(t / 120)]);
 
   const actsNow = useMemo(() => {
     return town.acts.filter((a) => (a.t <= t && a.t > t - ACT_WINDOW) || a.seq === selAct);
@@ -323,6 +366,11 @@ function Map({ city, camera }: { city: CityData; camera?: CityViewProps["camera"
 
   const layers = [
     new BitmapLayer({
+      id: "beyond", image: B.beyond as any, coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+      bounds: [-staticLayers.W * 1.5, -staticLayers.H * 2.5, staticLayers.W * 2.5, staticLayers.H * 1.5],
+      tintColor: sky.groundTint, parameters: { depthWriteEnabled: false },
+    }),
+    new BitmapLayer({
       id: "ground", image: B.ground as any, bounds: [0, -staticLayers.H, staticLayers.W, 0], coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
       tintColor: sky.groundTint, textureParameters: { minFilter: "linear", magFilter: "linear", mipmapFilter: "linear", addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge" } as any,
     }),
@@ -344,7 +392,7 @@ function Map({ city, camera }: { city: CityData; camera?: CityViewProps["camera"
       getFillColor: [92, 128, 84, 255], extruded: false, pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 40],
     }),
     new ColumnLayer({
-      id: "trees", data: { length: B.trees.length / 4 }, diskResolution: 7, extruded: true,
+      id: "trees", data: staticLayers.trees, diskResolution: 7, extruded: true,
       getPosition: (_: any, { index }: any) => [B.trees[index * 4]!, B.trees[index * 4 + 1]!, 0],
       getElevation: (_: any, { index }: any) => B.trees[index * 4 + 2]!,
       getFillColor: (_: any, { index }: any) => { const r = hash01(index, 17); return [52 + r * 30, 86 + r * 34, 50 + r * 18, 255]; },
@@ -360,7 +408,7 @@ function Map({ city, camera }: { city: CityData; camera?: CityViewProps["camera"
       updateTriggers: { getFillColor: [overlays.colour, selS, Math.floor(t / 3600)], getElevation: Math.floor(t / 3600) },
     }),
     new SolidPolygonLayer({
-      id: "roofs", data: visibleBoxes.filter((i) => !underWay(i)), extruded: true,
+      id: "roofs", data: roofBoxes, extruded: true,
       getPolygon: (i: number) => { const sh = B.shapes[i]!; return rect(sh.cx, sh.cy, sh.fw - 1.6, sh.fh - 1.6, sh.height); },
       getElevation: (i: number) => B.shapes[i]!.roof,
       getFillColor: (i: number) => { const c = buildingColor(i); return [c[0] * 0.7, c[1] * 0.68, c[2] * 0.66, 255]; },
@@ -369,27 +417,27 @@ function Map({ city, camera }: { city: CityData; camera?: CityViewProps["camera"
     }),
     // Night: street lamps, lit windows, pools of light.
     sky.night > 0.02 && new ScatterplotLayer({
-      id: "lamps", data: { length: B.lamps.length / 3, attributes: { getPosition: { value: B.lamps, size: 3 } } },
+      id: "lamps", data: staticLayers.lamps,
       getFillColor: [255, 196, 120, 38 * sky.night], getRadius: 3.2, radiusUnits: "meters", billboard: false, updateTriggers: { getFillColor: sky.night },
       parameters: ADDITIVE,
     }),
     sky.night > 0.02 && new ScatterplotLayer({
       id: "pools", data: glow.pools, getPosition: (d: any) => [d.p[0], d.p[1], 0.5], getRadius: (d: any) => d.r, radiusUnits: "meters", billboard: false,
-      getFillColor: (d: any) => [255, 170, 90, 46 * d.a * sky.night], parameters: ADDITIVE, updateTriggers: { getFillColor: sky.night },
+      getFillColor: (d: any) => [255, 170, 90, 26 * d.a * sky.night], parameters: ADDITIVE, updateTriggers: { getFillColor: sky.night },
     }),
     sky.night > 0.02 && new ScatterplotLayer({
-      id: "windows", data: { length: B.windows.n, attributes: { getPosition: { value: B.windows.pos, size: 3 }, getFillColor: { value: glow.col, size: 4, normalized: true } } },
+      id: "windows", data: glow.data,
       getRadius: 1.1, radiusUnits: "meters", radiusMinPixels: 0.8, radiusMaxPixels: 5, billboard: true, parameters: { depthWriteEnabled: false },
     }),
     // Overlays.
     overlays.networks && new LineLayer({
-      id: "networks", data: town.networks.filter((l) => l.mode !== "road"),
+      id: "networks", data: staticLayers.nets,
       getSourcePosition: (l: any) => [(l.a[0] + 0.5) * cell + NET_OFF[l.mode]!, -(l.a[1] + 0.5) * cell + NET_OFF[l.mode]!, 0.6],
       getTargetPosition: (l: any) => [(l.b[0] + 0.5) * cell + NET_OFF[l.mode]!, -(l.b[1] + 0.5) * cell + NET_OFF[l.mode]!, 0.6],
       getColor: (l: any) => hex(NET_COL[l.mode] ?? "#cccccc", 200), getWidth: 2, widthUnits: "pixels", pickable: true,
     }),
     overlays.wildlife && new ScatterplotLayer({
-      id: "wildlife", data: { length: town.wildlife.cells.length / 4 },
+      id: "wildlife", data: staticLayers.wildlife,
       getPosition: (_: any, { index }: any) => { const c = town.wildlife.cells; return [(c[index * 4]! + 0.2 + 0.6 * hash01(index, 1)) * cell, -(c[index * 4 + 1]! + 0.2 + 0.6 * hash01(index, 2)) * cell, 1]; },
       getRadius: (_: any, { index }: any) => 3 + Math.sqrt(town.wildlife.cells[index * 4 + 3]!) * 2.5,
       getFillColor: (_: any, { index }: any) => hex(SPECIES_COL[town.wildlife.cells[index * 4 + 2]! % SPECIES_COL.length]!, 210),
@@ -423,6 +471,10 @@ function Map({ city, camera }: { city: CityData; camera?: CityViewProps["camera"
       getRadius: 0.7, radiusUnits: "meters", radiusMinPixels: 0.9, radiusMaxPixels: 3, billboard: true, pickable: true, parameters: { depthWriteEnabled: false },
     }),
     // Selection.
+    trail.length > 0 && new PathLayer({
+      id: "sel-trail", data: trail, getPath: (d: any) => d.path, getColor: (d: any) => hex(PAL.seat, d.done ? 150 : 255), getWidth: 2.2, widthUnits: "pixels",
+      capRounded: true, jointRounded: true, parameters: { depthCompare: "always" },
+    }),
     selS >= 0 && new PathLayer({
       id: "sel-outline", data: [selS], getPath: (i: number) => { const sh = B.shapes[i]!; const r = rect(sh.cx, sh.cy, sh.fw + 3, sh.fh + 3, 0.6); return [...r, r[0]!]; },
       getColor: hex(PAL.seat), getWidth: 2, widthUnits: "pixels",
@@ -437,7 +489,7 @@ function Map({ city, camera }: { city: CityData; camera?: CityViewProps["camera"
       updateTriggers: { getPosition: t },
     }),
     overlays.labels && new TextLayer({
-      id: "labels", data: B.labels.filter((l) => l.tier === 0 || (view.zoom as number) > 0.9), getPosition: (l: any) => l.pos, getText: (l: any) => l.text, getSize: (l: any) => l.size,
+      id: "labels", data: (view.zoom as number) > 0.9 ? staticLayers.labels1 : staticLayers.labels0, getPosition: (l: any) => l.pos, getText: (l: any) => l.text, getSize: (l: any) => l.size,
       getColor: (l: any) => (l.tier === 0 ? [232, 230, 225, 150] : [232, 230, 225, 215]), fontFamily: "Inter Variable, Inter, system-ui, sans-serif", fontWeight: 500,
       characterSet: "auto", billboard: true, getTextAnchor: "middle", getAlignmentBaseline: "bottom", fontSettings: { sdf: true, fontSize: 64, buffer: 6 },
       outlineWidth: 3, outlineColor: [11, 15, 23, 200], parameters: { depthCompare: "always" },
@@ -475,7 +527,7 @@ function Map({ city, camera }: { city: CityData; camera?: CityViewProps["camera"
       <Clock t={t} sky={sky} town={town} />
       <Panel overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />
       {tip && <Tooltip tip={tip} city={city} t={t} name={(i) => structureName(city, i)} />}
-      <Card city={city} t={t} selection={selection} name={(i) => structureName(city, i)} onClose={() => select(null)} />
+      {card && <Card city={city} t={t} selection={selection} name={(i) => structureName(city, i)} onClose={() => select(null)} />}
     </div>
   );
 }
@@ -516,33 +568,6 @@ function pickToSelection(c: CityData, info: PickingInfo): ReturnType<typeof useL
   if (id === "people") { const q = info.index; return { kind: "person", id: c.people.people[q]![0] }; }
   if (id === "acts" || id === "act-hits") return { kind: "act", seq: (info.object as any).act.seq };
   return null;
-}
-
-/** Where a person was at moment t: the structure they were in, or the one they had just left (else home). */
-export function placeAt(c: CityData, person: string, t: number): number {
-  const q = c.pById.get(person);
-  if (q === undefined) return -1;
-  // The rows are in time order; scan this person's rows backward from the first after t.
-  const rows = personRows(c)[q]!;
-  let lo = 0, hi = rows.length;
-  while (lo < hi) { const m = (lo + hi) >> 1; if (c.rows.t[rows[m]!]! <= t) lo = m + 1; else hi = m; }
-  const r = rows[lo - 1];
-  if (r !== undefined) return c.rows.s[r]!;
-  const home = c.people.people[q]![5];
-  return home >= 0 ? c.sMap[home]! : -1;
-}
-const rowsCache = new WeakMap<CityData, Int32Array[]>();
-export function personRows(c: CityData): Int32Array[] {
-  let r = rowsCache.get(c);
-  if (r) return r;
-  const n = c.people.people.length;
-  const counts = new Int32Array(n);
-  for (let i = 0; i < c.rows.n; i++) counts[c.rows.p[i]!]!++;
-  r = Array.from({ length: n }, (_, q) => new Int32Array(counts[q]!));
-  const fill = new Int32Array(n);
-  for (let i = 0; i < c.rows.n; i++) { const q = c.rows.p[i]!; r[q]![fill[q]!++] = i; }
-  rowsCache.set(c, r);
-  return r;
 }
 
 function personXY(c: CityData, B: Built, q: number, t: number): [number, number] | undefined {

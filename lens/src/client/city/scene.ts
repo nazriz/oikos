@@ -282,6 +282,28 @@ export function paintGround(town: TownBundle, px = 8): HTMLCanvasElement | Offsc
   return canvas;
 }
 
+/** The land beyond the district, a quiet field that fades into the backdrop (the world ends at its edge; this only
+ * keeps the map from looking like a tile in space). The district fills the middle quarter. */
+export function paintBeyond(): HTMLCanvasElement | OffscreenCanvas {
+  const N = 256;
+  const canvas: HTMLCanvasElement | OffscreenCanvas = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(N, N) : Object.assign(document.createElement("canvas"), { width: N, height: N });
+  const ctx = canvas.getContext("2d") as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+  const img = ctx.createImageData(N, N);
+  const base = hex("#4f5f45");
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    // Distance from the district's square (the middle fifth), in the margin.
+    const dx = Math.max(0, Math.abs(x / N - 0.5) - 0.125) / 0.375, dy = Math.max(0, Math.abs(y / N - 0.5) - 0.125) / 0.375;
+    const d = Math.min(1, Math.hypot(dx, dy));
+    const n = noise2(x / 10, y / 10, 77) * 0.6 + noise2(x / 3, y / 3, 78) * 0.4;
+    const shade = 0.55 + n * 0.25;
+    const o = (y * N + x) * 4;
+    img.data[o] = base[0] * shade; img.data[o + 1] = base[1] * shade; img.data[o + 2] = base[2] * shade;
+    img.data[o + 3] = 255 * Math.pow(1 - d, 2) * 0.6;
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
 /** Trees for the woodland and parks: a few per cell, jittered. [x, y, height, radius] in metres. */
 export function treesOf(town: TownBundle, perCell = 2): Float32Array {
   const { w, h, cell } = town.ground;

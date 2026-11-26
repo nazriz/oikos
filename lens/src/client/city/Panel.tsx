@@ -2,7 +2,7 @@
 import { useState } from "react";
 import type { Selection } from "../state";
 import type { CityData, TownBundle } from "./data";
-import { tripOf } from "./data";
+import { personRows, tripOf } from "./data";
 import { PAL, WHERE_LABEL } from "./scene";
 import type { Sky } from "./sky";
 
@@ -139,7 +139,7 @@ function ageAt(c: CityData, q: number, t: number) {
   return Math.floor((t - born) / (365.25 * DAY));
 }
 
-function StructureBody({ c, i, t, name, full }: { c: CityData; i: number; t: number; name: (i: number) => string; full?: boolean }) {
+export function StructureBody({ c, i, t, name, full }: { c: CityData; i: number; t: number; name: (i: number) => string; full?: boolean }) {
   const s = c.town.structures[i]!;
   const who = inside(c, i);
   const byKind: Record<string, number> = {};
@@ -168,7 +168,7 @@ function StructureBody({ c, i, t, name, full }: { c: CityData; i: number; t: num
   );
 }
 
-function PersonBody({ c, q, t, name }: { c: CityData; q: number; t: number; name: (i: number) => string }) {
+export function PersonBody({ c, q, t, name, full }: { c: CityData; q: number; t: number; name: (i: number) => string; full?: boolean }) {
   const p = c.people.people[q]!;
   const s = c.where.at[q]!;
   const kind = s >= 0 ? c.people.spaceKinds[c.where.kind[q]!] ?? "" : "";
@@ -191,7 +191,30 @@ function PersonBody({ c, q, t, name }: { c: CityData; q: number; t: number; name
         {home >= 0 && <><dt>First home</dt><dd>{name(home)}</dd></>}
         {hh > 1 && <><dt>Household</dt><dd>{hh} people</dd></>}
       </dl>
+      {full && <Today c={c} q={q} t={t} name={name} />}
     </>
+  );
+}
+
+/** The person's day so far, from the log's occupied/vacated rows. */
+function Today({ c, q, t, name }: { c: CityData; q: number; t: number; name: (i: number) => string }) {
+  const day0 = Math.floor(t / DAY) * DAY;
+  const items: { t: number; text: string; kind: string }[] = [];
+  for (const r of personRows(c)[q] ?? []) {
+    const rt = c.rows.t[r]!;
+    if (rt < day0 || rt > t) continue;
+    const k = c.rows.k[r]!, s = c.rows.s[r]!;
+    const kind = c.people.spaceKinds[Math.abs(k) - 1] ?? "";
+    items.push({ t: rt, text: `${k > 0 ? "into" : "left"} ${s >= 0 ? name(s) : "?"}`, kind: k > 0 ? kind : "moving" });
+  }
+  if (!items.length) return <div className="lc-note">No moves yet today.</div>;
+  return (
+    <div className="lc-today">
+      <div className="lc-sec-title" style={{ marginTop: 10 }}>Today</div>
+      {items.map((it, i) => (
+        <div key={i} className="lc-row"><span className="lc-sw dot" style={{ background: PAL.where[it.kind] ?? PAL.where.other }} /><span>{it.text}</span><span className="lc-num">{fmtDay(it.t).clock}</span></div>
+      ))}
+    </div>
   );
 }
 
@@ -228,7 +251,7 @@ export function Card({ city, t, selection, name, onClose }: { city: CityData; t:
   let body: any = null;
   if (selection?.kind === "structure") { const i = city.sById.get(selection.id); if (i !== undefined) body = <StructureBody c={city} i={i} t={t} name={name} full />; }
   else if (selection?.kind === "entity") { const i = city.town.entities[selection.id]?.structure; if (i !== undefined) body = <StructureBody c={city} i={i} t={t} name={name} full />; }
-  else if (selection?.kind === "person") { const q = city.pById.get(selection.id); if (q !== undefined) body = <PersonBody c={city} q={q} t={t} name={name} />; }
+  else if (selection?.kind === "person") { const q = city.pById.get(selection.id); if (q !== undefined) body = <PersonBody c={city} q={q} t={t} name={name} full />; }
   else if (selection?.kind === "act") { const a = city.town.acts.find((x) => x.seq === selection.seq); if (a) body = <ActBody a={a} t={t} />; }
   if (!body) return null;
   return (

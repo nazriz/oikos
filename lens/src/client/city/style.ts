@@ -84,6 +84,9 @@ export const CITY_CSS = `
 .lens-city .lc-pill.applied { color: #9fe0b0; } .lens-city .lc-pill.refused { color: var(--lc-flag); }
 .lens-city .lc-quote { margin-top: 8px; padding-left: 9px; border-left: 2px solid color-mix(in srgb, var(--lc-seat) 60%, transparent); color: #d9d6cf; font-size: 12px; line-height: 1.45; white-space: pre-line; max-height: 9em; overflow: hidden; }
 
+.lens-city.lc-insp { position: static; height: auto; background: transparent; overflow: visible; }
+.lens-city .lc-today { display: grid; gap: 3px; margin-top: 4px; }
+.lens-city .lc-today .lc-row { font-size: 12px; }
 @media (max-width: 640px) {
   .lens-city .lc-clock { top: 10px; left: 12px; }
   .lens-city .lc-clock-time { font-size: 26px; }

@@ -158,3 +158,31 @@ export function strHash(s: string): number {
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
   return h >>> 0;
 }
+
+/** Where a person was at moment t: the structure they were in, or the one they had just left (else home). */
+export function placeAt(c: CityData, person: string, t: number): number {
+  const q = c.pById.get(person);
+  if (q === undefined) return -1;
+  // The rows are in time order; scan this person's rows backward from the first after t.
+  const rows = personRows(c)[q]!;
+  let lo = 0, hi = rows.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (c.rows.t[rows[m]!]! <= t) lo = m + 1; else hi = m; }
+  const r = rows[lo - 1];
+  if (r !== undefined) return c.rows.s[r]!;
+  const home = c.people.people[q]![5];
+  return home >= 0 ? c.sMap[home]! : -1;
+}
+const rowsCache = new WeakMap<CityData, Int32Array[]>();
+export function personRows(c: CityData): Int32Array[] {
+  let r = rowsCache.get(c);
+  if (r) return r;
+  const n = c.people.people.length;
+  const counts = new Int32Array(n);
+  for (let i = 0; i < c.rows.n; i++) counts[c.rows.p[i]!]!++;
+  r = Array.from({ length: n }, (_, q) => new Int32Array(counts[q]!));
+  const fill = new Int32Array(n);
+  for (let i = 0; i < c.rows.n; i++) { const q = c.rows.p[i]!; r[q]![fill[q]!++] = i; }
+  rowsCache.set(c, r);
+  return r;
+}
+
