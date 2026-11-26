@@ -16329,3 +16329,37 @@ Naz saw flicker, and set the rule "a professional research tool that is a joy to
   at 80/300/900 m: 39/27/110 on main, 32/18/6 after; playing slow/fast (320x200): 5.7/4.5 before, 1.2/0.1 after; WebKit
   after: 0/0.5/0 orbiting, 2.3/3.8/0.3 playing slow/normal/fast. The remaining blinks are sub-pixel detail far off.
 - **Revisit if** the shell gains one shared "light clock" (lens-smooth's light.ts): use it in place of the engine's own.
+## 2026-11-26 Lens: way-finding (`src/client/nav`)
+
+Naz: "the ability for a human to really jump in and out of things and really understand what's going on." Lens's
+navigation, so nobody is lost, and the lead's rule that it is a professional tool that does not get in the way.
+- **Where am I.** The run bar's second line is a trail: Library, the run ("GLM 5.3, town 7"), the day (and turn, when one
+  is open), the person or building open; each step goes back to it. The page's "This page answers" line moved into
+  "About this view" (it says the same, and the bar needed the room).
+- **Selections are history.** Every selection is a browser history entry (pushState), carrying the trail in
+  history.state, so Back and Forward go through what was opened; moving in time only rewrites the current entry
+  (replaceQuery, which now keeps history.state). Several selects in one click make one entry. **Revisit if** people find
+  Back too fine-grained (then: only push when the kind changes).
+- **Esc steps out one level**: a person or building opened from a turn goes back to that turn; a turn closes; an open
+  popover, the palette, the glossary, the walkthrough and the key sheet each close first (a popover marks itself
+  `data-esc-own`). The turn reader keeps its own Esc, j/k and [ ]; the global ones stand aside while it is open.
+- **Keys** (one sheet on `?`, also the timeline's Keys button): j/k turns, [ ] power grabs, g then l/f/m for the library,
+  findings, moments. The timeline's speed moved from [ ] to - and =, since [ ] means power grabs everywhere else.
+- **Same town, other mayors.** The switcher beside the run's step in the trail lists the runs of the same town (same seed,
+  same fork day, same post): other models with the same instructions, the rule-based twin, and this model under other
+  instructions, one per model (finished first, then the same study folder, then the most recent). It opens the same
+  moment, and the same person, building or organisation (the towns share them); a turn is the run's own and is dropped.
+- **Hover cards** (`data-peek="<selection token>"` on anything that names a thing): after 300 ms, beside the thing and
+  never over it or the pointer, with "Go there". Off on touch screens. Story and city put the attribute on their names.
+- **About this view**: a corner panel of plain sentences that change with what is open (the town, a turn, a power grab,
+  an act, a person, a building with how many live there and how many are inside now). Open by default in Story mode,
+  folded in Researcher mode, the viewer's choice kept.
+- **One prompt at a time** (the lead's order): `useLens().prompt` is the walkthrough, then the "Play the first week"
+  bar, then the map's first-use hint (once per browser); each goes at the first interaction and the next follows
+  (`nav/prompts.ts`).
+- **Carry on.** The last run, moment and selection are kept in this browser (`lens.last`); the library offers them back.
+- **nav-2 (lead's review).** Other mayors leaves out scripted controls and rope tests (story's `isControl`, plus the
+  older pilots' control names); Researcher mode lists them apart as "Test mayors". The inspector's small heading says
+  what the thing is in words.ts's `KIND_WORDS` ("Building", "Organisation", "Resident"), never the log's "structure". On
+  a phone the inspector and the turn reader fill the screen below the run bar (its visible bottom, measured into
+  `--run-bar-h`), so the trail and Other mayors stay in reach.

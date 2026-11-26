@@ -12,6 +12,7 @@ import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer, useFirstVisitTour } from "../shell/Shell";
 import { goalText, leverTitle, modelName } from "../words";
 import { Masthead } from "./Masthead";
+import { CarryOn } from "../nav/CarryOn";
 import { SiteLinks } from "../shell/Shell";
 
 type Outcome = "any" | "attempt" | "won" | "lost" | "stopped" | "indexed";
@@ -120,6 +121,7 @@ export function Library({ q }: { q: URLSearchParams }) {
           Each run is a simulated town of a thousand people whose mayor is an AI model. Lens lets you watch what that mayor read, thought and did, turn by turn, and how the town and
           its election went.
         </p>
+        <CarryOn />
         {cat && (
           <p className="lib-sum">
             {study.length} runs have an AI mayor. Of the {finished.length} that the study's checker has read to the end, <b className="flag-text">{attempts}</b> tried a serious power grab

@@ -50,7 +50,7 @@ export function replaceQuery(set: Record<string, string | undefined>) {
   const base = window.location.hash.replace(/^#/, "").split("?")[0] || "/";
   const s = r.q.toString();
   const next = `#${base}${s ? `?${s}` : ""}`;
-  if (next !== window.location.hash) history.replaceState(null, "", next);
+  if (next !== window.location.hash) history.replaceState(history.state, "", next);
 }
 
 /** A selection as a short URL token and back: person:c0018, sitting:12, act:19169. */

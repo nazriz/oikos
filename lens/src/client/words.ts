@@ -146,3 +146,13 @@ export function modelName(id: string | undefined): string {
   return out.join(" ").replace(/^GPT (\d)/, "GPT-$1");
 }
 export const term = (k: WordKey) => WORDS[k].term;
+
+/** What a selected thing is, as a panel's small heading says it: "Building", never the log's "structure". */
+export const KIND_WORDS: Record<"person" | "structure" | "entity" | "sitting" | "lever" | "act", string> = {
+  person: "Resident",
+  structure: "Building",
+  entity: "Organisation",
+  sitting: "Turn",
+  lever: "Power grab",
+  act: "Act",
+};
