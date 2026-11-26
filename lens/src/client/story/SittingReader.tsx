@@ -5,7 +5,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, loadSystem, useAsync, when, worldDay, usd, tokens, plural, human, STAGE, type SeatAct, type SeatDraft, type SeatJson, type SeatLever, type SittingDetail, type SittingTurn } from "./data";
-import { Hi, Md, MarksContext, hasQuery, type Marks } from "./text";
+import { Hi, Md, MarksContext, hasQuery, openPerson, type Marks } from "./text";
 import { leverTitle } from "../words";
 import { useResearcher } from "../mode";
 import { firstPoll } from "./moments-data";
@@ -92,7 +92,7 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
   };
 
   return (
-    <div className={`st-reader ${researcher ? "researcher" : "story"}`} ref={root}>
+    <div className={`st-reader ${researcher ? "researcher" : "story"}`} ref={root} onClick={(e) => openPerson(e, select)}>
       <div className="st-rbar">
         <div>
           <h2>Turn {s.i + 1} of {seat.sittings.length}, day {worldDay(s.t)} at {when(s.t).split(", ").at(-1)}{s.kind === "code" ? " (rule-based mayor)" : ""}</h2>
