@@ -16234,3 +16234,24 @@ timeline as track `power.appointments`; an appointment of kin of the seat is mar
 seat's child c0571 is appointed editor and electoral commissioner on day 155, and the chart ties both posts to the
 mayor in rose. **Revisit if** the world records ties beyond family and household (employment, debts): add them as
 further kinds of line.
+
+## 2026-11-26 Lens city: presentation and recording
+
+**Decided:**
+- **Present.** Present (a button in the open Layers panel, or the `present` prop) asks for full screen and hides the
+  map's chrome. A caption bar says what is happening, in this order of precedence:
+  1. A lever of the study's reader in the last 12 h, attempted or executed only.
+  2. The election declared in the last day.
+  3. The seat's current sitting in its own words (its gist and first words) while it is under 1.5 days old.
+  4. The time of day.
+
+  The clock plays at 1 h/s. The camera eases toward what the seat's acts touched in the last 12 h, else the town,
+  with a slow drift round. A hand on the map holds the camera for 4 s. Esc leaves and restores the clock's play
+  and speed.
+- **Record.** Record plays the tour in presentation and records it. Through the tour the town moves at 15 min/s. The
+  recording copies each rendered frame of the map's canvas to a 2D canvas and draws the caption onto it.
+  `captureStream(30)` feeds a MediaRecorder: MP4 (H.264) where the browser offers it, else WebM (VP9 or VP8), at
+  8 Mb/s. The size is the map's own (at most 1920 wide), set from the first full frame. The file downloads when the
+  tour ends. The sample tour is 70 s, 1280×720 H.264, about 65 MB.
+- **Measured.** In GPU Chrome presentation holds 60 frames a second. The headless software renderer cannot keep up
+  with it (screenshots time out), so presentation is checked in a real window.

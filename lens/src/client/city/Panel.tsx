@@ -52,8 +52,8 @@ export function Clock({ t, sky, town }: { t: number; sky: Sky; town: TownBundle 
 
 const CAT_ORDER = ["residential", "commercial", "industrial", "civic", "education", "health", "utility", "green"];
 
-export function Panel({ twin, open0, overlays, setOverlays, counts, kinds, city, t, arcs, onHome, ev, candCol, papersShown, onTour }: {
-  twin?: boolean; open0: boolean; overlays: Overlays; setOverlays: (o: Overlays) => void; counts: Record<string, number>; kinds: string[]; city: CityData; t: number; arcs: number; onHome: () => void;
+export function Panel({ onPresent, onRecord, twin, open0, overlays, setOverlays, counts, kinds, city, t, arcs, onHome, ev, candCol, papersShown, onTour }: {
+  onPresent?: () => void; onRecord?: () => void; twin?: boolean; open0: boolean; overlays: Overlays; setOverlays: (o: Overlays) => void; counts: Record<string, number>; kinds: string[]; city: CityData; t: number; arcs: number; onHome: () => void;
   ev?: ElectionView; candCol: Record<string, string>; papersShown: number[]; onTour?: () => void;
 }) {
   const [open, setOpen] = useState(() => open0 && (typeof window === "undefined" || window.innerWidth > 640));
@@ -68,6 +68,8 @@ export function Panel({ twin, open0, overlays, setOverlays, counts, kinds, city,
       <div className="lc-panel-head">
         <button className="lc-ghost" onClick={() => setOpen(!open)} aria-expanded={open}>{open ? "Layers" : "Layers"}<span className="lc-chev">{open ? "▾" : "▸"}</span></button>
         {onTour && <button className="lc-ghost" onClick={onTour} title="Play the run's key moments">Tour</button>}
+        {open && onPresent && <button className="lc-ghost" onClick={onPresent} title="Full screen, a caption bar, the camera on its own (Esc to leave)">Present</button>}
+        {open && onRecord && <button className="lc-ghost" onClick={onRecord} title="Record the tour as a video (it downloads at the end)">Record</button>}
         <button className="lc-ghost" onClick={onHome} title="Frame the town"><span className="lc-long">Frame town</span><span className="lc-short">Frame</span></button>
       </div>
       {open && (

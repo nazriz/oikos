@@ -12,10 +12,11 @@ import { useLens } from "../state";
 import { hash01, loadCity, personRows, placeAt, strHash, tripOf, type CityData } from "./data";
 import { along, hex, hipFaces, mix, PAL, paintBeyond, paintGround, rect, shadowOf, type Mass, Roads, shapeOf, treesOf, WHERE_LABEL, type RGBA, type Shape } from "./scene";
 import { skyAt } from "./sky";
-import { Panel, Tooltip, Clock, type Overlays, type HoverInfo, DEFAULT_OVERLAYS, Card } from "./Panel";
+import { Panel, Tooltip, Clock, type Overlays, type HoverInfo, DEFAULT_OVERLAYS, Card, fmtDay } from "./Panel";
 import { CITY_CSS } from "./style";
 import { blocksOf, candidateColours, electionView, homeAt, paintHeat, PAPER_GROUPS, papersIn, turnoutByBlock } from "./civic";
-import { Tour, useTourSteps } from "./Tour";
+import { Tour, useSeat, useTourSteps } from "./Tour";
+import { captionAt, download, makeRecorder, PresentBar, PRESENT_CSS, type Caption } from "./Present";
 import { Minimap } from "./Minimap";
 
 const DAY = 86_400;
@@ -33,6 +34,8 @@ export interface CityViewProps {
   layers?: boolean;
   /** Start the tour at this step once the run is read (for demos and the dev page). */
   tour?: number;
+  /** Start presenting ("show") or recording the tour ("record") once the run is read. */
+  present?: "show" | "record";
   /** Start with these overlays set (e.g. { election: true }). */
   overlays?: Partial<Overlays>;
   /** Where the bundle is served; defaults to `/api/run/<key>`. */
@@ -41,15 +44,15 @@ export interface CityViewProps {
   camera?: Partial<{ zoom: number; rotationX: number; rotationOrbit: number; target: [number, number, number] }>;
 }
 
-export function CityView({ runKey, run: runProp, base, camera, card = true, layers = false, tour, overlays }: CityViewProps) {
+export function CityView({ runKey, run: runProp, base, camera, card = true, layers = false, tour, overlays, present }: CityViewProps) {
   const open = useLens((s) => s.run);
   const key = runKey ?? runProp ?? open;
   const url = base ?? (key ? `/api/run/${encodeURIComponent(key)}` : null);
   const { city, error } = useCity(url);
   return (
     <div className="lens-city">
-      <style>{CITY_CSS}</style>
-      {city ? <Map city={city} camera={camera} card={card} layersOpen={layers} base={url} tour0={tour} overlays0={overlays} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : url ? <><div className="lc-spin" />Drawing the town</> : "No run open"}</div>}
+      <style>{CITY_CSS}{PRESENT_CSS}</style>
+      {city ? <Map city={city} camera={camera} card={card} layersOpen={layers} base={url} tour0={tour} overlays0={overlays} present0={present} /> : <div className="lc-loading">{error ? <span className="lc-err">The town could not be read: {error}</span> : url ? <><div className="lc-spin" />Drawing the town</> : "No run open"}</div>}
     </div>
   );
 }
@@ -181,6 +184,7 @@ export interface PaneProps {
   label?: string;
   /** Leave out the panel, tour and clock (the second pane of Two towns). */
   bare?: boolean;
+  present0?: "show" | "record";
 }
 
 /** One map pane over a loaded city (CityView is this plus loading; TwoTowns puts two side by side). */
@@ -188,7 +192,7 @@ export function CityPane(p: PaneProps) {
   return <div className="lens-city"><style>{CITY_CSS}</style><Map {...p} /></div>;
 }
 
-function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedView, sharedOverlays, twin, label, bare }: PaneProps) {
+function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedView, sharedOverlays, twin, label, bare, present0 }: PaneProps) {
   const t = useLens((s) => s.t);
   const selection = useLens((s) => s.selection);
   const hovered = useLens((s) => s.hovered);
@@ -265,6 +269,13 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   const [tour, setTour] = useState<number | null>(null);
   const tourStarted = useRef(false);
   const steps = useTourSteps(base, city);
+  const seat = useSeat(base);
+  // Presentation (a room, a recording): the chrome goes, a caption bar speaks, the camera moves on its own.
+  const [present, setPresent] = useState(false);
+  const recorder = useRef<ReturnType<typeof makeRecorder> | null>(null);
+  const [recording, setRecording] = useState(false);
+  const deckRef = useRef<any>(null);
+  const before = useRef<{ playing: boolean; speed: number } | null>(null);
   const [tourActs, setTourActs] = useState<number[]>([]);
   const hi = useMemo(() => new Set([...(selAct >= 0 ? [selAct] : []), ...(tour !== null ? tourActs : [])]), [selAct, tour, tourActs.join(",")]);
   const hiKey = [...hi].join(",");
@@ -470,6 +481,8 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     const L = useLens.getState();
     L.setPlaying(false);
     L.setT(st.t + 30);
+    // Presenting, the town keeps moving through each step (a quarter of an hour a second).
+    if (present) { L.setSpeed(900); L.setPlaying(true); }
     setTourActs(st.acts);
     if (st.election) { if (tourElection.current === null) tourElection.current = overlays.election; setOverlays((o) => ({ ...o, election: true })); }
     const pts: [number, number][] = [];
@@ -826,18 +839,89 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     select(s);
   }, [city, select]);
 
+  // ---- Presentation ----
+  const caption: Caption | null = present ? (tour !== null && steps[tour] ? { kicker: `${steps[tour]!.kicker} · ${fmtDay(steps[tour]!.t).clock}, day ${fmtDay(steps[tour]!.t).day}`, title: steps[tour]!.title, words: steps[tour]!.words, tone: steps[tour]!.tone === "flag" ? "flag" : steps[tour]!.tone === "election" ? "election" : "seat" } : captionAt(t, seat, town)) : null;
+  const captionRef = useRef<Caption | null>(null);
+  captionRef.current = caption;
+  const manual = useRef(0);
+  const startPresent = (record: boolean) => {
+    const L = useLens.getState();
+    before.current = { playing: L.playing, speed: L.speed };
+    setPresent(true);
+    try { if (!record) wrap.current?.requestFullscreen?.().catch(() => {}); } catch { /* not allowed here */ }
+    if (record) {
+      try { recorder.current = makeRecorder(); setRecording(true); } catch (e) { console.error("recording is not available here", e); }
+      setTour(0);
+    } else {
+      L.setSpeed(3600);
+      L.setPlaying(true);
+    }
+  };
+  const stopPresent = async () => {
+    setPresent(false);
+    setTour(null);
+    const L = useLens.getState();
+    if (before.current) { L.setPlaying(before.current.playing); L.setSpeed(before.current.speed); before.current = null; }
+    try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* ignore */ }
+    const r = recorder.current;
+    recorder.current = null;
+    setRecording(false);
+    if (r) { const blob = await r.stop(); download(blob, `lens-${(base ?? "run").split("/").pop()}-tour.${r.type.includes("mp4") ? "mp4" : "webm"}`); }
+  };
+  const presented = useRef(false);
+  useEffect(() => { if (present0 && !presented.current && (present0 === "show" || steps.length)) { presented.current = true; startPresent(present0 === "record"); } }, [steps.length]);
+  // A recording ends with its tour.
+  const hadTour = useRef(false);
+  useEffect(() => { if (tour !== null) hadTour.current = true; else if (present && recording && hadTour.current) { hadTour.current = false; stopPresent(); } }, [tour]);
+  useEffect(() => {
+    if (!present) return;
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape" && tour === null) stopPresent(); };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [present, tour]);
+  // The camera on its own (not in the tour, which moves it itself): toward what the seat's acts touched in the last
+  // 12 hours, else the town; a slow drift round; a hand on the map holds it for a few seconds.
+  const autoRef = useRef({ arcs, home, t });
+  autoRef.current = { arcs, home, t };
+  useEffect(() => {
+    if (!present || tour !== null) return;
+    let raf = 0;
+    const step = () => {
+      raf = requestAnimationFrame(step);
+      if (performance.now() - manual.current < 4000) return;
+      const { arcs: A, home: Hm, t: now } = autoRef.current;
+      const recent = A.filter((a) => now - a.act.t < 12 * 3600);
+      let cx = (Hm.target as number[])[0]!, cy = (Hm.target as number[])[1]!, zoom = Hm.zoom as number;
+      if (recent.length) {
+        const xs = recent.flatMap((a) => [a.from[0], a.to[0]]), ys = recent.flatMap((a) => [a.from[1], a.to[1]]);
+        cx = (Math.min(...xs) + Math.max(...xs)) / 2; cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+        const ext = Math.max(Math.max(...xs) - Math.min(...xs), (Math.max(...ys) - Math.min(...ys)) * 1.3, 220);
+        zoom = Math.max(-0.2, Math.min(2.2, Math.log2(Math.min(size.w / (ext * 1.5), size.h / (ext * 1.9)))));
+      }
+      setView((v) => {
+        const tg = (v.target ?? [0, 0, 0]) as number[], k = 0.02;
+        return { ...v, target: [tg[0]! + (cx - tg[0]!) * k, tg[1]! + (cy - tg[1]!) * k, 0], zoom: (v.zoom as number) + (zoom - (v.zoom as number)) * k,
+          rotationX: (v.rotationX as number) + (50 - (v.rotationX as number)) * k, rotationOrbit: (v.rotationOrbit as number) + 0.03, transitionDuration: 0 } as any;
+      });
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [present, tour, size.w, size.h]);
+
   // The panel only changes with the clock (by the minute), the overlays and the run: not on every camera frame.
   const canTour = steps.length > 0 && (town.acts.length > 0 || town.elections.some((e) => e.result));
   const panel = useMemo(() => (
-    <Panel twin={!!twin} open0={layersOpen} ev={ev} candCol={candCol} papersShown={papersShown} onTour={canTour ? () => setTour(0) : undefined} overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />
+    <Panel twin={!!twin} open0={layersOpen} ev={ev} candCol={candCol} papersShown={papersShown} onTour={canTour ? () => setTour(0) : undefined} onPresent={() => startPresent(false)} onRecord={canTour && typeof MediaRecorder !== "undefined" ? () => startPresent(true) : undefined} overlays={overlays} setOverlays={setOverlays} counts={people.counts} kinds={kindNames} city={city} t={t} arcs={arcs.length} onHome={() => setView({ ...home, transitionDuration: 800, transitionInterpolator: new LinearInterpolator(["target", "zoom", "rotationX", "rotationOrbit"]) } as any)} />
   ), [twin, layersOpen, ev, candCol, papersShown, canTour, overlays, ver, Math.floor(t / 60), arcs.length, city, home]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div ref={wrap} className={`lc-wrap${dark ? "" : " light"}`} style={{ background: `rgb(${sky.backdrop.join(",")})` }}>
       <DeckGL
+        ref={deckRef}
+        onAfterRender={() => { const r = recorder.current; const cv = deckRef.current?.deck?.getCanvas?.() ?? deckRef.current?.deck?.canvas; if (r && cv && captionRef.current) r.frame(cv, captionRef.current); }}
         views={ORBIT}
         viewState={view as any}
-        onViewStateChange={({ viewState, interactionState }) => { if (interactionState?.isDragging || interactionState?.isPanning || interactionState?.isZooming) setFollow(false); setView(viewState as OrbitViewState); }}
+        onViewStateChange={({ viewState, interactionState }) => { if (interactionState?.isDragging || interactionState?.isPanning || interactionState?.isZooming) { setFollow(false); manual.current = performance.now(); } setView(viewState as OrbitViewState); }}
         controller={{ dragMode: "pan", inertia: 250, scrollZoom: { speed: 0.012, smooth: true }, touchRotate: true, touchZoom: true, doubleClickZoom: true, keyboard: true } as any}
         layers={layers.filter(Boolean) as any}
         effects={effects}
@@ -849,16 +933,17 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       />
       <div className="lc-haze" style={{ opacity: Math.max(0, Math.min(1, (82 - (view.rotationX as number)) / 40)), background: `linear-gradient(to bottom, rgba(${sky.backdrop.join(",")},0.92) 0%, rgba(${sky.backdrop.join(",")},0.5) 16%, rgba(${sky.backdrop.join(",")},0) 44%)` }} />
       <div className="lc-vignette" />
-      {selP >= 0 && <button className={`lc-follow ${follow ? "on" : ""}`} onClick={() => setFollow(!follow)}>{follow ? <>Following {city.people.people[selP]![1]}<span className="muted"> · stop</span></> : <>Follow {city.people.people[selP]![1]}</>}</button>}
+      {!present && selP >= 0 && <button className={`lc-follow ${follow ? "on" : ""}`} onClick={() => setFollow(!follow)}>{follow ? <>Following {city.people.people[selP]![1]}<span className="muted"> · stop</span></> : <>Follow {city.people.people[selP]![1]}</>}</button>}
       {label && <div className={`lc-pane-label${bare ? " bare" : ""}`}>{label}</div>}
-      {!bare && <Clock t={t} sky={sky} town={town} />}
+      {!bare && !present && <Clock t={t} sky={sky} town={town} />}
       {diff && diff.ended !== undefined && <div className="lc-diff"><b>Difference from the other arm</b><span>An arm ended on day {Math.floor(diff.ended / DAY) + 1}: nothing to compare after it.</span></div>}
       {diff && diff.ended === undefined && <div className="lc-diff"><b>Difference from the other arm</b><span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people elsewhere now</span><span><i className="sw dot" />{diff.onlyHere.length} papers only here (7 d)</span><span><i className="sw ring" />{diff.onlyThere.length} only there</span></div>}
-      <Minimap B={B} town={town} view={view} size={size} setView={setView} />
-      {!bare && panel}
-      {tip && <Tooltip tip={tip} city={city} t={t} name={(i) => structureName(city, i)} />}
-      {!bare && tour !== null && <Tour steps={steps} at={tour} setAt={setTour} onExit={() => setTour(null)} />}
-      {card && tour === null && <Card city={city} t={t} selection={selection} name={(i) => structureName(city, i)} onClose={() => select(null)} />}
+      {!present && <Minimap B={B} town={town} view={view} size={size} setView={setView} />}
+      {!bare && !present && panel}
+      {present && caption && <PresentBar c={caption} recording={recording} onExit={() => stopPresent()} />}
+      {!present && tip && <Tooltip tip={tip} city={city} t={t} name={(i) => structureName(city, i)} />}
+      {!bare && tour !== null && <Tour steps={steps} at={tour} setAt={setTour} onExit={() => setTour(null)} hidden={present} />}
+      {card && tour === null && !present && <Card city={city} t={t} selection={selection} name={(i) => structureName(city, i)} onClose={() => select(null)} />}
     </div>
   );
 }
