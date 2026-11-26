@@ -68,6 +68,7 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   expect(good!.levers).toContain(executed.i);
   expect(seat.levers.every((l) => l.t >= 5 * D)).toBe(true); // (the warm-up's own appointment is not the arm's)
   expect(seat.outcome).toBe("won");
+  expect(seat.ended).toBe("finished");
   expect(seat.election.poll_at).toBe(30 * D);
 
   const detail = JSON.parse(new TextDecoder().decode(files!["sitting-0"])) as SittingDetail;

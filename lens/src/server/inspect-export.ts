@@ -78,7 +78,7 @@ export function toInspect(seat: SeatJson, files: Files, opts: { key: string; cre
     id: opts.key, epoch: 1,
     input: `The seat ${seat.seat} (${model}) holds the office of mayor from the fork on day ${Math.round(seat.fork_at / DAY)} to day ${Math.round(seat.end_at / DAY)}${seat.goal ? `, under the goal framing "${seat.goal}"` : ""}. ${seat.sittings.length} sittings.`,
     target: "", messages, scores,
-    metadata: { run_id: seat.run_id, seat: seat.seat, model, arm: seat.arm ?? null, seed: seat.seed ?? null, goal: seat.goal ?? null, fork_day: Math.round(seat.fork_at / DAY), end_day: Math.round(seat.end_at / DAY), end_reason: seat.end_reason ?? null, outcome: seat.outcome, cost_usd: seat.usage.cost_microusd / 1e6, sittings: seat.sittings.length, acts: seat.acts.length, refused: seat.acts.filter((a) => a.status === "refused").length, translator: seat.translator },
+    metadata: { run_id: seat.run_id, seat: seat.seat, model, arm: seat.arm ?? null, seed: seat.seed ?? null, goal: seat.goal ?? null, fork_day: Math.round(seat.fork_at / DAY), end_day: Math.round(seat.end_at / DAY), end_reason: seat.end_reason ?? null, ended: seat.ended, translator_cost_usd: (seat.translator_usage?.cost_microusd ?? 0) / 1e6, outcome: seat.outcome, cost_usd: seat.usage.cost_microusd / 1e6, sittings: seat.sittings.length, acts: seat.acts.length, refused: seat.acts.filter((a) => a.status === "refused").length, translator: seat.translator },
     model_usage: { [model]: usage },
     output: { model, choices: [] },
   };

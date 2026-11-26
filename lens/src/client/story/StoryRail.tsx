@@ -69,7 +69,7 @@ function pollMoved(seat: SeatJson) { return seat.amendments.find((a) => a.outcom
 function outcomeOf(seat: SeatJson): { label: string; tone: string } {
   const moved = pollMoved(seat);
   if (seat.outcome === "not_held" && moved) return { label: `Poll moved to day ${Math.round((seat.election.poll_at ?? 0) / DAY)}`, tone: "flag" };
-  if (seat.outcome === "not_held" && seat.election.poll_at !== undefined) return { label: `Run ended before the poll (day ${Math.round(seat.election.poll_at / DAY)})`, tone: "muted" };
+  if (seat.outcome === "not_held" && seat.election.poll_at !== undefined) return { label: `${seat.ended === "stopped" ? "Stopped" : "Run ended"} before the poll (day ${Math.round(seat.election.poll_at / DAY)})`, tone: "muted" };
   return OUTCOME[seat.outcome];
 }
 
@@ -91,7 +91,7 @@ function Header({ seat }: { seat: SeatJson }) {
       <div className="st-title">{modelName(seat.model)}{seat.goal ? <> <span className="st-goal">· {seat.goal}</span></> : null}</div>
       <div className="st-sub">
         {seat.seed !== undefined && <span>seed {seat.seed}</span>}
-        <span>forked day {Math.round(seat.fork_at / DAY)} → day {Math.round(seat.end_at / DAY)}{seat.end_reason && seat.end_reason !== "completed" ? ` (${seat.end_reason})` : ""}</span>
+        <span>forked day {Math.round(seat.fork_at / DAY)} → day {Math.round(seat.end_at / DAY)}{seat.ended === "stopped" ? <span style={{ color: "var(--st-bad)" }}> · stopped early{seat.until_at ? ` (set to day ${Math.round(seat.until_at / DAY)})` : ""}{seat.end_reason ? `: ${seat.end_reason}` : ""}</span> : seat.ended === "unknown" && seat.end_reason && seat.end_reason !== "completed" ? ` (${seat.end_reason})` : ""}</span>
         {seat.model && <span className="st-mono st-faint" title={seat.model}>{seat.model}</span>}
       </div>
       <div className={`st-outcome ${out.tone}`}><span className="st-big">{out.label}</span>{seat.election.stood ? <span className="st-chip election">stood</span> : null}</div>
@@ -100,7 +100,7 @@ function Header({ seat }: { seat: SeatJson }) {
         <div className="st-stat"><div className="v">{seat.sittings.length}</div><div className="k">sittings · {days}d</div></div>
         <div className="st-stat"><div className="v">{seat.acts.length}</div><div className="k">acts · {seat.acts.filter((a) => a.status === "refused").length} refused</div></div>
         <div className={`st-stat ${exec ? "flag" : ""}`} title="Distinct levers the reader found executed / attempted"><div className="v">{exec}<span className="st-faint" style={{ fontSize: 13 }}> / {tried}</span></div><div className="k">levers done / tried</div></div>
-        <div className="st-stat"><div className="v">{usd(seat.usage.cost_microusd)}</div><div className="k">{tokens(seat.usage.input_tokens + seat.usage.output_tokens)} tokens</div></div>
+        <div className="st-stat" title={`The seat's calls ${usd(seat.usage.cost_microusd)}, the translator's ${usd(seat.translator_usage?.cost_microusd ?? 0)}`}><div className="v">{usd(seat.usage.cost_microusd + (seat.translator_usage?.cost_microusd ?? 0))}</div><div className="k">{usd(seat.usage.cost_microusd)} seat · {usd(seat.translator_usage?.cost_microusd ?? 0)} transl.</div></div>
       </div>
       {byLever.size > 0 && (
         <div className="st-levers">
