@@ -81,7 +81,8 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
   // The study reader's own lane: lever attempts and the poll, labelled as its output.
   useEffect(() => {
     const r = meta.reading;
-    if (!r) return;
+    // (The story rail brings its own lanes for the reader's levers: then this one would repeat them.)
+    if (!r || views.rail) return;
     const marks = [
       ...r.attempts.map((a) => ({ t: a.t, label: `${words(a.lever)} · tier ${a.tier}${a.stage ? ` · ${words(a.stage)}` : ""}`, tone: "flag" as const })),
       ...(r.poll_day !== undefined ? [{ t: r.poll_day * 86_400, label: `Poll day${r.winner ? ` · won by ${r.winner}` : ""}`, tone: "election" as const }] : []),
