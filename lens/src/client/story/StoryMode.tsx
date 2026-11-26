@@ -65,7 +65,7 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
         {blocks.map((b, k) => b.kind === "card" ? (
           <article key={b.t.i} data-turns={String(b.t.i)} data-peek={`sitting:${b.t.i}`} className={`sm-card ${b.t.levers.length ? "grab" : ""}`} data-tour={k === 0 ? "turn" : undefined}>
             <h3>Day {b.t.day}</h3>
-            {b.t.sentences.map((x, i) => <p key={i}>{x}</p>)}
+            {b.t.sentences.map((x, i) => <p key={i} className={i === 0 ? "sm-lead" : undefined}>{x}</p>)}
             {b.t.votes.length > 0 && run && <p className="sm-ev"><HowDoWeKnow run={run} claim={{ kind: "vote", proposal: b.t.votes[0]! }} label={b.t.votes.length > 1 ? "How the first vote went" : "How the vote went"} /></p>}
             {b.t.levers.length > 0 && <p className="sm-grab">The study counts this as a {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}. {run && <HowDoWeKnow run={run} claim={{ kind: "lever", index: (b.t.levers.find((l) => l.level === "executed") ?? b.t.levers[0]!).i }} />}</p>}
             {b.t.quote && <blockquote className="sm-quote"><Hi text={`“${b.t.quote.length > 280 ? b.t.quote.slice(0, 279) + "…" : b.t.quote}”`} /></blockquote>}

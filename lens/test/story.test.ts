@@ -118,3 +118,33 @@ test("the browser's copy of the reader's levers matches the reader; Wilson inter
   expect(hi).toBeCloseTo(0.6032, 3);
   expect(wilson(0, 5)[0]).toBe(0);
 });
+
+test("the reader's prompt document keeps every line, and key-sentence highlights nest cleanly", async () => {
+  const { readPrompt } = await import("../src/client/story/prompt-parts");
+  const { keyWrap, keyWords } = await import("../src/client/story/text");
+  const input = [
+    "Your notebook: GOAL: stay mayor.", "Council: loyal 4.", "(1,993 of the 8,000 characters it holds are used.)", "",
+    "Since you last looked:", "It is year 1, day 176.", "You are 41 years old.", "", "## The town's accounts",
+    "- Town account (acc-city), kept by bank: $2,154,386.10", "  Paid out $2,445.70 since you last looked: acc-c0065 $2,445.70.", "",
+    "Now:", "It is year 1, day 180.", "You are 41 years old.", "## Elections, and the local paper: what you looked up (2 found)",
+    '- [rec.9] nomination, year 1, day 125, from c0033: to electoral-commission: "Standing for mayor: cut spending."',
+    '- [rec.7] disposal docket from city, to outside (year 1, day 173): "Delivered: 1,040 of waste." (kind: waste; quantity: 1040), citing rec.6',
+    "Posts: Editor (editor), for paper: held by c0072; Mayor (mayor), for city: held by c0461.",
+    "(To read one in full: look at this report with paper: its id.)",
+  ].join("\n");
+  const p = readPrompt(input);
+  expect(p.notebook).toEqual({ text: "GOAL: stay mayor.\nCouncil: loyal 4.", used: "1,993 of the 8,000 characters it holds are used." });
+  expect(p.groups.map((g) => [g.label, g.days.map((d) => d.day)])).toEqual([["Since you last looked", [176]], ["Now", [180]]]);
+  const now = p.groups[1]!.days[0]!.sections[0]!;
+  expect([now.title, now.count, now.items.map((x) => x.k)]).toEqual(["Elections, and the local paper: what you looked up", "2 found", ["rec", "rec", "list", "note"]]);
+  expect(now.items[0]).toMatchObject({ rec: { id: "rec.9", kind: "nomination", from: "c0033", to: "electoral-commission", day: 125, text: "Standing for mayor: cut spending." } });
+  expect(now.items[1]).toMatchObject({ rec: { id: "rec.7", kind: "disposal docket", from: "city", to: "outside", day: 173, meta: "kind: waste; quantity: 1040", citing: "rec.6" } });
+  // (Nothing dropped: every word of the input, but for the markers the parts stand for, is somewhere in the parts.)
+  const kept = JSON.stringify(p);
+  const words = input.replace(/^Your notebook: /, "").replace(/^(Since you last looked|Now):$/gm, "").replace(/^It is year \d+, day \d+\.$/gm, "");
+  for (const w of words.match(/[\w$.,-]{4,}/g)!) expect(kept).toContain(w.replace(/[.,]$/, ""));
+
+  const re = keyWords(["c0571"]);
+  const html = keyWrap('<p>Rates are fine. I will appoint <button data-person="c0571">c0571</button>. Waste is <em>late. Again</em>. The poll is day 181.</p>', re);
+  expect(html).toBe('<p>Rates are fine. <span class="st-key">I will appoint <button data-person="c0571">c0571</button>.</span> Waste is <em>late. Again</em>. <span class="st-key">The poll is day 181.</span></p>');
+});

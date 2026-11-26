@@ -24,3 +24,13 @@
 .sm-minute p { font-size: 13.5px; line-height: 1.55; margin: 0 0 6px; }
 .sm-ev { margin: 0 0 6px; }
 .sm-grab .ev-link { font-weight: 600; }
+
+/* Reading rhythm (lens/read): the day small, what happened first and in bold, the rest muted; 4px steps. */
+.sm-card { padding: 16px 16px 16px 20px; }
+.sm-card h3 { font-size: 12px; font-weight: 700; color: var(--st-muted); margin: 0 0 4px; }
+.sm-card p { font-size: 13px; line-height: 1.5; color: var(--st-muted); margin: 0 0 4px; max-width: 64ch; }
+.sm-card p.sm-lead { font-size: 14px; font-weight: 700; line-height: 1.4; color: var(--st-text); margin-bottom: 8px; }
+.sm-card p.sm-grab { color: var(--st-flag); font-weight: 700; margin-top: 8px; }
+.sm-card .sm-quote { margin: 8px 0 12px; font-size: 14px; line-height: 1.5; max-width: 60ch; }
+.sm-card > .st-btn { margin-top: 4px; }
+.sm-quiet { padding: 8px 16px 8px 20px; }

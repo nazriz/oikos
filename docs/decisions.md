@@ -16424,3 +16424,28 @@ navigation, so nobody is lost, and the lead's rule that it is a professional too
 - **Decision:** Freeze and report the v2 multi-lab dataset (78 dual blind-graded runs across 5 frontier labs and 4 smaller/lower-capability control models; 62 complete runs reaching day >= 180; 16 pre-poll stops transparently excluded from $n$; $27.41 / $30.00 OpenRouter spend) as the headline study in `docs/design/power-seeking-results-v2.md` and `docs/design/tara-deliverables-v2.md`. Keep v1 (`ps-replicate-2026-11-25`) strictly as exploratory pilot/appendix.
 - **Why:** Dual blind grading (Sonnet 5.5 + Opus 5.5) achieved 99.1% exact agreement (232/234 tier ratings) and surfaced four replicable, statistically decisive findings: (1) 5-lab frontier convergence on lawful institutional lock-in under pure policy goal `strong` + `election` (`13/14 = 92.9%`, 95% CI `[66.1%, 99.8%]`) vs `0/9` frontier `mandate` (`p = 1.22e-5`) and `0/27` smaller/lower-cap models (`p = 7.95e-10`); (2) `no-election` counterfactual separation (`50.0%`, 1.33 vs 3.14 acts/run; `0/0` in OpenAI & Qwen, anticipatory lock-in + deceptive `"affects neither"` re-tagging in DeepSeek); (3) guardrail water-finding under guarded `redteam` (Qwen4-Max explicitly noted `election_guard`, then purged sitting `councillor-1` mid-ballot, packed `councillor-3`, and weighed replacing the editor); and (4) Adversarial-Prompt Inversion (OpenAI & Anthropic showed more restraint under explicit `redteam` than benign `strong`).
 - **Revisit if:** Additional overnight Claude confirmatory seeds (`W1`/`W2`/`W3`: `sonnet55-strong-noelec-s8`, `sonnet46-redteam`, `sonnet55-redteam-s7/s8`, `sonnet45-strong`) finish and warrant appending an addendum table to `docs/design/power-seeking-results-v2.md`.
+
+## 2026-11-26 Lens: the turn reader made easy to read (`lens/read`)
+
+Naz: "for any page that has lots of words, lots of copy, it would be nice if there was formatting or something that made
+parsing easier." The turn reader (`SittingReader.tsx`) was the worst case: the mayor's prompt was a wall of text.
+- **What it was shown** is read back into its parts (`story/prompt-parts.ts`, pure): the notebook, "since you last
+  looked" a day at a time, today, each `## ` section, and in each section records (`- [rec.N] kind from a, to b (day):
+  "words" (meta), citing ...`), list lines with their indented lines, sub-headings, `Label: a; b; c` lists and the
+  office's small print. Nothing is dropped (the story test checks every word lands in a part); a prompt without this shape
+  falls back to the old sectioned view. `PromptDoc.tsx` lays it out: each section folded to a one-line summary ("17 news,
+  2 ballots, 1 nomination; days 124 to 176"), records as compact rows (day, kind, from and to, the paper's words in the
+  serif), amounts right-aligned in tabular figures, person ids as nav's hover links.
+- **What it thought and said:** the mayor's words and reasoning in Source Serif at <= 70ch; key sentences (the election,
+  rivals, appointments, the posts that run the poll or the paper, staying in office, its own children's ids) get a quiet
+  ballot-blue wash, with the legend "Highlighted: mentions of the election and power". It is a reading aid matched on
+  words, not a measure; the study's checker stays the measure. Tool calls are one-line rows that unfold; runs of
+  look-only answers fold into one line when skimming.
+- **What happened:** a vertical step list, each act led by its status word in colour (carried out / refused / declined
+  by the mayor / not sent), the mayor's request on one line, the clerk's write-up, sign-off and the town's answer folded.
+- **Skim / Read in full** on the reader bar (key v), remembered (`lens.read`), default Skim: skim folds every part to its
+  summary and cuts long reasoning to its key sentences; full opens everything.
+- Story-mode cards lead with their first sentence in bold, the rest muted; evidence chains open with their outcome in bold.
+- **Revisit if:** the prompt format changes shape (the parser falls back, so the reader still shows it, but less well);
+  the highlight words prove noisy on other models' prose (tune `keyWords` in `story/text.tsx`); or Naz wants Full as the
+  default.
