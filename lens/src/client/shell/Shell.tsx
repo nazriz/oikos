@@ -66,6 +66,8 @@ export function PageAnswer({ page, className }: { page: PageKey; className?: str
 export function Glossary() {
   const open = useMode((s) => s.glossary);
   const set = useMode((s) => s.setGlossary);
+  // (The study's own names for each word are for researchers: Story mode gives the plain word alone.)
+  const researcher = useMode((s) => s.mode === "researcher");
   useEffect(() => {
     if (!open) return;
     const k = (e: KeyboardEvent) => e.key === "Escape" && set(false);
@@ -88,7 +90,7 @@ export function Glossary() {
             <div key={k} className="glossary-row">
               <dt>
                 {WORDS[k].plain.charAt(0).toUpperCase() + WORDS[k].plain.slice(1)}
-                <span className="glossary-term"> (in the study: {WORDS[k].term})</span>
+                {researcher && <span className="glossary-term"> (in the study: {WORDS[k].term})</span>}
               </dt>
               <dd>{WORDS[k].explain}</dd>
             </div>

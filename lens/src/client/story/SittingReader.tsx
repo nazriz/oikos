@@ -5,7 +5,7 @@
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, loadSystem, useAsync, when, worldDay, usd, tokens, plural, human, STAGE, type SeatAct, type SeatDraft, type SeatJson, type SeatLever, type SittingDetail, type SittingTurn } from "./data";
-import { Hi, Md, MarksContext, hasQuery, openPerson, keyWords, keySentences, plainWords, plainReason, type Marks } from "./text";
+import { Hi, Md, MarksContext, hasQuery, openPerson, keyWords, keySentences, usePlain, plainReason, type Marks } from "./text";
 import { leverTitle } from "../words";
 import { useResearcher } from "../mode";
 import { firstPoll } from "./moments-data";
@@ -176,6 +176,7 @@ export function sections(input: string): { prelude: string; parts: { title: stri
 
 function Saw({ run, d, query }: { run: string; seat: SeatJson; d: Detail; query: string }) {
   const full = useFull();
+  const plain = usePlain();
   const first = d.turns.find((t) => t.purpose === "participant" && typeof t.input === "string");
   const input = first?.input as string | undefined;
   const shaped = useMemo(() => (input ? readPrompt(input).shaped : false), [input]);
@@ -188,7 +189,7 @@ function Saw({ run, d, query }: { run: string; seat: SeatJson; d: Detail; query:
         <Md text={prelude} className="st-prose st-prelude" />
         {parts.map((p, k) => (
           <details key={`${k}${full}`} className="st-sec" open={full || hasQuery(p.body, query)}>
-            <summary><Hi text={p.title} /><span className="n">{p.count ?? ""}{p.body.length > 2_400 ? `, ${Math.round(p.body.length / 1000)}k characters` : ""}</span></summary>
+            <summary><Hi text={plain(p.title)} /><span className="n">{p.count ?? ""}{p.body.length > 2_400 ? `, ${Math.round(p.body.length / 1000)}k characters` : ""}</span></summary>
             <div className="body"><Md text={p.body} className="st-prose small" /></div>
           </details>
         ))}
@@ -338,11 +339,12 @@ const TOOL: { [name: string]: (i: any) => { what: string; body?: string; why?: s
 /** A tool call as one line (what it did, and for a request its first words); its details and what came back unfold. */
 function Tool({ c, result, seat }: { c: any; result?: string; seat: SeatJson }) {
   const researcher = useResearcher();
+  const plain = usePlain();
   const full = useFull();
   const input = c.input ?? {};
   const raw = TOOL[c.name]?.(input) ?? { what: human(String(c.name)), rest: [] };
   // (Story mode says the office's ids as words: "Signed the clerk's draft", "Wrote to Councillor 1".)
-  const shape = researcher ? raw : { ...raw, what: c.name === "confirm" ? (raw.what.startsWith("Declined") ? "Declined the clerk's draft" : "Signed the clerk's draft") : plainWords(raw.what) };
+  const shape = researcher ? raw : { ...raw, what: c.name === "confirm" ? (raw.what.startsWith("Declined") ? "Declined the clerk's draft" : "Signed the clerk's draft") : plain(raw.what) };
   const extra = Object.entries(input).filter(([k]) => !(shape.rest ?? []).includes(k));
   const kids = seat.children.filter((ch) => JSON.stringify(input).includes(ch));
   const body = shape.body ? String(shape.body) : "";
@@ -407,10 +409,11 @@ export function Happened({ seat, d, levers, focus }: { seat: SeatJson; d: Detail
 function FailureCard({ f, levers }: { f: Detail["failures"][number]; levers: SeatLever[] }) {
   const full = useFull();
   const researcher = useResearcher();
+  const plain = usePlain();
   return (
     <div className={`st-act wait ${levers.length ? "lever" : ""}`}>
       <div className="st-act-top"><span className="st-status wait">Not sent</span><span className="st-act-when">{when(f.t).split(", ").at(-1)}</span></div>
-      <div className="st-act-ask" title={f.proposal}><Hi text={researcher ? firstClause(f.proposal) : plainWords(firstClause(f.proposal))} /></div>
+      <div className="st-act-ask" title={f.proposal}><Hi text={researcher ? firstClause(f.proposal) : plain(firstClause(f.proposal))} /></div>
       {levers.map((l) => <FlagBox key={l.i} l={l} />)}
       <details className="st-act-more" open={full}>
         <summary>The clerk could not draw it up: <Hi text={researcher ? f.reason : plainReason(f.reason)} /></summary>
@@ -456,7 +459,7 @@ function ActCard({ seat, draft, act, levers, focus }: { seat: SeatJson; draft?: 
   const status = act ? (act.status === "applied" ? { cls: "ok", word: "Carried out" } : act.status === "refused" ? { cls: "no", word: "Refused" } : { cls: "wait", word: "No outcome yet" }) : declined ? { cls: "declined", word: "Declined by the mayor" } : { cls: "wait", word: "Not sent" };
   const kids = act ? seat.children.filter((c) => act.blocks.some((b) => b?.participant === c || b?.participant === `${c}-self`)) : [];
   const writeUp = draft?.label ? lower(draft.label) : act?.label ? lower(act.label) : undefined;
-  const say = (x: string) => (researcher ? x : plainWords(x));
+  const say = usePlain();
   const fold = act?.status === "refused" ? `Refused: ${human(act.code ?? "")}${act.detail ? `, ${act.detail}` : ""}` : writeUp ? `The clerk wrote it up as: ${writeUp}` : "How it went";
   return (
     <div className={`st-act ${status.cls} ${levers.length ? "lever" : ""} ${focus ? "focus" : ""}`} id={act ? `st-act-${act.i}` : undefined}>

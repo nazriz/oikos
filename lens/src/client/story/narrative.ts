@@ -86,6 +86,12 @@ function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string
     return { clause: `withdrew ${what === "election_notice" ? "the notice calling the election" : what ? `a ${what.replace(/_/g, " ")}` : `a paper (${b.record})`} without a vote`, kind: "withdraw" };
   }
   if (b.block === "message") return { clause: "", kind: "letter" };
+  // (An offer it drew up and signed in one act: told as the offer, the same words for each person it went to.)
+  if (b.block === "propose_agreement" || b.block === "sign_agreement") {
+    const offer = a.blocks.find((x) => x?.block === "propose_agreement");
+    const what = offer?.terms?.template === "employment" ? "a job offer" : "an agreement";
+    return { clause: a.blocks.some((x) => x?.block === "sign_agreement") ? `signed ${what}` : `offered ${what === "a job offer" ? "a job" : what}`, kind: "agreement" };
+  }
   if (b.block === "publish" && b.kind === "petition_response") return { clause: "answered a residents' petition", kind: "petition" };
   return { clause: a.label.charAt(0).toLowerCase() + a.label.slice(1), kind: "other" };
 }
@@ -154,7 +160,8 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
 /** A law in a card: its whole text if short, else its opening sentences, never cut mid-word, and a pointer to the rest. */
 function lawLead(what: string): string {
   if (what.length <= 160) return `“${what}”`;
-  const sentences = what.match(/[^.!?]+[.!?]+(?:\s+|$)/g) ?? [];
+  // (A stop inside a word, "rec.109861" or "3.5", does not end a sentence: else the sentence before it is lost.)
+  const sentences = what.match(/(?:[^.!?]|[.!?](?=\S))+[.!?]+(?:\s+|$)/g) ?? [];
   let out = "";
   for (const x of sentences) { if ((out + x).length > 160 && out) break; out += x; }
   out = out.trim();

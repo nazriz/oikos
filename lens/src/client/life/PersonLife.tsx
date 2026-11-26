@@ -11,11 +11,12 @@ import { describePerson, personLabel } from "../people";
 import { DAY, clock, dayIndex, dayOf, words } from "../format";
 import { useLens } from "../state";
 import type { InspectorProps } from "../views";
-import { plainWords } from "../story/text";
+import { usePlainNames } from "../story/text";
+import { plainText, type PlainNames } from "../plain";
 import "./life.css";
 
 /** A line from the world, its raw tokens as words: "let_go by offer:employment" → "let go by offer of employment". */
-const plain = (x: string) => plainWords(x).replace(/\b([a-z]+):([a-z]+)\b/g, "$1 of $2");
+const plain = (x: string, names?: PlainNames) => plainText(x, names).replace(/\b([a-z]+):([a-z]+)\b/g, "$1 of $2");
 
 const ledgerCache = new Map<string, Promise<PersonLedger>>();
 function loadLedger(run: string, id: string): Promise<PersonLedger> {
@@ -268,6 +269,7 @@ function Money({ ledger, t, nameOf, whoOf }: { ledger: PersonLedger; t: number; 
 /** Everything that reached them, newest last, with who decided it. */
 function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger: PersonLedger; t: number; nameOf: (x?: string) => string; whoOf: (x?: string) => Who; filter: "all" | Who; setFilter: (f: "all" | Who) => void; bulk: string[] }) {
   const s = useLens.getState();
+  const names = usePlainNames();
   type Row = { t: number; who: Who; from?: string; kind: string; text: string; it?: LedgerItem; cents?: number };
   const rows = useMemo<Row[]>(() => {
     // (What they did themselves, for themselves or for an organisation they act for, did not "reach" them: left out.)
@@ -335,7 +337,7 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
                   {r.from && <span className={`life-who ${r.who}`}>, from {nameOf(r.from)}</span>}
                   {r.it?.refused && <span className="bad">, refused ({words(r.it.refused)})</span>}
                 </span>
-                <span className="life-text">{plain(r.text)}</span>
+                <span className="life-text">{plain(r.text, names)}</span>
               </span>
             </button>
           </li>,

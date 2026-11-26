@@ -9,6 +9,7 @@ import { leverCounts } from "../../shared/outcome";
 import { useDescribe } from "../people";
 import { useWords, leverTitle, modelName, goalText } from "../words";
 import { useResearcher } from "../mode";
+import { winnerWords } from "../plain";
 import { StoryAccount } from "./StoryMode";
 import "./story.css";
 import { dayNo, dayOf } from "../format";
@@ -20,7 +21,7 @@ export function storyTracks(seat: SeatJson) {
   const e = seat.election;
   const elec: TimelineMark[] = [];
   const pin = (t: number | undefined, label: string) => { if (t !== undefined && t <= seat.end_at + 30 * DAY) elec.push({ t, label, tone: "election" }); };
-  pin(e.notice_at, "Election notice"); pin(e.nominations_close_at, "Nominations close"); pin(e.poll_at, "Poll"); pin(e.result_at, e.winner ? `Result: ${e.winner === seat.seat ? "the AI mayor" : e.winner} won` : "Result"); pin(e.seated_at, "Seated");
+  pin(e.notice_at, "Election notice"); pin(e.nominations_close_at, "Nominations close"); pin(e.poll_at, "Poll"); pin(e.result_at, e.winner ? `Result: ${winnerWords(e.winner, { seats: [seat.seat] })} won` : "Result"); pin(e.seated_at, "Seated");
   const news = seat.records.filter((r) => r.kind === "news" && r.t >= seat.fork_at);
   const results = seat.records.filter((r) => r.kind === "ballot_result" && r.t >= seat.fork_at);
   return [
@@ -183,7 +184,7 @@ function Election({ seat, compact }: { seat: SeatJson; compact?: boolean }) {
       </div>
       {!compact && moved && <div className="st-elec-note">The election was moved to day {dayOf(e.poll_at ?? 0)} by a law the AI mayor proposed on day {dayNo(moved.day)}, and the council passed.</div>}
       {!compact && !moved && e.poll_at !== undefined && e.poll_at > seat.end_at && <div className="st-elec-note st-muted" style={{ color: "var(--st-muted)" }}>The run ended on day {dayOf(seat.end_at)}, before election day (day {dayOf(e.poll_at)}).</div>}
-      {!compact && e.result_at !== undefined && <div className="st-elec-note" style={{ color: "var(--st-muted)" }}>{e.seat_won ? "The AI mayor won" : `Won by ${e.winner ?? "another candidate"}`}, declared {when(e.result_at)}{e.seated ? `; ${e.seated === seat.seat ? "the AI mayor" : e.seated} took office ${when(e.seated_at ?? 0)}` : ""}.</div>}
+      {!compact && e.result_at !== undefined && <div className="st-elec-note" style={{ color: "var(--st-muted)" }}>{e.seat_won ? "The AI mayor won" : `Won by ${winnerWords(e.winner, { seats: [seat.seat] })}`}, declared {when(e.result_at)}{e.seated ? `; ${e.seated === seat.seat ? "the AI mayor" : e.seated} took office ${when(e.seated_at ?? 0)}` : ""}.</div>}
     </div>
   );
 }

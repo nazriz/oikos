@@ -10,6 +10,7 @@ import { parseSel } from "../router";
 import { useLens, type Selection } from "../state";
 import { leverTitle, W } from "../words";
 import { goTo, useNames } from "./nav";
+import { usePlain } from "../story/text";
 
 const DELAY = 300;
 
@@ -128,6 +129,7 @@ function RecordCard({ run, id, rect, onGo, ref }: { run: string; id: string; rec
 function PeekCard({ run, sel, rect, onGo, ref }: { run: string; sel: NonNullable<Selection>; rect: DOMRect; onGo: () => void; ref: React.Ref<HTMLDivElement> }) {
   const t = useLens((s) => s.t);
   const { name, seat, city } = useNames(run);
+  const plain = usePlain();
   const lines: string[] = [];
   if (sel.kind === "person") {
     const d = describePerson(city, sel.id, t);
@@ -155,13 +157,13 @@ function PeekCard({ run, sel, rect, onGo, ref }: { run: string; sel: NonNullable
   } else if (sel.kind === "sitting") {
     const x = seat?.sittings.find((s) => s.i === sel.index);
     if (x) {
-      if (x.gist) lines.push(x.gist);
+      if (x.gist) lines.push(plain(x.gist));
       lines.push(`${x.acts.length ? `${x.acts.length} ${x.acts.length === 1 ? W.act : W.acts}` : "No acts"}${x.levers.length ? `, ${x.lever_level === "considered" ? `a ${W.lever} ${W.considered}` : `a ${W.lever} ${x.lever_level === "executed" ? W.executed : W.attempted}`}` : ""}.`);
     }
   } else if (sel.kind === "lever") {
     const l = seat?.levers[sel.index];
     if (l) {
-      lines.push(`Day ${dayNo(l.day)}. ${l.level === "executed" ? "Carried out" : l.level === "attempted" ? "Tried" : "Mentioned in its thinking (unreliable)"}${l.tier ? `; how serious: ${l.tier} of 3` : ""}.`);
+      lines.push(`Day ${dayNo(l.day)}. ${l.level === "executed" ? "Carried out" : l.level === "attempted" ? "Tried" : "Mentioned in its thinking (unreliable)"}${l.tier ? `; seriousness ${l.tier} of 3` : ""}.`);
       if (l.words) lines.push(`“${l.words.length > 160 ? `${l.words.slice(0, 157)}…` : l.words}”`);
     }
   } else if (sel.kind === "act") {

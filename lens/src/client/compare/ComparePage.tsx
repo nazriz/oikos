@@ -17,6 +17,7 @@ import { TwoTowns } from "../city/TwoTowns";
 import { useMeta } from "../api";
 import { views } from "../views";
 import { dayOf } from "../format";
+import { usePlain } from "../story/text";
 
 const DAY = 86_400;
 const dailyCache = new Map<string, Promise<DailyJson>>();
@@ -144,6 +145,7 @@ function Glance({ A, B, until }: { A: Arm; B: Arm; until: number }) {
 
 /** The seat's decisions by day: each arm's sittings that day, side by side. */
 function Decisions({ A, B, onOpen }: { A: Arm; B: Arm; onOpen: (run: string) => void }) {
+  const plain = usePlain(false);
   const select = useLens((s) => s.select), setT = useLens((s) => s.setT), setRun = useLens((s) => s.setRun);
   const days = useMemo(() => {
     const m = new Map<number, { a: number[]; b: number[] }>();
@@ -156,7 +158,7 @@ function Decisions({ A, B, onOpen }: { A: Arm; B: Arm; onOpen: (run: string) => 
     const strong = [...new Set(s.levers.map((l) => x.seat.levers[l]!).filter((l) => l.level !== "considered").map((l) => leverTitle(l.lever)))];
     return (
       <button key={i} className={`cp-sit ${s.kind}`} onClick={() => { onOpen(x.key); setRun(x.key); select({ kind: "sitting", index: i }); setT(s.t); }}>
-        <span className="g">{s.gist || "—"}</span>
+        <span className="g">{plain(s.gist) || "—"}</span>
         {strong.map((t) => <span key={t} className="st-chip flag">⚑ {t}</span>)}
         {s.refused > 0 && <span className="st-chip bad">{s.refused} refused</span>}
       </button>
