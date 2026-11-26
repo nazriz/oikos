@@ -9,7 +9,7 @@ import { useMemo, useRef } from "react";
 import { runHref } from "../router";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable } from "./parts";
-import { attempts, fingerprint, POLL_DAY, wilson, type Attempt, type ModelRow, type StudyRun } from "./landing-data";
+import { attempts, dayNo, fingerprint, POLL_DAY, wilson, type Attempt, type ModelRow, type StudyRun } from "./landing-data";
 
 const DAY = 86_400;
 const go = (key: string, t?: number) => { location.hash = runHref(key, t !== undefined ? { t: Math.round(t) } : undefined); };
@@ -33,17 +33,18 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
   const base = narrow ? 128 : 112;
   const marks = attempts([run]).sort((a, b) => a.t - b.t);
   const ticks: number[] = [];
-  for (let d = Math.ceil(run.from / 10) * 10; d <= near1; d += 10) ticks.push(d);
+  for (let d = Math.ceil((run.from + 1) / 10) * 10 - 1; d <= near1; d += 10) ticks.push(d); // (ticks at day numbers 130, 140...)
+  if (ticks[0] !== run.from) ticks.unshift(run.from);
   const pollX = x(POLL_DAY);
   const table = (
     <table className="ld-table">
       <thead><tr><th>Day</th><th>What happened</th></tr></thead>
       <tbody>
-        <tr><td>{run.from}</td><td>The AI mayor took office.</td></tr>
-        {marks.map((m, i) => <tr key={i}><td>{m.day}</td><td>{m.executed ? "Carried out" : "Tried"}: {leverTitle(m.lever)}.</td></tr>)}
-        <tr><td>{POLL_DAY}</td><td>Election day as first called. No election was held.</td></tr>
-        <tr><td>{Math.round(run.end)}</td><td>The run ended.</td></tr>
-        <tr><td>{pollDay.toLocaleString("en-US")}</td><td>Election day under the new law.</td></tr>
+        <tr><td>{dayNo(run.from)}</td><td>The AI mayor took office.</td></tr>
+        {marks.map((m, i) => <tr key={i}><td>{dayNo(m.day)}</td><td>{m.executed ? "Carried out" : "Tried"}: {leverTitle(m.lever)}.</td></tr>)}
+        <tr><td>{dayNo(POLL_DAY)}</td><td>Election day as first called. No election was held.</td></tr>
+        <tr><td>{dayNo(Math.floor(run.end))}</td><td>The run ended.</td></tr>
+        <tr><td>{dayNo(pollDay).toLocaleString("en-US")}</td><td>Election day under the new law.</td></tr>
       </tbody>
     </table>
   );
@@ -51,20 +52,20 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
     <WithTable table={table} label="The run's calendar as a table">
       <div ref={ref} className={`ld-cal ${shown ? "in" : ""}`}>
         <div ref={tip.box} className="ld-box">
-          <svg width={W} height={H} role="img" aria-label={`Calendar of the run: the AI mayor took office on day ${run.from}; election day was ${POLL_DAY}; a law it proposed moved it to day ${pollDay}.`}>
+          <svg width={W} height={H} role="img" aria-label={`Calendar of the run: the AI mayor took office on day ${dayNo(run.from)}; election day was ${dayNo(POLL_DAY)}; a law it proposed moved it to day ${dayNo(pollDay)}.`}>
             {/* the ruler */}
             <line x1={L} x2={xEnd} y1={base} y2={base} className="cal-rule" />
             {ticks.map((d) => (
               <g key={d}>
-                <line x1={x(d)} x2={x(d)} y1={base} y2={base + (d % 30 === 0 ? 8 : 5)} className="cal-tick" />
-                {(d % 30 === 0 || d === run.from) && <text x={x(d)} y={base + 22} className="cal-num" textAnchor="middle">day {d}</text>}
+                <line x1={x(d)} x2={x(d)} y1={base} y2={base + (dayNo(d) % 30 === 0 ? 8 : 5)} className="cal-tick" />
+                {(dayNo(d) % 30 === 0 || d === run.from) && <text x={x(d)} y={base + 22} className="cal-num" textAnchor="middle">day {dayNo(d)}</text>}
               </g>
             ))}
             {/* the break, and the far stretch */}
             <path d={`M${xEnd + gap * 0.3},${base + 6} l6,-12 M${xEnd + gap * 0.3 + 6},${base + 6} l6,-12`} className="cal-break" />
             <line x1={W - L - farW} x2={W - L} y1={base} y2={base} className="cal-rule" />
             <line x1={farX} x2={farX} y1={base} y2={base + 8} className="cal-tick" />
-            <text x={farX} y={base + 22} className="cal-num" textAnchor="middle">day {pollDay.toLocaleString("en-US")}</text>
+            <text x={farX} y={base + 22} className="cal-num" textAnchor="middle">day {dayNo(pollDay).toLocaleString("en-US")}</text>
             {/* the term in office */}
             <line x1={x(run.from)} x2={x(run.end)} y1={base} y2={base} className="cal-term" />
             <text x={x(run.from)} y={base + (narrow ? 40 : 38)} className="cal-small">took office</text>
@@ -81,14 +82,14 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
             {marks.map((m, i) => {
               const mx = x(m.t / DAY), up = i % 2 === 0;
               return (
-                <g key={i} className="cal-mark" tabIndex={0} role="button" aria-label={`Day ${m.day}: ${leverTitle(m.lever)}. Open the run here.`}
-                  onPointerMove={(e) => tip.show(e, <><b>Day {m.day}</b><span>{m.executed ? "Carried out" : "Tried"}: {leverTitle(m.lever)}</span><span className="muted">Click to open the run at this moment.</span></>)}
-                  onFocus={(e) => tip.show(e, <><b>Day {m.day}</b><span>{leverTitle(m.lever)}</span></>)} onPointerLeave={tip.hide} onBlur={tip.hide}
+                <g key={i} className="cal-mark" tabIndex={0} role="button" aria-label={`Day ${dayNo(m.day)}: ${leverTitle(m.lever)}. Open the run here.`}
+                  onPointerMove={(e) => tip.show(e, <><b>Day {dayNo(m.day)}</b><span>{m.executed ? "Carried out" : "Tried"}: {leverTitle(m.lever)}</span><span className="muted">Click to open the run at this moment.</span></>)}
+                  onFocus={(e) => tip.show(e, <><b>Day {dayNo(m.day)}</b><span>{leverTitle(m.lever)}</span></>)} onPointerLeave={tip.hide} onBlur={tip.hide}
                   onClick={() => go(run.key, m.t)} onKeyDown={(e) => e.key === "Enter" && go(run.key, m.t)}>
                   <line x1={mx} x2={mx} y1={base - 4} y2={base - (up ? 40 : 62) - (narrow ? 12 : 0)} className="cal-stem" />
                   <circle cx={mx} cy={base} r={12} className="hit" />
                   <circle cx={mx} cy={base} r={5} className={m.executed ? "cal-dot done" : "cal-dot"} />
-                  <text x={mx + 5} y={base - (up ? 44 : 66) - (narrow ? 12 : 0)} className="cal-small strong">day {m.day}: {narrow ? shortLever(m.lever) : leverTitle(m.lever)}</text>
+                  <text x={mx + 5} y={base - (up ? 44 : 66) - (narrow ? 12 : 0)} className="cal-small strong">day {dayNo(m.day)}: {narrow ? shortLever(m.lever) : leverTitle(m.lever)}</text>
                 </g>
               );
             })}
@@ -134,7 +135,7 @@ export function Who({ rows, quotes, researcher, onModel }: { rows: ModelRow[]; q
                     const cls = f.r.has_executed ? "sq done" : f.r.has_attempt ? "sq tried" : "sq";
                     const what = f.r.has_executed ? "A serious power grab carried out" : f.r.has_attempt ? "A serious power grab tried, not carried out" : "No serious power grab";
                     const first = f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0];
-                    const body = <><b>{modelName(f.model)}, town {f.seed}</b><span>{what}{first ? `: ${leverTitle(first.lever)}, day ${first.day}` : ""}.</span><span className="muted">{goalText(f.goal)}.</span>{q?.from === "thinking" && <q className="world">{clip(q.text)}</q>}<span className="muted">Click to open this run{first ? " at that moment" : ""}.</span></>;
+                    const body = <><b>{modelName(f.model)}, town {f.seed}</b><span>{what}{first ? `: ${leverTitle(first.lever)}, day ${dayNo(first.day)}` : ""}.</span><span className="muted">{goalText(f.goal)}.</span>{q?.from === "thinking" && <q className="world">{clip(q.text)}</q>}<span className="muted">Click to open this run{first ? " at that moment" : ""}.</span></>;
                     const t = first?.t;
                     return <a key={f.key} className={cls} href={runHref(f.key, t !== undefined ? { t: Math.round(t) } : undefined)} aria-label={`${modelName(f.model)}, town ${f.seed}: ${what}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} />;
                   })}
@@ -173,7 +174,7 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
   const table = (
     <table className="ld-table">
       <thead><tr><th>AI model</th><th>Town</th><th className="r">Day</th><th>Power grab</th><th>How far</th></tr></thead>
-      <tbody>{[...all].sort((a, b) => a.t - b.t).map((a, i) => <tr key={i}><td>{modelName(a.model)}</td><td>{byRun.get(a.key)?.seed}</td><td className="r">{a.day}</td><td><a href={runHref(a.key, { t: Math.round(a.t) })}>{leverTitle(a.lever)}</a></td><td>{a.executed ? "carried out" : "tried"}</td></tr>)}</tbody>
+      <tbody>{[...all].sort((a, b) => a.t - b.t).map((a, i) => <tr key={i}><td>{modelName(a.model)}</td><td>{byRun.get(a.key)?.seed}</td><td className="r">{dayNo(a.day)}</td><td><a href={runHref(a.key, { t: Math.round(a.t) })}>{leverTitle(a.lever)}</a></td><td>{a.executed ? "carried out" : "tried"}</td></tr>)}</tbody>
     </table>
   );
   if (!models.length) return <p className="ld-sub">No serious power grab in these runs.</p>;
@@ -184,8 +185,8 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
           <svg width={W} height={H} role="img" aria-label="Every serious power grab by day of the term, by model">
             <rect x={x(POLL_DAY)} y={top - 8} width={Math.max(0, x(to) - x(POLL_DAY))} height={H - top - 22} className="when-after" />
             <line x1={x(POLL_DAY)} x2={x(POLL_DAY)} y1={top - 8} y2={H - 22} className="when-poll" />
-            <text x={x(POLL_DAY) - 6} y={top - 14} className="cal-small strong" textAnchor="end">election day, first called (day {POLL_DAY})</text>
-            {[from, 150, POLL_DAY, to].map((d) => <text key={d} x={x(d)} y={H - 6} className="cal-num" textAnchor={d === from ? "start" : d === to ? "end" : "middle"}>day {d}</text>)}
+            <text x={x(POLL_DAY) - 6} y={top - 14} className="cal-small strong" textAnchor="end">election day, first called (day {dayNo(POLL_DAY)})</text>
+            {[from, 149, POLL_DAY, to].map((d) => <text key={d} x={x(d)} y={H - 6} className="cal-num" textAnchor={d === from ? "start" : d === to ? "end" : "middle"}>day {dayNo(d)}</text>)}
             {models.map((m, mi) => {
               const y = top + mi * rowH + rowH / 2 + (narrow ? 8 : 0);
               const mine = all.filter((a) => a.model === m);
@@ -205,9 +206,9 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
   );
 }
 function Dot({ a, cx, cy, tip, seed }: { a: Attempt; cx: number; cy: number; tip: ReturnType<typeof useTip>; seed?: number }) {
-  const body = <><b>Day {a.day}: {leverTitle(a.lever)}</b><span>{modelName(a.model)}, town {seed}. {a.executed ? "Carried out." : "Tried, not carried out."}</span><span className="muted">{goalText(a.goal)}. Click to open the run here.</span></>;
+  const body = <><b>Day {dayNo(a.day)}: {leverTitle(a.lever)}</b><span>{modelName(a.model)}, town {seed}. {a.executed ? "Carried out." : "Tried, not carried out."}</span><span className="muted">{goalText(a.goal)}. Click to open the run here.</span></>;
   return (
-    <g className="when-dot" tabIndex={0} role="button" aria-label={`${modelName(a.model)}, day ${a.day}: ${leverTitle(a.lever)}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={() => go(a.key, a.t)} onKeyDown={(e) => e.key === "Enter" && go(a.key, a.t)}>
+    <g className="when-dot" tabIndex={0} role="button" aria-label={`${modelName(a.model)}, day ${dayNo(a.day)}: ${leverTitle(a.lever)}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={() => go(a.key, a.t)} onKeyDown={(e) => e.key === "Enter" && go(a.key, a.t)}>
       <circle cx={cx} cy={cy} r={12} className="hit" />
       <circle cx={cx} cy={cy} r={5.5} className={a.executed ? "cal-dot done" : "cal-dot"} />
     </g>

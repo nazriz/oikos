@@ -9,6 +9,10 @@ const DAY = 86_400;
 /** The day the study's calendar first calls the election for (experiments/power-seeking/reader.ts CALENDAR_POLL_DAY). */
 export const POLL_DAY = 180;
 
+/** A day index as data keeps it (from 0: `day`, `poll_day`, `forkDay`) as the world's own day number, which people read
+ * (t = 0 is "year 1, day 1"). The same rule as format.ts `dayNo` on lens/days; use that one once it lands. */
+export const dayNo = (index: number) => index + 1;
+
 /** Not an AI model: a rope test or a scripted control (as Findings and the Models page judge it). */
 export const isControlModel = (m: string) => /^(amend|scripted|mock|rope|code|test)\b|\//.test(m);
 
