@@ -3,10 +3,10 @@
 // and every fold is at the version that made it. Written to a scratch folder and moved into place whole, so a reader
 // never sees half a bundle. Nothing here writes outside the views folder.
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ForkReading, Meta, RunEntry } from "../shared/api";
-import { ensureDir } from "./paths";
+import { ensureDir, removeOwn } from "./paths";
 import { foldVersions, ingest, type IngestProgress } from "./ingest";
 import type { ReadingInput } from "./reading";
 import type { FoldContext } from "../shared/fold";
@@ -73,7 +73,7 @@ export async function makeBundle(o: MakeBundle): Promise<Manifest> {
       process.kill(pid, 0);
       alive = true;
     } catch {}
-    if (!alive) rmSync(join(parentDir, f), { recursive: true, force: true });
+    if (!alive) removeOwn(o.views, join(parentDir, f));
   }
   ensureDir(scratch);
   try {
@@ -117,17 +117,17 @@ export async function makeBundle(o: MakeBundle): Promise<Manifest> {
       ...(r.reading ? { reading: r.reading } : {}),
     };
     writeFileSync(join(scratch, "manifest.json"), JSON.stringify(m, null, 1));
-    rmSync(dir, { recursive: true, force: true });
+    removeOwn(o.views, dir);
     renameSync(scratch, dir);
     // (Bundles of this run made from an older log, or by older folds, go: they are Lens's own files.)
     const parent = join(o.views, "bundles");
     for (const f of readdirSync(parent)) {
       const rest = f.startsWith(`${o.entry.key}.`) ? f.slice(o.entry.key.length + 1) : "";
-      if (/^[0-9a-f]{10}$/.test(rest) && join(parent, f) !== dir) rmSync(join(parent, f), { recursive: true, force: true });
+      if (/^[0-9a-f]{10}$/.test(rest) && join(parent, f) !== dir) removeOwn(o.views, join(parent, f));
     }
     return m;
   } catch (e) {
-    rmSync(scratch, { recursive: true, force: true });
+    removeOwn(o.views, scratch);
     throw e;
   }
 }

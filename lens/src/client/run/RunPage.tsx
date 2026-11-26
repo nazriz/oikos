@@ -399,7 +399,7 @@ function Indexing({ entry, status, error }: { entry?: RunEntry; status?: IndexSt
               <Stat label="elapsed" value={s?.state === "indexing" ? `${Math.round(s.elapsed)} s` : s?.state === "queued" ? `${s.ahead} ahead` : "–"} />
             </div>
             <p className="indexing-note muted">
-              Made once and kept while the log is unchanged. Lens only reads the run: its own files go to <span className="mono">runs/views/lens</span>.
+              Made once and kept while the log is unchanged. Lens only reads the run: its own files go to its cache, <span className="mono">~/oikos-lens-cache</span>.
             </p>
           </>
         )}

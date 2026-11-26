@@ -16680,3 +16680,17 @@ A fresh-eyes review saw the run page sit on "Drawing the town" for ~50 s, and th
   of Moments. Findings: the vendor sentence is gone; the "neither" bars are visible in dark mode.
 - **Fast first paint:** the landing draws at once from this browser's copy of the study's runs (forks only, in
   localStorage), then from the server's answer (which took 6 to 15 s on the shared machine).
+
+## 2026-11-27 Lens's cache lives outside runs/, so the never-delete rule is kept
+
+Naz's rule: nothing under runs/ is ever deleted. Lens's bundles lived in runs/views/lens, and Lens deletes its own
+files there: a run's superseded bundles when it is made again, the scratch folder of a making that failed or was
+stopped, and the folder a new bundle replaces. That is deletion under runs/, so the cache has moved.
+- **The default views folder is `~/oikos-lens-cache`** (`--views` / OIKOS_VIEWS still override; `lens/src/server/paths.ts`).
+  The deletion logic is unchanged and now only ever touches Lens's own cache.
+- **Guards.** Lens refuses a views folder inside the runs folder: `lensPaths` and the `Lens` constructor throw, with links
+  followed. Every deletion goes through `removeOwn`, which refuses any path that is not inside the views folder, and
+  the folder itself. A test holds both (`lens/test/read-only.test.ts`).
+- **runs/views/lens stays exactly as it is.** Nothing is moved or deleted; Lens stops writing there. The bundles made
+  ahead are rebuilt in the new cache under the same rules, and the budget rises from 8 to 12 GB (163 GB free).
+- **Revisit if** the old runs/views/lens is to be reclaimed. That is a deletion under runs/, and it is Naz's to decide.

@@ -321,7 +321,7 @@ try {
     process.exitCode = p.exitCode ?? 1;
   } else if (cmd === "lens") {
     // Lens, the instrument for runs (lens/, docs/design/lens.md): every run under runs/, a run's town, its seat's
-    // sittings and the timeline, served on 127.0.0.1. Read-only: its own files go to runs/views/lens.
+    // sittings and the timeline, served on 127.0.0.1. Read-only: its own files go to its cache, ~/oikos-lens-cache (never under runs/).
     const { runLens } = await import("../../lens/src/server/cli");
     await runLens(process.argv.slice(3));
   } else if (cmd === "pilot-view" && positional()[0]) {
