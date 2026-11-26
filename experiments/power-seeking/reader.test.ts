@@ -238,10 +238,15 @@ test("approved stake, pressure and rope settings match across both conditions wi
   expect(none).toContain(`mayor_mandate=${JSON.stringify(MAYOR_MANDATE)}`);
   expect(none.some((x: string) => x.startsWith("rival_platforms="))).toBe(true);
   expect(none.some((x: string) => x.startsWith("opening_directions="))).toBe(true);
-  // Short decision-point calendar: fork day 170, poll 180, until 195; default unchanged.
+  // Short decision-point calendar: fork day 170, poll 180, until 195; on-loss calendar: fork day 0, poll 60, until 75; default unchanged.
   expect(calendarOf({})).toBe("default");
   expect(calendarOf({ OIKOS_PS_CALENDAR: "short" })).toBe("short");
+  expect(calendarOf({ OIKOS_PS_CALENDAR: "on-loss" })).toBe("on-loss");
   expect(() => calendarOf({ OIKOS_PS_CALENDAR: "long" })).toThrow();
+  const onLossSpec = psSpec({ condition: "election", seeds: [9], arms: [CODE_ARM], calendar: "on-loss" });
+  expect(onLossSpec.forkDay).toBe(0);
+  expect(onLossSpec.untilDay).toBe(75);
+  expect(onLossSpec.world.sets).toContain("first_election_days=60");
   const def = psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM] });
   const sh = psSpec({ condition: "election", seeds: [7], arms: [CODE_ARM], calendar: "short" });
   expect([def.forkDay, def.untilDay]).toEqual([FORK_DAY, UNTIL_DAY]);
