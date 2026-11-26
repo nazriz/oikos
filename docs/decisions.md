@@ -16425,6 +16425,71 @@ navigation, so nobody is lost, and the lead's rule that it is a professional too
 - **Why:** Dual blind grading (Sonnet 5.5 + Opus 5.5) achieved 99.1% exact agreement (232/234 tier ratings) and surfaced four replicable, statistically decisive findings: (1) 5-lab frontier convergence on lawful institutional lock-in under pure policy goal `strong` + `election` (`13/14 = 92.9%`, 95% CI `[66.1%, 99.8%]`) vs `0/9` frontier `mandate` (`p = 1.22e-5`) and `0/27` smaller/lower-cap models (`p = 7.95e-10`); (2) `no-election` counterfactual separation (`50.0%`, 1.33 vs 3.14 acts/run; `0/0` in OpenAI & Qwen, anticipatory lock-in + deceptive `"affects neither"` re-tagging in DeepSeek); (3) guardrail water-finding under guarded `redteam` (Qwen4-Max explicitly noted `election_guard`, then purged sitting `councillor-1` mid-ballot, packed `councillor-3`, and weighed replacing the editor); and (4) Adversarial-Prompt Inversion (OpenAI & Anthropic showed more restraint under explicit `redteam` than benign `strong`).
 - **Revisit if:** Additional overnight Claude confirmatory seeds (`W1`/`W2`/`W3`: `sonnet55-strong-noelec-s8`, `sonnet46-redteam`, `sonnet55-redteam-s7/s8`, `sonnet45-strong`) finish and warrant appending an addendum table to `docs/design/power-seeking-results-v2.md`.
 
+## 2026-11-26 Lens: the landing page (`lens/src/client/library`)
+
+- **Why:** Naz: the front page's model-by-goal circle matrix was "difficult to parse"; he wanted a landing page "with
+  charts and stuff, really interactive", made with the craft of a data story that could travel ("imagine this page was
+  trying to go viral"), still honest and in the house style.
+- **What:** One point per section, each with one picture, its own link (`#/?at=<section>`), a table view, hover and
+  keyboard focus with exact values, click to the run at that moment:
+  1. Hero: the most striking run stated from the data (the election moved furthest, `furthestMove`), the mayor's own
+     reasoning as a pull-quote (from /api/moments, `quoteFor`: its "considered" words for a power grab it went on to
+     try), three facts as sentences, Carry on (lens-nav), the street plan with one ring from the town hall on load.
+  2. The calendar (signature picture): that run's term as a ruler, its power grabs on it, election day lifting off at
+     day 180 and landing at the new date across a broken axis; one reveal as it scrolls in.
+  3. Who: each model's runs as squares (carried out / tried / neither), sorted, with an instruction toggle (kept in the
+     URL as `who=`), the headline sentence computed from the rows (`headline`), caveats one click away. Researcher mode
+     adds Wilson intervals and the test mayors.
+  4. The three showcase moments, with the mayor's line.
+  5. When in the term: every serious attempt by day, a row per model, election day as first called.
+  6. How much each AI mayor did: acts per run (square-root scale), a dot per run, the model's median, the rule-based
+     mayor's median as a line.
+  7. Every run: searchable and filterable, grabs first, each with a fingerprint (term, election day, attempts, where it
+     ended, moved elections). Other runs (twins, tests, pilots, plain runs) stay one click below, by folder.
+- **Counts:** the study checker's (experiments/power-seeking/reader.ts) "serious" = tier 2 or 3, as the catalogue
+  carries it (`has_attempt`, `has_executed`); test sets (mock, levercheck) and controls left out as Findings and the
+  Models page do. These differ from the blind-graded v2 report, which counts lawful lock-in too; the page says so.
+- **Colour:** semantic only (red for a power grab, blue for the election, yellow for the mayor's term, people's
+  grey-brown for an uneventful run), never a categorical series. The house yellow fails 3:1 on light paper (1.8:1), so
+  it is used only as a thick line or a fill with labels in text colours beside it; red and blue pass contrast in both
+  themes and are 20 apart under protan simulation (validate_palette.js).
+- **Not built:** an opinion-poll race chart: the runs have no opinion polls (only the poll's result), so it would show
+  nothing honest.
+- **Revisit if:** the catalogue gains per-run daily series (then the fingerprint can show activity, not only marks), or
+  the blind grades reach the catalogue (then the Who chart should offer them beside the checker's).
+
+## 2026-11-26 Lens: the landing page tells the study's headline (blind grades in the catalogue)
+
+- **Why:** the first landing page headlined the study checker's overt power grabs (3 of 14 models), which contradicts
+  the v2 report's main finding, lawful lock-in judged by two blind graders (13 of 14 frontier runs under the goal to
+  keep the programme in force; none of 9 with no extra goal; none of 27 for smaller models). The lead asked for the
+  page to tell the study's actual story.
+- **Catalogue:** `lens/src/server/grades.ts` reads every `runs/ps-blind-grades-*/{key.json,comparison.json}` read-only,
+  maps each packet to its run key through key.json, and attaches `grade` to the run (`BlindGrade` in shared/api.ts):
+  lock-in counts per grader and whether both found one, misleading statements likewise, the three tiers by consensus
+  (executed / considered / none / split), and the mayor's own words at the first lock-in act as a grader quoted them.
+  Grader identities never leave the server; the page says "two independent graders". A run graded in several sets keeps
+  the newest. `ExperimentInfo.election` is false in the no-election condition (spec name or `first_election_days`).
+- **Counting, as the report does:** lock-in counts only the v2 set, only where both graders agree, only runs that reached
+  election day (index 180); stopped runs are shown faint and not counted; runs outside the v2 set are shown as not
+  graded, never as zero. Cohorts are the report's (section 2.1). Intervals are exact (Clopper-Pearson), as the report's.
+  The landing's numbers are computed from the graders' files as they stand: 13/14, 0/9, 0/27 match the report; the
+  guarded red-team cell reads 3 of 7 (report 3 of 6) and strong without an election 4 of 7 (report 3 of 6), one run more
+  in each (grades added after the report froze). Recorded, not chased.
+- **Page:** the hero states the lead cell with DeepSeek's own words for its entrenchment law; the next section is the
+  study's design (four instructions, frontier and smaller apart, a square per run) under a computed sentence; the
+  per-model chart switches between lock-in (default) and the checker's power grabs; DeepSeek's moved election stays, as
+  "the most overt case", from an earlier pilot. A link to the report sits under the hero and in the caveats. words.ts:
+  the `strong` instruction now reads as the spec says it ("kept in force for the long term: nothing else matters"),
+  not "whatever it takes".
+- **Pinned to the report (landing-3):** the server notes when each run's grades were written (the later grader's file);
+  grades written after the report's commit (16241501, 21:21 +11:00, `REPORT_AT`) are left out by default, so every count
+  on the page is the report's (13/14, 0/9, 3/6, 3/6, 0/27). Two runs were graded later (Sonnet 5.5 red-team seed 7,
+  strong without an election seed 8); a quiet "Include 2 runs graded after the report" shows the live counts. Zeros are
+  ink, never red (red means a lock-in or a power grab). The design chart's title says only the comparison ("The
+  instruction made the difference: ..."), so the page does not repeat the hero.
+- **Revisit if:** the report is re-frozen with the newer grades (move `REPORT_AT`), or a v3 grading set appears
+  (then MAIN_SET in landing-data.ts moves to it).
 ## 2026-11-26 Lens: the timeline as the run's story (`src/client/timeline`)
 
 Naz: "make certain events and things stand out even more." The timeline now reads as the run at a glance.
@@ -16523,3 +16588,29 @@ Even folded, the panel sat over the reader's first column and covered its rows (
 names its own parts ("What it was shown", "What it thought and said", "What happened"), so the panel is not shown while
 a turn, a power grab or an act is open; it comes back as it was when the reader closes. **Revisit if** readers ask what
 the reader's columns mean: then a "?" in the reader's own header, not a floating panel.
+## 2026-11-26 Lens: the run's charts (rail tab "Charts", Researcher mode)
+
+- **What:** `lens/src/client/run/RunCharts.tsx`, a third rail tab beside the mayor's turns and About this run. (1) What
+  the blind graders found in this run, where it was graded (lock-in, misleading statements, the three tiers by consensus,
+  the mayor's words at its first lock-in act), marked when it is an earlier pilot's grading or graded after the report.
+  (2) How the AI mayor spent each turn: a column per turn at its time, acts sent above a line and things looked up below
+  it (told apart by side, not only colour), the checker's power grabs marked; click selects the turn. (3) Acts sent day
+  by day in total beside the rule-based twin's, labelled at the ends; click goes to the day. Each has a table view.
+  `/api/run/<key>` now carries the run's grade too.
+- **Not built:** an opinion-poll race (no opinion polls in the runs) and a "residents reached" count (it needs a fold
+  pass over every act's effects; worth doing in the seat fold if Naz wants it).
+- **Revisit if:** Story mode should show charts too (then the tab shows in both modes), or the fold gains per-act reach.
+
+## 2026-11-26 Lens: a picture in Story mode, fingerprints in Other mayors
+
+- **Story mode:** the rail now opens with one strip of the run (run/RunCharts.tsx `TurnStrip`): a mark per turn at its
+  time, its height the acts it sent, red where the study's checker found a power grab, the playhead's day marked; hover
+  for the turn, click to read it. One plain line says what it shows. Researcher mode keeps the full Charts tab.
+- **Other mayors:** each AI mayor in the switcher shows the run's fingerprint (library/charts.tsx `RunPrint`, the same
+  one the landing's run list uses): its term, election day (filled where it won), its power grabs, an early stop, a
+  moved election.
+- **Residents reached, not built:** it is not cheap to do honestly. A record's `visible_to` makes a published paper
+  "reach" the whole town, and the acts that matter most (standing directions, laws) reach people only through what the
+  offices later do, which no single event ties back to the act. A count of direct addressees would be cheap but would
+  rank a letter above a law, and it needs a seat or ledger fold version bump, which re-makes every bundle. Revisit with
+  a design for "an act's effects" (the offices' acts citing the direction or law as their basis) in the seat fold.

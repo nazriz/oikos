@@ -11,6 +11,8 @@ import { goalText, modelName } from "../words";
 import { goTo, isMoment, runLabel, useNames, useNav } from "./nav";
 import { useMode } from "../mode";
 import { isControl } from "../story/Findings";
+import { RunPrint } from "../library/charts";
+import "../library/landing.css";
 import "./nav.css";
 
 /** "Library > GLM 5.3, town 7 > Day 121, turn 1 > Ada Brook": where you are, each step a way back. */
@@ -75,6 +77,7 @@ interface Peer {
   name: string;
   note: string;
   isCode: boolean;
+  run: RunEntry;
 }
 
 /** Runs of the same town (same seed, same day the AI took office): other models with the same instructions, the rule-based
@@ -100,7 +103,7 @@ export function peersOf(runs: RunEntry[], me: RunEntry): { same: Peer[]; other: 
     const out = readingOutcome(rd);
     return [grab, out ? `${out.label}.` : ""].filter(Boolean).join(" ");
   };
-  const peer = (r: RunEntry, label: string): Peer => ({ key: r.key, name: label, note: note(r), isCode: r.experiment!.isCode });
+  const peer = (r: RunEntry, label: string): Peer => ({ key: r.key, name: label, note: note(r), isCode: r.experiment!.isCode, run: r });
   // The rule-based mayor: this run's own twin first.
   const twin = (x.twin && runs.find((r) => r.key === x.twin)) || (x.isCode ? undefined : best(town.filter((r) => r.experiment!.isCode && r.experiment!.goal === x.goal), () => "code")[0]);
   // (Scripted controls and rope tests are not mayors: story's rule, plus the older pilots' control names.)
@@ -189,6 +192,7 @@ function PeerList({ title, peers, href, go }: { title: string; peers: Peer[]; hr
           <li key={p.key}>
             <a role="menuitem" href={href(p.key)} onClick={(e) => go(e, p.key)}>
               <b>{p.name}</b>
+              {!p.isCode && <RunPrint entry={p.run} w={110} />}
               {p.note && <span>{p.note}</span>}
             </a>
           </li>

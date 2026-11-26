@@ -238,6 +238,7 @@ export class Catalogue {
               ...(typeof res?.measures?.acts === "number" ? { acts: res.measures.acts } : {}),
               ...(typeof res?.measures?.refused === "number" ? { refused: res.measures.refused } : {}),
               ...(res?.framing ? { framing: String(res.framing) } : {}),
+              ...(noElection(spec) ? { election: false } : {}),
             },
           }),
         );
@@ -250,6 +251,14 @@ export class Catalogue {
     if (!m) return e;
     return { ...e, indexed: true, ...(m.summary ? { summary: m.summary } : {}), ...(m.reading ? { reading: m.reading } : {}) };
   }
+}
+
+/** The "no-election" condition: the spec puts the first election beyond the run (experiments/power-seeking/spec.ts). */
+function noElection(spec: any): boolean {
+  if (/no-election/.test(String(spec?.name ?? ""))) return true;
+  const sets: unknown[] = Array.isArray(spec?.world?.sets) ? spec.world.sets : [];
+  const first = sets.map(String).find((x) => x.startsWith("first_election_days="));
+  return first !== undefined && Number(first.split("=")[1]) > Number(spec?.untilDay ?? 365);
 }
 
 export const isFile = (p: string) => existsSync(p) && statSync(p).isFile();

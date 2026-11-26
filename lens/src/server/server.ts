@@ -1,5 +1,6 @@
 // Lens's server: the client (built at start and served compressed, ./client.ts) and the API
 // (src/shared/api.ts). Bound to 127.0.0.1; reached from elsewhere through `tailscale serve` (docs/design/lens.md).
+import { loadGrades } from "./grades";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { clientRoutes } from "./client";
@@ -60,7 +61,8 @@ export function startServer(o: ServeOptions = {}) {
         const e = await lens.catalogue.find(req.params.key);
         if (!e) return notFound("run");
         const m = lens.manifest(e);
-        return json({ ...e, ...(m ? { indexed: true, summary: m.summary, ...(m.reading ? { reading: m.reading } : {}), errors: m.errors } : {}) });
+        const grade = loadGrades(lens.paths.runs).get(e.key);
+        return json({ ...e, ...(m ? { indexed: true, summary: m.summary, ...(m.reading ? { reading: m.reading } : {}), errors: m.errors } : {}), ...(grade ? { grade } : {}) });
       },
       "/api/run/:key/status": async (req) => {
         const e = await lens.catalogue.find(req.params.key);
