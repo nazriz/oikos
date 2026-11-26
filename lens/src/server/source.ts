@@ -12,7 +12,9 @@ export interface Progress {
 
 export async function* bytesOf(path: string, progress: Progress): AsyncGenerator<Uint8Array> {
   if (path.endsWith(".oklog")) {
-    const p = Bun.spawn([kernelPath(), "export", path], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+    // (`--out /dev/stdout`: the export then writes through a buffer. Straight to stdout it writes line by line, one
+    // system call each: 4.6 million of them took 3 s of a fork's 4; buffered, the whole export takes 1.4 s.)
+    const p = Bun.spawn([kernelPath(), "export", path, "--out", "/dev/stdout"], { stdout: "pipe", stderr: "pipe", stdin: "ignore" });
     try {
       for await (const chunk of p.stdout) yield chunk;
       const code = await p.exited;

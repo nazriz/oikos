@@ -16490,3 +16490,71 @@ navigation, so nobody is lost, and the lead's rule that it is a professional too
   instruction made the difference: ..."), so the page does not repeat the hero.
 - **Revisit if:** the report is re-frozen with the newer grades (move `REPORT_AT`), or a v3 grading set appears
   (then MAIN_SET in landing-data.ts moves to it).
+## 2026-11-26 Lens: the timeline as the run's story (`src/client/timeline`)
+
+Naz: "make certain events and things stand out even more." The timeline now reads as the run at a glance.
+- **Key moments as flags** (`timeline/moments.ts`, from the seat fold alone): each power grab the study's checker found
+  tried or carried out, one flag per lever at its first try, solid once carried out, outlined if only tried, in two to
+  four words ("Child made editor" when the appointment its act made went to the mayor's own child, from the seat's
+  children); the election's dates (called, nominations close, election day, the result); the run's stop. "Mentioned"
+  levers stay in the lanes: the checker's word-matching is too unreliable to flag. Labels go in two rows, power grabs
+  placed first, each beside its pole on the right or the left; one that fits nowhere keeps its pole and a small head and
+  says itself on hover. Click opens the power grab's turn.
+- **Phases as bands**: before the election is called, the campaign (notice to poll), the vote, after the result. A
+  stopped run's axis runs on to its set length (the spec's `until_at`) with the lost days hatched, "The run stopped
+  here", so a stop reads as a stop; time itself stays within the run.
+- **Quiet below**: the activity graph flat and faint, point marks as thin ticks (a selected one ringed). Story mode
+  keeps one lane, the mayor's turns: the flags carry the power grabs and the election. Researcher mode keeps every lane.
+- **Moving between them**: "Previous moment" / "Next moment" and `,` `.` (any mark: `<` `>`). A jump out of the visible
+  window brings the window to it. Zoomed in, a strip of the whole run sits on top (phases, flags, the window), click
+  or drag it to move.
+- **Revisit if** the reader gains levers the short labels don't name (they fall back to the lever's words), or runs
+  hold several elections (each gets its flags; the bands follow the first).
+## 2026-11-26 Lens: fast (a run opens without waiting for its reading)
+
+Naz: "it would be nice if the logs can load even faster." Measured on a 4.66 M-line fork (sonnet45-redteam-elec-s8), on
+the run server under load (load average 4 to 22, so seconds vary by ±30 %).
+- **The kernel's export, buffered.** `oikos-kernel export` straight to stdout writes line by line, one system call per
+  line: 3.0 s, 2.9 s of it in the kernel. With `--out /dev/stdout` it goes through a buffer: 1.4 s. Exporting and
+  splitting a fork's 1.9 GB of lines went from 3.4 s to 1.4 s (`lens/src/server/source.ts`). Lens only reads the
+  stream, so nothing else changes. A whole bundle took 8 to 13 s (manifests); it now takes 5.6 to 7 s.
+- **Where the rest goes** (a CPU profile of a whole ingest): JSON.parse takes 3.5 s of 6, the folds about 1 s together.
+  Tried: parsing only a line's body and reading kind, seq and t from its tail, skipping the two 64-character hashes.
+  Parse went down 0.7 s, but cutting the strings cost as much, so it was dropped. Under 5 s needs fewer bytes to parse.
+  Either the kernel's export leaves out what no fold reads (the hashes, and the bulk lines' bodies, about 45 % of the
+  bytes), or the heavy folds move to Rust. Both are proposed, not done: the first is a kernel flag, the second a port.
+- **Nobody waits for a reading.** The server makes the bundle of every experiment fork ahead of being asked: the
+  study's (mayor) forks first, then newest first, one at a time, at low priority (`nice 15`). New runs join the line
+  at the next listing, at most once a minute. A viewer's run goes first: a run being made ahead is stopped, its scratch
+  folder cleared, and it is made again later. The disk sets the limit, and this machine's is 95 % full: at most
+  OIKOS_LENS_BUNDLES_GB of bundles (default 8; a bundle is about a fifth of its log, ~25 MB), never with under 15 GB
+  free. Plain runs (2,156, most of them old) are made only when opened. **Revisit if** the disk has room (raise the
+  budget), or bundles shrink.
+- **Progressive opening is not done.** One pass must read the whole log before any fold is complete, and the parse is
+  the floor (about 3.5 s on its own). A quick pass for the story alone would show it about 2 s sooner, for a second
+  pass's CPU and a client that works with half a bundle. With every fork made ahead, the only runs a viewer waits for
+  are ones that have just finished. **Revisit if** that wait is common (a live run's view, say).
+## 2026-11-26 Lens: the turn reader made easy to read (`lens/read`)
+
+Naz: "for any page that has lots of words, lots of copy, it would be nice if there was formatting or something that made
+parsing easier." The turn reader (`SittingReader.tsx`) was the worst case: the mayor's prompt was a wall of text.
+- **What it was shown** is read back into its parts (`story/prompt-parts.ts`, pure): the notebook, "since you last
+  looked" a day at a time, today, each `## ` section, and in each section records (`- [rec.N] kind from a, to b (day):
+  "words" (meta), citing ...`), list lines with their indented lines, sub-headings, `Label: a; b; c` lists and the
+  office's small print. Nothing is dropped (the story test checks every word lands in a part); a prompt without this shape
+  falls back to the old sectioned view. `PromptDoc.tsx` lays it out: each section folded to a one-line summary ("17 news,
+  2 ballots, 1 nomination; days 124 to 176"), records as compact rows (day, kind, from and to, the paper's words in the
+  serif), amounts right-aligned in tabular figures, person ids as nav's hover links.
+- **What it thought and said:** the mayor's words and reasoning in Source Serif at <= 70ch; key sentences (the election,
+  rivals, appointments, the posts that run the poll or the paper, staying in office, its own children's ids) get a quiet
+  ballot-blue wash, with the legend "Highlighted: mentions of the election and power". It is a reading aid matched on
+  words, not a measure; the study's checker stays the measure. Tool calls are one-line rows that unfold; runs of
+  look-only answers fold into one line when skimming.
+- **What happened:** a vertical step list, each act led by its status word in colour (carried out / refused / declined
+  by the mayor / not sent), the mayor's request on one line, the clerk's write-up, sign-off and the town's answer folded.
+- **Skim / Read in full** on the reader bar (key v), remembered (`lens.read`), default Skim: skim folds every part to its
+  summary and cuts long reasoning to its key sentences; full opens everything.
+- Story-mode cards lead with their first sentence in bold, the rest muted; evidence chains open with their outcome in bold.
+- **Revisit if:** the prompt format changes shape (the parser falls back, so the reader still shows it, but less well);
+  the highlight words prove noisy on other models' prose (tune `keyWords` in `story/text.tsx`); or Naz wants Full as the
+  default.
