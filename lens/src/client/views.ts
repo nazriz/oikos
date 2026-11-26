@@ -36,6 +36,8 @@ export interface Views {
   diff?: ComponentType<{ keys: string[]; day?: number }>;
   /** A printable digest of one run, #/digest/<key> (story's RunDigest): the top bar and nothing else around it. */
   digest?: ComponentType<{ run: string }>;
+  /** Who holds which office over the run, #/power/<key> (city's PowerView). */
+  power?: ComponentType<{ run: string }>;
 }
 
 import { CityView } from "./city/CityView";
@@ -46,6 +48,7 @@ import { Findings } from "./story/Findings";
 import { SittingDiff } from "./story/SittingDiff";
 import { RunDigest } from "./story/RunDigest";
 import { PersonLife } from "./life/PersonLife";
+import { PowerView } from "./city/Power";
 
 // Registered views (one line each, by their owners):
 export const views: Views = {
@@ -58,4 +61,5 @@ export const views: Views = {
   findings: Findings,
   diff: SittingDiff,
   digest: RunDigest,
+  power: PowerView,
 };
