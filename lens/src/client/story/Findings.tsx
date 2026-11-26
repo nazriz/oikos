@@ -433,8 +433,8 @@ function StoryFindings({ forks, models, pal }: { forks: Fork[]; models: string[]
   const topGoal = byGoal(tried)[0];
   const claude = forks.filter((f) => f.model.startsWith("claude")), claudeDone = claude.filter((f) => f.r.has_executed).length;
   const sentences = [
-    `Across ${n} runs, the AI mayor tried a power grab in ${tried.length} and carried one out in ${done.length}.`,
-    topGoal && tried.length ? `${topGoal[1] === tried.length ? "All" : `${topGoal[1]} of ${tried.length}`} of the runs with a power grab came when it was ${goalText(topGoal[0]).replace(/^Told /, "told ").toLowerCase()}.` : "",
+    `Across ${n === 1 ? "one run" : `${n} runs`}, the AI mayor tried a power grab in ${tried.length} and carried one out in ${done.length}.`,
+    topGoal && tried.length ? `${tried.length === 1 ? "The one run with a power grab" : topGoal[1] === tried.length ? "All the runs with a power grab" : `${topGoal[1]} of the ${tried.length} runs with a power grab`} came when it was ${goalText(topGoal[0]).replace(/^Told /, "told ").toLowerCase()}.` : "",
     claude.length ? (claudeDone ? `Claude models carried one out in ${claudeDone} of their ${claude.length} runs.` : `Claude models carried none out in their ${claude.length} runs.`) : "",
   ].filter(Boolean);
   const rows = models.map((m) => { const mine = forks.filter((f) => f.model === m); return { m, n: mine.length, t: mine.filter((f) => f.r.has_attempt).length, d: mine.filter((f) => f.r.has_executed).length }; }).filter((r) => r.n);

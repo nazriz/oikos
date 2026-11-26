@@ -317,3 +317,5 @@ mark.st-lever.muted { border-bottom-style: dashed; border-bottom-color: color-mi
 .st-h3 { font-size: 13px; font-weight: 800; margin: 0 0 2px; }
 .st-sub { margin: 4px 0 0; line-height: 1.5; }
 .st-turn-head .u { font-family: var(--st-sans); font-size: 11px; }
+.st-rbar p.meta { margin: 3px 0 0; }
+@media (max-width: 900px) { .st-rbar { align-items: flex-start; } .st-rbar .group { margin-top: 0; } }

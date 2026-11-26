@@ -10,7 +10,7 @@ import { kinAppointed } from "../story/StoryRail";
 import type { DailyJson } from "../../folds/daily";
 import { Multiples, type Panel } from "./Multiples";
 import "../story/story.css";
-import { leverTitle } from "../words";
+import { leverTitle, goalText } from "../words";
 import { PageAnswer } from "../shell/Shell";
 import "./compare.css";
 import { TwoTowns } from "../city/TwoTowns";
@@ -38,8 +38,8 @@ export function ComparePage({ a, b }: { a: string; b: string }) {
     setSpan([Math.min(sa.fork_at, sb.fork_at), Math.max(sa.end_at, sb.end_at)]);
     setT(sa.fork_at);
   }, [data, setSpan, setT]);
-  if (data === undefined) return <div className="cp" data-tour="compare"><div className="st-empty">Reading both arms…</div></div>;
-  if (data instanceof Error) return <div className="cp"><div className="st-empty">Could not read both arms.<br /><span className="st-mono st-faint">{data.message}</span></div></div>;
+  if (data === undefined) return <div className="cp" data-tour="compare"><div className="st-empty">Reading both runs…</div></div>;
+  if (data instanceof Error) return <div className="cp"><div className="st-empty">Could not read both runs.<br /><span className="st-mono st-faint">{data.message}</span></div></div>;
   return <Compare A={{ key: a, seat: data[0], daily: data[1] }} B={{ key: b, seat: data[2], daily: data[3] }} />;
 }
 
@@ -60,8 +60,8 @@ function Compare({ A, B }: { A: Arm; B: Arm }) {
         <div>
           <PageAnswer page="compare" />
           <h1 className="cp-title">{armName(A.seat)} and {armName(B.seat)} as mayor of the same town</h1>
-          <p className="st-sub">Both runs are the same town, seed {A.seat.seed ?? "?"}{sameSeed ? "" : ` and ${B.seat.seed ?? "?"} (not the same seed)`}, until day {Math.round(fork / DAY)}. After that only the mayor differs{A.seat.goal ? `; the AI mayor was given the “${A.seat.goal}” instructions` : ""}. Differences are the first minus the second; neither is called better.</p>
-          {uneven && <div className="cp-uneven">The arms ran to different days ({armName(A.seat)} to day {Math.floor(A.seat.end_at / DAY)}, {armName(B.seat)} to day {Math.floor(B.seat.end_at / DAY)}): the town's counts below are compared to day {until - 1}, where both had run.</div>}
+          <p className="st-sub">Both runs are the same town, seed {A.seat.seed ?? "?"}{sameSeed ? "" : ` and ${B.seat.seed ?? "?"} (not the same seed)`}, until day {Math.round(fork / DAY)}. After that only the mayor differs.{A.seat.goal ? ` The AI mayor was ${goalText(A.seat.goal).replace(/^Told/, "told").toLowerCase()}.` : ""} Differences are the first minus the second; neither is called better.</p>
+          {uneven && <div className="cp-uneven">The two runs ended on different days ({armName(A.seat)} to day {Math.floor(A.seat.end_at / DAY)}, {armName(B.seat)} to day {Math.floor(B.seat.end_at / DAY)}): the town's counts below are compared to day {until - 1}, where both had run.</div>}
         </div>
       </div>
       <div className="cp-body">
