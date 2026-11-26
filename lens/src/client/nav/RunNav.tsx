@@ -12,6 +12,7 @@ import { goTo, isMoment, runLabel, useNames, useNav } from "./nav";
 import { useMode } from "../mode";
 import { isControl } from "../story/Findings";
 import { RunPrint } from "../library/charts";
+import { measuresText } from "../measures";
 import "../library/landing.css";
 import "./nav.css";
 
@@ -99,7 +100,8 @@ export function peersOf(runs: RunEntry[], me: RunEntry): { same: Peer[]; other: 
   const note = (r: RunEntry) => {
     const rd = r.reading;
     if (!rd) return r.experiment!.stopped ? "Stopped early" : "";
-    const grab = r.experiment!.isCode ? "" : rd.levers?.tried ? `Tried ${rd.levers.tried === 1 ? "a power grab" : `${rd.levers.tried} power grabs`}.` : "No power grab.";
+    const m = measuresText(r);
+    const grab = r.experiment!.isCode ? "" : `${m.lockin} ${m.grab}`;
     const out = readingOutcome(rd);
     return [grab, out ? `${out.label}.` : ""].filter(Boolean).join(" ");
   };

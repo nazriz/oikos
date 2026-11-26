@@ -356,3 +356,17 @@
     margin-left: 0;
   }
 }
+
+/* The study's two measures, everywhere a run or a model is summarised (src/client/measures.tsx). */
+.measures-key {
+  margin: 0 0 14px;
+  max-width: 780px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--line-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.measures-key b {
+  color: var(--text);
+}
