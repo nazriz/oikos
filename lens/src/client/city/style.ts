@@ -13,6 +13,11 @@ export const CITY_CSS = `
 }
 .lens-city * { box-sizing: border-box; }
 .lens-city .lc-wrap { position: absolute; inset: 0; transition: background 1.2s linear; }
+.lens-city .lc-haze { position: absolute; inset: 0; pointer-events: none; transition: opacity .3s; }
+.lens-city .lc-follow { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); border: 1px solid var(--lc-hair);
+  background: color-mix(in srgb, var(--lc-panel) 86%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  color: var(--lc-text); font: inherit; font-size: 12px; padding: 6px 12px; border-radius: 16px; cursor: pointer; z-index: 3; }
+.lens-city .lc-follow.on { border-color: color-mix(in srgb, var(--lc-seat) 55%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--lc-seat) 14%, transparent); }
 .lens-city .lc-vignette { position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(5,7,12,.55) 100%); }
 .lens-city .lc-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -21,7 +26,10 @@ export const CITY_CSS = `
 .lens-city .lc-spin { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--lc-hair); border-top-color: var(--lc-seat); animation: lc-spin 1s linear infinite; }
 @keyframes lc-spin { to { transform: rotate(360deg); } }
 
-.lens-city .lc-clock { position: absolute; top: 16px; left: 18px; pointer-events: none; text-shadow: 0 1px 12px rgba(0,0,0,.6); }
+.lens-city .lc-clock { position: absolute; top: 12px; left: 12px; pointer-events: none; z-index: 2; padding: 10px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--lc-ink) 62%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--lc-hair); color: var(--lc-text); }
+.lens-city .lc-wrap.light .lc-clock { background: color-mix(in srgb, var(--panel, #f3f0e8) 78%, transparent); text-shadow: none; }
 .lens-city .lc-clock-time { font-family: var(--lc-serif); font-size: 34px; line-height: 1; font-weight: 400; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 .lens-city .lc-clock-sub { display: flex; align-items: center; gap: 8px; margin-top: 6px; color: var(--lc-muted); font-size: 12px; }
 .lens-city .lc-clock-place { margin-top: 2px; color: var(--lc-muted); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; opacity: .7; }

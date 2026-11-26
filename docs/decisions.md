@@ -16137,3 +16137,21 @@ or the toggle makes them taller, and they show words only when the words fit. Th
 Both sizes are kept in the browser.
 **Revisit if** the showcase set grows past a few dozen forks: make them ahead in a slot (scripts/slots.ts) rather than
 whenever the server starts.
+## 2026-11-26 Lens city: the look of the map (passes 2 and 3)
+
+**Decided:**
+- **A model, not a game.** The ground is painted in quiet, slightly cool tones, with pale inset lots and fine fence
+  lines. Countryside outside the town is shown as paddocks with hedgerow trees, and there are trees along the river
+  and on the town's verges. All of this is decoration drawn from the cover and road layout; none of it is in the
+  world (the world has no paddocks or street trees). The same goes for the sun's shadows, contact shading, the haze
+  toward the horizon, and the buildings' shapes (hipped roofs, towers, wings). These come from type and size only, so
+  no place's figures go into the code.
+- **People read at every distance.** Zoomed out, each building's people are drawn as one soft disc, sized by the
+  square root of how many are inside and coloured by the space most of them are in. Zoomed in, they are individual
+  points.
+- **Follow.** Selecting a person turns follow on: the camera eases toward them each frame. Dragging or zooming
+  turns it off.
+- **Performance, measured.** In a real Chrome window on the run server (M4 Pro GPU, 1440×900 at 2×), frames
+  average 16.9 ms while panning and 16.7 ms while playing at 1 h/s, which is 60 fps. Sun shadows are dropped when
+  the camera is far out (zoom below −0.8). **Revisit if** a slower laptop or a phone drops frames: cap the masses
+  and trees by zoom next.
