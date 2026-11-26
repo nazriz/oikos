@@ -16038,6 +16038,27 @@ broke typechecks that pull in tally.ts.
 **Revisit if** a view needs the bulk lines for every run (then parse them once in Rust), or reader.ts starts to need
 lines its `wanted` filter drops.
 
+## 2026-11-26 Lens city: the town and people folds, and the map
+
+The map's data comes from two folds: `town` and `people` (lens/src/folds). **Decided:**
+- **Whereabouts as columns.** Every `occupied`/`vacated` event, plus the header's initial occupancy at t = 0, becomes
+  one row of four little-endian columns: t (Uint32), person (Uint16), structure (Uint16), and ±(space kind + 1)
+  (Int8). For the sample that is 355k rows and 3.2 MB. The client keeps one keyframe per day and replays from it, so a
+  seek anywhere takes about 8 µs. A person in no space is drawn walking along the road grid between the place they
+  left and the next place they enter, when the gap is at most 3 h (99% of gaps are under 35 min). Otherwise they are
+  counted as away.
+- **What an act "reached"** is the one inference the map makes. It is drawn as an arc from the government's civic
+  structure (the hall). The target is an entity's premises (a structure whose id begins with the entity's id, else
+  one it owns on the property roll, non-residential first), a post's holder, or a person. A person or post holder is
+  drawn wherever they were at the act's moment. Targets that cannot be placed are kept and not drawn. **Revisit if**
+  the world gains an explicit "premises" or "seat of" relation: read that instead.
+- **Seats** are the participants with an `llm` controller, or person-kind participants that are not a citizen's own
+  (`*-self`), so a code twin's acts are drawn too.
+- **The light follows the hour, and that is not the world's.** The world has no sky. Sun, dusk and night are a reading
+  aid, so that lit windows mean someone is in.
+- Both folds together add about 1.3 s over the 4.6 M-line sample (19 s to read and parse it). Bun's dev-mode
+  bundler breaks deck.gl 9.4 (a shader module arrives undefined), so the dev page and Lens serve with
+  `development: false`.
 ## 2026-11-26 Lens: the seat's story (the `seat` fold, the story rail, the sitting reader)
 
 **Decided.** A *sitting* is one wake of the seat in which it was asked to answer: it begins at the seat's model call of
