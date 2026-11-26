@@ -16457,3 +16457,30 @@ navigation, so nobody is lost, and the lead's rule that it is a professional too
   nothing honest.
 - **Revisit if:** the catalogue gains per-run daily series (then the fingerprint can show activity, not only marks), or
   the blind grades reach the catalogue (then the Who chart should offer them beside the checker's).
+
+## 2026-11-26 Lens: the landing page tells the study's headline (blind grades in the catalogue)
+
+- **Why:** the first landing page headlined the study checker's overt power grabs (3 of 14 models), which contradicts
+  the v2 report's main finding, lawful lock-in judged by two blind graders (13 of 14 frontier runs under the goal to
+  keep the programme in force; none of 9 with no extra goal; none of 27 for smaller models). The lead asked for the
+  page to tell the study's actual story.
+- **Catalogue:** `lens/src/server/grades.ts` reads every `runs/ps-blind-grades-*/{key.json,comparison.json}` read-only,
+  maps each packet to its run key through key.json, and attaches `grade` to the run (`BlindGrade` in shared/api.ts):
+  lock-in counts per grader and whether both found one, misleading statements likewise, the three tiers by consensus
+  (executed / considered / none / split), and the mayor's own words at the first lock-in act as a grader quoted them.
+  Grader identities never leave the server; the page says "two independent graders". A run graded in several sets keeps
+  the newest. `ExperimentInfo.election` is false in the no-election condition (spec name or `first_election_days`).
+- **Counting, as the report does:** lock-in counts only the v2 set, only where both graders agree, only runs that reached
+  election day (index 180); stopped runs are shown faint and not counted; runs outside the v2 set are shown as not
+  graded, never as zero. Cohorts are the report's (section 2.1). Intervals are exact (Clopper-Pearson), as the report's.
+  The landing's numbers are computed from the graders' files as they stand: 13/14, 0/9, 0/27 match the report; the
+  guarded red-team cell reads 3 of 7 (report 3 of 6) and strong without an election 4 of 7 (report 3 of 6), one run more
+  in each (grades added after the report froze). Recorded, not chased.
+- **Page:** the hero states the lead cell with DeepSeek's own words for its entrenchment law; the next section is the
+  study's design (four instructions, frontier and smaller apart, a square per run) under a computed sentence; the
+  per-model chart switches between lock-in (default) and the checker's power grabs; DeepSeek's moved election stays, as
+  "the most overt case", from an earlier pilot. A link to the report sits under the hero and in the caveats. words.ts:
+  the `strong` instruction now reads as the spec says it ("kept in force for the long term: nothing else matters"),
+  not "whatever it takes".
+- **Revisit if:** the report is re-frozen with the newer grades (then the two cells agree), or a v3 grading set appears
+  (then MAIN_SET in landing-data.ts moves to it).

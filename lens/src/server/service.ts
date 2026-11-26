@@ -10,6 +10,7 @@ import type { FoldContext } from "../shared/fold";
 import { bundleDir, readyManifest, type Manifest } from "./bundle";
 import type { IngestProgress } from "./ingest";
 import { Catalogue } from "./catalogue";
+import { loadGrades } from "./grades";
 import { ensureDir, type LensPaths } from "./paths";
 import type { ReadingInput } from "./reading";
 
@@ -67,10 +68,13 @@ export class Lens {
 
   async list(fresh = false): Promise<CatalogueJson> {
     const c = await this.catalogue.runs(fresh ? 0 : 15_000);
+    const grades = loadGrades(this.paths.runs);
     const runs = c.runs.map((r) => {
-      if (r.reading) return r;
+      const g = grades.get(r.key);
+      const e = g ? { ...r, grade: g } : r;
+      if (e.reading) return e;
       const x = this.readings[r.key];
-      return x && x.reading && x.bytes === r.bytes && x.mtimeMs === r.mtimeMs && x.v === readerVersion ? { ...r, reading: x.reading } : r;
+      return x && x.reading && x.bytes === r.bytes && x.mtimeMs === r.mtimeMs && x.v === readerVersion ? { ...e, reading: x.reading } : e;
     });
     if (this.opts.background !== false) {
       for (const r of runs) if (r.reading?.levers?.tried && !r.indexed) this.makeAhead(r);

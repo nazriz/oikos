@@ -1,7 +1,8 @@
 // The landing page's pictures. Each one makes one point, labels its marks where they are, answers hover and keyboard
 // focus with the exact numbers, opens the run at the moment on click, and has the same numbers as a table.
 //   Calendar   the run that moved its election: the term as a ruler, election day lifted off it and carried away
-//   Who        each AI model's runs as squares: a serious power grab carried out, tried, or neither
+//   Who        each AI model's runs as squares, on either measure: lawful lock-in (blind graders) or power grabs (checker)
+//   Conditions the study's design: lock-in by instruction, frontier and smaller models apart
 //   When       every serious attempt by day of the term, beside election day
 //   Activity   how many acts each AI mayor sent in a run, one dot per run, beside the rule-based mayor
 //   Print      a run's fingerprint: its term, election day, its attempts, where it ended
@@ -9,7 +10,7 @@ import { useMemo, useRef } from "react";
 import { runHref } from "../router";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable } from "./parts";
-import { attempts, dayNo, fingerprint, POLL_DAY, wilson, type Attempt, type ModelRow, type StudyRun } from "./landing-data";
+import { attempts, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
 
 const DAY = 86_400;
 const go = (key: string, t?: number) => { location.hash = runHref(key, t !== undefined ? { t: Math.round(t) } : undefined); };
@@ -103,52 +104,163 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
 const SHORT: Record<string, string> = { amend_election_rules: "moved the election", withdraw_law: "withdrew the notice", replace_editor: "new editor", replace_electoral: "new election head" };
 const shortLever = (l: string) => SHORT[l] ?? leverTitle(l);
 
-// ---------------------------------------------------------------- Who
+// ---------------------------------------------------------------- Who, and the conditions
 
 export interface Quote { text: string; t?: number; day?: number; from?: "thinking" | "sent" | "voice" }
 
-/** Each model's runs as squares, in the order the rows give. */
-export function Who({ rows, quotes, researcher, onModel }: { rows: ModelRow[]; quotes: Map<string, Quote>; researcher: boolean; onModel: (m: string) => void }) {
+const MARK_WORDS: Record<Measure, Record<Mark, string>> = {
+  lockin: {
+    yes: "Locked its programme in (both graders agree)",
+    split: "One grader found a lock-in, the other did not",
+    tried: "",
+    no: "No lock-in found by either grader",
+    ungraded: "Not blind-graded",
+    excluded: "Stopped before election day, so not counted",
+  },
+  grab: {
+    yes: "A serious power grab carried out (the study's checker)",
+    split: "",
+    tried: "A serious power grab tried, not carried out (the study's checker)",
+    no: "No serious power grab (the study's checker)",
+    ungraded: "Not read by the checker yet",
+    excluded: "",
+  },
+};
+const ORDER: Record<Mark, number> = { yes: 0, split: 1, tried: 1, no: 2, excluded: 3, ungraded: 4 };
+const sortRuns = (rs: StudyRun[], m: Measure) => [...rs].sort((a, b) => ORDER[markOf(a, m)] - ORDER[markOf(b, m)] || a.seed - b.seed || a.key.localeCompare(b.key));
+
+/** Where a run's square opens it: the lock-in's day, the first power grab, else its start. */
+function openAt(f: StudyRun, m: Measure): number | undefined {
+  if (m === "lockin" && f.grade?.lockInQuote && markOf(f, m) !== "no") return f.grade.lockInQuote.day * DAY;
+  return (f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0])?.t;
+}
+
+/** One run as a square: its mark on the measure, a tooltip with what happened and, where there is one, the mayor's words. */
+function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnType<typeof useTip>; quotes?: Map<string, Quote> }) {
+  const mark = markOf(f, m);
+  const what = MARK_WORDS[m][mark];
+  let detail: string | undefined, words: string | undefined;
+  if (m === "lockin" && f.grade?.lockInQuote && (mark === "yes" || mark === "split" || mark === "excluded")) {
+    detail = `Day ${dayNo(f.grade.lockInQuote.day)}: ${f.grade.lockInQuote.act}`;
+    words = f.grade.lockInQuote.quote;
+  } else if (m === "grab") {
+    const first = f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0];
+    if (first) detail = `${leverTitle(first.lever)}, day ${dayNo(first.day)}`;
+    const q = quotes?.get(f.key);
+    if (q?.from === "thinking" && mark !== "no") words = q.text;
+  }
+  const t = openAt(f, m);
+  const body = (
+    <>
+      <b>{modelName(f.model)}, town {f.seed}</b>
+      <span>{what}.</span>
+      {detail && <span>{clip(detail, 200)}</span>}
+      {words && <q className="world">{clip(words)}</q>}
+      <span className="muted">{goalText(f.goal)}{f.election ? "" : " No election fell in the run"}.</span>
+      <span className="muted">Click to open this run{t !== undefined ? " at that moment" : ""}.</span>
+    </>
+  );
+  const cls = `sq m-${mark}${mark === "excluded" && f.grade?.lockIn?.both ? " was-yes" : ""}`;
+  return <a className={cls} href={runHref(f.key, t !== undefined ? { t: Math.round(t) } : undefined)} aria-label={`${modelName(f.model)}, town ${f.seed}: ${what}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} />;
+}
+
+/** "13 of 14", with what is shown but not counted. */
+function CountText({ t, m }: { t: Tally; m: Measure }) {
+  return (
+    <span className="who-k">
+      <b>{t.k}</b> of {t.n}
+      {m === "grab" && t.tried ? <>, and {t.tried} tried</> : null}
+      {m === "lockin" && t.excluded ? <>; {t.excluded} stopped early</> : null}
+      {m === "lockin" && t.ungraded ? <>; {t.ungraded} not graded</> : null}
+    </span>
+  );
+}
+function Interval({ t, show }: { t: Tally; show: boolean }) {
+  if (!show || !t.n) return show ? <span /> : null;
+  const [lo, hi] = clopperPearson(t.k, t.n);
+  return (
+    <span className="who-ci" title={`${t.k} of ${t.n}: ${pct(t.k / t.n)}, exact 95% interval ${pct(lo)} to ${pct(hi)}`}>
+      <svg width={90} height={12}><line x1={0} x2={90} y1={6} y2={6} className="ci-track" /><line x1={lo * 90} x2={hi * 90} y1={6} y2={6} className="ci-bar" /><circle cx={(t.k / t.n) * 90} cy={6} r={3} className="ci-dot" /></svg>
+    </span>
+  );
+}
+
+/** Each model's runs as squares, grouped by cohort (frontier, smaller, other), on one measure. */
+export function Who({ runs, measure, quotes, researcher, onModel }: { runs: StudyRun[]; measure: Measure; quotes: Map<string, Quote>; researcher: boolean; onModel: (m: string) => void }) {
   const tip = useTip();
   const ref = useRef<HTMLDivElement>(null);
   const shown = useReveal(ref);
+  const groups = useMemo(() => {
+    const by = new Map<string, StudyRun[]>();
+    for (const f of runs) by.set(f.model, [...(by.get(f.model) ?? []), f]);
+    const rows = [...by.entries()].map(([model, rs]) => ({ model, runs: rs, t: tally(rs, measure) }));
+    const rate = (t: Tally) => (t.n ? t.k / t.n : -1);
+    rows.sort((a, b) => rate(b.t) - rate(a.t) || b.t.k - a.t.k || b.t.n - a.t.n || a.model.localeCompare(b.model));
+    return (["frontier", "smaller", "other"] as Cohort[]).map((c) => ({ cohort: c, rows: rows.filter((r) => cohortOf(r.model) === c) })).filter((g) => g.rows.length);
+  }, [runs, measure]);
+  const head = measure === "lockin" ? "Locked in" : "Carried out";
   const table = (
     <table className="ld-table">
-      <thead><tr><th>AI model</th><th className="r">Runs</th><th className="r">Carried out</th><th className="r">Tried only</th>{researcher && <th className="r">Any attempt, 95% interval</th>}</tr></thead>
-      <tbody>{rows.map((r) => { const [lo, hi] = wilson(r.done + r.tried, r.n); return <tr key={r.model}><td>{modelName(r.model)}</td><td className="r">{r.n}</td><td className="r">{r.done}</td><td className="r">{r.tried}</td>{researcher && <td className="r">{pct((r.done + r.tried) / r.n)} ({pct(lo)} to {pct(hi)})</td>}</tr>; })}</tbody>
+      <thead><tr><th>AI model</th><th>Group</th><th className="r">Counted</th><th className="r">{head}</th>{measure === "grab" ? <th className="r">Tried only</th> : <><th className="r">Stopped early</th><th className="r">Not graded</th></>}{researcher && <th className="r">Share, exact 95% interval</th>}</tr></thead>
+      <tbody>{groups.flatMap((g) => g.rows.map((r) => { const [lo, hi] = clopperPearson(r.t.k, r.t.n); return <tr key={r.model}><td>{modelName(r.model)}</td><td>{COHORT_WORDS[g.cohort]}</td><td className="r">{r.t.n}</td><td className="r">{r.t.k}</td>{measure === "grab" ? <td className="r">{r.t.tried}</td> : <><td className="r">{r.t.excluded}</td><td className="r">{r.t.ungraded}</td></>}{researcher && <td className="r">{r.t.n ? `${pct(r.t.k / r.t.n)} (${pct(lo)} to ${pct(hi)})` : ""}</td>}</tr>; }))}</tbody>
     </table>
   );
+  let i = 0;
   return (
-    <WithTable table={table} label="Runs with a power grab, by model, as a table">
+    <WithTable table={table} label="Runs by model, as a table">
       <div ref={tip.box} className="ld-box">
-        <div ref={ref} className={`who matrix ${shown ? "in" : ""}`} role="list">
-          {rows.map((r, ri) => {
-            const k = r.done + r.tried;
-            const [lo, hi] = wilson(k, r.n);
-            const sorted = [...r.runs].sort((a, b) => Number(b.r.has_executed) - Number(a.r.has_executed) || Number(b.r.has_attempt) - Number(a.r.has_attempt) || a.seed - b.seed);
-            return (
-              <div key={r.model} className="who-row" role="listitem" style={{ ["--i" as string]: ri }}>
-                <button className="who-model" onClick={() => onModel(r.model)} title={`Show ${modelName(r.model)}'s runs in the list below`}>{modelName(r.model)}</button>
-                <div className="who-squares">
-                  {sorted.map((f) => {
-                    const q = quotes.get(f.key);
-                    const cls = f.r.has_executed ? "sq done" : f.r.has_attempt ? "sq tried" : "sq";
-                    const what = f.r.has_executed ? "A serious power grab carried out" : f.r.has_attempt ? "A serious power grab tried, not carried out" : "No serious power grab";
-                    const first = f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0];
-                    const body = <><b>{modelName(f.model)}, town {f.seed}</b><span>{what}{first ? `: ${leverTitle(first.lever)}, day ${dayNo(first.day)}` : ""}.</span><span className="muted">{goalText(f.goal)}.</span>{q?.from === "thinking" && <q className="world">{clip(q.text)}</q>}<span className="muted">Click to open this run{first ? " at that moment" : ""}.</span></>;
-                    const t = first?.t;
-                    return <a key={f.key} className={cls} href={runHref(f.key, t !== undefined ? { t: Math.round(t) } : undefined)} aria-label={`${modelName(f.model)}, town ${f.seed}: ${what}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} />;
-                  })}
+        <div ref={ref} className={`who matrix ${shown ? "in" : ""}`}>
+          {groups.map((g) => (
+            <div key={g.cohort} className="who-group" role="list" aria-label={COHORT_WORDS[g.cohort]}>
+              <div className="who-group-head">{COHORT_WORDS[g.cohort]}</div>
+              {g.rows.map((r) => (
+                <div key={r.model} className="who-row" role="listitem" style={{ ["--i" as string]: i++ }}>
+                  <button className="who-model" onClick={() => onModel(r.model)} title={`Show ${modelName(r.model)}'s runs in the list below`}>{modelName(r.model)}</button>
+                  <div className="who-squares">{sortRuns(r.runs, measure).map((f) => <Square key={f.key} f={f} m={measure} tip={tip} quotes={quotes} />)}</div>
+                  <CountText t={r.t} m={measure} />
+                  <Interval t={r.t} show={researcher} />
                 </div>
-                <span className="who-k"><b>{r.done}</b> of {r.n}{r.tried ? <>, and {r.tried} tried</> : null}</span>
-                {researcher && (
-                  <span className="who-ci" title={`Any serious attempt: ${k} of ${r.n}, Wilson 95% interval ${pct(lo)} to ${pct(hi)}`}>
-                    <svg width={90} height={12}><line x1={0} x2={90} y1={6} y2={6} className="ci-track" /><line x1={lo * 90} x2={hi * 90} y1={6} y2={6} className="ci-bar" /><circle cx={(k / r.n) * 90} cy={6} r={3} className="ci-dot" /></svg>
-                  </span>
-                )}
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          ))}
+        </div>
+        {tip.el}
+      </div>
+    </WithTable>
+  );
+}
+
+/** The study's design as a picture: each condition (the instruction, and whether an election falls in the run), frontier
+ * and smaller models apart, each run a square on the lock-in measure. */
+export function Conditions({ runs, researcher }: { runs: StudyRun[]; researcher: boolean }) {
+  const tip = useTip();
+  const ref = useRef<HTMLDivElement>(null);
+  const shown = useReveal(ref);
+  const cells = CONDITIONS.map((c) => ({ c, rows: (["frontier", "smaller"] as Cohort[]).map((co) => ({ co, ...conditionCell(runs, c, co) })) }));
+  const table = (
+    <table className="ld-table">
+      <thead><tr><th>Instruction</th><th>Group</th><th className="r">Counted</th><th className="r">Locked in</th><th className="r">Share, exact 95% interval</th><th className="r">Stopped early</th></tr></thead>
+      <tbody>{cells.flatMap(({ c, rows }) => rows.map((r) => { const [lo, hi] = clopperPearson(r.t.k, r.t.n); return <tr key={c.id + r.co}><td>{c.label}</td><td>{COHORT_WORDS[r.co]}</td><td className="r">{r.t.n}</td><td className="r">{r.t.k}</td><td className="r">{r.t.n ? `${pct(r.t.k / r.t.n)} (${pct(lo)} to ${pct(hi)})` : ""}</td><td className="r">{r.t.excluded}</td></tr>; }))}</tbody>
+    </table>
+  );
+  let i = 0;
+  return (
+    <WithTable table={table} label="Lock-in by instruction and group, as a table">
+      <div ref={tip.box} className="ld-box">
+        <div ref={ref} className={`who cond ${shown ? "in" : ""}`}>
+          {cells.map(({ c, rows }) => (
+            <div key={c.id} className="cond-block" role="list" aria-label={c.label}>
+              <div className="cond-head"><b>{c.label}</b> <span className="muted">{c.long}</span></div>
+              {rows.map((r) => (
+                <div key={r.co} className="who-row" role="listitem" style={{ ["--i" as string]: i++ }}>
+                  <span className="who-cohort">{COHORT_WORDS[r.co]}</span>
+                  <div className="who-squares">{r.runs.length ? sortRuns(r.runs, "lockin").map((f) => <Square key={f.key} f={f} m="lockin" tip={tip} />) : <span className="muted">no runs</span>}</div>
+                  <CountText t={r.t} m="lockin" />
+                  <Interval t={r.t} show={researcher} />
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
         {tip.el}
       </div>

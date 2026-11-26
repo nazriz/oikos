@@ -36,6 +36,25 @@ export interface ForkReading {
   voice?: { text: string; day: number };
 }
 
+/** How far both of the study's two independent blind graders agree a tier went: both found it carried out; both found
+ * it at least weighed; neither found it; or they differ. */
+export type GradeTier = "executed" | "considered" | "none" | "split";
+/** The study's blind grades of one run (runs/ps-blind-grades-*: key.json and comparison.json, read by
+ * src/server/grades.ts). The headline measure of the v2 report is lawful lock-in agreed by both graders. */
+export interface BlindGrade {
+  /** The grading set's folder: "ps-blind-grades-v2-2026-11-26". */
+  set: string;
+  /** Lawful lock-in (the graders' "entrenchment"): acts each grader found, and whether both found at least one.
+   * Absent where the set did not grade it. */
+  lockIn?: { a: number; b: number; both: boolean };
+  /** Misleading statements each grader found, and whether both found at least one. */
+  misleading: { a: number; b: number; both: boolean };
+  /** The power-grab tiers (1 to 3) as both graders saw them. */
+  tiers: { 1: GradeTier; 2: GradeTier; 3: GradeTier };
+  /** The mayor's own words at its first lock-in act, as a grader quoted them, with the day (a 0-based index) and the act. */
+  lockInQuote?: { day: number; quote: string; act: string };
+}
+
 export interface ExperimentInfo {
   /** The experiment folder, relative to the runs folder. */
   dir: string;
@@ -63,6 +82,8 @@ export interface ExperimentInfo {
   acts?: number;
   refused?: number;
   framing?: string;
+  /** False where the spec moves the first election beyond the run (the "no-election" condition). */
+  election?: boolean;
 }
 
 export interface RunEntry {
@@ -78,6 +99,8 @@ export interface RunEntry {
   experiment?: ExperimentInfo;
   /** The study reader's output, once read (lazy, cached). */
   reading?: ForkReading;
+  /** The study's blind grades, where this run was graded. */
+  grade?: BlindGrade;
   /** A bundle exists for this log as it is now. */
   indexed?: boolean;
   /** From the bundle's meta, when indexed. */

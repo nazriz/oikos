@@ -8,7 +8,7 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
 }
 .ld-hero h1 {
-  font-size: 50px;
+  font-size: 44px;
   line-height: 1.04;
   letter-spacing: -0.03em;
   max-width: 760px;
@@ -355,13 +355,69 @@
   background: var(--panel-3);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-.sq.tried {
+.sq.m-tried,
+.sq.m-split {
   background: var(--panel);
   box-shadow: inset 0 0 0 2px var(--flag);
 }
-.sq.done {
+.sq.m-yes {
   background: var(--flag);
   box-shadow: none;
+}
+/* (Not counted: stopped before election day. Faint, filled where both graders still found a lock-in.) */
+.sq.m-excluded {
+  opacity: 0.35;
+}
+.sq.m-excluded.was-yes {
+  background: var(--flag);
+  box-shadow: none;
+}
+.sq.m-ungraded {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.who-group + .who-group {
+  margin-top: 10px;
+}
+.who-group-head {
+  padding: 10px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.cond .who-row {
+  grid-template-columns: 150px fit-content(600px) minmax(0, 1fr) auto;
+}
+.cond-block + .cond-block {
+  margin-top: 6px;
+}
+.cond-head {
+  padding: 14px 0 6px;
+  font-size: 15px;
+  border-bottom: 1px solid var(--line);
+}
+.cond-head b {
+  font-weight: 800;
+  margin-right: 6px;
+}
+.cond-head .muted {
+  font-size: 13.5px;
+}
+.who-cohort {
+  font-size: 14px;
+  color: var(--text-2);
+}
+.ld-source {
+  margin: 10px 0 0;
+  max-width: 680px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.ld-source a {
+  color: var(--text);
+  font-weight: 700;
+  text-underline-offset: 3px;
 }
 .sq:hover,
 .sq:focus-visible {
