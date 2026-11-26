@@ -199,6 +199,8 @@
 }
 .fork-dot {
   position: relative;
+  display: inline-block;
+  flex: none;
   width: 13px;
   height: 13px;
   border-radius: 50%;
@@ -502,6 +504,47 @@
 }
 
 @media (max-width: 900px) {
+  .lib-scan,
+  .hide-sm {
+    display: none;
+  }
+  .matrix table,
+  .matrix tbody,
+  .matrix tr,
+  .matrix td {
+    display: block;
+  }
+  .matrix thead {
+    display: none;
+  }
+  .matrix tr {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .matrix td,
+  .matrix td.model {
+    width: auto;
+    padding: 6px 0;
+    border: 0;
+  }
+  .matrix td.empty[data-goal] {
+    display: none;
+  }
+  .matrix td[data-goal] {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    align-items: center;
+  }
+  .matrix td[data-goal]::before {
+    content: attr(data-goal);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .cell {
+    min-width: 0;
+  }
   .lib {
     padding: 0 16px 60px;
   }

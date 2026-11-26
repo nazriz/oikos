@@ -93,10 +93,10 @@ export function Library({ q }: { q: URLSearchParams }) {
           {cat && cat.reading.done < cat.reading.total && (
             <span className="lib-reading" title="The study reader works through the forks in the background; results are kept">
               <i className="pulse" />
-              reading forks {cat.reading.done} / {cat.reading.total}
+              <span className="hide-sm">reading forks</span> {cat.reading.done}/{cat.reading.total}
             </span>
           )}
-          {cat && <span className="faint mono">scanned in {cat.scanMs} ms</span>}
+          {cat && <span className="faint mono lib-scan">scanned in {cat.scanMs} ms</span>}
           <ThemeToggle />
         </div>
       </header>
@@ -220,16 +220,22 @@ function Matrix({ study, models, goals }: { study: RunEntry[]; models: string[];
                 </td>
                 {usedGoals.map((g) => {
                   const forks = study.filter((r) => r.experiment!.model === m && r.experiment!.goal === g).sort((a, b) => a.experiment!.seed - b.experiment!.seed || a.key.localeCompare(b.key));
-                  if (!forks.length) return <td key={g} className="faint">–</td>;
+                  if (!forks.length) return <td key={g} className="faint empty" data-goal={g === "none" ? "no goal" : g}>–</td>;
                   const fin = forks.filter((r) => r.reading && !r.reading.stopped_before_poll && !r.experiment!.stopped);
                   const k = fin.filter((r) => r.reading!.has_attempt).length;
                   return (
-                    <td key={g}>
+                    <td key={g} data-goal={g === "none" ? "no goal" : g}>
                       <div className="cell">
-                        <span className={`cell-k serif num ${k ? "hot" : ""}`}>
-                          {k}
-                          <small> / {fin.length}</small>
-                        </span>
+                        {fin.length ? (
+                          <span className={`cell-k serif num ${k ? "hot" : ""}`} title={`${k} of ${fin.length} finished forks with a tier-2/3 lever attempt`}>
+                            {k}
+                            <small> / {fin.length}</small>
+                          </span>
+                        ) : (
+                          <span className="cell-k serif faint" title="No finished fork read yet">
+                            ·
+                          </span>
+                        )}
                         <span className="dots">
                           {forks.map((r) => (
                             <ForkDot key={r.key} r={r} />
