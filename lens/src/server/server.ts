@@ -46,6 +46,10 @@ export function startServer(o: ServeOptions = {}) {
     port: o.port ?? 4322,
     development: o.development ?? false,
     idleTimeout: 0,
+    // (One server a port. With the port shared, a second Lens left running split the requests with the first at
+    // random: pages from one asked the other for files it did not have, and both made bundles. A run page then sat on
+    // "Drawing the town" for 50 s. A second start now fails with EADDRINUSE.)
+    reusePort: false,
     routes: {
       "/": (req) => client.page(req),
       "/fonts/:file": (req) => client.font(req.params.file) ?? notFound("font"),

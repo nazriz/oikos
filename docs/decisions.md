@@ -16614,3 +16614,21 @@ the reader's columns mean: then a "?" in the reader's own header, not a floating
   offices later do, which no single event ties back to the act. A count of direct addressees would be cheap but would
   rank a letter above a law, and it needs a seat or ledger fold version bump, which re-makes every bundle. Revisit with
   a design for "an act's effects" (the offices' acts citing the direction or law as their basis) in the seat fold.
+
+## 2026-11-27 Lens: a viewer never waits behind Lens's own work
+
+A fresh-eyes review saw the run page sit on "Drawing the town" for ~50 s, and the landing on grey placeholders for over
+6 s, at load average 23-30. What it was:
+- **Two servers on one port.** An earlier Lens (pid 45615, older code) was still listening on 4322 beside the new one.
+  Bun binds with SO_REUSEPORT, so connections were split between them at random. A page from one asked the other for
+  files it did not have, and both made bundles. The lead stopped the old one. `reusePort: false` now makes a second
+  start fail with EADDRINUSE ("Failed to start server. Is port … in use?"), so a restart loop can't leave two running.
+- **A run still being written** gets a new bundle each time its log grows. Opening one meant a full reading (12.5 s on
+  the live server, a 3.1 M-line fork at load 25). Now the newest older bundle of that run is served at once, and the
+  log's own is made behind it (`Lens.served`): the viewer sees the run as of its last reading in ~20 ms. Forks written
+  to in the last 5 minutes are not made ahead (each would be stale within the minute). A run that grows again joins
+  the line again, and one that failed is not retried every minute.
+- **Lens's own work at low priority:** the study reader's passes now run under `nice 15`, like the bundles made ahead.
+  A viewer's run already stops a bundle being made ahead.
+- **Measured once the stray server was stopped** (live server, load 31, a cold browser profile): the landing showed its
+  runs at 0.6 s and a cached run's map was drawn at 1.0 s. Every API answer took 0-20 ms.
