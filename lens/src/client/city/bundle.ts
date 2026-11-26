@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Dev only: run the city's folds (town, people) over a JSONL log and write their bundle files, as the ingest will:
-//   bun lens/src/client/city/bundle.ts <log.jsonl> <out dir>
-// Writes <out>/town.json, <out>/people.json, <out>/people.<file>.bin. Never writes beside the log (Lens is read-only).
+//   bun lens/src/client/city/bundle.ts <log.jsonl | - for stdin> <out dir>
+// Writes <out>/town.json, <out>/people.json, <out>/people.<file>.bin (with --all, every registered fold's files). Never writes beside the log (Lens is read-only).
 // Reports the time spent inside the folds apart from reading and parsing, which is the ingest's.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -13,7 +13,6 @@ export async function bundleLog(log: string, out: string, folds: Fold[] = [townF
   const ctx: FoldContext = { runId: "", dir: "" };
   const t0 = performance.now();
   let foldMs = 0, lines = 0;
-  const stream = Bun.file(log).stream().pipeThrough(new TextDecoderStream());
   let buf = "";
   const take = (line: string) => {
     if (!line) return;
@@ -23,13 +22,20 @@ export async function bundleLog(log: string, out: string, folds: Fold[] = [townF
     for (const f of folds) f.line(l, ctx);
     foldMs += performance.now() - a;
   };
-  for await (const chunk of stream) {
-    buf += chunk;
-    let i, start = 0;
-    while ((i = buf.indexOf("\n", start)) >= 0) { take(buf.slice(start, i)); start = i + 1; }
-    buf = buf.slice(start);
+  if (log.endsWith(".zst") || log.endsWith(".oklog")) {
+    // Compressed logs and experiment forks, through the orchestrator's reader (zstd; the kernel's export).
+    const { logLines } = await import("../../../../orchestrator/src/logs");
+    for await (const line of logLines(log)) take(line);
+  } else {
+    const stream = (log === "-" ? Bun.stdin.stream() : Bun.file(log).stream()).pipeThrough(new TextDecoderStream());
+    for await (const chunk of stream) {
+      buf += chunk;
+      let i, start = 0;
+      while ((i = buf.indexOf("\n", start)) >= 0) { take(buf.slice(start, i)); start = i + 1; }
+      buf = buf.slice(start);
+    }
+    take(buf);
   }
-  take(buf);
   mkdirSync(out, { recursive: true });
   const a = performance.now();
   for (const f of folds) {
@@ -42,8 +48,10 @@ export async function bundleLog(log: string, out: string, folds: Fold[] = [townF
 }
 
 if (import.meta.main) {
-  const [log, out] = process.argv.slice(2);
-  if (!log || !out) { console.log("usage: bun lens/src/client/city/bundle.ts <log.jsonl> <out dir>"); process.exit(2); }
-  const r = await bundleLog(log, out);
+  const args = process.argv.slice(2);
+  const [log, out] = args.filter((a) => !a.startsWith("--"));
+  if (!log || !out) { console.log("usage: bun lens/src/client/city/bundle.ts <log.jsonl> <out dir> [--all (every registered fold, for the tour)]"); process.exit(2); }
+  const folds = args.includes("--all") ? (await import("../../server/folds")).FOLDS.map((f) => f()) : undefined;
+  const r = await bundleLog(log, out, folds);
   console.log(`${r.lines} lines; folds ${(r.foldMs / 1000).toFixed(2)} s of ${(r.totalMs / 1000).toFixed(1)} s`);
 }

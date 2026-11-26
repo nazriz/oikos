@@ -22,7 +22,26 @@ Pages (hash routes):
   (model × goal: k of n towns with an attempt, from experiments/power-seeking/tally.ts) where each dot opens its run.
 - **Run** `#/run/<key>?t=…&sel=…`: the map in the middle, the story rail on the right, the timeline along the bottom,
   the inspector as a drawer. Time is one shared value (`src/client/state.ts`): scrub and everything follows.
-- **Compare** `#/compare/<keyA>/<keyB>` (later): two arms of one seed side by side, synced time, metric differences.
+- **Compare** `#/compare/<keyA>/<keyB>`: two arms of one seed side by side: the seat's counts, its sittings day by day
+  beside the twin's acts, and the town's daily counts as small multiples, over the days both arms ran.
+- **Moments** `#/moments`: every lever the study's reader found attempted or executed, across runs, as quote cards in
+  the seat's own words; filter by model, goal, lever, level; "cite" copies a citation.
+- **Findings** `#/findings`: the study across runs as charts (k of n by model × goal with Wilson intervals, levers by
+  tier, when before the poll, outcome, cost), each with a table view and SVG/PNG export, each mark opening its runs.
+- **The same moment** `#/diff/<keyA>,<keyB>[,<keyC>]?day=<n>`: forks of one seed with different models, each at its
+  sitting nearest that day, side by side: what each thought and said, and what it did.
+
+### Reading a run in Inspect AI
+
+A fork's seat can also be read in UK AISI's Inspect viewer (`inspect_ai` log format, version 2): one sample per fork,
+the sittings as messages (standing instructions, each sitting's prompt, each call's words, reasoning and tool calls,
+what came back) and the study reader's verdicts as scores. Read-only on the runs; nothing is installed in the repo.
+
+    oikos lens inspect runs/ps-replicate-2026-11-25/glm-redteam-s7      # every model fork; --with-code adds the twin
+    uvx --from inspect-ai inspect view --log-dir runs/views/lens/inspect/glm-redteam-s7
+
+The logs go to `<views>/inspect/<experiment>/` (`runs/views/lens/inspect/...`). One log alone:
+`bun lens/src/server/inspect-export.ts <bundle dir | arm.oklog> [--spec spec.json]`.
 
 ## 2. Rules it keeps
 
@@ -106,3 +125,25 @@ Each fold is registered with one line in `src/server/folds.ts`. Each view contri
   mark), Home/End, `?`. Core's own lane, `zz-reader`, holds the study reader's lever attempts and the poll.
 - **Server**. Development mode is off by default: deck.gl's shaders break under Bun's HMR bundling. `oikos lens list`
   prints the catalogue, and `oikos lens index <key>` makes one bundle without a server.
+
+## 8. Wave 3 (core, 2026-11-26)
+
+- **`ledger` fold** (`src/folds/ledger.ts`). Each person's own record, in one file per person (`ledger/p-<id>`), fetched
+  when their page opens. It holds every payment into or out of their accounts, with who decided it: the author of the
+  instruction it was paid under, else the participant whose act caused it. It also holds every record and message
+  that named them (author, post, whether the seat wrote it, refused or not), their illnesses, and posts taken,
+  departures and deaths. Kinds of paper with more than 2,000 in a run (orders, delivery notes, requests, invoices) are
+  counted per person, not listed. `ledger.json` carries a search index of the other records. It adds about 10 s to a
+  4.6 M-line fork.
+- **A life in the run** (`src/client/life/PersonLife.tsx`, `views.inspector.person`), shown in a wide drawer: who they
+  are and their household, where they lived and spent their days (from the people fold's rows), their balance day by
+  day (click to jump), and everything that reached them. Each item is coloured by who decided it: the seat (amber),
+  an institution (periwinkle) or a person (teal). It can be filtered by that, and a seat's item opens its act.
+- **⌘K palette** (`src/client/palette/Palette.tsx`; also `/`, or the run bar's Search). It searches people,
+  households, posts, organisations, buildings, sittings, the ledger's records and the words of every model sitting's
+  transcript. It is indexed in the browser; transcripts are fetched four at a time the first time it opens.
+- **Pulse** (`src/client/pulse/Pulse.tsx`) is a foldable strip above the timeline, built from the `daily` and `people`
+  folds. It shows people in town, refusals, complaints (record kinds naming one), petitions, money moved and illnesses
+  begun, with the playhead's day marked; click a strip to jump.
+- **Deep links.** `#/run/<key>?t=<s>&sel=<kind>:<id>` opens any moment and selection. The run bar's "copy link", or
+  `L`, copies one.

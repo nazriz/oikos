@@ -6,6 +6,7 @@ import index from "../client/index.html";
 import type { IndexStatus } from "../shared/api";
 import { lensPaths, type LensPaths } from "./paths";
 import { Lens } from "./service";
+import { momentsResponse } from "./moments";
 
 export interface ServeOptions {
   runs?: string;
@@ -52,6 +53,7 @@ export function startServer(o: ServeOptions = {}) {
         if ((req.headers.get("accept-encoding") ?? "").includes("gzip")) return new Response(Bun.gzipSync(Buffer.from(body)), { headers: { ...headers, "content-encoding": "gzip" } });
         return new Response(body, { headers });
       },
+      "/api/moments": (req) => momentsResponse(lens, req),
       "/api/run/:key": async (req) => {
         const e = await lens.catalogue.find(req.params.key);
         if (!e) return notFound("run");
@@ -116,5 +118,7 @@ export function startServer(o: ServeOptions = {}) {
       return new Response("Not found", { status: 404 });
     },
   });
+  // (At start: the catalogue, the background reading, and the showcase runs made ahead.)
+  if (o.background !== false) void lens.list().catch(() => {});
   return { server, lens, paths, url: `http://${server.hostname}:${server.port}/` };
 }

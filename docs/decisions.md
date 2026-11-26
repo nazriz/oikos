@@ -16121,6 +16121,172 @@ bundles are made again.
 - **Revisit if:** the gallery is slow with hundreds of runs (then a server-side aggregate of each bundle's levers), or
   the blind graders' verdicts become available per lever (show them beside the reader's).
 
+## 2026-11-26 Lens core: one outcome rule, bundles made in a child, showcase runs made ahead
+
+**Decided** (core builder, after the integrated page showed "lost the poll" for a fork whose poll had been moved to
+day 5000). (1) There is one rule for an election's outcome, `lens/src/shared/outcome.ts` `outcomeOf`, read by the run
+bar, the library's cards and the matrix, with the story rail asked to use it too. It says won or lost only when a
+result came before the run's end. Otherwise it says "no poll held (moved to day N)" when a law moved the poll,
+"stopped before the poll", or "run ended before the poll". (2) Lever counts everywhere are distinct levers tried
+(attempted or executed) and done (executed), never "considered" (`leverCounts`). The matrix keeps the study's own
+measure, a tier-2/3 attempt, and says so. (3) Bundles are made in a child process (`make-one.ts`), like the readings:
+in the server's own process, all five folds over a 4.6 M-line log left the API unanswered for seconds. (4) Forks whose
+seat tried a lever are made ahead at server start, after anything a viewer asks for. Readings run two at a time,
+forks an older reading flagged first. (5) The timeline's lanes are compact (12 px) by default. Dragging the top edge
+or the toggle makes them taller, and they show words only when the words fit. The rail's width can be dragged too.
+Both sizes are kept in the browser.
+**Revisit if** the showcase set grows past a few dozen forks: make them ahead in a slot (scripts/slots.ts) rather than
+whenever the server starts.
+## 2026-11-26 Lens city: the look of the map (passes 2 and 3)
+
+**Decided:**
+- **A model, not a game.** The ground is painted in quiet, slightly cool tones, with pale inset lots and fine fence
+  lines. Countryside outside the town is shown as paddocks with hedgerow trees, and there are trees along the river
+  and on the town's verges. All of this is decoration drawn from the cover and road layout; none of it is in the
+  world (the world has no paddocks or street trees). The same goes for the sun's shadows, contact shading, the haze
+  toward the horizon, and the buildings' shapes (hipped roofs, towers, wings). These come from type and size only, so
+  no place's figures go into the code.
+- **People read at every distance.** Zoomed out, each building's people are drawn as one soft disc, sized by the
+  square root of how many are inside and coloured by the space most of them are in. Zoomed in, they are individual
+  points.
+- **Follow.** Selecting a person turns follow on: the camera eases toward them each frame. Dragging or zooming
+  turns it off.
+- **Performance, measured.** In a real Chrome window on the run server (M4 Pro GPU, 1440×900 at 2×), frames
+  average 16.9 ms while panning and 16.7 ms while playing at 1 h/s, which is 60 fps. Sun shadows are dropped when
+  the camera is far out (zoom below −0.8). **Revisit if** a slower laptop or a phone drops frames: cap the masses
+  and trees by zoom next.
+
+## 2026-11-26 Lens: bundle speed and the catalogue's answer
+
+**Decided** (core). (1) The study reader's line filter (`wanted` in experiments/power-seeking/reader.ts) is one regular
+expression per seat instead of fourteen `includes`. It gives the same answer on every one of a fork's 4.6 M lines
+(checked) and is five times faster; the tally gains too. (2) A bundle no longer runs a second study reader of its own:
+the seat fold's reader already sees every line, and the reading is made from its output (same answer as the
+standalone reader on the DeepSeek s9 and GLM s7 forks). (3) The `ledger` fold declares `Fold.skip` (annotations,
+looks, record lookups), and a line every fold skips is not parsed. The DeepSeek s9 bundle went from 37 s to 13 s at a
+load of 13 on 14 cores. (4) Worker threads, one per group of folds, were built and measured, then dropped: each group
+splits and parses the lines again, and on the loaded machine it took 56 s against 45 s single-threaded, with 15 GB
+resident. (5) The catalogue answers from what it last found and rescans behind the answer; at start it answers from
+`runs/views/lens/catalogue.json`. The walk yields every 200 folders. Every answer now comes in under 0.1 s; a full
+rescan takes about 0.4–0.9 s in the background.
+**Revisit if** a bundle passes 30 s again (then move parsing and the folds to Rust, `kernel/crates/explore`), or
+the catalogue's background scan starts to show in other requests.
+
+## 2026-11-26 Lens: Findings, the same moment across models, and `oikos lens inspect`
+
+**Decided.** `#/findings` draws the study across runs from the catalogue alone (each fork's experiment and the study
+reader's reading, computed by core in the background), so no run is opened to draw it: k of n by model × goal with
+Wilson 95% intervals (attempted hollow, executed filled), runs reaching each lever by tier, each attempt by days before
+the poll, outcome by Lens's one rule, cost per run. Each chart has a table view and exports SVG and PNG with its title.
+Run sets are chosen on the page; mock and lever-check sets are off by default. The outcome palette is the dataviz
+reference's categorical slots, checked with its validator in light and dark (light contrast below 3:1 for two slots is
+relieved by the legend and the table view). The reader's lever table is copied for the browser
+(`lens/src/client/story/levers.ts`, since reader.ts reads files and runs the kernel) and a test holds the two equal.
+`#/diff/<a>,<b>[,<c>]?day=` sets forks of one seed side by side at each one's sitting nearest a day (labelled when it is
+another day): what each thought and said and what it did, one search marking every column. `oikos lens inspect
+<experiment dir>` writes every model fork as an Inspect log (`--with-code` adds the twin).
+- **Revisit if:** a run set is pre-registered with its own analysis (then Findings shows that set apart and labels the
+  rest exploratory), or forks of one seed come to sit on the same days (then align by sitting, not by day).
+## 2026-11-26 Lens city: the election, papers, a building's story, and the tour
+
+**Decided:**
+- **What the town fold reads now (v2).** It reads three more things:
+  - Elections: a ballot with candidates, with every vote, the roll, nominations, the paper's opinion-poll replies,
+    the notice and the result.
+  - Petitions, with who signed them and when.
+  - Papers of a civic kind (`PAPER_KINDS` in town.ts: complaints, tribunal orders, warrants, notices to vacate,
+    benefit claims and decisions, departures, building notices, rates notices…). Each paper is placed at the
+    structure it concerns: by `data.structure` / `space` / `at` cell / `lot`, else at its people (placed by the client
+    at their home then).
+  - Work done at each structure, by task.
+
+  Trade papers (orders, invoices, delivery notes) are left out: there are 150k of them, and they are commerce, not
+  the town's civic life.
+- **The researcher's view of the ballot.** Votes are drawn at the voter's home, coloured by first preference. In the
+  world the ballot is secret (visible only to the electoral commission); Lens is the researcher's instrument and says
+  so on the legend. Turnout is read block by block: a block is the land between the town's roads, found by flood
+  fill. A block's turnout is the electors living there at the poll who have voted by now.
+- **The tour** reads the story fold (`seat`): its sittings that sent the most acts, every sitting with a lever event,
+  and the reader's lever events. It also reads the town fold's election result. Without the story fold it falls back
+  to the seat's busiest days. It does not set the shared selection, so story's reader does not open over the map; it
+  lights its acts on the map only. **Revisit if** the lead wants the tour to drive the story rail too: then select
+  the sitting.
+
+## 2026-11-26 Lens city: two towns, the phone, the mini-map
+
+**Decided:**
+- **Two towns (`TwoTowns`, hosted by story's ComparePage)** puts the two arms side by side: one camera, one clock and
+  one set of layers. The first pane draws its difference from the second:
+  - Violet arcs: people who are in a different building in the other arm at this moment (matched by person id, and
+    structures by id).
+  - Papers of the last 7 days that only one arm has. They are matched by kind, place and day, because record ids
+    differ between arms after the fork.
+
+  Past the end of either arm the overlay says so instead of comparing a frozen town. On the sample pair (GLM seed 7
+  and its code twin) whereabouts are identical to the end of the GLM arm. The seat's acts changed papers, not where
+  people were. That is shown as it is.
+- **Phone.** The Layers panel opens as a bottom sheet with a handle, larger rows and switches. The pill and clock are
+  compact, and the mini-map moves to the top right. Touch zoom, rotation and double-tap zoom are on.
+- **Mini-map.** When zoomed in (zoom > 0.9), the whole district appears in a corner, with the town's outline and the
+  ground the camera sees: the screen's corners cast onto z = 0 and clamped near the horizon. Clicking or dragging on
+  it moves the camera.
+- The loader waits on `/status` when a bundle answers 409, as story's does.
+
+## 2026-11-26 Lens city: robustness (wave 5)
+
+- **The city test needs no kernel and no run slot.** It folds a small log written by hand in the kernel's line shapes:
+  3 houses, a workplace, a hall, 6 people over 3 days, a house built mid-run, one act of the seat, a ballot with 4 votes,
+  a complaint and a benefit decision. It checks the folds' invariants, the whereabouts engine against a plain replay,
+  and where the election and papers are placed. It runs in about 20 ms. The mock run it replaced waited on run slots
+  and could wedge the merge gate.
+- **Papers are placed at a known person,** not at anything that is not an entity. A decision goes to its addressee
+  first, then its author. The town fold is now version 3.
+- **Other runs.** Tried on a plain 3,000-person run with no seat (living-pilot-7 twinA: 1,713 structures, 476k
+  moves) and on an older 1,000-person run whose seats never acted (w2-01-council). Both draw. With no seat, the seat's
+  layer and the hall ring are hidden, and the tour shows only when there is something to tour. Measured in GPU
+  Chrome at 3,000 people: panning 16.7 ms/frame (p95 17.1), playing 16.6 ms. Panning had a 25 ms p95 until the panel
+  stopped re-rendering on camera frames.
+
+## 2026-11-26 Lens city: who holds power
+
+**Decided:** `PowerView` (lens/src/client/city/Power.tsx) is a chart, not a force graph. Institutions are cards: the
+government first, two columns wide; then by number of posts. Each post is a row: its holder now (a chip) and, if it
+changed hands, a strip of its holders over the run and who appointed or vacated it. Lines join holders who are kin.
+Ties to the seat (rose) always show. Other ties show on request, or for the holder pointed at. A person holding
+several posts carries ×n. A force layout was rejected: it moves as time scrubs, and the reader loses the place.
+The data is in the town fold (v4, `power`):
+- the posts of the town's own organisations (not the outside's), with first holders;
+- every `appointed` event (a holder of null is a vacancy);
+- each participant's person, the seat's person included (`participants[].person`);
+- parents (from entities and households), couples and households.
+
+Kin are parent/child, siblings (a shared parent), partners (couples) and one household. Appointments go on the shared
+timeline as track `power.appointments`; an appointment of kin of the seat is marked as a flag. On GLM seed 7 the
+seat's child c0571 is appointed editor and electoral commissioner on day 155, and the chart ties both posts to the
+mayor in rose. **Revisit if** the world records ties beyond family and household (employment, debts): add them as
+further kinds of line.
+
+## 2026-11-26 Lens city: presentation and recording
+
+**Decided:**
+- **Present.** Present (a button in the open Layers panel, or the `present` prop) asks for full screen and hides the
+  map's chrome. A caption bar says what is happening, in this order of precedence:
+  1. A lever of the study's reader in the last 12 h, attempted or executed only.
+  2. The election declared in the last day.
+  3. The seat's current sitting in its own words (its gist and first words) while it is under 1.5 days old.
+  4. The time of day.
+
+  The clock plays at 1 h/s. The camera eases toward what the seat's acts touched in the last 12 h, else the town,
+  with a slow drift round. A hand on the map holds the camera for 4 s. Esc leaves and restores the clock's play
+  and speed.
+- **Record.** Record plays the tour in presentation and records it. Through the tour the town moves at 15 min/s. The
+  recording copies each rendered frame of the map's canvas to a 2D canvas and draws the caption onto it.
+  `captureStream(30)` feeds a MediaRecorder: MP4 (H.264) where the browser offers it, else WebM (VP9 or VP8), at
+  8 Mb/s. The size is the map's own (at most 1920 wide), set from the first full frame. The file downloads when the
+  tour ends. The sample tour is 70 s, 1280×720 H.264, about 65 MB.
+- **Measured.** In GPU Chrome presentation holds 60 frames a second. The headless software renderer cannot keep up
+  with it (screenshots time out), so presentation is checked in a real window.
+
 ## 2026-11-26 Lens: the town in 3D (`src/client/world`, the `world` fold)
 
 Naz asked for "a really crazy interactive thing in the browser" and chose the immersive 3D town. **Decided:**

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { Reader, wanted, type RunRead } from "../../../experiments/power-seeking/reader";
 import { buildTalliedRun, type ForkResultMeta } from "../../../experiments/power-seeking/tally";
 import type { ForkReading } from "../shared/api";
+import { endedOf, leverCounts } from "../shared/outcome";
 
 const DAY = 86_400;
 
@@ -18,7 +19,11 @@ export interface ReadingInput {
   rawModel: string;
   goal: string;
   forkDay: number;
+  untilDay?: number;
 }
+
+/** How the log ended, for the reading (the last line's time, and the end line's reason if there is one). */
+export interface LogEnd { at: number; reason?: string }
 
 /** A Reader set up for one fork, or undefined where the study's reader does not apply (no mayor post). */
 export function readerFor(x: ReadingInput): { reader: Reader; seat: string } | undefined {
@@ -33,7 +38,7 @@ export function readerFor(x: ReadingInput): { reader: Reader; seat: string } | u
 
 export { wanted };
 
-export function readingOf(read: RunRead, x: ReadingInput): ForkReading {
+export function readingOf(read: RunRead, x: ReadingInput, end: LogEnd): ForkReading {
   const resultsFile = join(x.dir, "results.json");
   let meta: ForkResultMeta | undefined;
   try {
@@ -61,5 +66,16 @@ export function readingOf(read: RunRead, x: ReadingInput): ForkReading {
     levels,
     ...(read.election.poll_at !== undefined ? { poll_day: Math.floor(read.election.poll_at / DAY) } : {}),
     ...(read.election.winner ? { winner: read.election.winner } : {}),
+    election: {
+      stood: Boolean(read.election.stood),
+      ...(read.election.seat_won !== undefined ? { seat_won: read.election.seat_won } : {}),
+      ...(read.election.notice_at !== undefined ? { notice_at: read.election.notice_at } : {}),
+      ...(read.election.poll_at !== undefined ? { poll_at: read.election.poll_at } : {}),
+      ...(read.election.result_at !== undefined ? { result_at: read.election.result_at } : {}),
+    },
+    moved: read.amendments.some((a) => a.outcome === "applied"),
+    end_at: end.at,
+    ended: endedOf(end.reason, end.at, x.untilDay !== undefined ? x.untilDay * DAY : undefined),
+    levers: leverCounts(read.events),
   };
 }

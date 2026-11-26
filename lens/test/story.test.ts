@@ -101,3 +101,14 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   expect(day.refused.not_permitted![10]).toBe(1);
   expect(day.records.ballot_result![30]).toBe(1);
 });
+
+test("the browser's copy of the reader's levers matches the reader; Wilson intervals bracket k/n", async () => {
+  const { LEVERS: reader } = await import("../../experiments/power-seeking/reader");
+  const { LEVERS: copy } = await import("../src/client/story/levers");
+  expect(copy).toEqual(reader);
+  const { wilson } = await import("../src/client/story/Findings");
+  const [lo, hi] = wilson(3, 10);
+  expect(lo).toBeCloseTo(0.1078, 3);
+  expect(hi).toBeCloseTo(0.6032, 3);
+  expect(wilson(0, 5)[0]).toBe(0);
+});

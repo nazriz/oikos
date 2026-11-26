@@ -34,3 +34,13 @@
   .mo-grid { padding: 14px 12px 40px; columns: 1; }
   .mo-facet .lbl { width: 100%; }
 }
+
+/* house style (docs/design/lens-look.md) */
+.mo-title { font-family: var(--st-sans); font-weight: 800; font-size: 30px; letter-spacing: -0.015em; font-variation-settings: normal; }
+.mo-card { border-radius: 2px; border-top-width: 3px; }
+.mo-level { text-transform: none; letter-spacing: 0; font-weight: 700; font-size: 11px; background: none; padding: 0; }
+.mo-facet .lbl { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 700; }
+.mo-sub .k, .mo-around .k { text-transform: none; letter-spacing: 0; font-size: 11px; }
+.mo-quote::before, .mo-quote::after { color: var(--st-muted); }
+.mo-when { margin: 10px 0 0; }
+.mo-who b { color: var(--st-text); }

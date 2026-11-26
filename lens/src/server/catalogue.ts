@@ -73,9 +73,23 @@ export class Catalogue {
 
   private scanning?: Promise<{ runs: RunEntry[]; at: number; ms: number }>;
 
-  /** The runs, scanned at most every `maxAgeMs` (one scan at a time; callers during a scan share it). */
+  private savedHash?: number;
+
+  /** The runs. Kept for `maxAgeMs`; after that the last answer is given at once and a new scan starts behind it (so no
+   * request waits on the disk), and at start the last answer saved in <views>/catalogue.json. `maxAgeMs` 0 waits for a
+   * fresh scan. One scan at a time; callers during a scan share it. */
   async runs(maxAgeMs = 15_000): Promise<{ runs: RunEntry[]; at: number; ms: number }> {
+    if (!this.last && maxAgeMs > 0) {
+      const saved = readJson(join(this.paths.views, "catalogue.json"));
+      if (saved?.runs) this.last = { at: 0, runs: saved.runs, ms: saved.ms ?? 0 };
+    }
     if (this.last && Date.now() - this.last.at < maxAgeMs) return this.last;
+    if (this.last && maxAgeMs > 0) {
+      // (Started after this answer has gone: the walk holds the thread for a few hundred milliseconds.)
+      if (!this.scanning) this.scanning = new Promise<{ runs: RunEntry[]; at: number; ms: number }>((res, rej) => setTimeout(() => this.scan().then(res, rej), 50)).finally(() => (this.scanning = undefined));
+      this.scanning.catch(() => {});
+      return this.last;
+    }
     return (this.scanning ??= this.scan().finally(() => (this.scanning = undefined)));
   }
 
@@ -83,8 +97,8 @@ export class Catalogue {
     const t0 = performance.now();
     const runs: RunEntry[] = [];
     const candidates: { path: string; bytes: number; mtimeMs: number }[] = [];
-    // (The walk itself never awaits: in a server that also reads logs, every await would let a batch of that in.)
-    this.walk(this.paths.runs, 0, runs, candidates);
+    // (The walk gives the thread back every couple of hundred folders, so the server keeps answering while it runs.)
+    await this.walk(this.paths.runs, 0, runs, candidates, { n: 0 });
     const unknown = candidates.filter((c) => {
       const s = this.sniff[c.path];
       return !s || s.bytes !== c.bytes || s.mtimeMs !== c.mtimeMs;
@@ -113,6 +127,13 @@ export class Catalogue {
       this.sniffDirty = false;
     }
     this.last = { at: Date.now(), runs, ms: Math.round(performance.now() - t0) };
+    const text = JSON.stringify({ runs, ms: this.last.ms });
+    const h = Bun.hash(text) as number;
+    if (h !== this.savedHash) {
+      this.savedHash = h;
+      ensureDir(this.paths.views);
+      writeFileSync(join(this.paths.views, "catalogue.json"), text);
+    }
     return this.last;
   }
 
@@ -126,7 +147,8 @@ export class Catalogue {
     return join(this.paths.runs, entry.log);
   }
 
-  private walk(dir: string, depth: number, out: RunEntry[], candidates: { path: string; bytes: number; mtimeMs: number }[]): void {
+  private async walk(dir: string, depth: number, out: RunEntry[], candidates: { path: string; bytes: number; mtimeMs: number }[], count: { n: number }): Promise<void> {
+    if (++count.n % 200 === 0) await new Promise((r) => setImmediate(r));
     let ents: Dirent[];
     try {
       ents = readdirSync(dir, { withFileTypes: true });
@@ -149,7 +171,7 @@ export class Catalogue {
       } catch {}
     }
     if (depth >= MAX_DEPTH) return;
-    for (const e of ents) if (e.isDirectory() && !e.name.startsWith(".") && !SKIP_DIRS.has(e.name)) this.walk(join(dir, e.name), depth + 1, out, candidates);
+    for (const e of ents) if (e.isDirectory() && !e.name.startsWith(".") && !SKIP_DIRS.has(e.name)) await this.walk(join(dir, e.name), depth + 1, out, candidates, count);
   }
 
   private experiment(dir: string, ents: Dirent[], out: RunEntry[]): void {

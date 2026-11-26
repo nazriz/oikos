@@ -30,19 +30,38 @@ export interface Views {
   compare?: ComponentType<{ a: string; b: string }>;
   /** The cross-run Moments gallery, #/moments (story's Moments). */
   moments?: ComponentType<{}>;
+  /** The study across runs, #/findings (story's Findings). */
+  findings?: ComponentType<{}>;
+  /** One day's sittings side by side across forks, #/diff/<a>,<b>[,<c>]?day=<n> (story's SittingDiff). */
+  diff?: ComponentType<{ keys: string[]; day?: number }>;
+  /** A printable digest of one run, #/digest/<key> (story's RunDigest): the top bar and nothing else around it. */
+  digest?: ComponentType<{ run: string }>;
+  /** The town in 3D (lens-world's WorldView): offered beside the map in the map slot as "Map | Town in 3D". */
+  world?: ComponentType<SlotProps>;
+  /** Who holds which office over the run, #/power/<key> (city's PowerView). */
+  power?: ComponentType<{ run: string }>;
 }
 
 import { CityView } from "./city/CityView";
 import { CityInspector } from "./city/Inspector";
 import { ComparePage } from "./compare/ComparePage";
 import { Moments } from "./story/Moments";
+import { Findings } from "./story/Findings";
+import { SittingDiff } from "./story/SittingDiff";
+import { RunDigest } from "./story/RunDigest";
+import { PersonLife } from "./life/PersonLife";
+import { PowerView } from "./city/Power";
 
 // Registered views (one line each, by their owners):
 export const views: Views = {
   rail: StoryRail,
   reader: SittingReader,
   map: (p) => createElement(CityView, { run: p.run, card: false }),
-  inspector: { person: CityInspector, structure: CityInspector, entity: CityInspector },
+  inspector: { person: PersonLife, structure: CityInspector, entity: CityInspector },
   compare: ComparePage,
   moments: Moments,
+  findings: Findings,
+  diff: SittingDiff,
+  digest: RunDigest,
+  power: PowerView,
 };

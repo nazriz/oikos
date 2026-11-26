@@ -20,6 +20,15 @@ export const span = (seconds: number) => {
   return `${d < 10 ? Math.round(d * 10) / 10 : Math.round(d)} d`;
 };
 
+/** A span of time in words: "34 days", "7 hours", "20 minutes". */
+export const spanWords = (seconds: number) => {
+  const a = Math.abs(seconds);
+  if (a < HOUR) return `${Math.round(a / 60)} minutes`;
+  if (a < DAY) { const h = Math.round(a / HOUR); return `${h} hour${h === 1 ? "" : "s"}`; }
+  const d = Math.round(a / DAY);
+  return `${d} day${d === 1 ? "" : "s"}`;
+};
+
 export const usd = (x: number | undefined) => (x === undefined ? "–" : x < 0.01 && x > 0 ? "<$0.01" : `$${x < 100 ? x.toFixed(2) : Math.round(x).toLocaleString("en-US")}`);
 export const int = (n: number | undefined) => (n === undefined ? "–" : Math.round(n).toLocaleString("en-US"));
 export const compact = (n: number) => (n < 1000 ? String(n) : n < 1e6 ? `${Math.round(n / 100) / 10}k` : `${Math.round(n / 1e5) / 10}M`);

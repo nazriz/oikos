@@ -6,9 +6,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { useLens } from "../state";
 import { loadSeat, loadSitting, loadSystem, useAsync, when, worldDay, usd, tokens, plural, human, STAGE, type SeatAct, type SeatDraft, type SeatJson, type SeatLever, type SittingDetail, type SittingTurn } from "./data";
 import { Hi, Md, MarksContext, hasQuery, type Marks } from "./text";
+import { leverTitle } from "../words";
+import { useResearcher } from "../mode";
+import { firstPoll } from "./moments-data";
 import "./story.css";
 
-type Detail = SittingDetail & { acts: SeatAct[] };
+export type Detail = SittingDetail & { acts: SeatAct[] };
 
 /** Which sitting the selection points at, and what in it to bring into view. */
 function target(seat: SeatJson, sel: ReturnType<typeof useLens.getState>["selection"]): { sitting: number; act?: number; lever?: number } | null {
@@ -31,6 +34,7 @@ export function SittingReader({ run: runProp }: { run?: string }) {
 }
 
 function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting: number; act?: number; lever?: number } }) {
+  const researcher = useResearcher();
   const select = useLens((s) => s.select), setT = useLens((s) => s.setT);
   const s = seat.sittings[tg.sitting]!;
   const detail = useAsync(() => loadSitting(run, tg.sitting) as Promise<Detail>, [run, tg.sitting]);
@@ -87,31 +91,28 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
   };
 
   return (
-    <div className="st-reader" ref={root}>
+    <div className={`st-reader ${researcher ? "researcher" : "story"}`} ref={root}>
       <div className="st-rbar">
         <div>
-          <div className="st-kicker">Sitting {s.i + 1} of {seat.sittings.length}{s.kind === "code" ? " · code seat" : ""}</div>
-          <h2>Day {worldDay(s.t)}, <span className="st-muted" style={{ fontWeight: 400 }}>{when(s.t).split(", ").at(-1)}</span></h2>
-          <div className="meta">
-          {s.woke_for && <span>woke for {human(s.woke_for)}</span>}
-          {s.turns > 0 && <span>{plural(s.turns, "call")}</span>}
-          {s.usage.calls > 0 && <span className="st-mono">{tokens(s.usage.input_tokens)} in · {tokens(s.usage.output_tokens)} out{s.usage.reasoning_tokens ? ` (${tokens(s.usage.reasoning_tokens)} reasoning)` : ""} · {usd(s.usage.cost_microusd)}</span>}
-          {seat.election.poll_at !== undefined && <span style={{ color: "var(--st-election)" }}>{Math.round((seat.election.poll_at - s.t) / 86_400)} days to the poll</span>}
-          </div>
+          <h2>Turn {s.i + 1} of {seat.sittings.length}, day {worldDay(s.t)} at {when(s.t).split(", ").at(-1)}{s.kind === "code" ? " (rule-based mayor)" : ""}</h2>
+          <p className="meta">
+          {researcher && <>{s.turns > 0 ? `The AI mayor was asked ${s.turns === 1 ? "once" : `${s.turns} times`} in this turn` : "No model was asked in this turn"}{s.usage.calls > 0 ? `, reading ${tokens(s.usage.input_tokens)} tokens and writing ${tokens(s.usage.output_tokens)}${s.usage.reasoning_tokens ? ` (${tokens(s.usage.reasoning_tokens)} of them hidden reasoning)` : ""}, at a cost of ${usd(s.usage.cost_microusd)}` : ""}.</>}
+          {firstPoll(seat) !== undefined && <span style={{ color: "var(--st-election)" }}> {Math.round((firstPoll(seat)! - s.t) / 86_400)} days before the election was due.</span>}
+          </p>
         </div>
         <div className="grow" />
         <div className="st-search">
           <span className="st-faint">⌕</span>
-          <input placeholder="Find in this sitting" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setHit((h) => (hits ? (h + (e.shiftKey ? hits - 1 : 1)) % hits : 0)); }} />
+          <input placeholder="Find words in this turn" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") setHit((h) => (hits ? (h + (e.shiftKey ? hits - 1 : 1)) % hits : 0)); }} />
           {query.trim().length >= 2 && <span className="n">{hits ? `${hit + 1}/${hits}` : "none"}</span>}
         </div>
         <div className="group">
-          <button className="st-btn" disabled={tg.sitting === 0} onClick={() => go(-1)} title="Previous sitting (k)">‹ sitting</button>
-          <button className="st-btn" disabled={tg.sitting === seat.sittings.length - 1} onClick={() => go(1)} title="Next sitting (j)">sitting ›</button>
+          <button className="st-btn" disabled={tg.sitting === 0} onClick={() => go(-1)} title="Key: k">Previous turn</button>
+          <button className="st-btn" disabled={tg.sitting === seat.sittings.length - 1} onClick={() => go(1)} title="Key: j">Next turn</button>
         </div>
         {seat.levers.length > 0 && <div className="group">
-          <button className="st-btn flag" onClick={() => lever(-1)} title="Previous lever event ([)">‹ lever</button>
-          <button className="st-btn flag" onClick={() => lever(1)} title="Next lever event (])">lever ›</button>
+          <button className="st-btn flag" onClick={() => lever(-1)} title="Key: [">Previous power grab</button>
+          <button className="st-btn flag" onClick={() => lever(1)} title="Key: ]">Next power grab</button>
         </div>}
         <button className="st-btn st-close" onClick={() => select(null)} title="Close (Esc)">×</button>
       </div>
@@ -122,7 +123,7 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
         <MarksContext.Provider value={marks}>
           <div className="st-cols">
             <Col k="saw" tab={tab} n={detail.turns[0] ? undefined : ""}><Saw run={run} seat={seat} d={detail} query={query} /></Col>
-            <Col k="said" tab={tab} n={plural(detail.turns.length, "call")}><Said seat={seat} d={detail} levers={levers} /></Col>
+            <Col k="said" tab={tab} n={plural(detail.turns.length, "answer")}><Said seat={seat} d={detail} levers={levers} /></Col>
             <Col k="happened" tab={tab} n={plural(detail.acts.length, "act")}><Happened seat={seat} d={detail} levers={levers} focus={tg.act} /></Col>
           </div>
         </MarksContext.Provider>
@@ -131,7 +132,7 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
   );
 }
 
-const COLS = { saw: "What it saw", said: "What it thought & said", happened: "What happened" };
+const COLS = { saw: "What it was shown", said: "What it thought and said", happened: "What happened" };
 function Col({ k, tab, n, children }: { k: keyof typeof COLS; tab: string; n?: string; children: ReactNode }) {
   return (
     <div className={`st-col ${tab === k ? "on" : ""}`} data-col={k}>
@@ -161,7 +162,7 @@ function Saw({ run, seat, d, query }: { run: string; seat: SeatJson; d: Detail; 
         const big = p.body.length > 2_400;
         return (
           <details key={k} className="st-sec" open={!big || hasQuery(p.body, query)}>
-            <summary><Hi text={p.title} /><span className="n">{p.count ?? ""}{big ? ` · ${Math.round(p.body.length / 1000)}k chars` : ""}</span></summary>
+            <summary><Hi text={p.title} /><span className="n">{p.count ?? ""}{big ? `, ${Math.round(p.body.length / 1000)}k characters` : ""}</span></summary>
             <div className="body"><Md text={p.body} className="st-prose small" /></div>
           </details>
         );
@@ -190,21 +191,22 @@ function resultsOf(turns: SittingTurn[]): Map<string, string> {
   return m;
 }
 
-function Said({ seat, d, levers }: { seat: SeatJson; d: Detail; levers: SeatLever[] }) {
+export function Said({ seat, d, levers }: { seat: SeatJson; d: Detail; levers: SeatLever[] }) {
+  const researcher = useResearcher();
   const results = useMemo(() => resultsOf(d.turns), [d]);
   if (!d.turns.length) return <div className="st-muted" style={{ fontSize: 13 }}>No model calls: {d.acts.length ? "a code seat's acts." : "nothing was asked."}</div>;
   let call = 0;
   const unseen = d.turns.reduce((n, t) => n + (Array.isArray(t.output) && t.output.some((c: any) => c?.type === "thinking") ? 0 : t.usage?.reasoning_tokens ?? 0), 0);
   return (
     <>
-      {unseen > 0 && <div className="st-unseen">{tokens(unseen)} tokens of reasoning in this sitting were not returned by the provider: what is below is what it wrote, not all it thought.</div>}
+      {researcher && unseen > 0 && <div className="st-unseen">{tokens(unseen)} tokens of reasoning in this turn were kept hidden by the model's provider. Below is what it wrote, not all it thought.</div>}
       {d.turns.map((t, k) => {
         const flagged = levers.filter((l) => l.level === "considered" && l.turn === k);
         const told = Array.isArray(t.input) ? t.input.filter((x: any) => x?.type === "text") : [];
         return (
           <div key={k} className={`st-turn ${t.purpose === "notebook" ? "notebook" : ""}`}>
-            <div className="st-turn-head">{t.purpose === "notebook" ? "Notebook" : `Call ${++call}`}<span className="u">{when(t.t).split(", ").at(-1)}{t.usage ? ` · ${tokens(t.usage.output_tokens ?? 0)} out${t.usage.reasoning_tokens ? ` · ${tokens(t.usage.reasoning_tokens)} reasoning` : ""} · ${usd(t.usage.cost_microusd ?? 0)}` : ""}</span></div>
-            {flagged.length > 0 && <div id={`st-lever-${flagged[0]!.i}`} className="st-flagbox muted" style={{ margin: "0 0 10px" }}>{flagged.slice(1).map((l) => <span key={l.i} id={`st-lever-${l.i}`} />)}<div className="who">Reader · considered · {[...new Set(flagged.map((l) => l.title))].join(" · ")}</div><div style={{ fontSize: 11.5, marginTop: 2 }}>A phrase match in its own words (dashed below), not proof it weighed the lever: blind grading found this level unreliable.</div></div>}
+            <div className="st-turn-head">{t.purpose === "notebook" ? "Its notebook" : `Answer ${++call}`}<span className="u">{t.usage ? `${tokens(t.usage.output_tokens ?? 0)} tokens written, ${usd(t.usage.cost_microusd ?? 0)}` : ""}</span></div>
+            {flagged.length > 0 && <div id={`st-lever-${flagged[0]!.i}`} className="st-flagbox muted" style={{ margin: "0 0 10px" }}>{flagged.slice(1).map((l) => <span key={l.i} id={`st-lever-${l.i}`} />)}<div className="who">Mentioned (unreliable): {[...new Set(flagged.map((l) => leverTitle(l.lever)))].join("; ")}</div><div style={{ fontSize: 11.5, marginTop: 2 }}>The study's checker matched these words (underlined below). That is not proof the mayor weighed a power grab; checking by hand found this often wrong.</div></div>}
             {told.map((x: any, j: number) => <div key={j} className="st-note"><span className="k">told</span><Hi text={String(x.text)} /></div>)}
             {t.purpose === "notebook" && typeof t.input === "string" && <details className="st-think"><summary>what the notebook asked</summary><Md text={t.input} className="st-prose small" /></details>}
             <Output out={t.output} results={results} seat={seat} />
@@ -229,8 +231,8 @@ function Output({ out, results, seat }: { out: any; results: Map<string, string>
 }
 
 const TOOL: { [name: string]: (i: any) => { what: string; body?: string; why?: string; rest?: string[] } } = {
-  look: (i) => ({ what: `Looked at ${i.report ?? "?"}${i.paper ? `: ${i.paper}` : ""}${i.named ? `: ${[].concat(i.named).join(", ")}` : ""}${i.words ? ` for “${i.words}”` : ""}${i.find ? ` where ${i.find.map((f: any) => `${f.field} = ${f.value}`).join(", ")}` : ""}${i.visit ? `: visit ${[].concat(i.visit).join(", ")}` : ""}`, rest: ["report", "paper", "named", "words", "find", "visit"] }),
-  do: (i) => ({ what: `Asked${i.as ? ` as ${i.as}` : ""}`, body: i.what ?? i.request, why: i.why, rest: ["as", "what", "request", "why"] }),
+  look: (i) => ({ what: `Looked at ${place(i.report)}${i.paper ? `: ${i.paper}` : ""}${i.named ? `: ${[].concat(i.named).join(", ")}` : ""}${i.words ? ` for “${i.words}”` : ""}${i.find ? ` where ${i.find.map((f: any) => `${f.field} = ${f.value}`).join(", ")}` : ""}${i.visit ? `: visit ${[].concat(i.visit).join(", ")}` : ""}`, rest: ["report", "paper", "named", "words", "find", "visit"] }),
+  do: (i) => ({ what: `Asked the clerk for this${i.as ? `, as ${i.as}` : ""}`, body: i.what ?? i.request, why: i.why, rest: ["as", "what", "request", "why"] }),
   write: (i) => ({ what: `Wrote${i.to ? ` to ${[].concat(i.to).join(", ")}` : ""}${i.about ? `, about ${i.about}` : ""}`, body: i.text, why: i.why, rest: ["to", "about", "text", "why", "as"] }),
   confirm: (i) => ({ what: `${i.decision === "decline" || i.decision === "reject" ? "Declined" : "Confirmed"} ${i.ref ?? ""}`, why: i.note, rest: ["ref", "decision", "note"] }),
   notebook: (i) => ({ what: i.text ? "Rewrote its notebook" : "Noted in its notebook", body: i.add ?? i.text, rest: ["add", "text"] }),
@@ -238,13 +240,14 @@ const TOOL: { [name: string]: (i: any) => { what: string; body?: string; why?: s
 };
 
 function Tool({ c, result, seat }: { c: any; result?: string; seat: SeatJson }) {
+  const researcher = useResearcher();
   const input = c.input ?? {};
   const shape = TOOL[c.name]?.(input) ?? { what: human(String(c.name)), rest: [] };
   const extra = Object.entries(input).filter(([k]) => !(shape.rest ?? []).includes(k));
   const kids = seat.children.filter((ch) => JSON.stringify(input).includes(ch));
   return (
     <div className="st-tool">
-      <div className="st-tool-head"><span className="st-tool-name">{c.name}</span><span className="st-tool-what"><Hi text={shape.what} /></span></div>
+      <div className="st-tool-head">{researcher && <span className="st-tool-name">{c.name}</span>}<span className="st-tool-what"><Hi text={shape.what} /></span></div>
       {(shape.body || shape.why || extra.length > 0 || kids.length > 0) && (
         <div className="st-tool-body">
           {shape.body && <Md text={String(shape.body)} />}
@@ -255,7 +258,7 @@ function Tool({ c, result, seat }: { c: any; result?: string; seat: SeatJson }) 
       )}
       {result !== undefined && (
         <details className="st-result" open={c.name !== "look" && result.length < 1_200}>
-          <summary>{c.name === "look" ? `what it found · ${Math.round(result.length / 100) / 10}k chars` : "the answer"}</summary>
+          <summary>{c.name === "look" ? `What it found (${Math.round(result.length / 100) / 10}k characters)` : "The answer"}</summary>
           <div className="body"><Md text={result} className="st-prose small" /></div>
         </details>
       )}
@@ -265,7 +268,7 @@ function Tool({ c, result, seat }: { c: any; result?: string; seat: SeatJson }) 
 
 // ---------- what happened ----------
 
-function Happened({ seat, d, levers, focus }: { seat: SeatJson; d: Detail; levers: SeatLever[]; focus?: number }) {
+export function Happened({ seat, d, levers, focus }: { seat: SeatJson; d: Detail; levers: SeatLever[]; focus?: number }) {
   type Item = { t: number; key: string; node: ReactNode };
   const items: Item[] = [];
   const used = new Set<number>();
@@ -280,10 +283,10 @@ function Happened({ seat, d, levers, focus }: { seat: SeatJson; d: Detail; lever
     const lv = levers.filter((l) => l.source === "translator" && l.t === f.t);
     items.push({ t: f.t, key: `f${f.t}${f.draft}`, node: (
       <div className={`st-act ${lv.length ? "lever" : ""}`}>
-        <div className="st-act-title"><span className="grow">The translator could not draw it up</span><span className="st-pill no">not sent</span></div>
+        <div className="st-act-title"><span className="grow">The translator could not draw it up</span><span className="st-pill no">Not sent</span></div>
         {lv.map((l) => <FlagBox key={l.i} l={l} />)}
         <div className="st-steps">
-          <div className="st-step seat"><span className="lbl">Asked</span><Hi className="q" text={f.proposal} /></div>
+          <div className="st-step seat"><span className="lbl">It asked</span><Hi className="q" text={f.proposal} /></div>
           {f.call && <div className="st-step inst"><span className="lbl">Read as</span><Hi className="st-mono" text={f.call} /></div>}
           <div className="st-step no"><span className="lbl">Why not</span><Hi text={f.reason} />{f.again ? <span className="st-faint"> (drawn up again)</span> : null}</div>
         </div>
@@ -296,7 +299,7 @@ function Happened({ seat, d, levers, focus }: { seat: SeatJson; d: Detail; lever
       {items.map((x) => <div key={x.key}>{x.node}</div>)}
       {d.notes.length > 0 && (
         <div className="st-notes">
-          <div className="st-kicker" style={{ marginBottom: 4 }}>The platform's notes</div>
+          <h4 className="st-h3" style={{ marginBottom: 4 }}>Notes from the simulation</h4>
           {d.notes.map((n, k) => <div key={k} className="st-note"><span className="k">{n.key}</span><Hi text={typeof n.data === "string" ? n.data : JSON.stringify(n.data).slice(0, 400)} /></div>)}
         </div>
       )}
@@ -316,17 +319,20 @@ function FlagBox({ l, also = [] }: { l: SeatLever; also?: SeatLever[] }) {
   return (
     <div className="st-flagbox" id={`st-lever-${l.i}`}>
       {also.filter((x) => x.i !== l.i).map((x) => <span key={x.i} id={`st-lever-${x.i}`} />)}
-      <div className="who">Reader · {levels.length > 1 ? levels.join(" & ") : l.level} · {l.title}{l.tier ? ` · tier ${l.tier}` : ""}</div>
-      <div style={{ fontSize: 12, marginTop: 2 }}>{l.stage ? STAGE[l.stage] ?? l.stage : ""}{l.days_to_poll !== null ? ` · ${l.days_to_poll} days to the poll` : ""} · {human(l.phase)}{l.detail ? ` · ${l.detail}` : ""}</div>
+      <div className="who">Power grab, {l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}: {leverTitle(l.lever)}</div>
+      <div style={{ fontSize: 12, marginTop: 2 }}>{[l.stage ? STAGE[l.stage] ?? l.stage : "", l.days_to_poll !== null ? `${l.days_to_poll} days before election day` : "", l.tier ? `seriousness ${l.tier} of 3` : "", l.detail ?? ""].filter(Boolean).join("; ")}.</div>
       <div className="words"><Hi text={`“${l.words}”`} /></div>
     </div>
   );
 }
 
 function ActCard({ seat, draft, act, levers, focus }: { seat: SeatJson; draft?: SeatDraft; act?: SeatAct; levers: SeatLever[]; focus: boolean }) {
-  const title = act?.label ?? (draft?.label ? `Draft: ${draft.label}` : draft?.summary?.split("\n")[0] ?? "A request");
+  // (Titled by what the mayor asked for, in its words; what the clerk made of it is said underneath, since the two can differ.)
+  const asked = draft?.proposal ? firstClause(draft.proposal) : undefined;
+  const title = act && !draft ? act.label : asked ?? act?.label ?? draft?.label ?? "A request";
   const declined = draft?.decision && draft.decision !== "accept";
-  const pill = act ? (act.status === "applied" ? <span className="st-pill ok">applied</span> : act.status === "refused" ? <span className="st-pill no">refused</span> : <span className="st-pill wait">no outcome</span>) : declined ? <span className="st-pill no">declined</span> : <span className="st-pill wait">unsent</span>;
+  const pill = act ? (act.status === "applied" ? <span className="st-pill ok">Carried out</span> : act.status === "refused" ? <span className="st-pill no">Refused</span> : <span className="st-pill wait">No outcome yet</span>) : declined ? <span className="st-pill no">Declined by the mayor</span> : <span className="st-pill wait">Not sent</span>;
+  const researcher = useResearcher();
   const kids = act ? seat.children.filter((c) => act.blocks.some((b) => b?.participant === c || b?.participant === `${c}-self`)) : [];
   return (
     <div className={`st-act ${levers.length ? "lever" : ""} ${focus ? "focus" : ""}`} id={act ? `st-act-${act.i}` : undefined}>
@@ -334,9 +340,10 @@ function ActCard({ seat, draft, act, levers, focus }: { seat: SeatJson; draft?: 
       {topLevers(levers).map(({ top, all }) => <FlagBox key={top.i} l={top} also={all} />)}
       {kids.length > 0 && <div className="st-flagbox"><div className="who">Who</div><div style={{ fontSize: 12.5, marginTop: 2 }}>{kids.join(", ")} is the seat's own child, as its prompt names them.</div></div>}
       <div className="st-steps">
-        {draft && <div className="st-step seat"><span className="lbl">Asked</span><Hi className="q" text={draft.proposal} /></div>}
+        {draft && draft.label && <p className="st-clerk">{draft.decision && draft.decision !== "accept" ? <>The clerk wrote it up as: <b>{lower(draft.label)}</b>. The mayor declined this draft.</> : act ? <>The clerk wrote it up as: <b>{lower(draft.label)}</b>.</> : <>The clerk wrote it up as: <b>{lower(draft.label)}</b>; it was not sent.</>}</p>}
+        {draft && asked !== draft.proposal && <div className="st-step seat"><span className="lbl">It asked</span><Hi className="q" text={draft.proposal} /></div>}
         {draft && (draft.summary || draft.call) && (
-          <div className="st-step inst"><span className="lbl">Drawn up</span><span className="st-faint" style={{ fontSize: 11.5 }}>{draftBy(draft)}</span>
+          <div className="st-step inst"><span className="lbl">Written up by the clerk</span>{researcher && <span className="st-faint" style={{ fontSize: 11.5 }}>{draftBy(draft)}</span>}
             <details className="st-drawn" open={!!draft.summary && draft.summary.length < 220}>
               <summary><Hi text={draft.summary?.split("\n")[0] ?? draft.call ?? ""} /></summary>
               {draft.summary && draft.summary.includes("\n") ? <Md text={draft.summary.split("\n").slice(1).join("\n")} className="st-prose small" /> : null}
@@ -344,15 +351,15 @@ function ActCard({ seat, draft, act, levers, focus }: { seat: SeatJson; draft?: 
             </details>
           </div>
         )}
-        {draft && <div className={`st-step ${draft.decision === "accept" ? "ok" : draft.decision ? "no" : "wait"}`}><span className="lbl">{draft.decision === "accept" ? "Signed" : draft.decision ? "Declined" : "Not answered"}</span>{draft.note && <Hi className="q" text={draft.note} />}</div>}
-        {act && !draft && act.proposal && <div className="st-step seat"><span className="lbl">Asked</span><Hi className="q" text={act.proposal} /></div>}
+        {draft && <div className={`st-step ${draft.decision === "accept" ? "ok" : draft.decision ? "no" : "wait"}`}><span className="lbl">{draft.decision === "accept" ? "The mayor signed it" : draft.decision ? "The mayor declined it" : "Not answered"}</span>{draft.note && <Hi className="q" text={draft.note} />}</div>}
+        {act && !draft && act.proposal && <div className="st-step seat"><span className="lbl">It asked</span><Hi className="q" text={act.proposal} /></div>}
         {act && act.reasoning && <div className="st-step seat"><span className="lbl">Its reason</span><Hi className="q" text={act.reasoning} /></div>}
-        {act && <div className="st-step"><span className="lbl">Sent</span><span className="st-faint">{when(act.t)}{act.as ? ` · as ${act.as}` : ""}{act.via ? ` · via ${act.via}` : ""}</span> <span className="st-rec">seq {act.seq}</span></div>}
+        {act && <div className="st-step"><span className="lbl">Sent</span><span className="st-faint">{when(act.t)}{act.as ? `, as ${act.as}` : ""}</span></div>}
         {act && act.status === "applied" && <div className="st-step ok"><span className="lbl">Applied</span><span className="st-faint">{act.at !== undefined ? when(act.at) : ""}</span>{act.records.map((r) => <div key={r.id}><span className="st-rec">{r.id}</span> <span className="st-faint">{human(r.kind)}</span> <Hi text={r.text} /></div>)}</div>}
-        {act && act.status === "refused" && <div className="st-step no"><span className="lbl">Refused</span><span className="st-mono">{act.code}</span>{act.detail ? <> · <Hi text={act.detail} /></> : null}</div>}
+        {act && act.status === "refused" && <div className="st-step no"><span className="lbl">Refused</span>{human(act.code ?? "")}{act.detail ? <>: <Hi text={act.detail} /></> : null}</div>}
         {act && act.status === "pending" && <div className="st-step wait"><span className="lbl">Outcome</span><span className="st-faint">none in the log by the run's end</span></div>}
       </div>
-      {act && <details className="st-raw"><summary>the act as sent</summary><pre>{JSON.stringify(act.blocks, null, 1)}</pre></details>}
+      {researcher && act && <details className="st-raw"><summary>The act as sent</summary><pre>{JSON.stringify(act.blocks, null, 1)}</pre></details>}
     </div>
   );
 }
@@ -361,4 +368,19 @@ function draftBy(d: SeatDraft): string {
   if (r?.used === "behind" && r.behind) return `drawn up by ${r.behind}${r.first ? ` (behind ${r.first})` : ""}`;
   if (r?.first) return `drawn up by ${r.first}${r.agree === false && r.behind ? `; ${r.behind} read it otherwise` : ""}`;
   return d.translator ? `drawn up by ${d.translator}` : "";
+}
+
+/** The first clause of a request, for a title ("Appoint my child c0571 to the post of Electoral commissioner"). */
+function firstClause(x: string): string {
+  const t = x.replace(/\s+/g, " ").trim();
+  const cut = t.search(/[.;:](\s|$)|, (?:vacating|replacing|so that|because)\b/);
+  const c = cut > 12 ? t.slice(0, cut) : t;
+  return c.length > 160 ? c.slice(0, 159) + "…" : c;
+}
+const lower = (x: string) => x.charAt(0).toLowerCase() + x.slice(1);
+
+/** Where the mayor looked, in plain words: "mayor/in-tray" is its in-tray. */
+function place(report: unknown): string {
+  const r = String(report ?? "").replace(/^[\w-]+\//, "").replace(/[-_]/g, " ");
+  return r ? `its ${r}` : "its papers";
 }

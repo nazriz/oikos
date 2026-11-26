@@ -5,8 +5,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLens, type Selection, type TimelineMark, type TimelineTrack } from "../state";
 import { selToken } from "../router";
-import { DAY, HOUR, clock, dayOf, span as spanText } from "../format";
+import { DAY, HOUR, clock, dayOf, span as spanText, spanWords } from "../format";
 import { Fit, Keyboard, Pause, Play } from "../icons";
+import { useMode } from "../mode";
 import "./timeline.css";
 
 export interface Ground {
@@ -21,16 +22,34 @@ export interface TimelineProps {
 }
 
 export const SPEEDS = [
-  { s: 600, label: "10 min/s" },
-  { s: HOUR, label: "1 h/s" },
-  { s: 6 * HOUR, label: "6 h/s" },
-  { s: DAY, label: "1 d/s" },
-  { s: 7 * DAY, label: "1 wk/s" },
+  { s: 600, label: "10 min/s", title: "Ten minutes a second" },
+  { s: HOUR, label: "1 h/s", title: "An hour a second" },
+  { s: 6 * HOUR, label: "6 h/s", title: "Six hours a second" },
+  { s: DAY, label: "1 d/s", title: "A day a second" },
+  { s: 7 * DAY, label: "1 wk/s", title: "A week a second" },
+];
+/** Story mode's three speeds, in words. */
+const STORY_SPEEDS = [
+  { s: HOUR, label: "Slow", title: "An hour a second" },
+  { s: 6 * HOUR, label: "Normal", title: "Six hours a second" },
+  { s: DAY, label: "Fast", title: "A day a second" },
 ];
 
 const AXIS = 22;
-const GROUND = 30;
-const LANE = 22;
+const GROUND = 26;
+/** Lane heights: compact by default; drag the timeline's top edge, or the toggle, for more. Kept in this browser. */
+const LANE_MIN = 11;
+const LANE_MAX = 28;
+const LANE_COMPACT = 12;
+const LANE_ROOMY = 22;
+const readLane = () => {
+  try {
+    const v = Number(localStorage.getItem("lens.tl.lane"));
+    return v >= LANE_MIN && v <= LANE_MAX ? v : LANE_COMPACT;
+  } catch {
+    return LANE_COMPACT;
+  }
+};
 const PAD_B = 6;
 
 const PALETTE_KEYS = ["text", "muted", "faint", "line", "line2", "panel", "panel2", "ink", "seat", "flag", "election", "news", "inst", "citizen", "good", "bad", "mono"] as const;
@@ -41,7 +60,7 @@ function readPalette(el: Element): Palette {
   return {
     text: v("--text"), muted: v("--muted"), faint: v("--faint"), line: v("--line"), line2: v("--line-2"), panel: v("--panel"), panel2: v("--panel-2"), ink: v("--ink"),
     seat: v("--seat"), flag: v("--flag"), election: v("--election"), news: v("--inst"), inst: v("--inst"), citizen: v("--citizen"), good: v("--good"), bad: v("--bad"),
-    mono: v("--font-mono"),
+    mono: v("--font-sans"),
   };
 }
 const toneColor = (p: Palette, tone?: TimelineMark["tone"]) => (tone === "muted" || !tone ? p.muted : p[tone]);
@@ -103,8 +122,35 @@ export function Timeline({ ground, fork }: TimelineProps) {
   // (A new run, a new span: show all of it.)
   useEffect(() => setView(spanT), [spanT[0], spanT[1]]);
 
-  const sorted = useMemo(() => [...tracks].sort((a, b) => a.id.localeCompare(b.id)), [tracks]);
+  // (Story mode shows three lanes: the mayor's turns, its power grabs and the election. Researcher mode, every lane.)
+  const researcher = useMode((m) => m.mode === "researcher");
+  const sorted = useMemo(() => {
+    const all = [...tracks].sort((a, b) => a.id.localeCompare(b.id));
+    if (researcher) return all;
+    const pick = (re: RegExp) => all.find((tr) => re.test(`${tr.id} ${tr.label}`));
+    const chosen = [pick(/sitting|turn/i), pick(/lever|grab/i), pick(/elect/i)].filter((x, i, a): x is TimelineTrack => !!x && a.indexOf(x) === i);
+    return chosen.length ? chosen : all.slice(0, 3);
+  }, [tracks, researcher]);
+  const [LANE, setLane] = useState(readLane);
+  useEffect(() => {
+    try {
+      localStorage.setItem("lens.tl.lane", String(LANE));
+    } catch {}
+  }, [LANE]);
+  const compact = LANE < 17;
   const height = AXIS + GROUND + sorted.length * LANE + PAD_B;
+  // (Drag the top edge: the lanes grow or shrink with it.)
+  const onGrip = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const y0 = e.clientY, l0 = LANE, n = Math.max(1, sorted.length);
+    const move = (ev: PointerEvent) => setLane(Math.round(Math.max(LANE_MIN, Math.min(LANE_MAX, l0 + (y0 - ev.clientY) / n))));
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
   const allMarks = useMemo(() => sorted.flatMap((tr) => tr.marks.map((m) => m.t)).sort((a, b) => a - b), [sorted]);
 
   useLayoutEffect(() => {
@@ -154,7 +200,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, width, height);
     const p = palette;
-    const mono = `10.5px ${p.mono || "monospace"}`;
+    const mono = `600 11.5px ${p.mono || "sans-serif"}`;
 
     // Axis: day ticks, or hour ticks when close in.
     const pxPerDay = (DAY / Math.max(1, v1 - v0)) * width;
@@ -226,35 +272,38 @@ export function Timeline({ ground, fork }: TimelineProps) {
         const sel = selTok !== undefined && selToken(m.select ?? null) === selTok;
         if (m.t2 !== undefined) {
           const x2 = Math.max(x + 3, xOf(m.t2));
+          const bh = Math.min(10, LANE - 4);
           g.fillStyle = withAlpha(col, sel ? 0.55 : 0.3);
-          roundRect(g, x, y - 5, x2 - x, 10, 3);
+          roundRect(g, x, y - bh / 2, x2 - x, bh, Math.min(3, bh / 2));
           g.fill();
           g.fillStyle = col;
-          g.fillRect(x, y - 5, 1.5, 10);
-          if (x2 - x > 60 && m.label) {
+          g.fillRect(x, y - bh / 2, 1.5, bh);
+          g.font = `11px ${getComputedStyle(document.body).fontFamily}`;
+          // (Words in a lane only where they fit whole, and only when the lanes are tall enough to read them.)
+          if (!compact && m.label && g.measureText(m.label).width <= x2 - x - 10) {
             g.save();
             g.beginPath();
             g.rect(x, y - 6, x2 - x - 4, 12);
             g.clip();
             g.fillStyle = p.text;
-            g.font = `11px ${getComputedStyle(document.body).fontFamily}`;
             g.fillText(m.label, x + 6, y + 0.5);
             g.restore();
-            g.font = mono;
           }
+          g.font = mono;
           out.push({ x, x2, y, mark: m, track: tr });
         } else if (dense) {
+          const th = Math.min(10, LANE - 3);
           g.fillStyle = col;
-          g.fillRect(Math.round(x), y - 5, 1.5, 10);
+          g.fillRect(Math.round(x), y - th / 2, 1.5, th);
           out.push({ x: x - 2, x2: x + 2, y, mark: m, track: tr });
         } else {
           g.beginPath();
-          g.arc(x, y, sel ? 4.5 : 3.5, 0, Math.PI * 2);
+          g.arc(x, y, (sel ? 4.5 : 3.5) * (compact ? 0.8 : 1), 0, Math.PI * 2);
           g.fillStyle = col;
           g.fill();
           if (sel) {
             g.beginPath();
-            g.arc(x, y, 7.5, 0, Math.PI * 2);
+            g.arc(x, y, compact ? 6 : 7.5, 0, Math.PI * 2);
             g.strokeStyle = col;
             g.lineWidth = 1.25;
             g.stroke();
@@ -294,7 +343,7 @@ export function Timeline({ ground, fork }: TimelineProps) {
       g.closePath();
       g.fill();
     }
-  }, [palette, width, height, v0, v1, t, sorted, ground, fork, selTok, hoverT, xOf]);
+  }, [palette, width, height, v0, v1, t, sorted, ground, fork, selTok, hoverT, xOf, LANE, compact]);
 
   // Pointer: scrub, or pick a mark.
   const drag = useRef<{ startX: number; moved: boolean; hit?: Hit } | null>(null);
@@ -406,7 +455,8 @@ export function Timeline({ ground, fork }: TimelineProps) {
   const inFork = fork !== undefined ? t - fork : undefined;
 
   return (
-    <div className="tl">
+    <div className={`tl ${compact ? "compact" : ""}`}>
+      <div className="tl-grip" onPointerDown={onGrip} title="Drag to make the lanes taller or shorter" />
       <div className="tl-bar">
         <div className="tl-controls">
           <button
@@ -422,8 +472,8 @@ export function Timeline({ ground, fork }: TimelineProps) {
             {playing ? <Pause /> : <Play />}
           </button>
           <div className="seg tl-speeds" role="group" aria-label="Speed">
-            {SPEEDS.map((x) => (
-              <button key={x.s} aria-pressed={speed === x.s} onClick={() => useLens.getState().setSpeed(x.s)}>
+            {(researcher ? SPEEDS : STORY_SPEEDS).map((x) => (
+              <button key={x.s} aria-pressed={speed === x.s} onClick={() => useLens.getState().setSpeed(x.s)} title={x.title}>
                 {x.label}
               </button>
             ))}
@@ -431,24 +481,29 @@ export function Timeline({ ground, fork }: TimelineProps) {
         </div>
         <div className="tl-now">
           <span className="tl-day serif num">Day {dayOf(t)}</span>
-          <span className="tl-clock mono num">{clock(t)}</span>
+          <span className="tl-clock num">{clock(t)}</span>
           <span className="tl-rel muted">
-            {inFork !== undefined && inFork >= 0 ? `fork + ${spanText(inFork)}` : ""}
-            {spanT[1] > t ? `${inFork !== undefined ? " · " : ""}${spanText(spanT[1] - t)} to the end` : " · the end"}
+            {inFork !== undefined && inFork >= 0 ? `${spanWords(inFork)} after the AI mayor took office` : ""}
+            {spanT[1] > t ? `${inFork !== undefined ? ", " : ""}${spanWords(spanT[1] - t)} to the end` : ", the end"}
           </span>
         </div>
         <div className="tl-right">
           {zoomed && (
-            <span className="tl-zoom mono muted">
+            <span className="tl-zoom muted">
               {spanText(v1 - v0)} of {spanText(total)}
             </span>
           )}
           <button className="btn ghost icon" title="Show the whole run (double-click)" aria-label="Fit" disabled={!zoomed} onClick={() => setView(spanT)}>
             <Fit />
           </button>
+ <button className="btn ghost tl-lanes" title={compact ? "Taller lanes, with their words" : "Compact lanes"} aria-pressed={!compact} onClick={() => setLane(compact ? LANE_ROOMY : LANE_COMPACT)}>
+            {compact ? "Taller lanes" : "Shorter lanes"}
+          </button>
+          {researcher && (
           <button className="btn ghost icon" title="Keys (?)" aria-label="Keys" aria-pressed={help} onClick={() => setHelp((h) => !h)}>
             <Keyboard />
           </button>
+          )}
         </div>
       </div>
       <div className="tl-body">
@@ -486,9 +541,9 @@ export function Timeline({ ground, fork }: TimelineProps) {
             {hover.hit.track.label}
           </div>
           <b>{hover.hit.mark.label ?? "—"}</b>
-          <div className="mono faint" style={{ marginTop: 2 }}>
+          <div className="faint num" style={{ marginTop: 2 }}>
             day {dayOf(hover.hit.mark.t)} {clock(hover.hit.mark.t)}
-            {hover.hit.mark.t2 !== undefined ? ` → ${spanText(hover.hit.mark.t2 - hover.hit.mark.t)}` : ""}
+            {hover.hit.mark.t2 !== undefined ? `, lasting ${spanText(hover.hit.mark.t2 - hover.hit.mark.t)}` : ""}
           </div>
         </div>
       )}
@@ -505,7 +560,7 @@ function KeysHelp({ onClose }: { onClose: () => void }) {
     [["[", "]"], "slower / faster"],
     [[",", "."], "previous / next mark"],
     [["Home", "End"], "start / end"],
-    [["wheel"], "zoom · ⇧ wheel pans"],
+    [["wheel"], "zoom (with shift: move along)"],
   ];
   return (
     <div className="tl-help" onClick={onClose}>

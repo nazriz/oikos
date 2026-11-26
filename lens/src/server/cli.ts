@@ -2,6 +2,7 @@
 //   --dev is Bun's development mode (hot reload): it breaks deck.gl's shaders, so the map does not draw under it.
 //   oikos lens index <key>   make one run's bundle and print its manifest (no server)
 //   oikos lens list          print the catalogue
+//   oikos lens inspect <experiment dir> [--with-code]   every fork's seat as an Inspect AI log, in <views>/inspect/<experiment>/
 import { startServer } from "./server";
 import { Lens } from "./service";
 import { lensPaths } from "./paths";
@@ -16,6 +17,14 @@ export async function runLens(argv: string[]): Promise<void> {
   const runs = flag("runs");
   const views = flag("views");
 
+  if (positional[0] === "inspect" && positional[1]) {
+    const { inspectExperiment } = await import("./inspect-export");
+    const { join, resolve } = await import("node:path");
+    const out = join(lensPaths({ runs, views }).views, "inspect");
+    const files = await inspectExperiment(resolve(positional[1]), out, { withCode: has("with-code"), log: (s) => console.error(s) });
+    console.log(`${files.length} Inspect logs in ${join(out, positional[1].replace(/\/+$/, "").split("/").pop()!)}; open with: uvx --from inspect-ai inspect view --log-dir <that folder>`);
+    return;
+  }
   if (positional[0] === "list") {
     const lens = new Lens(lensPaths({ runs, views }), { background: false });
     const c = await lens.list(true);

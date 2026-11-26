@@ -41,10 +41,11 @@ export function skyAt(hour: number, dark = true): Sky {
   const noonSun: RGB = [255, 247, 232], goldSun: RGB = [255, 176, 110], moon: RGB = [150, 170, 230];
   const sunColor = day > 0 ? lerp3(noonSun, goldSun, golden) : moon;
   const sunIntensity = day > 0 ? lerp(0.25, 1.35, day) : 0.18;
-  const ambientColor = lerp3([110, 130, 190], [255, 250, 240], day);
+  const ambientColor = lerp3([96, 132, 150], [255, 250, 240], day);
   const ambientIntensity = lerp(0.42, 0.9, day);
-  const groundTint = lerp3(lerp3([92, 104, 140], [255, 222, 190], golden * 0.6), [255, 252, 246], Math.max(0, day - golden * 0.3));
-  const backdrop: RGB = dark ? lerp3([7, 9, 15], [11, 15, 23], day) : lerp3([214, 210, 200], [246, 243, 236], day);
+  const groundTint = lerp3(lerp3([62, 92, 104], [255, 222, 190], golden * 0.6), [255, 252, 246], Math.max(0, day - golden * 0.3));
+  // A surveyor's plan by day (survey paper), the town at night (night slate); dark theme stays on slate.
+  const backdrop: RGB = dark ? lerp3([15, 23, 31], [22, 33, 43], day) : lerp3([37, 49, 60], [237, 240, 242], day);
   const night = 1 - smooth(0.05, 0.6, day);
   const label = hour < 5 ? "night" : hour < 7 ? "dawn" : hour < 11.5 ? "morning" : hour < 14 ? "midday" : hour < 17.5 ? "afternoon" : hour < 19.5 ? "dusk" : hour < 22 ? "evening" : "night";
   return { day, golden, sunDir, sunColor, sunIntensity, ambientColor, ambientIntensity, groundTint, backdrop, night, label };
