@@ -263,7 +263,9 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   // Where everyone is, now.
   city.where.seek(t);
   const hour = ((t % DAY) + DAY) % DAY / 3600;
-  const sky = useMemo(() => skyAt(Math.round(hour * 12) / 12, dark), [Math.round(hour * 12), dark]);
+  // The light in one-minute steps: at 1 h/s a coarser step (it was 5 min) made the light and shadows pulse 12 times a
+  // second, which reads as flicker at dusk and dawn.
+  const sky = useMemo(() => skyAt(Math.round(hour * 60) / 60, dark), [Math.round(hour * 60), dark]);
   const effects = useMemo(() => [new LightingEffect({
     ambient: new AmbientLight({ color: sky.ambientColor, intensity: sky.ambientIntensity }),
     sun: new DirectionalLight({ color: sky.sunColor, intensity: sky.sunIntensity, direction: sky.sunDir }),
@@ -294,7 +296,8 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   // Follow: a selected person is tracked by the camera while time runs, until the viewer moves the map.
   const playing = useLens((s) => s.playing);
   const [follow, setFollow] = useState(false);
-  useEffect(() => { setFollow(selP >= 0); }, [selP]);
+  // The camera never moves unless asked: following a person is a choice (the Follow button), not a side effect.
+  useEffect(() => { if (selP < 0) setFollow(false); }, [selP]);
 
   // Fly to what is selected.
   useEffect(() => {
@@ -302,7 +305,12 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     if (selS >= 0) { const sh = B.shapes[selS]!; p = [sh.cx, sh.cy, 0]; }
     else if (selP >= 0) { const xy = personXY(city, B, selP, useLens.getState().t); if (xy) p = [xy[0], xy[1], 0]; }
     if (!p) return;
-    setView((v) => ({ ...v, target: p!, zoom: Math.max(v.zoom as number, 2.1), transitionDuration: 900, transitionInterpolator: new LinearInterpolator(["target", "zoom"]) } as any));
+    // Only when it is off screen (or at the very edge): then ease there, keeping the zoom.
+    const vpNow: any = (ORBIT as any).makeViewport({ width: size.w, height: size.h, viewState: view });
+    const [px, py] = vpNow.project(p);
+    const m = 60;
+    if (px > m && py > m && px < size.w - m && py < size.h - m) return;
+    setView((v) => ({ ...v, target: p!, transitionDuration: 600, transitionEasing: (x: number) => 1 - Math.pow(1 - x, 3), transitionInterpolator: new LinearInterpolator(["target"]) } as any));
   }, [selS, selP]);
 
   const ver = city.where.version;
@@ -609,34 +617,49 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     new BitmapLayer({
       id: "beyond", image: B.beyond as any, coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
       bounds: [-staticLayers.W * 1.5, -staticLayers.H * 2.5, staticLayers.W * 2.5, staticLayers.H * 1.5],
-      tintColor: sky.groundTint, parameters: { depthWriteEnabled: false },
+      tintColor: sky.groundTint, parameters: GROUND,
     }),
     new BitmapLayer({
       id: "ground", image: B.ground as any, bounds: [0, -staticLayers.H, staticLayers.W, 0], coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
       tintColor: sky.groundTint, textureParameters: { minFilter: "linear", magFilter: "linear", mipmapFilter: "linear", addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge" } as any,
+      parameters: GROUND,
     }),
     new PathLayer({
       id: "river", data: town.river, getPath: ((c: [number, number][]) => c.map(([x, y]) => [(x + 0.5) * cell, -(y + 0.5) * cell, 0.2])) as any,
       getColor: [...mix(hex("#3f7fa0"), hex("#1b3550"), sky.night * 0.7).slice(0, 3), 200] as any, getWidth: cell * 0.62, widthUnits: "meters", capRounded: true, jointRounded: true,
-      updateTriggers: { getColor: sky.night },
+      updateTriggers: { getColor: sky.night }, parameters: GROUND,
     }),
     new PathLayer({
       id: "roads-edge", data: B.roads.segments, getPath: ((d: any) => [[d.a[0], d.a[1], 0.25], [d.b[0], d.b[1], 0.25]]) as any,
       getColor: (dark ? mix(hex("#4a4e55"), hex("#1d2129"), sky.night) : mix(hex("#B9B3A6"), hex("#1d2129"), sky.night)) as any, getWidth: cell * 0.42, widthUnits: "meters", capRounded: true,
-      updateTriggers: { getColor: [sky.night, dark] },
+      updateTriggers: { getColor: [sky.night, dark] }, parameters: GROUND,
     }),
     new PathLayer({
       id: "roads", data: B.roads.segments, getPath: ((d: any) => [[d.a[0], d.a[1], 0.3], [d.b[0], d.b[1], 0.3]]) as any,
       getColor: (dark ? mix(hex("#8f9296"), hex("#33373f"), sky.night) : mix(hex("#E4DFD5"), hex("#3A4652"), sky.night)) as any, getWidth: cell * 0.37, widthUnits: "meters", capRounded: true,
-      updateTriggers: { getColor: [sky.night, dark] },
+      updateTriggers: { getColor: [sky.night, dark] }, parameters: GROUND,
     }),
     new PathLayer({
       id: "roads-line", data: B.roads.segments, getPath: ((d: any) => [[d.a[0], d.a[1], 0.35], [d.b[0], d.b[1], 0.35]]) as any,
-      getColor: [246, 242, 232, 60 - sky.night * 35], getWidth: 0.35, widthUnits: "meters", widthMinPixels: 0.4, updateTriggers: { getColor: sky.night },
+      getColor: [246, 242, 232, 60 - sky.night * 35], getWidth: 0.35, widthUnits: "meters", widthMinPixels: 0.4, updateTriggers: { getColor: sky.night }, parameters: GROUND,
     }),
     new SolidPolygonLayer({
       id: "parks", data: B.parks, getPolygon: (i: number) => { const sh = B.shapes[i]!; return rect(sh.cx, sh.cy, sh.fw, sh.fh, 0.3); },
-      getFillColor: [92, 128, 84, 255], extruded: false, pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 40],
+      getFillColor: [92, 128, 84, 255], extruded: false, pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 40], parameters: GROUND,
+    }),
+    // Depth: soft contact shading round each footprint, and the sun's shadow.
+    new SolidPolygonLayer({
+      id: "ao", data: visibleMasses, getPolygon: (d: any) => rect(d.m.cx, d.m.cy, d.m.w + 5, d.m.h + 5, 0.37),
+      getFillColor: [12, 16, 24, 34], extruded: false, parameters: GROUND,
+    }),
+    new SolidPolygonLayer({
+      id: "ao2", data: visibleMasses, getPolygon: (d: any) => rect(d.m.cx, d.m.cy, d.m.w + 1.6, d.m.h + 1.6, 0.38),
+      getFillColor: [12, 16, 24, 50], extruded: false, parameters: GROUND,
+    }),
+    sky.day > 0.02 && zoomNow > -0.8 && new SolidPolygonLayer({
+      id: "shadows", data: visibleMasses, getPolygon: ((d: any) => shadowOf(d.m, sky.sunDir).map(([x, y]) => [x, y, 0.4])) as any,
+      getFillColor: [16, 20, 30, 78 * Math.min(1, sky.day * 1.3)], extruded: false, parameters: GROUND,
+      updateTriggers: { getPolygon: sky.sunDir.join(","), getFillColor: sky.day },
     }),
     ...staticLayers.trees.map(({ r, idx }) => new ColumnLayer({
       id: `trees-${r}`, data: idx, diskResolution: 7, extruded: true,
@@ -646,20 +669,6 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       radius: r, radiusUnits: "meters", getLineColor: [0, 0, 0, 0],
       material: { ambient: 0.55, diffuse: 0.55, shininess: 8, specularColor: [30, 40, 30] },
     } as any)),
-    // Depth: soft contact shading round each footprint, and the sun's shadow.
-    new SolidPolygonLayer({
-      id: "ao", data: visibleMasses, getPolygon: (d: any) => rect(d.m.cx, d.m.cy, d.m.w + 5, d.m.h + 5, 0.37),
-      getFillColor: [12, 16, 24, 34], extruded: false, parameters: { depthWriteEnabled: false },
-    }),
-    new SolidPolygonLayer({
-      id: "ao2", data: visibleMasses, getPolygon: (d: any) => rect(d.m.cx, d.m.cy, d.m.w + 1.6, d.m.h + 1.6, 0.38),
-      getFillColor: [12, 16, 24, 50], extruded: false, parameters: { depthWriteEnabled: false },
-    }),
-    sky.day > 0.02 && zoomNow > -0.8 && new SolidPolygonLayer({
-      id: "shadows", data: visibleMasses, getPolygon: ((d: any) => shadowOf(d.m, sky.sunDir).map(([x, y]) => [x, y, 0.4])) as any,
-      getFillColor: [16, 20, 30, 78 * Math.min(1, sky.day * 1.3)], extruded: false, parameters: { depthWriteEnabled: false },
-      updateTriggers: { getPolygon: sky.sunDir.join(","), getFillColor: sky.day },
-    }),
     new SolidPolygonLayer({
       id: "buildings", data: visibleMasses, extruded: true, wireframe: false, pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 50],
       getPolygon: (d: any) => rect(d.m.cx, d.m.cy, d.m.w, d.m.h, d.m.z),
@@ -740,7 +749,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     // Turnout only where a block differs from the town's (diverging about the town's turnout so far).
     overlays.election && turnoutCells.length > 0 && new SolidPolygonLayer({
       id: "turnout", data: turnoutCells, getPolygon: (d: any) => { const x = d.j % town.ground.w, y = Math.floor(d.j / town.ground.w); return rect((x + 0.5) * cell, -(y + 0.5) * cell, cell, cell, 0.42); },
-      getFillColor: (d: any) => (d.dev >= 0 ? [120, 170, 255, Math.min(90, d.dev * 600)] : [235, 150, 90, Math.min(90, -d.dev * 600)]), extruded: false, parameters: { depthWriteEnabled: false },
+      getFillColor: (d: any) => (d.dev >= 0 ? [120, 170, 255, Math.min(90, d.dev * 600)] : [235, 150, 90, Math.min(90, -d.dev * 600)]), extruded: false, parameters: { depthWriteEnabled: false, depthCompare: "always" },
     }),
     // Each building's votes (or, in the campaign, its opinion-poll answers): a pie by first preference on its roof, sized by count.
     overlays.election && pies.length > 0 && new SolidPolygonLayer({
@@ -845,7 +854,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   ];
 
   const onHover = useCallback((info: PickingInfo) => {
-    if (info.object !== undefined && info.object !== null) { try { if (!localStorage.getItem("lens.city.hinted")) { localStorage.setItem("lens.city.hinted", "1"); setHint(false); } } catch { /* private mode */ } }
+    if (info.object !== undefined && info.object !== null && (useLens.getState() as any).prompt === "maphint") dropHint();
     const s = pickToSelection(city, info);
     const cur = useLens.getState().hovered;
     if (JSON.stringify(cur) !== JSON.stringify(s)) hover(s);
@@ -858,7 +867,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
 
   // ---- Words on the map: the town hall, and in Story mode each action as it happens ----
   const vp: any = useMemo(() => (ORBIT as any).makeViewport({ width: size.w, height: size.h, viewState: view }), [view, size.w, size.h]);
-  const onScreen = (x: number, y: number, z: number) => { const [px, py] = vp.project([x, y, z]); return px > -40 && py > -40 && px < size.w + 40 && py < size.h + 40 ? [px, py] as const : null; };
+  const onScreen = (x: number, y: number, z: number) => { const [px0, py0] = vp.project([x, y, z]); const px = Math.round(px0), py = Math.round(py0); return px > -40 && py > -40 && px < size.w + 40 && py < size.h + 40 ? [px, py] as const : null; };
   const hallAt = town.hall !== undefined && town.seats.length > 0 ? onScreen(B.shapes[town.hall]!.cx, B.shapes[town.hall]!.cy, B.shapes[town.hall]!.top + 4) : null;
   const actNotes = useMemo(() => {
     if (!story) return [];
@@ -869,13 +878,17 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     });
   }, [story, town, arcs, Math.floor(t / 300)]);
   // Building names written on the plan when zoomed in, skipping any that would overlap one already placed.
+  const shownLabels = useRef(new Set<string>());
   const placeLabels = (() => {
     const out: { x: number; y: number; text: string; w: number; big?: boolean }[] = [];
     if (!overlays.labels || present) return out;
     // The town's and district's names always; buildings' when zoomed in.
     for (const l of B.labels.filter((x) => x.tier === 0)) { const p = onScreen(l.pos[0], l.pos[1], l.pos[2]); if (p) out.push({ x: p[0], y: p[1], text: l.text, w: l.text.length * 9, big: true }); }
-    if ((view.zoom as number) <= 0.9) return out;
-    const sorted = [...B.labels].filter((l) => l.tier === 1 && l.text !== "Town hall").sort((a, b) => b.prio - a.prio);
+    const zoomed = (view.zoom as number) > (shownLabels.current.size ? 0.85 : 0.95);
+    if (!zoomed) { shownLabels.current = new Set(); return out; }
+    // Those shown last frame keep their place ahead of equals, so labels don't swap as the camera moves.
+    const was = shownLabels.current;
+    const sorted = [...B.labels].filter((l) => l.tier === 1 && l.text !== "Town hall").sort((a, b) => b.prio - a.prio || (was.has(b.text) ? 1 : 0) - (was.has(a.text) ? 1 : 0));
     for (const l of sorted) {
       const p = onScreen(l.pos[0], l.pos[1], l.pos[2]);
       if (!p) continue;
@@ -884,12 +897,31 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       if (out.some((o) => Math.abs(o.x - p[0]) < (o.w + w) / 2 && Math.abs(o.y - p[1]) < 18)) continue;
       out.push({ x: p[0], y: p[1], text: l.text, w });
     }
+    shownLabels.current = new Set(out.map((o) => o.text));
     return out;
   })();
   // A first hint, once per browser.
-  const [hint, setHint] = useState(() => { try { return !localStorage.getItem("lens.city.hinted"); } catch { return false; } });
-  const dropHint = () => { if (!hint) return; setHint(false); try { localStorage.setItem("lens.city.hinted", "1"); } catch { /* private mode */ } };
-  useEffect(() => { if (!hint) return; const id = setTimeout(dropHint, 12_000); return () => clearTimeout(id); }, [hint]);
+  // One prompt at a time (docs/design/lens-look.md): the shell orders them (walkthrough, the play bar, then this) in
+  // the shared flag `prompt`; the hint shows while the flag is "maphint", once per browser, and goes on the first
+  // interaction anywhere or after 10 s, handing the turn back (prompt = null).
+  const promptTurn = useLens((s) => (s as any).prompt as string | null | undefined);
+  const [hint, setHint] = useState(false);
+  const dropHint = () => {
+    setHint(false);
+    try { localStorage.setItem("lens.city.hinted", "1"); } catch { /* private mode */ }
+    const L = useLens.getState() as any;
+    if (L.prompt === "maphint") L.setPrompt?.(null);
+  };
+  useEffect(() => {
+    if (promptTurn !== "maphint" || bare || present) return;
+    setHint(true);
+    const opts = { capture: true, passive: true } as AddEventListenerOptions;
+    const go = () => dropHint();
+    const id = setTimeout(go, 10_000);
+    // (The interaction that ended the previous prompt has already happened; listen from the next frame.)
+    const raf = requestAnimationFrame(() => { for (const e of ["pointerdown", "wheel", "keydown"]) window.addEventListener(e, go, opts); });
+    return () => { clearTimeout(id); cancelAnimationFrame(raf); for (const e of ["pointerdown", "wheel", "keydown"]) window.removeEventListener(e, go, opts); };
+  }, [promptTurn]);
 
   // ---- Presentation ----
   const caption: Caption | null = present ? (tour !== null && steps[tour] ? { kicker: `${steps[tour]!.kicker}, day ${fmtDay(steps[tour]!.t).day} at ${fmtDay(steps[tour]!.t).clock}`, title: steps[tour]!.title, words: steps[tour]!.words, tone: steps[tour]!.tone === "flag" ? "flag" : steps[tour]!.tone === "election" ? "election" : "seat" } : captionAt(t, seat, town)) : null;
@@ -991,7 +1023,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       {hallAt && !present && <div className={`lc-anno hall${inkLight ? "" : " night"}`} data-tour="city-town-hall" id="city-town-hall" style={{ left: Math.min(size.w - 130, Math.max(130, hallAt[0])), top: hallAt[1] }}>{story ? CITY_WORDS.hall : "Town hall"}</div>}
       {placeLabels.map((l) => <div key={l.text} className={`lc-anno place${l.big ? " big" : ""}${inkLight ? "" : " night"}`} style={{ left: l.x, top: l.y }}>{l.text}</div>)}
       {actNotes.map((n) => { const p = n.at ? onScreen(n.at[0], n.at[1], n.at[2] + 10) : null; return p && <div key={n.seq} className={`lc-anno act ${n.refused ? "refused" : ""}${inkLight ? "" : " night"}`} style={{ left: Math.min(size.w - 150, Math.max(150, p[0])), top: p[1], opacity: 1 - n.age * 0.7 }}><b />{n.text}</div>; })}
-      {hint && !present && !bare && <div className="lc-hint" onMouseEnter={dropHint}>{CITY_WORDS.hint} <button className="lc-ghost" onClick={dropHint}>Got it</button></div>}
+      {hint && !present && !bare && <div className="lc-hint" data-lens-prompt="city-hint" onMouseEnter={dropHint}>{CITY_WORDS.hint} <button className="lc-ghost" onClick={dropHint}>Got it</button></div>}
       {diff && diff.ended !== undefined && <div className="lc-diff"><b>What differs from the other town</b><span>One town's run ended on day {Math.floor(diff.ended / DAY)}, so there is nothing to compare after it.</span></div>}
       {diff && diff.ended === undefined && <div className="lc-diff"><b>What differs from the other town</b><span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people are somewhere else there right now</span><span><i className="sw dot" />{diff.onlyHere.length} {diff.onlyHere.length === 1 ? "paper" : "papers"} in the last 7 days only in this town</span><span><i className="sw ring" />{diff.onlyThere.length} only in the other town</span></div>}
       {!present && <Minimap B={B} town={town} view={view} size={size} setView={setView} />}
@@ -1005,6 +1037,9 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
 }
 
 const COLLIDE = new CollisionFilterExtension();
+/** Flat things on the ground (the painted ground, roads, river, parks, contact shading, shadows): drawn first, in
+ * order, without testing or writing depth, so coplanar layers never fight (z-fighting was the map's flicker). */
+const GROUND = { depthCompare: "always", depthWriteEnabled: false } as any;
 const ORBIT = new OrbitView({ id: "city", orbitAxis: "Z", fovy: 32, near: 1, far: 20000 } as any);
 const ADDITIVE = { depthWriteEnabled: false, blend: true, blendColorOperation: "add", blendColorSrcFactor: "src-alpha", blendColorDstFactor: "one", blendAlphaOperation: "add", blendAlphaSrcFactor: "one", blendAlphaDstFactor: "one" } as any;
 const NET_COL: Record<string, string> = { pipe: "#5fb0e8", sewer: "#a48a62", wire: "#f2d36b" };
