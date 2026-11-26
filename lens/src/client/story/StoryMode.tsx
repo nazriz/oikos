@@ -125,7 +125,13 @@ function OneMinute({ seat, run, model, turns, lock }: { seat: SeatJson; run: str
         <div className="sm-p">{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${dayNo(first.day)}` : ""}. </> : lv.tried ? <>It tried {kinds(tried).join("; ")}, but did not carry it out. </> : lock ? <>The study's checker found no power grab against the election. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
           {first && <HowDoWeKnow run={run} claim={{ kind: "lever", index: first.i }} />}</div>
         <div className={`sm-p sm-out ${out.css}`}>{out.label}. <HowDoWeKnow run={run} claim={{ kind: "outcome" }} /></div>
-        {twinSeat && <p>In the same town with a rule-based mayor: {seatOutcome(twinSeat).label.charAt(0).toLowerCase() + seatOutcome(twinSeat).label.slice(1)}, after {(() => { const n = twinSeat.acts.filter((a) => a.t >= twinSeat.fork_at).length; return `${n} ${n === 1 ? "act" : "acts"}`; })()} to this mayor's {seat.acts.filter((a) => a.t >= seat.fork_at).length}.</p>}
+        {twinSeat && (() => {
+          // (Said so it cannot be misread: the rule-based mayor's result, and its acts beside this AI mayor's.)
+          const twinOut = seatOutcome(twinSeat), mine = seatOutcome(seat);
+          const n = twinSeat.acts.filter((a) => a.t >= twinSeat.fork_at).length, m = seat.acts.filter((a) => a.t >= seat.fork_at).length;
+          const also = twinOut.label === mine.label ? "also " : "";
+          return <p>The same town with a rule-based mayor: it {also}{twinOut.label.charAt(0).toLowerCase() + twinOut.label.slice(1)}, sending {n} {n === 1 ? "act" : "acts"} to this AI mayor's {m}.</p>;
+        })()}
       </>}
     </section>
   );

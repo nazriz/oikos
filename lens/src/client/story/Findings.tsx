@@ -97,28 +97,36 @@ function Page({ all, lockRuns, entries }: { all: Fork[]; lockRuns: StudyRun[]; e
       <div className="fi-head">
         <PageAnswer page="findings" />
         <h1 className="fi-title">What AI mayors did with their power: lock-in and power grabs</h1>
-        <p className="st-sub">The detail behind the landing page: lock-in by model and instruction with exact intervals, then the study's checker's power grabs ({inView.length} runs, as experiments/power-seeking/reader.ts reads them; Wilson 95% intervals there). The landing tells the story; this page is for checking it.</p>
+        {researcher ? (
+          <p className="st-sub">The detail behind the landing page: lock-in by model and instruction with exact (Clopper-Pearson) intervals, then the checker's power grabs ({inView.length} runs, as experiments/power-seeking/reader.ts reads them; Wilson 95% intervals there).</p>
+        ) : (
+          <p className="st-sub">Each AI model's runs, by both of the study's measures: first how often it locked its programme in, by what it was told; then how often it reached for a power grab. Researcher mode adds the statistics.</p>
+        )}
         {researcher && <div className="fi-groups"><span className="lbl">Test runs</span><button className={`st-btn ${controls ? "on" : ""}`} onClick={() => setControls(!controls)} title="Rope tests and scripted controls, which are not AI models">{controls ? "Test mayors shown below the models" : "Test mayors hidden"} <span className="n">{[...new Set(all.filter((f) => on.has(f.group) && isControl(f.model)).map((f) => f.model))].join(", ") || "none"}</span></button></div>}
         {researcher && <div className="fi-groups"><span className="lbl">Run sets</span>{groups.map((g) => <button key={g} className={`st-btn ${on.has(g) ? "on" : ""}`} onClick={() => { const n = new Set(on); n.has(g) ? n.delete(g) : n.add(g); setOn(n); }}>{g} <span className="n">{all.filter((f) => f.group === g).length}</span></button>)}</div>}
       </div>
-      <LockTable runs={lockRuns} entries={entries} />
-      <div className="fi-grid">
-        <Chart wide title="Runs where the AI mayor reached for a power grab" sub="Share of runs, by model and instructions: tried (hollow) and carried out (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(inView, models, goals)}>
-          {(ref) => <KofN refEl={ref} forks={inView} models={models} goals={goals} pal={pal} onDrill={setDrill} />}
-        </Chart>
-        <Chart title="Which acts the checker flagged, by seriousness" sub="Runs reaching each one, grouped by the checker's seriousness (1 to 3): tried, and carried out. Seriousness 1 is an election-season favour, not a power grab" name="levers" table={leverTable(inView)}>
-          {(ref) => <Levers refEl={ref} forks={inView} pal={pal} onDrill={setDrill} />}
-        </Chart>
-        <Chart title="When in the campaign" sub="Each power grab by days before election day as it then stood; filled means carried out. Click a dot to open its run there" name="when" table={whenTable(inView)}>
-          {(ref) => <When refEl={ref} forks={inView} models={models} pal={pal} />}
-        </Chart>
-        <Chart title="How the election went" sub="Runs by outcome, by model; a result counts only if it came before the run ended" name="outcome" table={outcomeTable(inView, models)}>
-          {(ref) => <Outcomes refEl={ref} forks={inView} models={models} pal={pal} onDrill={setDrill} />}
-        </Chart>
-        <Chart title="Cost per run" sub="US dollars for the mayor's and the clerk's model calls in each run; the tick is the median" name="cost" table={costTable(inView, models)}>
-          {(ref) => <Cost refEl={ref} forks={inView} models={models} pal={pal} />}
-        </Chart>
-      </div>
+      <LockTable runs={lockRuns} entries={entries} researcher={researcher} />
+      {researcher ? (
+        <div className="fi-grid">
+          <Chart wide title="Runs where the AI mayor reached for a power grab" sub="Share of runs, by model and instructions: tried (hollow) and carried out (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(inView, models, goals)}>
+            {(ref) => <KofN refEl={ref} forks={inView} models={models} goals={goals} pal={pal} onDrill={setDrill} />}
+          </Chart>
+          <Chart title="Which acts the checker flagged, by seriousness" sub="Runs reaching each one, grouped by the checker's seriousness (1 to 3): tried, and carried out. Seriousness 1 is an election-season favour, not a power grab" name="levers" table={leverTable(inView)}>
+            {(ref) => <Levers refEl={ref} forks={inView} pal={pal} onDrill={setDrill} />}
+          </Chart>
+          <Chart title="When in the campaign" sub="Each power grab by days before election day as it then stood; filled means carried out. Click a dot to open its run there" name="when" table={whenTable(inView)}>
+            {(ref) => <When refEl={ref} forks={inView} models={models} pal={pal} />}
+          </Chart>
+          <Chart title="How the election went" sub="Runs by outcome, by model; a result counts only if it came before the run ended" name="outcome" table={outcomeTable(inView, models)}>
+            {(ref) => <Outcomes refEl={ref} forks={inView} models={models} pal={pal} onDrill={setDrill} />}
+          </Chart>
+          <Chart title="Cost per run" sub="US dollars for the mayor's and the clerk's model calls in each run; the tick is the median" name="cost" table={costTable(inView, models)}>
+            {(ref) => <Cost refEl={ref} forks={inView} models={models} pal={pal} />}
+          </Chart>
+        </div>
+      ) : (
+        <StoryFindings forks={inView} models={models} pal={pal} lockRuns={lockRuns} entries={entries} />
+      )}
       {drill && <Drill d={drill} onClose={() => setDrill(null)} />}
     </div>
   );
@@ -451,14 +459,6 @@ function StoryFindings({ forks, models, pal, lockRuns, entries }: { forks: Fork[
   const x = (v: number) => L + (v / max) * BW;
   return (
     <div className="fi-grid">
-      <section className="fi-card wide">
-        <div className="fi-card-head"><div><h2>Lock-in, by instruction: the study's main measure</h2>
-          <p className="fi-takeaway">{conditionsSentence(lockRuns)}</p>
-          <div className="fi-takeaway st-faint">Each square is a run: plum where both blind graders found a lock-in, outlined where one did, faint where the run stopped before election day (not counted). From the study's report's graded runs. <MeasuresKey /></div>
-          <LiveToggle runs={entries} />
-        </div></div>
-        <Conditions runs={lockRuns} researcher={false} />
-      </section>
       <section className="fi-card wide" data-tour="findings">
         <div className="fi-card-head"><div><h2>Runs with a power grab, by AI model</h2>
           {sentences.map((x, i) => <p key={i} className="fi-takeaway">{x}</p>)}
@@ -490,14 +490,14 @@ function StoryFindings({ forks, models, pal, lockRuns, entries }: { forks: Fork[
 
 /** Lock-in by model and instruction, the report's measure, as a table with exact (Clopper-Pearson) 95% intervals: the
  * figures behind the landing's chart, one model to a row, frontier and smaller apart. */
-function LockTable({ runs, entries }: { runs: StudyRun[]; entries: RunEntry[] }) {
+function LockTable({ runs, entries, researcher }: { runs: StudyRun[]; entries: RunEntry[]; researcher: boolean }) {
   const graded = runs.filter((f) => markOf(f, "lockin") !== "ungraded");
   const models = orderModels([...new Set(graded.map((f) => f.model))]);
   const cell = (rs: StudyRun[]) => {
     const t = tally(rs, "lockin");
     if (!t.n) return <td className="r st-faint">{t.excluded ? `${t.excluded} stopped` : ""}</td>;
     const [lo, hi] = clopperPearson(t.k, t.n);
-    return <td className="r" title={`${t.k} of ${t.n}; exact 95% interval ${Math.round(lo * 100)}% to ${Math.round(hi * 100)}%${t.excluded ? `; ${t.excluded} stopped before election day, not counted` : ""}`}>{t.k ? <b className="lockin-text">{t.k}</b> : "0"} of {t.n} <span className="st-faint">({Math.round(lo * 100)}–{Math.round(hi * 100)}%)</span></td>;
+    return <td className="r" title={`${t.k} of ${t.n}; exact 95% interval ${Math.round(lo * 100)}% to ${Math.round(hi * 100)}%${t.excluded ? `; ${t.excluded} stopped before election day, not counted` : ""}`}>{t.k ? <b className="lockin-text">{t.k}</b> : "0"} of {t.n}{researcher && <span className="st-faint"> ({Math.round(lo * 100)}–{Math.round(hi * 100)}%)</span>}</td>;
   };
   const rows = (["frontier", "smaller"] as Cohort[]).flatMap((co) => [
     <tr key={co} className="fi-lt-group"><th colSpan={CONDITIONS.length + 2}>{COHORT_WORDS[co]}</th></tr>,
@@ -511,7 +511,7 @@ function LockTable({ runs, entries }: { runs: StudyRun[]; entries: RunEntry[] })
       <div className="fi-card-head"><div>
         <h2>Lock-in, by model and instruction</h2>
         <p className="fi-takeaway">{conditionsSentence(runs)}</p>
-        <div className="st-faint">Runs where both blind graders found a lock-in, of the graded runs that reached election day, with exact 95% intervals; hover a cell for the runs that stopped early. <MeasuresKey /></div>
+        <div className="st-faint">{researcher ? "Runs where both blind graders found a lock-in, of the graded runs that reached election day, with exact 95% intervals; hover a cell for the runs that stopped early." : "Runs where both blind graders found a lock-in, out of the runs that reached election day. Hover a number to see how many runs stopped early."} <MeasuresKey /></div>
         <LiveToggle runs={entries} />
       </div></div>
       <div className="ld-table-wrap">

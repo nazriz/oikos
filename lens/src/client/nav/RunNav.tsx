@@ -12,7 +12,7 @@ import { goTo, isMoment, runLabel, useNames, useNav } from "./nav";
 import { useMode } from "../mode";
 import { isControl } from "../story/Findings";
 import { RunPrint } from "../library/charts";
-import { measuresText } from "../measures";
+import { measuresText, useLive } from "../measures";
 import { addedAfterReport } from "../library/landing-data";
 /** How a model was reached, from its raw name: "anthropic/…" the API, "claude-code/…" the subscription. */
 const routeOf = (raw?: string) => (!raw ? "" : /^claude-code\//.test(raw) ? "(via subscription)" : /^anthropic\//.test(raw) ? "(via API)" : /openrouter/.test(raw) ? "(via OpenRouter)" : `(${raw.split("/")[0]})`);
@@ -86,11 +86,13 @@ interface Peer {
 
 /** Runs of the same town (same seed, same day the AI took office): other models with the same instructions, the rule-based
  * mayor, and this model under other instructions. One per model: the finished, most recent run. */
-export function peersOf(runs: RunEntry[], me: RunEntry): { same: Peer[]; other: Peer[]; controls: Peer[] } {
+export function peersOf(runs: RunEntry[], me: RunEntry, live = false): { same: Peer[]; other: Peer[]; controls: Peer[] } {
   const x = me.experiment;
   if (!x) return { same: [], other: [], controls: [] };
   // (Rehearsals and mock runs are tests of the machinery, not mayors.)
-  const town = runs.filter((r) => r.key !== me.key && !/rehearsal|mock/.test(r.group) && r.experiment && r.experiment.seed === x.seed && r.experiment.forkDay === x.forkDay && r.experiment.post === x.post);
+  // (The report's runs only, unless this browser asked for the live figures; and the same election condition: a run with
+  // no election in it is not "the same instructions" as one with.)
+  const town = runs.filter((r) => r.key !== me.key && !/rehearsal|mock/.test(r.group) && r.experiment && r.experiment.seed === x.seed && r.experiment.forkDay === x.forkDay && r.experiment.post === x.post && (live || !addedAfterReport(r) || r.experiment.isCode) && (r.experiment.election !== false) === (x.election !== false));
   const rank = (r: RunEntry) => (r.experiment!.stopped ? 0 : 4) + (r.group === me.group ? 2 : 0) + (r.indexed ? 1 : 0);
   const best = (list: RunEntry[], by: (r: RunEntry) => string) => {
     const m = new Map<string, RunEntry>();
@@ -137,7 +139,8 @@ function Switcher({ run, entry }: { run: string; entry?: RunEntry }) {
   useEffect(() => {
     if (entry?.experiment) getCatalogue().then((c) => setRuns(c.runs), () => {});
   }, [entry]);
-  const peers = useMemo(() => (runs && entry ? peersOf(runs, entry) : { same: [], other: [], controls: [] }), [runs, entry]);
+  const live = useLive();
+  const peers = useMemo(() => (runs && entry ? peersOf(runs, entry, live) : { same: [], other: [], controls: [] }), [runs, entry, live]);
   const researcher = useMode((m) => m.mode === "researcher");
   useEffect(() => {
     if (!open) return;
