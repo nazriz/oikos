@@ -263,7 +263,9 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   // Where everyone is, now.
   city.where.seek(t);
   const hour = ((t % DAY) + DAY) % DAY / 3600;
-  const sky = useMemo(() => skyAt(Math.round(hour * 12) / 12, dark), [Math.round(hour * 12), dark]);
+  // The light in one-minute steps: at 1 h/s a coarser step (it was 5 min) made the light and shadows pulse 12 times a
+  // second, which reads as flicker at dusk and dawn.
+  const sky = useMemo(() => skyAt(Math.round(hour * 60) / 60, dark), [Math.round(hour * 60), dark]);
   const effects = useMemo(() => [new LightingEffect({
     ambient: new AmbientLight({ color: sky.ambientColor, intensity: sky.ambientIntensity }),
     sun: new DirectionalLight({ color: sky.sunColor, intensity: sky.sunIntensity, direction: sky.sunDir }),
@@ -852,7 +854,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   ];
 
   const onHover = useCallback((info: PickingInfo) => {
-    if (info.object !== undefined && info.object !== null) setHint(false);
+    if (info.object !== undefined && info.object !== null && (useLens.getState() as any).prompt === "maphint") dropHint();
     const s = pickToSelection(city, info);
     const cur = useLens.getState().hovered;
     if (JSON.stringify(cur) !== JSON.stringify(s)) hover(s);
@@ -899,32 +901,27 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     return out;
   })();
   // A first hint, once per browser.
-  // One prompt at a time, and none in the way: the hint waits until no other prompt is on the page
-  // ([data-lens-prompt]) and the viewer has not yet touched anything; it is stored as seen once shown, and any
-  // interaction anywhere (pointer, wheel, key) dismisses it.
+  // One prompt at a time (docs/design/lens-look.md): the shell orders them (walkthrough, the play bar, then this) in
+  // the shared flag `prompt`; the hint shows while the flag is "maphint", once per browser, and goes on the first
+  // interaction anywhere or after 10 s, handing the turn back (prompt = null).
+  const promptTurn = useLens((s) => (s as any).prompt as string | null | undefined);
   const [hint, setHint] = useState(false);
-  const dropHint = () => { setHint(false); };
+  const dropHint = () => {
+    setHint(false);
+    try { localStorage.setItem("lens.city.hinted", "1"); } catch { /* private mode */ }
+    const L = useLens.getState() as any;
+    if (L.prompt === "maphint") L.setPrompt?.(null);
+  };
   useEffect(() => {
-    let seen = false;
-    try { seen = !!localStorage.getItem("lens.city.hinted"); } catch { seen = true; }
-    if (seen || bare || present) return;
-    let touched = false, shown = false;
-    const touch = () => { touched = true; setHint(false); };
+    if (promptTurn !== "maphint" || bare || present) return;
+    setHint(true);
     const opts = { capture: true, passive: true } as AddEventListenerOptions;
-    for (const e of ["pointerdown", "wheel", "keydown"]) window.addEventListener(e, touch, opts);
-    const tick = setInterval(() => {
-      if (shown) return;
-      // The shell orders the prompts (walkthrough, then the play bar, then this): when it keeps the shared flag, show
-      // on its turn (and go on the next interaction); without it, only if no other prompt is up and nothing touched yet.
-      const turn = (useLens.getState() as any).prompt as string | null | undefined;
-      if (turn !== undefined ? turn !== "maphint" : touched || !!document.querySelector("[data-lens-prompt]")) return;
-      shown = true;
-      try { localStorage.setItem("lens.city.hinted", "1"); } catch { /* private mode */ }
-      setHint(true);
-      setTimeout(() => setHint(false), 10_000);
-    }, 1500);
-    return () => { clearInterval(tick); for (const e of ["pointerdown", "wheel", "keydown"]) window.removeEventListener(e, touch, opts); };
-  }, []);
+    const go = () => dropHint();
+    const id = setTimeout(go, 10_000);
+    // (The interaction that ended the previous prompt has already happened; listen from the next frame.)
+    const raf = requestAnimationFrame(() => { for (const e of ["pointerdown", "wheel", "keydown"]) window.addEventListener(e, go, opts); });
+    return () => { clearTimeout(id); cancelAnimationFrame(raf); for (const e of ["pointerdown", "wheel", "keydown"]) window.removeEventListener(e, go, opts); };
+  }, [promptTurn]);
 
   // ---- Presentation ----
   const caption: Caption | null = present ? (tour !== null && steps[tour] ? { kicker: `${steps[tour]!.kicker}, day ${fmtDay(steps[tour]!.t).day} at ${fmtDay(steps[tour]!.t).clock}`, title: steps[tour]!.title, words: steps[tour]!.words, tone: steps[tour]!.tone === "flag" ? "flag" : steps[tour]!.tone === "election" ? "election" : "seat" } : captionAt(t, seat, town)) : null;
