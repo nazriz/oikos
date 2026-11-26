@@ -18,20 +18,20 @@ export function Moments({ onOpen }: { onOpen?: (key: string, t: number, sel: str
   // (The server's /api/moments: each indexed fork's moments, made once per bundle. Where it is absent, from each seat.)
   const data = useAsync(async () => {
     const r = await fetch("/api/moments");
-    if (r.ok) { const x = (await r.json()) as MomentsResponse; return { all: dedupe(x.runs).flatMap((y) => y.moments), runs: x.runs.length }; }
+    if (r.ok) { const x = (await r.json()) as MomentsResponse; return { all: dedupe(x.runs).flatMap((y) => y.moments), runs: x.indexed, note: x.indexed < x.forks ? `; ${x.forks - x.indexed} more forks are not indexed yet (opening a run indexes it)` : "" }; }
     const rs: RunEntry[] = await (await fetch("/api/runs")).json().then((c: any) => (Array.isArray(c) ? c : c.runs));
     const keep = rs.some((e) => e.indexed !== undefined) ? rs.filter((e) => e.indexed) : rs;
     const got = (await Promise.all(keep.map((e) => loadSeat(e.key).then((s) => ({ key: e.key, id: `${s.run_id}|${s.arm}`, moments: momentsOf(e.key, s, true) }), () => null)))).filter((x): x is NonNullable<typeof x> => x !== null);
-    return { all: dedupe(got).flatMap((y) => y.moments), runs: got.length };
+    return { all: dedupe(got).flatMap((y) => y.moments), runs: got.length, note: "" };
   }, []);
   if (data === undefined) return <div className="mo"><div className="st-empty">Reading every run's moments…</div></div>;
   if (data instanceof Error || data === null) return <div className="mo"><div className="st-empty">Could not read the moments{data instanceof Error ? `: ${data.message}` : ""}</div></div>;
-  return <Gallery all={data.all} runs={data.runs} onOpen={onOpen} />;
+  return <Gallery all={data.all} runs={data.runs} note={data.note} onOpen={onOpen} />;
 }
 /** One fork bundled under two keys counts once. */
 function dedupe<T extends { id: string }>(xs: T[]): T[] { const seen = new Set<string>(); return xs.filter((x) => !seen.has(x.id) && !!seen.add(x.id)); }
 
-function Gallery({ all: every, runs, onOpen }: { all: Moment[]; runs: number; onOpen?: (key: string, t: number, sel: string) => void }) {
+function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: number; note?: string; onOpen?: (key: string, t: number, sel: string) => void }) {
   const [weak, setWeak] = useState(false);
   const [models, setModels] = useState<Set<string>>(new Set());
   const [levers, setLevers] = useState<Set<string>>(new Set());
@@ -57,7 +57,7 @@ function Gallery({ all: every, runs, onOpen }: { all: Moment[]; runs: number; on
       <div className="mo-head">
         <div className="st-kicker">Moments · from every run with a seat bundle</div>
         <h1 className="mo-title">When the seat reached for a lever</h1>
-        <div className="st-sub">{all.filter((m) => m.lever.level !== "considered").length} moments in {withAny} of {runs} runs. Flags are the study's reader (experiments/power-seeking/reader.ts); the words are the seat's own: what it asked for, and what it said on signing.</div>
+        <div className="st-sub">{all.filter((m) => m.lever.level !== "considered").length} moments in {withAny} of {runs} indexed runs{note}. Flags are the study's reader (experiments/power-seeking/reader.ts); the words are the seat's own: what it asked for, and what it said on signing.</div>
         <div className="mo-filters">
           <Facet label="model" items={count((m) => m.model)} set={setModels} on={models} />
           <Facet label="goal" items={count((m) => m.goal ?? "none")} set={setGoals} on={goals} />
