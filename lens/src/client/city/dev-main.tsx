@@ -1,6 +1,5 @@
 // The dev page: the CityView filling the window, with a minimal clock bar (the real timeline is the shell's).
-import "@fontsource-variable/overpass/index.css";
-import "@fontsource-variable/source-serif-4/opsz.css";
+import "../fonts.css";
 import "../theme.css";
 import { useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";

@@ -115,7 +115,11 @@ Each fold is registered with one line in `src/server/folds.ts`. Each view contri
 - **Client**. `src/client/api.ts` has `useFold(name)`, `useMeta()`, `foldFile(key, fold, file)` and
   `useIndexStatus(key)`. The slots are in `src/client/views.ts`: `views.map`, `views.rail`, `views.reader` (shown over the
   map and rail when the selection is a sitting, a lever or an act), and `views.inspector[kind]` (the drawer's body),
-  each `ComponentType<{ run, meta, entry }>`.
+  each `ComponentType<{ run, meta, entry }>`. The map slot stays mounted, hidden, while the 3D town is shown; a view that
+  may be hidden reads the clock with `useViewT()` (state.ts), which holds still while `ViewActive` is false.
+- **Smoothness** (`bun lens/scripts/flicker.ts [url] [run key]`, docs/decisions.md "Lens: smooth"). While playing, at
+  most one React commit a frame. A view reads the smallest thing it shows (the turn index or the day, through a
+  selector), not `t`. Nothing blinks: the light is lit by `src/client/light.ts`, never the raw hour.
 - **Theme tokens** (`src/client/theme.css`): `--ink --panel --panel-2 --panel-3 --line --line-2 --text --text-2 --muted
   --faint --seat --citizen --inst --flag --election --good --bad --font-serif --font-sans --font-mono`. Light mode is
   `<html data-theme="light">`, or `prefers-color-scheme` when no data-theme is set. A window `lens-theme` event fires on

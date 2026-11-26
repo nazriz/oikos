@@ -8,7 +8,8 @@ import { AmbientLight, COORDINATE_SYSTEM, DirectionalLight, LightingEffect, Line
 import type { OrbitViewState, PickingInfo } from "@deck.gl/core";
 import { CollisionFilterExtension } from "@deck.gl/extensions";
 import { ArcLayer, BitmapLayer, ColumnLayer, LineLayer, PathLayer, ScatterplotLayer, SolidPolygonLayer, TextLayer } from "@deck.gl/layers";
-import { useLens } from "../state";
+import { useLens, useViewT } from "../state";
+import { useLightHour } from "../light";
 import { hash01, loadCity, personRows, placeAt, strHash, tripOf, type CityData } from "./data";
 import { along, hex, hipFaces, mix, PAL, paintBeyond, paintGround, rect, shadowOf, type Mass, Roads, shapeOf, treesOf, WHERE_LABEL, type RGBA, type Shape } from "./scene";
 import { skyAt } from "./sky";
@@ -72,9 +73,6 @@ interface Built {
   windows: { pos: Float32Array; owner: Uint32Array; h: Float32Array; n: number };
   lamps: Float32Array;
   trees: Float32Array;
-  ground: HTMLCanvasElement | OffscreenCanvas | ImageBitmap;
-  /** The land beyond the district: fades out to the backdrop. */
-  beyond: HTMLCanvasElement | OffscreenCanvas;
   roads: Roads;
   /** Per person: jitter inside their building (fractions of footprint). */
   jx: Float32Array; jy: Float32Array; jz: Float32Array;
@@ -85,7 +83,7 @@ interface Built {
   caps: { i: number; m: Mass }[];
 }
 
-function build(c: CityData, plan = false): Built {
+function build(c: CityData): Built {
   const town = c.town, cell = town.ground.cell;
   const shapes = town.structures.map((s) => shapeOf(s, cell));
   const boxes: number[] = [], parks: number[] = [];
@@ -142,8 +140,18 @@ function build(c: CityData, plan = false): Built {
   return {
     shapes, boxes, parks, masses, hips, caps,
     windows: { pos: new Float32Array(wp), owner: new Uint32Array(wo), h: new Float32Array(wh), n: wo.length },
-    lamps: new Float32Array(lamps), trees: treesOf(town), ground: paintGround(town, 10, plan), beyond: paintBeyond(plan), roads: new Roads(town), jx, jy, jz, disrepairMax, labels,
+    lamps: new Float32Array(lamps), trees: treesOf(town), roads: new Roads(town), jx, jy, jz, disrepairMax, labels,
   };
+}
+
+/** The painted ground (a plan by day, the town at night), kept per city and theme: painting takes a few hundred ms. */
+const painted = new WeakMap<CityData, globalThis.Map<boolean, { ground: HTMLCanvasElement | OffscreenCanvas; beyond: HTMLCanvasElement | OffscreenCanvas }>>();
+function paintFor(c: CityData, plan: boolean) {
+  let m = painted.get(c);
+  if (!m) painted.set(c, (m = new globalThis.Map()));
+  let p = m.get(plan);
+  if (!p) m.set(plan, (p = { ground: paintGround(c.town, 10, plan), beyond: paintBeyond(plan) }));
+  return p;
 }
 
 export function structureName(c: CityData, i: number): string {
@@ -201,7 +209,8 @@ export function CityPane(p: PaneProps) {
 }
 
 function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedView, sharedOverlays, twin, label, bare, present0, story }: PaneProps) {
-  const t = useLens((s) => s.t);
+  // (Held while the 3D town is shown over it: no renders, no redraws.)
+  const t = useViewT();
   const selection = useLens((s) => s.selection);
   const hovered = useLens((s) => s.hovered);
   const select = useLens((s) => s.select);
@@ -210,7 +219,15 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   const setSpan = useLens((s) => s.setSpan);
   const span = useLens((s) => s.span);
   const dark = useDark();
-  const B = useMemo(() => build(city, !dark), [city, dark]);
+  // (The geometry does not depend on the theme: a theme toggle repaints the ground and nothing else.)
+  const B = useMemo(() => build(city), [city]);
+  const paint = useMemo(() => paintFor(city, !dark), [city, dark]);
+  // (The other theme's ground is painted while the page is idle, so a theme toggle swaps it in without a pause.)
+  useEffect(() => {
+    const ric = (window as any).requestIdleCallback as ((f: () => void, o?: object) => number) | undefined;
+    const id = ric ? ric(() => paintFor(city, dark), { timeout: 4000 }) : (setTimeout(() => paintFor(city, dark), 1500) as unknown as number);
+    return () => (ric ? (window as any).cancelIdleCallback(id) : clearTimeout(id));
+  }, [city, dark]);
   const town = city.town, cell = town.ground.cell;
   const wrap = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 1200, h: 800 });
@@ -262,7 +279,8 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
 
   // Where everyone is, now.
   city.where.seek(t);
-  const hour = ((t % DAY) + DAY) % DAY / 3600;
+  // (The light holds while time races and eases across a jump: day and night must not strobe. ../light.ts)
+  const hour = useLightHour(t);
   const sky = useMemo(() => skyAt(Math.round(hour * 12) / 12, dark), [Math.round(hour * 12), dark]);
   const effects = useMemo(() => [new LightingEffect({
     ambient: new AmbientLight({ color: sky.ambientColor, intensity: sky.ambientIntensity }),
@@ -285,6 +303,9 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   const recorder = useRef<ReturnType<typeof makeRecorder> | null>(null);
   const [recording, setRecording] = useState(false);
   const deckRef = useRef<any>(null);
+  // (Until the GPU has drawn the town twice, the loading cover stays: no empty ground with its words floating on it.)
+  const drawnFrames = useRef(0);
+  const [firstDrawn, setFirstDrawn] = useState(false);
   const before = useRef<{ playing: boolean; speed: number } | null>(null);
   const [tourActs, setTourActs] = useState<number[]>([]);
   const hi = useMemo(() => new Set([...(selAct >= 0 ? [selAct] : []), ...(tour !== null ? tourActs : [])]), [selAct, tour, tourActs.join(",")]);
@@ -607,12 +628,12 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
 
   const layers = [
     new BitmapLayer({
-      id: "beyond", image: B.beyond as any, coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+      id: "beyond", image: paint.beyond as any, coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
       bounds: [-staticLayers.W * 1.5, -staticLayers.H * 2.5, staticLayers.W * 2.5, staticLayers.H * 1.5],
       tintColor: sky.groundTint, parameters: { depthWriteEnabled: false },
     }),
     new BitmapLayer({
-      id: "ground", image: B.ground as any, bounds: [0, -staticLayers.H, staticLayers.W, 0], coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
+      id: "ground", image: paint.ground as any, bounds: [0, -staticLayers.H, staticLayers.W, 0], coordinateSystem: COORDINATE_SYSTEM.CARTESIAN,
       tintColor: sky.groundTint, textureParameters: { minFilter: "linear", magFilter: "linear", mipmapFilter: "linear", addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge" } as any,
     }),
     new PathLayer({
@@ -970,7 +991,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     <div ref={wrap} data-tour="city-map" id="city-map" className={`lc-wrap${dark ? "" : " light"}`} style={{ background: `rgb(${sky.backdrop.join(",")})` }}>
       <DeckGL
         ref={deckRef}
-        onAfterRender={() => { const r = recorder.current; const cv = deckRef.current?.deck?.getCanvas?.() ?? deckRef.current?.deck?.canvas; if (r && cv && captionRef.current) r.frame(cv, captionRef.current); }}
+        onAfterRender={() => { if (++drawnFrames.current === 2) setFirstDrawn(true); const r = recorder.current; const cv = deckRef.current?.deck?.getCanvas?.() ?? deckRef.current?.deck?.canvas; if (r && cv && captionRef.current) r.frame(cv, captionRef.current); }}
         views={ORBIT}
         viewState={view as any}
         onViewStateChange={({ viewState, interactionState }) => { if (interactionState?.isDragging || interactionState?.isPanning || interactionState?.isZooming) { setFollow(false); manual.current = performance.now(); } setView(viewState as OrbitViewState); }}
@@ -985,6 +1006,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       />
       <div className="lc-haze" style={{ opacity: Math.max(0, Math.min(1, (82 - (view.rotationX as number)) / 40)), background: `linear-gradient(to bottom, rgba(${sky.backdrop.join(",")},0.92) 0%, rgba(${sky.backdrop.join(",")},0.5) 16%, rgba(${sky.backdrop.join(",")},0) 44%)` }} />
       <div className="lc-vignette" />
+      {!firstDrawn && <div className="lc-loading" style={{ zIndex: 40, background: "var(--lc-ink)" }}><div className="lc-spin" />Drawing the town</div>}
       {!present && selP >= 0 && <button className={`lc-follow ${follow ? "on" : ""}`} onClick={() => setFollow(!follow)}>{follow ? <>Stop following {city.people.people[selP]![1]}</> : <>Follow {city.people.people[selP]![1]}</>}</button>}
       {label && <div className={`lc-pane-label${bare ? " bare" : ""}`}>{label}</div>}
       {!bare && !present && <Clock t={t} sky={sky} town={town} />}
@@ -994,7 +1016,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       {hint && !present && !bare && <div className="lc-hint" onMouseEnter={dropHint}>{CITY_WORDS.hint} <button className="lc-ghost" onClick={dropHint}>Got it</button></div>}
       {diff && diff.ended !== undefined && <div className="lc-diff"><b>What differs from the other town</b><span>One town's run ended on day {Math.floor(diff.ended / DAY)}, so there is nothing to compare after it.</span></div>}
       {diff && diff.ended === undefined && <div className="lc-diff"><b>What differs from the other town</b><span><i className="sw arc" />{diff.elsewhere} of {diff.compared} people are somewhere else there right now</span><span><i className="sw dot" />{diff.onlyHere.length} {diff.onlyHere.length === 1 ? "paper" : "papers"} in the last 7 days only in this town</span><span><i className="sw ring" />{diff.onlyThere.length} only in the other town</span></div>}
-      {!present && <Minimap B={B} town={town} view={view} size={size} setView={setView} />}
+      {!present && <Minimap B={paint} town={town} view={view} size={size} setView={setView} />}
       {!bare && !present && panel}
       {present && caption && <PresentBar c={caption} recording={recording} onExit={() => stopPresent()} />}
       {!present && tip && <Tooltip tip={tip} city={city} t={t} name={(i) => structureName(city, i)} />}

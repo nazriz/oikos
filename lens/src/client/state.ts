@@ -2,6 +2,7 @@
 // story rail and the timeline move together: scrub the timeline and the map and the story follow; click a sitting
 // and the map jumps to its moment. Owners may add fields for their own view; the ones below are the contract.
 
+import { createContext, useContext, useRef } from "react";
 import { create } from "zustand";
 
 /** What can be selected anywhere in Lens: opening it shows its inspector, and the map and story highlight it. */
@@ -60,3 +61,17 @@ export const useLens = create<LensState>((set) => ({
   hover: (hovered) => set({ hovered }),
   setTrack: (track) => set((s) => ({ tracks: [...s.tracks.filter((x) => x.id !== track.id), track] })),
 }));
+
+/** Whether the view around it is the one on screen. The run page keeps the map mounted while the 3D town is shown (a
+ * switch back is then instant, not a rebuild) and says here that it is hidden. */
+export const ViewActive = createContext(true);
+
+/** The moment, for a view that may be hidden: while hidden it holds its last value, so the view does not render on
+ * every frame of play; shown again, it catches up at once. */
+export function useViewT(): number {
+  const active = useContext(ViewActive);
+  const held = useRef(0);
+  const t = useLens((s) => (active ? s.t : held.current));
+  held.current = t;
+  return t;
+}

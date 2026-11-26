@@ -7,6 +7,7 @@ import { townFold, type TownBundle } from "../src/folds/town";
 import { peopleFold, type PeopleBundle } from "../src/folds/people";
 import { makeCity } from "../src/client/city/data";
 import { electionView, homeAt, papersIn, PAPER_GROUPS } from "../src/client/city/civic";
+import { LightClock } from "../src/client/light";
 
 const DAY = 86_400, H = 3600;
 
@@ -135,4 +136,32 @@ test("town and people folds on a hand-made log: one row per move, nobody in two 
   const placed = papersIn(city, 2 * DAY, 7 * DAY, new Set(PAPER_GROUPS.map((_, i) => i)));
   expect(placed.find((x) => x.p.id === "c1")?.s).toBe(city.sById.get("house-2"));
   expect(placed.find((x) => x.p.id === "d1")?.s).toBe(city.sById.get("house-3"));
+});
+
+test("the light holds while time races, takes a lone jump at once, and follows the clock at a walk", () => {
+  const c = new LightClock();
+  let now = 0;
+  // Playing at an hour a second, 60 frames a second: the light is the clock's hour.
+  let t = 10 * H;
+  c.update(t, now);
+  for (let i = 0; i < 120; i++) c.update((t += H / 60), (now += 1000 / 60));
+  expect(c.update(t, now)).toBeCloseTo(12, 5);
+  // A lone jump (a click): the new hour at once.
+  t += 9 * H;
+  expect(c.update(t, (now += 1000))).toBeCloseTo(21, 5);
+  // A week a second: after the first step, the light holds, whatever the hour.
+  c.update((t += (7 * DAY) / 60), (now += 1000 / 60));
+  const held = c.update(t, now);
+  for (let i = 0; i < 120; i++) expect(c.update((t += (7 * DAY) / 60), (now += 1000 / 60))).toBe(held);
+  // Stopped: within a second it takes the true hour.
+  let last = held;
+  for (let i = 0; i < 10; i++) last = c.update(t, (now += 120));
+  expect(last).toBeCloseTo((t % DAY) / H, 5);
+});
+
+test("the fonts are declared so a browser keeps them (Bun's minifier unquotes fontsource's format() hint)", async () => {
+  const css = await Bun.file(new URL("../src/client/fonts.css", import.meta.url)).text();
+  for (const family of ["Overpass Variable", "Source Serif 4 Variable"]) expect(css).toContain(`font-family: '${family}'`);
+  expect(css).not.toMatch(/src:[^;]*format\(/);
+  for (const m of css.matchAll(/url\("([^"]+)"\)/g)) expect(await Bun.file(new URL(`../src/client/${m[1]}`, import.meta.url)).exists()).toBe(true);
 });
