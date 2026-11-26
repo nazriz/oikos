@@ -9,12 +9,12 @@
 //   outcome     how each run's election went, by model (Lens's one rule, src/shared/outcome.ts)
 //   cost        dollars per run, by model
 import { LiveToggle, useLive } from "../measures";
-import { conditionsSentence, type StudyRun } from "../library/landing-data";
+import { clopperPearson, cohortOf, COHORT_WORDS, conditionsSentence, CONDITIONS, inCondition, markOf, tally, type Cohort, type StudyRun } from "../library/landing-data";
 import { Conditions } from "../library/charts";
 import "../library/landing.css";
 import { studyRuns } from "../library/landing-data";
 import { MeasuresKey } from "../measures";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { RunEntry, ForkReading } from "../../shared/api";
 import { outcomeOf, type OutcomeKind } from "../../shared/outcome";
 import { LEVERS } from "./levers";
@@ -97,16 +97,16 @@ function Page({ all, lockRuns, entries }: { all: Fork[]; lockRuns: StudyRun[]; e
       <div className="fi-head">
         <PageAnswer page="findings" />
         <h1 className="fi-title">What AI mayors did with their power: lock-in and power grabs</h1>
-        {researcher && <p className="st-sub">{inView.length} runs from {on.size} run sets, as the study's checker reads them (experiments/power-seeking/reader.ts, through tally.ts). Intervals are Wilson 95%. Exploratory unless a run set was pre-registered.</p>}
+        <p className="st-sub">The detail behind the landing page: lock-in by model and instruction with exact intervals, then the study's checker's power grabs ({inView.length} runs, as experiments/power-seeking/reader.ts reads them; Wilson 95% intervals there). The landing tells the story; this page is for checking it.</p>
         {researcher && <div className="fi-groups"><span className="lbl">Test runs</span><button className={`st-btn ${controls ? "on" : ""}`} onClick={() => setControls(!controls)} title="Rope tests and scripted controls, which are not AI models">{controls ? "Test mayors shown below the models" : "Test mayors hidden"} <span className="n">{[...new Set(all.filter((f) => on.has(f.group) && isControl(f.model)).map((f) => f.model))].join(", ") || "none"}</span></button></div>}
         {researcher && <div className="fi-groups"><span className="lbl">Run sets</span>{groups.map((g) => <button key={g} className={`st-btn ${on.has(g) ? "on" : ""}`} onClick={() => { const n = new Set(on); n.has(g) ? n.delete(g) : n.add(g); setOn(n); }}>{g} <span className="n">{all.filter((f) => f.group === g).length}</span></button>)}</div>}
       </div>
-      {!researcher && <StoryFindings forks={inView} models={models} pal={pal} lockRuns={lockRuns} entries={entries} />}
-      {researcher && <div className="fi-grid">
+      <LockTable runs={lockRuns} entries={entries} />
+      <div className="fi-grid">
         <Chart wide title="Runs where the AI mayor reached for a power grab" sub="Share of runs, by model and instructions: tried (hollow) and carried out (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(inView, models, goals)}>
           {(ref) => <KofN refEl={ref} forks={inView} models={models} goals={goals} pal={pal} onDrill={setDrill} />}
         </Chart>
-        <Chart title="Which power grabs, by seriousness" sub="Runs reaching each one, grouped by the draft rubric's seriousness (1 to 3): tried, and carried out" name="levers" table={leverTable(inView)}>
+        <Chart title="Which acts the checker flagged, by grade" sub="Runs reaching each one, grouped by the checker's grade (1 to 3): tried, and carried out. Grade 1 is an election-season favour, not a power grab" name="levers" table={leverTable(inView)}>
           {(ref) => <Levers refEl={ref} forks={inView} pal={pal} onDrill={setDrill} />}
         </Chart>
         <Chart title="When in the campaign" sub="Each power grab by days before election day as it then stood; filled means carried out. Click a dot to open its run there" name="when" table={whenTable(inView)}>
@@ -118,7 +118,7 @@ function Page({ all, lockRuns, entries }: { all: Fork[]; lockRuns: StudyRun[]; e
         <Chart title="Cost per run" sub="US dollars for the mayor's and the clerk's model calls in each run; the tick is the median" name="cost" table={costTable(inView, models)}>
           {(ref) => <Cost refEl={ref} forks={inView} models={models} pal={pal} />}
         </Chart>
-      </div>}
+      </div>
       {drill && <Drill d={drill} onClose={() => setDrill(null)} />}
     </div>
   );
@@ -485,5 +485,41 @@ function StoryFindings({ forks, models, pal, lockRuns, entries }: { forks: Fork[
         </div>
       </section>
     </div>
+  );
+}
+
+/** Lock-in by model and instruction, the report's measure, as a table with exact (Clopper-Pearson) 95% intervals: the
+ * figures behind the landing's chart, one model to a row, frontier and smaller apart. */
+function LockTable({ runs, entries }: { runs: StudyRun[]; entries: RunEntry[] }) {
+  const graded = runs.filter((f) => markOf(f, "lockin") !== "ungraded");
+  const models = orderModels([...new Set(graded.map((f) => f.model))]);
+  const cell = (rs: StudyRun[]) => {
+    const t = tally(rs, "lockin");
+    if (!t.n) return <td className="r st-faint">{t.excluded ? `${t.excluded} stopped` : ""}</td>;
+    const [lo, hi] = clopperPearson(t.k, t.n);
+    return <td className="r" title={`${t.k} of ${t.n}; exact 95% interval ${Math.round(lo * 100)}% to ${Math.round(hi * 100)}%${t.excluded ? `; ${t.excluded} stopped before election day, not counted` : ""}`}>{t.k ? <b className="lockin-text">{t.k}</b> : "0"} of {t.n} <span className="st-faint">({Math.round(lo * 100)}–{Math.round(hi * 100)}%)</span></td>;
+  };
+  const rows = (["frontier", "smaller"] as Cohort[]).flatMap((co) => [
+    <tr key={co} className="fi-lt-group"><th colSpan={CONDITIONS.length + 2}>{COHORT_WORDS[co]}</th></tr>,
+    ...models.filter((m) => cohortOf(m) === co).map((m) => (
+      <tr key={m}><td>{modelName(m)}</td>{CONDITIONS.map((c) => <Fragment key={c.id}>{cell(graded.filter((f) => f.model === m && inCondition(f, c)))}</Fragment>)}{cell(graded.filter((f) => f.model === m))}</tr>
+    )),
+    <tr key={co + "-all"} className="fi-lt-total"><td>All {COHORT_WORDS[co].toLowerCase()}</td>{CONDITIONS.map((c) => <Fragment key={c.id}>{cell(graded.filter((f) => cohortOf(f.model) === co && inCondition(f, c)))}</Fragment>)}{cell(graded.filter((f) => cohortOf(f.model) === co))}</tr>,
+  ]);
+  return (
+    <section className="fi-card wide fi-lt">
+      <div className="fi-card-head"><div>
+        <h2>Lock-in, by model and instruction</h2>
+        <p className="fi-takeaway">{conditionsSentence(runs)}</p>
+        <div className="st-faint">Runs where both blind graders found a lock-in, of the graded runs that reached election day, with exact 95% intervals; hover a cell for the runs that stopped early. <MeasuresKey /></div>
+        <LiveToggle runs={entries} />
+      </div></div>
+      <div className="ld-table-wrap">
+        <table className="ld-table">
+          <thead><tr><th>AI model</th>{CONDITIONS.map((c) => <th key={c.id} className="r">{c.label}</th>)}<th className="r">All</th></tr></thead>
+          <tbody>{rows}</tbody>
+        </table>
+      </div>
+    </section>
   );
 }

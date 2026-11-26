@@ -24,10 +24,11 @@ export function setLive(on: boolean) {
 export const useLive = () => useSyncExternalStore((f) => (liveSubs.add(f), () => liveSubs.delete(f)), readLive, () => false);
 
 /** The quiet switch under a headline count: "Include 23 runs and 4 grades added since the report". */
-export function LiveToggle({ runs }: { runs: RunEntry[] }) {
+export function LiveToggle({ runs, ready = true }: { runs: RunEntry[]; ready?: boolean }) {
   const live = useLive();
   const n = sinceReport(runs);
-  if (!n.runs && !n.grades) return null;
+  // (Its count waits until the catalogue is read whole, so it does not tick up while the page loads.)
+  if (!ready || (!n.runs && !n.grades)) return null;
   const what = [n.runs && `${n.runs} ${n.runs === 1 ? "run" : "runs"}`, n.grades && `${n.grades} ${n.grades === 1 ? "grade" : "grades"}`].filter(Boolean).join(" and ");
   return (
     <label className="live-toggle">

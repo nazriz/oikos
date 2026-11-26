@@ -13,6 +13,9 @@ import { useMode } from "../mode";
 import { isControl } from "../story/Findings";
 import { RunPrint } from "../library/charts";
 import { measuresText } from "../measures";
+import { addedAfterReport } from "../library/landing-data";
+/** How a model was reached, from its raw name: "anthropic/…" the API, "claude-code/…" the subscription. */
+const routeOf = (raw?: string) => (!raw ? "" : /^claude-code\//.test(raw) ? "(via subscription)" : /^anthropic\//.test(raw) ? "(via API)" : /openrouter/.test(raw) ? "(via OpenRouter)" : `(${raw.split("/")[0]})`);
 import "../library/landing.css";
 import "./nav.css";
 
@@ -103,7 +106,7 @@ export function peersOf(runs: RunEntry[], me: RunEntry): { same: Peer[]; other: 
     const code = r.experiment!.isCode ? "The comparison: a fixed, rule-based mayor." : "";
     if (!rd) return code ? `${code}${r.experiment!.stopped ? " Stopped early." : ""}` : r.experiment!.stopped ? "Stopped early." : "Not read by the study yet; open it to see what it did.";
     const m = measuresText(r);
-    const grab = r.experiment!.isCode ? code : `${m.lockin} ${m.grab}`;
+    const grab = r.experiment!.isCode ? code : `${m.lockin} ${m.grab}${addedAfterReport(r) ? " Added since the study's report, so not in its counts." : ""}`;
     const out = readingOutcome(rd);
     return [grab, out ? `${out.label}.` : ""].filter(Boolean).join(" ");
   };
@@ -188,6 +191,8 @@ function Switcher({ run, entry }: { run: string; entry?: RunEntry }) {
 
 function PeerList({ title, peers, href, go }: { title: string; peers: Peer[]; href: (k: string) => string; go: (e: React.MouseEvent<HTMLAnchorElement>, k: string) => void }) {
   if (!peers.length) return null;
+  // (Two runs of one model in one town differ by how the model was reached: the API, the subscription, OpenRouter.)
+  const twice = new Set(peers.map((p) => p.name).filter((n, i, all) => all.indexOf(n) !== i));
   return (
     <>
       <h3 className="switcher-h">{title}</h3>
@@ -195,7 +200,7 @@ function PeerList({ title, peers, href, go }: { title: string; peers: Peer[]; hr
         {peers.map((p) => (
           <li key={p.key}>
             <a role="menuitem" href={href(p.key)} onClick={(e) => go(e, p.key)}>
-              <b>{p.name}</b>
+              <b>{p.name}{twice.has(p.name) ? ` ${routeOf(p.run.experiment?.rawModel)}` : ""}</b>
               {!p.isCode && <RunPrint entry={p.run} w={110} />}
               {p.note && <span>{p.note}</span>}
             </a>

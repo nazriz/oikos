@@ -168,6 +168,10 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
 
 /** "13 of 14", with what is shown but not counted. */
 function CountText({ t, m }: { t: Tally; m: Measure }) {
+  if (m === "lockin" && !t.n) {
+    const all = t.ungraded + t.excluded;
+    return <span className="who-k">{all} {all === 1 ? "run" : "runs"}, {t.excluded && !t.ungraded ? "all stopped before election day" : "none graded yet"}</span>;
+  }
   return (
     <span className="who-k">
       <b>{t.k}</b> of {t.n}
@@ -226,6 +230,7 @@ export function Who({ runs, measure, quotes, researcher, onModel }: { runs: Stud
             </div>
           ))}
         </div>
+        {measure === "lockin" && <p className="ld-chart-key">Faint: the run stopped before election day, so not counted. Hollow: not graded in the study's report.</p>}
         {tip.el}
       </div>
     </WithTable>
@@ -264,6 +269,7 @@ export function Conditions({ runs, researcher }: { runs: StudyRun[]; researcher:
             </div>
           ))}
         </div>
+        <p className="ld-chart-key">Faint: the run stopped before election day, so not counted.</p>
         {tip.el}
       </div>
     </WithTable>
