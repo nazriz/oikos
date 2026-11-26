@@ -2,7 +2,7 @@
 // often it tried a power grab and carried one out, which kinds, how its elections went, and a line of its own words
 // about the election; each row opens to its runs. Counts come from the catalogue (every run the study's checker has
 // read); the words from the runs Lens has opened (/api/moments).
-import { lockInOf, measuresText, MeasuresKey, runCount, runCountText } from "../measures";
+import { LiveToggle, lockInOf, measuresText, MeasuresKey, runCount, runCountText, useLive } from "../measures";
 import { MAIN_SET, studyRuns } from "../library/landing-data";
 const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 import { useEffect, useMemo, useState } from "react";
@@ -39,7 +39,8 @@ export function ModelsPage() {
 
 function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse | null }) {
   // (The same runs every page counts: src/client/measures.tsx runCount, through landing-data's studyRuns.)
-  const keep = useMemo(() => new Set(studyRuns(runs).map((f) => f.key)), [runs]);
+  const live = useLive();
+  const keep = useMemo(() => new Set(studyRuns(runs, false, live).map((f) => f.key)), [runs, live]);
   const forks: Fork[] = runs.flatMap((e) => (keep.has(e.key) && e.kind === "fork" && e.experiment && !e.experiment.isCode && e.reading && !isControl(e.experiment.model) && !/mock|levercheck/.test(e.group) ? [{ key: e.key, model: e.experiment.model, goal: e.experiment.goal || "none", seed: e.experiment.seed, r: e.reading, outcome: kindOf(e.reading), e }] : []));
   // (Its words: from the run as Lens opened it where it has, else from the catalogue's reading, which every read run has.)
   const voices = useMemo(() => { const v = new Map<string, { text: string; day: number }>(); for (const f of forks) if (f.r.voice) v.set(f.key, f.r.voice); for (const r of moments?.runs ?? []) if (r.voice) v.set(r.key, r.voice); return v; }, [moments, forks]);
@@ -51,8 +52,9 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
       <div className="md-head">
         <PageAnswer page="models" />
         <h1>What each AI model did as mayor</h1>
-        <p className="st-sub">{runCountText(runCount(runs))}. Each row gives both of the study's measures; a row opens to its runs.</p>
+        <p className="st-sub">{runCountText(runCount(runs, live))}. Each row gives both of the study's measures; a row opens to its runs.</p>
         <MeasuresKey />
+        <LiveToggle runs={runs} />
       </div>
       <table className="md-table">
         <thead><tr><th>Model</th><th>Runs</th><th>Locked its programme in</th><th>Tried a power grab</th><th>Carried one out</th><th>Which kinds</th><th>How its elections went</th><th>In its own words</th></tr></thead>

@@ -684,3 +684,17 @@
 .sq.lk.m-split {
   box-shadow: inset 0 0 0 2px var(--lockin);
 }
+
+/* Each section's "Copy link" and "Show as a table" stay out of the way until the section is pointed at or focused
+   (always shown where there is no hover, on a phone). */
+@media (hover: hover) {
+  .ld-section .ld-link {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .ld-section:hover .ld-link,
+  .ld-section:focus-within .ld-link,
+  .ld-link[aria-pressed="true"] {
+    opacity: 1;
+  }
+}

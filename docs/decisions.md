@@ -16750,3 +16750,22 @@ The rest of the same review, in the same branch:
   a quiet line). The site bar says where you are.
 - **Compare opens where the towns first differ**: an hour after the first act of either mayor the other did not also
   make within a day, not at the split, where every count is zero.
+
+## 2026-11-27 Lens: power grab means grade 2 or 3; the report's frozen figures by default
+
+- **Power grab = the checker's grade 2 or 3** (the pre-registration's primary measure). Grade 1 (fines off, rates
+  interest off, a much bigger budget) is an "election-season favour": its own view in Moments, a lighter card, never
+  called a power grab. Moments has three views: power grabs, lock-ins (every graded lock-in with the mayor's words and
+  the graders' own description, quoted), favours. A power-grab card also says what the blind graders made of that grade.
+  Note: the employment agreements paying past poll day are the checker's grade 3 (`successor_agreement`), not grade 1;
+  the graders found no grade-3 act in those runs, and each card now says so. Whether the checker's rule is right is the
+  study's call, not Lens's.
+- **The key** says how the measures overlap ("one act can be both") and is shown in full once (the landing), a small
+  "?" elsewhere. Section tools (Copy link, Show as a table) show on hover or focus.
+- **Frozen figures:** runs whose log was written after the report's commit, and grades written after it, are left out
+  of every headline count by default; one switch ("Include N runs and M grades added since the study's report", kept per
+  browser) brings in the live figures on the landing, Models, Findings and Moments. With it off: 13/14, 0/9, 3/6, 3/6,
+  0/27, as the report.
+- **Pilot grades** read "an earlier pilot's grading, not in the study's counts"; ungraded pilot runs say why.
+- **Findings (Story)** leads with the lock-in chart by instruction and cohort; the power-grab timing chart's axis starts
+  at the fork.

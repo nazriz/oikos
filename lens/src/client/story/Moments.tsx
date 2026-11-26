@@ -3,6 +3,10 @@
 // reader's reading of the act, when (day, days to the poll, phase), what became of it, and which run. Filter by model,
 // lever, level and goal; each card opens its run at that sitting. The reader's `considered` level (a phrase match,
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
+import { LiveToggle, useLive } from "../measures";
+import { markOf, studyRuns, type StudyRun } from "../library/landing-data";
+import { modelName } from "../words";
+const GRADER_TIER: Record<string, string> = { executed: "both found it carried out", considered: "both found it weighed, not carried out", none: "neither found it", split: "they differ" };
 import type { RunEntry as FullEntry } from "../../shared/api";
 import { Measures, MeasuresKey, runCount, runCountText } from "../measures";
 import { isControlModel } from "../library/landing-data";
@@ -47,11 +51,19 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
   const [goals, setGoals] = useState<Set<string>>(new Set());
   const [levels, setLevels] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<"poll" | "day" | "model">("poll");
+  // (Three views: the checker's power grabs (grade 2 or 3, its primary measure), its election-season favours (grade 1,
+  // never called a power grab), and the graders' lock-ins, each with the mayor's words.)
+  const [view, setView] = useState<"grabs" | "favours" | "lockins">(() => (location.hash.includes("view=lockins") ? "lockins" : location.hash.includes("view=favours") ? "favours" : "grabs"));
+  const live = useLive();
   // (Each card also gives the run's lock-in, which needs the catalogue's grades; the cards show without it until it comes.)
   const cat = useAsync(async () => { const c = await (await fetch("/api/runs")).json(); return (Array.isArray(c) ? c : c.runs) as FullEntry[]; }, []);
   const entries = useMemo(() => new Map((Array.isArray(cat) ? cat : []).map((e) => [e.key, e])), [cat]);
-  const aiRuns = Array.isArray(cat) ? runCount(cat) : null;
-  const all = useMemo(() => (weak ? every : every.filter((m) => m.lever.level !== "considered")), [every, weak]);
+  const aiRuns = Array.isArray(cat) ? runCount(cat, live) : null;
+  const tierOf = (m: Moment) => m.lever.tier ?? 2;
+  const all = useMemo(() => (weak ? every : every.filter((m) => m.lever.level !== "considered")).filter((m) => (view === "favours" ? tierOf(m) === 1 : tierOf(m) >= 2)), [every, weak, view]);
+  const favours = every.filter((m) => m.lever.level !== "considered" && tierOf(m) === 1).length;
+  const grabs = every.filter((m) => m.lever.level !== "considered" && tierOf(m) >= 2).length;
+  const lockins = useMemo(() => (Array.isArray(cat) ? studyRuns(cat, false, live).filter((f) => markOf(f, "lockin") === "yes" && f.grade?.lockInQuote) : []), [cat, live]);
   const count = (f: (m: Moment) => string) => { const c = new Map<string, number>(); for (const m of all) c.set(f(m), (c.get(f(m)) ?? 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); };
   const shown = all.filter((m) => (!models.size || models.has(m.model)) && (!levers.size || levers.has(leverTitle(m.lever.lever))) && (!goals.size || goals.has(goalText(m.goal ?? "none"))) && (!levels.size || levels.has(LEVEL[m.lever.level] ?? "")))
     .sort((a, b) => sort === "model" ? a.model.localeCompare(b.model) || a.lever.t - b.lever.t : sort === "day" ? a.lever.t - b.lever.t : (a.lever.days_to_poll ?? 1e9) - (b.lever.days_to_poll ?? 1e9));
@@ -69,10 +81,22 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
     <div className="mo">
       <div className="mo-head">
         <PageAnswer page="moments" />
-        <h1 className="mo-title">When an AI mayor reached for a power grab</h1>
-        <p className="st-sub">{all.filter((m) => m.lever.level !== "considered").length} moments in {withAny} runs{aiRuns ? `, from the runs Lens has opened (${runCountText(aiRuns)})` : ""}. The study's checker decides what counts as a power grab; the quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</p>
+        <h1 className="mo-title">{view === "lockins" ? "When an AI mayor locked its programme in" : view === "favours" ? "Election-season favours" : "When an AI mayor reached for a power grab"}</h1>
+        <div className="seg mo-view" role="group" aria-label="Which moments">
+          <button aria-pressed={view === "grabs"} onClick={() => setView("grabs")}>Power grabs <span className="n">{grabs}</span></button>
+          <button aria-pressed={view === "lockins"} onClick={() => setView("lockins")}>Lock-ins <span className="n">{lockins.length}</span></button>
+          <button aria-pressed={view === "favours"} onClick={() => setView("favours")}>Election-season favours <span className="n">{favours}</span></button>
+        </div>
+        <p className="st-sub">
+          {view === "lockins"
+            ? <>Every run where both blind graders found a lock-in{aiRuns ? `, of ${runCountText(aiRuns)}` : ""}. The words are the mayor's own; the description of the act is the graders', quoted as they wrote it.</>
+            : view === "favours"
+              ? <>Spending or hiring timed for the vote, which the study's checker grades 1 of 3: {all.length} moments in {withAny} runs. Lens never calls these power grabs.</>
+              : <>{all.filter((m) => m.lever.level !== "considered").length} moments in {withAny} runs, from the runs Lens has opened{aiRuns ? ` (${runCountText(aiRuns)})` : ""}. A power grab is the study's checker's grade 2 or 3 of 3; the quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</>}
+        </p>
         <MeasuresKey />
-        <div className="mo-filters">
+        {Array.isArray(cat) && <LiveToggle runs={cat} />}
+        {view !== "lockins" && <div className="mo-filters">
           <Facet label="Model" items={count((m) => m.model)} set={setModels} on={models} />
           <Facet label="Instructions" items={count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
           <Facet label="Power grab" items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />
@@ -82,13 +106,39 @@ function Gallery({ all: every, runs, note, onOpen }: { all: Moment[]; runs: numb
             <span style={{ flex: 1 }} />
             <button className={`st-btn ${weak ? "on" : ""}`} onClick={() => setWeak(!weak)} title="The checker matched words only; often wrong">{weak ? "Hide" : "Show"} mentions (unreliable)</button>
           </div>
-        </div>
+        </div>}
       </div>
+      {view === "lockins" ? (
+        <div className="mo-grid">
+          {lockins.map((f) => <LockCard key={f.key} f={f} />)}
+          {!lockins.length && <div className="st-empty">{Array.isArray(cat) ? "No graded lock-in in these runs." : "Reading the runs…"}</div>}
+        </div>
+      ) : (
       <div className="mo-grid">
         {shown.map((m) => <Card key={`${m.key}:${m.lever.i}`} m={m} entry={entries.get(m.key)} onOpen={() => open(m)} />)}
         {!shown.length && <div className="st-empty">No moment matches.</div>}
       </div>
+      )}
     </div>
+  );
+}
+
+/** One graded lock-in: the mayor's words, and the graders' own description of the act (quoted, never paraphrased). */
+function LockCard({ f }: { f: StudyRun }) {
+  const q = f.grade!.lockInQuote!;
+  const t = q.day * 86_400 + 43_200;
+  return (
+    <article className="mo-card lockin">
+      <div className="mo-card-top"><span className="mo-lever lk">Locked its programme in</span><span className="mo-level lk">both graders</span></div>
+      <blockquote className="mo-quote lk">{q.quote}</blockquote>
+      <div className="mo-sub"><span className="k">the graders' description</span>“{q.act}”</div>
+      <p className="mo-when">Day {dayNo(q.day)}.</p>
+      <div className="mo-foot">
+        <span className="mo-who"><b>{modelName(f.model)}</b>, {goalText(f.goal).toLowerCase()}, town {f.seed}. <Measures entry={f.entry} /></span>
+        <span style={{ flex: 1 }} />
+        <a className="st-btn" href={`#/run/${encodeURIComponent(f.key)}?t=${t}`}>Open day {dayNo(q.day)}</a>
+      </div>
+    </article>
   );
 }
 
@@ -97,14 +147,15 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
   const [more, setMore] = useState(false);
   const [copied, setCopied] = useState(false);
   return (
-    <article className={`mo-card ${weak ? "weak" : ""} ${l.level}`}>
-      <div className="mo-card-top"><span className="mo-lever">{leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`}>{l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}</span></div>
+    <article className={`mo-card ${weak ? "weak" : ""} ${l.level} ${(l.tier ?? 2) === 1 ? "favour" : ""}`}>
+      <div className="mo-card-top"><span className="mo-lever">{(l.tier ?? 2) === 1 ? "Election-season favour: " : ""}{(l.tier ?? 2) === 1 ? leverTitle(l.lever) : leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`}>{l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}</span></div>
       <blockquote className={`mo-quote ${more ? "open" : ""}`} onClick={() => setMore(!more)}>{m.words}</blockquote>
       {m.note && <div className="mo-sub"><span className="k">on signing</span>“{m.note}”</div>}
       {m.reason && <div className="mo-sub"><span className="k">its reason</span>“{m.reason}”</div>}
       {more && <Around m={m} />}
       <p className="mo-when">Day {dayNo(l.day)}{m.daysBefore !== undefined ? (m.daysBefore >= 0 ? `, ${m.daysBefore} days before the election was due` : `, ${-m.daysBefore} days after the election was due`) : ""}.</p>
       <div className="mo-out"><span className={`st-pill ${m.outcomeTone}`}>{m.outcome}</span></div>
+      {(l.tier ?? 2) >= 2 && entry?.grade && <p className="mo-graders">The blind graders, grade {l.tier ?? 2} of 3: {GRADER_TIER[entry.grade.tiers[(l.tier ?? 2) as 2 | 3]]}.</p>}
       <div className="mo-foot">
         <span className="mo-who"><b>{m.model}</b>, {m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}{m.seed !== undefined ? `, town ${m.seed}` : ""}. <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>{entry && <> <Measures entry={entry} /></>}</span>
         <span style={{ flex: 1 }} />

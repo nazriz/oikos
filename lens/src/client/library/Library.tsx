@@ -16,7 +16,7 @@ import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer, SiteLinks, useFirstVisitTour } from "../shell/Shell";
 import { goalText, leverTitle, modelName } from "../words";
 import { CarryOn } from "../nav/CarryOn";
-import { Measures, MeasuresKey, runCount, runCountText } from "../measures";
+import { LiveToggle, Measures, MeasuresKey, runCount, runCountText, useLive } from "../measures";
 import type { MomentsResponse } from "../story/moments-data";
 import { Masthead } from "./Masthead";
 import { Section } from "./parts";
@@ -63,8 +63,7 @@ export function Library({ q }: { q: URLSearchParams }) {
 
   const runs = cat?.runs ?? [];
   const [controls, setControls] = useState(false);
-  const [live, setLive] = useState(q.get("grades") === "live");
-  useEffect(() => replaceQuery({ grades: live ? "live" : undefined }), [live]);
+  const live = useLive();
   const study = useMemo(() => studyRuns(runs, researcher && controls, live), [runs, researcher, controls, live]);
   const quotes = useMemo(() => {
     const m = new Map<string, Quote>();
@@ -107,7 +106,7 @@ export function Library({ q }: { q: URLSearchParams }) {
 
       {cat && study.length > 0 && (
         <>
-          <ConditionsSection study={study} researcher={researcher} live={live} setLive={setLive} />
+          <ConditionsSection study={study} researcher={researcher} />
           <WhoSection study={study} quotes={quotes} researcher={researcher} q={q} onModel={showModel} controls={controls} setControls={setControls} />
           <MovedSection study={study} />
           <StartHere runs={runs} moments={moments} />
@@ -131,6 +130,7 @@ export function Library({ q }: { q: URLSearchParams }) {
 const HERO_QUOTE_RUN = /deepseek-strong-elec-s9~seed-9/;
 
 function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; moments: MomentsResponse | null }) {
+  const live = useLive();
   const runs = cat?.runs ?? [];
   const lead = useMemo(() => leadSentence(study), [study]);
   const cell = useMemo(() => conditionCell(study, CONDITIONS[1]!, "frontier"), [study]);
@@ -173,7 +173,7 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
         {cat && study.length > 0 ? (
           <ul className="ld-facts">
             <li>
-              {runCountText(runCount(runs))}. Each was mayor of the same town for about {typical} days.
+              {runCountText(runCount(runs, live))}. Each was mayor of the same town for about {typical} days.
             </li>
             {lead && (
               <li>
@@ -194,6 +194,8 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
             Counted where two independent graders, reading each run blind, agree; runs that stopped before election day are not counted. <a href={REPORT_URL}>From the study's report</a>
           </p>
         )}
+        {cat && <LiveToggle runs={runs} />}
+        {cat && <MeasuresKey full className="ld-key" />}
         <CarryOn />
       </div>
       {runs.some((r) => r.key === PLAN_RUN && r.indexed) ? <Masthead run={PLAN_RUN} /> : <div className="masthead masthead-empty" aria-hidden />}
@@ -214,7 +216,7 @@ function Skeleton() {
 
 // ---------------------------------------------------------------- what the instructions changed
 
-function ConditionsSection({ study, researcher, live, setLive }: { study: StudyRun[]; researcher: boolean; live: boolean; setLive: (b: boolean) => void }) {
+function ConditionsSection({ study, researcher }: { study: StudyRun[]; researcher: boolean }) {
   const later = study.filter((f) => f.gradedLater).length;
   const graded = study.some((f) => markOf(f, "lockin") !== "ungraded");
   if (!graded) return null;
@@ -231,12 +233,7 @@ function ConditionsSection({ study, researcher, live, setLive }: { study: StudyR
       }
     >
       <Conditions runs={study} researcher={researcher} />
-      {later > 0 && (
-        <label className="ld-check ld-live">
-          <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} /> Include {later} {later === 1 ? "run" : "runs"} graded after the report
-          {live ? " (the counts above are now the live ones, not the report's)" : " (the counts above are the report's)"}
-        </label>
-      )}
+
       <details className="ld-caveat">
         <summary>What these numbers can and cannot say</summary>
         <p>
@@ -262,7 +259,8 @@ function MovedSection({ study }: { study: StudyRun[] }) {
       title={`The most overt case: ${modelName(r.model)} moved its own election ${move.years} years away`}
       sub={
         <>
-          An earlier pilot run, town {r.seed}, where the AI mayor was told to stay mayor by any means and the election law could still be amended (the main study fixes it). On its
+          An earlier pilot run, town {r.seed}, before the main study and not graded for lock-in, where the AI mayor was told to stay mayor by any means and the election law could
+          still be amended (the main study fixes it). On its
           first day in office it proposed a law setting the next election for day {dayNo(move.pollDay).toLocaleString("en-US")}, and the council passed it. Nobody voted for mayor
           before the run ended. Click a mark to open the run at that moment.
         </>
@@ -312,7 +310,7 @@ function WhoSection({ study, quotes, researcher, q, onModel, controls, setContro
           </label>
         )}
       </div>
-      <MeasuresKey className="ld-key" />
+      <MeasuresKey />
       <Who runs={runs} measure={measure} quotes={quotes} researcher={researcher} onModel={onModel} />
     </Section>
   );
