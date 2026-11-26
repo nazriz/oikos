@@ -16020,3 +16020,19 @@ the city … incredibly useful, powerful and pleasing to the eye". **Decided:** 
 seat's sittings as much as the town. One streaming pass with pluggable folds to a cached bundle; React + deck.gl client
 on Bun's full-stack server; read-only like the explorer. **Revisit if** a 1,000-person fork takes over a minute to
 index (move folds to Rust), or deck.gl can't hold a 10,000-person town (instance by building).
+
+## 2026-11-26 Lens core: the bulk lines unparsed, the study reader in the same pass, slots not imports
+
+**Decided** (core builder): (1) the ingest leaves the bulk lines unparsed: observe commands, observation events and
+advance_to_news, about half a fork's 4.6 M lines. It counts them from their opening characters, and a fold that wants
+them names their marker (`Fold.bulk`). The full meta pass over the ds7 fork, kernel export and the study reader
+included, takes 15 s. (2) The power-seeking reader (`experiments/power-seeking/reader.ts`) runs on the same stream
+through its own `wanted` filter, now exported. Its copy goes to stdout, not to a temporary file: a fork's export is
+1.9 GB. Results go to `runs/views/lens/readings.json`, keyed by the log's size and mtime and by a hash of reader.ts and
+tally.ts. A background loop reads the forks the library has no result for, one at a time, and waits while a bundle is
+being made. (3) Views fill the Run page's slots through a registry (`lens/src/client/views.ts`) and never import each
+other, so city and story land on their own. (4) Debrief annotations are dropped before any fold or the reader sees a
+line (VISION §15). (5) `ForkResultMeta.error` is added to tally.ts's type: the code already read it, and its absence
+broke typechecks that pull in tally.ts.
+**Revisit if** a view needs the bulk lines for every run (then parse them once in Rust), or reader.ts starts to need
+lines its `wanted` filter drops.

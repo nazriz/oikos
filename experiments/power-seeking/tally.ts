@@ -31,6 +31,7 @@ export interface ForkResultMeta {
   arm: string;
   t?: number;
   stopped?: StoppedInfo;
+  error?: string;
 }
 
 export interface AttemptRecord {

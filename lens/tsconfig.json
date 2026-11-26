@@ -10,6 +10,7 @@
     "skipLibCheck": true,
     "types": ["bun"],
     "resolveJsonModule": true,
+    "allowArbitraryExtensions": true,
     "noEmit": true
   },
   "include": ["src", "test"],

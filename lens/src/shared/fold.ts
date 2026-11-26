@@ -23,6 +23,12 @@ export interface FoldContext {
   arm?: string;
   /** The folder the log is in (read-only; folds must not open it: the ingest passes what they need). */
   dir: string;
+  /** For an experiment fork: the fork point, seconds (spec.json forkDay x 86,400). Before it is the shared history. */
+  forkAt?: number;
+  /** For an experiment fork: the seed (the `seed-N` folder). */
+  seed?: number;
+  /** For an experiment fork: its spec.json, parsed (name, goal in `-goal-<g>`, arms[].steward.model, forkDay, untilDay). */
+  spec?: any;
 }
 
 export interface FoldResult {
@@ -37,7 +43,11 @@ export interface Fold {
   readonly name: string;
   /** Bump when the fold's output changes shape: a bundle made by an older version is made again. */
   readonly version: number;
-  /** Every line, header first, in seq order. */
+  /** The bulk lines are not parsed unless a fold asks for them here, by marker (BULK in src/server/ingest.ts):
+   * '"command":"observe"', '"event":"observation"', '"command":"advance_to_news"'. Together they are about half of
+   * a fork's lines and few views need them. A fold that names one gets those lines too (and only folds that name it). */
+  readonly bulk?: readonly string[];
+  /** Every line, header first, in seq order (bulk lines only if asked for; `debrief` annotations never). */
   line(l: LogLine, ctx: FoldContext): void;
   /** After the last line. */
   finish(ctx: FoldContext): FoldResult | Promise<FoldResult>;
