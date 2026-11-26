@@ -71,7 +71,7 @@ const Sep = () => (
 );
 
 let catalogue: Promise<Catalogue> | null = null;
-const getCatalogue = () => (catalogue ??= fetchCatalogue().catch((e) => ((catalogue = null), Promise.reject(e))));
+export const getCatalogue = () => (catalogue ??= fetchCatalogue().catch((e) => ((catalogue = null), Promise.reject(e))));
 
 interface Peer {
   key: string;
@@ -98,10 +98,12 @@ export function peersOf(runs: RunEntry[], me: RunEntry): { same: Peer[]; other: 
     return [...m.values()];
   };
   const note = (r: RunEntry) => {
+    // (Every entry says something: the rule-based mayor what it is, a run not yet read that it is not.)
     const rd = r.reading;
-    if (!rd) return r.experiment!.stopped ? "Stopped early" : "";
+    const code = r.experiment!.isCode ? "The comparison: a fixed, rule-based mayor." : "";
+    if (!rd) return code ? `${code}${r.experiment!.stopped ? " Stopped early." : ""}` : r.experiment!.stopped ? "Stopped early." : "Not read by the study yet; open it to see what it did.";
     const m = measuresText(r);
-    const grab = r.experiment!.isCode ? "" : `${m.lockin} ${m.grab}`;
+    const grab = r.experiment!.isCode ? code : `${m.lockin} ${m.grab}`;
     const out = readingOutcome(rd);
     return [grab, out ? `${out.label}.` : ""].filter(Boolean).join(" ");
   };

@@ -1309,20 +1309,36 @@ export class WorldEngine {
     let lo = 0, hi = this.acts.length;
     while (lo < hi) { const m = (lo + hi) >> 1; if (this.acts[m]!.t <= t) lo = m + 1; else hi = m; }
     const shown: { a: { t: number; to: number; refused: boolean; seq: number }; text: string }[] = [];
-    const seenTo = new Set<number>();
+    // (One sign per act and per sentence: an act that reached five people is one sentence, "wrote to the councillor 1
+    // and 4 others", drawn once, over the first place it reached.)
+    const seenTo = new Set<number>(), seenSeq = new Set<number>(), seenText = new Set<string>();
     for (let i = lo - 1; i >= 0 && shown.length < 3 && t - this.acts[i]!.t < keep; i--) {
       const a = this.acts[i]!;
-      if (seenTo.has(a.to)) continue;
+      if (seenTo.has(a.to) || seenSeq.has(a.seq)) continue;
       const text = this.ev.caption?.(a.seq);
-      if (!text) continue;
+      if (!text || seenText.has(text)) continue;
       seenTo.add(a.to);
+      seenSeq.add(a.seq);
+      seenText.add(text);
       shown.push({ a, text });
     }
+    // (Each sign keeps its element while it stays shown: a sign that only moved up the list does not fade out in one
+    // place and in again in another, which drew it twice, one a ghost.)
+    const els = this.captions.slice();
+    const order: (HTMLDivElement | undefined)[] = shown.map((c) => {
+      const i = els.findIndex((e) => e && e.textContent === c.text);
+      if (i < 0) return undefined;
+      const e = els[i]!;
+      els.splice(i, 1);
+      return e;
+    });
+    for (let k = 0; k < order.length; k++) if (!order[k]) order[k] = els.shift();
+    this.captions = [...(order.filter(Boolean) as HTMLDivElement[]), ...els];
     const w = this.renderer.domElement.clientWidth, h = this.renderer.domElement.clientHeight;
     const placed: [number, number, number, number][] = [];
     for (let k = 0; k < Math.max(shown.length, this.captions.length); k++) {
-      let el = this.captions[k];
-      if (!el) { el = document.createElement("div"); el.className = "lw-caption"; this.labelLayer.appendChild(el); this.captions.push(el); }
+      let el = k < shown.length ? order[k] : this.captions[k];
+      if (!el) { el = document.createElement("div"); el.className = "lw-caption"; this.labelLayer.appendChild(el); this.captions.splice(k, 0, el); }
       const c = shown[k];
       if (!c) { el.style.opacity = "0"; continue; }
       const L = this.plan.lots[c.a.to];

@@ -13,7 +13,8 @@ import { Palette } from "../palette/Palette";
 import { Search } from "../icons";
 import { CopyLink } from "./CopyLink";
 import { Timeline } from "../timeline/Timeline";
-import { views, type SlotProps } from "../views";
+import { views, type EvidenceClaim, type SlotProps } from "../views";
+import { lockInfo } from "../story/lockin";
 import { RunSummary } from "./RunSummary";
 import { RunCharts, TurnStrip } from "./RunCharts";
 import { Measures } from "../measures";
@@ -183,11 +184,11 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
           )}
           {World && (
             <div className="seg map-toggle" role="group" aria-label="How to show the town">
-              <button aria-pressed={mapView === "map"} onClick={() => setMapView("map")}>
-                Map
+              <button aria-pressed={mapView === "map"} onClick={() => setMapView("map")} title="The town as a plan: every building, who is in it now, and lines to what the mayor's acts reached">
+                Plan
               </button>
-              <button aria-pressed={mapView === "world"} onClick={() => setMapView("world")}>
-                Town in 3D
+              <button aria-pressed={mapView === "world"} onClick={() => setMapView("world")} title="The town in 3D: people walking between buildings, the light following the hour">
+                3D town
               </button>
             </div>
           )}
@@ -220,7 +221,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
         <footer className="run-timeline">
           {guided && <Guided start={guided} />}
           {researcher && <Pulse run={runKey} meta={meta} />}
-          <Timeline ground={ground} {...(meta.span.fork !== undefined ? { fork: meta.span.fork } : {})} />
+          <Timeline ground={ground} {...(entry ? { entry } : {})} {...(meta.span.fork !== undefined ? { fork: meta.span.fork } : {})} />
         </footer>
       </div>
     </div>
@@ -235,6 +236,16 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
   const researcher = useMode((m) => m.mode === "researcher");
   const cost = meta ? meta.cost.all.microusd / 1e6 : x?.usd;
   const out = readingOutcome(reading);
+  // "How do we know?" explains the verdict it follows, the first that was found: the lock-in (the study's main measure),
+  // else the power grab carried out or tried, else the election.
+  const seatFold = useSeat(run ?? null);
+  const headClaim = useMemo((): EvidenceClaim => {
+    const lock = seatFold && entry ? lockInfo(seatFold, entry) : null;
+    if (lock) return { kind: "lockin", lock };
+    const l = seatFold?.levers.find((x) => x.level === "executed") ?? seatFold?.levers.find((x) => x.level === "attempted");
+    if (l && (reading?.has_executed || reading?.has_attempt)) return { kind: "lever", index: l.i };
+    return { kind: "outcome" };
+  }, [seatFold, entry, reading]);
   const tried = reading?.levers?.tried ?? 0, done = reading?.levers?.done ?? 0;
   const name = x ? (x.isCode ? "The rule-based mayor" : modelName(x.model)) : (entry?.title.split("/").at(-1) ?? "");
   // (Its height, for what fills the screen below it on a phone: src/client/nav/nav.css.)
@@ -280,7 +291,7 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
             {entry && views.howDoWeKnow && (
               <span className="run-evidence">
                 {" "}
-                <views.howDoWeKnow run={entry.key} claim={{ kind: "outcome" }} />
+                <views.howDoWeKnow run={entry.key} claim={headClaim} />
               </span>
             )}
           </p>
@@ -301,7 +312,7 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
             </a>
           )}
           {entry && views.power && (
-            <a className="btn ghost run-copy" href={`#/power/${encodeURIComponent(entry.key)}`} title="Who holds each office in the town, over the run">
+            <a className="btn ghost run-power" href={`#/power/${encodeURIComponent(entry.key)}`} title="Who holds each office in the town, over the run">
               Who holds power
             </a>
           )}

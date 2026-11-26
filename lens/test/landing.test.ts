@@ -84,4 +84,10 @@ test("every page says the two measures the same way, and counts the same runs", 
   // (Tests and controls are not counted; a run that stopped before election day is counted, but not as reaching it.)
   const c = runCount([locked, grabbed, fork("scripted/full", "none", 7), fork("glm-5.3", "redteam", 7, { end_at: 150 * DAY, ended: "stopped" })]);
   expect(c).toEqual({ ai: 3, reachedPoll: 2, models: 3 });
+  // (A run added after the report is out of its figures unless the live ones are asked for.)
+  const newer = { ...fork("gpt-6.1-terra", "strong", 7), mtimeMs: REPORT_AT + 1 };
+  expect([runCount([locked, newer]).ai, runCount([locked, newer], true).ai]).toEqual([1, 2]);
+  // (An earlier pilot's grading is never one of the study's lock-ins.)
+  const pilot = { ...fork("glm-5.3", "redteam", 7), grade: gradeOf("ps-blind-grades-v1-x", { A: { entrenchment: [{}], misleading: [], tiers: {} }, B: { entrenchment: [{}], misleading: [], tiers: {} } }) };
+  expect(lockInOf(pilot)).toBe("pilot");
 });

@@ -9,7 +9,7 @@
 import { useMemo, useRef } from "react";
 import { runHref } from "../router";
 import { goalText, leverTitle, modelName } from "../words";
-import { useReveal, useTip, useWidth, WithTable } from "./parts";
+import { useReveal, useTip, useWidth, WithTable, POINT, tapTwice } from "./parts";
 import type { RunEntry } from "../../shared/api";
 import { attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
 
@@ -143,7 +143,7 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
   const what = m === "lockin" && mark === "ungraded" && f.gradedLater ? "Graded after the report froze, so not in its counts (include such runs below the design chart)" : MARK_WORDS[m][mark];
   let detail: string | undefined, words: string | undefined;
   if (m === "lockin" && f.grade?.lockInQuote && (mark === "yes" || mark === "split" || mark === "excluded")) {
-    detail = `Day ${dayNo(f.grade.lockInQuote.day)}: ${f.grade.lockInQuote.act}`;
+    detail = `Day ${dayNo(f.grade.lockInQuote.day)}. The graders: “${f.grade.lockInQuote.act}”`;
     words = f.grade.lockInQuote.quote;
   } else if (m === "grab") {
     const first = f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0];
@@ -159,11 +159,11 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
       {detail && <span>{clip(detail, 200)}</span>}
       {words && <q className="world">{clip(words)}</q>}
       <span className="muted">{goalText(f.goal)}{f.election ? "" : " No election fell in the run"}.</span>
-      <span className="muted">Click to open this run{t !== undefined ? " at that moment" : ""}.</span>
+      <span className="muted">{POINT.Click} to open this run{t !== undefined ? " at that moment" : ""}.</span>
     </>
   );
   const cls = `sq ${m === "lockin" ? "lk " : ""}m-${mark}${mark === "excluded" && f.grade?.lockIn?.both ? " was-yes" : ""}`;
-  return <a className={cls} href={runHref(f.key, t !== undefined ? { t: Math.round(t) } : undefined)} aria-label={`${modelName(f.model)}, town ${f.seed}: ${what}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} />;
+  return <a className={cls} href={runHref(f.key, t !== undefined ? { t: Math.round(t) } : undefined)} aria-label={`${modelName(f.model)}, town ${f.seed}: ${what}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={(e) => tapTwice(e, () => tip.show(e, body))} />;
 }
 
 /** "13 of 14", with what is shown but not counted. */
@@ -279,7 +279,9 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
   const tip = useTip();
   const all = useMemo(() => attempts(runs), [runs]);
   const models = order.filter((m) => all.some((a) => a.model === m));
-  const from = Math.min(120, ...runs.map((r) => r.from)), to = Math.max(195, ...runs.map((r) => r.until));
+  // (The axis runs from the day the AI mayors took office, never from the town's day 1.)
+  const shownRuns = runs.filter((r) => all.some((a) => a.key === r.key));
+  const from = shownRuns.length ? Math.min(...shownRuns.map((r) => r.from)) : 120, to = Math.max(195, ...shownRuns.map((r) => r.until));
   const narrow = W < 560;
   const LW = narrow ? 0 : 170, R = 12, rowH = narrow ? 52 : 40, top = 28;
   const H = top + models.length * rowH + 30;

@@ -4,11 +4,12 @@
 import { createElement, useContext, type ComponentType } from "react";
 import type { Meta, RunEntry } from "../shared/api";
 import { ViewActive, type Selection } from "./state";
+import type { LockInfo } from "./story/lockin";
 import { SittingReader } from "./story/SittingReader";
 import { StoryRail } from "./story/StoryRail";
 
 /** What a "How do we know?" link explains. */
-export type EvidenceClaim = { kind: "outcome" } | { kind: "lever"; index: number } | { kind: "act"; seq: number } | { kind: "vote"; proposal: string };
+export type EvidenceClaim = { kind: "outcome" } | { kind: "lever"; index: number } | { kind: "act"; seq: number } | { kind: "vote"; proposal: string } | { kind: "lockin"; lock: LockInfo };
 
 export interface SlotProps {
   /** The open run's key. */
@@ -43,7 +44,7 @@ export interface Views {
   diff?: ComponentType<{ keys: string[]; day?: number }>;
   /** A printable digest of one run, #/digest/<key> (story's RunDigest): the top bar and nothing else around it. */
   digest?: ComponentType<{ run: string }>;
-  /** The town in 3D (lens-world's WorldView): offered beside the map in the map slot as "Map | Town in 3D". */
+  /** The town in 3D (lens-world's WorldView): offered beside the map in the map slot as "Plan | 3D town". */
   world?: ComponentType<SlotProps>;
   /** Who holds which office over the run, #/power/<key> (city's PowerView). */
   power?: ComponentType<{ run: string }>;
@@ -62,11 +63,14 @@ import { PersonLife } from "./life/PersonLife";
 import { PowerView } from "./city/Power";
 import { WorldView } from "./world/WorldView";
 
+const PLAN = { rotationX: 90, rotationOrbit: 0, minRotationX: 90 };
+
 // Registered views (one line each, by their owners):
 export const views: Views = {
   rail: StoryRail,
   reader: SittingReader,
-  map: (p) => createElement(CityView, { run: p.run, card: false }),
+  // (A plan: straight down, north up, the tilt held; the 3D town is the view to look around in.)
+  map: (p) => createElement(CityView, { run: p.run, card: false, camera: PLAN }),
   inspector: { person: PersonLife, structure: CityInspector, entity: CityInspector },
   compare: ComparePage,
   moments: Moments,

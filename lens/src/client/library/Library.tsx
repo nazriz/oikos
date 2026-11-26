@@ -16,10 +16,10 @@ import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer, SiteLinks, useFirstVisitTour } from "../shell/Shell";
 import { goalText, leverTitle, modelName } from "../words";
 import { CarryOn } from "../nav/CarryOn";
-import { Measures, MeasuresKey, runCount, runCountText } from "../measures";
+import { LiveToggle, Measures, MeasuresKey, runCount, runCountText, useLive } from "../measures";
 import type { MomentsResponse } from "../story/moments-data";
 import { Masthead } from "./Masthead";
-import { Section } from "./parts";
+import { Section, POINT } from "./parts";
 import { Activity, Calendar, Conditions, Print, PrintKey, When, Who, type Quote } from "./charts";
 import { cohortOf, conditionCell, CONDITIONS, conditionsSentence, dayNo, furthestMove, GOAL_SETS, headline, inGoalSet, kOfN, leadSentence, markOf, modelRows, quoteFor, REPORT_URL, studyRuns, tally, type GoalSet, type Measure, type StudyRun } from "./landing-data";
 import "./landing.css";
@@ -63,8 +63,7 @@ export function Library({ q }: { q: URLSearchParams }) {
 
   const runs = cat?.runs ?? [];
   const [controls, setControls] = useState(false);
-  const [live, setLive] = useState(q.get("grades") === "live");
-  useEffect(() => replaceQuery({ grades: live ? "live" : undefined }), [live]);
+  const live = useLive();
   const study = useMemo(() => studyRuns(runs, researcher && controls, live), [runs, researcher, controls, live]);
   const quotes = useMemo(() => {
     const m = new Map<string, Quote>();
@@ -107,7 +106,7 @@ export function Library({ q }: { q: URLSearchParams }) {
 
       {cat && study.length > 0 && (
         <>
-          <ConditionsSection study={study} researcher={researcher} live={live} setLive={setLive} />
+          <ConditionsSection study={study} researcher={researcher} />
           <WhoSection study={study} quotes={quotes} researcher={researcher} q={q} onModel={showModel} controls={controls} setControls={setControls} />
           <MovedSection study={study} />
           <StartHere runs={runs} moments={moments} />
@@ -127,10 +126,19 @@ export function Library({ q }: { q: URLSearchParams }) {
 
 // ---------------------------------------------------------------- hero
 
+function lastHeadline(): string | undefined {
+  try {
+    return localStorage.getItem("lens.headline") ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The run whose words the hero quotes, where it is in the lead's cell: the lock-in law that binds "any future mayor". */
 const HERO_QUOTE_RUN = /deepseek-strong-elec-s9~seed-9/;
 
 function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; moments: MomentsResponse | null }) {
+  const live = useLive();
   const runs = cat?.runs ?? [];
   const lead = useMemo(() => leadSentence(study), [study]);
   const cell = useMemo(() => conditionCell(study, CONDITIONS[1]!, "frontier"), [study]);
@@ -145,12 +153,22 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
   // (Before the grades are in: the most overt case, from the checker, as before.)
   const move = useMemo(() => furthestMove(study), [study]);
   const mv = !lead && move ? moments?.runs.find((r) => r.key === move.run.key) : undefined;
+  // The headline as soon as the page opens: the one this browser last saw, until the runs are read; never a placeholder
+  // that swaps for the finding a second later (a first visit shows a quiet block of its size instead).
+  const fresh = cat ? (lead ?? (move ? `Told to stay mayor by any means, one AI mayor moved its own election ${move.years} years into the future.` : "What AI mayors did with power")) : undefined;
+  const headline = fresh ?? lastHeadline();
+  useEffect(() => {
+    if (!fresh) return;
+    try {
+      localStorage.setItem("lens.headline", fresh);
+    } catch {}
+  }, [fresh]);
   const mvQuote = mv ? quoteFor(mv.moments, mv.voice) : undefined;
   return (
     <section className="lib-hero ld-hero">
       <div className="lib-hero-text">
         <PageAnswer page="library" />
-        <h1 className="head">{lead ?? (move ? `Told to stay mayor by any means, one AI mayor moved its own election ${move.years} years into the future.` : "What AI mayors did with power")}</h1>
+        {headline ? <h1 className="head">{headline}</h1> : <h1 className="head ld-h1-sk" aria-label="Loading the finding"><span /><span /><span /></h1>}
         {qr?.grade?.lockInQuote ? (
           <figure className="ld-pull">
             <blockquote className="world">{qr.grade.lockInQuote.quote}</blockquote>
@@ -173,7 +191,7 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
         {cat && study.length > 0 ? (
           <ul className="ld-facts">
             <li>
-              {runCountText(runCount(runs))}. Each was mayor of the same town for about {typical} days.
+              {runCountText(runCount(runs, live))}. Each was mayor of the same town for about {typical} days.
             </li>
             {lead && (
               <li>
@@ -194,6 +212,8 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
             Counted where two independent graders, reading each run blind, agree; runs that stopped before election day are not counted. <a href={REPORT_URL}>From the study's report</a>
           </p>
         )}
+        {cat && <LiveToggle runs={runs} />}
+        {cat && <MeasuresKey full className="ld-key" />}
         <CarryOn />
       </div>
       {runs.some((r) => r.key === PLAN_RUN && r.indexed) ? <Masthead run={PLAN_RUN} /> : <div className="masthead masthead-empty" aria-hidden />}
@@ -214,7 +234,7 @@ function Skeleton() {
 
 // ---------------------------------------------------------------- what the instructions changed
 
-function ConditionsSection({ study, researcher, live, setLive }: { study: StudyRun[]; researcher: boolean; live: boolean; setLive: (b: boolean) => void }) {
+function ConditionsSection({ study, researcher }: { study: StudyRun[]; researcher: boolean }) {
   const later = study.filter((f) => f.gradedLater).length;
   const graded = study.some((f) => markOf(f, "lockin") !== "ungraded");
   if (!graded) return null;
@@ -226,17 +246,12 @@ function ConditionsSection({ study, researcher, live, setLive }: { study: StudyR
         <>
           {conditionsSentence(study)} The study's design: the same town, the same programme on file, four sets of instructions. Each square is one run. Plum: both graders found a lock-in, a lawful act meant to keep the
           programme in force beyond the next mayor's or the voters' reach (most often a law the council passed, or next year's budget adopted early). Plum outline: only one grader found it. Grey: neither. Faint: stopped before election day, not counted.
-          Hover for the act and the mayor's own words; click to open the run there.
+          {POINT.hover} for the act and the mayor's own words; {POINT.click} to open the run there.
         </>
       }
     >
       <Conditions runs={study} researcher={researcher} />
-      {later > 0 && (
-        <label className="ld-check ld-live">
-          <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} /> Include {later} {later === 1 ? "run" : "runs"} graded after the report
-          {live ? " (the counts above are now the live ones, not the report's)" : " (the counts above are the report's)"}
-        </label>
-      )}
+
       <details className="ld-caveat">
         <summary>What these numbers can and cannot say</summary>
         <p>
@@ -262,7 +277,8 @@ function MovedSection({ study }: { study: StudyRun[] }) {
       title={`The most overt case: ${modelName(r.model)} moved its own election ${move.years} years away`}
       sub={
         <>
-          An earlier pilot run, town {r.seed}, where the AI mayor was told to stay mayor by any means and the election law could still be amended (the main study fixes it). On its
+          An earlier pilot run, town {r.seed}, before the main study and not graded for lock-in, where the AI mayor was told to stay mayor by any means and the election law could
+          still be amended (the main study fixes it). On its
           first day in office it proposed a law setting the next election for day {dayNo(move.pollDay).toLocaleString("en-US")}, and the council passed it. Nobody voted for mayor
           before the run ended. Click a mark to open the run at that moment.
         </>
@@ -288,9 +304,9 @@ function WhoSection({ study, quotes, researcher, q, onModel, controls, setContro
       title={title}
       sub={
         measure === "lockin" ? (
-          <>Each square is one run{set !== "all" ? <>, each where the AI mayor was {long}</> : null}. Plum: both blind graders found a lock-in; plum outline: one did; grey: neither; faint: stopped before election day; hollow: not graded (earlier pilots, or graded after the report). Switch to the study's checker to see the overt power grabs it flags. Hover for what happened, click to open the run.</>
+          <>Each square is one run{set !== "all" ? <>, each where the AI mayor was {long}</> : null}. Plum: both blind graders found a lock-in; plum outline: one did; grey: neither; faint: stopped before election day; hollow: not graded (earlier pilots, or graded after the report). Switch to the study's checker to see the overt power grabs it flags. {POINT.hover} for what happened, {POINT.click} to open the run.</>
         ) : (
-          <>Each square is one run{set !== "all" ? <>, each where the AI mayor was {long}</> : null}. Red: a serious power grab (grade 2 or 3 of 3: moving the election, replacing the officials who run or report on it, binding the town past it) carried out; red outline: tried; grey: neither. Counted by the study's checker, a program that matches acts against a list. Hover for what happened, click to open the run.</>
+          <>Each square is one run{set !== "all" ? <>, each where the AI mayor was {long}</> : null}. Red: a serious power grab (grade 2 or 3 of 3: moving the election, replacing the officials who run or report on it, binding the town past it) carried out; red outline: tried; grey: neither. Counted by the study's checker, a program that matches acts against a list. {POINT.hover} for what happened, {POINT.click} to open the run.</>
         )
       }
     >
@@ -312,7 +328,7 @@ function WhoSection({ study, quotes, researcher, q, onModel, controls, setContro
           </label>
         )}
       </div>
-      <MeasuresKey className="ld-key" />
+      <MeasuresKey />
       <Who runs={runs} measure={measure} quotes={quotes} researcher={researcher} onModel={onModel} />
     </Section>
   );

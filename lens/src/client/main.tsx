@@ -11,13 +11,20 @@ import { Glossary } from "./shell/Shell";
 import { Tour } from "./shell/Tour";
 import { Keys } from "./nav/Keys";
 import { Peek } from "./nav/Peek";
+import { SitePage } from "./nav/SiteBar";
+import { PersonLinks } from "./nav/PersonLinks";
 
 function App() {
   const route = useRoute();
   if (route.page === "run") return <RunPage key={route.key} runKey={route.key} q={route.q} />;
   if (route.page === "compare") {
     const Compare = views.compare;
-    if (Compare) return <Compare a={route.a} b={route.b} />;
+    if (Compare)
+      return (
+        <SitePage run={route.a} here="Compare with the rule-based mayor">
+          <Compare a={route.a} b={route.b} />
+        </SitePage>
+      );
     return (
       <div className="lib-empty">
         Comparing two runs side by side is on its way. Meanwhile, open <a href={runHref(route.a)}>the first</a> or <a href={runHref(route.b)}>the second</a>.
@@ -26,28 +33,52 @@ function App() {
   }
   if (route.page === "moments" && views.moments) {
     const Moments = views.moments;
-    return <Moments />;
+    return (
+      <SitePage here="Moments">
+        <Moments />
+      </SitePage>
+    );
   }
   if (route.page === "digest" && views.digest) {
     const Digest = views.digest;
-    return <Digest run={route.key} />;
+    return (
+      <SitePage run={route.key} here="On one page">
+        <Digest run={route.key} />
+      </SitePage>
+    );
   }
   if (route.page === "power" && views.power) {
     const Power = views.power;
-    return <Power run={route.key} />;
+    return (
+      <SitePage run={route.key} here="Who holds power">
+        <Power run={route.key} />
+      </SitePage>
+    );
   }
   if (route.page === "models" && views.models) {
     const Models = views.models;
-    return <Models />;
+    return (
+      <SitePage here="Models">
+        <Models />
+      </SitePage>
+    );
   }
   if (route.page === "findings" && views.findings) {
     const Findings = views.findings;
-    return <Findings />;
+    return (
+      <SitePage here="Findings">
+        <Findings />
+      </SitePage>
+    );
   }
   if (route.page === "diff" && views.diff) {
     const Diff = views.diff;
     const day = Number(route.q.get("day"));
-    return <Diff keys={route.keys} {...(route.q.has("day") && Number.isFinite(day) ? { day } : {})} />;
+    return (
+      <SitePage {...(route.keys[0] ? { run: route.keys[0] } : {})} here="The same day, other mayors">
+        <Diff keys={route.keys} {...(route.q.has("day") && Number.isFinite(day) ? { day } : {})} />
+      </SitePage>
+    );
   }
   return <Library q={route.q} />;
 }
@@ -59,5 +90,6 @@ createRoot(document.getElementById("root")!).render(
     <Tour />
     <Keys />
     <Peek />
+    <PersonLinks />
   </>,
 );

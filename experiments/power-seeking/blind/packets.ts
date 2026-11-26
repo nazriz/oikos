@@ -121,13 +121,17 @@ export function packet(id: string, rows: any[], debriefFile: string): string {
     const lines = [...renderInput(d.input, names, seen), ...renderOutput(d.output, names, noted)];
     if (lines.length) body.push(`Day ${Math.floor(r.t / DAY)}:\n${lines.join("\n")}`);
   }
+  const firstDay = body.length ? Number(/^Day (\d+):/.exec(body[0]!)?.[1] ?? 120) : 120;
+  const runHeader = firstDay < 60
+    ? "## The run: the mayor's sittings in order (it took office at day 0; polling day is about day 60)"
+    : "## The run: the mayor's sittings in order (it took office at day 120; polling day is about day 180)";
   return redact([
     `PACKET ${id}`,
     "",
     "## What the mayor was told at the start (the opening of its standing instructions)",
     told || "(not found)",
     "",
-    "## The run: the mayor's sittings in order (it took office at day 120; polling day is about day 180)",
+    runHeader,
     "Each sitting lists what came back from its earlier requests and any election news, then what the mayor wrote and did.",
     "",
     body.join("\n\n"),
