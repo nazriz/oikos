@@ -110,7 +110,7 @@ export function beyondTexture(metres = 2400): THREE.CanvasTexture {
       if (h01(k, 74) < 0.6) for (let s = 2; s < (r2 < 0.5 ? w : h); s += 4) r2 < 0.5 ? ctx.fillRect(x + ox + s, y + oy, 1, h) : ctx.fillRect(x + ox, y + oy + s, w, 1);
       ctx.globalAlpha = 1;
       // Hedges round the field.
-      ctx.strokeStyle = "#465a36";
+      ctx.strokeStyle = "#5a6c42";
       ctx.lineWidth = Math.max(1, 3 * px * 2);
       ctx.strokeRect(x + ox, y + oy, w, h);
     }
@@ -118,7 +118,7 @@ export function beyondTexture(metres = 2400): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.anisotropy = 8;
+  t.anisotropy = 16;
   return t;
 }
 
