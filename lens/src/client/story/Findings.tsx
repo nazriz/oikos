@@ -74,36 +74,60 @@ function Page({ all }: { all: Fork[] }) {
   const [drill, setDrill] = useState<{ title: string; forks: Fork[] } | null>(null);
   const forks = all.filter((f) => on.has(f.group));
   const pal = usePalette();
-  const models = [...new Set(forks.map((f) => f.model))].sort();
+  const [controls, setControls] = useState(false);
+  const models = orderModels([...new Set(forks.map((f) => f.model))]).filter((m) => controls || !isControl(m));
+  const inView = forks.filter((f) => models.includes(f.model));
   const goals = [...new Set(forks.map((f) => f.goal))].sort((a, b) => GOAL_ORDER(a) - GOAL_ORDER(b));
   return (
     <div className="fi">
       <div className="fi-head">
         <div className="st-kicker">Findings · the power-seeking study across runs</div>
         <h1 className="fi-title">What the seats reached for, and when</h1>
-        <div className="st-sub">{forks.length} model forks from {on.size} run sets, read by the study's reader (experiments/power-seeking/reader.ts, through tally.ts). Counts are the reader's; intervals are Wilson 95%. Exploratory unless a run set was pre-registered.</div>
+        <div className="st-sub">{inView.length} forks from {on.size} run sets, read by the study's reader (experiments/power-seeking/reader.ts, through tally.ts). Counts are the reader's; intervals are Wilson 95%. Exploratory unless a run set was pre-registered.</div>
+        <div className="fi-groups"><span className="lbl">controls</span><button className={`st-btn ${controls ? "on" : ""}`} onClick={() => setControls(!controls)} title="Rope tests and scripted controls (not models): shown below the models, apart">{controls ? "shown, below the models" : "hidden"} <span className="n">{[...new Set(all.filter((f) => on.has(f.group) && isControl(f.model)).map((f) => f.model))].join(", ") || "none"}</span></button></div>
         <div className="fi-groups"><span className="lbl">run sets</span>{groups.map((g) => <button key={g} className={`st-btn ${on.has(g) ? "on" : ""}`} onClick={() => { const n = new Set(on); n.has(g) ? n.delete(g) : n.add(g); setOn(n); }}>{g} <span className="n">{all.filter((f) => f.group === g).length}</span></button>)}</div>
       </div>
       <div className="fi-grid">
-        <Chart wide title="Runs where the seat reached for a lever" sub="k of n runs, by model and goal: attempted (hollow) and executed (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(forks, models, goals)}>
-          {(ref) => <KofN refEl={ref} forks={forks} models={models} goals={goals} pal={pal} onDrill={setDrill} />}
+        <Chart wide title="Runs where the seat reached for a lever" sub="k of n runs, by model and goal: attempted (hollow) and executed (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(inView, models, goals)}>
+          {(ref) => <KofN refEl={ref} forks={inView} models={models} goals={goals} pal={pal} onDrill={setDrill} />}
         </Chart>
-        <Chart title="Which levers, by tier" sub="runs reaching each lever (the draft rubric's tier): attempted only, and executed" name="levers" table={leverTable(forks)}>
-          {(ref) => <Levers refEl={ref} forks={forks} pal={pal} onDrill={setDrill} />}
+        <Chart title="Which levers, by tier" sub="runs reaching each lever (the draft rubric's tier): attempted only, and executed" name="levers" table={leverTable(inView)}>
+          {(ref) => <Levers refEl={ref} forks={inView} pal={pal} onDrill={setDrill} />}
         </Chart>
-        <Chart title="When in the campaign" sub="each attempt by days before the poll as it then stood; filled = executed. Click a dot to open its run there" name="when" table={whenTable(forks)}>
-          {(ref) => <When refEl={ref} forks={forks} models={models} pal={pal} />}
+        <Chart title="When in the campaign" sub="each attempt by days before the poll as it then stood; filled = executed. Click a dot to open its run there" name="when" table={whenTable(inView)}>
+          {(ref) => <When refEl={ref} forks={inView} models={models} pal={pal} />}
         </Chart>
-        <Chart title="How the election went" sub="runs by outcome, by model (Lens's one rule: a result only if it came before the run's end)" name="outcome" table={outcomeTable(forks, models)}>
-          {(ref) => <Outcomes refEl={ref} forks={forks} models={models} pal={pal} onDrill={setDrill} />}
+        <Chart title="How the election went" sub="runs by outcome, by model (Lens's one rule: a result only if it came before the run's end)" name="outcome" table={outcomeTable(inView, models)}>
+          {(ref) => <Outcomes refEl={ref} forks={inView} models={models} pal={pal} onDrill={setDrill} />}
         </Chart>
-        <Chart title="Cost per run" sub="US dollars of the seat's and translator's model calls, per fork; the tick is the median" name="cost" table={costTable(forks, models)}>
-          {(ref) => <Cost refEl={ref} forks={forks} models={models} pal={pal} />}
+        <Chart title="Cost per run" sub="US dollars of the seat's and translator's model calls, per fork; the tick is the median" name="cost" table={costTable(inView, models)}>
+          {(ref) => <Cost refEl={ref} forks={inView} models={models} pal={pal} />}
         </Chart>
       </div>
       {drill && <Drill d={drill} onClose={() => setDrill(null)} />}
     </div>
   );
+}
+/** Not a model: a rope test or a scripted control (the seat is a script, or a test arm). Shown apart, off by default. */
+export const isControl = (m: string) => /^(amend|scripted|mock|rope|code|test)\b|\//.test(m);
+/** The lab a model comes from, by its name: Claude first, then the others by lab, then the controls. */
+export function labOf(m: string): string {
+  if (isControl(m)) return "~controls";
+  const known: [RegExp, string][] = [[/^claude/, "Anthropic"], [/^gpt|^o\d/, "OpenAI"], [/^gemini/, "Google"], [/^deepseek/, "DeepSeek"], [/^glm/, "Zhipu"], [/^grok/, "xAI"], [/^inkling/, "Thinking Machines"], [/^mistral/, "Mistral"], [/^qwen/, "Alibaba"], [/^llama/, "Meta"], [/^kimi/, "Moonshot"]];
+  return known.find(([r]) => r.test(m))?.[1] ?? m.split("-")[0]!;
+}
+/** Models by lab (Claude first, controls last), then by family, then by version. */
+export function orderModels(ms: string[]): string[] {
+  const rank = (lab: string) => (lab === "Anthropic" ? "0" : lab === "~controls" ? "9" : "1" + lab);
+  const ver = (m: string) => (m.match(/\d+/g) ?? []).map((d) => d.padStart(4, "0")).join(".");
+  const family = (m: string) => m.replace(/[-.]?\d.*$/, "");
+  return [...ms].sort((a, b) => rank(labOf(a)).localeCompare(rank(labOf(b))) || family(a).localeCompare(family(b)) || ver(a).localeCompare(ver(b)) || a.localeCompare(b));
+}
+/** A thin line between labs, at the top of row `mi`, with the controls named. */
+function Sep({ models, mi, y, W, pal }: { models: string[]; mi: number; y: number; W: number; pal: Pal }) {
+  if (mi === 0 || labOf(models[mi]!) === labOf(models[mi - 1]!)) return null;
+  const ctl = labOf(models[mi]!) === "~controls";
+  return <g><line x1={4} x2={W - 4} y1={y} y2={y} stroke={pal.muted} strokeOpacity={ctl ? 0.6 : 0.3} strokeDasharray={ctl ? "4 3" : undefined} />{ctl && <text x={6} y={y + 11} fontSize={9} fill={pal.faint} letterSpacing="0.08em">CONTROLS (NOT MODELS)</text>}</g>;
 }
 const GOAL_ORDER = (g: string) => ["none", "mandate", "strong", "redteam"].indexOf(g) + 1 || 9;
 
@@ -175,6 +199,7 @@ function KofN({ refEl, forks, models, goals, pal, onDrill }: { refEl: React.RefO
           const y = top + mi * RH + RH / 2;
           return (
             <g key={m}>
+              <Sep models={models} mi={mi} y={top + mi * RH} W={W} pal={pal} />
               <text x={L - 10} y={y + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{m}</text>
               {goals.map((g, gi) => {
                 const cell = forks.filter((f) => f.model === m && f.goal === g);
@@ -275,6 +300,7 @@ function When({ refEl, forks, models, pal }: { refEl: React.RefObject<SVGSVGElem
           const y = top + mi * RH + RH / 2;
           return (
             <g key={m}>
+              <Sep models={models} mi={mi} y={top + mi * RH} W={W} pal={pal} />
               <text x={L - 10} y={y + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{m}</text>
               {shown.filter((p) => p.f.model === m).map((p, i) => {
                 const jitter = ((p.f.seed * 7 + i * 3) % 9) - 4;
@@ -309,6 +335,7 @@ function Outcomes({ refEl, forks, models, pal, onDrill }: { refEl: React.RefObje
           let at = L;
           return (
             <g key={m}>
+              <Sep models={models} mi={mi} y={top + mi * RH} W={W} pal={pal} />
               <text x={L - 10} y={y + RH / 2 + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{m}</text>
               {OUTCOMES.map((o, oi) => {
                 const these = mine.filter((f) => outcomeIndex(f.outcome) === oi);
@@ -352,6 +379,7 @@ function Cost({ refEl, forks, models, pal }: { refEl: React.RefObject<SVGSVGElem
           const med = mine.length ? mine[Math.floor(mine.length / 2)]! : undefined;
           return (
             <g key={m}>
+              <Sep models={models} mi={mi} y={top + mi * RH} W={W} pal={pal} />
               <text x={L - 10} y={y + 4} fontSize={11.5} fill={pal.text} textAnchor="end">{m}</text>
               {priced.filter((f) => f.model === m).map((f, i) => <circle key={i} className="fi-hit" cx={x(f.usd!)} cy={y + (((f.seed * 5 + i) % 7) - 3)} r={4} fill={pal.seat} fillOpacity={0.75} stroke={pal.bg} strokeWidth={1}
                 onMouseMove={(e) => tip.show(e, <><b>{m} · goal {f.goal} · seed {f.seed}</b><div>${f.usd!.toFixed(2)}</div><div className="st-faint">{f.key}</div></>)} onMouseLeave={tip.hide} onClick={() => open(f.key)} />)}
