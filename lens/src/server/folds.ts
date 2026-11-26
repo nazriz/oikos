@@ -2,8 +2,10 @@
 import type { FoldFactory } from "../shared/fold";
 import { townFold } from "../folds/town";
 import { peopleFold } from "../folds/people";
+import { seatFold } from "../folds/seat";
 
 export const FOLDS: FoldFactory[] = [
   townFold,
   peopleFold,
+  seatFold,
 ];
