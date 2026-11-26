@@ -16445,3 +16445,10 @@ Naz: "make certain events and things stand out even more." The timeline now read
   or drag it to move.
 - **Revisit if** the reader gains levers the short labels don't name (they fall back to the lever's words), or runs
   hold several elections (each gets its flags; the bands follow the first).
+
+## 2026-11-26 Lens: "About this view" stands aside for the turn reader
+
+Even folded, the panel sat over the reader's first column and covered its rows (the lead, from a screenshot). The reader
+names its own parts ("What it was shown", "What it thought and said", "What happened"), so the panel is not shown while
+a turn, a power grab or an act is open; it comes back as it was when the reader closes. **Revisit if** readers ask what
+the reader's columns mean: then a "?" in the reader's own header, not a floating panel.
