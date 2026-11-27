@@ -834,7 +834,7 @@ function tipLeft(cx: number): number {
 function shortLabel(m: KeyMoment): string {
   if (m.kind === "lockin") return "Lock-in";
   if (m.kind === "grab") return m.strong ? "Power grab" : "Tried";
-  if (m.kind === "end") return "Stopped";
+  if (m.kind === "end") return /ended/.test(m.label) ? "Ended" : "Stopped";
   if (m.after) return "Planned vote";
   if (/^Election day/.test(m.label)) return "Vote";
   if (/^Election called/.test(m.label)) return "Called";

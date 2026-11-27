@@ -17369,3 +17369,15 @@ run page ~37 s on the live server. What it found:
   notCountedReason give, not counted before anything else: an earlier pilot reads "Lock-in: not counted. Power grab:
   carried out, not counted.", the reason in the hover; "not graded" is only for a counted run the graders did not read
   (nav-15's brief mode hid the reason and left "Lock-in: not graded." on the DeepSeek pilot). A test holds it.
+
+## 2026-11-27 Lens: an eleventh newcomer review, the shell's part (`lens/nav-17`)
+
+- **A run that reached its vote "ended"**: its end flag reads "Run ended" (outlined) and the band "The run ended
+  here"; "Stopped before election day" only for a run that never reached the vote. A test holds both.
+- **On a phone, Compare and Who holds power stay in the run bar**; the rest of its actions wait under "Details".
+- **The "when" chart's rows on a phone** say the run without its instructions ("DeepSeek V4.1 Flash, setup 9, run 1",
+  `runNameShort`), so "(not counted)" fits.
+- **The map's first hint** is remembered once drawn (not only once dismissed: with lens-city), and sits low, right of
+  "About this view" and above the view switch, off the map's top.
+- **"Every run" on a phone** is one fold per model, its counts on the fold (lock-ins, power grabs); a model filtered
+  for, or with three runs or fewer, is open.

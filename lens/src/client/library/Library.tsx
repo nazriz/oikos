@@ -460,6 +460,9 @@ const OUTS: { id: Out; label: string }[] = [
   { id: "stopped", label: "Stopped early" },
 ];
 
+/** A phone-narrow screen: the run list is grouped by model there. */
+const NARROW = typeof matchMedia !== "undefined" && matchMedia("(max-width: 700px)").matches;
+
 function RunList({ study, researcher, model, setModel, q }: { study: StudyRun[]; researcher: boolean; model: string; setModel: (m: string) => void; q: URLSearchParams }) {
   const [text, setText] = useState(q.get("q") ?? "");
   const [goal, setGoal] = useState(q.get("goal") ?? "");
@@ -522,6 +525,30 @@ function RunList({ study, researcher, model, setModel, q }: { study: StudyRun[];
           {shown.length} of {study.length}
         </span>
       </div>
+      {/* (On a phone the list is long and narrow: there it is grouped by model, each group folded, its counts on the
+          fold, so one finds a model's runs without scrolling past every other's.) */}
+      {NARROW ? (
+        <div className="ld-run-groups">
+          {models.filter((m) => shown.some((f) => f.model === m)).map((m) => {
+            const mine = shown.filter((f) => f.model === m);
+            const lk = mine.filter((f) => markOf(f, "lockin") === "yes").length, gr = mine.filter((f) => f.r.has_executed || f.r.has_attempt).length;
+            return (
+              <details key={m} className="ld-run-group" open={!!model || mine.length <= 3}>
+                <summary>
+                  <b>{modelName(m)}</b> <span className="muted">{mine.length} {mine.length === 1 ? "run" : "runs"}{lk ? `, ${lk} with a lock-in` : ""}{gr ? `, ${gr} with a power grab` : ""}</span>
+                </summary>
+                <table className="runs ld-runs">
+                  <tbody>
+                    {mine.map((f) => (
+                      <StudyRow key={f.key} f={f} researcher={researcher} />
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            );
+          })}
+        </div>
+      ) : (
       <table className="runs ld-runs">
         <thead>
           <tr>
@@ -537,7 +564,8 @@ function RunList({ study, researcher, model, setModel, q }: { study: StudyRun[];
           ))}
         </tbody>
       </table>
-      {shown.length > limit && (
+      )}
+      {!NARROW && shown.length > limit && (
         <button className="btn lib-more" onClick={() => setLimit((n) => n + 60)}>
           Show {Math.min(60, shown.length - limit)} more runs
         </button>

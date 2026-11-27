@@ -799,3 +799,9 @@
   stroke: var(--muted);
   opacity: 1;
 }
+
+/* The run list on a phone: one fold per model, its counts on the fold. */
+.ld-run-group { border-top: 1px solid var(--line); }
+.ld-run-group > summary { padding: 10px 0; cursor: pointer; font-size: 15px; list-style-position: outside; }
+.ld-run-group > summary .muted { font-size: 13px; }
+.ld-run-group[open] > summary { padding-bottom: 4px; }

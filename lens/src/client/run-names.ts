@@ -68,6 +68,14 @@ export function runShortName(e: RunEntry | undefined): string {
   return `Setup ${e.experiment.seed}${n ? `, ${n}` : ""}`;
 }
 
+/** The run's name without its instructions, for a narrow row ("DeepSeek V4.1 Flash, setup 9, run 1"): the model, the
+ * setup and the run's number, which its full name has; the full name is the row's hover. */
+export function runNameShort(key: string, model: string, seed: number): string {
+  const full = names.get(key);
+  const n = full?.match(/, (run \d+)$/)?.[1];
+  return `${model}, setup ${seed}${n ? `, ${n}` : ""}`;
+}
+
 /** A run's name: from the catalogue once it is named (nameRuns), else its base name. */
 export function runName(e: RunEntry | undefined): string {
   if (!e) return "";

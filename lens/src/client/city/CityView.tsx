@@ -1044,6 +1044,9 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   // interaction anywhere or after 10 s, handing the turn back (prompt = null).
   const promptTurn = useLens((s) => (s as any).prompt as string | null | undefined);
   const [hint, setHint] = useState(false);
+  // (Seen once is enough: remembered once it is drawn, not only when dismissed, so leaving the page does not bring it
+  // back on the next run; a page left before it was drawn does not use it up.)
+  useEffect(() => { if (hint) { try { localStorage.setItem("lens.city.hinted", "1"); } catch { /* private mode */ } } }, [hint]);
   const dropHint = () => {
     setHint(false);
     try { localStorage.setItem("lens.city.hinted", "1"); } catch { /* private mode */ }

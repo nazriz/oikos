@@ -612,8 +612,10 @@
     vertical-align: 3px;
     cursor: pointer;
   }
+  /* (Folded, the actions keep Compare and Who holds power, the two pages a reader goes to from a run; the rest wait
+     under "Details".) */
   .run-bar:not(.details) .run-sub,
-  .run-bar:not(.details) .run-actions {
+  .run-bar:not(.details) .run-actions > :not(.run-compare):not(.run-power) {
     display: none;
   }
   .run-bar-top {
