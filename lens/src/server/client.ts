@@ -19,6 +19,9 @@ async function build(dev: boolean): Promise<Map<string, Asset>> {
     entrypoints: [CLIENT],
     minify: !dev,
     target: "browser",
+    // (React's production build: without this the bundle took React's development build, which checks and warns on
+    // every render and runs slower; Bun's HTML import had set it.)
+    define: { "process.env.NODE_ENV": JSON.stringify(dev ? "development" : "production") },
     // (The fonts stay files, served below: inlined, they were 0.8 MB of base64 in the CSS.)
     external: ["/fonts/*"],
     naming: { entry: "[name]-[hash].[ext]", chunk: "[name]-[hash].[ext]", asset: "[name]-[hash].[ext]" },

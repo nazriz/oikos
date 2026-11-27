@@ -17188,3 +17188,26 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
   (`st-sub-lead`, `st-sub-more`); lens-viz split the landing's the same way (`ld-sub-lead`, `ld-sub-more`).
 - **Revisit if** a reader needs to tell two residents apart in a Story sentence (then a name or a hover is needed), or
   ages should be the age on the sentence's day.
+
+## 2026-11-27 Lens: React's production build; reviews draw on the CPU
+
+The eighth fresh-eyes review measured a showcase run's map at 6.7-12 s, the 3D town ~24 s, Compare ~14 s, and a phone
+run page ~37 s on the live server. What it found:
+- **The reviews draw on the CPU.** Their Chrome runs WebGL in SwiftShader (`--use-angle=swiftshader`), on a machine at
+  load 12-27. A showcase run's bundles were all current (served in 1-8 ms). Its map was drawn in 0.36 s in Chrome with
+  the GPU, and in 4.8-25.7 s with SwiftShader, the same page a minute apart. That spread is the machine's load. The CPU
+  profile is 7.9 s of native work (compiling shaders and filling pixels on the CPU), with almost no JavaScript. On a
+  device with a GPU (Naz's Mac and iPhone), timings like these mean little. Reviews of speed should use the GPU, or say
+  that they don't.
+- **React was running its development build.** Since the server builds the client itself (Lens: smooth, client.ts), the
+  bundle took React's development build (2,663 `jsxDEV` calls, the DevTools notice): Bun.build was not told the
+  NODE_ENV. Now `process.env.NODE_ENV` is "production" (unless --dev). The bundle is 2.62 MB against 2.91 MB, and a
+  showcase map is drawn in 0.31-0.33 s against 0.36-0.37 s with the GPU.
+- **Made ahead first: every flagged run and its code twin**, which Compare and the twin lines open beside it. Before,
+  only the flagged run went first.
+- **Lens's own work waits for a quiet moment at most a minute.** After the town fold's new version (nav-9), 449 bundles
+  were stale, and one was made in ten minutes. Viewers are seldom absent for 3 s while reviews and several people use
+  the server. A bundle made ahead now starts at most a minute after the last one, quiet or not. It runs at nice 19 in
+  its own process; a stale bundle is served meanwhile.
+- **Revisit if** Lens must serve devices without a GPU: then draw fewer layers, and fewer pixels, when the renderer is
+  SwiftShader.
