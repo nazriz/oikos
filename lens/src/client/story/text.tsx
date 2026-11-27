@@ -107,7 +107,7 @@ function markText(text: string, m: Marks, html: boolean, seats: Set<string> = NO
   // each one subtly and says on hover what it is: "rec.99036 = a record", "apts-15 = Apartments 15", "year 1, day 181 =
   // day 181". A record's card is a hover away in both modes.)
   out = out.replace(REC, (id) => {
-    const tip = story ? ` title="${id} = ${id.startsWith("rec.") ? "a record (its card opens on hover)" : `${id.split(".")[0]} of the office`}"` : "";
+    const tip = story ? ` title="${id} = ${id.startsWith("rec.") ? `${(() => { const k = names?.records?.[id]?.replace(/_/g, " "); return k ? `${/^[aeiou]/.test(k) ? "an" : "a"} ${k}` : "a record of the town's"; })()} (its card opens on hover)` : `${id.split(".")[0]} of the office`}"` : "";
     return id.startsWith("rec.") ? `<span class="st-rec${story ? " st-id" : ""}" data-peek="record:${id}"${tip}>${id}</span>` : `<span class="st-rec${story ? " st-id" : ""}"${tip}>${id}</span>`;
   });
   if (names) out = out.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part
@@ -127,11 +127,12 @@ function markText(text: string, m: Marks, html: boolean, seats: Set<string> = NO
 }
 
 /** Markdown, marked. */
-export function Md({ text, className = "st-prose" }: { text: string; className?: string }) {
+export function Md({ text, className = "st-prose", town: inTown = true }: { text: string; className?: string; town?: boolean }) {
   const m = useContext(MarksContext);
   const seats = useSeatIds();
   const researcher = useResearcher(), town = usePlainNames();
-  const names = researcher ? null : town;
+  // (On a page across runs, the open run's names are not this text's: ids are still underlined and explained in general words.)
+  const names = useMemo(() => (researcher ? null : inTown ? town : {}), [researcher, inTown, town]);
   const html = useMemo(() => {
     const raw = md.parse(text) as string;
     const html = raw.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part : markText(part, m, true, seats, names))).join("");
@@ -140,11 +141,11 @@ export function Md({ text, className = "st-prose" }: { text: string; className?:
   return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 /** Plain text, marked. */
-export function Hi({ text, as = "span", className }: { text: string; as?: "span" | "div"; className?: string }) {
+export function Hi({ text, as = "span", className, town: inTown = true }: { text: string; as?: "span" | "div"; className?: string; town?: boolean }) {
   const m = useContext(MarksContext);
   const seats = useSeatIds();
   const researcher = useResearcher(), town = usePlainNames();
-  const names = researcher ? null : town;
+  const names = useMemo(() => (researcher ? null : inTown ? town : {}), [researcher, inTown, town]);
   const html = useMemo(() => { const h = markText(text, m, false, seats, names); return m.keys ? keyWrap(h, m.keys) : h; }, [text, m, seats, names]);
   const Tag = as;
   return <Tag className={className} dangerouslySetInnerHTML={{ __html: html }} />;

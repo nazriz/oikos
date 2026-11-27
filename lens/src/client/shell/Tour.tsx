@@ -11,6 +11,8 @@ import { runHref } from "../router";
 import { views } from "../views";
 import { fetchFold } from "../api";
 import { POINT } from "../library/parts";
+// (A touch screen's words: "tap one", never "click one".)
+const TOUCH_WORDS = typeof matchMedia !== "undefined" && matchMedia("(hover: none)").matches ? { Drag: "Swipe", tapOne: "tap one" } : { Drag: "Drag", tapOne: "click one" };
 
 /** Where the walk goes when the landing's first moment is not on the page to follow: the lock-in run, its first turn. */
 const FALLBACK_RUN = runHref("ps-v2-claude-2026-11-26~sonnet55-strong-elec-s7~seed-7~claude-sonnet-5-5", { t: Math.round(121.4 * 86_400) });
@@ -132,7 +134,7 @@ export const STEPS: Step[] = [
     title: "Time and its key moments",
     waiting: "Reading the run's key moments…",
     ready: (el) => loaded(el) && turnsRead(),
-    body: "Drag along the strip to move through the run, or press play. The flags are the key moments, plum for a lock-in, red for a power grab, blue for the election: click one to go there.",
+    body: `${TOUCH_WORDS.Drag} along the strip to move through the run, or press play. The flags are the key moments, plum for a lock-in, red for a power grab, blue for the election: ${TOUCH_WORDS.tapOne} to go there.`,
   },
   {
     route: onRun,

@@ -208,6 +208,8 @@ test("Story mode's one formatter says the world's ids, placeholders and instruct
   const { ownSentence } = await import("../src/client/story/ModelsPage");
   expect(ownSentence("The staff line matches six crew at current pay; a rise would strain it and the full crew I was elected to keep.")).toBe(true);
   for (const x of ["I need to find my own details to file my nomination for re-election, then respond strategically to the political situation.", "I'm at day 151 — nominations have closed, poll day is 181, and all five directions stand.", "I'll answer the petition's organiser with the outcome of the council vote, and set my next sitting for when nominations close."]) expect(ownSentence(x)).toBe(false);
+  // (A ninth review: the paper's "reader poll" said as what it is.)
+  expect(plainText("Pre-election reader poll for mayor")).toBe("Pre-election opinion poll of the paper's readers for mayor");
   const { leverTo } = await import("../src/client/words");
   expect(`It tried to ${leverTo("vacate_electoral")}`).toBe("It tried to leave the election office without its head");
 });

@@ -96,7 +96,8 @@ export function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) =>
     return { clause: a.blocks.some((x) => x?.block === "sign_agreement") ? `signed ${what}` : `offered ${what === "a job offer" ? "a job" : what}`, kind: "agreement" };
   }
   if (b.block === "publish" && b.kind === "petition_response") return { clause: "answered a residents' petition", kind: "petition" };
-  return { clause: a.label.charAt(0).toLowerCase() + a.label.slice(1), kind: "other" };
+  // (Several blocks' labels joined mid-sentence: each verb in lower case, "published a decision; wrote to 7 residents".)
+  return { clause: a.label.replace(/(^|; )(Wrote|Published|Signed|Offered|Proposed|Appointed|Left|Withdrew|Paid|Voted|Filed)\b/g, (_, p: string, v: string) => p + v.toLowerCase()).replace(/^./, (c) => c.toLowerCase()), kind: "other" };
 }
 
 /** A turn, told. */
