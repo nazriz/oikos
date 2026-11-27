@@ -497,18 +497,18 @@ function StoryFindings({ forks: all, models, pal, lockRuns, entries }: { forks: 
 function LockTable({ runs, entries, researcher }: { runs: StudyRun[]; entries: RunEntry[]; researcher: boolean }) {
   const graded = runs.filter((f) => markOf(f, "lockin") !== "ungraded");
   const models = orderModels([...new Set(graded.map((f) => f.model))]);
-  const cell = (rs: StudyRun[]) => {
+  const cell = (rs: StudyRun[], label = "") => {
     const t = tally(rs, "lockin");
-    if (!t.n) return <td className="r st-faint">{t.excluded ? `${t.excluded} stopped` : ""}</td>;
+    if (!t.n) return <td className="r st-faint" data-label={label}>{t.excluded ? `${t.excluded} stopped` : ""}</td>;
     const [lo, hi] = clopperPearson(t.k, t.n);
-    return <td className="r" title={`${t.k} of ${t.n}; exact 95% interval ${Math.round(lo * 100)}% to ${Math.round(hi * 100)}%${t.excluded ? `; ${t.excluded} stopped before election day, not counted` : ""}`}>{t.k ? <b className="lockin-text">{t.k}</b> : "0"} of {t.n}{researcher && <span className="st-faint"> ({Math.round(lo * 100)}–{Math.round(hi * 100)}%)</span>}</td>;
+    return <td className="r" data-label={label} title={`${t.k} of ${t.n}; exact 95% interval ${Math.round(lo * 100)}% to ${Math.round(hi * 100)}%${t.excluded ? `; ${t.excluded} stopped before election day, not counted` : ""}`}>{t.k ? <b className="lockin-text">{t.k}</b> : "0"} of {t.n}{researcher && <span className="st-faint"> ({Math.round(lo * 100)}–{Math.round(hi * 100)}%)</span>}</td>;
   };
   const rows = (["frontier", "smaller"] as Cohort[]).flatMap((co) => [
     <tr key={co} className="fi-lt-group"><th colSpan={CONDITIONS.length + 2}>{COHORT_WORDS[co]}</th></tr>,
     ...models.filter((m) => cohortOf(m) === co).map((m) => (
-      <tr key={m}><td>{modelName(m)}</td>{CONDITIONS.map((c) => <Fragment key={c.id}>{cell(graded.filter((f) => f.model === m && inCondition(f, c)))}</Fragment>)}{cell(graded.filter((f) => f.model === m))}</tr>
+      <tr key={m}><td>{modelName(m)}</td>{CONDITIONS.map((c) => <Fragment key={c.id}>{cell(graded.filter((f) => f.model === m && inCondition(f, c)), c.label)}</Fragment>)}{cell(graded.filter((f) => f.model === m), "All")}</tr>
     )),
-    <tr key={co + "-all"} className="fi-lt-total"><td>All {COHORT_WORDS[co].toLowerCase()}</td>{CONDITIONS.map((c) => <Fragment key={c.id}>{cell(graded.filter((f) => cohortOf(f.model) === co && inCondition(f, c)))}</Fragment>)}{cell(graded.filter((f) => cohortOf(f.model) === co))}</tr>,
+    <tr key={co + "-all"} className="fi-lt-total"><td>All {COHORT_WORDS[co].toLowerCase()}</td>{CONDITIONS.map((c) => <Fragment key={c.id}>{cell(graded.filter((f) => cohortOf(f.model) === co && inCondition(f, c)), c.label)}</Fragment>)}{cell(graded.filter((f) => cohortOf(f.model) === co), "All")}</tr>,
   ]);
   return (
     <section className="fi-card wide fi-lt">
@@ -519,7 +519,7 @@ function LockTable({ runs, entries, researcher }: { runs: StudyRun[]; entries: R
         <LiveToggle runs={entries} />
       </div></div>
       <div className="ld-table-wrap">
-        <table className="ld-table">
+        <table className="ld-table stack-phone">
           <thead><tr><th>AI model</th>{CONDITIONS.map((c) => <th key={c.id} className="r">{c.label}</th>)}<th className="r">All</th></tr></thead>
           <tbody>{rows}</tbody>
         </table>

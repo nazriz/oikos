@@ -17188,3 +17188,19 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
   (`st-sub-lead`, `st-sub-more`); lens-viz split the landing's the same way (`ld-sub-lead`, `ld-sub-more`).
 - **Revisit if** a reader needs to tell two residents apart in a Story sentence (then a name or a hover is needed), or
   ages should be the age on the sentence's day.
+
+## 2026-11-27 Lens: eighth review (a power-grab square bug; counted headlines)
+
+- **Bug:** in the landing's power-grab view, a run the study does not count but where both graders found a lock-in took
+  the lock-in's "was-yes" class, drawn in the carried-out red, and its hover was empty (the power-grab words had no entry
+  for "not counted"). A square's class and hover now come from one pure function per measure in landing-data
+  (`squareClass`, `squareText`): solid colour only for what the measure counts as found; an uncounted run is hatched,
+  red-hatched only if the checker found a power grab in it; every hover has words. A test holds both.
+- **Counted headlines:** the per-model heading and Moments' count give power grabs in the study's counted runs, with the
+  rest said apart ("plus N in runs not counted"). Moments' grader line says the checker found the act and the graders,
+  reading the whole run, also rated it. Models' lock-in and power-grab columns both count counted runs ("of N counted
+  and graded" / "of N counted").
+- The hero quotes Mistral's law, a run no showcase card shares. A card for an uncounted run gives only its reason, not
+  also its stop day. Long counts wrap. On a phone, Models' and Findings' tables stack row by row, each value labelled
+  ("Locked its programme in: 3 of 4 counted and graded"), so nothing is cut. Models' "In its own words" is Researcher
+  mode only: a first-person plan sentence is rare in what Lens keeps of a run.

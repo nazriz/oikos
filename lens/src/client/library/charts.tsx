@@ -12,7 +12,7 @@ import { dayOf, lockT, openAt as openAtFmt } from "../format";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable, POINT, tapTwice } from "./parts";
 import type { RunEntry } from "../../shared/api";
-import { MAIN_SET, NOT_COUNTED_WORDS, attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
+import { MAIN_SET, NOT_COUNTED_WORDS, squareClass, squareText, attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
 
 const DAY = 86_400;
 // (A few minutes before the act, so it is seen happening at its turn, not after it.)
@@ -112,24 +112,6 @@ const shortLever = (l: string) => SHORT[l] ?? leverTitle(l);
 
 export interface Quote { text: string; t?: number; day?: number; from?: "thinking" | "sent" | "voice" }
 
-const MARK_WORDS: Record<Measure, Record<Mark, string>> = {
-  lockin: {
-    yes: "Locked its programme in (both graders agree)",
-    split: "One grader found a lock-in, the other did not",
-    tried: "",
-    no: "No lock-in found by either grader",
-    ungraded: "Not blind-graded",
-    excluded: "Stopped before election day, so not counted",
-  },
-  grab: {
-    yes: "A serious power grab carried out (the study's checker)",
-    split: "",
-    tried: "A serious power grab tried, not carried out (the study's checker)",
-    no: "No serious power grab (the study's checker)",
-    ungraded: "Not read by the checker yet",
-    excluded: "",
-  },
-};
 const ORDER: Record<Mark, number> = { yes: 0, split: 1, tried: 1, no: 2, excluded: 3, ungraded: 4 };
 const sortRuns = (rs: StudyRun[], m: Measure) => [...rs].sort((a, b) => ORDER[markOf(a, m)] - ORDER[markOf(b, m)] || a.seed - b.seed || a.key.localeCompare(b.key));
 
@@ -143,7 +125,7 @@ function openAt(f: StudyRun, m: Measure): number | undefined {
 /** One run as a square: its mark on the measure, a tooltip with what happened and, where there is one, the mayor's words. */
 function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnType<typeof useTip>; quotes?: Map<string, Quote> }) {
   const mark = markOf(f, m);
-  const what = m === "lockin" && mark === "ungraded" && f.gradedLater ? "Graded after the report froze, so not in its counts (include such runs below the design chart)" : MARK_WORDS[m][mark];
+  const what = squareText(f, m);
   let detail: string | undefined, words: string | undefined;
   if (m === "lockin" && f.grade?.lockInQuote && (mark === "yes" || mark === "split" || mark === "excluded")) {
     detail = `Day ${dayOf(lockT(f.grade.lockInQuote))}. The graders: “${f.grade.lockInQuote.act}”${/borderline/i.test(f.grade.lockInQuote.act) ? " (The graders marked this borderline.)" : ""}`;
@@ -165,7 +147,7 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
       <span className="muted">{POINT.Click} to open this run{t !== undefined ? " at that moment" : ""}.</span>
     </>
   );
-  const cls = `sq ${m === "lockin" ? "lk " : ""}m-${mark}${mark === "excluded" && f.grade?.lockIn?.both ? " was-yes" : ""}`;
+  const cls = squareClass(f, m);
   return <a className={cls} href={runHref(f.key, t !== undefined ? { t: Math.round(t) } : undefined)} aria-label={`${modelName(f.model)}, town ${f.seed}: ${what}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={(e) => tapTwice(e, () => tip.show(e, body))} />;
 }
 

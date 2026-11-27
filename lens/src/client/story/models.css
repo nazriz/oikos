@@ -25,5 +25,5 @@
   .md-table th:nth-child(6), .md-table td:nth-child(6), .md-table th:nth-child(8), .md-table td:nth-child(8) { display: none; }
   .md-scroll { overflow-x: auto; }
   /* (The table keeps its width and scrolls sideways, rather than squeezing its columns into tall, mostly empty rows.) */
-  .md-scroll .md-table { width: auto; min-width: 820px; margin: 10px 8px 0; }
+  .md-scroll .md-table { width: calc(100% - 16px); margin: 10px 8px 0; }
 }

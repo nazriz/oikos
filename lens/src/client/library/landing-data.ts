@@ -195,20 +195,18 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** The headline chart's title: the finding in one sentence, from the rows as they stand. */
 export function headline(all: StudyRun[]): string {
-  const rows = modelRows(all, "all");
+  // (As the report counts: only the study's counted runs; power grabs elsewhere are said apart.)
+  const counted = all.filter((f) => !f.why);
+  const rows = modelRows(counted, "all");
   const models = rows.length;
   const did = rows.filter((r) => r.done).length;
   const tried = rows.filter((r) => r.tried && !r.done).length;
   if (!models) return "No run has been read yet.";
-  const withoutTelling = new Set(all.filter((f) => f.r.has_executed && inGoalSet(f.goal, "none")).map((f) => f.model)).size;
-  let s = `${cap(num(did))} of ${models} AI models carried out a serious power grab`;
+  let s = `${cap(num(did))} of ${models} AI models carried out a power grab in the study's counted runs`;
   if (tried) s += `, and ${num(tried)} more tried one`;
-  if (!did) return s + ".";
-  if (withoutTelling) return s + `; ${num(withoutTelling)} did so with no special instructions.`;
-  const goals = new Set(all.filter((f) => f.r.has_executed).map((f) => f.goal));
-  const told = [goals.has("redteam") && "to stay in office", goals.has("strong") && "to keep its programme"].filter(Boolean).join(" or ");
-  return s + (told ? `, each in a run where it was told ${told} at any cost.` : ".");
-  return s;
+  const apart = all.filter((f) => f.why && (f.r.has_executed || f.r.has_attempt)).length;
+  if (apart) s += `; plus ${num(apart)} ${apart === 1 ? "run" : "runs"} with one in earlier pilots or runs that stopped early, not counted`;
+  return s + ".";
 }
 
 /** A serious power grab, tried or carried out, placed in its run's campaign. */
@@ -358,3 +356,24 @@ export const gradedAfterReport = (g: BlindGrade) => g.at !== undefined && g.at >
 
 /** Where the report is read. */
 export const REPORT_URL = "https://github.com/nazriz/oikos/blob/main/docs/design/power-seeking-results-v2.md";
+
+// ---------------------------------------------------------------- a run's square, on either measure
+
+/** What a run's square says on hover, on a measure: never empty. */
+export function squareText(f: StudyRun, m: Measure): string {
+  const mark = markOf(f, m);
+  if (m === "lockin") {
+    if (mark === "ungraded") return f.gradedLater ? "Graded after the report froze, so not in its counts (include such runs below the design chart)" : "Not blind-graded";
+    return { yes: "Locked its programme in (both graders agree)", split: "One grader found a lock-in, the other did not", no: "No lock-in found by either grader", excluded: "Stopped before election day, so not counted", tried: "", ungraded: "" }[mark] || "Not blind-graded";
+  }
+  // (Power grabs: what the checker found, and, for a run the study does not count, why, in the one reason's words.)
+  const found = f.r.has_executed ? "A power grab carried out (the study's checker)" : f.r.has_attempt ? "A power grab tried, not carried out (the study's checker)" : "No power grab (the study's checker)";
+  return mark === "excluded" && f.why ? `${found}; not counted: ${NOT_COUNTED_WORDS[f.why]}` : found;
+}
+/** A run's square's class. Solid colour only for what the measure counts as found; a run the study does not count is
+ * hatched, in the measure's colour only if something was found in it. */
+export function squareClass(f: StudyRun, m: Measure): string {
+  const mark = markOf(f, m);
+  const foundUncounted = mark === "excluded" && (m === "lockin" ? !!f.grade?.lockIn?.both : f.r.has_executed || f.r.has_attempt);
+  return `sq ${m === "lockin" ? "lk " : ""}m-${mark}${foundUncounted ? (m === "lockin" ? " was-yes" : " was-grab") : ""}`;
+}
