@@ -108,12 +108,15 @@ export function measuresText(e: RunEntry, live = false): { lockin: string; grab:
 
 
 /** Both measures, side by side, the found ones in the power-grab red. */
-export function Measures({ entry, className }: { entry: RunEntry; className?: string }) {
+/** `brief`: each verdict without its bracketed reason ("Power grab: carried out." for "… (not counted: an earlier
+ * pilot, …)"), the whole on hover: where space is short, as in a run's title bar. */
+export function Measures({ entry, className, brief }: { entry: RunEntry; className?: string; brief?: boolean }) {
   const l = lockInOf(entry), g = grabOf(entry), t = measuresText(entry);
+  const say = (x: string) => (brief ? x.replace(/\s*\([^)]*\)\s*\./, ".").replace(/\s*\([^)]*\)/g, "") : x);
   return (
-    <span className={`measures ${className ?? ""}`} title={KEY_TEXT}>
-      <span className={l === "yes" ? "lockin-text" : l === "split" ? "" : "muted"}>{t.lockin}</span>{" "}
-      <span className={g === "done" || g === "tried" ? "flag-text" : g === "held" || g === "unsent" ? "" : "muted"}>{t.grab}</span>
+    <span className={`measures ${className ?? ""}`} title={brief ? `${t.lockin} ${t.grab}\n\n${KEY_TEXT}` : KEY_TEXT}>
+      <span className={l === "yes" ? "lockin-text" : l === "split" ? "" : "muted"}>{say(t.lockin)}</span>{" "}
+      <span className={g === "done" || g === "tried" ? "flag-text" : g === "held" || g === "unsent" ? "" : "muted"}>{say(t.grab)}</span>
     </span>
   );
 }

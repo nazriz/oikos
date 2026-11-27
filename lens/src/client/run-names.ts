@@ -57,6 +57,14 @@ export function runNameOf(key: string, fallback: string): string {
   return names.get(key) ?? fallback;
 }
 
+/** The run's name for the trail, where the title above already says the model and its instructions: "Setup 7, run 3"
+ * (the setup, as lens-words names it, and the run's number where its full name has one). The full name is the crumb's hover. */
+export function runShortName(e: RunEntry | undefined): string {
+  if (!e?.experiment) return runName(e);
+  const n = runName(e).match(/, (run \d+)$/)?.[1];
+  return `Setup ${e.experiment.seed}${n ? `, ${n}` : ""}`;
+}
+
 /** A run's name: from the catalogue once it is named (nameRuns), else its base name. */
 export function runName(e: RunEntry | undefined): string {
   if (!e) return "";

@@ -368,7 +368,7 @@ export function StructureStoryBody({ c, i, t, name }: { c: CityData; i: number; 
             <div className="lc-sec-title" style={{ marginTop: 10 }}>{kind === "dwelling" ? "Lived here" : kind === "workplace" ? "Worked here" : `In its ${kind}s`} <span className="lc-num">{rows.length} people</span></div>
             <div className="lc-today">
               {rows.slice(0, kind === "dwelling" ? 12 : 8).map(([q, [tot, a, b]]) => (
-                <div key={q} className="lc-row"><span className="lc-sw dot" style={{ background: PAL.where[kind] ?? PAL.where.other }} /><span>{c.people.people[q]![1]}</span><span className="lc-num">days {fmtDay(a).day} to {fmtDay(b).day}, {days(tot) >= 1 ? `${days(tot).toFixed(0)} days` : `${(tot / 3600).toFixed(0)} hours`}</span></div>
+                <div key={q} className="lc-row"><span className="lc-sw dot" style={{ background: PAL.where[kind] ?? PAL.where.other }} /><button type="button" className="id-link lc-person" data-person={c.people.people[q]![0]} data-peek={`person:${c.people.people[q]![0]}`} title="Open their life">{c.people.people[q]![1]}</button><span className="lc-num">days {fmtDay(a).day} to {fmtDay(b).day}, {days(tot) >= 1 ? `${days(tot).toFixed(0)} days` : `${(tot / 3600).toFixed(0)} hours`}</span></div>
               ))}
               {rows.length > (kind === "dwelling" ? 12 : 8) && <div className="lc-note">and {rows.length - (kind === "dwelling" ? 12 : 8)} more</div>}
             </div>

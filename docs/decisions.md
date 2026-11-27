@@ -17313,3 +17313,15 @@ run page ~37 s on the live server. What it found:
   has an age and a job: "The AI mayor is a resident of the town too: 48, works at Factory 2."; on a touch screen the
   walk says "tap one" and Findings "Tap a number".
 - **Revisit if** the cross-run pages should explain ids with each run's own town names (they use general words now).
+
+## 2026-11-27 Lens: a tenth newcomer review, the shell's part (`lens/nav-15`)
+
+- **A run's title bar says both measures whole**: each without its bracketed reason ("Power grab: carried out."),
+  the reason and the key on hover (`Measures brief`); the election's outcome after them is what gives way.
+- **The trail's run step is short** ("Setup 9, run 1", lens-words' "setup" for a town's seed): the title above it
+  already says the model and its instructions; the full name is its hover. Its first and last steps never shrink.
+- **A resident named in a building's panel opens their life**, and a click on the map's empty ground closes what is
+  open: the map now picks a click itself too (deck's own onClick missed the first click after the page settled).
+- **Other mayors says what its little lines are**: the run from the AI mayor's first day to its end, its election day
+  (filled where it won), a power grab.
+- (The day across Compare and Back held already, since nav-11: checked again on the Qwen run, day 145 there and back.)
