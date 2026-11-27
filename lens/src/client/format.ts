@@ -6,6 +6,11 @@
 // they are. Runs stay within the world's first year, so "Day 181" is "year 1, day 181".
 export const DAY = 86_400;
 export const HOUR = 3_600;
+/** Whole world days from an act to its election day (day 155 to day 181 is 26), from the act's time and the checker's
+ * days_to_poll (rounded from seconds; the election itself starts at a day's first second). */
+export function daysToPoll(l: { t: number; days_to_poll: number | null }): number | null {
+  return l.days_to_poll == null ? null : Math.round(l.t / DAY + l.days_to_poll) - Math.floor(l.t / DAY);
+}
 
 /** The world's day number of moment t: day 1 is t = 0. For labels; for arrays by day, dayIndex. */
 export const dayOf = (t: number) => Math.floor(t / DAY) + 1;

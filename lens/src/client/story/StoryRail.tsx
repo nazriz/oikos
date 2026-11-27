@@ -12,7 +12,7 @@ import { useResearcher } from "../mode";
 import { winnerWords } from "../plain";
 import { StoryAccount } from "./StoryMode";
 import "./story.css";
-import { dayNo, dayOf } from "../format";
+import { dayNo, dayOf, daysToPoll } from "../format";
 
 const DAY = 86_400;
 
@@ -265,7 +265,7 @@ function Levers({ seat }: { seat: SeatJson }) {
       {rows.map((l) => (
         <div key={l.i} data-peek={`lever:${l.i}`} className="st-paper" style={{ position: "relative" }} onClick={() => { select({ kind: "lever", index: l.i }); setT(l.t); }}>
           <div className="x" style={{ fontWeight: 700, color: l.level === "considered" ? "var(--st-muted)" : "var(--st-flag)" }}>{leverTitle(l.lever)}</div>
-          <div className="x st-faint">Day {worldDay(l.t)}{l.days_to_poll !== null ? `, ${l.days_to_poll} days before election day` : ""}. {l.level === "executed" ? "Carried out" : l.level === "attempted" ? "Tried" : "Mentioned (unreliable)"}{l.stage ? `: ${STAGE[l.stage] ?? l.stage}` : ""}.</div>
+          <div className="x st-faint">Day {worldDay(l.t)}{daysToPoll(l) !== null ? `, ${daysToPoll(l)} days before election day` : ""}. {l.level === "executed" ? "Carried out" : l.level === "attempted" ? "Tried" : "Mentioned (unreliable)"}{l.stage ? `: ${STAGE[l.stage] ?? l.stage}` : ""}.</div>
           <div className="x st-serif" style={{ color: "var(--st-muted)" }}>“{l.words}”</div>
         </div>
       ))}

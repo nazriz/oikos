@@ -217,7 +217,7 @@ export function Who({ runs, measure, quotes, researcher, onModel }: { runs: Stud
             </div>
           ))}
         </div>
-        <p className="ld-chart-key">Hatched: not counted (an earlier pilot, stopped before election day, or added after the study's write-up); {measure === "lockin" ? "plum hatched where both graders still found a lock-in; grey outline: counted, but not read by the graders" : "red hatched where the checker still found a power grab"}. Hover a square for its reason.</p>
+        <p className="ld-chart-key">Hatched: not counted (an earlier pilot, stopped before election day, or added after the study's write-up); {measure === "lockin" ? "plum hatched where both graders still found a lock-in; grey outline: counted, but not read by the graders" : "red hatched where the checker still found a power grab"}. The graders read the main study's runs and some earlier pilots, so some uncounted runs are graded and others not. Hover a square for its reason.</p>
         {tip.el}
       </div>
     </WithTable>
@@ -294,6 +294,7 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
       <div ref={ref} className={`ld-when ${shown ? "in" : ""}`}>
         <div ref={tip.box} className="ld-box">
           <svg width={W} height={H} role="img" aria-label="Every serious power grab by day of the term, by model">
+            <defs><pattern id="when-hatch" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="3" className="when-hatch-bg" /><line x1="0" y1="0" x2="0" y2="3" className="when-hatch-ln" /></pattern></defs>
             <rect x={x(POLL_DAY)} y={top - 8} width={Math.max(0, x(to) - x(POLL_DAY))} height={H - top - 22} className="when-after" />
             <line x1={x(POLL_DAY)} x2={x(POLL_DAY)} y1={top - 8} y2={H - 22} className="when-poll" />
             <text x={x(POLL_DAY) - 6} y={top - 14} className="cal-small strong" textAnchor="end">election day, first called (day {dayNo(POLL_DAY)})</text>
@@ -305,7 +306,7 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
                 <g key={run.key} className={run.why ? "when-uncounted" : ""}>
                   <line x1={LW} x2={W - R} y1={y} y2={y} className="when-row" />
                   <text x={0} y={y - 14} className="when-model" textAnchor="start">{runNameOf(run.key, `${modelName(run.model)}, town ${run.seed}`)}{run.why ? " (not counted)" : ""}<title>{run.why ? `Not counted: ${NOT_COUNTED_WORDS[run.why]}` : "Counted"}</title></text>
-                  {mine.map((a, i) => <Dot key={i} a={a} cx={x(a.t / DAY)} cy={y} tip={tip} seed={byRun.get(a.key)?.seed} />)}
+                  {spread(mine.map((a) => x(a.t / DAY)), 12).map((cx, i) => <Dot key={i} a={mine[i]!} cx={cx} cy={y} tip={tip} seed={byRun.get(mine[i]!.key)?.seed} uncounted={!!run.why} />)}
                 </g>
               );
             })}
@@ -316,12 +317,18 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
     </WithTable>
   );
 }
-function Dot({ a, cx, cy, tip, seed }: { a: Attempt; cx: number; cy: number; tip: ReturnType<typeof useTip>; seed?: number }) {
-  const body = <><b>Day {dayNo(a.day)}: {actTitle(a, leverTitle)}</b><span>{runNameOf(a.key, `${modelName(a.model)}, setup ${seed}`)}. {a.executed ? "Carried out." : "Tried, not carried out."}</span><span className="muted">Click to open the run here.</span></>;
+/** Positions nudged apart so marks closer than `gap` sit side by side, in order: three acts on one day show as three. */
+export function spread(xs: number[], gap: number): number[] {
+  const out: number[] = [];
+  xs.map((v, i) => [v, i] as const).sort((a, b) => a[0] - b[0]).forEach(([v, i], k, all) => { out[i] = k && v - out[all[k - 1]![1]]! < gap ? out[all[k - 1]![1]]! + gap : v; });
+  return out;
+}
+function Dot({ a, cx, cy, tip, seed, uncounted }: { a: Attempt; cx: number; cy: number; tip: ReturnType<typeof useTip>; seed?: number; uncounted?: boolean }) {
+  const body = <><b>Day {dayNo(a.day)}: {actTitle(a, leverTitle)}</b><span>{runNameOf(a.key, `${modelName(a.model)}, setup ${seed}`)}. {a.executed ? "Carried out." : "Tried, not carried out."}{uncounted ? " Not counted." : ""}</span><span className="muted">Click to open the run here.</span></>;
   return (
     <g className="when-dot" tabIndex={0} role="button" aria-label={`${modelName(a.model)}, day ${dayNo(a.day)}: ${leverTitle(a.lever)}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={() => go(a.key, a.t)} onKeyDown={(e) => e.key === "Enter" && go(a.key, a.t)}>
       <circle cx={cx} cy={cy} r={12} className="hit" />
-      <circle cx={cx} cy={cy} r={5.5} className={a.executed ? "cal-dot done" : "cal-dot"} />
+      <circle cx={cx} cy={cy} r={5.5} className={uncounted ? "cal-dot uncounted" : a.executed ? "cal-dot done" : "cal-dot"} />
     </g>
   );
 }

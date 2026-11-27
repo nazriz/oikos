@@ -4,7 +4,7 @@ import type { SeatAct, SeatDraft, SeatJson, SeatLever } from "../../folds/seat";
 import { actClause } from "./narrative";
 import { outcomeOf } from "../../shared/outcome";
 import { modelName } from "../words";
-import { dayNo } from "../format";
+import { dayNo, daysToPoll } from "../format";
 
 /** What became of a lever event, in words (the reader's stages). */
 export const STAGE: { [k: string]: string } = {
@@ -35,7 +35,7 @@ export interface Moment {
 /** Moments ordered by how near each came to its run's own election day, before or after it (a moment 10 days after
  * the vote is as near as one 10 days before); a moment with no election day goes last. */
 export function byNearestElection(a: Moment, b: Moment): number {
-  const d = (m: Moment) => Math.abs(m.daysBefore ?? m.lever.days_to_poll ?? Infinity);
+  const d = (m: Moment) => Math.abs(m.daysBefore ?? daysToPoll(m.lever) ?? Infinity);
   return d(a) - d(b) || a.lever.t - b.lever.t;
 }
 
@@ -87,7 +87,7 @@ export function momentsOf(key: string, seat: SeatJson, withConsidered = false): 
     const outcome = act ? (act.status === "applied" ? (top.stage && top.stage !== "applied" ? STAGE[top.stage] ?? top.stage : "took effect") : act.status === "refused" ? `refused by the town: ${(act.code ?? "").replace(/_/g, " ")}` : "sent, no outcome in the log") : top.stage ? STAGE[top.stage] ?? top.stage : top.level === "considered" ? "words only" : "—";
     const tone: Moment["outcomeTone"] = top.level === "executed" || outcome === "took effect" ? "ok" : /refused|held back|could not|rejected|asked back/.test(outcome) ? "no" : "wait";
     return { key, model: modelOf(seat), ...(seat.goal ? { goal: seat.goal } : {}), ...(seat.seed !== undefined ? { seed: seat.seed } : {}), lever: top, words, said,
-      ...(draft?.note ? { note: draft.note } : {}), ...(act?.reasoning ? { reason: act.reasoning } : {}), outcome, outcomeTone: tone, also: all.filter((x) => x !== top), ...(redrafted.has(gk) ? { redrafted: true } : {}), election, ...(poll !== undefined ? { daysBefore: Math.round((poll - top.t) / 86_400) } : {}) };
+      ...(draft?.note ? { note: draft.note } : {}), ...(act?.reasoning ? { reason: act.reasoning } : {}), outcome, outcomeTone: tone, also: all.filter((x) => x !== top), ...(redrafted.has(gk) ? { redrafted: true } : {}), election, ...(poll !== undefined ? { daysBefore: Math.floor(poll / 86_400) - Math.floor(top.t / 86_400) } : {}) };
   });
 }
 
@@ -118,7 +118,7 @@ function saidOf(seat: SeatJson, act: SeatAct | undefined, draft: SeatDraft | und
 /** The card as a line to paste into a slide or a paper. */
 export function citation(m: Moment): string {
   const l = m.lever;
-  return `“${m.words}” (${m.model}${m.goal ? `, goal ${m.goal}` : ""}${m.seed !== undefined ? `, seed ${m.seed}` : ""}; day ${dayNo(l.day)}${l.days_to_poll !== null ? `, ${l.days_to_poll} days before the poll` : ""}). Reader: ${l.title}, ${l.level}; ${m.outcome}. Run ${m.key}.`;
+  return `“${m.words}” (${m.model}${m.goal ? `, goal ${m.goal}` : ""}${m.seed !== undefined ? `, seed ${m.seed}` : ""}; day ${dayNo(l.day)}${daysToPoll(l) !== null ? `, ${daysToPoll(l)} days before the poll` : ""}). Reader: ${l.title}, ${l.level}; ${m.outcome}. Run ${m.key}.`;
 }
 
 /** What /api/moments answers: each indexed fork's moments (the reader's `considered` included; the page hides them). */

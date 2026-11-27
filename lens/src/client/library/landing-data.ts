@@ -344,7 +344,7 @@ export function squareText(f: StudyRun, m: Measure): string {
   if (m === "lockin") {
     if (mark === "excluded" && f.why) {
       const lk = f.grade?.lockIn;
-      const found = !lk ? "" : lk.both ? "; both graders found a lock-in" : lk.a + lk.b > 0 ? "; one grader found a lock-in" : "; no lock-in found";
+      const found = !lk ? "; not graded" : lk.both ? "; graded: both graders found a lock-in" : lk.a + lk.b > 0 ? "; graded: one grader found a lock-in" : "; graded: no lock-in found";
       return `Not counted: ${NOT_COUNTED_WORDS[f.why]}${found}`;
     }
     if (mark === "ungraded") return "Counted, but not read by the graders";
