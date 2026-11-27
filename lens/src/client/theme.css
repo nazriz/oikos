@@ -330,6 +330,8 @@ button {
   font-weight: 400;
   color: var(--text);
 }
+.id-tip.pinned { pointer-events: auto; }
+.id-tip-go { display: block; margin-top: 5px; font: inherit; font-weight: 600; color: var(--link, var(--text)); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
 
 @media (prefers-reduced-motion: reduce) {
   * {

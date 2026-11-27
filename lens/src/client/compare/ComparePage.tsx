@@ -96,7 +96,7 @@ function Compare({ A, B }: { A: Arm; B: Arm }) {
         <div>
           <PageAnswer page="compare" />
           <h1 className="cp-title">{armName(A.seat)} and {armName(B.seat)} as mayor of the same town</h1>
-          {entryA && entryB && <p className="st-sub cp-runs">The runs: <a href={`#/run/${encodeURIComponent(A.key)}`}>{runName(entryA)}</a> and <a href={`#/run/${encodeURIComponent(B.key)}`}>{runName(entryB)}</a>.</p>}
+          {entryA && entryB && <p className="st-sub cp-runs">The runs: <a href={`#/run/${encodeURIComponent(A.key)}`}>{runName(entryA)}</a> and {entryB.experiment?.isCode ? <>the <a href={`#/run/${encodeURIComponent(B.key)}`} title={runName(entryB)}>rule-based mayor in the same setup</a></> : <a href={`#/run/${encodeURIComponent(B.key)}`}>{runName(entryB)}</a>}.</p>}
           <p className="st-sub">Both runs are the same town from the same start (setup {A.seat.seed ?? "?"}{sameSeed ? "" : `; the other is setup ${B.seat.seed ?? "?"}`}) until day {dayOf(fork)}. After that only the mayor differs.{!B.seat.model ? " The rule-based mayor is the comparison: a mayor written as rules, with no AI and no instructions of its own." : ""}{A.seat.goal ? ` The AI mayor was ${goalText(A.seat.goal).replace(/^Told/, "told").toLowerCase()}.` : ""} Differences are the first minus the second; neither is called better.</p>
           {uneven && <div className="cp-uneven">The two runs ended on different days ({armName(A.seat)} to day {dayOf(A.seat.end_at)}, {armName(B.seat)} to day {dayOf(B.seat.end_at)}): the town's counts below are compared to day {until}, where both had run.</div>}
         </div>

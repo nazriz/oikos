@@ -7,6 +7,14 @@ import { seriousness } from "../plain";
 import { LiveToggle, useLive } from "../measures";
 import { FINANCE_WHY, isFinanceLever, notCountedReason, addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
 import { modelName } from "../words";
+/** Said plainly on a card whose words are the mayor's nomination (its campaign platform): the checker matched words
+ * there, not an order to an office; and where the platform says the opposite of the act (it promises to enforce what
+ * the act would stop), that too. */
+function platformNote(m: Moment): string {
+  const keeps = m.lever.lever === "fines_off" && /\benforc\w*/i.test(m.words);
+  return `The checker matched words in the mayor's campaign platform, not an order to an office. Read the platform${keeps ? ": it promises to keep the fines" : " before taking this as an act"}.`;
+}
+
 /** What the two blind graders found at this act's seriousness, as one plain sentence. */
 const GRADER_TIER: Record<string, string> = {
   executed: "both found an act this serious carried out",
@@ -24,6 +32,7 @@ import { momentsOf, citation, type Moment, type MomentsResponse, byNearestElecti
 import { PageAnswer } from "../shell/Shell";
 import { HowDoWeKnow } from "./Evidence";
 import { Hi, usePlain } from "./text";
+import { withSetups } from "./IdTip";
 import { goalText, leverTitle } from "../words";
 import "./story.css";
 import "./moments.css";
@@ -178,7 +187,7 @@ function LockCard({ f }: { f: StudyRun }) {
       {/borderline/i.test(q.act) && <p className="mo-graders">The graders marked this borderline; it is their verdict, kept as they gave it.</p>}
       <p className="mo-when">Day {dayOf(lockT(q))}.</p>
       <div className="mo-foot">
-        <span className="mo-who"><b>{runName(f.entry)}</b>. <Measures entry={f.entry} /></span>
+        <span className="mo-who"><b>{withSetups(runName(f.entry))}</b>. <Measures entry={f.entry} /></span>
         <span style={{ flex: 1 }} />
         <a className="st-btn" href={`#/run/${encodeURIComponent(f.key)}?t=${t}`}>Open day {dayOf(lockT(q))}</a>
       </div>
@@ -199,7 +208,7 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
       {m.said && <p className="mo-said">{plain(m.said)}</p>}
       {m.said && <div className="mo-sub-k">its words</div>}
       <blockquote className={`mo-quote ${m.said ? "small" : ""} ${more ? "open" : ""}`} onClick={() => setMore(!more)}><Hi text={m.words} town={false} /></blockquote>
-      {/form-mayor-nomination|nomination form/i.test(m.words) && <p className="mo-graders">The checker matched this in the mayor's nomination form (its campaign platform), not in a direction to an office.</p>}
+      {/form-mayor-nomination|nomination form|file (?:my|a) nomination/i.test(m.words) && <p className="mo-platform">{platformNote(m)}</p>}
       {m.note && <div className="mo-sub"><span className="k">on signing</span><Hi text={`“${m.note}”`} town={false} /></div>}
       {m.reason && <div className="mo-sub"><span className="k">its reason</span><Hi text={`“${m.reason}”`} town={false} /></div>}
       {more && <Around m={m} />}
@@ -208,7 +217,7 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
       {isFinanceLever(l.lever) && <p className="mo-graders">{FINANCE_WHY}</p>}
       {(l.tier ?? 2) >= 2 && entry?.grade && <p className="mo-graders" title={`The graders' rating at ${seriousness(l.tier ?? 2)}, where the checker put this act`}>Found by the study's checker. The blind graders, reading the whole run, also rated it: {GRADER_TIER[entry.grade.tiers[(l.tier ?? 2) as 2 | 3]]}.</p>}
       <div className="mo-foot">
-        <span className="mo-who"><b>{entry ? runName(entry) : `${m.model}, ${m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}${m.seed !== undefined ? `, setup ${m.seed}` : ""}`}</b>. {!(entry && notCountedReason(entry) && /^stopped|^run ended/i.test(m.election)) && <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>}{entry && <> <Measures entry={entry} /></>}</span>
+        <span className="mo-who"><b>{entry ? withSetups(runName(entry)) : `${m.model}, ${m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}${m.seed !== undefined ? `, setup ${m.seed}` : ""}`}</b>. {!(entry && notCountedReason(entry) && /^stopped|^run ended/i.test(m.election)) && <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>}{entry && <> <Measures entry={entry} /></>}</span>
         <span style={{ flex: 1 }} />
         <button className="st-btn" title="Copy as a citation" onClick={() => { navigator.clipboard?.writeText(citation(m)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }, () => {}); }}>{copied ? "Copied" : "Copy as a citation"}</button>
         <HowDoWeKnow run={m.key} claim={{ kind: "lever", index: m.lever.i }} />

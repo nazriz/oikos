@@ -172,7 +172,7 @@ function Chart({ city }: { city: CityData }) {
           {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />{story ? <>In the simulation the AI mayor also has a life in the town{(() => { const d = describePerson(city, pp, t)?.split(", ") ?? []; const age = /^\d+$/.test(d[0] ?? "") ? `age ${d[0]}` : ""; const job = d.slice(age ? 1 : 0).join(", ").replace(/^works at /, "a job at "); return age || job ? `: ${[age, job].filter(Boolean).join(", ")}` : ""; })()}.</> : <>The AI mayor holds this office as resident <b>{pp}</b>{describePerson(city, pp, t) ? ` (${describePerson(city, pp, t)})` : ""}.</>}</div>)}
           {story && several.length > 0 && (
             <div className="pw-several">
-              <div className="pw-several-h">Residents who hold several posts</div>
+              <div className="pw-several-h">Residents who hold several posts <span className="muted">(town staff, none of them the AI mayor)</span></div>
               <ol>{several.map(([pp, posts]) => <li key={pp}>A resident{ageOf(pp) ? ` (${ageOf(pp)})` : ""}: {posts.map(titleOf).join(", ")}</li>)}</ol>
             </div>
           )}

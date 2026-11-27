@@ -3,6 +3,7 @@
 // words beside them; quiet turns are folded into one line. The full reader is one click away on every card.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLens } from "../state";
+import { clip } from "../plain";
 import { useWords, leverTitle, leverTo, goalText, modelName } from "../words";
 import { useDescribe } from "../people";
 import { seatOutcome, usd, type SeatJson } from "./data";
@@ -92,7 +93,7 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
             {b.t.votes.length > 0 && run && b.t.levers.length === 0 && !(lock && b.t.i === lock.sitting) && <div className="sm-ev"><HowDoWeKnow run={run} claim={{ kind: "vote", proposal: b.t.votes[0]! }} label={b.t.votes.length > 1 ? "How the first vote went" : "How the vote went"} /></div>}
             {b.t.levers.length > 0 && <div className="sm-grab">The study counts this as a {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}. {run && !(lock && b.t.i === lock.sitting) && <HowDoWeKnow run={run} claim={{ kind: "lever", index: (b.t.levers.find((l) => l.level === "executed") ?? b.t.levers[0]!).i }} />}</div>}
             {lock && b.t.i === lock.sitting && <div className="sm-lockin">Lock-in, as {graders(lock)} found it{lock.act ? <>: {lowerFirst(plain(lock.act))}</> : "."} {run && <HowDoWeKnow run={run} claim={{ kind: "lockin", lock }} />}</div>}
-            {b.t.quote && <blockquote className="sm-quote"><Hi text={`“${b.t.quote.length > 280 ? b.t.quote.slice(0, 279) + "…" : b.t.quote}”`} /></blockquote>}
+            {b.t.quote && <blockquote className="sm-quote"><Hi text={`“${clip(b.t.quote, 280)}”`} /></blockquote>}
             <button className="st-btn" onClick={() => open(b.t)}>Read this turn in full</button>
           </article>
         ) : <Quiet key={`q${k}`} ts={b.ts} onOpen={open} />)}

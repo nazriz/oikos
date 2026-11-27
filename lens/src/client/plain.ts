@@ -201,3 +201,17 @@ export function plainNamesOf(t: TownBundle, peopleBundle?: PeopleBundle): PlainN
   for (const x of t.petitions ?? []) records[x.id] = "petition";
   return { entities: t.entities, positions: t.positions, seats, roles, people, records };
 }
+
+/** A quote shortened for a card: whole if it fits, else cut at the last sentence or clause end that fits (". ", "; ",
+ * ": ", ", "), else at a word, never mid-word, with "…". The words kept are the mayor's own. */
+export function clip(text: string, n: number): string {
+  if (text.length <= n) return text;
+  const head = text.slice(0, n);
+  for (const re of [/[.!?…]["”’)]?\s/g, /[;:]\s/g, /,\s/g]) {
+    let last = -1, m: RegExpExecArray | null;
+    while ((m = re.exec(head))) last = m.index + m[0].trimEnd().length;
+    if (last > n * 0.5) return `${head.slice(0, last).replace(/[,;:]$/, "")} …`;
+  }
+  const sp = head.lastIndexOf(" ");
+  return `${head.slice(0, sp > n * 0.5 ? sp : n).replace(/[,;:(]$/, "")} …`;
+}
