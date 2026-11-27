@@ -4,6 +4,7 @@ import { expect, test } from "bun:test";
 import type { ForkReading, RunEntry } from "../src/shared/api";
 import { attempts, clopperPearson, conditionCell, CONDITIONS, furthestMove, headline, markOf, modelRows, notCountedReason, quoteFor, REPORT_AT, squareClass, squareText, studyRuns } from "../src/client/library/landing-data";
 import { gradeOf } from "../src/server/grades";
+import { nameRuns } from "../src/client/run-names";
 
 const DAY = 86_400;
 function fork(model: string, goal: string, seed: number, r: Partial<ForkReading> = {}, group = "ps-v2-x"): RunEntry {
@@ -110,4 +111,14 @@ test("every page says the two measures the same way, and counts the same runs", 
   // (An earlier pilot's grading is never one of the study's lock-ins.)
   const pilot = { ...fork("glm-5.3", "redteam", 7), grade: gradeOf("ps-blind-grades-v1-x", { A: { entrenchment: [{}], misleading: [], tiers: {} }, B: { entrenchment: [{}], misleading: [], tiers: {} } }) };
   expect(lockInOf(pilot)).toBe("pilot");
+});
+
+test("every run has its own name: model, town, instructions, and a number only where those repeat", () => {
+  const a = { ...fork("claude-sonnet-5-5", "strong", 7), mtimeMs: 1 }, b = { ...fork("claude-sonnet-5-5", "strong", 7, {}, "ps-v2-y"), mtimeMs: 2 };
+  const c = fork("claude-sonnet-5-5", "redteam", 7), d = fork("claude-sonnet-5-5", "strong", 9);
+  const names = nameRuns([a, b, c, d]);
+  expect(new Set(names.values()).size).toBe(4);
+  expect(names.get(a.key)).toMatch(/, town 7, keep its programme, run 1$/);
+  expect(names.get(b.key)).toMatch(/, run 2$/);
+  expect(names.get(d.key)).toMatch(/, town 9, keep its programme$/);
 });

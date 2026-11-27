@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Catalogue, RunEntry } from "../../shared/api";
 import { fetchCatalogue } from "../api";
+import { nameRuns } from "../run-names";
 import { dayOf } from "../format";
 import { readingOutcome } from "../outcome";
 import { runHref, selToken } from "../router";
@@ -73,7 +74,7 @@ const Sep = () => (
 );
 
 let catalogue: Promise<Catalogue> | null = null;
-export const getCatalogue = () => (catalogue ??= fetchCatalogue().catch((e) => ((catalogue = null), Promise.reject(e))));
+export const getCatalogue = () => (catalogue ??= fetchCatalogue().then((c) => (nameRuns(c.runs), c)).catch((e) => ((catalogue = null), Promise.reject(e))));
 
 interface Peer {
   key: string;

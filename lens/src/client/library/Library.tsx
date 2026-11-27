@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Catalogue, RunEntry } from "../../shared/api";
 import { fetchCatalogue } from "../api";
+import { nameRuns, runName } from "../run-names";
 import { ago, bytes, dayOf, lockT, openAt, usd } from "../format";
 import { Search } from "../icons";
 import { replaceQuery, runHref } from "../router";
@@ -38,6 +39,7 @@ export function Library({ q }: { q: URLSearchParams }) {
       fetchCatalogue().then(
         (c) => {
           if (!live) return;
+          nameRuns(c.runs);
           setCat(c);
           writeCachedCatalogue(c);
           // (While the study's checker works through the runs, look again now and then.)
@@ -554,10 +556,8 @@ function StudyRow({ f, researcher }: { f: StudyRun; researcher: boolean }) {
       </td>
       <td>
         <a href={runHref(f.key)} className="run-link">
-          {modelName(f.model)}
+          {runName(f.entry)}
         </a>
-        {f.ordinal && <span className="muted"> {f.ordinal}</span>}
-        <span className="muted"> town {f.seed}</span>
         {researcher && <div className="faint ld-group">{f.group}</div>}
       </td>
       <td className="muted ld-col-goal">{goalText(f.goal)}{f.election ? "" : ". No election in the run"}</td>

@@ -96,8 +96,15 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
     if (onOpen) onOpen(m.key, m.lever.t, sel);
     else { const st = useLens.getState(); st.setRun(m.key); location.hash = `#/run/${encodeURIComponent(m.key)}?t=${Math.round(m.lever.t)}${sel ? `&sel=${sel}` : ""}`; }
   };
-  const Facet = ({ label, items, set, on }: { label: string; items: [string, number][]; set: (x: Set<string>) => void; on: Set<string> }) => (
-    <div className="mo-facet"><span className="lbl">{label}</span>{items.map(([v, n]) => <button key={v} className={`st-btn ${on.has(v) ? "on" : ""}`} onClick={() => toggle(on, set, v)}>{v} <span className="n">{n}</span></button>)}</div>
+  // (Each filter a plain select in one line of words, "Model: all ▾", not a block of chips: lens-look.md.)
+  const Facet = ({ label, all, items, set, on, show = (v: string) => v }: { label: string; all: string; items: [string, number][]; set: (x: Set<string>) => void; on: Set<string>; show?: (v: string) => string }) => (
+    <label className="mo-sel">
+      <span>{label}</span>
+      <select value={on.size === 1 ? [...on][0]! : ""} onChange={(e) => set(e.target.value ? new Set([e.target.value]) : new Set())}>
+        <option value="">{all}</option>
+        {items.map(([v, n]) => <option key={v} value={v}>{show(v)} ({n})</option>)}
+      </select>
+    </label>
   );
   return (
     <div className="mo">
@@ -125,15 +132,21 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
           </button>
         )}
         {view !== "lockins" && (!PHONE || filtersOpen) && <div className="mo-filters">
-          <Facet label="Model" items={count((m) => m.model)} set={setModels} on={models} />
-          <Facet label="Instructions" items={count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
-          <Facet label={view === "favours" ? "Favour" : "Power grab"} items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />
-          <Facet label="How far (the checker's count)" items={count((m) => LEVEL[m.lever.level] ?? "")} set={setLevels} on={levels} />
-          <div className="mo-facet"><span className="lbl">Order</span>
-            {(["poll", "day", "model"] as const).map((k) => <button key={k} className={`st-btn ${sort === k ? "on" : ""}`} onClick={() => setSort(k)}>{k === "poll" ? "Nearest election day" : k === "day" ? "By day" : "By model"}</button>)}
-            <span style={{ flex: 1 }} />
-            <button className={`st-btn ${weak ? "on" : ""}`} onClick={() => setWeak(!weak)} title="Where the idea only came up in its thinking: the checker matched words, which is often wrong">{weak ? "Hide" : "Also show"} ideas it only mentioned</button>
-          </div>
+          <Facet label="Model" all="all models" items={count((m) => m.model)} set={setModels} on={models} show={modelName} />
+          <Facet label="Instructions" all="any" items={count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
+          <Facet label={view === "favours" ? "Favour" : "Power grab"} all="any kind" items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />
+          <Facet label="How far" all="tried or carried out" items={count((m) => LEVEL[m.lever.level] ?? "")} set={setLevels} on={levels} />
+          <label className="mo-sel">
+            <span>Order</span>
+            <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+              <option value="poll">nearest election day</option>
+              <option value="day">by day</option>
+              <option value="model">by model</option>
+            </select>
+          </label>
+          <label className="mo-sel mo-weak" title="Where the idea only came up in its thinking: the checker matched words, which is often wrong">
+            <input type="checkbox" checked={weak} onChange={() => setWeak(!weak)} /> also ideas it only mentioned
+          </label>
         </div>}
       </div>
       {view === "lockins" ? (

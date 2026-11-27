@@ -67,3 +67,10 @@
 /* (A facet's name on its own line on a phone; beside its chips, never over them, on a wide screen.) */
 @media (max-width: 700px) { .mo-facet .lbl { width: 100%; min-width: 0; } }
 .mo-filter-toggle { margin-top: 12px; }
+
+/* The filters as one line of plain selects ("Model: all models ▾  Instructions: any ▾ …"), wrapping where narrow. */
+.mo-filters { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; margin-top: 14px; flex-direction: row; }
+.mo-sel { display: inline-flex; align-items: baseline; gap: 6px; font-size: 13px; color: var(--st-muted); }
+.mo-sel > span { font-weight: 600; color: var(--st-text); }
+.mo-sel select { font: inherit; font-size: 13px; color: var(--st-text); background: transparent; border: 0; border-bottom: 1px solid var(--st-line); padding: 1px 2px; max-width: 280px; cursor: pointer; }
+.mo-sel.mo-weak { gap: 5px; }

@@ -8,6 +8,7 @@
 //   Print      a run's fingerprint: its term, election day, its attempts, where it ended
 import { useMemo, useRef } from "react";
 import { runHref } from "../router";
+import { runName } from "../run-names";
 import { dayOf, lockT, openAt as openAtFmt } from "../format";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable, POINT, tapTwice } from "./parts";
@@ -139,7 +140,7 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
   const t = openAt(f, m);
   const body = (
     <>
-      <b>{modelName(f.model)}, town {f.seed}{f.ordinal ? `, ${f.ordinal}` : ""}</b>
+      <b>{runName(f.entry)}</b>
       <span>{what}.</span>
       {detail && <span>{clip(detail, 200)}</span>}
       {words && <q className="world">{clip(words)}</q>}

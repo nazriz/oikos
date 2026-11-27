@@ -480,12 +480,15 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
     const fl: FlagHit[] = [];
     const rows: [number, number][][] = Array.from({ length: FLAG_ROWS }, () => []);
     // (The vote outranks the run's stop: on a narrow strip, election day keeps its words.)
+    // (On a phone-narrow strip a long label would stretch far from its day: "Election day: mayor re-elected" read as
+    // day 140. There each flag says a word or two; the full words are on its card.)
+    const said = (m: KeyMoment) => (width < 560 ? shortLabel(m) : m.label);
     const prio = (m: KeyMoment) => (m.kind === "lockin" ? 0 : m.kind === "grab" ? (m.strong ? 0 : 1) : m.kind === "election" && m.strong && !m.after ? 2 : m.kind === "end" ? 3 : m.strong ? 4 : 5);
     const order = moments.map((m, i) => ({ m, i, x: xOf(m.t) })).filter((o) => o.x >= -2 && o.x <= width + 2).sort((a, b) => prio(a.m) - prio(b.m) || a.x - b.x);
     g.font = font(700, 11.5);
     const placed = new Map<KeyMoment, { row: number; bx: number; bw: number }>();
     for (const o of order) {
-      const bw = Math.ceil(g.measureText(o.m.label).width) + 10;
+      const bw = Math.ceil(g.measureText(said(o.m)).width) + 10;
       // (To the right of its pole, else to the left; the top row first.)
       const sides = [o.x - 0.5, o.x - bw + 0.5].filter((bx) => bx >= 0 && bx + bw <= width);
       find: for (let r = 0; r < FLAG_ROWS; r++)
@@ -533,7 +536,7 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
           g.strokeRect(pl.bx + 0.5, top + 0.5, pl.bw - 1, h - 1);
           g.fillStyle = m.kind === "grab" ? p.flag : m.kind === "lockin" ? p.lockin : col;
         }
-        g.fillText(m.label, pl.bx + 5, top + h / 2 + 0.5);
+        g.fillText(said(m), pl.bx + 5, top + h / 2 + 0.5);
         fl.push({ x: pl.bx, x2: pl.bx + pl.bw, y: top, y2: top + h, m });
       } else {
         g.fillStyle = col;
@@ -825,6 +828,20 @@ function tipLeft(cx: number): number {
   const W = 330;
   if (cx + 12 + W <= lim) return Math.max(8, cx + 12);
   return Math.max(8, Math.min(lim, cx) - W - 12);
+}
+
+/** A key moment in a word or two, for a narrow strip. */
+function shortLabel(m: KeyMoment): string {
+  if (m.kind === "lockin") return "Lock-in";
+  if (m.kind === "grab") return m.strong ? "Power grab" : "Tried";
+  if (m.kind === "end") return "Stopped";
+  if (m.after) return "Planned vote";
+  if (/^Election day/.test(m.label)) return "Vote";
+  if (/^Election called/.test(m.label)) return "Called";
+  if (/^Nominations/.test(m.label)) return "Nominations";
+  if (/re-elected/.test(m.label)) return "Re-elected";
+  if (/lost/.test(m.label)) return "Lost";
+  return m.label.split(/[ :]/)[0]!;
 }
 
 const momentColor = (p: Palette, m: KeyMoment) => (m.kind === "lockin" ? p.lockin : m.kind === "grab" ? p.flag : m.kind === "election" ? p.election : p.text);

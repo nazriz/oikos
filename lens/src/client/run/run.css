@@ -643,3 +643,32 @@
   border-radius: var(--r-2);
   box-shadow: var(--shadow-map);
 }
+
+/* The run's verdicts on one line (a stopped pilot's ran to three lines of red): the whole of them on hover. */
+.run-result {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 640px;
+  min-width: 0;
+}
+.run-verdict {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-result .run-evidence {
+  flex: none;
+}
+@media (max-width: 700px) {
+  /* (On a phone the line wraps, whole: there is no hover to read the rest.) */
+  .run-result {
+    display: block;
+    max-width: none;
+  }
+  .run-verdict {
+    white-space: normal;
+  }
+}

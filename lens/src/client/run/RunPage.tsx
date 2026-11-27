@@ -17,7 +17,7 @@ import { views, type EvidenceClaim, type SlotProps } from "../views";
 import { lockInfo } from "../story/lockin";
 import { RunSummary } from "./RunSummary";
 import { RunCharts, TurnStrip } from "./RunCharts";
-import { Measures } from "../measures";
+import { Measures, measuresText } from "../measures";
 import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer } from "../shell/Shell";
@@ -316,8 +316,11 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
         </div>
         {reading && !x?.isCode && (
           <div className="run-result">
-            {entry ? <Measures entry={{ ...entry, reading }} /> : null}{" "}
-            {out && <span className={out.kind === "won" ? "election-text" : out.kind === "poll_moved" ? "flag-text" : "muted"}>{out.label}.</span>}
+            {/* (One line: the verdicts, the rest of a long one on hover; "How do we know?" always whole beside them.) */}
+            <span className="run-verdict" title={entry ? `${measuresText({ ...entry, reading }).lockin} ${measuresText({ ...entry, reading }).grab}${out ? ` ${out.label}.` : ""}` : undefined}>
+              {entry ? <Measures entry={{ ...entry, reading }} /> : null}{" "}
+              {out && <span className={out.kind === "won" ? "election-text" : out.kind === "poll_moved" ? "flag-text" : "muted"}>{out.label}.</span>}
+            </span>
             {entry && views.howDoWeKnow && (
               <span className="run-evidence">
                 {" "}
