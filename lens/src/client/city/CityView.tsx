@@ -465,7 +465,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     const pools: { p: [number, number]; r: number; a: number }[] = [];
     for (const i of B.boxes) {
       const k = W.count[i]!;
-      if (k > 0) pools.push({ p: [B.shapes[i]!.cx, B.shapes[i]!.cy], r: 10 + Math.min(20, Math.sqrt(k) * 4.5), a: Math.min(1, 0.3 + k / 12) });
+      if (k > 0) pools.push({ p: [B.shapes[i]!.cx, B.shapes[i]!.cy], r: 7 + Math.min(10, Math.sqrt(k) * 2.5), a: Math.min(1, 0.3 + k / 12) });
     }
     return { col, pools, data: { length: n, attributes: { getPosition: { value: B.windows.pos, size: 3 }, getFillColor: { value: col, size: 4, normalized: true } } } };
   }, [ver, sky.night, B, city]);
@@ -793,12 +793,12 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     // Night: street lamps, lit windows, pools of light.
     sky.night > 0.02 && new ScatterplotLayer({
       id: "lamps", data: staticLayers.lamps,
-      getFillColor: [255, 196, 120, 38 * sky.night], getRadius: 3.2, radiusUnits: "meters", billboard: false, updateTriggers: { getFillColor: sky.night },
+      getFillColor: [236, 232, 222, 26 * sky.night], getRadius: 2.4, radiusUnits: "meters", billboard: false, updateTriggers: { getFillColor: sky.night },
       parameters: ADDITIVE,
     }),
     sky.night > 0.02 && new ScatterplotLayer({
       id: "pools", data: glow.pools, getPosition: (d: any) => [d.p[0], d.p[1], 0.5], getRadius: (d: any) => d.r, radiusUnits: "meters", billboard: false,
-      getFillColor: (d: any) => [255, 170, 90, 26 * d.a * sky.night], parameters: ADDITIVE, updateTriggers: { getFillColor: sky.night },
+      getFillColor: (d: any) => [230, 226, 216, 12 * d.a * sky.night], parameters: ADDITIVE, updateTriggers: { getFillColor: sky.night },
     }),
     sky.night > 0.02 && new ScatterplotLayer({
       id: "windows", data: glow.data,
@@ -903,11 +903,11 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     // People: crowds at a distance, points up close.
     overlays.people && !overlays.election && crowdF > 0.02 && new ScatterplotLayer({
       id: "crowds", data: crowds, getPosition: (d: any) => [d.p[0], d.p[1], 0.6], getRadius: (d: any) => 5 + Math.sqrt(d.n) * 3.4, radiusUnits: "meters", radiusMinPixels: 1.5,
-      getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * (0.22 + 0.2 * sky.night) * (overlays.election || overlays.papers ? 0.3 : 1), parameters: { ...(sky.night > 0.5 ? ADDITIVE : { depthWriteEnabled: false }), depthCompare: "always" },
+      getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * (0.22 + 0.06 * sky.night) * (overlays.election || overlays.papers ? 0.3 : 1), parameters: { ...(sky.night > 0.5 ? ADDITIVE : { depthWriteEnabled: false }), depthCompare: "always" },
     }),
     overlays.people && !overlays.election && crowdF > 0.02 && new ScatterplotLayer({
       id: "crowds-core", data: crowds, getPosition: (d: any) => [d.p[0], d.p[1], 0.7], getRadius: (d: any) => 2 + Math.sqrt(d.n) * 1.5, radiusUnits: "meters", radiusMinPixels: 1,
-      getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * 0.55 * (overlays.election || overlays.papers ? 0.3 : 1), parameters: { depthWriteEnabled: false, depthCompare: "always" },
+      getFillColor: (d: any) => d.c, billboard: false, opacity: crowdF * (0.55 - 0.25 * sky.night) * (overlays.election || overlays.papers ? 0.3 : 1), parameters: { depthWriteEnabled: false, depthCompare: "always" },
     }),
     overlays.people && !overlays.election && new ScatterplotLayer({
       id: "people-halo", data: { length: nP, attributes: { getPosition: { value: people.pos, size: 3 }, getFillColor: { value: people.col, size: 4, normalized: true } } },

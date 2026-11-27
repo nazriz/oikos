@@ -33,8 +33,9 @@ export const PAL = {
   // People by where they are.
   // People by where they are: by day in plan inks, at night the lamplit versions (whereNight).
   where: { dwelling: "#46586A", workplace: "#2F7D5B", classroom: "#3B6EA8", hall: "#5B6B78", waiting: "#B5523B", moving: "#1D2B36", other: "#5B6B78" } as Record<string, string>,
-  whereNight: { dwelling: "#F2D4A0", workplace: "#8FD1B0", classroom: "#A9C8EE", hall: "#C9D3DB", waiting: "#F0A493", moving: "#FFFFFF", other: "#C9D3DB" } as Record<string, string>,
-  window: "#ffc677",
+  // Night lights in near-white, never yellow: yellow means the AI mayor (docs/design/lens-look.md).
+  whereNight: { dwelling: "#E9E4DA", workplace: "#8FD1B0", classroom: "#A9C8EE", hall: "#C9D3DB", waiting: "#F0A493", moving: "#FFFFFF", other: "#C9D3DB" } as Record<string, string>,
+  window: "#EFE8DA",
 };
 
 export const WHERE_LABEL: Record<string, string> = {
