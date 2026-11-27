@@ -759,3 +759,17 @@
   background: repeating-linear-gradient(45deg, var(--lockin) 0 2px, transparent 2px 4px);
   box-shadow: inset 0 0 0 1px var(--lockin);
 }
+
+@media (max-width: 900px) {
+  .who-row .who-k {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+  .start-pilot { font-size: 13px; }
+}
+.start-pilot {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ld { overflow-x: clip; }

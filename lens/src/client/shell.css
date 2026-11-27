@@ -51,7 +51,7 @@
 }
 .masthead-empty {
   aspect-ratio: 4 / 3;
-  border: 1px solid var(--line);
+  /* (Space kept, no frame: an empty bordered box for seconds read as broken.) */
 }
 .plan-ground {
   fill: var(--panel);

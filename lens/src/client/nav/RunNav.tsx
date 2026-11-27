@@ -93,7 +93,9 @@ export function peersOf(runs: RunEntry[], me: RunEntry, live = false): { same: P
   // (The report's runs only, unless this browser asked for the live figures; and the same election condition: a run with
   // no election in it is not "the same instructions" as one with.)
   const town = runs.filter((r) => r.key !== me.key && !/rehearsal|mock/.test(r.group) && r.experiment && r.experiment.seed === x.seed && r.experiment.forkDay === x.forkDay && r.experiment.post === x.post && (live || !addedAfterReport(r) || r.experiment.isCode) && (r.experiment.election !== false) === (x.election !== false));
-  const rank = (r: RunEntry) => (r.experiment!.stopped ? 0 : 4) + (r.group === me.group ? 2 : 0) + (r.indexed ? 1 : 0);
+  // (Deterministic: a run that went the distance, from this run's set, in the report; then the newest. Never "whichever
+  // happens to be prepared", which changed the pick from one visit to the next.)
+  const rank = (r: RunEntry) => (r.experiment!.stopped ? 0 : 4) + (r.group === me.group ? 2 : 0) + (addedAfterReport(r) ? 0 : 1);
   const best = (list: RunEntry[], by: (r: RunEntry) => string) => {
     const m = new Map<string, RunEntry>();
     for (const r of list) {
