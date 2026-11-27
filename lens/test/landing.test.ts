@@ -2,7 +2,7 @@
 // counted, the headline sentence, and the quote it picks. Pure functions over catalogue entries.
 import { expect, test } from "bun:test";
 import type { ForkReading, RunEntry } from "../src/shared/api";
-import { attempts, clopperPearson, conditionCell, CONDITIONS, furthestMove, headline, markOf, modelRows, notCountedReason, quoteFor, REPORT_AT, squareClass, squareText, studyRuns } from "../src/client/library/landing-data";
+import { attempts, cellHover, lockCell, tally, clopperPearson, conditionCell, CONDITIONS, furthestMove, headline, markOf, modelRows, notCountedReason, quoteFor, REPORT_AT, squareClass, squareText, studyRuns } from "../src/client/library/landing-data";
 import { gradeOf } from "../src/server/grades";
 import { nameRuns } from "../src/client/run-names";
 
@@ -51,6 +51,16 @@ test("counts lawful lock-in only where both blind graders agree, among runs that
   const cell = conditionCell(study, CONDITIONS[1]!, "frontier").t;
   expect([cell.k, cell.n, cell.split, cell.excluded]).toEqual([1, 2, 1, 1]);
   expect(conditionCell(study, CONDITIONS[1]!, "smaller").t.n).toBe(1);
+  // (Findings' cells come from the landing's statuses: a model's row equals the landing chart's row for it, and its
+  // condition cells add up to the design chart's cell; every run is in the hover, counted or not.)
+  for (const model of new Set(study.map((f) => f.model))) {
+    const t = tally(study.filter((f) => f.model === model), "lockin");
+    expect(lockCell(study, model).t).toEqual(t);
+  }
+  const frontier = ["claude-sonnet-5-5", "deepseek-v4.1-flash"].map((m) => lockCell(study, m, CONDITIONS[1]!).t);
+  expect([frontier.reduce((s, t) => s + t.k, 0), frontier.reduce((s, t) => s + t.n, 0)]).toEqual([cell.k, cell.n]);
+  const ds = lockCell(study, "deepseek-v4.1-flash", CONDITIONS[1]!);
+  expect(cellHover(ds.runs, ds.t)).toBe("No counted run; 1 counted, not graded; 1 not counted: 1 stopped before election day.");
   // (Grades written after the report froze stay out of its counts unless the live grades are asked for.)
   const late = [{ ...fork("claude-sonnet-5-5", "strong", 9), grade: gradeOf("ps-blind-grades-v2-x", { A: { entrenchment: [{}], misleading: [], tiers: {} }, B: { entrenchment: [{}], misleading: [], tiers: {} } }, REPORT_AT + 1) }];
   expect(markOf(studyRuns(late)[0]!, "lockin")).toBe("excluded");

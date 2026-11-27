@@ -181,8 +181,10 @@ export function headline(all: StudyRun[]): string {
   if (!models) return "No run has been read yet.";
   let s = `${cap(num(did))} of ${models} AI models carried out a power grab in the study's counted runs`;
   if (tried) s += `, and ${num(tried)} more tried one`;
-  const apart = all.filter((f) => f.why && (f.r.has_executed || f.r.has_attempt)).length;
-  if (apart) s += `; plus ${num(apart)} ${apart === 1 ? "run" : "runs"} with one in earlier pilots or runs that stopped early, not counted`;
+  const apartRuns = all.filter((f) => f.why && (f.r.has_executed || f.r.has_attempt)), apart = apartRuns.length;
+  // (A run whose every attempt was drafted and then declined by the mayor itself sent nothing: said so, in brackets.)
+  const heldBack = apartRuns.filter((f) => !f.r.has_executed && f.r.attempts.length > 0 && f.r.attempts.every((a) => a.stage === "seat_declined")).length;
+  if (apart) s += `; plus ${num(apart)} ${apart === 1 ? "run" : "runs"} with one tried or carried out${heldBack ? ` (${num(heldBack)} only drafted, then held back)` : ""}, not counted`;
   return s + ".";
 }
 
@@ -303,6 +305,24 @@ export const inCondition = (f: StudyRun, c: Condition) => goalOf(f.goal) === c.g
 export function conditionCell(runs: StudyRun[], c: Condition, cohort: Cohort): { runs: StudyRun[]; t: Tally } {
   const rs = runs.filter((f) => cohortOf(f.model) === cohort && inCondition(f, c) && f.why !== "earlier pilot" && markOf(f, "lockin") !== "ungraded");
   return { runs: rs, t: tally(rs, "lockin") };
+}
+
+/** One cell of a lock-in table, from the same statuses as the landing's squares: a model's runs (the landing's row for
+ * it), or its runs under one of the design's instructions (earlier pilots are not in the design, as in its chart). */
+export function lockCell(runs: StudyRun[], model: string, c?: Condition): { runs: StudyRun[]; t: Tally } {
+  const rs = runs.filter((f) => f.model === model && (!c || (inCondition(f, c) && f.why !== "earlier pilot")));
+  return { runs: rs, t: tally(rs, "lockin") };
+}
+/** A cell's hover, every run in it accounted for: counted (with the result), counted but not graded, and not counted
+ * with each reason. */
+export function cellHover(rs: StudyRun[], t: Tally): string {
+  const why = new Map<string, number>();
+  const SHORT: Record<NotCounted, [string, string]> = { "earlier pilot": ["an earlier pilot", "earlier pilots"], "stopped before election day": ["stopped before election day", "stopped before election day"], "added after the report": ["added after the study's write-up", "added after the study's write-up"] };
+  for (const f of rs) if (f.why) why.set(f.why, (why.get(f.why) ?? 0) + 1);
+  const parts = [t.n ? `${t.k} of ${t.n} counted ${t.n === 1 ? "run" : "runs"} had a lock-in both graders found` : "No counted run"];
+  if (t.ungraded) parts.push(`${t.ungraded} counted, not graded`);
+  if (why.size) parts.push(`${t.excluded} not counted: ${[...why].map(([w, n]) => `${n} ${SHORT[w as NotCounted][n === 1 ? 0 : 1]}`).join(", ")}`);
+  return parts.join("; ") + ".";
 }
 
 /** "13 of 14", "none of 9". */

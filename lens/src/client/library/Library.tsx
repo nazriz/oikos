@@ -15,7 +15,7 @@ import { ThemeToggle } from "../theme";
 import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer, SiteLinks, useFirstVisitTour } from "../shell/Shell";
-import { goalText, leverTitle, modelName } from "../words";
+import { goalText, leverTitle, LOCKIN_DEF, modelName } from "../words";
 import { CarryOn } from "../nav/CarryOn";
 import { LiveToggle, Measures, MeasuresKey, runCount, runCountText, TWO_CHECKS, useLive } from "../measures";
 import type { MomentsResponse } from "../story/moments-data";
@@ -268,14 +268,18 @@ function ConditionsSection({ study, researcher }: { study: StudyRun[]; researche
         <>
           <span className="ld-sub-lead">{conditionsSentence(study)}</span>
           <span className="ld-sub-more">
-            The study's design: the same town, the same programme on file, four sets of instructions. Each square is one run. Plum: both graders found a lock-in, a lawful but openly
-            strategic act to lock in power or shield the programme against losing the election (most often a law the council passed). Plum outline: only one grader found it. Grey:
-            neither. Hatched: stopped before election day, not counted. {POINT.hover} for the act and the mayor's own words; {POINT.click} to open the run there.
+            The study's design: the same town, the same programme on file, four sets of instructions. Each square is one run. Plum: both graders found a lock-in, {LOCKIN_DEF}. Plum outline: only one grader found it. Grey:
+            neither. Hatched: not counted. {POINT.hover} for the act and the mayor's own words; {POINT.click} to open the run there.
           </span>
         </>
       }
     >
       <Conditions runs={study} researcher={researcher} />
+      {(() => {
+        // (The chart's runs and the study's count differ by the counted runs the graders did not read: said, never left to add up.)
+        const n = study.filter((f) => !f.why && markOf(f, "lockin") === "ungraded").length;
+        return n ? <p className="ld-chart-key">{n} counted {n === 1 ? "run was" : "runs were"} not read by the graders, so {n === 1 ? "it is" : "they are"} not in this chart.</p> : null;
+      })()}
 
       <details className="ld-caveat">
         <summary>What these numbers can and cannot say</summary>

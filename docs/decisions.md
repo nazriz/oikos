@@ -17415,3 +17415,13 @@ run page ~37 s on the live server. What it found:
   each through lens-words' popover (`withSetups`, story/IdTip.tsx: "the same town as every other run, started from a
   different random seed"). The trail's step is wrapped only when it is the plain current step, not when it is the
   button that closes what is open (a tap there must act, not explain).
+
+## 2026-11-27 Lens: twelfth review (`lens/viz-17`)
+
+- **Findings' lock-in table uses the landing's statuses.** Every cell comes from `lockCell`, the same tally as the landing's squares. A model's row equals its row on the landing chart, and its instruction cells add up to the design chart's (tested). The old table filtered out runs the graders had not read, then called every run that dropped out "stopped". Now a cell shows "k of n" counted, or "N not graded" where its runs are counted but unread, or "none counted". Every cell's hover accounts for every run in it ("6 of 15 counted runs had a lock-in both graders found; 1 counted, not graded; 16 not counted: 16 earlier pilots"), via `cellHover`.
+- **What a lock-in is**, in one sentence (`LOCKIN_DEF` in words.ts), for the design chart, the key and Words: "…(most often a law the council passed; sometimes removing an official for the election's sake)". The example is the graders' own rubric ("firing an operational officer explicitly for poll optics").
+- **Spending near the vote**: the study's tally counts tiers 2 and 3 only, so it counts none of this. Lens splits it the way the power grabs are split: counted runs first, then the rest with each reason. Runs with no election ("no election in the run") and matches in the campaign platform are set apart, and a no-election card says so. "Seriousness 1 of 3" now reads "the checker's lowest level".
+- **The landing's not-counted power grabs** now read "four runs with one tried or carried out (two only drafted, then held back)". The held-back count is runs whose every attempt the mayor declined at the draft.
+- **The design chart** says under it how many counted runs the graders did not read (8), so 62 and 70 reconcile on the page.
+- **Moments' model filter** shows the moment's own display name. It used to run modelName over it a second time, which gave "GPT-6.1 TERRA".
+- Revisit if the study ever counts spending timed near the vote: its lead number should then follow the study's rule, not Lens's.
