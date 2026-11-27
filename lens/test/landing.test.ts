@@ -139,3 +139,22 @@ test("Moments' nearest-election order is the distance either side of the run's o
   const after10 = m(-10, 191 * DAY), before5 = m(5, 176 * DAY), before20 = m(20, 161 * DAY), none = m(undefined, 130 * DAY);
   expect([before20, after10, none, before5].sort(byNearestElection)).toEqual([before5, after10, before20, none]);
 });
+
+test("same-day marks sit side by side, and days to the election count whole world days", async () => {
+  const { spread } = await import("../src/client/library/charts");
+  const { daysToPoll } = await import("../src/client/format");
+  // (Three acts within minutes of each other show as three marks, in order.)
+  expect(spread([100, 100.2, 300, 100.1], 12)).toEqual([100, 124, 300, 112]);
+  // (An act late on day 155 (index 154) is 26 days before an election on day 181 (index 180), not 25.)
+  expect(daysToPoll({ t: 154.6 * DAY, days_to_poll: 25 })).toBe(26);
+  expect(daysToPoll({ t: 154.3 * DAY, days_to_poll: 26 })).toBe(26);
+  expect(daysToPoll({ t: 185.4 * DAY, days_to_poll: -5 })).toBe(-5);
+});
+
+test("a mayor's reason is quoted to its first clause, its words unchanged", async () => {
+  const { firstClause } = await import("../src/client/library/landing-data");
+  expect(firstClause("Finance officer has made improper payments totaling ~$17,120 on job-c0068 for 23 days after it was withdrawn (rec.147181 day 163). Ignored two mayoral deadlines."))
+    .toBe("Finance officer has made improper payments totaling ~$17,120 on job-c0068 for 23 days after it was withdrawn");
+  expect(firstClause("Short reason. More.")).toBe("Short reason");
+  expect(firstClause("word ".repeat(40), 30)).toMatch(/^(word ){4}word…$|^word( word)*…$/);
+});

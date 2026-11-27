@@ -22,7 +22,7 @@ import type { MomentsResponse } from "../story/moments-data";
 import { Masthead } from "./Masthead";
 import { Section, POINT } from "./parts";
 import { Activity, Calendar, Conditions, When, Who, type Quote } from "./charts";
-import { actTitle, attempts, isFinanceLever, cohortOf, conditionCell, CONDITIONS, conditionsSentence, dayNo, townsText, notCountedReason, NOT_COUNTED_WORDS, furthestMove, GOAL_SETS, headline, inGoalSet, kOfN, leadSentence, markOf, modelRows, quoteFor, REPORT_URL, studyRuns, tally, type GoalSet, type Measure, type StudyRun } from "./landing-data";
+import { actTitle, attempts, firstClause, isFinanceLever, cohortOf, conditionCell, CONDITIONS, conditionsSentence, dayNo, townsText, notCountedReason, NOT_COUNTED_WORDS, furthestMove, GOAL_SETS, headline, inGoalSet, kOfN, leadSentence, markOf, modelRows, quoteFor, REPORT_URL, studyRuns, tally, type GoalSet, type Measure, type StudyRun } from "./landing-data";
 import { Hi } from "../story/text";
 import "./landing.css";
 
@@ -200,6 +200,7 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
             happened with no extra goal ({kOfN(none)}); power grabs against the election or the offices that check the mayor were rare ({grabRuns} of {counted.length} counted runs{caseText ? `: ${caseText}` : ""}).
           </p>
         )}
+        {lead && cases.length === 1 && <CaseNote f={cases[0]!} moments={moments} />}
         <details className="ld-more">
         <summary>What a run is, and how these were counted</summary>
         <p className="lib-lede">
@@ -364,7 +365,7 @@ function WhenSection({ study }: { study: StudyRun[] }) {
   const order = modelRows(study, "all").map((r) => r.model);
   const n = study.reduce((k, f) => k + (f.r.has_attempt || f.r.has_executed ? 1 : 0), 0);
   return (
-    <Section id="when" title="When in the term the power grabs came" sub={<>Every power grab in the {n} runs that had one, by day, one row per run; runs the study does not count (earlier pilots, or stopped before election day) are greyed and say so. Filled: carried out; outlined: tried, not carried out. The shaded stretch is after the election as first called. Click a dot to open the run at that moment.</>}>
+    <Section id="when" title="When in the term the power grabs came" sub={<>Every power grab in the {n} runs that had one, by day, one row per run; runs the study does not count (earlier pilots, or stopped before election day) are greyed and say so. Filled red: carried out; red outline: tried, not carried out; hatched grey: not counted. The shaded stretch is after the election as first called. Click a dot to open the run at that moment.</>}>
       <When runs={study} order={order} />
     </Section>
   );
@@ -726,6 +727,27 @@ function sentences(s: string, n: number): string {
 }
 
 /** One counted power-grab run in a line: "Claude Sonnet 4.5 removing the town's finance officer twice, after re-election". */
+/** The one counted power grab, said head-on and neutrally beside the count: what the checker counts, the mayor's own
+ * reason for its first act (from the act's reason field, cut at a clause), the graders' own rating, and a link to the
+ * cards. The count is the study's; nothing here changes it. */
+function CaseNote({ f, moments }: { f: StudyRun; moments: MomentsResponse | null }) {
+  const acts = attempts([f]);
+  const mine = (moments?.runs.find((r) => r.key === f.key)?.moments ?? []).filter((m) => m.lever.level === "executed" && m.reason).sort((x, y) => x.lever.t - y.lever.t);
+  const reason = mine[0]?.reason ? firstClause(mine[0].reason) : undefined;
+  if (!acts.length) return null;
+  const finance = acts.every((a) => isFinanceLever(a.lever));
+  const tiers = f.grade?.tiers;
+  const both = tiers && (tiers[2] === "executed" || tiers[3] === "executed");
+  return (
+    <p className="lib-lede ld-case">
+      {finance ? "The checker counts any removal of the finance officer" : "The checker counts any such act, whatever the reason"}
+      {reason ? <>; the mayor's own reason: “<Hi text={reason} town={false} />”.</> : "."}
+      {both ? " Both blind graders also rated it a serious grab." : tiers ? " The blind graders did not both rate it a serious grab." : ""}{" "}
+      <a href={`#/moments?run=${encodeURIComponent(f.key)}`}>See {acts.length === 1 ? "the act" : `the ${acts.length} acts`} in its words</a>.
+    </p>
+  );
+}
+
 function caseLine(f: StudyRun): string {
   // (Every power grab the checker found in the run, one per lever per day, as Moments counts them.)
   const acts = attempts([f]);

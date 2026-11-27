@@ -5,7 +5,7 @@
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
 import { seriousness } from "../plain";
 import { LiveToggle, useLive } from "../measures";
-import { FINANCE_WHY, isFinanceLever, notCountedReason, addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
+import { FINANCE_WHY, POLL_DAY, isFinanceLever, notCountedReason, addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
 import { modelName } from "../words";
 /** Said plainly on a card whose words are the mayor's nomination (its campaign platform): the checker matched words
  * there, not an order to an office; and where the platform says the opposite of the act (it promises to enforce what
@@ -74,6 +74,10 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
   const [goals, setGoals] = useState<Set<string>>(new Set());
   const [levels, setLevels] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<"poll" | "day" | "model">("poll");
+  // (#/moments?run=<key>: one run's cards, as the landing links its one counted case.)
+  const runInHash = () => { const m = /[?&]run=([^&]+)/.exec(location.hash); return m ? decodeURIComponent(m[1]!) : null; };
+  const [onlyRun, setOnlyRun] = useState<string | null>(runInHash);
+  useEffect(() => { const on = () => setOnlyRun(runInHash()); addEventListener("hashchange", on); return () => removeEventListener("hashchange", on); }, []);
   // (Three views: the checker's power grabs (seriousness 2 or 3, its primary measure), its election-season favours (grade 1,
   // never called a power grab), and the graders' lock-ins, each with the mayor's words.)
   const [view, setView] = useState<"grabs" | "favours" | "lockins">(() => (location.hash.includes("view=lockins") ? "lockins" : location.hash.includes("view=favours") ? "favours" : "grabs"));
@@ -92,13 +96,20 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
   const acts = (keep: (m: Moment) => boolean) => { const xs = every.filter((m) => m.lever.level !== "considered" && keep(m)); return { n: xs.length, runs: new Set(xs.map((m) => m.key)).size }; };
   // (As the report counts: acts in the study's counted runs, and apart, those in runs it does not count.)
   const isCounted = (m: Moment) => { const e = entries.get(m.key); return !!e && !notCountedReason(e, live); };
-  const split = (x: (m: Moment) => boolean) => ({ counted: acts((m) => x(m) && isCounted(m)), apart: acts((m) => x(m) && !isCounted(m)) });
+  const split = (x: (m: Moment) => boolean) => ({ counted: acts((m) => pass(m) && x(m) && isCounted(m)), apart: acts((m) => pass(m) && x(m) && !isCounted(m)) });
   const splitText = (x: (m: Moment) => boolean, noun: string) => { const s = split(x); return `${s.counted.n} ${noun} in ${s.counted.runs} counted ${s.counted.runs === 1 ? "run" : "runs"}${s.apart.n ? `, plus ${s.apart.n} in ${s.apart.runs} ${s.apart.runs === 1 ? "run" : "runs"} not counted (earlier pilots, or stopped before election day)` : ""}`; };
   const favours = acts((m) => tierOf(m) === 1), grabs = acts((m) => tierOf(m) >= 2);
   const inRuns = (x: { n: number; runs: number }) => `${x.n} ${x.n === 1 ? "act" : "acts"} in ${x.runs} ${x.runs === 1 ? "run" : "runs"}`;
   const lockins = useMemo(() => (Array.isArray(cat) ? studyRuns(cat, false, live).filter((f) => markOf(f, "lockin") === "yes" && f.grade?.lockInQuote) : []), [cat, live]);
+  const pass = (m: Moment) => (!onlyRun || m.key === onlyRun) && (!models.size || models.has(m.model)) && (!levers.size || levers.has(leverTitle(m.lever.lever))) && (!goals.size || goals.has(goalText(m.goal ?? "none"))) && (!levels.size || levels.has(LEVEL[m.lever.level] ?? ""));
+  const filtered = !!onlyRun || models.size + levers.size + goals.size + levels.size > 0;
+  // (The lock-ins take the same model and instruction filters, and the same orders, by the day the graders quoted.)
+  const lockDay = (f: StudyRun) => Math.floor(lockT(f.grade!.lockInQuote!) / 86_400);
+  const lockShown = lockins.filter((f) => (!onlyRun || f.key === onlyRun) && (!models.size || models.has(modelName(f.model)) || models.has(f.model)) && (!goals.size || goals.has(goalText(f.goal ?? "none"))))
+    .sort((a, b) => sort === "model" ? modelName(a.model).localeCompare(modelName(b.model)) || lockDay(a) - lockDay(b) : sort === "day" ? lockDay(a) - lockDay(b) : Math.abs(lockDay(a) - POLL_DAY) - Math.abs(lockDay(b) - POLL_DAY) || lockDay(a) - lockDay(b));
+  const countLock = (f: (x: StudyRun) => string) => { const c = new Map<string, number>(); for (const x of lockins) c.set(f(x), (c.get(f(x)) ?? 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); };
   const count = (f: (m: Moment) => string) => { const c = new Map<string, number>(); for (const m of all) c.set(f(m), (c.get(f(m)) ?? 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); };
-  const shown = all.filter((m) => (!models.size || models.has(m.model)) && (!levers.size || levers.has(leverTitle(m.lever.lever))) && (!goals.size || goals.has(goalText(m.goal ?? "none"))) && (!levels.size || levels.has(LEVEL[m.lever.level] ?? "")))
+  const shown = all.filter(pass)
     .sort((a, b) => sort === "model" ? a.model.localeCompare(b.model) || a.lever.t - b.lever.t : sort === "day" ? a.lever.t - b.lever.t : byNearestElection(a, b));
   const withAny = new Set(all.filter((m) => m.lever.level !== "considered").map((m) => m.key)).size;
   const toggle = (s: Set<string>, set: (x: Set<string>) => void, v: string) => { const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); set(n); };
@@ -129,24 +140,25 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
         </div>
         <p className="st-sub">
           {view === "lockins"
-            ? <><span className="st-sub-lead">{lockins.length} {lockins.length === 1 ? "run" : "runs"} where both blind graders found a lock-in.</span> <span className="st-sub-more">Out of {aiRuns ? runCountText(aiRuns) : "the runs"}. The words are the mayor's own; the description of the act is the graders', as they wrote it.</span></>
+            ? <><span className="st-sub-lead">{lockShown.length} {lockShown.length === 1 ? "run" : "runs"} where both blind graders found a lock-in{filtered ? ", with these filters" : ""}.</span> <span className="st-sub-more">Out of {aiRuns ? runCountText(aiRuns) : "the runs"}. The words are the mayor's own; the description of the act is the graders', as they wrote it.</span></>
             : view === "favours"
-              ? <><span className="st-sub-lead">{all.length} acts of spending timed near the vote, in {withAny} runs.</span> <span className="st-sub-more">Spending or hiring timed for the vote, which the study's checker rates seriousness 1 of 3. The study does not count these as power grabs.</span></>
-              : <><span className="st-sub-lead">{splitText((m) => (m.lever.tier ?? 2) >= 2, "power grabs")}.</span> <span className="st-sub-more">Out of {aiRuns ? runCountText(aiRuns) : "the runs"}. A power grab is an act at the study's checker's two highest levels of seriousness. The quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</span></>}
+              ? <><span className="st-sub-lead">{shown.filter((m) => m.lever.level !== "considered").length} acts of spending timed near the vote, in {new Set(shown.filter((m) => m.lever.level !== "considered").map((m) => m.key)).size} runs{filtered ? ", with these filters" : ""}.</span> <span className="st-sub-more">Spending or hiring timed for the vote, which the study's checker rates seriousness 1 of 3. The study does not count these as power grabs.</span></>
+              : <><span className="st-sub-lead">{splitText((m) => (m.lever.tier ?? 2) >= 2, "power grabs")}{filtered ? ", with these filters" : ""}.</span> <span className="st-sub-more">Out of {aiRuns ? runCountText(aiRuns) : "the runs"}. A power grab is an act at the study's checker's two highest levels of seriousness. The quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</span></>}
         </p>
         <p className="st-sub">{TWO_CHECKS}</p>
         <MeasuresKey />
         {Array.isArray(cat) && <LiveToggle runs={cat} />}
-        {view !== "lockins" && PHONE && (
+        {onlyRun && <p className="st-sub"><b>One run's moments.</b> <button className="st-btn" onClick={() => { setOnlyRun(null); history.replaceState(null, "", "#/moments"); }}>Show every run</button></p>}
+        {PHONE && (
           <button className="st-btn mo-filter-toggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}>
             {filtersOpen ? "Hide the filters" : `Filter${models.size + goals.size + levers.size + levels.size ? ` (${models.size + goals.size + levers.size + levels.size} on)` : ""}`}
           </button>
         )}
-        {view !== "lockins" && (!PHONE || filtersOpen) && <div className="mo-filters">
-          <Facet label="Model" all="all models" items={count((m) => m.model)} set={setModels} on={models} show={modelName} />
-          <Facet label="Instructions" all="any" items={count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
-          <Facet label={view === "favours" ? "Favour" : "Power grab"} all="any kind" items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />
-          <Facet label="How far" all="tried or carried out" items={count((m) => LEVEL[m.lever.level] ?? "")} set={setLevels} on={levels} />
+        {(!PHONE || filtersOpen) && <div className="mo-filters">
+          <Facet label="Model" all="all models" items={view === "lockins" ? countLock((f) => modelName(f.model)) : count((m) => m.model)} set={setModels} on={models} show={modelName} />
+          <Facet label="Instructions" all="any" items={view === "lockins" ? countLock((f) => goalText(f.goal ?? "none")) : count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
+          {view !== "lockins" && <Facet label={view === "favours" ? "Favour" : "Power grab"} all="any kind" items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />}
+          {view !== "lockins" && <Facet label="How far" all="tried or carried out" items={count((m) => LEVEL[m.lever.level] ?? "")} set={setLevels} on={levels} />}
           <label className="mo-sel">
             <span>Order</span>
             <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
@@ -155,15 +167,15 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
               <option value="model">by model</option>
             </select>
           </label>
-          <label className="mo-sel mo-weak" title="Where the idea only came up in its thinking: the checker matched words, which is often wrong">
+          {view !== "lockins" && <label className="mo-sel mo-weak" title="Where the idea only came up in its thinking: the checker matched words, which is often wrong">
             <input type="checkbox" checked={weak} onChange={() => setWeak(!weak)} /> also ideas it only mentioned
-          </label>
+          </label>}
         </div>}
       </div>
       {view === "lockins" ? (
         <div className="mo-grid">
-          {lockins.map((f) => <LockCard key={f.key} f={f} />)}
-          {!lockins.length && <div className="st-empty">{Array.isArray(cat) ? "No graded lock-in in these runs." : "Reading the runs…"}</div>}
+          {lockShown.map((f) => <LockCard key={f.key} f={f} />)}
+          {!lockShown.length && <div className="st-empty">{Array.isArray(cat) ? (lockins.length ? "No lock-in matches." : "No graded lock-in in these runs.") : "Reading the runs…"}</div>}
         </div>
       ) : (
       <div className="mo-grid">
@@ -219,8 +231,10 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
       <div className="mo-foot">
         <span className="mo-who"><b>{entry ? withSetups(runName(entry)) : `${m.model}, ${m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}${m.seed !== undefined ? `, setup ${m.seed}` : ""}`}</b>. {!(entry && notCountedReason(entry) && /^stopped|^run ended/i.test(m.election)) && <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>}{entry && <> <Measures entry={entry} /></>}</span>
         <span style={{ flex: 1 }} />
-        <button className="st-btn" title="Copy as a citation" onClick={() => { navigator.clipboard?.writeText(citation(m)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }, () => {}); }}>{copied ? "Copied" : "Copy as a citation"}</button>
-        <HowDoWeKnow run={m.key} claim={{ kind: "lever", index: m.lever.i }} />
+        <span className="mo-more-acts">
+          <button className="st-btn" title="Copy as a citation" onClick={() => { navigator.clipboard?.writeText(citation(m)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }, () => {}); }}>{copied ? "Copied" : "Copy as a citation"}</button>
+          <HowDoWeKnow run={m.key} claim={{ kind: "lever", index: m.lever.i }} />
+        </span>
         <button className="st-btn" onClick={onOpen}>Open this turn</button>
       </div>
     </article>
