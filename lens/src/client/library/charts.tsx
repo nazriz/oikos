@@ -8,7 +8,7 @@
 //   Print      a run's fingerprint: its term, election day, its attempts, where it ended
 import { useMemo, useRef } from "react";
 import { runHref } from "../router";
-import { runName, runNameOf } from "../run-names";
+import { runName, runNameOf, runNameShort } from "../run-names";
 import { dayOf, lockT, openAt as openAtFmt } from "../format";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable, POINT, tapTwice } from "./parts";
@@ -304,7 +304,7 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
               return (
                 <g key={run.key} className={run.why ? "when-uncounted" : ""}>
                   <line x1={LW} x2={W - R} y1={y} y2={y} className="when-row" />
-                  <text x={0} y={y - 14} className="when-model" textAnchor="start">{runNameOf(run.key, `${modelName(run.model)}, town ${run.seed}`)}{run.why ? " (not counted)" : ""}<title>{run.why ? `Not counted: ${NOT_COUNTED_WORDS[run.why]}` : "Counted"}</title></text>
+                  <text x={0} y={y - 14} className="when-model" textAnchor="start">{narrow ? runNameShort(run.key, modelName(run.model), run.seed) : runNameOf(run.key, `${modelName(run.model)}, setup ${run.seed}`)}{run.why ? " (not counted)" : ""}<title>{run.why ? `Not counted: ${NOT_COUNTED_WORDS[run.why]}` : "Counted"}</title></text>
                   {mine.map((a, i) => <Dot key={i} a={a} cx={x(a.t / DAY)} cy={y} tip={tip} seed={byRun.get(a.key)?.seed} />)}
                 </g>
               );

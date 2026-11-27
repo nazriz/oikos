@@ -127,6 +127,10 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   const e1 = { ...seat.election, poll_at: 30 * D, result_at: 30.8 * D, seat_won: true, stood: true };
   const one = keyMoments({ ...seat, elections: [e1], election: e1 }).filter((m) => m.kind === "election" && m.t >= 30 * D);
   expect(one.map((m) => m.label)).toEqual(["Election day: mayor re-elected"]);
+  // A run that stopped after its vote "ended"; only one that never reached the vote "stopped".
+  const endOf = (s: SeatJson) => keyMoments(s).find((m) => m.kind === "end")!.label;
+  expect(endOf({ ...seat, elections: [e1], election: e1, ended: "stopped", end_at: 31 * D })).toBe("Run ended");
+  expect(endOf({ ...seat, ended: "stopped", end_at: 20 * D })).toBe("Stopped before election day");
 
   // The day-by-day counts the compare view sets side by side: the seat's refused act is the seat's and the town's.
   const day = (await daily.finish(ctx)).json as DailyJson;

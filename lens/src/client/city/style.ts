@@ -129,7 +129,7 @@ export const CITY_CSS = `
 .lens-city .lc-anno.act { font-weight: 600; font-size: 11.5px; max-width: 240px; white-space: normal; text-align: center; color: var(--lc-text); }
 .lens-city .lc-anno.act b { display: inline-block; width: 8px; height: 8px; background: var(--lc-seat); margin-right: 6px; }
 .lens-city .lc-anno.act.refused b { background: var(--lc-flag); }
-.lens-city .lc-hint { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 4; padding: 7px 12px; font-size: 12.5px; max-width: calc(100% - 24px); }
+.lens-city .lc-hint { position: absolute; left: 372px; bottom: 60px; z-index: 4; padding: 7px 12px; font-size: 12.5px; max-width: min(520px, calc(100% - 384px)); }
 .lens-city.lc-insp { position: static; height: auto; background: transparent; overflow: visible; }
 .lens-city .lc-today { display: grid; gap: 3px; margin-top: 4px; }
 .lens-city .lc-today .lc-row { font-size: 12.5px; }
@@ -161,6 +161,6 @@ export const CITY_CSS = `
   .lens-city .lc-tour { bottom: 8px; padding: 12px 14px 10px; }
   .lens-city .lc-tour-title { font-size: 16px; }
   .lens-city .lc-tour-words { font-size: 14px; max-height: 6em; }
-  .lens-city .lc-hint { top: 84px; bottom: auto; left: 8px; right: 8px; transform: none; max-width: none; }
+  .lens-city .lc-hint { bottom: 50px; top: auto; left: 8px; right: 8px; transform: none; max-width: none; }
 }
 `;

@@ -134,7 +134,15 @@ export function keyMoments(seat: SeatJson, lock?: LockInfo | null): KeyMoment[] 
     if (e.result_at !== undefined && !merged) at(e.result_at, result, resultLong, true);
   }
   // The end.
-  if (seat.ended === "stopped") out.push({ t: end, kind: "end", label: "Run stopped", long: `Day ${dayOf(end)}: the run stopped early${seat.until_at ? `, ${dayOf(seat.until_at) - dayOf(end)} days short of its set length` : ""}.`, strong: true });
+  // (A run that reached election day before it stopped "ended": its vote and result are in. "Stopped" is for a run
+  // that never reached the vote.)
+  const polled = (seat.elections.length ? seat.elections : [seat.election]).some((e) => e.poll_at !== undefined && e.poll_at <= end);
+  if (seat.ended === "stopped")
+    out.push(
+      polled
+        ? { t: end, kind: "end", label: "Run ended", long: `Day ${dayOf(end)}: the run ended after election day${seat.until_at ? `, ${dayOf(seat.until_at) - dayOf(end)} days short of its set length` : ""}.`, strong: false }
+        : { t: end, kind: "end", label: "Stopped before election day", long: `Day ${dayOf(end)}: the run stopped before election day${seat.until_at ? `, ${dayOf(seat.until_at) - dayOf(end)} days short of its set length` : ""}.`, strong: true },
+    );
   return out.sort((a, b) => a.t - b.t);
 }
 
@@ -158,6 +166,6 @@ export function phases(seat: SeatJson, start: number): Phase[] {
     const t2 = Math.min(cuts[i + 1]?.[0] ?? lived, lived);
     if (t2 > t && t < lived) out.push({ t: Math.max(start, t), t2, kind, label });
   }
-  if (seat.ended === "stopped" && limit > end) out.push({ t: end, t2: limit, kind: "stopped", label: "The run stopped here" });
+  if (seat.ended === "stopped" && limit > end) out.push({ t: end, t2: limit, kind: "stopped", label: e.poll_at !== undefined && e.poll_at <= end ? "The run ended here" : "The run stopped here" });
   return out;
 }
