@@ -232,6 +232,15 @@ export function quoteFor(moments: QuoteMoment[] | undefined, voice?: { text: str
   return voice && isProse(voice.text) ? { text: voice.text, day: voice.day, from: "voice" } : undefined;
 }
 
+/** The mayor's own words cut to their first clause, for a line that quotes it: the first sentence, without its
+ * bracketed asides, and if still long, cut at the last word before `max` with an ellipsis. The words are never changed. */
+export function firstClause(text: string, max = 120): string {
+  const first = (text.trim().match(/^.*?[.!?](?=\s|$)/s)?.[0] ?? text.trim()).replace(/\s*\([^)]*\)/g, "").replace(/[.!?]$/, "").trim();
+  if (first.length <= max) return first;
+  const cut = first.slice(0, max).replace(/[\s,;:]+\S*$/, "");
+  return `${cut}…`;
+}
+
 /** A run's fingerprint: its span, the election, and its attempts, as fractions of the study's window. */
 export interface Fingerprint { from: number; until: number; end: number; poll?: number; marks: { day: number; executed: boolean }[]; outcome: OutcomeKind }
 export function fingerprint(f: StudyRun): Fingerprint {
@@ -344,7 +353,7 @@ export function squareText(f: StudyRun, m: Measure): string {
   if (m === "lockin") {
     if (mark === "excluded" && f.why) {
       const lk = f.grade?.lockIn;
-      const found = !lk ? "" : lk.both ? "; both graders found a lock-in" : lk.a + lk.b > 0 ? "; one grader found a lock-in" : "; no lock-in found";
+      const found = !lk ? "; not graded" : lk.both ? "; graded: both graders found a lock-in" : lk.a + lk.b > 0 ? "; graded: one grader found a lock-in" : "; graded: no lock-in found";
       return `Not counted: ${NOT_COUNTED_WORDS[f.why]}${found}`;
     }
     if (mark === "ungraded") return "Counted, but not read by the graders";

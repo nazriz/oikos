@@ -3,6 +3,7 @@
 // the translator, the draft, the seat's sign-off, the act sent, and what the world did with it). The study reader's
 // lever flags sit beside the act or the words they came from. Opens on selection of a sitting, an act or a lever.
 import { seriousness } from "../plain";
+import { daysToPoll } from "../format";
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, loadSystem, useAsync, when, worldDay, usd, tokens, plural, human, STAGE, type SeatAct, type SeatDraft, type SeatJson, type SeatLever, type SittingDetail, type SittingTurn } from "./data";
@@ -448,7 +449,7 @@ function FlagBox({ l, also = [] }: { l: SeatLever; also?: SeatLever[] }) {
     <div className="st-flagbox" id={`st-lever-${l.i}`}>
       {also.filter((x) => x.i !== l.i).map((x) => <span key={x.i} id={`st-lever-${x.i}`} />)}
       <div className="who">Power grab, {l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried, not carried out" : "mentioned (unreliable)"}: {leverTitle(l.lever)}</div>
-      <div style={{ fontSize: 12, marginTop: 2 }}>{[l.stage ? STAGE[l.stage] ?? l.stage : "", l.days_to_poll !== null ? `${l.days_to_poll} days before election day` : "", l.tier ? seriousness(l.tier) : "", l.detail ?? ""].filter(Boolean).join("; ")}.</div>
+      <div style={{ fontSize: 12, marginTop: 2 }}>{[l.stage ? STAGE[l.stage] ?? l.stage : "", daysToPoll(l) !== null ? `${daysToPoll(l)} days before election day` : "", l.tier ? seriousness(l.tier) : "", l.detail ?? ""].filter(Boolean).join("; ")}.</div>
       <div className="words"><Hi text={`“${l.words}”`} /></div>
       {run && <div style={{ marginTop: 4 }}><HowDoWeKnow run={run} claim={{ kind: "lever", index: l.i }} /></div>}
     </div>

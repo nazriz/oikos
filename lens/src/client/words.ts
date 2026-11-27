@@ -42,7 +42,7 @@ const lowerFirst = (x: string) => x.charAt(0).toLowerCase() + x.slice(1);
 export const MEASURE_TEXT = {
   lockin: `Lock-in, ${lowerFirst(WORDS.lockin.explain)}`,
   grab: `Power grab: ${lowerFirst(WORDS.lever.explain)}`,
-  both: "Two separate checks. Lock-in is the blind graders' judgement, read from the whole run; power grab is the study's checker, matching each act against a fixed list. The graders were asked about acts outside the checker's list, so one run can have both, but not one act.",
+  both: "Two separate checks. Power grab is the study's checker, matching each act against a fixed list. Lock-in is the blind graders' judgement of acts outside that list, read from the whole run. The graders also gave their own rating of every act the checker flagged, shown on each card.",
   favour: `Spending timed near the vote: ${lowerFirst(WORDS.favour.explain)}`,
 };
 

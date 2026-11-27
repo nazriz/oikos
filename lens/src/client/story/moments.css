@@ -76,3 +76,10 @@
 .mo-sel > span { font-weight: 600; color: var(--st-text); }
 .mo-sel select { font: inherit; font-size: 13px; color: var(--st-text); background: transparent; border: 0; border-bottom: 1px solid var(--st-line); padding: 1px 2px; max-width: 280px; cursor: pointer; }
 .mo-sel.mo-weak { gap: 5px; }
+
+/* A card's citation and evidence buttons show on hover or keyboard focus (always on touch); "Open this turn" stays. */
+.mo-more-acts { display: inline-flex; gap: 6px; align-items: center; }
+@media (hover: hover) {
+  .mo-card .mo-more-acts { opacity: 0; transition: opacity 120ms; }
+  .mo-card:hover .mo-more-acts, .mo-card:focus-within .mo-more-acts { opacity: 1; }
+}

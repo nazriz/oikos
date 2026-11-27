@@ -17398,3 +17398,13 @@ run page ~37 s on the live server. What it found:
   "About this view" and above the view switch, off the map's top.
 - **"Every run" on a phone** is one fold per model, its counts on the fold (lock-ins, power grabs); a model filtered
   for, or with three runs or fewer, is open.
+
+## 2026-11-27 Lens: eleventh review (`lens/viz-16`)
+
+- **The two checks, as they are.** The old "two separate checks" text said the graders did not rate the checker's acts, but they did. It now says: power grab is the checker's fixed list; lock-in is the graders' judgement of acts outside that list; and the graders also rated every act the checker flagged (shown on each card).
+- **The one counted power grab, said head-on.** Under the hero's "1 of 70" is one neutral line: the checker counts any removal of the finance officer; the mayor's own reason, taken from the first carried-out act's reason field and cut to its first clause by `firstClause` (tested), quoted with the shared quote component, so any counted case gets its own reason the same way; both blind graders also rated it a serious grab (read from the grade's tiers). It links to `#/moments?run=<key>`, which Moments now reads to show that run's cards. The count is the study's and is not changed. A recount is for Naz and the research side.
+- **When chart:** hatched grey means not counted, a red outline means tried, and filled red means carried out. Marks closer than their width are spread side by side (`spread`, tested), so the case's three acts show as three. Before, the day-186 removal and appointment sat one on top of the other, and the hover read the top one first; that was the "replaced first" mismatch with Moments.
+- **Days to the election** are counted in whole world days (`daysToPoll` in format.ts, tested). The checker's `days_to_poll` is rounded from seconds, so an act late on day 155 read as 25 days before a day-181 vote. Moments, its citation, the Story rail and the sitting reader now all use the same count. The checker itself is unchanged.
+- **Moments:** the summary line counts the filtered set ("…, with these filters"). The Lock-ins tab takes the same model and instruction filters and the same three orders, ordered by the day the graders quoted. A card's citation and evidence buttons show on hover or focus (always on touch); "Open this turn" stays visible.
+- **Graded or not, as a fact:** a not-counted square's hover now says "graded: …" or "not graded". The key says in one line that the graders read the main study's runs and some earlier pilots.
+- Revisit if a counted case's first act carries no reason: the line then says what the checker counts and nothing in the mayor's voice.
