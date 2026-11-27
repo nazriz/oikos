@@ -38,7 +38,8 @@ export interface TownAct {
   participant: string;
   /** The post it acted as ("mayor"). */
   as?: string;
-  blocks: { block: string; kind?: string; text?: string; to: string[] }[];
+  /** `public`: the block is published for everyone (visible_to "public"). */
+  blocks: { block: string; kind?: string; text?: string; to: string[]; public?: boolean }[];
   status: "sent" | "applied" | "refused";
   refusal?: string;
   /** Why, in the seat's own words, when the command carries it (provenance reasoning / proposal). */
@@ -164,7 +165,7 @@ export function townFold(): Fold {
     const cat = cfg.catalogue ?? {};
     const g = w.ground ?? { cell: 25, w: 0, h: 0, terrain: [] };
     b = {
-      v: 1,
+      v: 5, // the fold's version, readable by the client (5: acts' blocks carry `public`)
       name: cfg.meta?.name,
       ground: { cell: g.cell ?? 25, w: g.w ?? 0, h: g.h ?? 0 },
       places: (w.places ?? []).map((p: any) => ({ id: p.id, kind: p.kind, name: p.name ?? p.id, area: p.area, within: p.within })),
@@ -382,7 +383,7 @@ export function townFold(): Fold {
 
   return {
     name: "town",
-    version: 4,
+    version: 5,
     line(l: LogLine) {
       if (l.t > tMax) tMax = l.t;
       if (l.kind === "header") return header(l.body);
@@ -465,7 +466,7 @@ export function townFold(): Fold {
         const blocks = (body.blocks ?? []).map((bl: any) => {
           const to: string[] = [...(bl.to ?? []), ...(bl.addressed_to ?? [])];
           for (const id of to) if (!b!.targets[id]) b!.targets[id] = target(id);
-          return { block: bl.block, kind: bl.kind, text: typeof bl.text === "string" ? bl.text.slice(0, 600) : undefined, to };
+          return { block: bl.block, kind: bl.kind, text: typeof bl.text === "string" ? bl.text.slice(0, 600) : undefined, to, ...(bl.visible_to === "public" ? { public: true } : {}) };
         });
         const why = body.provenance?.reasoning ?? body.reasoning ?? body.provenance?.proposal;
         actBySeq.set(l.seq, b.acts.length);

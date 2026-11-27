@@ -104,11 +104,17 @@ export function keyMoments(seat: SeatJson, lock?: LockInfo | null): KeyMoment[] 
   }
   // The election: called, nominations close, the vote, the result (each election the run saw).
   for (const e of seat.elections.length ? seat.elections : [seat.election]) {
+    // (A date the run never reached is a plan, not an event: hollow, and said so. A stopped run says it stopped first.)
     const at = (t: number | undefined, label: string, long: string, strong = false) =>
-      t !== undefined && out.push({ t, kind: "election", label, long, strong, ...(t > end ? { after: true } : {}) });
+      t !== undefined &&
+      out.push(
+        t > end
+          ? { t, kind: "election", label: `Planned ${label.charAt(0).toLowerCase()}${label.slice(1)} (${seat.ended === "stopped" ? "the run stopped first" : "after the run"})`, long, strong: false, after: true }
+          : { t, kind: "election", label, long, strong },
+      );
     at(e.notice_at, "Election called", `Day ${dayOf(e.notice_at ?? 0)}: the notice of election went up.`);
     at(e.nominations_close_at, "Nominations close", `Day ${dayOf(e.nominations_close_at ?? 0)}: the last day to stand.${e.stood ? " The AI mayor stood." : ""}`);
-    at(e.poll_at, "Election day", `Day ${dayOf(e.poll_at ?? 0)}: the vote${(e.poll_at ?? 0) > end ? ", after this run's end" : ""}.`, true);
+    at(e.poll_at, "Election day", `Day ${dayOf(e.poll_at ?? 0)}: the vote${(e.poll_at ?? 0) > end ? (seat.ended === "stopped" ? `, as planned; the run stopped on day ${dayOf(end)}, before it` : ", after this run's end") : ""}.`, true);
     if (e.result_at !== undefined) {
       const won = e.seat_won === true, lost = e.seat_won === false && e.stood;
       at(e.result_at, won ? "Mayor re-elected" : lost ? "Mayor lost" : "Result", `Day ${dayOf(e.result_at)}: the result.${e.winner ? ` Won by ${winnerWords(e.winner, { seats: [seat.seat] })}.` : ""}`, true);

@@ -24,9 +24,16 @@ interface Step {
   body: string;
   /** What the step says while its thing is still loading. */
   waiting?: string;
+  /** What to do when the step opens (open a folded part of the page). */
+  before?: () => void;
   /** Whether the thing is ready to be shown (beyond being on the page): by default, nothing in it is still loading. */
   ready?: (el: Element) => boolean;
 }
+
+/** A phone-narrow screen: the story sits below the town, not beside it, and the run bar folds its actions away. */
+const PHONE = typeof matchMedia !== "undefined" && matchMedia("(max-width: 700px)").matches;
+/** Before a step on the run bar's actions: open them (on a phone they are folded under "Details"). */
+const openRunDetails = () => window.dispatchEvent(new Event("lens-run-details"));
 
 /** Nothing in it still says it is loading (a spinner, "Drawing the town", "Reading the AI mayor's turns…"). */
 const LOADING = ".st-empty, .lc-loading, .lc-spin, .sk, .ld-h1-sk, .ld-skel";
@@ -99,14 +106,16 @@ export const STEPS: Step[] = [
     target: [".run-bar"],
     title: "One run",
     waiting: "Opening the run…",
-    body: "The top line says which AI model was the mayor and what it was told; on the right, how the run came out on both measures and at the election.",
+    body: PHONE
+      ? "The top says which AI model was the mayor and, under its name, how the run came out on both measures and at the election. “Details” opens what it was told."
+      : "The top line says which AI model was the mayor and what it was told; on the right, how the run came out on both measures and at the election.",
   },
   {
     route: onRun,
     target: ['[data-tour="city-map"]', ".run-map"],
     title: "The town",
     waiting: "Drawing the town…",
-    body: "Each block is a building and the dots on it are the people inside at this moment. Yellow lines run from the town hall to whatever the mayor's acts reached. Click anything to open it.",
+    body: `Each block is a building and the dots on it are the people inside at this moment. Yellow lines run from the town hall to whatever the mayor's acts reached. ${POINT.hover === "Tap" ? "Tap" : "Click"} anything to open it.`,
   },
   {
     route: onRun,
@@ -128,26 +137,28 @@ export const STEPS: Step[] = [
     target: ['[data-tour="rail"]', ".run-rail"],
     title: "The mayor's turns",
     waiting: "Reading the AI mayor's turns…",
-    body: "Each entry is one of the AI mayor's turns: what it did, in its own words. Open a turn to read everything it read, thought and sent.",
+    body: `${PHONE ? "Below the town, each entry" : "Each entry"} is one of the AI mayor's turns: what it did, in its own words. Open a turn to read everything it read, thought and sent.`,
   },
   {
     route: onRun,
     target: [".run-compare"],
     title: "Compare",
+    before: openRunDetails,
     body: "The same town from the same day, run by a simple rule-based mayor. Whatever differs is what the AI mayor changed.",
   },
   {
     route: onRun,
     target: [".run-power"],
     title: "Who holds power",
-    body: "Every office in the town and who held it over the run, with the AI mayor's family marked.",
+    before: openRunDetails,
+    body: "Every office in the town and who holds it on the day you are on, with the AI mayor's family marked. Move through the run and the posts change hands.",
   },
   {
     route: () => (views.findings ? "#/findings" : "#/"),
-    target: ['[data-tour="findings"]', "#s-who"],
+    target: [".fi-lt", '[data-tour="findings"]', "#s-who"],
     title: "All the runs together",
     waiting: "Loading the study's runs…",
-    body: "Findings sums up every run by AI model and instruction, on both measures.",
+    body: "Findings sums up every run: first lock-in, by AI model and instruction, with its exact figures; below it, the power grabs.",
   },
   {
     target: [".help-btns"],
@@ -186,6 +197,7 @@ export function Tour() {
     const s = STEPS[step]!;
     const want = s.route?.();
     if (want && window.location.hash.split("?")[0] !== want.split("?")[0]) window.location.hash = want;
+    s.before?.();
     setRect(null);
     setLost(false);
     const t0 = Date.now();

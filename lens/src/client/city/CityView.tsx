@@ -189,6 +189,9 @@ export const pretty = (id: string) => {
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
 
+/** More places than this reached by one act, and it is drawn as one "to everyone" mark at the town hall. */
+const BROADCAST = 12;
+
 function fitZoom(w: number, h: number, metresW: number, metresH: number) {
   return Math.log2(Math.min(w / metresW, h / metresH));
 }
@@ -538,6 +541,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     const out: { from: [number, number, number]; to: [number, number, number]; age: number; act: (typeof town.acts)[number]; target: string; refused: boolean }[] = [];
     for (const a of actsNow) {
       const seen = new Set<number>();
+      const mine: typeof out = [];
       for (const bl of a.blocks) for (const id of bl.to) {
         const tg = town.targets[id];
         let s = -1;
@@ -546,11 +550,38 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
         if (s < 0 || s === hall || seen.has(s)) continue;
         seen.add(s);
         const sh = B.shapes[s]!;
-        out.push({ from: [src.cx, src.cy, src.top + 2], to: [sh.cx, sh.cy, sh.top + 1], age: Math.max(0, t - a.t) / ACT_WINDOW, act: a, target: tg?.name ?? id, refused: a.status === "refused" });
+        mine.push({ from: [src.cx, src.cy, src.top + 2], to: [sh.cx, sh.cy, sh.top + 1], age: Math.max(0, t - a.t) / ACT_WINDOW, act: a, target: tg?.name ?? id, refused: a.status === "refused" });
       }
+      // (An act to the whole town, a paper published to everyone, is one mark at the town hall, not an arc to every
+      // building: see `broadcasts`.)
+      // (Asked for, by selecting or hovering it, or in the tour: then every arc, as wanted.)
+      if (mine.length <= BROADCAST || hi.has(a.seq)) out.push(...mine);
     }
     return out;
-  }, [actsNow, B, city, town, Math.floor(t / 600)]);
+  }, [actsNow, B, city, town, hi, Math.floor(t / 600)]);
+  /** The acts that reached more places than arcs can show, said once at the town hall: "To everyone: 212 places". */
+  const broadcasts = useMemo(() => {
+    const hall = town.hall;
+    if (hall === undefined) return [];
+    const out: { seq: number; n: number; everyone: boolean; age: number; refused: boolean }[] = [];
+    const people = city.people.people.length;
+    for (const a of actsNow) {
+      if (hi.has(a.seq)) continue;
+      const seen = new Set<number>(), persons = new Set<string>();
+      for (const bl of a.blocks) for (const id of bl.to) {
+        const tg = town.targets[id];
+        if (tg?.kind === "person" && tg.person) persons.add(tg.person);
+        const s = tg?.kind === "entity" && tg.structure !== undefined ? tg.structure : tg?.kind === "person" && tg.person ? placeAt(city, tg.person, a.t) : -1;
+        if (s >= 0 && s !== hall) seen.add(s);
+      }
+      // ("To everyone" only where the record says so: a block published for everyone (town fold v5, `public`). Many
+      // places is not everyone. A bundle made before v5 (its own `v` says so) cannot tell: there, until it is made
+      // again, addressees making up nearly the whole town stand in.)
+      const pub = a.blocks.some((bl) => bl.public), old = (town.v ?? 1) < 5;
+      if (seen.size > BROADCAST) out.push({ seq: a.seq, n: seen.size, everyone: pub || (old && people > 0 && persons.size >= people * 0.9), age: Math.max(0, t - a.t) / ACT_WINDOW, refused: a.status === "refused" });
+    }
+    return out;
+  }, [actsNow, city, town, hi, Math.floor(t / 600)]);
 
   // ---- The tour: go to each step's moment and frame what it touched ----
   const tourElection = useRef<boolean | null>(null);
@@ -949,6 +980,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     const hit = (a: [number, number, number, number], b: [number, number, number, number]) => a[0] < b[2] + 4 && a[2] > b[0] - 4 && a[1] < b[3] + 2 && a[3] > b[1] - 2;
     const taken: [number, number, number, number][] = [];
     if (hallAt) taken.push(box(Math.min(size.w - 130, Math.max(130, hallAt[0])), hallAt[1], (story ? CITY_WORDS.hall.length : 9) * 7.4 + 8, 34));
+    if (hallAt && broadcasts.length) taken.push(box(Math.min(size.w - 130, Math.max(130, hallAt[0])), hallAt[1] + 34, 240, 34));
     for (const l of placeLabels) taken.push(box(l.x, l.y, l.w + 8, l.big ? 22 : 18));
     const out: { seq: number; text: string; refused: boolean; age: number; x: number; y: number }[] = [];
     const seen = new Set<string>();
@@ -1115,6 +1147,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       {label && <div className={`lc-pane-label${bare ? " bare" : ""}`}>{label}</div>}
       {!bare && !present && <Clock t={t} sky={sky} town={town} />}
       {hallAt && !present && <div className={`lc-anno hall${inkLight ? "" : " night"}`} data-tour="city-town-hall" id="city-town-hall" style={{ left: Math.min(size.w - 130, Math.max(130, hallAt[0])), top: hallAt[1] }}>{story ? CITY_WORDS.hall : "Town hall"}</div>}
+      {hallAt && broadcasts.length > 0 && <div className={`lc-anno act broadcast ${broadcasts[0]!.refused ? "refused" : ""}${inkLight ? "" : " night"}`} style={{ left: Math.min(size.w - 130, Math.max(130, hallAt[0])), top: hallAt[1] + 34, opacity: Math.max(0.75, 1 - Math.min(...broadcasts.map((b) => b.age)) * 0.7) }}><b />{broadcasts.length === 1 ? (broadcasts[0]!.everyone ? `To everyone: the AI mayor's act reached ${broadcasts[0]!.n} places` : `The AI mayor's act reached ${broadcasts[0]!.n} places`) : `${broadcasts.length} acts of the AI mayor, each reaching more than ${BROADCAST} places`}</div>}
       {placeLabels.map((l) => <div key={l.text} className={`lc-anno place${l.big ? " big" : ""}${inkLight ? "" : " night"}`} style={{ left: l.x, top: l.y }}>{l.text}</div>)}
       {placeNotes().map((n) => <div key={n.seq} className={`lc-anno act ${n.refused ? "refused" : ""}${inkLight ? "" : " night"}`} style={{ left: n.x, top: n.y, opacity: 1 - n.age * 0.7 }}><b />{n.text}</div>)}
       {hint && !present && !bare && <div className="lc-hint" data-lens-prompt="city-hint" onMouseEnter={dropHint}>{CITY_WORDS.hint} <button className="lc-ghost" onClick={dropHint}>Got it</button></div>}

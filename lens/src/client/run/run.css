@@ -590,3 +590,36 @@
 @media (max-width: 700px) {
   .run-sub { white-space: normal; overflow: visible; line-height: 1.35; }
 }
+
+/* Phones: the bar is the model's name, the outcome and the trail; "Details" opens what it was told and the actions
+   (fresh-eyes 5: the full bar took ~250 px and pushed the story below the fold). */
+.run-more {
+  display: none;
+}
+@media (max-width: 700px) {
+  .run-more {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 0 6px;
+    height: 22px;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-2);
+    background: none;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-1);
+    vertical-align: 3px;
+    cursor: pointer;
+  }
+  .run-bar:not(.details) .run-sub,
+  .run-bar:not(.details) .run-actions {
+    display: none;
+  }
+  .run-bar-top {
+    padding: 6px 12px 4px;
+  }
+  .run-result {
+    font-size: 13.5px;
+  }
+}

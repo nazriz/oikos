@@ -17046,3 +17046,20 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
 - Mobile Findings scrolls sideways at a readable size; dark-mode "stopped" squares are hatched, apart from grey
   "neither"; the landing opens with one plain sentence and folds the rest; Models' quotes refuse "getting its bearings"
   lines ("I'll start by checking who I am on the electoral roll").
+## 2026-11-27 Lens: a fifth newcomer review, the shell's part (`lens/nav-9`)
+
+- **The walk says what the page shows**: Findings is shown from its lock-in table first (then the power grabs below);
+  Who holds power is "who holds it on the day you are on"; on a phone the outcome is "under its name" and the turns are
+  "below the town", and the steps on the run bar's actions open its folded "Details" first.
+- **A date the run never reached is a plan**: on a stopped run the election's flags after the stop read "Planned
+  election day (the run stopped first)", hollow and dashed.
+- **The run bar on a phone** is the model's name, the outcome and the trail; "Details" opens what it was told and the
+  actions (the full bar was ~250 px and pushed the story below the fold). The timeline drops its phase names when
+  phone-narrow (the bands keep their colour), so flags and names no longer crowd.
+- **One act to many places is one mark** (with lens-city): an act reaching more than 12 places draws no arcs but one
+  line under the town hall, "The AI mayor's act reached N places", "To everyone: …" only where the record says the
+  act was published for everyone (the town fold, v5, keeps `public` on such a block: lens-city); selected, hovered or
+  in the tour, it draws every arc as before. A bundle made before v5 (its own `v` below 5) falls back to addressees
+  making up 90% of the town, until it is made again.
+- **Revisit if** a publication's audience can be narrower than "public" and wider than its named addressees (a group,
+  a district): then the line says that audience.
