@@ -337,7 +337,7 @@ function Reached({ ledger, t, nameOf, whoOf, filter, setFilter, bulk }: { ledger
                   {r.from && <span className={`life-who ${r.who}`}>, from {nameOf(r.from)}</span>}
                   {r.it?.refused && <span className="bad">, refused ({words(r.it.refused)})</span>}
                 </span>
-                <span className="life-text">{plain(r.text, names)}</span>
+                <span className="life-text">{plain(r.text, { ...names, roles: undefined })}</span>
               </span>
             </button>
           </li>,

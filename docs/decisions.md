@@ -17063,3 +17063,24 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
   making up 90% of the town, until it is made again.
 - **Revisit if** a publication's audience can be narrower than "public" and wider than its named addressees (a group,
   a district): then the line says that audience.
+## 2026-11-27 · Lens: residents by their post, "tried" one meaning, a grouped Who holds power (`lens/words-4`)
+
+- **Residents in Lens's own sentences** are named by the post they hold at the run's end ("the works manager
+  (c0072)"), else "a resident (c0613)"; the AI mayor's person is "the AI mayor"; "-self" never shows (`roles` in
+  `usePlainNames`, `personWords` in plain.ts). Quotes, the residents' own talk and ids already described in
+  brackets are left alone. Posts by id read by their titles ("Appointed … as the works manager", "the works
+  manager's post"); "petition rec.948" reads "a petition"; a standing order by id ("dir-opening-works-collection")
+  reads "its standing order on waste collection"; a letter to `outside` goes to "an outside body".
+- **Turn cards** in the reader lead with the story's clause for the act ("Filed to stand for re-election"), the
+  mayor's request below; the simulation's own notes are Researcher-only; Compare says "town 9", not "seed 9"; the
+  evidence says "the study's checker rates it seriousness 2 of 3".
+- **"Tried"** means asked for it, carried out or not (the glossary says so); wherever Lens means the subset it says
+  "tried, not carried out" (Moments, the rail's lanes, the charts, the digest, the reader, the hover card, the
+  evidence). Sentences after "tried to" use the lever's verb form (`LEVER_TO`): "It tried to leave the election office
+  without its head, but did not carry it out." Agreed with lens-viz, whose viz-10 keeps the same wording.
+- **Who holds power (Story mode):** a resident who holds several posts is said once, at the first: "c0067 (58) holds
+  4 posts: Child protection officer, Clerk of the mayor, …"; at the others "c0067, same as above".
+- **Fault fixed:** the run page put "How do we know?" (whose panel has a list and paragraphs) inside a `<p>`, which
+  React reports as invalid nesting and a hydration error; the result line is a `<div>` now.
+- **Revisit if** the post a resident is named by should be the one held on the day of the sentence rather than at the
+  run's end.

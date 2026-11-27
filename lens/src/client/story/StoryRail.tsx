@@ -26,7 +26,7 @@ export function storyTracks(seat: SeatJson) {
   const results = seat.records.filter((r) => r.kind === "ballot_result" && r.t >= seat.fork_at);
   return [
     { id: "story.sittings", label: "Mayor's turns", marks: seat.sittings.map((s) => ({ t: s.t, ...(s.t_end > s.t ? { t2: s.t_end } : {}), label: s.gist, tone: "seat" as const, select: { kind: "sitting" as const, index: s.i } })) },
-    { id: "story.levers", label: "Power grabs", marks: seat.levers.map((l) => ({ t: l.t, label: `${leverTitle(l.lever)} (${l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned, unreliable"})`, tone: l.level === "considered" ? ("muted" as const) : ("flag" as const), select: { kind: "lever" as const, index: l.i } })) },
+    { id: "story.levers", label: "Power grabs", marks: seat.levers.map((l) => ({ t: l.t, label: `${leverTitle(l.lever)} (${l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried, not carried out" : "mentioned, unreliable"})`, tone: l.level === "considered" ? ("muted" as const) : ("flag" as const), select: { kind: "lever" as const, index: l.i } })) },
     { id: "story.election", label: "Election", marks: elec },
     { id: "story.news", label: "The paper", marks: news.map((r) => ({ t: r.t, label: r.text.slice(0, 120), tone: "news" as const })) },
     { id: "story.results", label: "Votes and results", marks: results.map((r) => ({ t: r.t, label: r.text.slice(0, 120), tone: r.data?.passed === true ? ("good" as const) : r.data?.passed === false ? ("bad" as const) : ("election" as const) })) },
@@ -105,7 +105,7 @@ function HeaderLine({ seat, onOpen }: { seat: SeatJson; onOpen: () => void }) {
       </div>
       {(top.size > 0 || kin.length > 0) && (
         <div className="st-line3">
-          {[...top.values()].sort((a, b) => rank[b.level] - rank[a.level]).map((l) => <button key={l.lever} className="st-grabline" onClick={() => select({ kind: "lever", index: l.i })}>{leverTitle(l.lever)} ({l.level === "executed" ? "carried out" : "tried"})</button>)}
+          {[...top.values()].sort((a, b) => rank[b.level] - rank[a.level]).map((l) => <button key={l.lever} className="st-grabline" onClick={() => select({ kind: "lever", index: l.i })}>{leverTitle(l.lever)} ({l.level === "executed" ? "carried out" : "tried, not carried out"})</button>)}
           {kin.length > 0 && <button className="st-grabline" onClick={() => select({ kind: "act", seq: seat.acts[kin[0]!.act]!.seq })}>Appointed its own child {kin.length === 1 ? "once" : `${kin.length} times`}</button>}
         </div>
       )}
@@ -143,7 +143,7 @@ function Header({ seat, onClose }: { seat: SeatJson; onClose: () => void }) {
           <span className="lbl">The study's checker found:</span>
           {[...byLever.values()].sort((a, b) => rank[b.level] - rank[a.level]).map((x) => (
             <button key={x.title} className={`st-grabline ${x.level === "considered" ? "weak" : ""}`} onClick={() => select({ kind: "lever", index: x.first })}>
-              {leverTitle(x.lever)} ({x.level === "executed" ? "carried out" : x.level === "attempted" ? "tried" : "mentioned, unreliable"})
+              {leverTitle(x.lever)} ({x.level === "executed" ? "carried out" : x.level === "attempted" ? "tried, not carried out" : "mentioned, unreliable"})
             </button>
           ))}
         </div>

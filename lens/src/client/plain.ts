@@ -13,6 +13,9 @@ export interface PlainNames {
   positions?: Record<string, { title: string }>;
   /** The participants that are the AI mayor (and the persons it is): said as "the AI mayor". */
   seats?: Iterable<string>;
+  /** A resident's post, by person id ("c0072" → "Works manager"): a resident in Lens's own sentences is named by the
+   * post they hold ("the works manager (c0072)"), else as "a resident (c0613)". Absent: person ids are left as they are. */
+  roles?: Record<string, string>;
 }
 
 const SEAT_WORDS = "the AI mayor";
@@ -48,6 +51,8 @@ export function plainId(id: string, names?: PlainNames): string | undefined {
   if (post) return /^councillor-\d+$/.test(id) || /\d$/.test(post.title) ? post.title : `the ${post.title.charAt(0).toLowerCase()}${post.title.slice(1)}`;
   const ent = names?.entities?.[id];
   let m: RegExpExecArray | null;
+  // (A standing order by its id, "dir-opening-works-collection": the order on what it covers.)
+  if ((m = /^dir-(?:opening-)?([a-z][a-z-]*[a-z])$/.exec(id))) return `its standing order on ${DIRECTIONS[m[1]!] ?? words(m[1]!)}`;
   if (ent) {
     // ("Trading from home (c0804)" reads in a sentence as "c0804's home business"; a group as "the Millbrook
     // congregation", so "what religious-group-1 teaches" becomes "what the Millbrook congregation teaches".)
@@ -65,6 +70,9 @@ export function plainId(id: string, names?: PlainNames): string | undefined {
   return structure(id, names);
 }
 
+/** What a standing order's form covers, where its name does not say it plainly. */
+const DIRECTIONS: Record<string, string> = { "works-collection": "waste collection", "works-staffing": "works staffing", "environment-staffing": "environment staffing", "inspector-enforcement": "building-code fines", "rates-recovery": "recovering overdue rates" };
+
 // The ids plainText looks for in running text. Each is a shape only the world writes, never an English word.
 const IDS = [
   "[a-z][a-z0-9-]*[a-z0-9]\\/[a-z]+\\.\\d+", // a place in a building: factory-3-works/workplace.1
@@ -76,6 +84,7 @@ const IDS = [
   "council-clerk|town-hall|town-offices",
   "form-[a-z][a-z-]*[a-z]",
   "ask-\\d+",
+  "dir-[a-z][a-z-]*[a-z]", // a standing order: dir-opening-works-collection
   "job-c\\d+(?:-[a-z]+)*", // a job agreement, or its standing payment: job-c0068, job-c0068-wages
 ];
 const ID_RE = new RegExp(`(?<![\\w.$/-])(?:the )?(?:${IDS.join("|")})(?![\\w/-]|\\.\\w)`, "g");
@@ -103,6 +112,16 @@ export function replaceIds(s: string, names?: PlainNames, render: (id: string, s
   });
 }
 function plainPart(s: string, names?: PlainNames): string {
+  // (A paper named with its record id says what it is: "petition rec.948" → "a petition".)
+  s = s.replace(/\b(?:the |a )?(petition|ballot|notice|proposal|law|nomination) (?:rec|draft)\.[\w.-]*\d\b/g, "a $1");
+  // (A post by its id after "as" or in "the … post": "Appointed c0068 as works" → "as the works manager".)
+  if (names?.positions) {
+    const title = (w: string) => names.positions?.[w.replace(/ /g, "-")]?.title;
+    s = s.replace(/\b(Appointed \S+ as )([a-z][a-z -]*?)(?=[;.,)]|$)/g, (hit, pre: string, w: string) => { const t = title(w); return t ? `${pre}${lower(t)}` : hit; })
+      .replace(/\bthe ([a-z][a-z -]*?) post\b/g, (hit, w: string) => { const t = title(w); return t ? `${lower(t)}'s post` : hit; });
+  }
+  // (The one being appointed is named as a resident: the post the sentence gives them is the one they end up holding.)
+  if (names?.roles) s = s.replace(/(?<![\w.(/-])(c\d{4,})(?:-self)?\b(?! \()(?!'s)/g, (hit: string, id: string, at: number, all: string) => (all.startsWith(" as ", at + hit.length) && !new Set(names.seats ?? []).has(id) ? `a resident (${id})` : personWords(id, names)));
   return replaceIds(s, names)
     .replace(/\bstanding direction(s?)\b/gi, "standing order$1 to a town office")
     .replace(/\b[Dd]irection: /g, "Standing order to a town office: ")
@@ -112,6 +131,16 @@ function plainPart(s: string, names?: PlainNames): string {
     // (A group or the union, named by its bare id in a resident's words: "what union teaches".)
     .replace(/\b(what|at|for|in|join|joined|of) union\b/g, "$1 the union")
     .replace(/\b([a-z]+)_([a-z]+)\b/g, "$1 $2");
+}
+
+const lower = (t: string) => (/^[A-Z][a-z]+(?: [a-z][\w']*)*$/.test(t) ? `the ${t.charAt(0).toLowerCase()}${t.slice(1)}` : t);
+/** A resident in Lens's own sentence: the AI mayor, by the post they hold ("the works manager (c0072)"), else "a
+ * resident (c0613)". */
+export function personWords(id: string, names?: PlainNames): string {
+  const seats = names?.seats ? new Set(names.seats) : undefined;
+  if (seats?.has(id)) return SEAT_WORDS;
+  const role = names?.roles?.[id];
+  return role ? `${lower(role)} (${id})` : `a resident (${id})`;
 }
 
 /** Who won an election, in words: the AI mayor when it is the seat, else the winner as the world names them. */

@@ -163,7 +163,7 @@ function PeekCard({ run, sel, rect, onGo, ref }: { run: string; sel: NonNullable
   } else if (sel.kind === "lever") {
     const l = seat?.levers[sel.index];
     if (l) {
-      lines.push(`Day ${dayNo(l.day)}. ${l.level === "executed" ? "Carried out" : l.level === "attempted" ? (l.stage === "seat_declined" ? "Drafted, then held back (the checker counts it as tried)" : "Tried") : "Mentioned in its thinking (unreliable)"}${l.tier ? `; seriousness ${l.tier} of 3` : ""}.`);
+      lines.push(`Day ${dayNo(l.day)}. ${l.level === "executed" ? "Carried out" : l.level === "attempted" ? (l.stage === "seat_declined" ? "Drafted, then held back (the checker counts it as tried)" : "Tried, not carried out") : "Mentioned in its thinking (unreliable)"}${l.tier ? `; seriousness ${l.tier} of 3` : ""}.`);
       if (l.words) lines.push(`“${l.words.length > 160 ? `${l.words.slice(0, 157)}…` : l.words}”`);
     }
   } else if (sel.kind === "act") {
