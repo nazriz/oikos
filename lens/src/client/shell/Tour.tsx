@@ -180,6 +180,8 @@ function find(sel: string[]): Element | null {
 
 /** How long a step waits for its thing before it says so (a run opening for the first time can take a while). */
 const WAIT_MS = 90_000;
+/** How long Next holds before opening a step whose thing is still loading (it then opens, saying so). */
+const NEXT_WAIT_MS = 3_000;
 
 export function Tour() {
   const step = useMode((s) => s.tour);
@@ -252,7 +254,8 @@ export function Tour() {
     const t0 = Date.now();
     const id = setInterval(() => {
       const el = find(next.target);
-      if ((el && (next.ready ?? loaded)(el)) || Date.now() - t0 > WAIT_MS) {
+      // (Never more than a few seconds on Next: after that the step opens anyway and says what it still waits for.)
+      if ((el && (next.ready ?? loaded)(el)) || Date.now() - t0 > NEXT_WAIT_MS) {
         clearInterval(id);
         setTour(pending);
       }
@@ -274,7 +277,16 @@ export function Tour() {
     else if (rect.top - pad - H >= pad) pos = { left: left0, top: rect.top - pad - H };
     else if (rect.right + pad + W <= vw - pad) pos = { left: rect.right + pad, top: Math.max(pad, Math.min(vh - H - pad, rect.top)) };
     else if (rect.left - pad - W >= pad) pos = { left: rect.left - pad - W, top: Math.max(pad, Math.min(vh - H - pad, rect.top)) };
-    else pos = { left: Math.max(pad, Math.min(vw - W - pad, rect.right - W - pad)), top: Math.max(pad, Math.min(vh - H - pad, Math.min(rect.bottom, vh) - H - pad)) };
+    else {
+      // No room around it: over it, in whichever corner of what shows covers the least of its own links and buttons
+      // (the three moments' "Open day …" buttons sit on the right; a note there would hide what it points at).
+      const own = [...(find(STEPS[step ?? 0]?.target ?? [])?.querySelectorAll("a, button") ?? [])].map((e) => e.getBoundingClientRect()).filter((b) => b.width > 0);
+      const top0 = Math.max(pad, rect.top + pad), bot0 = Math.max(pad, Math.min(vh - H - pad, Math.min(rect.bottom, vh) - H - pad));
+      const lefts = [Math.max(pad, rect.left + pad), Math.max(pad, Math.min(vw - W - pad, rect.right - W - pad))];
+      const spots = [bot0, top0].flatMap((top) => lefts.map((left) => ({ left: Math.min(left, vw - W - pad), top })));
+      const cover = (p0: { left: number; top: number }) => own.reduce((n, b) => n + Math.max(0, Math.min(p0.left + W, b.right) - Math.max(p0.left, b.left)) * Math.max(0, Math.min(p0.top + H, b.bottom) - Math.max(p0.top, b.top)), 0);
+      pos = spots.reduce((best, p0) => (cover(p0) < cover(best) ? p0 : best), spots[0]!);
+    }
     setNote(pos);
   }, [rect, step, lost]);
 
@@ -288,6 +300,9 @@ export function Tour() {
     // placeholder. A step on another page goes there at once and waits there, saying what it waits for.)
     const next = STEPS[n]!, here = window.location.hash.split("?")[0], there = next.route?.().split("?")[0];
     if (d > 0 && (!there || there === here)) {
+      // (A step that unfolds part of the page first does so now, or its thing would never show: step 10's Compare sits
+      // in the phone's folded "Details", and Next waited out its whole patience for it.)
+      next.before?.();
       const ok = () => { const el = find(next.target); return !!el && (next.ready ?? loaded)(el); };
       if (!ok()) {
         setPending(n);

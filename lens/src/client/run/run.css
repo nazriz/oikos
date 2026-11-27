@@ -623,3 +623,23 @@
     font-size: 13.5px;
   }
 }
+
+/* The 3D town while it builds: drawn but unseen, the plan in its place, and one line saying so. */
+.map-slot.warming {
+  opacity: 0;
+  pointer-events: none;
+}
+.world-warming {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  z-index: 7;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-2);
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-2);
+  box-shadow: var(--shadow-map);
+}

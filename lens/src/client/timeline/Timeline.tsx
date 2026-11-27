@@ -341,7 +341,9 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
         g.fillStyle = isDay ? p.text : p.faint;
         const lab = isDay ? `day ${dayOf(tt)}` : clock(tt);
         // (A label that would run off the right edge is left out, never cut.)
-        if (x + 4 + g.measureText(lab).width <= width - 2) g.fillText(lab, x + 4, axisTop + AXIS / 2);
+        // (Left out where it would run off the edge, or sit under the playhead's head.)
+        const lw = g.measureText(lab).width;
+        if (x + 4 + lw <= width - 2 && !(x + 4 < px + 8 && x + 4 + lw > px - 8)) g.fillText(lab, x + 4, axisTop + AXIS / 2);
       }
     } else {
       const ds = niceDayStep(pxPerDay);
@@ -354,7 +356,9 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
         g.fillRect(x, axisTop + AXIS - 6, 1, height - axisTop - AXIS + 6);
         g.fillStyle = p.muted;
         const lab = `${L === L0 ? "day " : ""}${L}`;
-        if (x + 4 + g.measureText(lab).width <= width - 2) g.fillText(lab, x + 4, axisTop + AXIS / 2);
+        // (Left out where it would run off the edge, or sit under the playhead's head.)
+        const lw = g.measureText(lab).width;
+        if (x + 4 + lw <= width - 2 && !(x + 4 < px + 8 && x + 4 + lw > px - 8)) g.fillText(lab, x + 4, axisTop + AXIS / 2);
       }
       if (pxPerDay > 6) {
         g.fillStyle = p.line;
@@ -469,7 +473,8 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
     // two rows; one that fits nowhere keeps its pole and a small head, and says itself on hover.
     const fl: FlagHit[] = [];
     const rows: [number, number][][] = Array.from({ length: FLAG_ROWS }, () => []);
-    const prio = (m: KeyMoment) => (m.kind === "lockin" ? 0 : m.kind === "grab" ? (m.strong ? 0 : 1) : m.kind === "end" ? 2 : m.strong ? 3 : 4);
+    // (The vote outranks the run's stop: on a narrow strip, election day keeps its words.)
+    const prio = (m: KeyMoment) => (m.kind === "lockin" ? 0 : m.kind === "grab" ? (m.strong ? 0 : 1) : m.kind === "election" && m.strong && !m.after ? 2 : m.kind === "end" ? 3 : m.strong ? 4 : 5);
     const order = moments.map((m, i) => ({ m, i, x: xOf(m.t) })).filter((o) => o.x >= -2 && o.x <= width + 2).sort((a, b) => prio(a.m) - prio(b.m) || a.x - b.x);
     g.font = font(700, 11.5);
     const placed = new Map<KeyMoment, { row: number; bx: number; bw: number }>();
