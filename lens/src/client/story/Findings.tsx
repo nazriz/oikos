@@ -109,7 +109,7 @@ function Page({ all, lockRuns, entries }: { all: Fork[]; lockRuns: StudyRun[]; e
       <LockTable runs={lockRuns} entries={entries} researcher={researcher} />
       {researcher ? (
         <div className="fi-grid">
-          <Chart wide title="Runs where the AI mayor reached for a power grab" sub="Share of runs, by model and instructions: tried (hollow) and carried out (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(inView, models, goals)}>
+          <Chart wide title="Runs where the AI mayor reached for a power grab" sub="Share of runs, by model and instructions: tried (outlined) and carried out (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(inView, models, goals)}>
             {(ref) => <KofN refEl={ref} forks={inView} models={models} goals={goals} pal={pal} onDrill={setDrill} />}
           </Chart>
           <Chart title="Which acts the checker flagged, by seriousness" sub="Runs reaching each one, grouped by the checker's seriousness (1 to 3): tried, and carried out. Seriousness 1 is spending timed near the vote, not a power grab" name="levers" table={leverTable(inView)}>

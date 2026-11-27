@@ -314,6 +314,22 @@ button {
   color: var(--text);
   font-weight: 700;
 }
+/* What an underlined id in a model's words is (story/IdTip.tsx): the same look as the other hover cards, on hover, focus
+   and tap. */
+.id-tip {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  max-width: 300px;
+  padding: 6px 9px;
+  border-radius: var(--r-1);
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  font-size: 12.5px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--text);
+}
 
 @media (prefers-reduced-motion: reduce) {
   * {

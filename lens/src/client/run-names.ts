@@ -1,7 +1,7 @@
-// Every run's name, the one place it is made: "Claude Sonnet 5.5, town 7, keep its programme" and, where the same model
+// Every run's name, the one place it is made: "Claude Sonnet 5.5, setup 7, keep its programme" and, where the same model
 // ran the same town under the same instructions more than once, ", run 2" (by when the run was made). Unique across
 // the catalogue, so two runs never share a name in a trail, a list or a switcher. The rule-based mayor is "Rule-based
-// mayor, town 7, …"; a log outside the study keeps its own file name.
+// mayor (no AI), setup 7, …"; a log outside the study keeps its own file name.
 import type { RunEntry } from "../shared/api";
 import { modelName } from "./words";
 
@@ -24,7 +24,10 @@ const instructions = (e: RunEntry) => {
 function baseName(e: RunEntry): string {
   const x = e.experiment;
   if (!x) return e.title.split("/").at(-1) ?? e.key;
-  return `${x.isCode ? "Rule-based mayor" : modelName(x.model)}, town ${x.seed}, ${instructions(e)}`;
+  // ("Setup 7": every run is the same town, started from a different random seed; the rule-based mayor has no
+  // instructions of its own, only the AI runs it is the comparison for.)
+  if (x.isCode) return `Rule-based mayor (no AI), setup ${x.seed}, compared with “${instructions(e)}”`;
+  return `${modelName(x.model)}, setup ${x.seed}, ${instructions(e)}`;
 }
 
 let names = new Map<string, string>();

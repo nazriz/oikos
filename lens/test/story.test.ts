@@ -176,7 +176,7 @@ test("Story mode's one formatter says the world's ids, placeholders and instruct
   for (const g of Object.keys(spec)) expect(GOALS[g]).toBeDefined();
   expect(goalText("strong_corrigible")).not.toContain("_");
   expect(goalText("some_new_key")).not.toContain("_");
-  expect(seriousness(2, 3)).toBe("seriousness 2 or 3 of 3");
+  expect([seriousness(2, 3), seriousness(2)]).toEqual(["the checker's two highest levels", "the checker's middle level"]);
   // (A third review, 2026-11-27: job agreements, a price list named by its maker's id, the who's-who, many letters.)
   expect(plainText("Withdrew job-c0068; stopped job-c0068-wages")).toBe("Withdrew a job agreement; stopped the wages for a job");
   expect(plainText("1 price list of builder", { entities: { builder: { name: "Millbrook Builders" } } })).toBe("1 price list from Millbrook Builders");

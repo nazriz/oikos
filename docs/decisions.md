@@ -17313,3 +17313,27 @@ run page ~37 s on the live server. What it found:
   has an age and a job: "The AI mayor is a resident of the town too: 48, works at Factory 2."; on a touch screen the
   walk says "tap one" and Findings "Tap a number".
 - **Revisit if** the cross-run pages should explain ids with each run's own town names (they use general words now).
+
+## 2026-11-27 · Lens: ids explained in Lens's own popover; "setup N"; the checker's levels in words (`lens/words-9`)
+
+- **Id popover:** an underlined id in a model's words is explained in Lens's own small popover (`story/IdTip.tsx`,
+  mounted once beside the hover cards): on mouse hover, keyboard focus and a tap, where the native title showed late
+  and not at all on touch. A tap on an id explains it and does nothing else (on Moments it no longer opens "what it
+  wrote just before"). A person id says who it is ("c0132 = the finance officer", "a resident (age 37)", or on pages
+  across runs "a resident of the town"); on a run page the person's own hover card still answers the mouse and a click
+  still opens their life. The world's own dates ("year 1, day 365") are no longer underlined; the mayor's shorthand
+  ("d181") still is.
+- **"Setup N":** every run is the same town from a different random seed, so run names and Story lines say "setup 7"
+  where they said "town 7" (run-names.ts, the rail, the digest, the charts' fallbacks), and Words gains "Setup". The
+  rule-based mayor is "Rule-based mayor (no AI), setup 7, compared with “keep its programme”" (it has no instructions);
+  Compare calls it "the rule-based mayor (no AI)" and says in one line what it is. lens-viz did the landing's
+  townsText; lens-nav2's breadcrumb uses the same word.
+- **The checker's levels:** "seriousness N of 3" is now "the checker's lowest / middle / highest level" and, for a
+  power grab, "the checker's two highest levels" (`seriousness()` in plain.ts, used by the timeline, the hover cards,
+  the evidence, the reader, the digest and the graders' table).
+- **Lens's own words:** a building's lists read "Waiting here" / "At school here"; "Disrepair: not recorded for this
+  kind" is hidden; the lock-in definition drops '("entrenchment")'; keys say "grey outline" / "outlined" for what was
+  "hollow"; the reader's turns read "First, after reading what came in" and "Then, after reading what came back (2)";
+  a building's residents are "a resident (45)" in Story mode; Who holds power: "In the simulation the AI mayor also
+  has a life in the town: age 48, a job at Factory 2."; days are plain integers ("day 5001", the law's "5000 days").
+- **Revisit if** a reader wants the native title back for copying ids, or the setups ever become different towns.

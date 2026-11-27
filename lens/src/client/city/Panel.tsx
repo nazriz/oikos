@@ -8,6 +8,7 @@ import type { Sky } from "./sky";
 import { PAPER_GROUPS, paperGroup, structureStory, type ElectionView } from "./civic";
 import { actSentence, CITY_WORDS } from "./words";
 import { describePerson, isSeatPerson } from "../people";
+import { useMode } from "../mode";
 
 export interface Overlays {
   people: boolean;
@@ -355,6 +356,9 @@ export function PaperBody({ p }: { p: CityData["town"]["papers"][number] }) {
 /** A building's whole story: who lived and worked there, papers about it, work done there. */
 export function StructureStoryBody({ c, i, t, name }: { c: CityData; i: number; t: number; name: (i: number) => string }) {
   const st = structureStory(c, i);
+  // (Story mode names no one by id: "a resident (45)"; the row still opens their life.)
+  const story = useMode((m) => m.mode !== "researcher");
+  const who = (id: string) => { if (!story) return id; if (isSeatPerson(c, id)) return CITY_WORDS.seat; const a = describePerson(c, id, t)?.split(", ")[0]; return `a resident${a && /^\d+$/.test(a) ? ` (${a})` : ""}`; };
   const s = c.town.structures[i]!;
   const days = (sec: number) => sec / DAY;
   const lists = Object.entries(st.stays).sort((a, b) => b[1].size - a[1].size);
@@ -365,10 +369,10 @@ export function StructureStoryBody({ c, i, t, name }: { c: CityData; i: number; 
         const rows = [...m.entries()].sort((a, b) => b[1][0] - a[1][0]);
         return (
           <div key={kind}>
-            <div className="lc-sec-title" style={{ marginTop: 10 }}>{kind === "dwelling" ? "Lived here" : kind === "workplace" ? "Worked here" : `In its ${kind}s`} <span className="lc-num">{rows.length} people</span></div>
+            <div className="lc-sec-title" style={{ marginTop: 10 }}>{kind === "dwelling" ? "Lived here" : kind === "workplace" ? "Worked here" : kind === "waiting" ? "Waiting here" : kind === "classroom" ? "At school here" : `In its ${kind.replace(/_/g, " ")}s`} <span className="lc-num">{rows.length} people</span></div>
             <div className="lc-today">
               {rows.slice(0, kind === "dwelling" ? 12 : 8).map(([q, [tot, a, b]]) => (
-                <div key={q} className="lc-row"><span className="lc-sw dot" style={{ background: PAL.where[kind] ?? PAL.where.other }} /><span>{c.people.people[q]![1]}</span><span className="lc-num">days {fmtDay(a).day} to {fmtDay(b).day}, {days(tot) >= 1 ? `${days(tot).toFixed(0)} days` : `${(tot / 3600).toFixed(0)} hours`}</span></div>
+                <div key={q} className="lc-row"><span className="lc-sw dot" style={{ background: PAL.where[kind] ?? PAL.where.other }} /><span>{who(c.people.people[q]![0])}</span><span className="lc-num">days {fmtDay(a).day} to {fmtDay(b).day}, {days(tot) >= 1 ? `${days(tot).toFixed(0)} days` : `${(tot / 3600).toFixed(0)} hours`}</span></div>
               ))}
               {rows.length > (kind === "dwelling" ? 12 : 8) && <div className="lc-note">and {rows.length - (kind === "dwelling" ? 12 : 8)} more</div>}
             </div>
@@ -395,7 +399,7 @@ export function StructureStoryBody({ c, i, t, name }: { c: CityData; i: number; 
           </div>
         </div>
       )}
-      <div className="lc-note">Disrepair: {s.vars?.disrepair !== undefined ? `${n0(s.vars.disrepair)} at the start; the log carries no later reading of it.` : "not recorded for this kind."}</div>
+      {s.vars?.disrepair !== undefined && <div className="lc-note">Disrepair: {n0(s.vars.disrepair)} at the start; the log carries no later reading of it.</div>}
     </div>
   );
 }

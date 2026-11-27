@@ -2,6 +2,7 @@
 // thought and said (each call: reasoning, words, tool calls with what came back), and what happened (each request to
 // the translator, the draft, the seat's sign-off, the act sent, and what the world did with it). The study reader's
 // lever flags sit beside the act or the words they came from. Opens on selection of a sitting, an act or a lever.
+import { seriousness } from "../plain";
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, loadSystem, useAsync, when, worldDay, usd, tokens, plural, human, STAGE, type SeatAct, type SeatDraft, type SeatJson, type SeatLever, type SittingDetail, type SittingTurn } from "./data";
@@ -254,7 +255,7 @@ export function Said({ seat, d, levers }: { seat: SeatJson; d: Detail; levers: S
       {researcher && unseen > 0 && <div className="st-unseen">{tokens(unseen)} tokens of reasoning in this turn were kept hidden by the model's provider. Below is what it wrote, not all it thought.</div>}
       {rows.map((r, j) => "one" in r ? turn(r.one) : r.quiet.length === 1 ? turn(r.quiet[0]!) : (
         <details key={`q${j}`} className="st-quietcalls">
-          <summary><span className="t">Answers {r.quiet[0]!.n} to {r.quiet.at(-1)!.n}</span><span className="g">{lookedAt(r.quiet.map((x) => x.t))}</span></summary>
+          <summary><span className="t">{researcher ? `Answers ${r.quiet[0]!.n} to ${r.quiet.at(-1)!.n}` : `Looking things up (${r.quiet[0]!.n} to ${r.quiet.at(-1)!.n})`}</span><span className="g">{lookedAt(r.quiet.map((x) => x.t))}</span></summary>
           {r.quiet.map(turn)}
         </details>
       ))}
@@ -277,7 +278,7 @@ function Turn({ seat, t, k, n, levers, results }: { seat: SeatJson; t: SittingTu
   const told = Array.isArray(t.input) ? t.input.filter((x: any) => x?.type === "text") : [];
   return (
     <div className={`st-turn ${t.purpose === "notebook" ? "notebook" : ""}`}>
-      <div className="st-turn-head">{t.purpose === "notebook" ? "Its notebook" : `Answer ${n}`}<span className="u">{researcher && t.usage ? `${tokens(t.usage.output_tokens ?? 0)} tokens written, ${usd(t.usage.cost_microusd ?? 0)}` : ""}</span></div>
+      <div className="st-turn-head">{t.purpose === "notebook" ? "Its notebook" : researcher ? `Answer ${n}` : n === 1 ? "First, after reading what came in" : `Then, after reading what came back (${n})`}<span className="u">{researcher && t.usage ? `${tokens(t.usage.output_tokens ?? 0)} tokens written, ${usd(t.usage.cost_microusd ?? 0)}` : ""}</span></div>
       {flagged.length > 0 && <div id={`st-lever-${flagged[0]!.i}`} className="st-flagbox muted" style={{ margin: "0 0 10px" }}>{flagged.slice(1).map((l) => <span key={l.i} id={`st-lever-${l.i}`} />)}<div className="who">Mentioned (unreliable): {[...new Set(flagged.map((l) => leverTitle(l.lever)))].join("; ")}</div><div style={{ fontSize: 11.5, marginTop: 2 }}>The study's checker matched these words (underlined below). That is not proof the mayor weighed a power grab; checking by hand found this often wrong.</div></div>}
       {told.map((x: any, j: number) => <div key={j} className="st-note"><span className="k">The office told it</span><Hi text={String(x.text)} /></div>)}
       {t.purpose === "notebook" && typeof t.input === "string" && <details className="st-think plain"><summary>What the notebook asked</summary><Md text={t.input} className="st-prose small" /></details>}
@@ -447,7 +448,7 @@ function FlagBox({ l, also = [] }: { l: SeatLever; also?: SeatLever[] }) {
     <div className="st-flagbox" id={`st-lever-${l.i}`}>
       {also.filter((x) => x.i !== l.i).map((x) => <span key={x.i} id={`st-lever-${x.i}`} />)}
       <div className="who">Power grab, {l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried, not carried out" : "mentioned (unreliable)"}: {leverTitle(l.lever)}</div>
-      <div style={{ fontSize: 12, marginTop: 2 }}>{[l.stage ? STAGE[l.stage] ?? l.stage : "", l.days_to_poll !== null ? `${l.days_to_poll} days before election day` : "", l.tier ? `seriousness ${l.tier} of 3` : "", l.detail ?? ""].filter(Boolean).join("; ")}.</div>
+      <div style={{ fontSize: 12, marginTop: 2 }}>{[l.stage ? STAGE[l.stage] ?? l.stage : "", l.days_to_poll !== null ? `${l.days_to_poll} days before election day` : "", l.tier ? seriousness(l.tier) : "", l.detail ?? ""].filter(Boolean).join("; ")}.</div>
       <div className="words"><Hi text={`“${l.words}”`} /></div>
       {run && <div style={{ marginTop: 4 }}><HowDoWeKnow run={run} claim={{ kind: "lever", index: l.i }} /></div>}
     </div>

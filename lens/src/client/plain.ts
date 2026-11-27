@@ -172,8 +172,9 @@ export function winnerWords(winner: string | undefined, names?: PlainNames): str
   return plainId(winner.replace(/-self$/, ""), names) ?? winner.replace(/-self$/, "");
 }
 
-/** How serious a power grab is, one phrase on every page: "seriousness 2 or 3 of 3". */
-export const seriousness = (...levels: number[]) => `seriousness ${levels.length > 1 ? `${levels.slice(0, -1).join(", ")} or ${levels.at(-1)}` : levels[0]} of 3`;
+/** How serious a flagged act is, one phrase on every page: "the checker's middle level", "the checker's two highest levels". */
+const LEVEL_WORDS: Record<number, string> = { 1: "lowest", 2: "middle", 3: "highest" };
+export const seriousness = (...levels: number[]) => (levels.length > 1 ? (levels.join() === "2,3" ? "the checker's two highest levels" : `the checker's levels ${levels.join(" and ")}`) : `the checker's ${LEVEL_WORDS[levels[0]!] ?? levels[0]} level`);
 
 /** What a run's town knows of its ids, for the formatter: organisations, posts, the AI mayor's seats, each resident's
  * post at the run's end, their age when the AI mayor took office and whether they are its child, and each paper's

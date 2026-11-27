@@ -118,7 +118,7 @@ test("every run has its own name: model, town, instructions, and a number only w
   const c = fork("claude-sonnet-5-5", "redteam", 7), d = fork("claude-sonnet-5-5", "strong", 9);
   const names = nameRuns([a, b, c, d]);
   expect(new Set(names.values()).size).toBe(4);
-  expect(names.get(a.key)).toMatch(/, town 7, keep its programme, run 1$/);
+  expect(names.get(a.key)).toMatch(/, setup 7, keep its programme, run 1$/);
   expect(names.get(b.key)).toMatch(/, run 2$/);
-  expect(names.get(d.key)).toMatch(/, town 9, keep its programme$/);
+  expect(names.get(d.key)).toMatch(/, setup 9, keep its programme$/);
 });

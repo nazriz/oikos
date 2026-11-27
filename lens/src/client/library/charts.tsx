@@ -149,7 +149,7 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
     </>
   );
   const cls = squareClass(f, m);
-  return <a className={cls} href={runHref(f.key, t !== undefined ? { t: Math.round(t) } : undefined)} aria-label={`${modelName(f.model)}, town ${f.seed}: ${what}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={(e) => tapTwice(e, () => tip.show(e, body))} />;
+  return <a className={cls} href={runHref(f.key, t !== undefined ? { t: Math.round(t) } : undefined)} aria-label={`${modelName(f.model)}, setup ${f.seed}: ${what}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={(e) => tapTwice(e, () => tip.show(e, body))} />;
 }
 
 /** "13 of 14", with what is shown but not counted. */
@@ -218,7 +218,7 @@ export function Who({ runs, measure, quotes, researcher, onModel }: { runs: Stud
             </div>
           ))}
         </div>
-        {measure === "lockin" && <p className="ld-chart-key">Hatched: the run stopped before election day, so not counted. Plum hatched: both graders found a lock-in, but the run stopped before election day, so it is not counted. Hollow: not graded in the study's report.</p>}
+        {measure === "lockin" && <p className="ld-chart-key">Hatched: the run stopped before election day, so not counted. Plum hatched: both graders found a lock-in, but the run stopped before election day, so it is not counted. Grey outline: not graded in the study's report.</p>}
         {tip.el}
       </div>
     </WithTable>
@@ -304,7 +304,7 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
               return (
                 <g key={run.key} className={run.why ? "when-uncounted" : ""}>
                   <line x1={LW} x2={W - R} y1={y} y2={y} className="when-row" />
-                  <text x={narrow ? 0 : LW - 12} y={narrow ? y - 14 : y + 4} className="when-model" textAnchor={narrow ? "start" : "end"}>{runNameOf(run.key, `${modelName(run.model)}, town ${run.seed}`)}{run.why ? " (not counted)" : ""}<title>{run.why ? `Not counted: ${NOT_COUNTED_WORDS[run.why]}` : "Counted"}</title></text>
+                  <text x={narrow ? 0 : LW - 12} y={narrow ? y - 14 : y + 4} className="when-model" textAnchor={narrow ? "start" : "end"}>{runNameOf(run.key, `${modelName(run.model)}, setup ${run.seed}`)}{run.why ? " (not counted)" : ""}<title>{run.why ? `Not counted: ${NOT_COUNTED_WORDS[run.why]}` : "Counted"}</title></text>
                   {mine.map((a, i) => <Dot key={i} a={a} cx={x(a.t / DAY)} cy={y} tip={tip} seed={byRun.get(a.key)?.seed} />)}
                 </g>
               );
@@ -317,7 +317,7 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
   );
 }
 function Dot({ a, cx, cy, tip, seed }: { a: Attempt; cx: number; cy: number; tip: ReturnType<typeof useTip>; seed?: number }) {
-  const body = <><b>Day {dayNo(a.day)}: {actTitle(a, leverTitle)}</b><span>{runNameOf(a.key, `${modelName(a.model)}, town ${seed}`)}. {a.executed ? "Carried out." : "Tried, not carried out."}</span><span className="muted">Click to open the run here.</span></>;
+  const body = <><b>Day {dayNo(a.day)}: {actTitle(a, leverTitle)}</b><span>{runNameOf(a.key, `${modelName(a.model)}, setup ${seed}`)}. {a.executed ? "Carried out." : "Tried, not carried out."}</span><span className="muted">Click to open the run here.</span></>;
   return (
     <g className="when-dot" tabIndex={0} role="button" aria-label={`${modelName(a.model)}, day ${dayNo(a.day)}: ${leverTitle(a.lever)}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={() => go(a.key, a.t)} onKeyDown={(e) => e.key === "Enter" && go(a.key, a.t)}>
       <circle cx={cx} cy={cy} r={12} className="hit" />
@@ -368,9 +368,9 @@ export function Activity({ runs, order, twinActs }: { runs: StudyRun[]; order: s
                   <line x1={x(md)} x2={x(md)} y1={y - 8} y2={y + 8} className="act-median" />
                   {place(mine, (r) => x(r.acts!)).map(([r, dy]) => {
                     const cls = r.r.has_executed ? "act-dot done" : r.r.has_attempt ? "act-dot tried" : "act-dot";
-                    const body = <><b>{r.acts} acts</b><span>{runNameOf(r.key, `${modelName(r.model)}, town ${r.seed}`)}.</span><span className="muted">{r.wakes ?? "?"} times something reached its desk. {r.r.has_executed ? "A serious power grab carried out." : r.r.has_attempt ? "A serious power grab tried." : ""}</span><span className="muted">Click to open this run.</span></>;
+                    const body = <><b>{r.acts} acts</b><span>{runNameOf(r.key, `${modelName(r.model)}, setup ${r.seed}`)}.</span><span className="muted">{r.wakes ?? "?"} times something reached its desk. {r.r.has_executed ? "A serious power grab carried out." : r.r.has_attempt ? "A serious power grab tried." : ""}</span><span className="muted">Click to open this run.</span></>;
                     return (
-                      <g key={r.key} tabIndex={0} role="button" className="act-g" aria-label={`${modelName(r.model)}, town ${r.seed}: ${r.acts} acts`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={() => go(r.key)} onKeyDown={(e) => e.key === "Enter" && go(r.key)}>
+                      <g key={r.key} tabIndex={0} role="button" className="act-g" aria-label={`${modelName(r.model)}, setup ${r.seed}: ${r.acts} acts`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={() => go(r.key)} onKeyDown={(e) => e.key === "Enter" && go(r.key)}>
                         <circle cx={x(r.acts!)} cy={y + dy} r={10} className="hit" />
                         <circle cx={x(r.acts!)} cy={y + dy} r={4.5} className={cls} />
                       </g>

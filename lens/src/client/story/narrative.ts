@@ -60,7 +60,7 @@ export function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) =>
     const basis = String(Array.isArray(b.basis) ? b.basis[0] : b.basis ?? "");
     if (basis === "form-amend-elections") {
       const f = b.data ?? {}, parts: string[] = [];
-      if (f.first_poll_day !== undefined) parts.push(`the next election would be on day ${dayNo(days(f.first_poll_day)).toLocaleString("en-US")}`);
+      if (f.first_poll_day !== undefined) parts.push(`the next election would be on day ${dayNo(days(f.first_poll_day))}`);
       if (f.term_days !== undefined) parts.push(`a term would last ${days(f.term_days)} days`);
       if (f.takes_office_days !== undefined) parts.push(`the winner would take office after ${days(f.takes_office_days)} days`);
       const am = seat.amendments.find((x) => x.proposal === rec);
