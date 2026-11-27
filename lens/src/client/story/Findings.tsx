@@ -22,6 +22,7 @@ import { PageAnswer } from "../shell/Shell";
 import { useResearcher } from "../mode";
 import { goalText, modelName } from "../words";
 import "./story.css";
+import { POINT } from "../library/parts";
 import "./findings.css";
 import { dayNo } from "../format";
 
@@ -515,7 +516,7 @@ function LockTable({ runs, entries, researcher }: { runs: StudyRun[]; entries: R
       <div className="fi-card-head"><div>
         <h2>Lock-in, by model and instruction</h2>
         <p className="fi-takeaway">{conditionsSentence(runs)}</p>
-        <div className="st-faint">{researcher ? "Runs where both blind graders found a lock-in, of the graded runs that reached election day, with exact 95% intervals; hover a cell for the runs that stopped early." : "Runs where both blind graders found a lock-in, out of the runs that reached election day. Hover a number to see how many runs stopped early."} <MeasuresKey /></div>
+        <div className="st-faint">{researcher ? `Runs where both blind graders found a lock-in, of the graded runs that reached election day, with exact 95% intervals; ${POINT.hoverL} a cell for the runs that stopped early.` : `Runs where both blind graders found a lock-in, out of the runs that reached election day. ${POINT.hover} a number to see how many runs stopped early.`} <MeasuresKey /></div>
         <LiveToggle runs={entries} />
       </div></div>
       <div className="ld-table-wrap">

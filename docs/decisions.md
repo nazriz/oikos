@@ -17261,3 +17261,21 @@ run page ~37 s on the live server. What it found:
   also its stop day. Long counts wrap. On a phone, Models' and Findings' tables stack row by row, each value labelled
   ("Locked its programme in: 3 of 4 counted and graded"), so nothing is cut. Models' "In its own words" is Researcher
   mode only: a first-person plan sentence is rare in what Lens keeps of a run.
+
+## 2026-11-27 · Lens: one quote component everywhere; "spending timed near the vote" (`lens/words-8`)
+
+- **Quotes:** the landing's hero and showcase quotes and the Moments cards' quotes (its words, its note on signing,
+  its reason, a lock-in's words) are drawn by the same component as the run pages (`Hi`, with `town={false}` on pages
+  across runs), so their ids are underlined and explained on hover there too. A record id's hover says what the record
+  is where the town knows it ("rec.99036 = a complaint"), else "a record of the town's".
+- **Words (with lens-viz):** "election-season favour" is now "spending timed near the vote" (Words entry, the
+  measures' key sentence via `MEASURE_TEXT`, the Moments tab, caption and card); a power grab is "at the checker's
+  two highest levels of seriousness". lens-viz owns the measures key paragraph, which reads its wording from words.ts.
+- **Lens's own lines:** "Show 1,218 other runs: comparison towns run by rules, tests and earlier pilots"; the paper's
+  "reader poll" is "an opinion poll of the paper's readers"; several acts joined mid-sentence keep their verbs lower
+  case ("published a decision; wrote to 7 residents"); a run with no election reads "Instruction: no election in the
+  run. Ended on day 191." (not "ended after election day"); Compare says whether the towns differ once (the map's own
+  count), its button only jumps to where the mayors first act differently; Who holds power says once why the AI mayor
+  has an age and a job: "The AI mayor is a resident of the town too: 48, works at Factory 2."; on a touch screen the
+  walk says "tap one" and Findings "Tap a number".
+- **Revisit if** the cross-run pages should explain ids with each run's own town names (they use general words now).

@@ -143,6 +143,8 @@ function plainPart(s: string, names?: PlainNames): string {
     .replace(/\bstanding direction(s?)\b/gi, "standing order$1 to a town office")
     .replace(/\b[Dd]irection: /g, "Standing order to a town office: ")
     .replace(YEAR1, yearOne)
+    // (The paper's "reader poll" is an opinion poll of its readers, not the election.)
+    .replace(/\b([Rr])eader poll\b/g, (_, r: string) => `${r === "R" ? "An" : "an"} opinion poll of the paper's readers`.replace(/^an? /i, ""))
     // (A kind of paper the world names by its maker's id: "1 price list of builder" → "1 price list from Millbrook Builders".)
     .replace(/\b(price lists?) of ([a-z][a-z0-9-]*)\b/g, (hit, what: string, id: string) => { const n = names?.entities?.[id]?.name ?? plainId(id, names); return n ? `${what} from ${n}` : hit; })
     // (A group or the union, named by its bare id in a resident's words: "what union teaches".)

@@ -49,7 +49,8 @@ function NotYet({ at }: { at: number }) {
   if (t >= at - 1800) return null;
   return (
     <div className="cp-notyet">
-      These towns haven't diverged yet. <button className="st-btn" onClick={() => setT(at)}>Jump to the first difference (day {dayOf(at)})</button>
+      {/* (Whether the towns differ yet is said once, by the map's own count; here only the way to the mayors' first different act.) */}
+      <button className="st-btn" onClick={() => setT(at)}>Jump to where the two mayors first act differently (day {dayOf(at)})</button>
     </div>
   );
 }

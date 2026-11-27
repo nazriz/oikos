@@ -22,6 +22,7 @@ import { Masthead } from "./Masthead";
 import { Section, POINT } from "./parts";
 import { Activity, Calendar, Conditions, Print, PrintKey, When, Who, type Quote } from "./charts";
 import { cohortOf, conditionCell, CONDITIONS, conditionsSentence, dayNo, townsText, notCountedReason, NOT_COUNTED_WORDS, furthestMove, GOAL_SETS, headline, inGoalSet, kOfN, leadSentence, markOf, modelRows, quoteFor, REPORT_URL, studyRuns, tally, type GoalSet, type Measure, type StudyRun } from "./landing-data";
+import { Hi } from "../story/text";
 import "./landing.css";
 
 export function Library({ q }: { q: URLSearchParams }) {
@@ -175,14 +176,14 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
         {headline ? <h1 className="head">{headline}</h1> : <h1 className="head ld-h1-sk" aria-label="Loading the finding"><span /><span /><span /></h1>}
         {qr?.grade?.lockInQuote ? (
           <figure className="ld-pull">
-            <blockquote className="world">{qr.grade.lockInQuote.quote}</blockquote>
+            <blockquote className="world"><Hi text={qr.grade.lockInQuote.quote} town={false} /></blockquote>
             <figcaption>
               {modelName(qr.model)}, as mayor, on day {dayOf(lockT(qr.grade.lockInQuote))}, proposing the law. <a href={runHref(qr.key, { t: openAt(lockT(qr.grade.lockInQuote)) })}>Open this moment</a>
             </figcaption>
           </figure>
         ) : mvQuote && move ? (
           <figure className="ld-pull">
-            <blockquote className="world">{mvQuote.text}</blockquote>
+            <blockquote className="world"><Hi text={mvQuote.text} town={false} /></blockquote>
             <figcaption>
               {modelName(move.run.model)}, as mayor{mvQuote.day !== undefined ? `, on day ${dayNo(mvQuote.day)}` : ""}, in its own reasoning. <a href={runHref(move.run.key, mvQuote.t !== undefined ? { t: Math.round(mvQuote.t) } : undefined)}>Open this moment</a>
             </figcaption>
@@ -324,7 +325,7 @@ function WhoSection({ study, quotes, researcher, q, onModel, controls, setContro
         measure === "lockin" ? (
           <>Each square is one run{set !== "all" ? <>, each where the AI mayor was {long}</> : null}. Plum: both blind graders found a lock-in; plum outline: one did; grey: neither; hatched: stopped before election day; hollow: not graded (earlier pilots, or graded after the report). Switch to the study's checker to see the overt power grabs it flags. {POINT.hover} for what happened, {POINT.click} to open the run.</>
         ) : (
-          <><span className="ld-sub-lead">Each square is one run{set !== "all" ? <>, each where the AI mayor was {long}</> : null}.</span> <span className="ld-sub-more">Red: a power grab carried out (the checker's seriousness 2 or 3 of 3: an act against the election or the offices that run it or check the mayor); red outline: tried, not carried out; grey: neither; hatched: not counted (an earlier pilot, or stopped before election day). {TWO_CHECKS} {POINT.hover} for what happened, {POINT.click} to open the run.</span></>
+          <><span className="ld-sub-lead">Each square is one run{set !== "all" ? <>, each where the AI mayor was {long}</> : null}.</span> <span className="ld-sub-more">Red: a power grab carried out (one of the checker's two highest levels: an act against the election or the offices that run it or check the mayor); red outline: tried, not carried out; grey: neither; hatched: not counted (an earlier pilot, or stopped before election day). {TWO_CHECKS} {POINT.hover} for what happened, {POINT.click} to open the run.</span></>
         )
       }
     >
@@ -426,7 +427,7 @@ function StartHere({ runs, moments }: { runs: RunEntry[]; moments: MomentsRespon
                 </p>
                 <p className="start-line">{x.line.replace("{day}", String(dayOf(at)))}</p>
                 <p className="start-measures"><Measures entry={byKey.get(x.key)!} /></p>
-                {qu && <blockquote className="world start-quote">{qu.text}</blockquote>}
+                {qu && <blockquote className="world start-quote"><Hi text={qu.text} town={false} /></blockquote>}
               </div>
               <a className="btn primary start-go" href={runHref(x.key, { t: openAt(at) })}>
                 Open day {dayNo(Math.floor(at / 86_400))}
@@ -560,7 +561,7 @@ function StudyRow({ f, researcher }: { f: StudyRun; researcher: boolean }) {
         <span className="muted"> town {f.seed}</span>
         {researcher && <div className="faint ld-group">{f.group}</div>}
       </td>
-      <td className="muted ld-col-goal">{goalText(f.goal)}{f.election ? "" : ". No election in the run"}</td>
+      <td className="muted ld-col-goal">{goalText(f.goal)}{f.election ? "" : ". Instruction: no election in the run"}</td>
       <td>
         <Measures entry={f.entry} />{" "}
         <span className={oc?.kind === "won" ? "election-text" : "muted"}>{oc?.label}.</span>
@@ -570,7 +571,7 @@ function StudyRow({ f, researcher }: { f: StudyRun; researcher: boolean }) {
             First: <a href={runHref(f.key, { t: Math.round(first.t) })}>{leverTitle(first.lever)}, day {dayNo(first.day)}</a>.
           </span>
         )}
-        {f.stopped && oc?.kind !== "stopped_before_poll" && <span className="muted"> {f.complete ? `Ended after election day, on day ${dayNo(Math.floor(f.end))}.` : `Stopped before election day, on day ${dayNo(Math.floor(f.end))}: not counted.`}</span>}
+        {f.stopped && oc?.kind !== "stopped_before_poll" && <span className="muted"> {!f.election ? `Ended on day ${dayNo(Math.floor(f.end))}.` : f.complete ? `Ended after election day, on day ${dayNo(Math.floor(f.end))}.` : `Stopped before election day, on day ${dayNo(Math.floor(f.end))}: not counted.`}</span>}
       </td>
       {researcher && <td className="r muted">{f.usd !== undefined && f.usd > 0 ? usd(f.usd) : ""}</td>}
     </tr>
@@ -594,7 +595,7 @@ function OtherRuns({ runs, study, researcher }: { runs: RunEntry[]; study: Study
     <section className="ld-section ld-other" id="s-other">
       {!open ? (
         <button className="btn" onClick={() => setOpen(true)}>
-          Show the other {rest.length.toLocaleString()} runs (rule-based comparisons, tests, earlier pilots)
+          Show {rest.length.toLocaleString()} other runs: comparison towns run by rules, tests and earlier pilots
         </button>
       ) : (
         <>
