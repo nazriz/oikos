@@ -8,7 +8,7 @@
 //   Print      a run's fingerprint: its term, election day, its attempts, where it ended
 import { useMemo, useRef } from "react";
 import { runHref } from "../router";
-import { runName } from "../run-names";
+import { runName, runNameOf } from "../run-names";
 import { dayOf, lockT, openAt as openAtFmt } from "../format";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable, POINT, tapTwice } from "./parts";
@@ -304,7 +304,7 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
               return (
                 <g key={run.key} className={run.why ? "when-uncounted" : ""}>
                   <line x1={LW} x2={W - R} y1={y} y2={y} className="when-row" />
-                  <text x={narrow ? 0 : LW - 12} y={narrow ? y - 14 : y + 4} className="when-model" textAnchor={narrow ? "start" : "end"}>{modelName(run.model)}, town {run.seed}{run.why ? " (not counted)" : ""}<title>{run.why ? `Not counted: ${NOT_COUNTED_WORDS[run.why]}` : "Counted"}</title></text>
+                  <text x={narrow ? 0 : LW - 12} y={narrow ? y - 14 : y + 4} className="when-model" textAnchor={narrow ? "start" : "end"}>{runNameOf(run.key, `${modelName(run.model)}, town ${run.seed}`)}{run.why ? " (not counted)" : ""}<title>{run.why ? `Not counted: ${NOT_COUNTED_WORDS[run.why]}` : "Counted"}</title></text>
                   {mine.map((a, i) => <Dot key={i} a={a} cx={x(a.t / DAY)} cy={y} tip={tip} seed={byRun.get(a.key)?.seed} />)}
                 </g>
               );
@@ -317,7 +317,7 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
   );
 }
 function Dot({ a, cx, cy, tip, seed }: { a: Attempt; cx: number; cy: number; tip: ReturnType<typeof useTip>; seed?: number }) {
-  const body = <><b>Day {dayNo(a.day)}: {actTitle(a, leverTitle)}</b><span>{modelName(a.model)}, town {seed}. {a.executed ? "Carried out." : "Tried, not carried out."}</span><span className="muted">{goalText(a.goal)}. Click to open the run here.</span></>;
+  const body = <><b>Day {dayNo(a.day)}: {actTitle(a, leverTitle)}</b><span>{runNameOf(a.key, `${modelName(a.model)}, town ${seed}`)}. {a.executed ? "Carried out." : "Tried, not carried out."}</span><span className="muted">Click to open the run here.</span></>;
   return (
     <g className="when-dot" tabIndex={0} role="button" aria-label={`${modelName(a.model)}, day ${dayNo(a.day)}: ${leverTitle(a.lever)}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={() => go(a.key, a.t)} onKeyDown={(e) => e.key === "Enter" && go(a.key, a.t)}>
       <circle cx={cx} cy={cy} r={12} className="hit" />
@@ -368,7 +368,7 @@ export function Activity({ runs, order, twinActs }: { runs: StudyRun[]; order: s
                   <line x1={x(md)} x2={x(md)} y1={y - 8} y2={y + 8} className="act-median" />
                   {place(mine, (r) => x(r.acts!)).map(([r, dy]) => {
                     const cls = r.r.has_executed ? "act-dot done" : r.r.has_attempt ? "act-dot tried" : "act-dot";
-                    const body = <><b>{r.acts} acts</b><span>{modelName(r.model)}, town {r.seed}. {goalText(r.goal)}.</span><span className="muted">{r.wakes ?? "?"} times something reached its desk. {r.r.has_executed ? "A serious power grab carried out." : r.r.has_attempt ? "A serious power grab tried." : ""}</span><span className="muted">Click to open this run.</span></>;
+                    const body = <><b>{r.acts} acts</b><span>{runNameOf(r.key, `${modelName(r.model)}, town ${r.seed}`)}.</span><span className="muted">{r.wakes ?? "?"} times something reached its desk. {r.r.has_executed ? "A serious power grab carried out." : r.r.has_attempt ? "A serious power grab tried." : ""}</span><span className="muted">Click to open this run.</span></>;
                     return (
                       <g key={r.key} tabIndex={0} role="button" className="act-g" aria-label={`${modelName(r.model)}, town ${r.seed}: ${r.acts} acts`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={() => go(r.key)} onKeyDown={(e) => e.key === "Enter" && go(r.key)}>
                         <circle cx={x(r.acts!)} cy={y + dy} r={10} className="hit" />

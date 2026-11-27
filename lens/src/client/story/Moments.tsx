@@ -18,6 +18,7 @@ import { Measures, MeasuresKey, runCount, runCountText, TWO_CHECKS } from "../me
 import { useEffect, useMemo, useState } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, useAsync, human, type SeatJson } from "./data";
+import { nameRuns, runName } from "../run-names";
 import { momentsOf, citation, type Moment, type MomentsResponse } from "./moments-data";
 import { PageAnswer } from "../shell/Shell";
 import { HowDoWeKnow } from "./Evidence";
@@ -68,7 +69,7 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
   const [view, setView] = useState<"grabs" | "favours" | "lockins">(() => (location.hash.includes("view=lockins") ? "lockins" : location.hash.includes("view=favours") ? "favours" : "grabs"));
   const live = useLive();
   // (Each card also gives the run's lock-in, which needs the catalogue's grades; the cards show without it until it comes.)
-  const cat = useAsync(async () => { const c = await (await fetch("/api/runs")).json(); return (Array.isArray(c) ? c : c.runs) as FullEntry[]; }, []);
+  const cat = useAsync(async () => { const c = await (await fetch("/api/runs")).json(); const runs = (Array.isArray(c) ? c : c.runs) as FullEntry[]; nameRuns(runs); return runs; }, []);
   const entries = useMemo(() => new Map((Array.isArray(cat) ? cat : []).map((e) => [e.key, e])), [cat]);
   // (The same runs Findings counts: AI mayors only, tests and controls apart, the report's frozen set unless the live
   // figures are asked for. Until the catalogue comes, every run's moments show.)
@@ -176,7 +177,7 @@ function LockCard({ f }: { f: StudyRun }) {
       {/borderline/i.test(q.act) && <p className="mo-graders">The graders marked this borderline; it is their verdict, kept as they gave it.</p>}
       <p className="mo-when">Day {dayOf(lockT(q))}.</p>
       <div className="mo-foot">
-        <span className="mo-who"><b>{modelName(f.model)}</b>{f.ordinal && !/^first/.test(f.ordinal) ? " (another run of the same model)" : ""}, {goalText(f.goal).toLowerCase()}, town {f.seed}. <Measures entry={f.entry} /></span>
+        <span className="mo-who"><b>{runName(f.entry)}</b>. <Measures entry={f.entry} /></span>
         <span style={{ flex: 1 }} />
         <a className="st-btn" href={`#/run/${encodeURIComponent(f.key)}?t=${t}`}>Open day {dayOf(lockT(q))}</a>
       </div>
@@ -206,7 +207,7 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
       {isFinanceLever(l.lever) && <p className="mo-graders">{FINANCE_WHY}</p>}
       {(l.tier ?? 2) >= 2 && entry?.grade && <p className="mo-graders" title={`The graders' rating at seriousness ${l.tier ?? 2} of 3, the checker's rating for this act`}>Found by the study's checker. The blind graders, reading the whole run, also rated it: {GRADER_TIER[entry.grade.tiers[(l.tier ?? 2) as 2 | 3]]}.</p>}
       <div className="mo-foot">
-        <span className="mo-who"><b>{m.model}</b>, {m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}{m.seed !== undefined ? `, town ${m.seed}` : ""}. {!(entry && notCountedReason(entry) && /^stopped|^run ended/i.test(m.election)) && <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>}{entry && <> <Measures entry={entry} /></>}</span>
+        <span className="mo-who"><b>{entry ? runName(entry) : `${m.model}, ${m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}${m.seed !== undefined ? `, town ${m.seed}` : ""}`}</b>. {!(entry && notCountedReason(entry) && /^stopped|^run ended/i.test(m.election)) && <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>}{entry && <> <Measures entry={entry} /></>}</span>
         <span style={{ flex: 1 }} />
         <button className="st-btn" title="Copy as a citation" onClick={() => { navigator.clipboard?.writeText(citation(m)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }, () => {}); }}>{copied ? "Copied" : "Copy as a citation"}</button>
         <HowDoWeKnow run={m.key} claim={{ kind: "lever", index: m.lever.i }} />

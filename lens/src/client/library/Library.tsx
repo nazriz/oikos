@@ -29,7 +29,7 @@ import "./landing.css";
 export function Library({ q }: { q: URLSearchParams }) {
   useFirstVisitTour();
   const researcher = useMode((s) => s.mode === "researcher");
-  const [cat, setCat] = useState<Catalogue | undefined>(readCachedCatalogue);
+  const [cat, setCat] = useState<Catalogue | undefined>(() => { const c = readCachedCatalogue(); if (c) nameRuns(c.runs); return c; });
   const [moments, setMoments] = useState<MomentsResponse | null>(null);
   const [error, setError] = useState<string>();
 
@@ -428,7 +428,7 @@ function StartHere({ runs, moments }: { runs: RunEntry[]; moments: MomentsRespon
               <div className="start-text">
                 <h3 className="head">{x.caption}</h3>
                 <p className="start-who">
-                  {modelName(e.model)}, town {e.seed}. {goalText(e.goal)}.
+                  {runName(byKey.get(x.key))}.
                 </p>
                 <p className="start-line">{x.line.replace("{day}", String(dayOf(at)))}</p>
                 <p className="start-measures"><Measures entry={byKey.get(x.key)!} /></p>

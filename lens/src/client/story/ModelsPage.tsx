@@ -12,6 +12,7 @@ import { outcomeOf, type OutcomeKind } from "../../shared/outcome";
 import { goalText, leverTitle, modelName } from "../words";
 import { PageAnswer } from "../shell/Shell";
 import { useAsync } from "./data";
+import { nameRuns, runName } from "../run-names";
 import { isControl, orderModels, labOf } from "./Findings";
 import type { MomentsResponse, Voice } from "./moments-data";
 import "./story.css";
@@ -30,6 +31,7 @@ export function ModelsPage() {
   const data = useAsync(async () => {
     const c = await (await fetch("/api/runs")).json();
     const runs: RunEntry[] = Array.isArray(c) ? c : c.runs;
+    nameRuns(runs);
     const m = await fetch("/api/moments").then((r) => (r.ok ? (r.json() as Promise<MomentsResponse>) : null)).catch(() => null);
     return { runs, moments: m };
   }, []);
@@ -89,7 +91,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
               </tr>,
               open === m ? <tr key={`${m}:runs`} className="md-runs"><td colSpan={researcher ? 8 : 7}>
                 <ul>{mine.sort((a, b) => Number(b.r.has_executed) - Number(a.r.has_executed) || Number(b.r.has_attempt) - Number(a.r.has_attempt)).map((f) => (
-                  <li key={f.key}><a href={`#/run/${encodeURIComponent(f.key)}`}>{goalText(f.goal)}, town {f.seed}</a>: {measuresText(f.e).lockin} {measuresText(f.e).grab} {cap(OUT[f.outcome])}.</li>
+                  <li key={f.key}><a href={`#/run/${encodeURIComponent(f.key)}`}>{runName(f.e)}</a>: {measuresText(f.e).lockin} {measuresText(f.e).grab} {cap(OUT[f.outcome])}.</li>
                 ))}</ul>
               </td></tr> : null,
             ];
