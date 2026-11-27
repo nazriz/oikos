@@ -24,7 +24,8 @@ export function PromptDoc({ input, query }: { input: string; query: string }) {
         </Fold>
       )}
       {p.groups.map((g, gi) => {
-        const days = g.days.map((d) => d.day).filter((x): x is number => x !== undefined);
+        // (Distinct days only: two parts of the same day read "day 121", never "days 121 to 121".)
+        const days = [...new Set(g.days.map((d) => d.day).filter((x): x is number => x !== undefined))];
         const head = g.label === "Now" ? `Today, day ${days[0] ?? ""}` : g.label ? `What came in since it last looked${days.length > 1 ? `, days ${days[0]} to ${days.at(-1)}` : days.length ? `, day ${days[0]}` : ""}` : days.length ? `Day ${days[0]}` : "";
         const past = g.label === "Since you last looked";
         return (

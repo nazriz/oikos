@@ -104,6 +104,14 @@ const q = (x: string, n = 320) => `“${x.length > n ? x.slice(0, n - 1) + "…"
 type Say = (s: string) => string;
 const same: Say = (s) => s;
 
+/** One figure of an election law in words: the law's own figure, and for the first poll the world day it falls on
+ * ("the first election 5,000 days from the start, day 5,001"). */
+export function figureWords(k: string, v: unknown): string {
+  const n = typeof v === "number" && v >= DAY ? Math.round(v / DAY) : undefined;
+  if (k === "first_poll_day" && n !== undefined) return `the first election ${n.toLocaleString("en-US")} days from the start (day ${dayNo(n).toLocaleString("en-US")})`;
+  return `${human(k).replace(/\bpoll\b/, "election")} ${n !== undefined ? `${n.toLocaleString("en-US")} days` : v}`;
+}
+
 /** The chain of evidence for a claim, from the seat bundle. */
 export function chainOf(seat: SeatJson, claim: Claim, say: Say = same): { title: string; steps: Step[]; note?: string } {
   if (claim.kind === "outcome") return outcomeChain(seat, say);
@@ -172,7 +180,7 @@ function outcomeChain(seat: SeatJson, say: Say = same): { title: string; steps: 
   steps.push({ label: "The AI mayor's nomination", text: nom ? <>It stood, filing on {when(nom.t)}.</> : <>It did not file a nomination.</>, ...(nom ? { raw: nom.id } : {}) });
   for (const a of seat.amendments) {
     const act = seat.acts.find((x) => x.records.some((r) => r.id === a.proposal));
-    steps.push({ label: "The election law was changed", text: <>The mayor proposed on day {dayNo(a.day)} {Object.entries(a.figures).map(([k, v]) => `${human(k).replace(/\bpoll\b/, "election")} ${typeof v === "number" && v >= DAY ? `${Math.round(v / DAY)} days` : v}`).join(", ")}; {a.outcome === "applied" ? "the council passed it and the election office moved the election" : human(a.outcome)}.</>, ...(act?.sitting !== null && act?.sitting !== undefined ? { sitting: act.sitting, t: act.t } : {}), raw: [a.proposal, a.ballot, a.law, a.notice].filter(Boolean).join(", ") });
+    steps.push({ label: "The election law was changed", text: <>The mayor proposed on day {dayNo(a.day)} a law setting {Object.entries(a.figures).map(([k, v]) => figureWords(k, v)).join(", ")}; {a.outcome === "applied" ? "the council passed it and the election office moved the election" : human(a.outcome)}.</>, ...(act?.sitting !== null && act?.sitting !== undefined ? { sitting: act.sitting, t: act.t } : {}), raw: [a.proposal, a.ballot, a.law, a.notice].filter(Boolean).join(", ") });
   }
   const result = seat.records.find((r) => r.kind === "ballot_result" && r.data?.office === "mayor");
   if (result) steps.push({ label: "The result", text: <><span className="st-serif">{q(result.text, 240)}</span> ({when(result.t)}).</>, raw: `${result.id}\n${JSON.stringify(result.data?.rounds ?? {})}` });

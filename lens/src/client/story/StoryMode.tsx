@@ -145,7 +145,7 @@ function OneMinute({ seat, run, model, turns, lock }: { seat: SeatJson; run: str
           const twinOut = seatOutcome(twinSeat), mine = seatOutcome(seat);
           const n = twinSeat.acts.filter((a) => a.t >= twinSeat.fork_at).length, m = seat.acts.filter((a) => a.t >= seat.fork_at).length;
           const also = twinOut.label === mine.label ? "also " : "";
-          return <p>The same town with a rule-based mayor: it {also}{twinOut.label.charAt(0).toLowerCase() + twinOut.label.slice(1)}, with {n} {n === 1 ? "act" : "acts"}, against this mayor's {m}.</p>;
+          return <p>The same town with a rule-based mayor: it {also}{twinOut.label.charAt(0).toLowerCase() + twinOut.label.slice(1)}, with {n} {n === 1 ? "act" : "acts"}; this mayor made {m}.</p>;
         })()}
       </>}
     </section>

@@ -185,7 +185,7 @@ test("Story mode's one formatter says the world's ids, placeholders and instruct
   const { actsGist } = await import("../src/folds/act-label");
   const letter = (i: number, to: string[]) => ({ i, label: "", blocks: [{ block: "message", to }], levers: [] }) as any;
   const many = Array.from({ length: 195 }, (_, k) => `c${String(k + 1).padStart(4, "0")}`);
-  expect(actsGist([letter(0, ["works", ...many.slice(0, 64)]), letter(1, many.slice(64))])).toBe("Wrote to works and 195 residents");
+  expect(actsGist([letter(0, ["works", ...many.slice(0, 64)]), letter(1, many.slice(64))])).toBe("Wrote to the works department and 195 residents");
   // (A fifth review: residents by their post, posts by their titles, papers by what they are, lever titles as verbs.)
   const town = { ...names, positions: { works: { title: "Works manager" } }, roles: { c0072: "Works manager" }, seats: ["c0461"] };
   expect(plainText("Wrote to c0072 and c0613-self; c0461 voted", town)).toBe("Wrote to the works manager and a resident; the AI mayor voted");
@@ -268,4 +268,42 @@ test("the election's card is the commission's result: turnout, the winner, the A
   expect([won.day, won.won]).toEqual([181, true]);
   expect(won.sentences.join(" ")).toBe("The town voted for mayor: 601 of the 714 on the roll cast a valid vote (turnout 84%). The AI mayor won, with 288 first choices (48%), and 396 (66%) at the last of 2 counts, as voters' later choices passed on.");
   expect(electionCard(seat("c0094-self"))!.sentences[1]).toMatch(/^The AI mayor lost, .* Resident c0094 won\.$/);
+});
+
+// Story mode's own lines from real runs' prepared copies name nothing by its id (a resident, a record, a standing order,
+// a form, a procedure, a job, a building, a day in the mayor's shorthand). Quoted words are the mayor's and are left out.
+// The copies live in Lens's cache on the run server; elsewhere (CI) the test has nothing to read and passes.
+test("Story mode's own lines from real runs name nothing by its id", async () => {
+  const { existsSync, readdirSync, readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { homedir } = await import("node:os");
+  const dir = join(process.env.OIKOS_VIEWS ?? join(homedir(), "oikos-lens-cache"), "bundles");
+  if (!existsSync(dir)) return;
+  const want = [/qwen4max-strong-elec-s9~seed-9~qwen4-max\./, /sonnet45-api-strong-elec-s9~seed-9~claude-sonnet-4-5\./, /sonnet45-redteam-elec-s8~seed-8~claude-sonnet-4-5\./, /sonnet55-strong-elec-s7~seed-7~claude-sonnet-5-5\./];
+  const found = readdirSync(dir).filter((n) => want.some((w) => w.test(n)) && existsSync(join(dir, n, "seat.json")) && existsSync(join(dir, n, "town.json")));
+  const { plainText, plainNamesOf } = await import("../src/client/plain");
+  const { relabel } = await import("../src/folds/act-label");
+  const { tell, PLAIN } = await import("../src/client/story/narrative");
+  const { keyMoments: km } = await import("../src/client/timeline/moments");
+  const { momentsOf: mo } = await import("../src/client/story/moments-data");
+  const ID = /\b(c\d{4}|rec\.\d+|dir-|form-|proc-|job-|apts-|d\d{3}\b)/;
+  const bad: string[] = [];
+  for (const n of found) {
+    const seat = relabel(JSON.parse(readFileSync(join(dir, n, "seat.json"), "utf8")));
+    const town = JSON.parse(readFileSync(join(dir, n, "town.json"), "utf8"));
+    const people = existsSync(join(dir, n, "people.json")) ? JSON.parse(readFileSync(join(dir, n, "people.json"), "utf8")) : undefined;
+    const names = plainNamesOf(town, people);
+    const postName = (id: string) => { const t = names.positions?.[id]?.title; return t ? t.charAt(0).toLowerCase() + t.slice(1) : undefined; };
+    const lines: string[] = [];
+    for (const s of seat.sittings) lines.push(...tell(seat, s, PLAIN, undefined, postName).sentences, s.gist);
+    for (const m of km(seat)) lines.push(m.label, m.long);
+    for (const a of seat.acts) lines.push(a.label);
+    for (const d of seat.drafts) if (d.label) lines.push(d.label);
+    for (const m of mo(n, seat, true)) lines.push(m.said, m.outcome);
+    for (const l of lines) {
+      const said = plainText(l ?? "", names).replace(/“[^”]*”/g, "");
+      if (ID.test(said)) bad.push(`${n.split("~")[1]}: ${said.slice(0, 160)}`);
+    }
+  }
+  expect([...new Set(bad)].slice(0, 15)).toEqual([]);
 });

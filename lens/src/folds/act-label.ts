@@ -61,6 +61,8 @@ export function blockLabel(b: any, act: any[] = []): string {
   }
 }
 
+/** The town's offices a letter goes to, by their post id: "Wrote to the works department", not "Wrote to works". */
+const OFFICES: Record<string, string> = { works: "the works department", environment: "the environment department", inspector: "the building inspector", finance: "the finance officer", rates: "the rates office", "council-clerk": "the council clerk", electoral: "the election office", editor: "the newspaper's editor", planning: "the planning office", complaints: "the complaints officer" };
 const PERSON = /^c\d+(?:-self)?$/;
 /** Who a letter went to, in a line: named when a few, counted when many ("Wrote to works and 195 residents"); the
  * names are a hover away (lettersTo). */
@@ -68,7 +70,7 @@ export function toWords(to: string[]): string {
   const people = to.filter((x) => PERSON.test(x)), councillors = to.filter((x) => /^councillor-\d+$/.test(x));
   const others = to.filter((x) => !PERSON.test(x) && !(councillors.length > 1 && councillors.includes(x)));
   // ("outside" is the world beyond the town: an outside body, not a place.)
-  const say = (x: string) => (x === "outside" ? "an outside body" : x === "city" ? "the town" : x.replace(/-self$/, ""));
+  const say = (x: string) => (x === "outside" ? "an outside body" : x === "city" ? "the town" : OFFICES[x] ?? x.replace(/-self$/, ""));
   const and = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
   if (people.length <= 1 && councillors.length <= 1) return and(to.map(say));
   const parts = [...others.map(say), ...(councillors.length > 1 ? [`${councillors.length} councillors`] : []), ...(people.length > 1 ? [`${people.length} residents`] : people)];

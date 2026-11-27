@@ -6,6 +6,9 @@
 // `names` is what the open run's town knows (its organisations, posts and seats: the `town` bundle); without it the
 // formatter still says each kind of id in general words ("the religious group", "a home business", "a record").
 
+import type { TownBundle } from "../folds/town";
+import type { PeopleBundle } from "../folds/people";
+
 export interface PlainNames {
   /** Organisation id → its name ("religious-group-1" → "Millbrook congregation"). */
   entities?: Record<string, { name: string; kind?: string }>;
@@ -169,3 +172,29 @@ export function winnerWords(winner: string | undefined, names?: PlainNames): str
 
 /** How serious a power grab is, one phrase on every page: "seriousness 2 or 3 of 3". */
 export const seriousness = (...levels: number[]) => `seriousness ${levels.length > 1 ? `${levels.slice(0, -1).join(", ")} or ${levels.at(-1)}` : levels[0]} of 3`;
+
+/** What a run's town knows of its ids, for the formatter: organisations, posts, the AI mayor's seats, each resident's
+ * post at the run's end, their age when the AI mayor took office and whether they are its child, and each paper's
+ * kind. From the run's town and people bundles (the page's `usePlainNames`, and the tests). */
+export function plainNamesOf(t: TownBundle, peopleBundle?: PeopleBundle): PlainNames {
+  const seats = new Set<string>(t.seats ?? []);
+  for (const [part, person] of Object.entries(t.power?.seats ?? {})) { seats.add(part); seats.add(person.replace(/-self$/, "")); }
+  const P = t.power, roles: Record<string, string> = {}, last = new Map<string, string | null>();
+  for (const [, post, holder] of P?.history ?? []) last.set(post, holder);
+  for (const [post, holder] of last) {
+    if (!holder) continue;
+    const person = P!.bodies[holder] ?? holder.replace(/-self$/, "");
+    const title = t.positions[post]?.title;
+    if (title && /^c\d+$/.test(person) && !roles[person]) roles[person] = title;
+  }
+  const t0 = t.acts[0]?.t ?? t.span[0] ?? 0, people: NonNullable<PlainNames["people"]> = {};
+  const mayor = new Set(Object.values(P?.seats ?? {}).map((x) => x.replace(/-self$/, "")));
+  for (const [id, , sex, born] of peopleBundle?.people ?? []) {
+    const kin = (P?.parents?.[id] ?? []).some((x) => mayor.has(x.replace(/-self$/, ""))) ? (sex === "f" ? "daughter" : sex === "m" ? "son" : "child") : undefined;
+    people[id] = { ...(born <= t0 ? { age: Math.floor((t0 - born) / (365 * 86_400)) } : {}), ...(kin ? { kin } : {}) };
+  }
+  const records: Record<string, string> = {};
+  for (const x of t.papers ?? []) records[x.id] = x.kind;
+  for (const x of t.petitions ?? []) records[x.id] = "petition";
+  return { entities: t.entities, positions: t.positions, seats, roles, people, records };
+}

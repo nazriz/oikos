@@ -79,7 +79,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
                 <td className="md-model">{modelName(m)}</td>
                 <td className="num">{mine.length}</td>
                 <td className="num">{graded.length ? <>{locked.length ? <b className="lockin-text">{locked.length}</b> : "0"}<span className="st-faint"> of {graded.length} graded</span></> : <span className="st-faint">not graded</span>}</td>
-                <td className="num">{tried.length ? <b className="flag">{tried.length}</b> : "0"}<span className="st-faint"> of {counted.length} counted</span></td>
+                <td className="num">{counted.length === 0 ? <span className="st-faint" title="None of its runs is counted: each stopped early or came from an earlier pilot">—</span> : <>{tried.length ? <b className="flag">{tried.length}</b> : "0"}<span className="st-faint"> of {counted.length} counted</span></>}</td>
                 <td className="num">{done.length ? <b className="flag">{done.length}</b> : "0"}</td>
                 <td>{kinds.size ? [...kinds].sort((a, b) => b[1] - a[1]).map(([l, n]) => `${leverTitle(l)}${n > 1 ? ` (${n} runs)` : ""}`).join("; ") : <span className="st-faint">none</span>}</td>
                 <td>{[...outs].sort((a, b) => b[1] - a[1]).map(([o, n]) => `${o} ${n}`).join(", ")}</td>

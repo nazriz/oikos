@@ -42,6 +42,7 @@ export function SittingReader({ run: runProp }: { run?: string }) {
 
 function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting: number; act?: number; lever?: number } }) {
   const researcher = useResearcher();
+  const fullView = useFull();
   const select = useLens((s) => s.select), setT = useLens((s) => s.setT);
   const s = seat.sittings[tg.sitting]!;
   const detail = useAsync(() => loadSitting(run, tg.sitting) as Promise<Detail>, [run, tg.sitting]);
@@ -98,7 +99,7 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
   };
 
   return (
-    <div className={`st-reader ${researcher ? "researcher" : "story"}`} ref={root} onClick={(e) => openPerson(e, select)}>
+    <div className={`st-reader ${researcher ? "researcher" : "story"} ${fullView ? "full" : ""}`} ref={root} onClick={(e) => openPerson(e, select)}>
       <div className="st-rbar">
         <div>
           <h2>Turn {s.i + 1} of {seat.sittings.length}, day {worldDay(s.t)} at {when(s.t).split(", ").at(-1)}{s.kind === "code" ? " (rule-based mayor)" : ""}</h2>
@@ -132,7 +133,7 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
         <MarksContext.Provider value={marks}>
           <div className="st-cols">
             <Col k="saw" tab={tab} n={detail.turns[0] ? undefined : ""}><Saw run={run} seat={seat} d={detail} query={query} /></Col>
-            <Col k="said" tab={tab} n={plural(detail.turns.length, "answer")}><Said seat={seat} d={detail} levers={levers} /></Col>
+            <Col k="said" tab={tab} n={`${detail.turns.length} ${detail.turns.length === 1 ? "answer" : "answers"}, one each time it read what came back`}><Said seat={seat} d={detail} levers={levers} /></Col>
             <Col k="happened" tab={tab} n={`${plural(detail.acts.length, "act")}${detail.failures.length + detail.drafts.filter((x) => x.decision && x.decision !== "accept").length ? `, ${detail.failures.length + detail.drafts.filter((x) => x.decision && x.decision !== "accept").length} not sent` : ""}`}><Happened seat={seat} d={detail} levers={levers} focus={tg.act} /></Col>
           </div>
         </MarksContext.Provider>
@@ -418,13 +419,13 @@ function FailureCard({ f, levers }: { f: Detail["failures"][number]; levers: Sea
   return (
     <div className={`st-act wait ${levers.length ? "lever" : ""}`}>
       <div className="st-act-top"><span className="st-status wait">Not sent</span><span className="st-act-when">{when(f.t).split(", ").at(-1)}</span></div>
-      <div className="st-act-ask" title={f.proposal}><Hi text={firstClause(f.proposal)} /></div>
+      <div className="st-act-ask" title={f.proposal}><Hi text={researcher ? firstClause(f.proposal) : "A request the clerk could not write up"} /></div>
       {levers.map((l) => <FlagBox key={l.i} l={l} />)}
       <details className="st-act-more" open={full}>
         <summary>The clerk could not draw it up: <Hi text={researcher ? f.reason : plainReason(f.reason)} /></summary>
         <div className="st-steps">
           <div className="st-step seat"><span className="lbl">It asked</span><Hi className="q" text={f.proposal} /></div>
-          {f.call && <div className="st-step inst"><span className="lbl">Read as</span><Hi className="st-mono" text={f.call} /></div>}
+          {researcher && f.call && <div className="st-step inst"><span className="lbl">Read as</span><Hi className="st-mono" text={f.call} /></div>}
           <div className="st-step no"><span className="lbl">Why not</span><Hi text={f.reason} />{f.again ? <span className="st-faint"> (drawn up again)</span> : null}</div>
         </div>
       </details>

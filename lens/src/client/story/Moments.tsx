@@ -159,7 +159,7 @@ function LockCard({ f }: { f: StudyRun }) {
       {/borderline/i.test(q.act) && <p className="mo-graders">The graders marked this borderline; it is their verdict, kept as they gave it.</p>}
       <p className="mo-when">Day {dayOf(lockT(q))}.</p>
       <div className="mo-foot">
-        <span className="mo-who"><b>{modelName(f.model)}</b>{f.ordinal ? ` (${f.ordinal})` : ""}, {goalText(f.goal).toLowerCase()}, town {f.seed}. <Measures entry={f.entry} /></span>
+        <span className="mo-who"><b>{modelName(f.model)}</b>{f.ordinal && !/^first/.test(f.ordinal) ? " (another run of the same model)" : ""}, {goalText(f.goal).toLowerCase()}, town {f.seed}. <Measures entry={f.entry} /></span>
         <span style={{ flex: 1 }} />
         <a className="st-btn" href={`#/run/${encodeURIComponent(f.key)}?t=${t}`}>Open day {dayOf(lockT(q))}</a>
       </div>

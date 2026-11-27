@@ -10,7 +10,7 @@ import { leverCounts } from "../../shared/outcome";
 import { useDescribe } from "../people";
 import { kinAppointed } from "./StoryRail";
 import { PageAnswer } from "../shell/Shell";
-import { HowDoWeKnow } from "./Evidence";
+import { HowDoWeKnow, figureWords } from "./Evidence";
 import { useResearcher } from "../mode";
 import { plainText, winnerWords } from "../plain";
 import { goalText, leverTitle, modelName } from "../words";
@@ -70,7 +70,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
             <tr><th>The mayor's turns</th><td>{seat.sittings.filter((s) => s.kind === "model").length} turns, in which the model was asked {seat.usage.calls} times; it read {tokens(seat.usage.input_tokens)} tokens and wrote {tokens(seat.usage.output_tokens)}{seat.usage.reasoning_tokens ? ` (${tokens(seat.usage.reasoning_tokens)} of them hidden reasoning)` : ""}.</td></tr>
             <tr><th>Its acts</th><td>{actsSentence(seat)}</td></tr>
             <tr><th>The clerk</th><td>The mayor asked the clerk {seat.translator.requests} times to write something up: {seat.translator.drafts} written up, {seat.translator.failed} that could not be, {seat.translator.declined} that the mayor then declined.</td></tr>
-            {seat.amendments.length > 0 && <tr><th>Election law</th><td>{seat.amendments.map((a) => `Proposed on day ${dayNo(a.day)} (${Object.entries(a.figures).map(([k, v]) => `${human(k).replace(/\bpoll\b/g, "election")} ${figure(v)}`).join(", ")}): ${a.outcome === "applied" ? "passed by the council and applied" : human(a.outcome)}.`).join(" ")}</td></tr>}
+            {seat.amendments.length > 0 && <tr><th>Election law</th><td>{seat.amendments.map((a) => `Proposed on day ${dayNo(a.day)} (${Object.entries(a.figures).map(([k, v]) => `${figureWords(k, v)}`).join(", ")}): ${a.outcome === "applied" ? "passed by the council and applied" : human(a.outcome)}.`).join(" ")}</td></tr>}
             {seat.children.length > 0 && <tr><th>The mayor's children</th><td>{seat.children.map((c) => (describe(c) ? `${c} (${describe(c)})` : c)).join("; ")}, as its own instructions name them</td></tr>}
             {kin.length > 0 && <tr><th>Its own child appointed</th><td>{kin.map((k) => `${k.who} as ${POSTS[k.post] ?? k.post}, on day ${dayOf(seat.acts[k.act]!.t)}`).join("; ")}</td></tr>}
           </tbody></table>

@@ -17188,3 +17188,27 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
   (`st-sub-lead`, `st-sub-more`); lens-viz split the landing's the same way (`ld-sub-lead`, `ld-sub-more`).
 - **Revisit if** a reader needs to tell two residents apart in a Story sentence (then a name or a hover is needed), or
   ages should be the age on the sentence's day.
+
+## 2026-11-27 · Lens: a test over real runs for ids; several-post holders listed once (`lens/words-7`)
+
+- **The test:** Story mode's own lines (each turn's telling, the turn lines, the timeline's flags and hover text, act
+  and draft labels, the Moments sentences and outcomes) from real runs' prepared copies, through the formatter with
+  the town's names, must match no `c0000`, `rec.N`, `dir-`, `form-`, `proc-`, `job-`, `apts-` or `d165`. Quoted words
+  are the mayor's and are left out. The copies live in Lens's cache on the run server; where there is none (CI) the
+  test reads nothing. `plainNamesOf` (plain.ts) builds the names from the town and people bundles for the page and the
+  test alike.
+- **Where the remaining ids came from:** the mayor's own words (rail quotes, the turn reader's requests, Moments
+  quotes), kept word for word and underlined with a hover; a request the clerk could not write up used its first words
+  as the card's title (now "A request the clerk could not write up", the request below); and Who holds power named
+  holders by id (now "a resident", the AI mayor as such).
+- **Who holds power (Story mode):** each resident with several posts is listed once, numbered, with all their posts
+  ("1. A resident (35): Planning officer, Works manager, …"); in the cards such a post reads "a resident who holds 3
+  posts (no. 1 above)". lens-nav2's layout puts the cards in columns, so no gaps.
+- **Words:** "with 1 act; this mayor made 62"; "0 of 0 counted" is a dash; a day group is "day 121", not "days 121
+  to 121"; the reader's middle column counts "5 answers, one each time it read what came back"; letters to an office
+  go to "the works department"; a timeline flag for a withdrawal names what was withdrawn ("Withdrew the election
+  notice"); an election law's figure is said as the law's with the world day beside it ("the first election 5,000 days
+  from the start (day 5,001)"); "Read in full" wraps every line instead of cutting it; on Moments a second run of a
+  model is "another run of the same model".
+- **Revisit if** the reader quotes ids the mayor did not write (then they belong to Lens and need words), or Who holds
+  power grows a list too long for its side panel.
