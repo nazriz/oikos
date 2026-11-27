@@ -17362,3 +17362,10 @@ run page ~37 s on the live server. What it found:
 - **Other mayors says what its little lines are**: the run from the AI mayor's first day to its end, its election day
   (filled where it won), a power grab.
 - (The day across Compare and Back held already, since nav-11: checked again on the Qwen run, day 145 there and back.)
+
+## 2026-11-27 Lens: a run's title bar says "not counted" first (`lens/nav-16`)
+
+- The title bar's brief measures (`briefMeasures`, measures.tsx) take the same status measuresText and
+  notCountedReason give, not counted before anything else: an earlier pilot reads "Lock-in: not counted. Power grab:
+  carried out, not counted.", the reason in the hover; "not graded" is only for a counted run the graders did not read
+  (nav-15's brief mode hid the reason and left "Lock-in: not graded." on the DeepSeek pilot). A test holds it.
