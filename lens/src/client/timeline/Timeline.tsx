@@ -325,6 +325,12 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
       g.fillStyle = withAlpha(p.seat, 0.85);
       g.fillRect(px - 0.5, axisTop + AXIS - 2, 2, height - axisTop - AXIS + 2);
     }
+    // The hover line, likewise under the flags' words (drawn over them, it cut "Elect|ion day" while one pointed at it).
+    if (hoverT !== null) {
+      const x = Math.round(xOf(hoverT)) + 0.5;
+      g.fillStyle = p.line2;
+      g.fillRect(x, flagsTop, 1, height - flagsTop);
+    }
 
     // Axis: day ticks, or hour ticks when close in.
     const pxPerDay = (DAY / Math.max(1, v1 - v0)) * width;
@@ -537,12 +543,6 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
     }
     flagHits.current = fl;
 
-    // Hover line.
-    if (hoverT !== null) {
-      const x = Math.round(xOf(hoverT)) + 0.5;
-      g.fillStyle = p.line2;
-      g.fillRect(x, flagsTop, 1, height - flagsTop);
-    }
     // The playhead's head.
     if (px >= -2 && px <= width + 2) {
       g.fillStyle = p.seat;

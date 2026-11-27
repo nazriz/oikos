@@ -173,3 +173,43 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* On a phone the header wraps: the links and the buttons go on their own lines, and a divider between them would stand
+   alone at a line's end. */
+@media (max-width: 760px) {
+  .site-links {
+    border-right: 0;
+    padding-right: 0;
+    margin-right: 0;
+  }
+}
+
+/* House style (docs/design/lens-look.md, "no tracked-out all-caps labels"): the small grey labels that were still set in
+   spaced capitals read as a template. Sentence case, the text's own spacing, a readable size. (:root raises these over
+   the views' own sheets, which load after this one.) */
+:root .st-kicker,
+:root .st-paper .k,
+:root .st-turn-head,
+:root .st-step .lbl,
+:root .st-pill,
+:root .st-flagbox .who,
+:root .df-sep,
+:root .cp-group,
+:root .mo-level,
+:root .mo-sub .k,
+:root .mo-around .k,
+:root .fi-groups .lbl,
+:root .dg-out .k,
+:root .dg-sub span {
+  text-transform: none;
+  letter-spacing: 0;
+}
+:root .st-kicker,
+:root .df-sep,
+:root .cp-group,
+:root .fi-groups .lbl,
+:root .st-step .lbl,
+:root .mo-sub .k,
+:root .mo-around .k {
+  font-size: 12px;
+}
