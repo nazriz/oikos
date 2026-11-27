@@ -17133,3 +17133,26 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
   is ready (a window event, "lens-world-ready", sent on ready and on failure; with lens-smooth).
 - **Revisit if** the 3D town builds in under a second (then the line is noise), or a step's thing is slow for a reason
   a few seconds will not cover (then say it in its `waiting`).
+
+## 2026-11-27 · Lens: no resident by id in Story mode; plainer counts and captions (`lens/words-6`)
+
+- **Residents:** Lens's own lines in Story mode name no one by id: a post-holder by the post ("the works manager"), the
+  AI mayor's children as "the mayor's son/daughter/child", anyone else as "a resident (age 24)" (age when the AI mayor
+  took office, from the people bundle; kin from the town's parent records). A description in brackets after an id is
+  folded in; a home business is "a resident's home business"; a job agreement "a job agreement". Who holds power says
+  "a resident (35) holds 3 posts: …", "the same resident as above", and the AI mayor "holds this office as one of the
+  town's residents". Ids stay in Researcher mode, in quotes (underlined, as before) and in the residents' own words.
+- **Records** are said by their kind where the town knows it ("a complaint", "a petition"); a withdrawn paper reads
+  "withdrew a complaint without a vote" (or "one of its earlier papers"), never "a paper (a record)".
+- **Sentences:** the election flag's hover is one sentence ("On day 181 the town voted and re-elected the mayor.");
+  the rule-based comparison reads "with 1 act, against this mayor's 62"; the turn reader heads its column "6 acts, 1
+  not sent" and tallies "6 acts carried out; 1 request the clerk could not draw up"; the graders' line on a Moments
+  card is a sentence ("The two blind graders disagreed on this one."); a prompt section's summary shows a list's
+  first items, never "Your own time: 5".
+- **Models' "In its own words"** keeps only a sentence of plan or reason (plan, programme, keep, power, law,
+  re-election, successor…) and drops status lines and errands ("I'm at day 151 …", "I need to find …", "I'll answer
+  …"); with none, the cell shows a dash.
+- **Captions:** the Moments captions are a short lead sentence with the count, then the details on their own line
+  (`st-sub-lead`, `st-sub-more`); lens-viz split the landing's the same way (`ld-sub-lead`, `ld-sub-more`).
+- **Revisit if** a reader needs to tell two residents apart in a Story sentence (then a name or a hover is needed), or
+  ages should be the age on the sentence's day.

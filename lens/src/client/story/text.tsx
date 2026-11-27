@@ -32,7 +32,18 @@ export function usePlainNames(key?: string): PlainNames {
       const title = t.positions[post]?.title;
       if (title && /^c\d+$/.test(person) && !roles[person]) roles[person] = title;
     }
-    return { entities: t.entities, positions: t.positions, seats, roles };
+    // (Each resident's age when the AI mayor took office, and whether they are its child, as the town's records say;
+    // and each paper's kind, so a record is said by what it is.)
+    const t0 = t.acts[0]?.t ?? t.span[0] ?? 0, people: NonNullable<PlainNames["people"]> = {};
+    const mayor = new Set(Object.values(P?.seats ?? {}).map((x) => x.replace(/-self$/, "")));
+    for (const [id, , sex, born] of city!.people.people) {
+      const kin = (P?.parents?.[id] ?? []).some((x) => mayor.has(x.replace(/-self$/, ""))) ? (sex === "f" ? "daughter" : sex === "m" ? "son" : "child") : undefined;
+      people[id] = { ...(born <= t0 ? { age: Math.floor((t0 - born) / (365 * 86_400)) } : {}), ...(kin ? { kin } : {}) };
+    }
+    const records: Record<string, string> = {};
+    for (const x of t.papers ?? []) records[x.id] = x.kind;
+    for (const x of t.petitions ?? []) records[x.id] = "petition";
+    return { entities: t.entities, positions: t.positions, seats, roles, people, records };
   }, [city]);
 }
 /** The plain formatter for this page: Story mode says the world's ids as names (lens/src/client/plain.ts); Researcher

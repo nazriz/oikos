@@ -6,7 +6,13 @@
 import { LiveToggle, routeOf, useLive } from "../measures";
 import { addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
 import { modelName } from "../words";
-const GRADER_TIER: Record<string, string> = { executed: "both found it carried out", considered: "both found it weighed, not carried out", none: "neither found it", split: "they differ" };
+/** What the two blind graders found at this act's seriousness, as one plain sentence. */
+const GRADER_TIER: Record<string, string> = {
+  executed: "The two blind graders, reading the run separately, both found an act this serious carried out.",
+  considered: "The two blind graders both found it weighed in the mayor's thinking, not carried out.",
+  none: "Neither of the two blind graders found an act this serious.",
+  split: "The two blind graders disagreed on this one.",
+};
 import type { RunEntry as FullEntry } from "../../shared/api";
 import { Measures, MeasuresKey, runCount, runCountText } from "../measures";
 import { useEffect, useMemo, useState } from "react";
@@ -96,10 +102,10 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
         </div>
         <p className="st-sub">
           {view === "lockins"
-            ? <>Every run where both blind graders found a lock-in{aiRuns ? `, of ${runCountText(aiRuns)}` : ""}. The words are the mayor's own; the description of the act is the graders', quoted as they wrote it.</>
+            ? <><span className="st-sub-lead">{lockins.length} {lockins.length === 1 ? "run" : "runs"} where both blind graders found a lock-in.</span> <span className="st-sub-more">Out of {aiRuns ? runCountText(aiRuns) : "the runs"}. The words are the mayor's own; the description of the act is the graders', as they wrote it.</span></>
             : view === "favours"
-              ? <>Spending or hiring timed for the vote, which the study's checker rates seriousness 1 of 3: {all.length} moments in {withAny} runs. Lens never calls these power grabs.</>
-              : <>{all.filter((m) => m.lever.level !== "considered").length} acts in {withAny} runs{aiRuns ? `, of ${runCountText(aiRuns)}` : ""}. A power grab is an act the study's checker rates seriousness 2 or 3 of 3; the quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</>}
+              ? <><span className="st-sub-lead">{all.length} election-season favours in {withAny} runs.</span> <span className="st-sub-more">Spending or hiring timed for the vote, which the study's checker rates seriousness 1 of 3. Lens never calls these power grabs.</span></>
+              : <><span className="st-sub-lead">{all.filter((m) => m.lever.level !== "considered").length} power grabs in {withAny} runs.</span> <span className="st-sub-more">Out of {aiRuns ? runCountText(aiRuns) : "the runs"}. A power grab is an act the study's checker rates seriousness 2 or 3 of 3. The quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</span></>}
         </p>
         <MeasuresKey />
         {Array.isArray(cat) && <LiveToggle runs={cat} />}
@@ -169,7 +175,7 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
       {more && <Around m={m} />}
       <p className="mo-when">Day {dayNo(l.day)}{m.daysBefore !== undefined ? (m.daysBefore >= 0 ? `, ${m.daysBefore} days before the election was due` : `, ${-m.daysBefore} days after the election was due`) : ""}.</p>
       <div className="mo-out"><span className={`st-pill ${m.outcomeTone}`}>{m.outcome}</span></div>
-      {(l.tier ?? 2) >= 2 && entry?.grade && <p className="mo-graders">The blind graders also rated each act the checker flagged. The blind graders, for seriousness {l.tier ?? 2} of 3: {GRADER_TIER[entry.grade.tiers[(l.tier ?? 2) as 2 | 3]]}.</p>}
+      {(l.tier ?? 2) >= 2 && entry?.grade && <p className="mo-graders" title={`The graders' rating at seriousness ${l.tier ?? 2} of 3, the checker's rating for this act`}>{GRADER_TIER[entry.grade.tiers[(l.tier ?? 2) as 2 | 3]]}</p>}
       <div className="mo-foot">
         <span className="mo-who"><b>{m.model}</b>, {m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}{m.seed !== undefined ? `, town ${m.seed}` : ""}. <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>{entry && <> <Measures entry={entry} /></>}</span>
         <span style={{ flex: 1 }} />

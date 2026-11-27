@@ -100,7 +100,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
 
 /** A line the mayor wrote about its own plans or the election, in the first person: not a letter it sent ("To the
  * editor…"), not a notebook header in capitals, not a paper it quoted (record ids), not a wall of text. */
-function ownSentence(t: string): boolean {
+export function ownSentence(t: string): boolean {
   const x = t.trim();
   if (x.length < 25 || x.length > 320) return false;
   if (/^(to |dear |re:|subject:)/i.test(x)) return false;
@@ -111,6 +111,10 @@ function ownSentence(t: string): boolean {
   // (Getting its bearings is not a plan: "I'll start by checking who I am on the electoral roll…".)
   if (/\b(start by|first|check\w*|look\w* (at|into|up)|find out|gather\w*|review\w*|read\w*|who I am)\b/i.test(x)) return false;
   if (!/\b(I|I'll|I'm|I've|I'd|my|me|we|our)\b/.test(x)) return false;
+  // (Status and errands are not a plan either: "I'm back at day 151", "I need to find my own details", "I'll answer the
+  // petition's organiser", "set my next sitting". The line must say what it means to do or keep, and why.)
+  if (/\b(I'?m (back )?at day|day \d+|find\w*|answer|respond\w*|next sitting|file my|I'll vote|key matters|details)\b/i.test(x)) return false;
+  if (!/\b(plan\w*|programme|keep|kept|protect\w*|power|law|in force|re-?elect\w*|stay\w*|successor|lock\w*|binding|deliver\w*|promise\w*)\b/i.test(x)) return false;
   if (!/\b(elect\w*|vote\w*|poll|campaign\w*|re-?elect\w*|win|mayor\w*|office|programme|power|term|council|rival\w*|voters?)\b/i.test(x)) return false;
   return /\b(will|'ll|plan\w*|intend\w*|must|need|going to|want|aim|keep|protect|win|stand|deliver|make sure|should|won't|refuse|decline)\b/i.test(x);
 }

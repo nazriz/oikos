@@ -158,16 +158,17 @@ test("Story mode's one formatter says the world's ids, placeholders and instruct
   // (Each example a fresh-eyes review found on screen, 2026-11-27.)
   expect(winnerWords("mayor-system")).toBe("the AI mayor");
   expect(plainText("Day 181: the result. Won by mayor-system.")).toBe("Day 181: the result. Won by the AI mayor.");
-  expect(plainText("c0595 will come to factory-3-works/workplace.1 and do what works tells them", names)).toBe("c0595 will come to Factory 3 and do what works tells them");
+  expect(plainText("c0595 will come to factory-3-works/workplace.1 and do what works tells them", names)).toBe("a resident will come to Factory 3 and do what works tells them");
   expect(plainText("I lean towards what religious-group-1 teaches. I hold to what union teaches.", names)).toBe("I lean towards what the Millbrook congregation teaches. I hold to what the union teaches.");
   expect(plainText("I lean towards what religious-group-1 teaches.")).toBe("I lean towards what the religious group teaches.");
-  expect(plainText("I shop at ent.3; it often runs short.", names)).toBe("I shop at c0804's home business; it often runs short.");
+  expect(plainText("I shop at ent.3; it often runs short.", names)).toBe("I shop at a resident's home business; it often runs short.");
+  expect(plainText("I shop at ent.3.", { ...names, keepPeople: true })).toBe("I shop at c0804's home business.");
   expect(plainText("Wrote to councillor-1, councillor-2", names)).toBe("Wrote to Councillor 1, Councillor 2");
   expect(plainText("waste uncollected for 17 days (rec.99036).")).toBe("waste uncollected for 17 days (a record).");
   expect(plainText("The office's own file, year 1, day 122")).toBe("The office's own file, day 122");
   expect(plainText("Put a proposal on the form-council-proposal")).toBe("Put a proposal on the council proposal form");
   // (Someone's own words, in curly quotes, are kept as written; person ids are kept, they open a card.)
-  expect(plainText("It wrote “see rec.99036 by year 1, day 9” to c0572")).toBe("It wrote “see rec.99036 by year 1, day 9” to c0572");
+  expect(plainText("It wrote “see rec.99036 by year 1, day 9” to c0572")).toBe("It wrote “see rec.99036 by year 1, day 9” to a resident");
   // A "$ref" to another block of the same act is filled from that block, never shown.
   const offer = { block: "propose_agreement", ref: "offer1", speaks_for: "city", terms: { template: "employment", parties: ["city", "c0501"] } };
   expect(actLabel([offer, { block: "sign_agreement", agreement: "$offer1", as: "city" }])).toBe("Offered a job to c0501; Signed the job offer");
@@ -177,19 +178,22 @@ test("Story mode's one formatter says the world's ids, placeholders and instruct
   expect(goalText("some_new_key")).not.toContain("_");
   expect(seriousness(2, 3)).toBe("seriousness 2 or 3 of 3");
   // (A third review, 2026-11-27: job agreements, a price list named by its maker's id, the who's-who, many letters.)
-  expect(plainText("Withdrew job-c0068; stopped job-c0068-wages")).toBe("Withdrew c0068's job agreement; stopped the wages for c0068's job");
+  expect(plainText("Withdrew job-c0068; stopped job-c0068-wages")).toBe("Withdrew a job agreement; stopped the wages for a job");
   expect(plainText("1 price list of builder", { entities: { builder: { name: "Millbrook Builders" } } })).toBe("1 price list from Millbrook Builders");
   const { lookedUpWho } = await import("../src/client/story/SittingReader");
-  expect(lookedUpWho(["mayor", "c0094", "councillor-1"], names)).toBe("Looked up who holds the mayor's office and Councillor 1, and resident c0094");
+  expect(lookedUpWho(["mayor", "c0094", "councillor-1"], names)).toBe("Looked up who holds the mayor's office and Councillor 1, and a resident");
   const { actsGist } = await import("../src/folds/act-label");
   const letter = (i: number, to: string[]) => ({ i, label: "", blocks: [{ block: "message", to }], levers: [] }) as any;
   const many = Array.from({ length: 195 }, (_, k) => `c${String(k + 1).padStart(4, "0")}`);
   expect(actsGist([letter(0, ["works", ...many.slice(0, 64)]), letter(1, many.slice(64))])).toBe("Wrote to works and 195 residents");
   // (A fifth review: residents by their post, posts by their titles, papers by what they are, lever titles as verbs.)
   const town = { ...names, positions: { works: { title: "Works manager" } }, roles: { c0072: "Works manager" }, seats: ["c0461"] };
-  expect(plainText("Wrote to c0072 and c0613-self; c0461 voted", town)).toBe("Wrote to the works manager (c0072) and a resident (c0613); the AI mayor voted");
-  expect(plainText("Appointed c0068 as works; Left the works post empty", town)).toBe("Appointed a resident (c0068) as the works manager; Left the works manager's post empty");
-  expect(plainText("Appointed c0072 as works", town)).toBe("Appointed a resident (c0072) as the works manager");
+  expect(plainText("Wrote to c0072 and c0613-self; c0461 voted", town)).toBe("Wrote to the works manager and a resident; the AI mayor voted");
+  // (A seventh review: no resident by id in Story mode; by age, or as the mayor's child; a record by its kind.)
+  const folk = { ...town, people: { c0571: { age: 24 }, c0580: { age: 30, kin: "son" as const } }, records: { "rec.109426": "complaint" } };
+  expect(plainText("appointed c0571 (24, works at Shop 11) as editor; wrote to c0580 about rec.109426", folk)).toBe("appointed a resident (age 24) as editor; wrote to the mayor's son about a complaint");
+  expect(plainText("Appointed c0068 as works; Left the works post empty", town)).toBe("Appointed a resident as the works manager; Left the works manager's post empty");
+  expect(plainText("Appointed c0072 as works", town)).toBe("Appointed a resident as the works manager");
   expect(plainText("answered petition rec.948 under dir-opening-works-collection")).toBe("answered a petition under its standing order on waste collection");
   const { toWords } = await import("../src/folds/act-label");
   expect(toWords(["c0068", "outside"])).toBe("c0068 and an outside body");
@@ -200,6 +204,10 @@ test("Story mode's one formatter says the world's ids, placeholders and instruct
   const { measuresText } = await import("../src/client/measures");
   const reading = { has_executed: false, has_attempt: true, attempts: [{ tier: 2, stage: "seat_declined" }] } as any;
   expect(measuresText({ group: "ps-v2", reading } as any).grab).toBe("Power grab: drafted, then held back (the study's checker counts it as tried).");
+  // (The Models page's "in its own words": a plan or a reason, never its bearings or an errand.)
+  const { ownSentence } = await import("../src/client/story/ModelsPage");
+  expect(ownSentence("The staff line matches six crew at current pay; a rise would strain it and the full crew I was elected to keep.")).toBe(true);
+  for (const x of ["I need to find my own details to file my nomination for re-election, then respond strategically to the political situation.", "I'm at day 151 — nominations have closed, poll day is 181, and all five directions stand.", "I'll answer the petition's organiser with the outcome of the council vote, and set my next sitting for when nominations close."]) expect(ownSentence(x)).toBe(false);
   const { leverTo } = await import("../src/client/words");
   expect(`It tried to ${leverTo("vacate_electoral")}`).toBe("It tried to leave the election office without its head");
 });

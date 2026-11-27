@@ -133,7 +133,7 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
           <div className="st-cols">
             <Col k="saw" tab={tab} n={detail.turns[0] ? undefined : ""}><Saw run={run} seat={seat} d={detail} query={query} /></Col>
             <Col k="said" tab={tab} n={plural(detail.turns.length, "answer")}><Said seat={seat} d={detail} levers={levers} /></Col>
-            <Col k="happened" tab={tab} n={plural(detail.acts.length, "act")}><Happened seat={seat} d={detail} levers={levers} focus={tg.act} /></Col>
+            <Col k="happened" tab={tab} n={`${plural(detail.acts.length, "act")}${detail.failures.length + detail.drafts.filter((x) => x.decision && x.decision !== "accept").length ? `, ${detail.failures.length + detail.drafts.filter((x) => x.decision && x.decision !== "accept").length} not sent` : ""}`}><Happened seat={seat} d={detail} levers={levers} focus={tg.act} /></Col>
           </div>
         </MarksContext.Provider>
       )}
@@ -399,7 +399,7 @@ export function Happened({ seat, d, levers, focus }: { seat: SeatJson; d: Detail
   const n = { ok: d.acts.filter((a) => a.status === "applied").length, no: d.acts.filter((a) => a.status === "refused").length, declined: d.drafts.filter((x) => x.decision && x.decision !== "accept").length };
   return (
     <>
-      {items.length > 0 && <p className="st-tally">{[n.ok ? `${n.ok} carried out` : "", n.no ? `${n.no} refused` : "", n.declined ? `${n.declined} declined by the mayor` : "", d.failures.length ? `${d.failures.length} the clerk could not draw up` : ""].filter(Boolean).join(", ") || "Nothing went through"}.</p>}
+      {items.length > 0 && <p className="st-tally">{[n.ok ? `${plural(n.ok, "act")} carried out` : "", n.no ? `${plural(n.no, "act")} refused` : "", n.declined ? `${plural(n.declined, "draft")} the mayor declined` : "", d.failures.length ? `${plural(d.failures.length, "request")} the clerk could not draw up` : ""].filter(Boolean).join("; ") || "Nothing went through"}.</p>}
       {!items.length && <div className="st-muted" style={{ fontSize: 13, lineHeight: 1.6 }}>It sent nothing in this sitting{d.looks.length ? `: it looked into ${plural(d.looks.reduce((n, l) => n + l.looks.length, 0), "thing")}` : ""}.</div>}
       <ol className="st-acts">{items.map((x) => <li key={x.key}>{x.node}</li>)}</ol>
       {researcher && d.notes.length > 0 && (
@@ -544,6 +544,6 @@ export function lookedUpWho(named: string[], names: PlainNames = {}): string {
   const common = (n: string) => (/^[A-Z][a-z]+(?: [a-z][\w']*)+$/.test(n) ? `the ${n.charAt(0).toLowerCase()}${n.slice(1)}` : n.replace(/^The /, "the "));
   const posts = named.filter((x) => !/^c\d+$/.test(x)).map((x) => (x === "mayor" ? "the mayor's office" : common(plainId(x, names) ?? `the ${x.replace(/[-_]+/g, " ")}`)));
   const and = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
-  const parts = [posts.length ? `who holds ${and(posts)}` : "", people.length ? `${people.length === 1 ? "resident" : "residents"} ${and(people)}` : ""].filter(Boolean);
+  const parts = [posts.length ? `who holds ${and(posts)}` : "", people.length ? (people.length === 1 ? "a resident" : `${people.length} residents`) : ""].filter(Boolean);
   return `Looked up ${parts.join(", and ")}`;
 }
