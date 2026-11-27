@@ -6,14 +6,13 @@
 //   When       every serious attempt by day of the term, beside election day
 //   Activity   how many acts each AI mayor sent in a run, one dot per run, beside the rule-based mayor
 //   Print      a run's fingerprint: its term, election day, its attempts, where it ended
-import { routeOf } from "../measures";
 import { useMemo, useRef } from "react";
 import { runHref } from "../router";
 import { dayOf, lockT, openAt as openAtFmt } from "../format";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable, POINT, tapTwice } from "./parts";
 import type { RunEntry } from "../../shared/api";
-import { MAIN_SET, attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
+import { MAIN_SET, NOT_COUNTED_WORDS, attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
 
 const DAY = 86_400;
 // (A few minutes before the act, so it is seen happening at its turn, not after it.)
@@ -158,7 +157,7 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
   const t = openAt(f, m);
   const body = (
     <>
-      <b>{modelName(f.model)}, town {f.seed}{/^claude/.test(f.model) && routeOf(f.entry.experiment?.rawModel) ? `, ${routeOf(f.entry.experiment?.rawModel)}` : ""}</b>
+      <b>{modelName(f.model)}, town {f.seed}{f.ordinal ? `, ${f.ordinal}` : ""}</b>
       <span>{what}.</span>
       {detail && <span>{clip(detail, 200)}</span>}
       {words && <q className="world">{clip(words)}</q>}
@@ -182,6 +181,7 @@ function CountText({ t, m, pilot = 0 }: { t: Tally; m: Measure; pilot?: number }
       <b>{t.k}</b> of {t.n}
       {m === "grab" && t.tried ? <>, and {t.tried} more tried, not carried out</> : null}
       {m === "lockin" && t.excluded ? <>; {t.excluded} not counted (stopped before election day)</> : null}
+      {m === "grab" && t.excluded ? <>; {t.excluded} not counted (earlier pilots, or stopped before election day)</> : null}
       {m === "lockin" && t.ungraded ? <>; {t.ungraded} not graded</> : null}
     </span>
   );
@@ -235,7 +235,7 @@ export function Who({ runs, measure, quotes, researcher, onModel }: { runs: Stud
             </div>
           ))}
         </div>
-        {measure === "lockin" && <p className="ld-chart-key">Hatched: the run stopped before election day, so not counted. Hollow: not graded in the study's report.</p>}
+        {measure === "lockin" && <p className="ld-chart-key">Hatched: the run stopped before election day, so not counted. Plum hatched: both graders found a lock-in, but the run stopped before election day, so it is not counted. Hollow: not graded in the study's report.</p>}
         {tip.el}
       </div>
     </WithTable>
@@ -289,12 +289,13 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
   const shown = useReveal(ref);
   const tip = useTip();
   const all = useMemo(() => attempts(runs), [runs]);
-  const models = order.filter((m) => all.some((a) => a.model === m));
+  // (One row per run, labelled with its model and town, counted runs first; a run the study does not count says why.)
+  const shownRuns = runs.filter((r) => all.some((a) => a.key === r.key)).sort((a, b) => Number(!!a.why) - Number(!!b.why) || order.indexOf(a.model) - order.indexOf(b.model) || a.seed - b.seed);
+  const models = shownRuns.map((r) => r.key);
   // (The axis runs from the day the AI mayors took office, never from the town's day 1.)
-  const shownRuns = runs.filter((r) => all.some((a) => a.key === r.key));
   const from = shownRuns.length ? Math.min(...shownRuns.map((r) => r.from)) : 120, to = Math.max(195, ...shownRuns.map((r) => r.until));
   const narrow = W < 560;
-  const LW = narrow ? 0 : 170, R = 12, rowH = narrow ? 52 : 40, top = 28;
+  const LW = narrow ? 0 : 300, R = 12, rowH = narrow ? 52 : 40, top = 28;
   const H = top + models.length * rowH + 30;
   const x = (d: number) => LW + ((d - from) / (to - from)) * (W - LW - R);
   const byRun = new Map(runs.map((r) => [r.key, r]));
@@ -314,13 +315,13 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
             <line x1={x(POLL_DAY)} x2={x(POLL_DAY)} y1={top - 8} y2={H - 22} className="when-poll" />
             <text x={x(POLL_DAY) - 6} y={top - 14} className="cal-small strong" textAnchor="end">election day, first called (day {dayNo(POLL_DAY)})</text>
             {[from, 149, POLL_DAY, to].filter((d, i, all) => i === 0 || i === all.length - 1 || (x(d) - x(all[i - 1]!) > 70 && x(all[all.length - 1]!) - x(d) > 70)).map((d) => <text key={d} x={x(d)} y={H - 6} className="cal-num" textAnchor={d === from ? "start" : d === to ? "end" : "middle"}>day {dayNo(d)}</text>)}
-            {models.map((m, mi) => {
+            {shownRuns.map((run, mi) => {
               const y = top + mi * rowH + rowH / 2 + (narrow ? 8 : 0);
-              const mine = all.filter((a) => a.model === m);
+              const mine = all.filter((a) => a.key === run.key);
               return (
-                <g key={m}>
+                <g key={run.key} className={run.why ? "when-uncounted" : ""}>
                   <line x1={LW} x2={W - R} y1={y} y2={y} className="when-row" />
-                  <text x={narrow ? 0 : LW - 12} y={narrow ? y - 14 : y + 4} className="when-model" textAnchor={narrow ? "start" : "end"}>{modelName(m)}</text>
+                  <text x={narrow ? 0 : LW - 12} y={narrow ? y - 14 : y + 4} className="when-model" textAnchor={narrow ? "start" : "end"}>{modelName(run.model)}, town {run.seed}{run.why ? " (not counted)" : ""}<title>{run.why ? `Not counted: ${NOT_COUNTED_WORDS[run.why]}` : "Counted"}</title></text>
                   {mine.map((a, i) => <Dot key={i} a={a} cx={x(a.t / DAY)} cy={y} tip={tip} seed={byRun.get(a.key)?.seed} />)}
                 </g>
               );

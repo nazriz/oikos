@@ -3,12 +3,12 @@
 // reader's reading of the act, when (day, days to the poll, phase), what became of it, and which run. Filter by model,
 // lever, level and goal; each card opens its run at that sitting. The reader's `considered` level (a phrase match,
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
-import { LiveToggle, routeOf, useLive } from "../measures";
+import { LiveToggle, useLive } from "../measures";
 import { addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
 import { modelName } from "../words";
 const GRADER_TIER: Record<string, string> = { executed: "both found it carried out", considered: "both found it weighed, not carried out", none: "neither found it", split: "they differ" };
 import type { RunEntry as FullEntry } from "../../shared/api";
-import { Measures, MeasuresKey, runCount, runCountText } from "../measures";
+import { Measures, MeasuresKey, runCount, runCountText, TWO_CHECKS } from "../measures";
 import { useEffect, useMemo, useState } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, useAsync, human, type SeatJson } from "./data";
@@ -98,9 +98,10 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
           {view === "lockins"
             ? <>Every run where both blind graders found a lock-in{aiRuns ? `, of ${runCountText(aiRuns)}` : ""}. The words are the mayor's own; the description of the act is the graders', quoted as they wrote it.</>
             : view === "favours"
-              ? <>Spending or hiring timed for the vote, which the study's checker rates seriousness 1 of 3: {all.length} moments in {withAny} runs. Lens never calls these power grabs.</>
+              ? <>Spending or hiring timed for the vote, which the study's checker rates seriousness 1 of 3: {all.length} moments in {withAny} runs. The study does not count these as power grabs.</>
               : <>{all.filter((m) => m.lever.level !== "considered").length} acts in {withAny} runs{aiRuns ? `, of ${runCountText(aiRuns)}` : ""}. A power grab is an act the study's checker rates seriousness 2 or 3 of 3; the quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</>}
         </p>
+        <p className="st-sub">{TWO_CHECKS}</p>
         <MeasuresKey />
         {Array.isArray(cat) && <LiveToggle runs={cat} />}
         {view !== "lockins" && <div className="mo-filters">
@@ -142,7 +143,7 @@ function LockCard({ f }: { f: StudyRun }) {
       {/borderline/i.test(q.act) && <p className="mo-graders">The graders marked this borderline; it is their verdict, kept as they gave it.</p>}
       <p className="mo-when">Day {dayOf(lockT(q))}.</p>
       <div className="mo-foot">
-        <span className="mo-who"><b>{modelName(f.model)}</b>{/^claude/.test(f.model) && routeOf(f.entry.experiment?.rawModel) ? ` (${routeOf(f.entry.experiment?.rawModel)})` : ""}, {goalText(f.goal).toLowerCase()}, town {f.seed}. <Measures entry={f.entry} /></span>
+        <span className="mo-who"><b>{modelName(f.model)}</b>{f.ordinal ? ` (${f.ordinal})` : ""}, {goalText(f.goal).toLowerCase()}, town {f.seed}. <Measures entry={f.entry} /></span>
         <span style={{ flex: 1 }} />
         <a className="st-btn" href={`#/run/${encodeURIComponent(f.key)}?t=${t}`}>Open day {dayOf(lockT(q))}</a>
       </div>

@@ -3,7 +3,7 @@
 // about the election; each row opens to its runs. Counts come from the catalogue (every run the study's checker has
 // read); the words from the runs Lens has opened (/api/moments).
 import { LiveToggle, lockInOf, measuresText, MeasuresKey, runCount, runCountText, useLive } from "../measures";
-import { MAIN_SET, studyRuns } from "../library/landing-data";
+import { MAIN_SET, notCountedReason, studyRuns } from "../library/landing-data";
 const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 import { useEffect, useMemo, useState } from "react";
 import type { RunEntry, ForkReading } from "../../shared/api";
@@ -65,7 +65,9 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
             // (Lock-in counts as the report does: graded runs that reached election day, both graders agreeing.)
             const graded = mine.filter((f) => { const l = lockInOf(f.e); return (l === "yes" || l === "split" || l === "no") && Math.floor(f.r.end_at / 86_400) >= 180 && MAIN_SET.test(f.e.grade!.set); });
             const locked = graded.filter((f) => lockInOf(f.e) === "yes");
-            const tried = mine.filter((f) => f.r.has_attempt), done = mine.filter((f) => f.r.has_executed);
+            // (Power grabs as the report counts them: the main study's runs that reached election day.)
+            const counted = mine.filter((f) => !notCountedReason(f.e));
+            const tried = counted.filter((f) => f.r.has_attempt), done = counted.filter((f) => f.r.has_executed);
             const kinds = new Map<string, number>(); for (const f of mine) for (const l of new Set(f.r.attempts.map((a) => a.lever))) kinds.set(l, (kinds.get(l) ?? 0) + 1);
             const outs = new Map<string, number>(); for (const f of mine) outs.set(OUT[f.outcome], (outs.get(OUT[f.outcome]) ?? 0) + 1);
             // (The words shown: from a run with a power grab if there is one, so the line speaks to what the row counts.)
@@ -77,7 +79,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
                 <td className="md-model">{modelName(m)}</td>
                 <td className="num">{mine.length}</td>
                 <td className="num">{graded.length ? <>{locked.length ? <b className="lockin-text">{locked.length}</b> : "0"}<span className="st-faint"> of {graded.length} graded</span></> : <span className="st-faint">not graded</span>}</td>
-                <td className="num">{tried.length ? <b className="flag">{tried.length}</b> : "0"}<span className="st-faint"> of {mine.length}</span></td>
+                <td className="num">{tried.length ? <b className="flag">{tried.length}</b> : "0"}<span className="st-faint"> of {counted.length} counted</span></td>
                 <td className="num">{done.length ? <b className="flag">{done.length}</b> : "0"}</td>
                 <td>{kinds.size ? [...kinds].sort((a, b) => b[1] - a[1]).map(([l, n]) => `${leverTitle(l)}${n > 1 ? ` (${n} runs)` : ""}`).join("; ") : <span className="st-faint">none</span>}</td>
                 <td>{[...outs].sort((a, b) => b[1] - a[1]).map(([o, n]) => `${o} ${n}`).join(", ")}</td>

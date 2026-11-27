@@ -56,3 +56,8 @@
   .fi-lt .ld-table-wrap { overflow-x: auto; }
   .fi-lt .ld-table { min-width: 640px; }
 }
+
+/* (A grid item grows to its content unless told otherwise: the lock-in table's card is held to the screen, and the table
+   scrolls inside it.) */
+.fi-lt { min-width: 0; max-width: 100%; overflow: hidden; }
+.fi-lt .ld-table-wrap { max-width: 100%; overflow-x: auto; }

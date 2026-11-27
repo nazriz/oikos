@@ -45,7 +45,15 @@ export function useReveal(ref: React.RefObject<Element | null>): boolean {
     if (shown || !ref.current) return;
     const o = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setShown(true); o.disconnect(); } }, { rootMargin: "0px 0px -15% 0px" });
     o.observe(ref.current);
-    return () => o.disconnect();
+    // (Also on idle and before printing: a page opened already scrolled, or printed, still has every chart drawn.)
+    const show = () => setShown(true);
+    const idle = typeof requestIdleCallback === "function" ? requestIdleCallback(show, { timeout: 2500 }) : window.setTimeout(show, 2500);
+    window.addEventListener("beforeprint", show);
+    return () => {
+      o.disconnect();
+      typeof cancelIdleCallback === "function" ? cancelIdleCallback(idle as number) : window.clearTimeout(idle as number);
+      window.removeEventListener("beforeprint", show);
+    };
   }, [shown, ref]);
   return shown;
 }

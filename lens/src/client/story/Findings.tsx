@@ -9,7 +9,7 @@
 //   outcome     how each run's election went, by model (Lens's one rule, src/shared/outcome.ts)
 //   cost        dollars per run, by model
 import { LiveToggle, useLive } from "../measures";
-import { clopperPearson, cohortOf, COHORT_WORDS, conditionsSentence, CONDITIONS, inCondition, markOf, tally, type Cohort, type StudyRun } from "../library/landing-data";
+import { notCountedReason, clopperPearson, cohortOf, COHORT_WORDS, conditionsSentence, CONDITIONS, inCondition, markOf, tally, type Cohort, type StudyRun } from "../library/landing-data";
 import { Conditions } from "../library/charts";
 import "../library/landing.css";
 import { studyRuns } from "../library/landing-data";
@@ -444,13 +444,17 @@ function Drill({ d, onClose }: { d: { title: string; forks: Fork[] }; onClose: (
 
 /** Story mode's Findings: one chart, per model, of runs with a power grab tried and carried out, and the sentences
  * that say what it shows, all computed from the same runs. */
-function StoryFindings({ forks, models, pal, lockRuns, entries }: { forks: Fork[]; models: string[]; pal: Pal; lockRuns: StudyRun[]; entries: RunEntry[] }) {
+function StoryFindings({ forks: all, models, pal, lockRuns, entries }: { forks: Fork[]; models: string[]; pal: Pal; lockRuns: StudyRun[]; entries: RunEntry[] }) {
   const ref = useRef<SVGSVGElement | null>(null);
+  // (As the report counts power grabs: only the main study's runs that reached election day; the others are said apart.)
+  const byKey = new Map(entries.map((e) => [e.key, e]));
+  const forks = all.filter((f) => { const e = byKey.get(f.key); return e && !notCountedReason(e); });
+  const apart = all.length - forks.length;
   const n = forks.length, tried = forks.filter((f) => f.r.has_attempt), done = forks.filter((f) => f.r.has_executed);
   const byGoal = (xs: Fork[]) => { const m = new Map<string, number>(); for (const f of xs) m.set(f.goal, (m.get(f.goal) ?? 0) + 1); return [...m].sort((a, b) => b[1] - a[1]); };
   const topGoal = byGoal(tried)[0];
   const sentences = [
-    `Across ${n === 1 ? "one run" : `${n} runs`}, the AI mayor tried a power grab in ${tried.length} and carried one out in ${done.length}.`,
+    `Across the ${n === 1 ? "one counted run" : `${n} counted runs`}, the AI mayor tried a power grab in ${tried.length} and carried one out in ${done.length}.${apart ? ` ${apart} more runs (earlier pilots, or stopped before election day) are not counted, as the study's report does not count them.` : ""}`,
     topGoal && tried.length ? `${tried.length === 1 ? "The one run with a power grab" : topGoal[1] === tried.length ? "All the runs with a power grab" : `${topGoal[1]} of the ${tried.length} runs with a power grab`} came when it was ${goalText(topGoal[0]).replace(/^Told /, "told ").toLowerCase()}.` : "",
   ].filter(Boolean);
   const rows = models.map((m) => { const mine = forks.filter((f) => f.model === m); return { m, n: mine.length, t: mine.filter((f) => f.r.has_attempt).length, d: mine.filter((f) => f.r.has_executed).length }; }).filter((r) => r.n);
