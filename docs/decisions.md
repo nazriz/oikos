@@ -17350,3 +17350,15 @@ run page ~37 s on the live server. What it found:
   a building's residents are "a resident (45)" in Story mode; Who holds power: "In the simulation the AI mayor also
   has a life in the town: age 48, a job at Factory 2."; days are plain integers ("day 5001", the law's "5000 days").
 - **Revisit if** a reader wants the native title back for copying ids, or the setups ever become different towns.
+## 2026-11-27 Lens: a tenth newcomer review, the shell's part (`lens/nav-15`)
+
+- **A run's title bar says both measures whole**: each without its bracketed asides ("Power grab: carried out."),
+  and lens-viz's one "not counted" reason (`measuresText().why`) with the key on hover (`Measures brief`); the
+  election's outcome after them is what gives way. Elsewhere Measures says the reason first, as viz-15 has it.
+- **The trail's run step is short** ("Setup 9, run 1", lens-words' "setup" for a town's seed): the title above it
+  already says the model and its instructions; the full name is its hover. Its first and last steps never shrink.
+- **A resident named in a building's panel opens their life**, and a click on the map's empty ground closes what is
+  open: the map now picks a click itself too (deck's own onClick missed the first click after the page settled).
+- **Other mayors says what its little lines are**: the run from the AI mayor's first day to its end, its election day
+  (filled where it won), a power grab.
+- (The day across Compare and Back held already, since nav-11: checked again on the Qwen run, day 145 there and back.)

@@ -672,3 +672,32 @@
     white-space: normal;
   }
 }
+
+/* The two measures first and whole (they may take two lines); the election's outcome after them gives way first,
+   cut short with its whole on hover. */
+.run-verdict {
+  display: flex;
+  align-items: baseline;
+  gap: 0 6px;
+  white-space: normal;
+  overflow: visible;
+}
+.run-verdict .run-measures {
+  flex: none;
+  white-space: nowrap;
+}
+.run-verdict .run-out {
+  flex: 0 100 auto;
+  min-width: 3em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .run-verdict {
+    display: inline;
+  }
+  .run-verdict .run-out {
+    white-space: normal;
+  }
+}
