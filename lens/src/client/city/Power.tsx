@@ -4,6 +4,7 @@
 // written under each post that changed hands. It follows the shared clock: scrub, and the posts change hands.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLens } from "../state";
+import { parseHash } from "../router";
 import { useCity, useDark } from "./CityView";
 import { describePerson } from "../people";
 import { useMode } from "../mode";
@@ -47,7 +48,13 @@ function Chart({ city }: { city: CityData }) {
   const [focus, setFocus] = useState<string | null>(null);
   useEffect(() => { if (span[1] === 0 && city.town.span[1] > 0) setSpan(city.town.span); }, [city, span, setSpan]);
   // Opened without a moment: start where the AI mayor first acts (a fork's first day), not before it took office.
-  useEffect(() => { const first = city.town.acts[0]?.t; if (useLens.getState().t === 0 && first) useLens.getState().setT(first); }, [city]);
+  // (Opened from a run at a moment (`?t=`): that moment, so the holders are those of the day the reader came from.)
+  useEffect(() => {
+    const q = parseHash(window.location.hash).q, at = Number(q.get("t"));
+    if (q.has("t") && Number.isFinite(at)) return useLens.getState().setT(at);
+    const first = city.town.acts[0]?.t;
+    if (useLens.getState().t === 0 && first) useLens.getState().setT(first);
+  }, [city]);
   const end = Math.max(span[1], city.town.span[1]);
   const person = (participant: string | null) => (participant ? P.bodies[participant] ?? (participant.endsWith("-self") ? participant.slice(0, -5) : `system:${participant}`) : null);
   const seatPeople = new Set(Object.values(P.seats));

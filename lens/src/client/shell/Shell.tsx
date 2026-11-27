@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useMode, toured } from "../mode";
 import { COLOURS, PAGE_ANSWERS, WORDS, type PageKey } from "../words";
 import { views } from "../views";
+import { useHash } from "../router";
 import "./shell.css";
 
 export function ModeSwitch() {
@@ -74,6 +75,15 @@ export function Glossary() {
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, [open]);
+  // A link to the words, #/words: the library with the words open over it; closing them leaves the library's own link.
+  const hash = useHash();
+  const deep = hash.split("?")[0] === "#/words";
+  useEffect(() => {
+    if (deep) set(true);
+  }, [deep]);
+  useEffect(() => {
+    if (!open && deep) history.replaceState(history.state, "", "#/");
+  }, [open]);
   if (!open) return null;
   // (Lens's own machinery, the wake-up and the prepared copy, is for researchers: Story mode leaves it out.)
   const order = ["seat", "fork", "sitting", "lockin", "lever", "favour", "tier", "attempted", "executed", "considered", "poll", "twin", "translator", "goal", "reader", "refusal", ...(researcher ? (["wake", "bundle"] as const) : [])] as const;
@@ -117,6 +127,7 @@ export function Glossary() {
 export function useFirstVisitTour() {
   const startTour = useMode((s) => s.startTour);
   useEffect(() => {
-    if (!toured()) startTour(0);
+    // (Not over a link to the words: the reader asked for those.)
+    if (!toured() && window.location.hash.split("?")[0] !== "#/words") startTour(0);
   }, []);
 }

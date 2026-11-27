@@ -96,7 +96,9 @@ export const STEPS: Step[] = [
   },
   {
     route: () => "#/",
-    target: ["#s-moments"],
+    // (The three moments themselves: on a desktop screen they fit with the note above them, where the section's heading
+    // was, which the note's own title repeats; a note over them hid one.)
+    target: ["#s-moments .start-list", "#s-moments"],
     title: "Three moments to start with",
     waiting: "Loading the study's runs…",
     body: "Each opens a run at the moment something happened. Next, we open the first of them together.",
@@ -216,7 +218,7 @@ export function Tour() {
       if (!scrolled) {
         scrolled = true;
         const r = el.getBoundingClientRect();
-        el.scrollIntoView({ block: r.height > window.innerHeight * 0.7 ? "start" : "center" });
+        el.scrollIntoView({ block: r.height > window.innerHeight * 0.6 ? "start" : "center" });
       }
       const r = el.getBoundingClientRect();
       const k = `${r.left|0},${r.top|0},${r.width|0},${r.height|0}`;
@@ -247,6 +249,8 @@ export function Tour() {
   const noteRef = useRef<HTMLDivElement>(null);
   // The step Next is waiting to open (its thing still loading), and the wait itself.
   const [pending, setPending] = useState<number | null>(null);
+  /** The step the page was last scrolled for, to make room for the note (once per step). */
+  const madeRoom = useRef<number | null>(null);
   useEffect(() => setPending(null), [step]);
   useEffect(() => {
     if (pending === null) return;
@@ -273,7 +277,17 @@ export function Tour() {
     // Below the thing, else above it, else beside it on the right or left, else over its lower right corner.
     const left0 = Math.max(pad, Math.min(vw - W - pad, rect.left));
     let pos: { left: number; top: number } | null = null;
-    if (rect.bottom + pad + H <= vh - pad) pos = { left: left0, top: rect.bottom + pad };
+    // (A thing taller than most of the screen was scrolled to its start: its heading is at the top, so the note goes to
+    // the foot of the screen, under what is read first, never over the heading.)
+    // (A thing that fits on the screen with the note, but not as it is scrolled: scrolled down to make room above it,
+    // so the note covers none of it: the three moments on a desktop screen.)
+    if (madeRoom.current !== step && rect.height + H + 3 * pad <= vh && rect.bottom + pad + H > vh - pad && rect.top - pad - H < pad) {
+      madeRoom.current = step;
+      document.scrollingElement?.scrollBy(0, rect.top - (H + 2 * pad));
+      return;
+    }
+    if (rect.height > vh * 0.6 && rect.height + H + 3 * pad > vh) pos = { left: left0, top: vh - H - pad };
+    else if (rect.bottom + pad + H <= vh - pad) pos = { left: left0, top: rect.bottom + pad };
     else if (rect.top - pad - H >= pad) pos = { left: left0, top: rect.top - pad - H };
     else if (rect.right + pad + W <= vw - pad) pos = { left: rect.right + pad, top: Math.max(pad, Math.min(vh - H - pad, rect.top)) };
     else if (rect.left - pad - W >= pad) pos = { left: rect.left - pad - W, top: Math.max(pad, Math.min(vh - H - pad, rect.top)) };

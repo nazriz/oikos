@@ -74,7 +74,7 @@ function AboutText({ run, meta, world }: { run: string; meta: Meta; world: boole
     lines.push(PAGE_ANSWERS.run);
     lines.push(
       world
-        ? `${place} in 3D on day ${dayOf(t)}, ${clock(t)}. The light follows the hour; the walkers are people going between buildings.`
+        ? `${place} in 3D on day ${dayOf(t)}, ${clock(t)}. The light follows the hour. People show walking only while they go between places, which takes minutes: often nobody is out at a given moment, and at night the streets are empty.`
         : `The plan of ${place} on day ${dayOf(t)}, ${clock(t)}. Each block is a building; the dots on it are the people inside now.`,
     );
     lines.push(`Yellow is ${W.seat}'s doing; red is a ${W.lever}, as the study's checker flags it. Click anything to open it.`);
