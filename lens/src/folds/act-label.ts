@@ -38,7 +38,7 @@ export function blockLabel(b: any, act: any[] = []): string {
       const to = Array.isArray(b.addressed_to) ? b.addressed_to.join(", ") : b.addressed_to;
       return `Published ${kind || "a statement"}${to ? ` to ${to}` : ""}`;
     }
-    case "appoint": return b.participant ? `Appointed ${b.participant} as ${b.position}` : `Left ${b.position} empty`;
+    case "appoint": return b.participant ? `Appointed ${String(b.participant).replace(/-self$/, "")} as ${human(String(b.position))}` : `Left the ${human(String(b.position))} post empty`;
     case "withdraw": return `Withdrew ${b.record}`;
     case "message": return `Wrote to ${toWords([].concat(b.to ?? []))}`;
     case "propose_agreement": {
@@ -65,8 +65,11 @@ const PERSON = /^c\d+(?:-self)?$/;
 export function toWords(to: string[]): string {
   const people = to.filter((x) => PERSON.test(x)), councillors = to.filter((x) => /^councillor-\d+$/.test(x));
   const others = to.filter((x) => !PERSON.test(x) && !(councillors.length > 1 && councillors.includes(x)));
-  if (people.length <= 1 && councillors.length <= 1) return to.join(", ");
-  const parts = [...others, ...(councillors.length > 1 ? [`${councillors.length} councillors`] : []), ...(people.length > 1 ? [`${people.length} residents`] : people)];
+  // ("outside" is the world beyond the town: an outside body, not a place.)
+  const say = (x: string) => (x === "outside" ? "an outside body" : x.replace(/-self$/, ""));
+  const and = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+  if (people.length <= 1 && councillors.length <= 1) return and(to.map(say));
+  const parts = [...others.map(say), ...(councillors.length > 1 ? [`${councillors.length} councillors`] : []), ...(people.length > 1 ? [`${people.length} residents`] : people)];
   return parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
 /** Everyone a turn's letters went to, in order, once each (the hover list behind "Wrote to 195 residents"). */

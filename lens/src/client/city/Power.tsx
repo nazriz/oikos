@@ -137,6 +137,17 @@ function Chart({ city }: { city: CityData }) {
   const f = fmtDay(t);
   const dark = useDark();
   const seatList = Object.entries(P.seats);
+  // (Story mode says a holder of several posts once, at the first of them: "c0067 (58) holds 4 posts: Child protection
+  // officer, Clerk of the mayor, …"; at the others, "c0067, same as above". One post: "a resident (c0613, 30, works at …)".)
+  const storyHolder = (pp: string, post: string) => {
+    const posts = now.holders.get(pp) ?? [];
+    const d = describePerson(city, pp, t);
+    if (posts.length < 2) return <>a resident <span className="pw-desc-inline">({[name(pp), d].filter(Boolean).join(", ")})</span></>;
+    if (posts[0] !== post) return <>{name(pp)}<span className="pw-n">, same as above</span></>;
+    const age = d?.split(", ")[0];
+    const titles = posts.map((x) => P.posts.find((q) => q.id === x)?.title ?? x);
+    return <>{name(pp)}{age && /^\d+$/.test(age) ? ` (${age})` : ""}<span className="pw-n"> holds {posts.length} posts: {titles.join(", ")}</span></>;
+  };
   return (
     <div className={`pw lc-wrap${dark ? "" : " light"}`} ref={wrap} style={{ background: "var(--lc-ink)" }}>
       <div className="pw-head">
@@ -168,7 +179,7 @@ function Chart({ city }: { city: CityData }) {
                 <div key={p.id} className="pw-post">
                   <div className="pw-row">
                     <span className="pw-post-title" title={p.id}>{p.title}</span>
-                    {pp ? <button data-holder={pp} {...(pp.startsWith("system:") ? {} : { "data-peek": `person:${pp}` })} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => { if (!pp.startsWith("system:")) select({ kind: "person", id: pp }); }} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{story && !isSeat && !pp.startsWith("system:") ? <>a resident <span className="pw-desc-inline">({[name(pp), describePerson(city, pp, t)].filter(Boolean).join(", ")})</span></> : name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">, holds {now.holders.get(pp)!.length} posts</span>}{!story && !isSeat && describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
+                    {pp ? <button data-holder={pp} {...(pp.startsWith("system:") ? {} : { "data-peek": `person:${pp}` })} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => { if (!pp.startsWith("system:")) select({ kind: "person", id: pp }); }} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{story && !isSeat && !pp.startsWith("system:") ? storyHolder(pp, p.id) : <>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">, holds {now.holders.get(pp)!.length} posts</span>}</>}{!story && !isSeat && describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
                   </div>
                   {kin && <div className="pw-kin">{seatKinLabel(pp!)}</div>}
                   {!kin && focus && pp && focus !== pp && relation(P, pp, focus) && <div className="pw-kin muted">{relation(P, pp, focus)} {name(focus)}</div>}

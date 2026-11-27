@@ -15,21 +15,30 @@ function useSeatIds(): Set<string> {
 }
 
 /** What the open run's town knows of its ids (organisations, posts, the AI mayor's seats), for the plain formatter. */
-export function usePlainNames(): PlainNames {
-  const run = useLens((s) => s.run);
+export function usePlainNames(key?: string): PlainNames {
+  const open = useLens((s) => s.run), run = key ?? open;
   const { city } = useCity(run ? `/api/run/${encodeURIComponent(run)}` : null);
   return useMemo(() => {
     const t = city?.town;
     if (!t) return {};
     const seats = new Set<string>(t.seats ?? []);
     for (const [part, person] of Object.entries(t.power?.seats ?? {})) { seats.add(part); seats.add(person.replace(/-self$/, "")); }
-    return { entities: t.entities, positions: t.positions, seats };
+    // (Each resident's post at the run's end, from the holders' history: who "the works manager (c0072)" is.)
+    const P = t.power, roles: Record<string, string> = {}, last = new Map<string, string | null>();
+    for (const [, post, holder] of P?.history ?? []) last.set(post, holder);
+    for (const [post, holder] of last) {
+      if (!holder) continue;
+      const person = P!.bodies[holder] ?? holder.replace(/-self$/, "");
+      const title = t.positions[post]?.title;
+      if (title && /^c\d+$/.test(person) && !roles[person]) roles[person] = title;
+    }
+    return { entities: t.entities, positions: t.positions, seats, roles };
   }, [city]);
 }
 /** The plain formatter for this page: Story mode says the world's ids as names (lens/src/client/plain.ts); Researcher
  * mode keeps them as they are. A page across runs passes `town` false: the open run's names are not its runs'. */
-export function usePlain(town = true): (s: string) => string {
-  const names = usePlainNames();
+export function usePlain(town = true, key?: string): (s: string) => string {
+  const names = usePlainNames(key);
   const researcher = useResearcher();
   return useMemo(() => (researcher ? (s: string) => s : (s: string) => plainText(s, town ? names : undefined)), [researcher, names, town]);
 }

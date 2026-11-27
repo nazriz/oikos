@@ -3,12 +3,12 @@
 // words beside them; quiet turns are folded into one line. The full reader is one click away on every card.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLens } from "../state";
-import { useWords, leverTitle, goalText, modelName } from "../words";
+import { useWords, leverTitle, leverTo, goalText, modelName } from "../words";
 import { useDescribe } from "../people";
 import { seatOutcome, usd, type SeatJson } from "./data";
 import { tell, type Telling } from "./narrative";
 import { HowDoWeKnow } from "./Evidence";
-import { Hi, openPerson, usePlain } from "./text";
+import { Hi, openPerson, usePlain, usePlainNames } from "./text";
 import { fetchRun } from "../api";
 import { lockInfo, lockDay, graders, type LockInfo } from "./lockin";
 import { electionCard, type ElectionCard } from "./election-card";
@@ -23,11 +23,13 @@ const DAY = 86_400;
 export function StoryAccount({ seat }: { seat: SeatJson }) {
   const W = useWords();
   const plain = usePlain();
+  const names = usePlainNames();
+  const postName = useMemo(() => (id: string) => { const t = names.positions?.[id]?.title; return t ? t.charAt(0).toLowerCase() + t.slice(1) : undefined; }, [names]);
   const run = useLens((s) => s.run);
   const describe = useDescribe(run, seat.end_at);
   const select = useLens((s) => s.select), setT = useLens((s) => s.setT);
   const words = useMemo(() => ({ mayor: W.seat, Mayor: W.Seat, powerGrab: W.lever, leverTitle }), [W]);
-  const tellings = useMemo(() => seat.sittings.filter((s) => s.kind === "model" || seat.sittings.every((x) => x.kind === "code")).map((s) => tell(seat, s, words, describe)), [seat, words, describe]);
+  const tellings = useMemo(() => seat.sittings.filter((s) => s.kind === "model" || seat.sittings.every((x) => x.kind === "code")).map((s) => tell(seat, s, words, describe, postName)), [seat, words, describe, postName]);
   const out = seatOutcome(seat);
   const model = seat.model ? modelName(seat.model) : "a rule-based program";
   const grabs = tellings.filter((t) => t.levers.length);
@@ -135,7 +137,7 @@ function OneMinute({ seat, run, model, turns, lock }: { seat: SeatJson; run: str
       {open && <>
         <p>An AI model, {model}, held the office of mayor from day {dayOf(seat.fork_at)} {end}. {seat.goal ? `${goalText(seat.goal)}.` : ""}</p>
         {lock && <div className="sm-p sm-lock">{lockDay(lock) !== undefined ? `On day ${lockDay(lock)}` : "In this run"} ({graders(lock)}: a lock-in){lock.act ? `: ${lowerFirst(plain(lock.act))}` : "."} <HowDoWeKnow run={run} claim={{ kind: "lockin", lock }} /></div>}
-        <div className="sm-p">{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${dayNo(first.day)}` : ""}. </> : lv.tried ? <>It tried {kinds(tried).join("; ")}, but did not carry it out. </> : lock ? <>The study's checker found no power grab against the election. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
+        <div className="sm-p">{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${dayNo(first.day)}` : ""}. </> : lv.tried ? <>It tried to {[...new Set(tried.map((l) => leverTo(l.lever)))].join(", and to ")}, but did not carry it out. </> : lock ? <>The study's checker found no power grab against the election. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
           {first && <HowDoWeKnow run={run} claim={{ kind: "lever", index: first.i }} />}</div>
         <div className={`sm-p sm-out ${out.css}`}>{out.label}. <HowDoWeKnow run={run} claim={{ kind: "outcome" }} /></div>
         {twinSeat && (() => {

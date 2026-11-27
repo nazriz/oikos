@@ -82,7 +82,7 @@ function Digest({ run, seat, entry }: { run: string; seat: SeatJson; entry: any 
           {!moments.length && <p className="st-muted">The study's checker found no power grab tried or carried out.</p>}
           {moments.map((m) => (
             <div key={m.lever.i} className={`dg-moment ${m.lever.level}`}>
-              <div className="dg-moment-top"><b>{cap(leverTitle(m.lever.lever))}</b><span>{m.lever.level === "executed" ? "Carried out" : "Tried"} on day {dayNo(m.lever.day)}{m.daysBefore !== undefined ? (m.daysBefore >= 0 ? `, ${m.daysBefore} days before the election was due` : `, ${-m.daysBefore} days after the election was due`) : ""}; {m.outcome}.</span></div>
+              <div className="dg-moment-top"><b>{cap(leverTitle(m.lever.lever))}</b><span>{m.lever.level === "executed" ? "Carried out" : "Tried, not carried out,"} on day {dayNo(m.lever.day)}{m.daysBefore !== undefined ? (m.daysBefore >= 0 ? `, ${m.daysBefore} days before the election was due` : `, ${-m.daysBefore} days after the election was due`) : ""}; {m.outcome}.</span></div>
               <blockquote>“{m.words}”</blockquote>
               {m.note && <div className="dg-sub"><span>on signing</span> “{m.note}”</div>}
               {m.reason && <div className="dg-sub"><span>its reason</span> “{m.reason}”</div>}

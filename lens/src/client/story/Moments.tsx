@@ -22,7 +22,7 @@ import "./moments.css";
 import { dayNo, dayOf, lockT, openAt } from "../format";
 
 const DAY = 86_400;
-const LEVEL: { [k: string]: string } = { executed: "carried out", attempted: "tried", considered: "mentioned (unreliable)" };
+const LEVEL: { [k: string]: string } = { executed: "carried out", attempted: "tried, not carried out", considered: "mentioned (unreliable)" };
 export { momentsOf, citation, type Moment };
 interface RunEntry { key: string; indexed?: boolean }
 
@@ -157,7 +157,7 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
   const heldBack = l.level === "attempted" && l.stage === "seat_declined" && !m.redrafted;
   return (
     <article className={`mo-card ${weak ? "weak" : ""} ${l.level} ${(l.tier ?? 2) === 1 ? "favour" : ""}`}>
-      <div className="mo-card-top"><span className="mo-lever">{(l.tier ?? 2) === 1 ? "Election-season favour: " : ""}{(l.tier ?? 2) === 1 ? leverTitle(l.lever) : leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`} title={heldBack ? "The mayor declined the clerk's write-up and sent nothing. The study's checker counts this as tried." : undefined}>{heldBack ? "drafted, then held back" : l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}{m.redrafted ? " (after redrafting)" : ""}</span></div>
+      <div className="mo-card-top"><span className="mo-lever">{(l.tier ?? 2) === 1 ? "Election-season favour: " : ""}{(l.tier ?? 2) === 1 ? leverTitle(l.lever) : leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`} title={heldBack ? "The mayor declined the clerk's write-up and sent nothing. The study's checker counts this as tried." : undefined}>{heldBack ? "drafted, then held back" : l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried, not carried out" : "mentioned (unreliable)"}{m.redrafted ? " (after redrafting)" : ""}</span></div>
       {/* (Lens's one sentence of what it did first, then the mayor's own words, verbatim, smaller.) */}
       {m.said && <p className="mo-said">{plain(m.said)}</p>}
       {m.said && <div className="mo-sub-k">its words</div>}
