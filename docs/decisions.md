@@ -17292,6 +17292,10 @@ run page ~37 s on the live server. What it found:
   asks, instead of a block of chips; one value per filter.
 - **Revisit if** a filter needs several values at once (then a select with a checklist), or two runs are ever made
   at the same moment (then the number falls back to the key's order).
+- (`lens/nav-14`) The rest of Lens now says each run by that name too: the landing's three moments and its "when" and
+  activity charts, Moments' cards, the Models page's run lists, and Compare (the two runs named under its title; its
+  columns keep the short "Claude Sonnet 5" / "rule-based mayor"). The landing's own ordinal ("first run, 26 Nov") is
+  removed (lens-viz agreed): one naming. Other mayors says "(run N)" for a model that ran the town twice.
 ## 2026-11-27 · Lens: one quote component everywhere; "spending timed near the vote" (`lens/words-8`)
 
 - **Quotes:** the landing's hero and showcase quotes and the Moments cards' quotes (its words, its note on signing,

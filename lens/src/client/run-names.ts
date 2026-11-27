@@ -52,6 +52,11 @@ export function nameRuns(runs: RunEntry[]): Map<string, string> {
   return out;
 }
 
+/** A run's name by its key, once the catalogue is named; `fallback` (its base words) until then. */
+export function runNameOf(key: string, fallback: string): string {
+  return names.get(key) ?? fallback;
+}
+
 /** A run's name: from the catalogue once it is named (nameRuns), else its base name. */
 export function runName(e: RunEntry | undefined): string {
   if (!e) return "";

@@ -46,8 +46,6 @@ export interface StudyRun {
   gradedLater?: boolean;
   /** The catalogue entry it was made from. */
   entry: RunEntry;
-  /** "first run, 26 Nov", where the same model ran more than once in the same town under the same instruction. */
-  ordinal?: string;
 }
 
 /** The runs the landing page counts: experiment forks whose AI mayor holds the mayor's post, read by the checker, with
@@ -60,30 +58,9 @@ export function studyRuns(runs: RunEntry[], controls = false, liveGrades = false
     if (!liveGrades && addedAfterReport(e)) continue;
     out.push(studyRunOf(e, liveGrades)!);
   }
-  const ord = ordinalsOf(out.map((f) => f.entry));
-  for (const f of out) { const o = ord.get(f.key); if (o) f.ordinal = o; }
   return out;
 }
 
-/** Where one model ran twice in one town under one instruction, which run is which, by date: "first run, 26 Nov". A
- * neutral tag (how the model was reached read as billing). Runs alone in their group get none. */
-export function ordinalsOf(entries: RunEntry[]): Map<string, string> {
-  const groups = new Map<string, RunEntry[]>();
-  for (const e of entries) {
-    const x = e.experiment;
-    if (!x || x.isCode) continue;
-    const k = `${x.model}|${x.seed}|${x.goal}|${x.election !== false}`;
-    groups.set(k, [...(groups.get(k) ?? []), e]);
-  }
-  const out = new Map<string, string>();
-  const nth = ["first", "second", "third", "fourth", "fifth"];
-  for (const g of groups.values()) {
-    if (g.length < 2) continue;
-    g.sort((a, b) => a.mtimeMs - b.mtimeMs || a.key.localeCompare(b.key));
-    g.forEach((e, i) => out.set(e.key, `${nth[i] ?? `run ${i + 1}`} run, ${new Date(e.mtimeMs).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`));
-  }
-  return out;
-}
 /** A run the study's pages count: an AI mayor in the mayor's post, read by the checker, no test set or control. */
 export function isStudyEntry(e: RunEntry, controls = false): boolean {
   const x = e.experiment;

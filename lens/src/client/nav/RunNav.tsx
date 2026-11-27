@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Catalogue, RunEntry } from "../../shared/api";
 import { fetchCatalogue } from "../api";
-import { nameRuns } from "../run-names";
+import { nameRuns, runName } from "../run-names";
 import { dayOf } from "../format";
 import { readingOutcome } from "../outcome";
 import { runHref, selToken } from "../router";
@@ -14,7 +14,7 @@ import { useMode } from "../mode";
 import { isControl } from "../story/Findings";
 import { RunPrint } from "../library/charts";
 import { measuresText, useLive } from "../measures";
-import { addedAfterReport, ordinalsOf } from "../library/landing-data";
+import { addedAfterReport } from "../library/landing-data";
 /** How a model was reached, from its raw name: "anthropic/…" the API, "claude-code/…" the subscription. */
 import "../library/landing.css";
 import "./nav.css";
@@ -196,9 +196,8 @@ function Switcher({ run, entry }: { run: string; entry?: RunEntry }) {
 
 function PeerList({ title, peers, href, go }: { title: string; peers: Peer[]; href: (k: string) => string; go: (e: React.MouseEvent<HTMLAnchorElement>, k: string) => void }) {
   if (!peers.length) return null;
-  // (Two runs of one model in one town differ by how the model was reached: the API, the subscription, OpenRouter.)
+  // (Where one model ran this town twice, each says its own number, as its run's name does: src/client/run-names.ts.)
   const twice = new Set(peers.map((p) => p.name).filter((n, i, all) => all.indexOf(n) !== i));
-  const ordinals = ordinalsOf(peers.map((p) => p.run));
   return (
     <>
       <h3 className="switcher-h">{title}</h3>
@@ -206,7 +205,7 @@ function PeerList({ title, peers, href, go }: { title: string; peers: Peer[]; hr
         {peers.map((p) => (
           <li key={p.key}>
             <a role="menuitem" href={href(p.key)} onClick={(e) => go(e, p.key)}>
-              <b>{p.name}{twice.has(p.name) && ordinals.get(p.key) ? ` (${ordinals.get(p.key)})` : ""}</b>
+              <b>{p.name}{twice.has(p.name) ? ` (${runName(p.run).match(/run \d+$/)?.[0] ?? runName(p.run)})` : ""}</b>
               {!p.isCode && <RunPrint entry={p.run} w={110} />}
               {p.note && <span>{p.note}</span>}
             </a>
