@@ -575,10 +575,10 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
         if (s >= 0 && s !== hall) seen.add(s);
       }
       // ("To everyone" only where the record says so: a block published for everyone (town fold v5, `public`). Many
-      // places is not everyone. Where no act in the town carries `public` at all (a bundle made before v5, until it is
-      // made again), addressees making up nearly the whole town stand in.)
-      const pub = a.blocks.some((bl) => bl.public), knows = a.blocks.some((bl) => "public" in bl) || town.acts.some((x) => x.blocks.some((bl) => bl.public));
-      if (seen.size > BROADCAST) out.push({ seq: a.seq, n: seen.size, everyone: pub || (!knows && people > 0 && persons.size >= people * 0.9), age: Math.max(0, t - a.t) / ACT_WINDOW, refused: a.status === "refused" });
+      // places is not everyone. A bundle made before v5 (its own `v` says so) cannot tell: there, until it is made
+      // again, addressees making up nearly the whole town stand in.)
+      const pub = a.blocks.some((bl) => bl.public), old = (town.v ?? 1) < 5;
+      if (seen.size > BROADCAST) out.push({ seq: a.seq, n: seen.size, everyone: pub || (old && people > 0 && persons.size >= people * 0.9), age: Math.max(0, t - a.t) / ACT_WINDOW, refused: a.status === "refused" });
     }
     return out;
   }, [actsNow, city, town, hi, Math.floor(t / 600)]);

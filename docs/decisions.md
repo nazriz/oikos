@@ -17043,7 +17043,7 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
 - **One act to many places is one mark** (with lens-city): an act reaching more than 12 places draws no arcs but one
   line under the town hall, "The AI mayor's act reached N places", "To everyone: …" only where the record says the
   act was published for everyone (the town fold, v5, keeps `public` on such a block: lens-city); selected, hovered or
-  in the tour, it draws every arc as before. A bundle made before v5 falls back to addressees making up 90% of the
-  town, until it is made again.
+  in the tour, it draws every arc as before. A bundle made before v5 (its own `v` below 5) falls back to addressees
+  making up 90% of the town, until it is made again.
 - **Revisit if** a publication's audience can be narrower than "public" and wider than its named addressees (a group,
   a district): then the line says that audience.
