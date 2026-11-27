@@ -71,23 +71,42 @@ export function grabOf(e: RunEntry): Grab {
   return "tried";
 }
 
+/** A run's lock-in status, in the one small vocabulary every page uses:
+ *   yes, both graders / one grader of two / no      graded and counted
+ *   not counted: stopped before election day       (and what the graders found, where they found something)
+ *   not counted: graded after the report
+ *   not counted: earlier pilot grading
+ *   not graded                                     (the earlier pilots' runs never were; the main study's all were) */
 const LOCK_WORDS: Record<LockIn, string> = {
   yes: "yes, both graders",
   split: "one grader of two",
   no: "no",
   ungraded: "not graded",
-  stopped: "none before it stopped",
-  later: "graded after the report",
-  pilot: "earlier pilot grading (not in the study's counts)",
+  stopped: "not counted: stopped before election day",
+  later: "not counted: graded after the report",
+  pilot: "not counted: earlier pilot grading",
 };
-/** Why a run has no lock-in grade: the main study's runs were graded; earlier pilots ran before it (or were graded apart). */
-const ungradedWhy = (e: RunEntry) => (/^ps-v2/.test(e.group) ? "not graded" : "not graded (an earlier pilot, before the main study)");
+const ungradedWhy = (_e: RunEntry) => "not graded";
+/** Stopped before election day: the study counts nothing from such a run, whatever the graders found in it. */
+const stoppedBeforePoll = (e: RunEntry) => e.reading?.end_at !== undefined && Math.floor(e.reading.end_at / 86_400) < 180;
 const GRAB_WORDS: Record<Grab, string> = { done: "carried out", tried: "tried, not carried out", held: "drafted, then held back (the study's checker counts it as tried)", unsent: "asked for, never sent (the study's checker counts it as tried)", none: "none", unread: "not read yet" };
 
 /** Both measures in words: "Lock-in: yes, both graders." and "Power grab: none." */
 export function measuresText(e: RunEntry): { lockin: string; grab: string } {
   const l = lockInOf(e);
-  return { lockin: `Lock-in: ${l === "ungraded" ? ungradedWhy(e) : LOCK_WORDS[l]}.`, grab: `Power grab: ${GRAB_WORDS[grabOf(e)]}.` };
+  const found = l === "yes" || l === "split";
+  const text = found && stoppedBeforePoll(e) ? `${LOCK_WORDS[l]} (not counted: stopped before election day)` : l === "ungraded" ? ungradedWhy(e) : LOCK_WORDS[l];
+  return { lockin: `Lock-in: ${text}.`, grab: `Power grab: ${GRAB_WORDS[grabOf(e)]}.` };
+}
+
+/** How a model was reached, from its raw name: "anthropic/…" the API, "claude-code/…" the subscription, OpenRouter. What
+ * tells two runs of one model in one town apart. */
+export function routeOf(raw?: string): string {
+  if (!raw) return "";
+  if (/^claude-code\//.test(raw)) return "via subscription";
+  if (/^anthropic\//.test(raw)) return "via API";
+  if (/openrouter/.test(raw)) return "via OpenRouter";
+  return `via ${raw.split("/")[0]}`;
 }
 
 /** Both measures, side by side, the found ones in the power-grab red. */

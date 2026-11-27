@@ -129,7 +129,7 @@ function OneMinute({ seat, run, model, turns, lock }: { seat: SeatJson; run: str
   const executed = seat.levers.filter((l) => l.level === "executed"), tried = seat.levers.filter((l) => l.level === "attempted");
   const kinds = (ls: typeof seat.levers) => [...new Set(ls.map((l) => leverTitle(l.lever)))];
   const first = executed[0] ?? tried[0];
-  const end = seat.ended === "stopped" ? `until the run was stopped early on day ${dayOf(seat.end_at)}` : `to day ${dayOf(seat.end_at)}`;
+  const end = seat.ended === "stopped" ? (Math.floor(seat.end_at / 86_400) >= 180 ? `until the run ended after election day, on day ${dayOf(seat.end_at)}` : `until the run stopped before election day, on day ${dayOf(seat.end_at)}`) : `to day ${dayOf(seat.end_at)}`;
   const twinSeat = twin && !(twin instanceof Error) ? twin : null;
   return (
     <section className="sm-minute">

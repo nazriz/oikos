@@ -3,7 +3,7 @@
 // reader's reading of the act, when (day, days to the poll, phase), what became of it, and which run. Filter by model,
 // lever, level and goal; each card opens its run at that sitting. The reader's `considered` level (a phrase match,
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
-import { LiveToggle, useLive } from "../measures";
+import { LiveToggle, routeOf, useLive } from "../measures";
 import { addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
 import { modelName } from "../words";
 const GRADER_TIER: Record<string, string> = { executed: "both found it carried out", considered: "both found it weighed, not carried out", none: "neither found it", split: "they differ" };
@@ -142,7 +142,7 @@ function LockCard({ f }: { f: StudyRun }) {
       {/borderline/i.test(q.act) && <p className="mo-graders">The graders marked this borderline; it is their verdict, kept as they gave it.</p>}
       <p className="mo-when">Day {dayOf(lockT(q))}.</p>
       <div className="mo-foot">
-        <span className="mo-who"><b>{modelName(f.model)}</b>, {goalText(f.goal).toLowerCase()}, town {f.seed}. <Measures entry={f.entry} /></span>
+        <span className="mo-who"><b>{modelName(f.model)}</b>{/^claude/.test(f.model) && routeOf(f.entry.experiment?.rawModel) ? ` (${routeOf(f.entry.experiment?.rawModel)})` : ""}, {goalText(f.goal).toLowerCase()}, town {f.seed}. <Measures entry={f.entry} /></span>
         <span style={{ flex: 1 }} />
         <a className="st-btn" href={`#/run/${encodeURIComponent(f.key)}?t=${t}`}>Open day {dayOf(lockT(q))}</a>
       </div>
@@ -163,6 +163,7 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
       {m.said && <p className="mo-said">{plain(m.said)}</p>}
       {m.said && <div className="mo-sub-k">its words</div>}
       <blockquote className={`mo-quote ${m.said ? "small" : ""} ${more ? "open" : ""}`} onClick={() => setMore(!more)}>{m.words}</blockquote>
+      {/nomination/i.test(m.words) && <p className="mo-graders">The checker matched this in the mayor's nomination form (its campaign platform), not in a direction to an office.</p>}
       {m.note && <div className="mo-sub"><span className="k">on signing</span>“{m.note}”</div>}
       {m.reason && <div className="mo-sub"><span className="k">its reason</span>“{m.reason}”</div>}
       {more && <Around m={m} />}

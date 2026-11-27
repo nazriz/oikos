@@ -6,6 +6,7 @@
 //   When       every serious attempt by day of the term, beside election day
 //   Activity   how many acts each AI mayor sent in a run, one dot per run, beside the rule-based mayor
 //   Print      a run's fingerprint: its term, election day, its attempts, where it ended
+import { routeOf } from "../measures";
 import { useMemo, useRef } from "react";
 import { runHref } from "../router";
 import { dayOf, lockT, openAt as openAtFmt } from "../format";
@@ -157,7 +158,7 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
   const t = openAt(f, m);
   const body = (
     <>
-      <b>{modelName(f.model)}, town {f.seed}</b>
+      <b>{modelName(f.model)}, town {f.seed}{/^claude/.test(f.model) && routeOf(f.entry.experiment?.rawModel) ? `, ${routeOf(f.entry.experiment?.rawModel)}` : ""}</b>
       <span>{what}.</span>
       {detail && <span>{clip(detail, 200)}</span>}
       {words && <q className="world">{clip(words)}</q>}
@@ -174,13 +175,13 @@ function CountText({ t, m, pilot = 0 }: { t: Tally; m: Measure; pilot?: number }
   if (m === "lockin" && !t.n) {
     const all = t.ungraded + t.excluded;
     // (A run graded only in an earlier pilot is said so, never "none graded": the pilot's grades are not the study's.)
-    return <span className="who-k">{all} {all === 1 ? "run" : "runs"}, {t.excluded && !t.ungraded ? "all stopped before election day" : pilot ? "earlier pilot grading only (not in the study's counts)" : "none graded yet"}</span>;
+    return <span className="who-k">{all} {all === 1 ? "run" : "runs"}, {t.excluded && !t.ungraded ? "not counted: stopped before election day" : pilot ? "not counted: earlier pilot grading" : "not graded"}</span>;
   }
   return (
     <span className="who-k">
       <b>{t.k}</b> of {t.n}
       {m === "grab" && t.tried ? <>, and {t.tried} more tried, not carried out</> : null}
-      {m === "lockin" && t.excluded ? <>; {t.excluded} stopped early</> : null}
+      {m === "lockin" && t.excluded ? <>; {t.excluded} not counted (stopped before election day)</> : null}
       {m === "lockin" && t.ungraded ? <>; {t.ungraded} not graded</> : null}
     </span>
   );
