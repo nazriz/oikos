@@ -17101,3 +17101,18 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
   Moments sentence for a held-back draft reads "The clerk wrote up what the mayor asked for (…), but the mayor held it
   back and sent nothing." Compare's row reads "Appointed its own child".
 - **Revisit if** the reader's search tool gains fields beyond kind, about, office, from and to.
+## 2026-11-27 Lens: a sixth newcomer review, the shell's part (`lens/nav-10`)
+
+- **Next never hangs**: a step that unfolds part of the page (the phone's run "Details" for Compare) unfolds it as Next
+  is pressed, not after; Next holds at most 3 s for the next step's thing, then opens it saying what it still waits for.
+  (Step 9 to 10 on a phone waited out the walk's whole patience for a button folded away.)
+- **The note never covers its own step's links**: with no room around a tall thing, it goes to whichever corner of it
+  hides the fewest of its links and buttons ("Open day 186").
+- **Who holds power**: the "holds 3 posts: …" sentence wraps in its column.
+- **The timeline**: a result within two days of the vote is one flag, "Election day: mayor re-elected" (two flags side
+  by side could read result-first); election day outranks the run's stop for a label on a narrow strip; an axis label is
+  left out under the playhead's head.
+- **The 3D town**: while it builds, the plan stays on screen with one line saying so, and swaps when the 3D view says it
+  is ready (a window event, "lens-world-ready", sent on ready and on failure; with lens-smooth).
+- **Revisit if** the 3D town builds in under a second (then the line is noise), or a step's thing is slow for a reason
+  a few seconds will not cover (then say it in its `waiting`).

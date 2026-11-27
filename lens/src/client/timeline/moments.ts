@@ -114,11 +114,14 @@ export function keyMoments(seat: SeatJson, lock?: LockInfo | null): KeyMoment[] 
       );
     at(e.notice_at, "Election called", `Day ${dayOf(e.notice_at ?? 0)}: the notice of election went up.`);
     at(e.nominations_close_at, "Nominations close", `Day ${dayOf(e.nominations_close_at ?? 0)}: the last day to stand.${e.stood ? " The AI mayor stood." : ""}`);
-    at(e.poll_at, "Election day", `Day ${dayOf(e.poll_at ?? 0)}: the vote${(e.poll_at ?? 0) > end ? (seat.ended === "stopped" ? `, as planned; the run stopped on day ${dayOf(end)}, before it` : ", after this run's end") : ""}.`, true);
-    if (e.result_at !== undefined) {
-      const won = e.seat_won === true, lost = e.seat_won === false && e.stood;
-      at(e.result_at, won ? "Mayor re-elected" : lost ? "Mayor lost" : "Result", `Day ${dayOf(e.result_at)}: the result.${e.winner ? ` Won by ${winnerWords(e.winner, { seats: [seat.seat] })}.` : ""}`, true);
-    }
+    // (The result within a couple of days of the vote is one flag, "Election day: mayor re-elected": two flags side by
+    // side were placed in whatever order fitted, and the result could read before the vote.)
+    const won = e.seat_won === true, lost = e.seat_won === false && e.stood;
+    const result = won ? "Mayor re-elected" : lost ? "Mayor lost" : "Result";
+    const resultLong = e.result_at !== undefined ? `Day ${dayOf(e.result_at)}: the result.${e.winner ? ` Won by ${winnerWords(e.winner, { seats: [seat.seat] })}.` : ""}` : "";
+    const merged = e.poll_at !== undefined && e.result_at !== undefined && e.result_at <= end && e.result_at - e.poll_at <= 2 * 86_400;
+    at(e.poll_at, merged ? `Election day: ${result.charAt(0).toLowerCase()}${result.slice(1)}` : "Election day", `Day ${dayOf(e.poll_at ?? 0)}: the vote${(e.poll_at ?? 0) > end ? (seat.ended === "stopped" ? `, as planned; the run stopped on day ${dayOf(end)}, before it` : ", after this run's end") : ""}.${merged ? ` ${resultLong}` : ""}`, true);
+    if (e.result_at !== undefined && !merged) at(e.result_at, result, resultLong, true);
   }
   // The end.
   if (seat.ended === "stopped") out.push({ t: end, kind: "end", label: "Run stopped", long: `Day ${dayOf(end)}: the run stopped early${seat.until_at ? `, ${dayOf(seat.until_at) - dayOf(end)} days short of its set length` : ""}.`, strong: true });

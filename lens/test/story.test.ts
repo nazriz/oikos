@@ -123,6 +123,10 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   // A date a stopped run never reached is a plan: hollow, and said so.
   const poll = keyMoments({ ...seat, ended: "stopped", end_at: 20 * D }).find((m) => m.long.includes("the vote"))!;
   expect([poll.label, poll.strong, poll.after]).toEqual(["Planned election day (the run stopped first)", false, true]);
+  // A result within two days of the vote is one flag, so it never reads before the vote.
+  const e1 = { ...seat.election, poll_at: 30 * D, result_at: 30.8 * D, seat_won: true, stood: true };
+  const one = keyMoments({ ...seat, elections: [e1], election: e1 }).filter((m) => m.kind === "election" && m.t >= 30 * D);
+  expect(one.map((m) => m.label)).toEqual(["Election day: mayor re-elected"]);
 
   // The day-by-day counts the compare view sets side by side: the seat's refused act is the seat's and the town's.
   const day = (await daily.finish(ctx)).json as DailyJson;

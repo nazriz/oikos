@@ -228,7 +228,7 @@ const POWER_CSS = `
 .lens-city .pw-chip.kin { color: var(--lc-flag); border-bottom: 3px solid var(--lc-flag); }
 .lens-city .pw-chip.vacant { color: var(--lc-muted); font-weight: 400; font-style: italic; cursor: default; }
 .lens-city .pw-desc { display: block; font-weight: 400; color: var(--lc-muted); font-size: 11.5px; text-align: left; }
-.lens-city .pw-n { margin-left: 0; color: var(--lc-muted); font-size: 11.5px; font-weight: 400; white-space: nowrap; }
+.lens-city .pw-n { margin-left: 0; color: var(--lc-muted); font-size: 11.5px; font-weight: 400; white-space: normal; overflow-wrap: anywhere; }
 .lens-city .pw-desc-inline { font-weight: 400; color: var(--lc-muted); }
 .lens-city .pw-by { color: var(--lc-muted); font-size: 12px; margin-top: 2px; }
 .lens-city .pw-kin { color: var(--lc-flag); font-size: 12px; font-weight: 700; margin-top: 2px; text-align: left; }

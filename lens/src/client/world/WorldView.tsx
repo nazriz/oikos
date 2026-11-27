@@ -57,9 +57,11 @@ export function WorldView({ run, base, view, mode: startMode, weather, active = 
     try {
       const bySeq = new Map(city.town.acts.map((a) => [a.seq, a] as const));
       const caption = (seq: number) => { const a = bySeq.get(seq); return a ? plainWords(actSentence(city.town, a)) : undefined; };
-      e = new WorldEngine(host.current, { city, world: extra.world, election: extra.election }, { onMode: setMode, onInfo: setInfo, caption, onReady: () => setReady(true) });
+      e = new WorldEngine(host.current, { city, world: extra.world, election: extra.election }, { onMode: setMode, onInfo: setInfo, caption, onReady: () => { setReady(true); window.dispatchEvent(new CustomEvent("lens-world-ready", { detail: run })); } });
     } catch (err) {
       setFailed(String((err as Error)?.message ?? err));
+      // (Shown, not hidden behind the plan: the page says it could not draw the town.)
+      window.dispatchEvent(new CustomEvent("lens-world-ready", { detail: run }));
       return;
     }
     engine.current = e;

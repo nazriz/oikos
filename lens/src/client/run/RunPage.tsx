@@ -154,6 +154,13 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
   const Map = views.map, Rail = views.rail, Reader = views.reader, World = views.world;
   const [mapView, setMapView] = useState<"map" | "world">("map");
   const [worldSeen, setWorldSeen] = useState(false);
+  // (The 3D town takes seconds to build: the plan stays on screen until it says it is ready, never a blank.)
+  const [worldReady, setWorldReady] = useState(false);
+  useEffect(() => {
+    const f = (e: Event) => (e as CustomEvent).detail === runKey && setWorldReady(true);
+    window.addEventListener("lens-world-ready", f);
+    return () => window.removeEventListener("lens-world-ready", f);
+  }, [runKey]);
   useEffect(() => { if (mapView === "world") setWorldSeen(true); }, [mapView]);
   const readerOpen = Reader && selection && (selection.kind === "sitting" || selection.kind === "lever" || selection.kind === "act");
   const drawerOpen = selection && !readerOpen && (selection.kind === "person" || selection.kind === "structure" || selection.kind === "entity" || !Reader);
@@ -167,7 +174,7 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
         <main className="run-map">
           {/* (The map stays mounted under the 3D town, hidden and still: back to it is instant, with its camera kept.) */}
           {Map ? (
-            <div className={`map-slot${World && mapView === "world" ? " off" : ""}`}>
+            <div className={`map-slot${World && mapView === "world" && worldReady ? " off" : ""}`}>
               <ViewActive.Provider value={!World || mapView === "map"}>
                 <Map {...props} />
               </ViewActive.Provider>
@@ -177,12 +184,13 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
           )}
           {/* (The 3D town, once opened, stays mounted too, its engine stopped while the map is shown.) */}
           {World && worldSeen && (
-            <div className={`map-slot${mapView === "world" ? "" : " off"}`}>
+            <div className={`map-slot${mapView === "world" ? (worldReady ? "" : " warming") : " off"}`}>
               <ViewActive.Provider value={mapView === "world"}>
                 <World {...props} />
               </ViewActive.Provider>
             </div>
           )}
+          {World && mapView === "world" && !worldReady && <div className="world-warming">Building the 3D town… the plan shows until it is ready.</div>}
           {World && (
             <div className="seg map-toggle" role="group" aria-label="How to show the town">
               <button aria-pressed={mapView === "map"} onClick={() => setMapView("map")} title="The town as a plan: every building, who is in it now, and lines to what the mayor's acts reached">
