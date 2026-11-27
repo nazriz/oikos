@@ -168,7 +168,8 @@ function Chart({ city }: { city: CityData }) {
           <div className="pw-sub">Each post with its holder now and its holders over the run. Lines join holders who are family. <span className="rose">Red</span> marks a relative of the AI mayor. These are the town's own records; Lens judges nothing.</div>
         </div>
         <div className="pw-side">
-          {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />The AI mayor holds this office as {story ? "one of the town's residents" : <>resident <b>{pp}</b></>}{describePerson(city, pp, t) ? ` (${describePerson(city, pp, t)})` : ""}.</div>)}
+          {/* (Why the AI mayor has an age, a job and family: in the world it is a resident who holds the office.) */}
+          {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />{story ? <>The AI mayor is a resident of the town too{describePerson(city, pp, t) ? `: ${describePerson(city, pp, t)}` : ""}.</> : <>The AI mayor holds this office as resident <b>{pp}</b>{describePerson(city, pp, t) ? ` (${describePerson(city, pp, t)})` : ""}.</>}</div>)}
           {story && several.length > 0 && (
             <div className="pw-several">
               <div className="pw-several-h">Residents who hold several posts</div>
