@@ -3,7 +3,7 @@
 // made, and how the study's checker classified it (its rule and seriousness). For the election: the notice, any change
 // to the law, the result. For a council vote: the proposal, the ballot, the result. Each step links to its turn; in
 // Researcher mode each also shows what the log holds (ids, the act as sent, the checker's source line).
-import { seriousness } from "../plain";
+import { clip, seriousness } from "../plain";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { useResearcher } from "../mode";
@@ -99,7 +99,19 @@ function leadOf(seat: SeatJson, claim: Claim): { text: string; tone: string } | 
   return null;
 }
 
-const q = (x: string, n = 320) => `“${x.length > n ? x.slice(0, n - 1) + "…" : x}”`;
+const q = (x: string, n = 320) => `“${clip(x, n)}”`;
+
+/** A record of the town in words, its own text quoted after: a council proposal's fields ("affects neither, kind law")
+ * said as "a proposed law; changes no budget or post", the proposal's words in quotes. */
+function recordWords(kind: string, text: string, n: number): ReactNode {
+  const m = /^(?:Council ballot: )?council proposal: affects (\w+), kind (\w+)(?:, year \d+)?, proposal (.*)$/s.exec(text ?? "");
+  if (m) {
+    const [, affects, k, rest] = m;
+    const what = `${kind === "ballot" ? "a vote on a proposed" : "a proposed"} ${k === "budget" ? "budget" : k === "law" ? "law" : k!.replace(/_/g, " ")}`;
+    return <>{what}{affects === "neither" ? "; changes no budget or post" : `; affects ${affects!.replace(/_/g, " ")}`}: <span className="st-serif">{q(rest!, n)}</span></>;
+  }
+  return <>{human(kind)}: <span className="st-serif">{q(text, n)}</span></>;
+}
 
 /** Lens's own words in a chain, said plainly (Story mode's formatter, usePlain); the mayor's quoted words never pass it. */
 type Say = (s: string) => string;
@@ -137,7 +149,7 @@ function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | u
   if (act) {
     steps.push({ label: "The act sent", text: <>{say(act.label)}, on {when(act.t)}{act.as ? `, as ${say(act.as)}` : ""}.</>, raw: `command ${act.seq}\n${JSON.stringify(act.blocks, null, 1)}` });
     steps.push({ label: "What the town did", text: act.status === "applied" ? <>It went through{act.at !== undefined ? ` on ${when(act.at)}` : ""}.</> : act.status === "refused" ? <>It was refused: {human(act.code ?? "")}{act.detail ? ` (${say(act.detail)})` : ""}.</> : <>No outcome was in the log by the end of the run.</> });
-    if (act.records.length) steps.push({ label: "The record it made", text: <>{act.records.map((r) => <span key={r.id} className="ev-rec">{human(r.kind)}: <span className="st-serif">{q(r.text, 200)}</span></span>)}</>, raw: act.records.map((r) => r.id).join(", ") });
+    if (act.records.length) steps.push({ label: "The record it made", text: <>{act.records.map((r) => <span key={r.id} className="ev-rec">{recordWords(r.kind, r.text, 200)}</span>)}</>, raw: act.records.map((r) => r.id).join(", ") });
   }
   if (lever) {
     const rule = RULES[lever.lever] ?? lever.title;
@@ -165,7 +177,7 @@ function voteChain(seat: SeatJson, proposal: string, say: Say = same): { title: 
   const act = seat.acts.find((a) => a.records.some((r) => r.id === proposal));
   if (act) { const c = actChain(seat, act, undefined, say); steps.push(...c.steps.filter((s) => s.label !== "What the town did")); }
   const ballot = seat.records.find((r) => r.kind === "ballot" && r.data?.proposal === proposal);
-  if (ballot) steps.push({ label: "The council clerk put it to a vote", text: <><span className="st-serif">{q(ballot.text, 220)}</span>, {when(ballot.t)}.</>, raw: ballot.id });
+  if (ballot) steps.push({ label: "The council clerk put it to a vote", text: <>{recordWords("ballot", ballot.text, 220)}, {when(ballot.t)}.</>, raw: ballot.id });
   const res = ballot ? seat.records.find((r) => r.kind === "ballot_result" && r.data?.ballot === ballot.id) : undefined;
   if (res) steps.push({ label: "How the council voted", text: <>{res.data?.passed ? "Passed" : "Voted down"}, {res.data?.yes} to {res.data?.no}. {Array.isArray(res.data?.voted_for) && res.data.voted_for.length ? `For: ${say(res.data.voted_for.join(", "))}. ` : ""}{Array.isArray(res.data?.voted_against) && res.data.voted_against.length ? `Against: ${say(res.data.voted_against.join(", "))}.` : ""}</>, raw: res.id });
   else if (ballot) steps.push({ label: "How the council voted", text: <>No result in the log by the end of the run.</> });

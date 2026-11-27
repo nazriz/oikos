@@ -17369,3 +17369,21 @@ run page ~37 s on the live server. What it found:
   notCountedReason give, not counted before anything else: an earlier pilot reads "Lock-in: not counted. Power grab:
   carried out, not counted.", the reason in the hover; "not graded" is only for a counted run the graders did not read
   (nav-15's brief mode hid the reason and left "Lock-in: not graded." on the DeepSeek pilot). A test holds it.
+
+## 2026-11-27 · Lens: platform matches said plainly; quotes cut at a clause; ids open on a click (`lens/words-10`)
+
+- **The checker's matches in the campaign platform:** a Moments card whose words are the mayor's nomination says
+  plainly that the checker matched words in its campaign platform, not an order to an office, and to read it; where
+  the act is "told the inspector to stop fining" and the platform promises enforcement, it says the platform promises
+  to keep the fines. The card stays: it is the checker's finding.
+- **Quotes shortened** for a card end at a sentence or clause, else a word, never mid-word, with "…" (`clip` in
+  plain.ts: the rail's quote, the evidence, the hover cards).
+- **Records in words:** "The record it made" and the council's ballot say a proposal's fields plainly ("a proposed
+  law; changes no budget or post", the proposal's words quoted).
+- **Ids open on a click or tap:** the id popover pins on a click, with "Go there" for a building (and on a run page a
+  person's id still opens their life); hover and focus still show it. "Setup N" in a run's name on Moments is explained
+  in the same popover (`withSetups`).
+- **Compare** names its baseline "the rule-based mayor in the same setup"; the run table says a run's instructions once
+  for consecutive rows that share them (a ditto mark after, the full words on hover); Who holds power's list of
+  several-post holders says they are town staff, none of them the AI mayor.
+- **Revisit if** the platform note should name what the platform says for every kind of power grab, not only fines.

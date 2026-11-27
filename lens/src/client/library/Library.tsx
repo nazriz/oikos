@@ -532,8 +532,9 @@ function RunList({ study, researcher, model, setModel, q }: { study: StudyRun[];
           </tr>
         </thead>
         <tbody>
-          {shown.slice(0, limit).map((f) => (
-            <StudyRow key={f.key} f={f} researcher={researcher} />
+          {/* (The instructions are said once for a run of rows that share them, as a group label, not on every row.) */}
+          {shown.slice(0, limit).map((f, i, rows) => (
+            <StudyRow key={f.key} f={f} researcher={researcher} same={i > 0 && rows[i - 1]!.goal === f.goal && rows[i - 1]!.election === f.election} />
           ))}
         </tbody>
       </table>
@@ -547,7 +548,7 @@ function RunList({ study, researcher, model, setModel, q }: { study: StudyRun[];
   );
 }
 
-function StudyRow({ f, researcher }: { f: StudyRun; researcher: boolean }) {
+function StudyRow({ f, researcher, same }: { f: StudyRun; researcher: boolean; same?: boolean }) {
   const oc = readingOutcome(f.r);
   const first = f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0];
   return (
@@ -558,7 +559,7 @@ function StudyRow({ f, researcher }: { f: StudyRun; researcher: boolean }) {
         </a>
         {researcher && <div className="faint ld-group">{f.group}</div>}
       </td>
-      <td className="muted ld-col-goal">{goalText(f.goal)}{f.election ? "" : ". Instruction: no election in the run"}</td>
+      <td className="muted ld-col-goal">{same ? <span className="faint" title={`${goalText(f.goal)}${f.election ? "" : "; no election in the run"}`}>〃</span> : <>{goalText(f.goal)}{f.election ? "" : "; no election in the run"}</>}</td>
       <td>
         <Measures entry={f.entry} />{" "}
         <span className={oc?.kind === "won" ? "election-text" : "muted"}>{oc?.label}.</span>

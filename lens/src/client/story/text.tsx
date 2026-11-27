@@ -108,13 +108,16 @@ function markText(text: string, m: Marks, html: boolean, seats: Set<string> = NO
   // complaint", "apts-15 = Apartments 15", "d181 = day 181". The world's own dates, "year 1, day 365", are plain words
   // and are left alone. A record's card is a hover away in both modes.)
   const tipAttr = (text: string) => ` data-tip="${esc(text)}" tabindex="0"`;
+  // (A building the page can open from the popover's "Go there": the building part of a place id, "apts-15",
+  // "factory-3-works/workplace.1".)
+  const goAttr = (id: string) => { const b = id.split("/")[0]!; return /^(?:apts|house|unit)-\d+$|-(?:works|premises)$|^town-(?:hall|offices)$/.test(b) ? ` data-go="structure:${b}"` : ""; };
   out = out.replace(REC, (id) => {
     const kind = (() => { const k = names?.records?.[id]?.replace(/_/g, " "); return k ? `${/^[aeiou]/.test(k) ? "an" : "a"} ${k}` : "a record of the town's"; })();
     const tip = story ? tipAttr(`${id} = ${id.startsWith("rec.") ? kind : `${id.split(".")[0]} of the office`}`) : "";
     return id.startsWith("rec.") ? `<span class="st-rec${story ? " st-id" : ""}" data-peek="record:${id}"${tip}>${id}</span>` : `<span class="st-rec${story ? " st-id" : ""}"${tip}>${id}</span>`;
   });
   if (names) out = out.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part
-    : replaceIds(part, names, (id, said) => (REC_ID.test(id) ? id : `<span class="st-id"${tipAttr(`${id} = ${said}`)}>${id}</span>`), true)
+    : replaceIds(part, names, (id, said) => (REC_ID.test(id) ? id : `<span class="st-id"${tipAttr(`${id} = ${said}`)}${goAttr(id)}>${id}</span>`), true)
       // (Its own shorthand for a date, "Y1 d122" or "d181", is explained; the world's "year 1, day 181" needs nothing.)
       .replace(/\b(?:Y1 )?d(\d{1,3})\b/g, (d: string, n: string) => `<span class="st-id"${tipAttr(`${d} = day ${n}`)}>${d}</span>`))).join("");
   // (A person's id opens their life: a link the page handles by delegation (openPerson), with nav's hover card. On a page
@@ -122,7 +125,7 @@ function markText(text: string, m: Marks, html: boolean, seats: Set<string> = NO
   // run's town knows them.)
   // (The AI mayor's own person is said to be it, in square brackets: an editor's note, so a quote keeps its words.)
   const personTip = (id: string) => (story ? tipAttr(`${id} = ${names?.people?.[id] || names?.roles?.[id] ? personWords(id, names) : "a resident of the town"}`) : "");
-  out = out.replace(PERSON, (_, id: string) => `<button type="button" class="id-link" data-person="${id}" data-peek="person:${id}"${personTip(id)}>${id}</button>${seats.has(id) ? '<span class="id-seat"> [the AI mayor]</span>' : ""}`);
+  out = out.replace(PERSON, (_, id: string) => `<button type="button" class="id-link" data-person="${id}" data-peek="person:${id}" data-go="person:${id}"${personTip(id)}>${id}</button>${seats.has(id) ? '<span class="id-seat"> [the AI mayor]</span>' : ""}`);
   if (m.query.trim().length >= 2) {
     const q = new RegExp(`(${reEsc(esc(m.query.trim()))})`, "gi");
     // (Only in text between tags: never inside an attribute or the record-id spans' markup.)
