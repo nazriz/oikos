@@ -295,7 +295,7 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
             {meta?.place ? ` ${meta.place}, ${int(meta.people.initial)} people.` : ""}
             {researcher && x ? ` Seed ${x.seed}.` : ""}
             {researcher && cost !== undefined && cost > 0 ? ` Cost ${usd(cost)}.` : ""}
-            {x?.stopped ? " This run was stopped early." : ""}
+            {x?.stopped ? (reading && Math.floor(reading.end_at / 86_400) >= 180 ? " This run ended after election day." : " This run stopped before election day, so the study does not count it.") : ""}
           </p>
         </div>
         {reading && !x?.isCode && (
