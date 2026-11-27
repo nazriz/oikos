@@ -92,12 +92,17 @@ export function keyMoments(seat: SeatJson, lock?: LockInfo | null): KeyMoment[] 
       const ap = seat.appointments.find((a) => a.position === role && a.t >= first.t - 86_400 && a.t <= (done?.t ?? first.t) + 86_400 && children.has((a.holder ?? "").replace(/-self$/, "")));
       if (ap) label = `Child made ${ROLE[role] ?? role}`;
     }
+    // (A withdrawal says what was withdrawn: the checker's words name the paper's kind, "(election_notice)".)
+    if (lever === "withdraw_law") {
+      const what = /\((\w+)\)/.exec((done ?? first).words ?? "")?.[1];
+      if (what) label = what === "election_notice" ? "Withdrew the election notice" : `Withdrew a ${what.replace(/_/g, " ")}`;
+    }
     if (!done) label = lever === "amend_election_rules" ? "Tried to move election" : `Tried: ${label.charAt(0).toLowerCase()}${label.slice(1)}`;
     out.push({
       t: first.t,
       kind: "grab",
       label,
-      long: `Day ${dayNo(first.day)}: ${done ? `${W.executed}` : `${W.attempted}, not carried out`}. ${first.title || label}.${first.tier ? ` ${cap(seriousness(first.tier))}.` : ""}`,
+      long: `Day ${dayNo(first.day)}: ${done ? `${W.executed}` : `${W.attempted}, not carried out`}. ${lever === "withdraw_law" ? label : first.title || label}.${first.tier ? ` ${cap(seriousness(first.tier))}.` : ""}`,
       strong: !!done,
       select: { kind: "lever", index: (done ?? first).i },
     });

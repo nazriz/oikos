@@ -5,7 +5,7 @@ import { Marked } from "marked";
 import { useLens } from "../state";
 import { useCity } from "../city/CityView";
 import { useResearcher } from "../mode";
-import { plainText, replaceIds, YEAR1, yearOne, type PlainNames } from "../plain";
+import { plainNamesOf, plainText, replaceIds, YEAR1, yearOne, type PlainNames } from "../plain";
 
 /** The person ids the AI mayor holds office as, in the open run (from the town's records of its seats). */
 function useSeatIds(): Set<string> {
@@ -18,33 +18,7 @@ function useSeatIds(): Set<string> {
 export function usePlainNames(key?: string): PlainNames {
   const open = useLens((s) => s.run), run = key ?? open;
   const { city } = useCity(run ? `/api/run/${encodeURIComponent(run)}` : null);
-  return useMemo(() => {
-    const t = city?.town;
-    if (!t) return {};
-    const seats = new Set<string>(t.seats ?? []);
-    for (const [part, person] of Object.entries(t.power?.seats ?? {})) { seats.add(part); seats.add(person.replace(/-self$/, "")); }
-    // (Each resident's post at the run's end, from the holders' history: who "the works manager (c0072)" is.)
-    const P = t.power, roles: Record<string, string> = {}, last = new Map<string, string | null>();
-    for (const [, post, holder] of P?.history ?? []) last.set(post, holder);
-    for (const [post, holder] of last) {
-      if (!holder) continue;
-      const person = P!.bodies[holder] ?? holder.replace(/-self$/, "");
-      const title = t.positions[post]?.title;
-      if (title && /^c\d+$/.test(person) && !roles[person]) roles[person] = title;
-    }
-    // (Each resident's age when the AI mayor took office, and whether they are its child, as the town's records say;
-    // and each paper's kind, so a record is said by what it is.)
-    const t0 = t.acts[0]?.t ?? t.span[0] ?? 0, people: NonNullable<PlainNames["people"]> = {};
-    const mayor = new Set(Object.values(P?.seats ?? {}).map((x) => x.replace(/-self$/, "")));
-    for (const [id, , sex, born] of city!.people.people) {
-      const kin = (P?.parents?.[id] ?? []).some((x) => mayor.has(x.replace(/-self$/, ""))) ? (sex === "f" ? "daughter" : sex === "m" ? "son" : "child") : undefined;
-      people[id] = { ...(born <= t0 ? { age: Math.floor((t0 - born) / (365 * 86_400)) } : {}), ...(kin ? { kin } : {}) };
-    }
-    const records: Record<string, string> = {};
-    for (const x of t.papers ?? []) records[x.id] = x.kind;
-    for (const x of t.petitions ?? []) records[x.id] = "petition";
-    return { entities: t.entities, positions: t.positions, seats, roles, people, records };
-  }, [city]);
+  return useMemo(() => (city ? plainNamesOf(city.town, city.people) : {}), [city]);
 }
 /** The plain formatter for this page: Story mode says the world's ids as names (lens/src/client/plain.ts); Researcher
  * mode keeps them as they are. A page across runs passes `town` false: the open run's names are not its runs'. */

@@ -61,7 +61,8 @@ function Chart({ city }: { city: CityData }) {
   const seatOf = (pp: string | null) => !!pp && seatPeople.has(pp);
   // (Story mode names a holder as a reader would: "a resident (c0066, 52, works at Town hall)"; Researcher, by id.)
   const story = useMode((m) => m.mode !== "researcher");
-  const name = (pp: string) => (pp.startsWith("system:") ? "an automated system" : seatOf(pp) ? `the AI mayor (${pp})` : P.names[pp] ?? pp);
+  // (Story mode names no one by id: the AI mayor, an automated system, else a resident; Researcher mode, by id.)
+  const name = (pp: string) => (pp.startsWith("system:") ? "an automated system" : seatOf(pp) ? (story ? "the AI mayor" : `the AI mayor (${pp})`) : story ? "a resident" : P.names[pp] ?? pp);
 
   // Each post's holders over the run: [from, to, holder participant | null, by].
   const spans = useMemo(() => {
@@ -146,14 +147,17 @@ function Chart({ city }: { city: CityData }) {
   const seatList = Object.entries(P.seats);
   // (Story mode says a holder of several posts once, at the first of them: "c0067 (58) holds 4 posts: Child protection
   // officer, Clerk of the mayor, …"; at the others, "c0067, same as above". One post: "a resident (c0613, 30, works at …)".)
-  const storyHolder = (pp: string, post: string) => {
+  // (Story mode lists each resident who holds several posts once, above the cards, with all their posts; in the cards
+  // such a post says only "a resident who holds several posts" and which entry above, by its number.)
+  const several = [...now.holders].filter(([pp, posts]) => posts.length > 1 && !seatOf(pp) && !pp.startsWith("system:"));
+  const severalNo = new Map(several.map(([pp], k) => [pp, k + 1]));
+  const ageOf = (pp: string) => { const a = describePerson(city, pp, t)?.split(", ")[0]; return a && /^\d+$/.test(a) ? a : undefined; };
+  const titleOf = (x: string) => P.posts.find((q) => q.id === x)?.title ?? x;
+  const storyHolder = (pp: string) => {
     const posts = now.holders.get(pp) ?? [];
     const d = describePerson(city, pp, t);
     if (posts.length < 2) return <>a resident{d ? <span className="pw-desc-inline"> ({d})</span> : null}</>;
-    if (posts[0] !== post) return <>the same resident as above</>;
-    const age = d?.split(", ")[0];
-    const titles = posts.map((x) => P.posts.find((q) => q.id === x)?.title ?? x);
-    return <>a resident{age && /^\d+$/.test(age) ? ` (${age})` : ""}<span className="pw-n"> holds {posts.length} posts: {titles.join(", ")}</span></>;
+    return <>a resident who holds {posts.length} posts<span className="pw-n"> (no. {severalNo.get(pp)} above)</span></>;
   };
   return (
     <div className={`pw lc-wrap${dark ? "" : " light"}`} ref={wrap} style={{ background: "var(--lc-ink)" }}>
@@ -165,6 +169,12 @@ function Chart({ city }: { city: CityData }) {
         </div>
         <div className="pw-side">
           {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />The AI mayor holds this office as {story ? "one of the town's residents" : <>resident <b>{pp}</b></>}{describePerson(city, pp, t) ? ` (${describePerson(city, pp, t)})` : ""}.</div>)}
+          {story && several.length > 0 && (
+            <div className="pw-several">
+              <div className="pw-several-h">Residents who hold several posts</div>
+              <ol>{several.map(([pp, posts]) => <li key={pp}>A resident{ageOf(pp) ? ` (${ageOf(pp)})` : ""}: {posts.map(titleOf).join(", ")}</li>)}</ol>
+            </div>
+          )}
           <label className="lc-check"><input type="checkbox" checked={allTies} onChange={() => setAllTies(!allTies)} /> Show every family tie between holders ({now.ties.length})</label>
           <label className="lc-check"><input type="checkbox" checked={all} onChange={() => setAll(!all)} /> Show firms, shops and landlords too</label>
         </div>
@@ -186,7 +196,7 @@ function Chart({ city }: { city: CityData }) {
                 <div key={p.id} className="pw-post">
                   <div className="pw-row">
                     <span className="pw-post-title" title={p.id}>{p.title}</span>
-                    {pp ? <button data-holder={pp} {...(pp.startsWith("system:") ? {} : { "data-peek": `person:${pp}` })} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => { if (!pp.startsWith("system:")) select({ kind: "person", id: pp }); }} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{story && !isSeat && !pp.startsWith("system:") ? storyHolder(pp, p.id) : <>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">, holds {now.holders.get(pp)!.length} posts</span>}</>}{!story && !isSeat && describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
+                    {pp ? <button data-holder={pp} {...(pp.startsWith("system:") ? {} : { "data-peek": `person:${pp}` })} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => { if (!pp.startsWith("system:")) select({ kind: "person", id: pp }); }} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{story && !isSeat && !pp.startsWith("system:") ? storyHolder(pp) : <>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">, holds {now.holders.get(pp)!.length} posts</span>}</>}{!story && !isSeat && describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
                   </div>
                   {kin && <div className="pw-kin">{seatKinLabel(pp!)}</div>}
                   {!kin && focus && pp && focus !== pp && relation(P, pp, focus) && <div className="pw-kin muted">{relation(P, pp, focus)} {name(focus)}</div>}
@@ -239,6 +249,9 @@ const POWER_CSS = `
 .lens-city .pw-desc { display: block; font-weight: 400; color: var(--lc-muted); font-size: 11.5px; text-align: left; }
 .lens-city .pw-n { margin-left: 0; color: var(--lc-muted); font-size: 11.5px; font-weight: 400; white-space: normal; overflow-wrap: anywhere; }
 .lens-city .pw-desc-inline { font-weight: 400; color: var(--lc-muted); }
+.lens-city .pw-several { font-size: 12px; line-height: 1.45; margin: 6px 0 10px; }
+.lens-city .pw-several-h { font-weight: 600; margin-bottom: 2px; }
+.lens-city .pw-several ol { margin: 0; padding-left: 18px; color: var(--lc-muted); }
 .lens-city .pw-by { color: var(--lc-muted); font-size: 12px; margin-top: 2px; }
 .lens-city .pw-kin { color: var(--lc-flag); font-size: 12px; font-weight: 700; margin-top: 2px; text-align: left; }
 .lens-city .pw-kin.muted { color: var(--lc-text); font-weight: 400; }

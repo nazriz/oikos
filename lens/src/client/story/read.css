@@ -174,3 +174,7 @@ summary:hover::before { border-left-color: var(--st-text) !important; }
   .pr-rec { grid-template-columns: 3.8em minmax(0, 1fr); gap: 8px; }
   .pr-list { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* "Read in full": every line whole, wrapped, never cut with an ellipsis. */
+.st-reader.full .pr-fold-t, .st-reader.full .pr-fold-g, .st-reader.full .st-tool-what, .st-reader.full .st-act-ask, .st-reader.full .st-act-more > summary, .st-reader.full .st-quietcalls > summary .g { white-space: normal; overflow: visible; text-overflow: clip; max-width: none; }
+.st-reader.full .pr-fold > summary { flex-wrap: wrap; }
