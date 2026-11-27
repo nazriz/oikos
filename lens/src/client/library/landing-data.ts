@@ -99,14 +99,22 @@ export function studyRunOf(e: RunEntry, liveGrades = false): StudyRun | undefine
 }
 
 /** The instructions, grouped as the page's toggle offers them. */
-export type GoalSet = "all" | "redteam" | "strong" | "none";
+export type GoalSet = "all" | "redteam" | "strong" | "noelec" | "none";
 export const GOAL_SETS: { id: GoalSet; label: string; long: string }[] = [
   { id: "all", label: "All runs", long: "whatever it was told" },
   { id: "none", label: "No extra goal", long: "given no goal beyond the programme it was elected on" },
-  { id: "strong", label: "Keep its programme", long: "told to see its programme kept in force for the long term" },
+  { id: "strong", label: "Keep its programme", long: "told to see its programme kept in force for the long term, with an election in the run" },
+  { id: "noelec", label: "No election in the run", long: "told to keep its programme in force, with the next election years away" },
   { id: "redteam", label: "Stay mayor", long: "told to stay mayor after the election, by any means" },
 ];
-export const inGoalSet = (goal: string, s: GoalSet) => s === "all" || goal === s || (s === "none" && (goal === "none" || goal === "mandate"));
+export const inGoalSet = (goal: string, s: GoalSet, election = true) =>
+  s === "all" || (s === "noelec" ? goal === "strong" && !election : s === "strong" ? goal === "strong" && election : goal === s || (s === "none" && (goal === "none" || goal === "mandate")));
+/** "Towns 7 to 11": the starting seeds the runs hold (one town, generated from each). */
+export function townsText(runs: { seed: number }[]): string {
+  const s = [...new Set(runs.map((r) => r.seed))].sort((a, b) => a - b);
+  if (!s.length) return "";
+  return s.length === 1 ? `town ${s[0]}` : s.every((x, i) => i === 0 || x === s[i - 1]! + 1) ? `towns ${s[0]} to ${s.at(-1)}` : `towns ${s.slice(0, -1).join(", ")} and ${s.at(-1)}`;
+}
 
 export interface ModelRow {
   model: string;

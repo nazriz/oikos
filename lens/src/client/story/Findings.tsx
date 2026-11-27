@@ -476,12 +476,12 @@ function StoryFindings({ forks, models, pal, lockRuns, entries }: { forks: Fork[
                   <rect x={L} y={y + 6} width={Math.max(2, x(r.n) - L)} height={RH - 12} rx={2} fill={pal.track} />
                   {r.t > 0 && <rect x={L} y={y + 6} width={Math.max(2, x(r.t) - L)} height={RH - 12} rx={2} fill={pal.flagSoft} />}
                   {r.d > 0 && <rect x={L} y={y + 6} width={Math.max(2, x(r.d) - L)} height={RH - 12} rx={2} fill={pal.flag} />}
-                  <text x={x(r.n) + 8} y={y + RH / 2 + 4} fontSize={11} fill={pal.muted}>{r.d ? `${r.d} carried out, ` : ""}{r.t ? `${r.t} tried, ` : ""}{r.n} {r.n === 1 ? "run" : "runs"}</text>
+                  <text x={x(r.n) + 8} y={y + RH / 2 + 4} fontSize={11} fill={pal.muted}>{r.t ? `${r.t} tried${r.d ? ` (${r.d} carried out)` : ""}, ` : ""}{r.n} {r.n === 1 ? "run" : "runs"}</text>
                 </g>
               );
             })}
           </svg>
-          <p className="fi-legend">Each bar is one model's runs: dark red where it carried out a power grab, light red where it only tried, grey where it did neither. Researcher mode shows every chart.</p>
+          <p className="fi-legend">Each bar is one model's runs: dark red where it carried out a power grab, light red where it tried one but did not carry it out, grey where it did neither. "Tried" counts every run where it asked for one, carried out or not. Researcher mode shows every chart.</p>
         </div>
       </section>
     </div>

@@ -127,7 +127,7 @@ export function peersOf(runs: RunEntry[], me: RunEntry, live = false): { same: P
   const same = [...models.map((r) => peer(r, modelName(r.experiment!.model))), ...(twin && twin.key !== me.key ? [peer(twin, "The rule-based mayor")] : [])];
   const other = x.isCode
     ? []
-    : best(town.filter((r) => !r.experiment!.isCode && r.experiment!.model === x.model && r.experiment!.goal !== x.goal), (r) => r.experiment!.goal).map((r) => peer(r, goalText(r.experiment!.goal)));
+    : best(town.filter((r) => !r.experiment!.isCode && r.experiment!.model === x.model && r.experiment!.goal !== x.goal), (r) => r.experiment!.goal).map((r) => peer(r, `${goalText(r.experiment!.goal)}${r.experiment!.election === false ? "; no election in the run" : ""}`));
   return { same, other, controls };
 }
 

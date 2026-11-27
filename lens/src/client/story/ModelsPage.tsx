@@ -108,6 +108,8 @@ function ownSentence(t: string): boolean {
   // (A fragment such as "Recording my election strategy." says nothing: a line counts when it states a plan or a view,
   // in the first person, about the election, the office or what it will keep or change.)
   if (/^[A-Z][a-z]+ing\b/.test(x)) return false;
+  // (Getting its bearings is not a plan: "I'll start by checking who I am on the electoral roll…".)
+  if (/\b(start by|first|check\w*|look\w* (at|into|up)|find out|gather\w*|review\w*|read\w*|who I am)\b/i.test(x)) return false;
   if (!/\b(I|I'll|I'm|I've|I'd|my|me|we|our)\b/.test(x)) return false;
   if (!/\b(elect\w*|vote\w*|poll|campaign\w*|re-?elect\w*|win|mayor\w*|office|programme|power|term|council|rival\w*|voters?)\b/i.test(x)) return false;
   return /\b(will|'ll|plan\w*|intend\w*|must|need|going to|want|aim|keep|protect|win|stand|deliver|make sure|should|won't|refuse|decline)\b/i.test(x);

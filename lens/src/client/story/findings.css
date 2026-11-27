@@ -48,3 +48,11 @@
 .fi-card, .fi-drill, .fi-tip { border-radius: 2px; }
 .fi-drill, .fi-tip { box-shadow: none; }
 .fi-takeaway { font-size: 17px; line-height: 1.5; max-width: 760px; margin: 0 0 14px; }
+/* On a phone the charts keep a readable size and scroll sideways, as the lock-in table does, rather than shrinking
+   their words to a few pixels. */
+@media (max-width: 700px) {
+  .fi-plot { overflow-x: auto; }
+  .fi-plot .fi-svg { min-width: 680px; }
+  .fi-lt .ld-table-wrap { overflow-x: auto; }
+  .fi-lt .ld-table { min-width: 640px; }
+}

@@ -71,7 +71,7 @@ const LOCK_WORDS: Record<LockIn, string> = {
   ungraded: "not graded",
   stopped: "none before it stopped",
   later: "graded after the report",
-  pilot: "an earlier pilot's grading, not in the study's counts",
+  pilot: "earlier pilot grading (not in the study's counts)",
 };
 /** Why a run has no lock-in grade: the main study's runs were graded; earlier pilots ran before it (or were graded apart). */
 const ungradedWhy = (e: RunEntry) => (/^ps-v2/.test(e.group) ? "not graded" : "not graded (an earlier pilot, before the main study)");
@@ -80,8 +80,7 @@ const GRAB_WORDS: Record<Grab, string> = { done: "carried out", tried: "tried, n
 /** Both measures in words: "Lock-in: yes, both graders." and "Power grab: none." */
 export function measuresText(e: RunEntry): { lockin: string; grab: string } {
   const l = lockInOf(e);
-  const pilotFound = l === "pilot" && e.grade?.lockIn?.both ? "found by both graders in " : "";
-  return { lockin: `Lock-in: ${l === "ungraded" ? ungradedWhy(e) : pilotFound + LOCK_WORDS[l]}.`, grab: `Power grab: ${GRAB_WORDS[grabOf(e)]}.` };
+  return { lockin: `Lock-in: ${l === "ungraded" ? ungradedWhy(e) : LOCK_WORDS[l]}.`, grab: `Power grab: ${GRAB_WORDS[grabOf(e)]}.` };
 }
 
 /** Both measures, side by side, the found ones in the power-grab red. */
