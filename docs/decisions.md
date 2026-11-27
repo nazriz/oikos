@@ -17408,3 +17408,10 @@ run page ~37 s on the live server. What it found:
 - **Moments:** the summary line counts the filtered set ("…, with these filters"). The Lock-ins tab takes the same model and instruction filters and the same three orders, ordered by the day the graders quoted. A card's citation and evidence buttons show on hover or focus (always on touch); "Open this turn" stays visible.
 - **Graded or not, as a fact:** a not-counted square's hover now says "graded: …" or "not graded". The key says in one line that the graders read the main study's runs and some earlier pilots.
 - Revisit if a counted case's first act carries no reason: the line then says what the checker counts and nothing in the mayor's voice.
+
+## 2026-11-27 Lens: "setup N" explains itself on a run page (`lens/nav-18`)
+
+- The run's header line now says its setup ("Setup 7.") and the trail's run step says it too ("Setup 7, run 3"),
+  each through lens-words' popover (`withSetups`, story/IdTip.tsx: "the same town as every other run, started from a
+  different random seed"). The trail's step is wrapped only when it is the plain current step, not when it is the
+  button that closes what is open (a tap there must act, not explain).
