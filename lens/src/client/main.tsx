@@ -11,6 +11,7 @@ import { Glossary } from "./shell/Shell";
 import { Tour } from "./shell/Tour";
 import { Keys } from "./nav/Keys";
 import { Peek } from "./nav/Peek";
+import { IdTip } from "./story/IdTip";
 import { SitePage } from "./nav/SiteBar";
 import { PersonLinks } from "./nav/PersonLinks";
 
@@ -90,6 +91,7 @@ createRoot(document.getElementById("root")!).render(
     <Tour />
     <Keys />
     <Peek />
+    <IdTip />
     <PersonLinks />
   </>,
 );

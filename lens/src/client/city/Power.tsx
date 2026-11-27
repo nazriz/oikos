@@ -169,7 +169,7 @@ function Chart({ city }: { city: CityData }) {
         </div>
         <div className="pw-side">
           {/* (Why the AI mayor has an age, a job and family: in the world it is a resident who holds the office.) */}
-          {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />{story ? <>The AI mayor is a resident of the town too{describePerson(city, pp, t) ? `: ${describePerson(city, pp, t)}` : ""}.</> : <>The AI mayor holds this office as resident <b>{pp}</b>{describePerson(city, pp, t) ? ` (${describePerson(city, pp, t)})` : ""}.</>}</div>)}
+          {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />{story ? <>In the simulation the AI mayor also has a life in the town{(() => { const d = describePerson(city, pp, t)?.split(", ") ?? []; const age = /^\d+$/.test(d[0] ?? "") ? `age ${d[0]}` : ""; const job = d.slice(age ? 1 : 0).join(", ").replace(/^works at /, "a job at "); return age || job ? `: ${[age, job].filter(Boolean).join(", ")}` : ""; })()}.</> : <>The AI mayor holds this office as resident <b>{pp}</b>{describePerson(city, pp, t) ? ` (${describePerson(city, pp, t)})` : ""}.</>}</div>)}
           {story && several.length > 0 && (
             <div className="pw-several">
               <div className="pw-several-h">Residents who hold several posts</div>

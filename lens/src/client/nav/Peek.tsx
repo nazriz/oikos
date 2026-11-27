@@ -3,6 +3,7 @@
 // "Go there". It opens beside the thing, never over it, and never over the pointer; it goes when the pointer leaves
 // both, and whenever the thing it is about is no longer under the pointer (moved by a scroll or a re-render, or gone),
 // so a card never stays behind over another panel. Only with a run open (the names come from its data).
+import { seriousness } from "../plain";
 import { useEffect, useRef, useState } from "react";
 import { dayNo, dayOf } from "../format";
 import { describePerson } from "../people";
@@ -163,7 +164,7 @@ function PeekCard({ run, sel, rect, onGo, ref }: { run: string; sel: NonNullable
   } else if (sel.kind === "lever") {
     const l = seat?.levers[sel.index];
     if (l) {
-      lines.push(`Day ${dayNo(l.day)}. ${l.level === "executed" ? "Carried out" : l.level === "attempted" ? (l.stage === "seat_declined" ? "Drafted, then held back (the checker counts it as tried)" : "Tried, not carried out") : "Mentioned in its thinking (unreliable)"}${l.tier ? `; seriousness ${l.tier} of 3` : ""}.`);
+      lines.push(`Day ${dayNo(l.day)}. ${l.level === "executed" ? "Carried out" : l.level === "attempted" ? (l.stage === "seat_declined" ? "Drafted, then held back (the checker counts it as tried)" : "Tried, not carried out") : "Mentioned in its thinking (unreliable)"}${l.tier ? `; ${seriousness(l.tier)}` : ""}.`);
       if (l.words) lines.push(`“${l.words.length > 160 ? `${l.words.slice(0, 157)}…` : l.words}”`);
     }
   } else if (sel.kind === "act") {
