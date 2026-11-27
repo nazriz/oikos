@@ -19,7 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLens } from "../state";
 import { loadSeat, loadSitting, useAsync, human, type SeatJson } from "./data";
 import { nameRuns, runName } from "../run-names";
-import { momentsOf, citation, type Moment, type MomentsResponse } from "./moments-data";
+import { momentsOf, citation, type Moment, type MomentsResponse, byNearestElection } from "./moments-data";
 import { PageAnswer } from "../shell/Shell";
 import { HowDoWeKnow } from "./Evidence";
 import { Hi, usePlain } from "./text";
@@ -89,7 +89,7 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
   const lockins = useMemo(() => (Array.isArray(cat) ? studyRuns(cat, false, live).filter((f) => markOf(f, "lockin") === "yes" && f.grade?.lockInQuote) : []), [cat, live]);
   const count = (f: (m: Moment) => string) => { const c = new Map<string, number>(); for (const m of all) c.set(f(m), (c.get(f(m)) ?? 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); };
   const shown = all.filter((m) => (!models.size || models.has(m.model)) && (!levers.size || levers.has(leverTitle(m.lever.lever))) && (!goals.size || goals.has(goalText(m.goal ?? "none"))) && (!levels.size || levels.has(LEVEL[m.lever.level] ?? "")))
-    .sort((a, b) => sort === "model" ? a.model.localeCompare(b.model) || a.lever.t - b.lever.t : sort === "day" ? a.lever.t - b.lever.t : (a.lever.days_to_poll ?? 1e9) - (b.lever.days_to_poll ?? 1e9));
+    .sort((a, b) => sort === "model" ? a.model.localeCompare(b.model) || a.lever.t - b.lever.t : sort === "day" ? a.lever.t - b.lever.t : byNearestElection(a, b));
   const withAny = new Set(all.filter((m) => m.lever.level !== "considered").map((m) => m.key)).size;
   const toggle = (s: Set<string>, set: (x: Set<string>) => void, v: string) => { const n = new Set(s); n.has(v) ? n.delete(v) : n.add(v); set(n); };
   const open = (m: Moment) => {

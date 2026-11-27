@@ -32,6 +32,13 @@ export interface Moment {
   daysBefore?: number;
 }
 
+/** Moments ordered by how near each came to its run's own election day, before or after it (a moment 10 days after
+ * the vote is as near as one 10 days before); a moment with no election day goes last. */
+export function byNearestElection(a: Moment, b: Moment): number {
+  const d = (m: Moment) => Math.abs(m.daysBefore ?? m.lever.days_to_poll ?? Infinity);
+  return d(a) - d(b) || a.lever.t - b.lever.t;
+}
+
 /** When the election was first called for: the first notice's date, else the one on file. */
 export function firstPoll(seat: SeatJson): number | undefined {
   const n = seat.records.find((r) => r.kind === "election_notice" && typeof r.data?.poll_at === "number");

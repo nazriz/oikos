@@ -110,7 +110,7 @@ export function peersOf(runs: RunEntry[], me: RunEntry, live = false): { same: P
     const code = r.experiment!.isCode ? "The comparison: a fixed, rule-based mayor." : "";
     if (!rd) return code ? `${code}${r.experiment!.stopped ? " Stopped early." : ""}` : r.experiment!.stopped ? "Stopped early." : "Not read by the study yet; open it to see what it did.";
     const m = measuresText(r);
-    const grab = r.experiment!.isCode ? code : `${m.lockin} ${m.grab}${addedAfterReport(r) ? " Added since the study's report, so not in its counts." : ""}`;
+    const grab = r.experiment!.isCode ? code : `${m.why ? `${m.why} ` : ""}${m.lockin} ${m.grab}${addedAfterReport(r) ? " Added since the study's report, so not in its counts." : ""}`;
     const out = readingOutcome(rd);
     return [grab, out ? `${out.label}.` : ""].filter(Boolean).join(" ");
   };

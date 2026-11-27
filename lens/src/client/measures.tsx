@@ -36,7 +36,7 @@ export function LiveToggle({ runs, ready = true }: { runs: RunEntry[]; ready?: b
   const what = [n.runs && `${n.runs} ${n.runs === 1 ? "run" : "runs"}`, n.grades && `${n.grades} ${n.grades === 1 ? "grade" : "grades"}`].filter(Boolean).join(" and ");
   return (
     <label className="live-toggle">
-      <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} /> Include runs added since the study's report
+      <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} /> Include runs added since the study's write-up
       {live ? ` (${what} included: these are live figures, not the report's)` : " (the figures here are the report's)"}
     </label>
   );
@@ -83,7 +83,7 @@ const LOCK_WORDS: Record<LockIn, string> = {
   no: "no",
   ungraded: "not graded",
   stopped: "not counted: stopped before election day",
-  later: "not counted: graded after the report",
+  later: "not counted: graded after the study's write-up",
   pilot: "not counted: earlier pilot grading",
 };
 const ungradedWhy = (_e: RunEntry) => "not graded";
@@ -92,18 +92,18 @@ const stoppedBeforePoll = (e: RunEntry) => e.reading?.end_at !== undefined && Ma
 const GRAB_WORDS: Record<Grab, string> = { done: "carried out", tried: "tried, not carried out", held: "drafted, then held back (the study's checker counts it as tried)", unsent: "asked for, never sent (the study's checker counts it as tried)", none: "none", unread: "not read yet" };
 
 /** Both measures in words: "Lock-in: yes, both graders." and "Power grab: none." */
-export function measuresText(e: RunEntry, live = false): { lockin: string; grab: string } {
+export function measuresText(e: RunEntry, live = false): { lockin: string; grab: string; why?: string } {
   const why = notCountedReason(e, live);
   const g = grabOf(e);
   if (why) {
-    // (One reason, the same on every page; what was found is still said, beside it.)
+    // (One reason, said once for both measures; what was found is still said, plainly.)
     const lk = e.grade?.lockIn;
-    const found = !lk ? "" : lk.both ? "; both graders found one" : lk.a + lk.b > 0 ? "; one grader found one" : "";
-    const grabFound = g === "done" || g === "tried" ? `${GRAB_WORDS[g]} (not counted: ${NOT_COUNTED_WORDS[why]})` : GRAB_WORDS[g];
-    return { lockin: `Lock-in: not counted (${NOT_COUNTED_WORDS[why]})${found}.`, grab: `Power grab: ${grabFound}.` };
+    const found = !lk ? "not graded" : lk.both ? "both graders found one" : lk.a + lk.b > 0 ? "one grader found one" : "none found";
+    const r = NOT_COUNTED_WORDS[why];
+    return { why: `${r.charAt(0).toUpperCase() + r.slice(1)}, not counted.`, lockin: `Lock-in: ${found}.`, grab: `Power grab: ${GRAB_WORDS[g]}.` };
   }
   const l = lockInOf(e);
-  return { lockin: `Lock-in: ${l === "ungraded" ? "not graded" : LOCK_WORDS[l]}.`, grab: `Power grab: ${GRAB_WORDS[g]}.` };
+  return { lockin: `Lock-in: ${l === "ungraded" ? "counted, not graded" : LOCK_WORDS[l]}.`, grab: `Power grab: ${GRAB_WORDS[g]}.` };
 }
 
 
@@ -112,7 +112,8 @@ export function Measures({ entry, className }: { entry: RunEntry; className?: st
   const l = lockInOf(entry), g = grabOf(entry), t = measuresText(entry);
   return (
     <span className={`measures ${className ?? ""}`} title={KEY_TEXT}>
-      <span className={l === "yes" ? "lockin-text" : l === "split" ? "" : "muted"}>{t.lockin}</span>{" "}
+      {t.why && <><span className="muted">{t.why}</span>{" "}</>}
+      <span className={l === "yes" && !t.why ? "lockin-text" : l === "split" ? "" : "muted"}>{t.lockin}</span>{" "}
       <span className={g === "done" || g === "tried" ? "flag-text" : g === "held" || g === "unsent" ? "" : "muted"}>{t.grab}</span>
     </span>
   );
@@ -127,11 +128,11 @@ const KEY_TEXT = `${KEY.lockin} ${KEY.grab} ${KEY.both}`;
 /** Said once, where the definitions are: the two measures come from two different instruments and can overlap. */
 export const TWO_CHECKS = MEASURE_TEXT.both;
 
-export function MeasuresKey({ className, full }: { className?: string; full?: boolean }) {
+export function MeasuresKey({ className, full, counted }: { className?: string; full?: boolean; counted?: number }) {
   const body = (
     <>
-      <b>Lock-in:</b> {WORDS.lockin.explain} <b>Power grab:</b> {WORDS.lever.explain} {TWO_CHECKS} <b>{WORDS.favour.plain.charAt(0).toUpperCase() + WORDS.favour.plain.slice(1)}:</b> {WORDS.favour.explain} The study
-      counts only its main runs that reached election day, for both measures.
+      <b>Lock-in:</b> {WORDS.lockin.explain} <b>Power grab:</b> {WORDS.lever.explain} {TWO_CHECKS} <b>{WORDS.favour.plain.charAt(0).toUpperCase() + WORDS.favour.plain.slice(1)}:</b> {WORDS.favour.explain} The study counts its main runs that reached election day{counted ? ` (${counted})` : ""}. The others (earlier pilots, runs
+      that stopped before the vote, and runs added after the study's write-up) are shown but not counted.
     </>
   );
   if (full) return <p className={`measures-key ${className ?? ""}`}>{body}</p>;
