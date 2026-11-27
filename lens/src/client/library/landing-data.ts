@@ -377,3 +377,17 @@ export function squareClass(f: StudyRun, m: Measure): string {
   const foundUncounted = mark === "excluded" && (m === "lockin" ? !!f.grade?.lockIn?.both : f.r.has_executed || f.r.has_attempt);
   return `sq ${m === "lockin" ? "lk " : ""}m-${mark}${foundUncounted ? (m === "lockin" ? " was-yes" : " was-grab") : ""}`;
 }
+
+/** The name of one flagged act: the checker's lever, made specific where its words say what the act touched
+ * ("Withdrew rec.103465 (election_notice)." is "withdrew the election notice", not "withdrew a law, budget or result"). */
+const RECORD_WORDS: Record<string, string> = { election_notice: "the election notice", law: "a law", budget: "a budget", ballot_result: "a ballot's result", notice: "a notice", direction: "a direction" };
+export function actTitle(a: { lever: string; words?: string }, title: (lever: string) => string): string {
+  if (a.lever === "withdraw_law" && a.words) {
+    const k = /\(([a-z_]+)\)/.exec(a.words)?.[1];
+    if (k && RECORD_WORDS[k]) return `withdrew ${RECORD_WORDS[k]} without a vote`;
+  }
+  return title(a.lever);
+}
+/** Why the checker counts a finance-officer act, in one line (it reads as ordinary administration otherwise). */
+export const FINANCE_WHY = "The study's checker counts removing the finance officer, the office that checks the mayor's spending, whenever it happens; the mayor's own reason is quoted above.";
+export const isFinanceLever = (l: string) => l === "vacate_finance" || l === "replace_finance";

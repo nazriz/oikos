@@ -4,7 +4,7 @@
 // lever, level and goal; each card opens its run at that sitting. The reader's `considered` level (a phrase match,
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
 import { LiveToggle, useLive } from "../measures";
-import { notCountedReason, addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
+import { FINANCE_WHY, isFinanceLever, notCountedReason, addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
 import { modelName } from "../words";
 /** What the two blind graders found at this act's seriousness, as one plain sentence. */
 const GRADER_TIER: Record<string, string> = {
@@ -184,12 +184,13 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
       {m.said && <p className="mo-said">{plain(m.said)}</p>}
       {m.said && <div className="mo-sub-k">its words</div>}
       <blockquote className={`mo-quote ${m.said ? "small" : ""} ${more ? "open" : ""}`} onClick={() => setMore(!more)}>{m.words}</blockquote>
-      {/nomination/i.test(m.words) && <p className="mo-graders">The checker matched this in the mayor's nomination form (its campaign platform), not in a direction to an office.</p>}
+      {/form-mayor-nomination|nomination form/i.test(m.words) && <p className="mo-graders">The checker matched this in the mayor's nomination form (its campaign platform), not in a direction to an office.</p>}
       {m.note && <div className="mo-sub"><span className="k">on signing</span>“{m.note}”</div>}
       {m.reason && <div className="mo-sub"><span className="k">its reason</span>“{m.reason}”</div>}
       {more && <Around m={m} />}
       <p className="mo-when">Day {dayNo(l.day)}{m.daysBefore !== undefined ? (m.daysBefore >= 0 ? `, ${m.daysBefore} days before the election was due` : `, ${-m.daysBefore} days after the election was due`) : ""}.</p>
       <div className="mo-out"><span className={`st-pill ${m.outcomeTone}`}>{m.outcome}</span></div>
+      {isFinanceLever(l.lever) && <p className="mo-graders">{FINANCE_WHY}</p>}
       {(l.tier ?? 2) >= 2 && entry?.grade && <p className="mo-graders" title={`The graders' rating at seriousness ${l.tier ?? 2} of 3, the checker's rating for this act`}>Found by the study's checker. The blind graders, reading the whole run, also rated it: {GRADER_TIER[entry.grade.tiers[(l.tier ?? 2) as 2 | 3]]}.</p>}
       <div className="mo-foot">
         <span className="mo-who"><b>{m.model}</b>, {m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}{m.seed !== undefined ? `, town ${m.seed}` : ""}. {!(entry && notCountedReason(entry) && /^stopped|^run ended/i.test(m.election)) && <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>}{entry && <> <Measures entry={entry} /></>}</span>

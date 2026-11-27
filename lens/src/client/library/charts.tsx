@@ -12,7 +12,7 @@ import { dayOf, lockT, openAt as openAtFmt } from "../format";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable, POINT, tapTwice } from "./parts";
 import type { RunEntry } from "../../shared/api";
-import { MAIN_SET, NOT_COUNTED_WORDS, squareClass, squareText, attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
+import { MAIN_SET, NOT_COUNTED_WORDS, actTitle, squareClass, squareText, attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
 
 const DAY = 86_400;
 // (A few minutes before the act, so it is seen happening at its turn, not after it.)
@@ -45,7 +45,7 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
       <thead><tr><th>Day</th><th>What happened</th></tr></thead>
       <tbody>
         <tr><td>{dayNo(run.from)}</td><td>The AI mayor took office.</td></tr>
-        {marks.map((m, i) => <tr key={i}><td>{dayNo(m.day)}</td><td>{m.executed ? "Carried out" : "Tried, not carried out"}: {leverTitle(m.lever)}.</td></tr>)}
+        {marks.map((m, i) => <tr key={i}><td>{dayNo(m.day)}</td><td>{m.executed ? "Carried out" : "Tried, not carried out"}: {actTitle(m, leverTitle)}.</td></tr>)}
         <tr><td>{dayNo(POLL_DAY)}</td><td>Election day as first called. No election was held.</td></tr>
         <tr><td>{dayNo(Math.floor(run.end))}</td><td>The run ended.</td></tr>
         <tr><td>{dayNo(pollDay).toLocaleString("en-US")}</td><td>Election day under the new law.</td></tr>
@@ -87,14 +87,14 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
             {marks.map((m, i) => {
               const mx = x(m.t / DAY), up = i % 2 === 0;
               return (
-                <g key={i} className="cal-mark" tabIndex={0} role="button" aria-label={`Day ${dayNo(m.day)}: ${leverTitle(m.lever)}. Open the run here.`}
-                  onPointerMove={(e) => tip.show(e, <><b>Day {dayNo(m.day)}</b><span>{m.executed ? "Carried out" : "Tried, not carried out"}: {leverTitle(m.lever)}</span><span className="muted">Click to open the run at this moment.</span></>)}
-                  onFocus={(e) => tip.show(e, <><b>Day {dayNo(m.day)}</b><span>{leverTitle(m.lever)}</span></>)} onPointerLeave={tip.hide} onBlur={tip.hide}
+                <g key={i} className="cal-mark" tabIndex={0} role="button" aria-label={`Day ${dayNo(m.day)}: ${actTitle(m, leverTitle)}. Open the run here.`}
+                  onPointerMove={(e) => tip.show(e, <><b>Day {dayNo(m.day)}</b><span>{m.executed ? "Carried out" : "Tried, not carried out"}: {actTitle(m, leverTitle)}</span><span className="muted">Click to open the run at this moment.</span></>)}
+                  onFocus={(e) => tip.show(e, <><b>Day {dayNo(m.day)}</b><span>{actTitle(m, leverTitle)}</span></>)} onPointerLeave={tip.hide} onBlur={tip.hide}
                   onClick={() => go(run.key, m.t)} onKeyDown={(e) => e.key === "Enter" && go(run.key, m.t)}>
                   <line x1={mx} x2={mx} y1={base - 4} y2={base - (up ? 40 : 62) - (narrow ? 12 : 0)} className="cal-stem" />
                   <circle cx={mx} cy={base} r={12} className="hit" />
                   <circle cx={mx} cy={base} r={5} className={m.executed ? "cal-dot done" : "cal-dot"} />
-                  <text x={mx + 5} y={base - (up ? 44 : 66) - (narrow ? 12 : 0)} className="cal-small strong">day {dayNo(m.day)}: {narrow ? shortLever(m.lever) : leverTitle(m.lever)}</text>
+                  <text x={mx + 5} y={base - (up ? 44 : 66) - (narrow ? 12 : 0)} className="cal-small strong">day {dayNo(m.day)}: {narrow ? shortLever(m.lever) : actTitle(m, leverTitle)}</text>
                 </g>
               );
             })}
@@ -132,7 +132,7 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
     words = f.grade.lockInQuote.quote;
   } else if (m === "grab") {
     const first = f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0];
-    if (first) detail = `${leverTitle(first.lever)}, day ${dayNo(first.day)}`;
+    if (first) detail = `${actTitle(first, leverTitle)}, day ${dayNo(first.day)}`;
     const q = quotes?.get(f.key);
     if (q?.from === "thinking" && mark !== "no") words = q.text;
   }
@@ -316,7 +316,7 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
   );
 }
 function Dot({ a, cx, cy, tip, seed }: { a: Attempt; cx: number; cy: number; tip: ReturnType<typeof useTip>; seed?: number }) {
-  const body = <><b>Day {dayNo(a.day)}: {leverTitle(a.lever)}</b><span>{modelName(a.model)}, town {seed}. {a.executed ? "Carried out." : "Tried, not carried out."}</span><span className="muted">{goalText(a.goal)}. Click to open the run here.</span></>;
+  const body = <><b>Day {dayNo(a.day)}: {actTitle(a, leverTitle)}</b><span>{modelName(a.model)}, town {seed}. {a.executed ? "Carried out." : "Tried, not carried out."}</span><span className="muted">{goalText(a.goal)}. Click to open the run here.</span></>;
   return (
     <g className="when-dot" tabIndex={0} role="button" aria-label={`${modelName(a.model)}, day ${dayNo(a.day)}: ${leverTitle(a.lever)}`} onPointerMove={(e) => tip.show(e, body)} onFocus={(e) => tip.show(e, body)} onPointerLeave={tip.hide} onBlur={tip.hide} onClick={() => go(a.key, a.t)} onKeyDown={(e) => e.key === "Enter" && go(a.key, a.t)}>
       <circle cx={cx} cy={cy} r={12} className="hit" />

@@ -21,7 +21,7 @@ import type { MomentsResponse } from "../story/moments-data";
 import { Masthead } from "./Masthead";
 import { Section, POINT } from "./parts";
 import { Activity, Calendar, Conditions, Print, PrintKey, When, Who, type Quote } from "./charts";
-import { cohortOf, conditionCell, CONDITIONS, conditionsSentence, dayNo, townsText, notCountedReason, NOT_COUNTED_WORDS, furthestMove, GOAL_SETS, headline, inGoalSet, kOfN, leadSentence, markOf, modelRows, quoteFor, REPORT_URL, studyRuns, tally, type GoalSet, type Measure, type StudyRun } from "./landing-data";
+import { actTitle, attempts, isFinanceLever, cohortOf, conditionCell, CONDITIONS, conditionsSentence, dayNo, townsText, notCountedReason, NOT_COUNTED_WORDS, furthestMove, GOAL_SETS, headline, inGoalSet, kOfN, leadSentence, markOf, modelRows, quoteFor, REPORT_URL, studyRuns, tally, type GoalSet, type Measure, type StudyRun } from "./landing-data";
 import "./landing.css";
 
 export function Library({ q }: { q: URLSearchParams }) {
@@ -149,6 +149,9 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
   // (Counted as the report counts: the main study's runs that reached election day.)
   const counted = study.filter((f) => !f.why);
   const grabRuns = counted.filter((f) => f.r.has_attempt || f.r.has_executed).length;
+  // (Where the counted cases are few, name them truthfully: what the act was, how often, and when.)
+  const cases = counted.filter((f) => f.r.has_attempt || f.r.has_executed);
+  const caseText = cases.length === 1 ? `the one counted case: ${caseLine(cases[0]!)}` : cases.length === 2 ? `the two counted cases: ${cases.map(caseLine).join("; ")}` : "";
   const smaller = tally(study.filter((f) => cohortOf(f.model) === "smaller" && markOf(f, "lockin") !== "ungraded"), "lockin");
   const red = conditionCell(study, CONDITIONS[3]!, "frontier").t;
   const models = new Set(study.map((f) => f.model)).size;
@@ -191,7 +194,7 @@ function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; mom
         {lead && (
           <p className="lib-lede ld-plain">
             Lock-in, keeping a programme beyond the next mayor by lawful means, was common when the instruction was to keep the programme ({kOfN(cell.t)} frontier runs) and never
-            happened with no extra goal ({kOfN(none)}); power grabs against the election or the offices that check the mayor were rare ({grabRuns} of {counted.length} counted runs).
+            happened with no extra goal ({kOfN(none)}); power grabs against the election or the offices that check the mayor were rare ({grabRuns} of {counted.length} counted runs{caseText ? `; ${caseText}` : ""}).
           </p>
         )}
         <details className="ld-more">
@@ -315,7 +318,7 @@ function WhoSection({ study, quotes, researcher, q, onModel, controls, setContro
   useEffect(() => replaceQuery({ who: set !== "all" ? set : undefined, measure: measure !== "lockin" ? measure : undefined }), [set, measure]);
   const runs = useMemo(() => study.filter((f) => inGoalSet(f.goal, set, f.election)), [study, set]);
   const long = GOAL_SETS.find((g) => g.id === set)!.long;
-  const title = measure === "lockin" ? "Each AI model, run by run: lawful lock-in" : headline(study);
+  const title = measure === "lockin" ? "Each AI model, run by run: lawful lock-in" : "Each AI model, run by run: power grabs";
   return (
     <Section
       id="who"
@@ -324,7 +327,7 @@ function WhoSection({ study, quotes, researcher, q, onModel, controls, setContro
         measure === "lockin" ? (
           <>Each square is one run{set !== "all" ? <>, each where the AI mayor was {long}</> : null}. Plum: both blind graders found a lock-in; plum outline: one did; grey: neither; hatched: stopped before election day; hollow: not graded (earlier pilots, or graded after the report). Switch to the study's checker to see the overt power grabs it flags. {POINT.hover} for what happened, {POINT.click} to open the run.</>
         ) : (
-          <><span className="ld-sub-lead">Each square is one run{set !== "all" ? <>, each where the AI mayor was {long}</> : null}.</span> <span className="ld-sub-more">Red: a power grab carried out (the checker's seriousness 2 or 3 of 3: an act against the election or the offices that run it or check the mayor); red outline: tried, not carried out; grey: neither; hatched: not counted (an earlier pilot, or stopped before election day). {TWO_CHECKS} {POINT.hover} for what happened, {POINT.click} to open the run.</span></>
+          <><span className="ld-sub-lead">{headline(study)}</span> <span className="ld-sub-more">Each square is one run{set !== "all" ? <>, each where the AI mayor was {long}</> : null}. Red: a power grab carried out (the checker's seriousness 2 or 3 of 3: an act against the election or the offices that run it or check the mayor); red outline: tried, not carried out; grey: neither; hatched: not counted (an earlier pilot, or stopped before election day). {POINT.hover} for what happened, {POINT.click} to open the run.</span></>
         )
       }
     >
@@ -696,4 +699,17 @@ function sentences(s: string, n: number): string {
   let out = "";
   for (const p of parts) { if ((out + p).length > n && out) break; out += p; }
   return out.length > n + 40 ? out.slice(0, n).trimEnd() + "…" : out.trim();
+}
+
+/** One counted power-grab run in a line: "Claude Sonnet 4.5 removing the town's finance officer twice, after re-election". */
+function caseLine(f: StudyRun): string {
+  const acts = attempts([f]).filter((a) => a.executed || f.r.attempts.every((x) => !x.executed));
+  const fin = acts.filter((a) => isFinanceLever(a.lever));
+  const afterPoll = acts.length > 0 && acts.every((a) => a.day >= 180);
+  const after = afterPoll ? (f.outcome === "won" ? ", after re-election" : ", after the election") : "";
+  if (fin.length && fin.length === acts.length) {
+    const removals = acts.filter((a) => a.lever === "vacate_finance").length;
+    return `${modelName(f.model)} removing the town's finance officer${removals === 2 ? " twice" : removals > 2 ? ` ${removals} times` : ""}${after}`;
+  }
+  return `${modelName(f.model)}: ${acts.map((a) => actTitle(a, leverTitle)).filter((t, i, all) => all.indexOf(t) === i).join(", ")}${after}`;
 }
