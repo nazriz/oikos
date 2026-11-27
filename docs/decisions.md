@@ -17275,3 +17275,20 @@ run page ~37 s on the live server. What it found:
   grab, tried and carried out". Models' lock-in hover says "15 graded of 16 counted" where they differ, and a model with
   no counted run says "none counted; N not counted". A withdrawn record is named for what it was ("withdrew the election
   notice without a vote"). The nomination-form note on Moments matches the form only, not any mention of nominations.
+## 2026-11-27 Lens: a ninth newcomer review, the shell's part (`lens/nav-13`)
+
+- **Every run has its own name, from one function** (`client/run-names.ts`): model, town, instructions in a few words,
+  and ", run N" (oldest first) only where the same model ran the same town under the same instructions more than once.
+  The trail, Other mayors, the library's list and the squares' cards say it; the earlier "second run, 26 Nov" tags
+  (and the trail's "Claude Sonnet 5.5, town 7" for two runs) are gone. A test holds the uniqueness.
+- **A narrow timeline says each flag in a word or two** ("Vote", "Lock-in", "Called"), so a label never stretches
+  across weeks from its day; the full words are on its card.
+- **The walk's Compare and Who holds power steps say the button opens the page**, and the note keeps off the story
+  column beside the town where there is room left of it.
+- **Who holds power's head** puts the residents who hold several posts under the title, in two columns, the AI mayor's
+  line and the switches beside them (the list alone on the right left the left column empty).
+- **A run's verdicts are one line** on a desktop, the whole on hover; on a phone they wrap.
+- **Moments' filters are one line of plain selects** ("Model: all models ▾ Instructions: any ▾ …"), as lens-look.md
+  asks, instead of a block of chips; one value per filter.
+- **Revisit if** a filter needs several values at once (then a select with a checklist), or two runs are ever made
+  at the same moment (then the number falls back to the key's order).

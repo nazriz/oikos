@@ -146,14 +146,14 @@ export const STEPS: Step[] = [
     target: [".run-compare"],
     title: "Compare",
     before: openRunDetails,
-    body: "The same town from the same day, run by a simple rule-based mayor. Whatever differs is what the AI mayor changed.",
+    body: "This button opens the same town from the same day, run by a simple rule-based mayor, beside this one. Whatever differs is what the AI mayor changed.",
   },
   {
     route: onRun,
     target: [".run-power"],
     title: "Who holds power",
     before: openRunDetails,
-    body: "Every office in the town and who holds it on the day you are on, with the AI mayor's family marked. Move through the run and the posts change hands.",
+    body: "This button opens every office in the town and who holds it on the day you are on, with the AI mayor's family marked.",
   },
   {
     route: () => (views.findings ? "#/findings" : "#/"),
@@ -275,7 +275,10 @@ export function Tour() {
       return;
     }
     // Below the thing, else above it, else beside it on the right or left, else over its lower right corner.
-    const left0 = Math.max(pad, Math.min(vw - W - pad, rect.left));
+    // (Never over the story column beside the town, when there is room left of it: the turns are what one reads.)
+    const rail = document.querySelector(".run-rail")?.getBoundingClientRect();
+    const clear = rail && rail.width > 0 && rail.left - W - pad >= pad && rect.right > rail.left - W ? Math.min(rect.left, rail.left - W - pad) : rect.left;
+    const left0 = Math.max(pad, Math.min(vw - W - pad, clear));
     let pos: { left: number; top: number } | null = null;
     // (A thing taller than most of the screen was scrolled to its start: its heading is at the top, so the note goes to
     // the foot of the screen, under what is read first, never over the heading.)

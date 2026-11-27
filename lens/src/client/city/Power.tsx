@@ -221,7 +221,16 @@ const POWER_CSS = `
 /* The page flows with its content (the shell gives it no sized box): never a zero-height absolute layer. */
 .lens-city.pw-root { height: auto; min-height: 100vh; overflow: visible; }
 .lens-city .pw { position: relative; min-height: 100vh; padding: 22px 24px 40px; }
-.lens-city .pw-head { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 18px; position: relative; z-index: 2; }
+/* The head in two columns: the title and, under it, the residents who hold several posts (in columns of their own);
+   beside them the AI mayor's line and the switches. (The list sat in the right column alone and left the left one
+   empty below the title.) */
+.lens-city .pw-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 0.75fr); column-gap: 32px; row-gap: 6px; align-items: start; margin-bottom: 18px; position: relative; z-index: 2; }
+.lens-city .pw-head > :first-child { grid-column: 1; grid-row: 1; }
+.lens-city .pw-head .pw-side { display: contents; }
+.lens-city .pw-head .pw-seat { grid-column: 2; grid-row: 1; }
+.lens-city .pw-head .pw-several { grid-column: 1; grid-row: 2 / span 3; columns: 2 300px; column-gap: 24px; }
+.lens-city .pw-head .pw-several-h { column-span: all; }
+.lens-city .pw-head .pw-side > .lc-check { grid-column: 2; }
 .lens-city .pw-kicker { color: var(--lc-muted); font-size: 13px; }
 .lens-city .pw-title { font-weight: 800; font-size: 26px; letter-spacing: -.01em; margin: 4px 0 6px; }
 .lens-city .pw-sub { color: var(--lc-muted); max-width: 640px; line-height: 1.45; }
@@ -266,6 +275,6 @@ const POWER_CSS = `
 .lens-city .pw-lines path.same { stroke: var(--lc-inst); stroke-dasharray: 2 3; }
 .lens-city .pw-lines path.seat { stroke: var(--lc-flag); stroke-opacity: 1; stroke-width: 2.5; }
 .lens-city .pw-lines path.focus { stroke: var(--lc-text); stroke-opacity: .9; stroke-width: 1.6; }
-@media (max-width: 640px) { .lens-city .pw { padding: 14px 12px 30px; } .lens-city .pw-card.gov { columns: 1; } }
+@media (max-width: 640px) { .lens-city .pw-head { grid-template-columns: minmax(0, 1fr); } .lens-city .pw-head > *, .lens-city .pw-head .pw-side > * { grid-column: 1 !important; grid-row: auto !important; } .lens-city .pw-head .pw-several { columns: 1; } .lens-city .pw { padding: 14px 12px 30px; } .lens-city .pw-card.gov { columns: 1; } }
 `;
 

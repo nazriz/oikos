@@ -15,6 +15,7 @@ import { parseHash, parseSel, selToken } from "../router";
 import { useLens, type Selection } from "../state";
 import { leverTitle, modelName } from "../words";
 import { isSeatPerson } from "../people";
+import { runName } from "../run-names";
 
 export type Sel = NonNullable<Selection>;
 const MOMENT = new Set(["sitting", "lever", "act"]);
@@ -185,11 +186,9 @@ export function lastPlace(): LastPlace | undefined {
   }
 }
 
-/** A run in a few words: "GLM 5.3, town 7" (an experiment fork), else the log's own name. */
+/** A run's name, unique across the catalogue (src/client/run-names.ts): every trail, list and switcher says it. */
 export function runLabel(entry?: RunEntry): string {
-  const x = entry?.experiment;
-  if (x) return `${x.isCode ? "Rule-based mayor" : modelName(x.model)}, town ${x.seed}`;
-  return entry?.title.split("/").at(-1) ?? "";
+  return runName(entry);
 }
 
 /** Names for selections in the open run: people and buildings from the map's data, turns and power grabs from the
