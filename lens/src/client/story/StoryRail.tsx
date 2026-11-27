@@ -101,7 +101,7 @@ function HeaderLine({ seat, onOpen }: { seat: SeatJson; onOpen: () => void }) {
       </div>
       <div className="st-line2">
         <span className={`st-outword ${out.tone}`}>{out.label}</span>
-        <span className="st-faint">{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seat.seed !== undefined ? `Town ${seat.seed}. ` : ""}{seat.sittings.length} turns, {seat.acts.length} acts, {usd(cost)}.</span>
+        <span className="st-faint">{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seat.seed !== undefined ? `Setup ${seat.seed}. ` : ""}{seat.sittings.length} turns, {seat.acts.length} acts, {usd(cost)}.</span>
       </div>
       {(top.size > 0 || kin.length > 0) && (
         <div className="st-line3">
@@ -129,7 +129,7 @@ function Header({ seat, onClose }: { seat: SeatJson; onClose: () => void }) {
   return (
     <div className="st-head">
       <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}><div className="st-title">{seat.model ? `${modelName(seat.model)} as mayor` : "The rule-based mayor"}</div><span style={{ flex: 1 }} /><button className="st-btn" onClick={onClose}>Hide details</button></div>
-      <p className="st-sub">{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seat.seed !== undefined ? `Town ${seat.seed}. ` : ""}The run began on day {dayOf(seat.fork_at)} and {seat.ended === "stopped" ? <span style={{ color: "var(--st-bad)" }}>{Math.floor(seat.end_at / 86_400) >= 180 ? `ended after election day, on day ${dayOf(seat.end_at)}` : `stopped before election day, on day ${dayOf(seat.end_at)}, so the study does not count it`}{seat.until_at ? ` (it was set to run to day ${dayOf(seat.until_at)})` : ""}</span> : `ended on day ${dayOf(seat.end_at)}`}. The model is {seat.model ?? "a rule-based program"}.</p>
+      <p className="st-sub">{seat.goal ? `${goalText(seat.goal)}. ` : ""}{seat.seed !== undefined ? `Setup ${seat.seed}. ` : ""}The run began on day {dayOf(seat.fork_at)} and {seat.ended === "stopped" ? <span style={{ color: "var(--st-bad)" }}>{Math.floor(seat.end_at / 86_400) >= 180 ? `ended after election day, on day ${dayOf(seat.end_at)}` : `stopped before election day, on day ${dayOf(seat.end_at)}, so the study does not count it`}{seat.until_at ? ` (it was set to run to day ${dayOf(seat.until_at)})` : ""}</span> : `ended on day ${dayOf(seat.end_at)}`}. The model is {seat.model ?? "a rule-based program"}.</p>
       <div className={`st-outcome ${out.tone}`}><span className="st-big">{out.label}</span>{seat.election.stood ? <span className="st-faint" style={{ fontSize: 12 }}>It stood for re-election.</span> : null}</div>
       {kin.length > 0 && <div className="st-kin">Appointed its own child: {kin.map((k) => <button key={k.act} className="st-linkish" onClick={() => select({ kind: "act", seq: seat.acts[k.act]!.seq })}>{k.who}{describe(k.who) ? ` (${describe(k.who)})` : ""} as {k.post} (day {worldDay(seat.acts[k.act]!.t)})</button>)}<span className="st-faint">. Its children as its own instructions name them.</span></div>}
       <div className="st-stats">

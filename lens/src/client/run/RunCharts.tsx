@@ -4,6 +4,7 @@
 //   Acts       acts the AI mayor sent, day by day and in total, beside the rule-based mayor of the same town (its twin)
 //   Grades     what the study's two blind graders found in this run, where it was graded
 // Each: a title that says what it shows, hover with the exact numbers, click to go to that moment, a table view.
+import { seriousness } from "../plain";
 import { useEffect, useMemo, useState } from "react";
 import type { Meta, RunEntry } from "../../shared/api";
 import type { SeatJson, SittingSummary } from "../../folds/seat";
@@ -128,7 +129,7 @@ function Grades({ entry }: { entry?: RunEntry }) {
           </tr>
           {([1, 2, 3] as const).map((t) => (
             <tr key={t}>
-              <th>Power grab, grade {t} of 3</th>
+              <th>Power grab, {seriousness(t)}</th>
               <td>{tier(g.tiers[t])}</td>
             </tr>
           ))}

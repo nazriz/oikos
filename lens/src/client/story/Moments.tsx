@@ -3,6 +3,7 @@
 // reader's reading of the act, when (day, days to the poll, phase), what became of it, and which run. Filter by model,
 // lever, level and goal; each card opens its run at that sitting. The reader's `considered` level (a phrase match,
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
+import { seriousness } from "../plain";
 import { LiveToggle, useLive } from "../measures";
 import { FINANCE_WHY, isFinanceLever, notCountedReason, addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
 import { modelName } from "../words";
@@ -205,9 +206,9 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
       <p className="mo-when">Day {dayNo(l.day)}{m.daysBefore !== undefined ? (m.daysBefore >= 0 ? `, ${m.daysBefore} days before the election was due` : `, ${-m.daysBefore} days after the election was due`) : ""}.</p>
       <div className="mo-out"><span className={`st-pill ${m.outcomeTone}`}>{m.outcome}</span></div>
       {isFinanceLever(l.lever) && <p className="mo-graders">{FINANCE_WHY}</p>}
-      {(l.tier ?? 2) >= 2 && entry?.grade && <p className="mo-graders" title={`The graders' rating at seriousness ${l.tier ?? 2} of 3, the checker's rating for this act`}>Found by the study's checker. The blind graders, reading the whole run, also rated it: {GRADER_TIER[entry.grade.tiers[(l.tier ?? 2) as 2 | 3]]}.</p>}
+      {(l.tier ?? 2) >= 2 && entry?.grade && <p className="mo-graders" title={`The graders' rating at ${seriousness(l.tier ?? 2)}, where the checker put this act`}>Found by the study's checker. The blind graders, reading the whole run, also rated it: {GRADER_TIER[entry.grade.tiers[(l.tier ?? 2) as 2 | 3]]}.</p>}
       <div className="mo-foot">
-        <span className="mo-who"><b>{entry ? runName(entry) : `${m.model}, ${m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}${m.seed !== undefined ? `, town ${m.seed}` : ""}`}</b>. {!(entry && notCountedReason(entry) && /^stopped|^run ended/i.test(m.election)) && <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>}{entry && <> <Measures entry={entry} /></>}</span>
+        <span className="mo-who"><b>{entry ? runName(entry) : `${m.model}, ${m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}${m.seed !== undefined ? `, setup ${m.seed}` : ""}`}</b>. {!(entry && notCountedReason(entry) && /^stopped|^run ended/i.test(m.election)) && <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>}{entry && <> <Measures entry={entry} /></>}</span>
         <span style={{ flex: 1 }} />
         <button className="st-btn" title="Copy as a citation" onClick={() => { navigator.clipboard?.writeText(citation(m)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }, () => {}); }}>{copied ? "Copied" : "Copy as a citation"}</button>
         <HowDoWeKnow run={m.key} claim={{ kind: "lever", index: m.lever.i }} />

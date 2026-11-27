@@ -3,6 +3,7 @@
 // made, and how the study's checker classified it (its rule and seriousness). For the election: the notice, any change
 // to the law, the result. For a council vote: the proposal, the ballot, the result. Each step links to its turn; in
 // Researcher mode each also shows what the log holds (ids, the act as sent, the checker's source line).
+import { seriousness } from "../plain";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLens } from "../state";
 import { useResearcher } from "../mode";
@@ -105,11 +106,11 @@ type Say = (s: string) => string;
 const same: Say = (s) => s;
 
 /** One figure of an election law in words: the law's own figure, and for the first poll the world day it falls on
- * ("the first election 5,000 days from the start, day 5,001"). */
+ * ("the first election 5000 days from the start, day 5001"). */
 export function figureWords(k: string, v: unknown): string {
   const n = typeof v === "number" && v >= DAY ? Math.round(v / DAY) : undefined;
-  if (k === "first_poll_day" && n !== undefined) return `the first election ${n.toLocaleString("en-US")} days from the start (day ${dayNo(n).toLocaleString("en-US")})`;
-  return `${human(k).replace(/\bpoll\b/, "election")} ${n !== undefined ? `${n.toLocaleString("en-US")} days` : v}`;
+  if (k === "first_poll_day" && n !== undefined) return `the first election ${n} days from the start (day ${dayNo(n)})`;
+  return `${human(k).replace(/\bpoll\b/, "election")} ${n !== undefined ? `${n} days` : v}`;
 }
 
 /** The chain of evidence for a claim, from the seat bundle. */
@@ -140,7 +141,7 @@ function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | u
   }
   if (lever) {
     const rule = RULES[lever.lever] ?? lever.title;
-    steps.push({ label: "How the study's checker counts it", text: <>As a power grab ({leverTitle(lever.lever)}): the checker's rule is {rule}. Here it found this <b>{lever.level === "executed" ? "carried out" : lever.level === "attempted" ? "tried, not carried out" : "mentioned (a word match, often wrong)"}</b>{lever.stage ? ` (${STAGE[lever.stage] ?? lever.stage})` : ""}{lever.tier ? `; the study's checker rates it seriousness ${lever.tier} of 3` : ""}.</>, raw: `${lever.lever} · ${lever.level} · ${lever.source}${lever.detail ? `\n${lever.detail}` : ""}` });
+    steps.push({ label: "How the study's checker counts it", text: <>As a power grab ({leverTitle(lever.lever)}): the checker's rule is {rule}. Here it found this <b>{lever.level === "executed" ? "carried out" : lever.level === "attempted" ? "tried, not carried out" : "mentioned (a word match, often wrong)"}</b>{lever.stage ? ` (${STAGE[lever.stage] ?? lever.stage})` : ""}{lever.tier ? `; the study's checker puts it at ${seriousness(lever.tier)}` : ""}.</>, raw: `${lever.lever} · ${lever.level} · ${lever.source}${lever.detail ? `\n${lever.detail}` : ""}` });
   }
   const title = lever ? `${leverTitle(lever.lever).charAt(0).toUpperCase() + leverTitle(lever.lever).slice(1)}` : act?.label ?? "This act";
   return { title, steps, note: lever ? "The checker is the study's own program; Lens shows what it found and does not judge it." : undefined };
