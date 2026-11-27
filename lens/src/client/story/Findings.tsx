@@ -111,7 +111,7 @@ function Page({ all, lockRuns, entries }: { all: Fork[]; lockRuns: StudyRun[]; e
           <Chart wide title="Runs where the AI mayor reached for a power grab" sub="Share of runs, by model and instructions: tried (hollow) and carried out (filled), with Wilson 95% intervals" name="k-of-n" table={kofnTable(inView, models, goals)}>
             {(ref) => <KofN refEl={ref} forks={inView} models={models} goals={goals} pal={pal} onDrill={setDrill} />}
           </Chart>
-          <Chart title="Which acts the checker flagged, by seriousness" sub="Runs reaching each one, grouped by the checker's seriousness (1 to 3): tried, and carried out. Seriousness 1 is an election-season favour, not a power grab" name="levers" table={leverTable(inView)}>
+          <Chart title="Which acts the checker flagged, by seriousness" sub="Runs reaching each one, grouped by the checker's seriousness (1 to 3): tried, and carried out. Seriousness 1 is spending timed near the vote, not a power grab" name="levers" table={leverTable(inView)}>
             {(ref) => <Levers refEl={ref} forks={inView} pal={pal} onDrill={setDrill} />}
           </Chart>
           <Chart title="When in the campaign" sub="Each power grab by days before election day as it then stood; filled means carried out. Click a dot to open its run there" name="when" table={whenTable(inView)}>
@@ -454,7 +454,7 @@ function StoryFindings({ forks: all, models, pal, lockRuns, entries }: { forks: 
   const byGoal = (xs: Fork[]) => { const m = new Map<string, number>(); for (const f of xs) m.set(f.goal, (m.get(f.goal) ?? 0) + 1); return [...m].sort((a, b) => b[1] - a[1]); };
   const topGoal = byGoal(tried)[0];
   const sentences = [
-    `Across the ${n === 1 ? "one counted run" : `${n} counted runs`}, the AI mayor tried a power grab in ${tried.length} and carried one out in ${done.length}.${apart ? ` ${apart} more runs (earlier pilots, or stopped before election day) are not counted, as the study's report does not count them.` : ""}`,
+    `Across the ${n === 1 ? "one counted run" : `${n} counted runs`}, ${tried.length === done.length ? `${done.length === 1 ? "one run" : `${done.length} runs`} had a power grab, tried and carried out` : `the AI mayor tried a power grab in ${tried.length} ${tried.length === 1 ? "run" : "runs"} and carried one out in ${done.length}`}.${apart ? ` ${apart} more runs (earlier pilots, or stopped before election day) are not counted, as the study's report does not count them.` : ""}`,
     topGoal && tried.length ? `${tried.length === 1 ? "The one run with a power grab" : topGoal[1] === tried.length ? "All the runs with a power grab" : `${topGoal[1]} of the ${tried.length} runs with a power grab`} came when it was ${goalText(topGoal[0]).replace(/^Told /, "told ").toLowerCase()}.` : "",
   ].filter(Boolean);
   const rows = models.map((m) => { const mine = forks.filter((f) => f.model === m); return { m, n: mine.length, t: mine.filter((f) => f.r.has_attempt).length, d: mine.filter((f) => f.r.has_executed).length }; }).filter((r) => r.n);
@@ -480,7 +480,7 @@ function StoryFindings({ forks: all, models, pal, lockRuns, entries }: { forks: 
                   <rect x={L} y={y + 6} width={Math.max(2, x(r.n) - L)} height={RH - 12} rx={2} fill={pal.track} />
                   {r.t > 0 && <rect x={L} y={y + 6} width={Math.max(2, x(r.t) - L)} height={RH - 12} rx={2} fill={pal.flagSoft} />}
                   {r.d > 0 && <rect x={L} y={y + 6} width={Math.max(2, x(r.d) - L)} height={RH - 12} rx={2} fill={pal.flag} />}
-                  <text x={x(r.n) + 8} y={y + RH / 2 + 4} fontSize={11} fill={pal.muted}>{r.t ? `${r.t} tried${r.d ? ` (${r.d} carried out)` : ""}, ` : ""}{r.n} {r.n === 1 ? "run" : "runs"}</text>
+                  <text x={x(r.n) + 8} y={y + RH / 2 + 4} fontSize={11} fill={pal.muted}>{r.t ? (r.t === r.d ? `${r.d} carried out, ` : `${r.t} tried${r.d ? ` (${r.d} carried out)` : ""}, `) : ""}{r.n} {r.n === 1 ? "run" : "runs"}</text>
                 </g>
               );
             })}

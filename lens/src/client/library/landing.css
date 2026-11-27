@@ -705,8 +705,10 @@
     opacity: 0;
     transition: opacity 0.15s ease;
   }
-  .ld-section:hover .ld-link,
-  .ld-section:focus-within .ld-link,
+  .ld-head:hover .ld-link,
+  .ld-head:focus-within .ld-link,
+  .ld-chart:hover .ld-chart-tools .ld-link,
+  .ld-chart:focus-within .ld-chart-tools .ld-link,
   .ld-link[aria-pressed="true"] {
     opacity: 1;
   }

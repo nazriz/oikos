@@ -17261,3 +17261,17 @@ run page ~37 s on the live server. What it found:
   also its stop day. Long counts wrap. On a phone, Models' and Findings' tables stack row by row, each value labelled
   ("Locked its programme in: 3 of 4 counted and graded"), so nothing is cut. Models' "In its own words" is Researcher
   mode only: a first-person plan sentence is rare in what Lens keeps of a run.
+
+## 2026-11-27 Lens: ninth review (the one counted case said plainly; one run can have both, not one act)
+
+- The single counted power grab (Sonnet 4.5 removing the finance officer twice after re-election) stays the study's
+  result; its cards now say why the checker counts it ("removing the finance officer, the office that checks the mayor's
+  spending, whenever it happens"), and the landing names it beside "1 of 70" from the data.
+- **One run can have both measures, not one act:** the graders were asked about acts outside the checker's list
+  (blind/prompt.md, "entrenchment … outside the listed levers"). MEASURE_TEXT.both says so; the key paragraph now reads
+  every definition from words.ts (lens-words owns those sentences and the "spending timed near the vote" rename).
+- The per-model heading keeps one line on either measure (the finding moves to the caption's lead line); the two-checks
+  line appears once on the landing (the key); "Copy link" shows on hover of a heading. Findings says "one run had a power
+  grab, tried and carried out". Models' lock-in hover says "15 graded of 16 counted" where they differ, and a model with
+  no counted run says "none counted; N not counted". A withdrawn record is named for what it was ("withdrew the election
+  notice without a vote"). The nomination-form note on Moments matches the form only, not any mention of nominations.
