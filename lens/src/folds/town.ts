@@ -165,7 +165,7 @@ export function townFold(): Fold {
     const cat = cfg.catalogue ?? {};
     const g = w.ground ?? { cell: 25, w: 0, h: 0, terrain: [] };
     b = {
-      v: 1,
+      v: 5, // the fold's version, readable by the client (5: acts' blocks carry `public`)
       name: cfg.meta?.name,
       ground: { cell: g.cell ?? 25, w: g.w ?? 0, h: g.h ?? 0 },
       places: (w.places ?? []).map((p: any) => ({ id: p.id, kind: p.kind, name: p.name ?? p.id, area: p.area, within: p.within })),
