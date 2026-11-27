@@ -134,8 +134,9 @@ function lastHeadline(): string | undefined {
   }
 }
 
-/** The run whose words the hero quotes, where it is in the lead's cell: the lock-in law that binds "any future mayor". */
-const HERO_QUOTE_RUN = /deepseek-strong-elec-s9~seed-9/;
+/** The run whose words the hero quotes, from the lead's cell and from no showcase card (so the hero and a card never look
+ * like one run): Mistral's law "whatever happens at the election". */
+const HERO_QUOTE_RUN = /mistral4-strong-elec-s9~seed-9/;
 
 function Hero({ cat, study, moments }: { cat?: Catalogue; study: StudyRun[]; moments: MomentsResponse | null }) {
   const live = useLive();

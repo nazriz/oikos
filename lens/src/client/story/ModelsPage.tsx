@@ -2,6 +2,7 @@
 // often it tried a power grab and carried one out, which kinds, how its elections went, and a line of its own words
 // about the election; each row opens to its runs. Counts come from the catalogue (every run the study's checker has
 // read); the words from the runs Lens has opened (/api/moments).
+import { useResearcher } from "../mode";
 import { LiveToggle, lockInOf, measuresText, MeasuresKey, runCount, runCountText, useLive } from "../measures";
 import { MAIN_SET, notCountedReason, studyRuns } from "../library/landing-data";
 const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
@@ -40,6 +41,7 @@ export function ModelsPage() {
 function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse | null }) {
   // (The same runs every page counts: src/client/measures.tsx runCount, through landing-data's studyRuns.)
   const live = useLive();
+  const researcher = useResearcher();
   const keep = useMemo(() => new Set(studyRuns(runs, false, live).map((f) => f.key)), [runs, live]);
   const forks: Fork[] = runs.flatMap((e) => (keep.has(e.key) && e.kind === "fork" && e.experiment && !e.experiment.isCode && e.reading && !isControl(e.experiment.model) && !/mock|levercheck/.test(e.group) ? [{ key: e.key, model: e.experiment.model, goal: e.experiment.goal || "none", seed: e.experiment.seed, r: e.reading, outcome: kindOf(e.reading), e }] : []));
   // (Its words: from the run as Lens opened it where it has, else from the catalogue's reading, which every read run has.)
@@ -57,8 +59,8 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
         <LiveToggle runs={runs} />
       </div>
       <div className="md-scroll">
-      <table className="md-table">
-        <thead><tr><th>Model</th><th>Runs</th><th>Locked its programme in</th><th>Tried a power grab</th><th>Carried one out</th><th>Which kinds</th><th>How its elections went</th><th>In its own words</th></tr></thead>
+      <table className="md-table stack-phone">
+        <thead><tr><th>Model</th><th>Runs</th><th>Locked its programme in</th><th>Tried a power grab</th><th>Carried one out</th><th>Which kinds</th><th>How its elections went</th>{researcher && <th>In its own words</th>}</tr></thead>
         <tbody>
           {models.map((m, i) => {
             const mine = forks.filter((f) => f.model === m);
@@ -77,15 +79,15 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
             return [
               <tr key={m} className={`md-row ${newLab ? "lab" : ""} ${open === m ? "open" : ""}`} onClick={() => setOpen(open === m ? null : m)}>
                 <td className="md-model">{modelName(m)}</td>
-                <td className="num">{mine.length}</td>
-                <td className="num">{graded.length ? <>{locked.length ? <b className="lockin-text">{locked.length}</b> : "0"}<span className="st-faint"> of {graded.length} graded</span></> : <span className="st-faint">not graded</span>}</td>
-                <td className="num">{counted.length === 0 ? <span className="st-faint" title="None of its runs is counted: each stopped early or came from an earlier pilot">—</span> : <>{tried.length ? <b className="flag">{tried.length}</b> : "0"}<span className="st-faint"> of {counted.length} counted</span></>}</td>
-                <td className="num">{done.length ? <b className="flag">{done.length}</b> : "0"}</td>
-                <td>{kinds.size ? [...kinds].sort((a, b) => b[1] - a[1]).map(([l, n]) => `${leverTitle(l)}${n > 1 ? ` (${n} runs)` : ""}`).join("; ") : <span className="st-faint">none</span>}</td>
-                <td>{[...outs].sort((a, b) => b[1] - a[1]).map(([o, n]) => `${o} ${n}`).join(", ")}</td>
-                <td className="md-voice">{voice ? <><span className="st-serif">“{voice.text}”</span> <span className="st-faint">(day {dayNo(voice.day)})</span></> : <span className="st-faint">—</span>}</td>
+                <td className="num" data-label="Runs">{mine.length}</td>
+                <td className="num" data-label="Locked its programme in">{graded.length ? <>{locked.length ? <b className="lockin-text">{locked.length}</b> : "0"}<span className="st-faint"> of {graded.length} counted and graded</span></> : <span className="st-faint">none counted</span>}</td>
+                <td className="num" data-label="Tried a power grab">{counted.length === 0 ? <span className="st-faint" title="None of its runs is counted: each stopped early or came from an earlier pilot">—</span> : <>{tried.length ? <b className="flag">{tried.length}</b> : "0"}<span className="st-faint"> of {counted.length} counted</span></>}</td>
+                <td className="num" data-label="Carried one out">{done.length ? <b className="flag">{done.length}</b> : "0"}</td>
+                <td data-label="Which kinds">{kinds.size ? [...kinds].sort((a, b) => b[1] - a[1]).map(([l, n]) => `${leverTitle(l)}${n > 1 ? ` (${n} runs)` : ""}`).join("; ") : <span className="st-faint">none</span>}</td>
+                <td data-label="Its elections">{[...outs].sort((a, b) => b[1] - a[1]).map(([o, n]) => `${o} ${n}`).join(", ")}</td>
+                {researcher && <td className="md-voice">{voice ? <><span className="st-serif">“{voice.text}”</span> <span className="st-faint">(day {dayNo(voice.day)})</span></> : <span className="st-faint">—</span>}</td>}
               </tr>,
-              open === m ? <tr key={`${m}:runs`} className="md-runs"><td colSpan={8}>
+              open === m ? <tr key={`${m}:runs`} className="md-runs"><td colSpan={researcher ? 8 : 7}>
                 <ul>{mine.sort((a, b) => Number(b.r.has_executed) - Number(a.r.has_executed) || Number(b.r.has_attempt) - Number(a.r.has_attempt)).map((f) => (
                   <li key={f.key}><a href={`#/run/${encodeURIComponent(f.key)}`}>{goalText(f.goal)}, town {f.seed}</a>: {measuresText(f.e).lockin} {measuresText(f.e).grab} {cap(OUT[f.outcome])}.</li>
                 ))}</ul>
@@ -95,7 +97,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
         </tbody>
       </table>
       </div>
-      <p className="md-foot">Rule-based and scripted test mayors are left out; Findings shows them in Researcher mode. "Locked its programme in" counts graded runs that reached election day where both blind graders agree, as the study's report does. "Tried" counts runs where the checker found a power grab sent to the clerk or the town, whatever became of it.</p>
+      <p className="md-foot">Rule-based and scripted test mayors are left out; Findings shows them in Researcher mode. "Locked its programme in" and "Tried a power grab" both count the study's counted runs: its main runs that reached election day (lock-in among those the graders read). "Tried" counts runs where the checker found a power grab sent to the clerk or the town, whatever became of it.</p>
     </div>
   );
 }
