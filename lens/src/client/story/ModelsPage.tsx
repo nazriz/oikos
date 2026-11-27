@@ -62,7 +62,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
       </div>
       <div className="md-scroll">
       <table className="md-table stack-phone">
-        <thead><tr><th>Model</th><th>Runs</th><th>Locked its programme in</th><th>Tried a power grab</th><th>Carried one out</th><th>Which kinds</th><th>How its elections went</th>{researcher && <th>In its own words</th>}</tr></thead>
+        <thead><tr><th>Model</th><th>Runs</th><th>Locked its programme in</th><th>Tried a power grab (counted runs)</th><th>Carried one out (counted runs)</th><th>Which kinds (counted runs)</th><th>How its elections went</th>{researcher && <th>In its own words</th>}</tr></thead>
         <tbody>
           {models.map((m, i) => {
             const mine = forks.filter((f) => f.model === m);
@@ -72,7 +72,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
             // (Power grabs as the report counts them: the main study's runs that reached election day.)
             const counted = mine.filter((f) => !notCountedReason(f.e));
             const tried = counted.filter((f) => f.r.has_attempt), done = counted.filter((f) => f.r.has_executed);
-            const kinds = new Map<string, number>(); for (const f of mine) for (const l of new Set(f.r.attempts.map((a) => a.lever))) kinds.set(l, (kinds.get(l) ?? 0) + 1);
+            const kinds = new Map<string, number>(); for (const f of counted) for (const l of new Set(f.r.attempts.map((a) => a.lever))) kinds.set(l, (kinds.get(l) ?? 0) + 1);
             const outs = new Map<string, number>(); for (const f of mine) outs.set(OUT[f.outcome], (outs.get(OUT[f.outcome]) ?? 0) + 1);
             // (The words shown: from a run with a power grab if there is one, so the line speaks to what the row counts.)
             const pick = [...done, ...tried, ...mine].find((f) => voices.has(f.key) && ownSentence(voices.get(f.key)!.text));
@@ -91,7 +91,7 @@ function Models({ runs, moments }: { runs: RunEntry[]; moments: MomentsResponse 
               </tr>,
               open === m ? <tr key={`${m}:runs`} className="md-runs"><td colSpan={researcher ? 8 : 7}>
                 <ul>{mine.sort((a, b) => Number(b.r.has_executed) - Number(a.r.has_executed) || Number(b.r.has_attempt) - Number(a.r.has_attempt)).map((f) => (
-                  <li key={f.key}><a href={`#/run/${encodeURIComponent(f.key)}`}>{runName(f.e)}</a>: {measuresText(f.e).lockin} {measuresText(f.e).grab} {cap(OUT[f.outcome])}.</li>
+                  <li key={f.key}><a href={`#/run/${encodeURIComponent(f.key)}`}>{runName(f.e)}</a>: {measuresText(f.e).why ?? ""} {measuresText(f.e).lockin} {measuresText(f.e).grab} {cap(OUT[f.outcome])}.</li>
                 ))}</ul>
               </td></tr> : null,
             ];

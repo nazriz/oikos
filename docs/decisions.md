@@ -17313,3 +17313,16 @@ run page ~37 s on the live server. What it found:
   has an age and a job: "The AI mayor is a resident of the town too: 48, works at Factory 2."; on a touch screen the
   walk says "tap one" and Findings "Tap a number".
 - **Revisit if** the cross-run pages should explain ids with each run's own town names (they use general words now).
+
+## 2026-11-27 Lens: tenth review, one "not counted" on both measures (`lens/viz-15`)
+
+- **One status for runs the study does not count, on both measures.** Lock-in used to call pilot-graded runs "not graded" while the power-grab view of the same run said "not counted". Now `markOf` returns "excluded" for any run with a `notCountedReason`, on both measures, and draws it hatched; the hover gives the reason and still says what was found. "Not graded" is left for a counted run the graders did not read, shown hollow and worded "counted, not graded". The key says once that the study counts its main runs that reached election day (70), and that the others are shown but not counted. "The report" now reads "the study's write-up". The design chart leaves out earlier pilots, because they are not in its four conditions.
+- **One reason, said once.** `measuresText` returns the shared reason as its own line ("An earlier pilot, before the study's counts, not counted.") ahead of "Lock-in: … Power grab: …".
+- **Models**: the tried, carried-out and kinds columns are all counted-only and labelled "(counted runs)".
+- **The one counted case**: the hero now names every act the checker found, as Moments counts them ("removed the town's finance officer twice and appointed a replacement, 3 power grabs in all"). It used to count removals only.
+- **Moments, "nearest election day"**: ordered by the absolute distance to the run's own election day (`byNearestElection`, tested). The old comparator used the signed days-to-poll, so a moment after the vote sorted first.
+- **Days** are plain integers. The moved election is said once as "day 5001 (the law: first poll 5000 days from the start)".
+- **When chart**: every run's name sits above its row at every width, so long names are not cut. An uncounted run's dots are hollow grey, never the counted red.
+- **Every-run table**: the micro-sparklines were dropped. Unlabelled, they read as decoration; the run page carries the shape.
+- **Toggle speed**: measured on this build, the lock-in/power-grab toggle paints in 30 to 90 ms, or about 230 ms with the CPU throttled 6x, so it is under 300 ms. The 4 s the reviewer saw was not reproduced; if it comes back, profile with the hover text built lazily.
+- Revisit if a counted run ever lacks a main-set grade in numbers that matter: then "counted, not graded" needs its own count in the headline.

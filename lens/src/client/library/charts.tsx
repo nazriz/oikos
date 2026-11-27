@@ -49,7 +49,7 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
         {marks.map((m, i) => <tr key={i}><td>{dayNo(m.day)}</td><td>{m.executed ? "Carried out" : "Tried, not carried out"}: {actTitle(m, leverTitle)}.</td></tr>)}
         <tr><td>{dayNo(POLL_DAY)}</td><td>Election day as first called. No election was held.</td></tr>
         <tr><td>{dayNo(Math.floor(run.end))}</td><td>The run ended.</td></tr>
-        <tr><td>{dayNo(pollDay).toLocaleString("en-US")}</td><td>Election day under the new law.</td></tr>
+        <tr><td>{dayNo(pollDay)}</td><td>Election day under the new law.</td></tr>
       </tbody>
     </table>
   );
@@ -70,7 +70,7 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
             <path d={`M${xEnd + gap * 0.3},${base + 6} l6,-12 M${xEnd + gap * 0.3 + 6},${base + 6} l6,-12`} className="cal-break" />
             <line x1={W - L - farW} x2={W - L} y1={base} y2={base} className="cal-rule" />
             <line x1={farX} x2={farX} y1={base} y2={base + 8} className="cal-tick" />
-            <text x={farX} y={base + 22} className="cal-num" textAnchor="middle">day {dayNo(pollDay).toLocaleString("en-US")}</text>
+            <text x={farX} y={base + 22} className="cal-num" textAnchor="middle">day {dayNo(pollDay)}</text>
             {/* the term in office */}
             <line x1={x(run.from)} x2={x(run.end)} y1={base} y2={base} className="cal-term" />
             <text x={x(run.from)} y={base + (narrow ? 40 : 38)} className="cal-small">took office</text>
@@ -154,18 +154,17 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
 
 /** "13 of 14", with what is shown but not counted. */
 function CountText({ t, m, pilot = 0 }: { t: Tally; m: Measure; pilot?: number }) {
-  if (m === "lockin" && !t.n) {
+  if (!t.n) {
+    // (Nothing counted: say how many runs are shown, and that none is counted.)
     const all = t.ungraded + t.excluded;
-    // (A run graded only in an earlier pilot is said so, never "none graded": the pilot's grades are not the study's.)
-    return <span className="who-k">{all} {all === 1 ? "run" : "runs"}, {t.excluded && !t.ungraded ? "not counted: stopped before election day" : pilot ? "not counted: earlier pilot grading" : "not graded"}</span>;
+    return <span className="who-k">none counted; {all} {all === 1 ? "run" : "runs"} not counted</span>;
   }
   return (
     <span className="who-k">
       <b>{t.k}</b> of {t.n}
       {m === "grab" && t.tried ? <>, and {t.tried} more tried, not carried out</> : null}
-      {m === "lockin" && t.excluded ? <>; {t.excluded} not counted (stopped before election day)</> : null}
-      {m === "grab" && t.excluded ? <>; {t.excluded} not counted (earlier pilots, or stopped before election day)</> : null}
-      {m === "lockin" && t.ungraded ? <>; {t.ungraded} not graded</> : null}
+      {t.excluded ? <>; {t.excluded} not counted</> : null}
+      {m === "lockin" && t.ungraded ? <>; {t.ungraded} counted, not graded</> : null}
     </span>
   );
 }
@@ -218,7 +217,7 @@ export function Who({ runs, measure, quotes, researcher, onModel }: { runs: Stud
             </div>
           ))}
         </div>
-        {measure === "lockin" && <p className="ld-chart-key">Hatched: the run stopped before election day, so not counted. Plum hatched: both graders found a lock-in, but the run stopped before election day, so it is not counted. Hollow: not graded in the study's report.</p>}
+        <p className="ld-chart-key">Hatched: not counted (an earlier pilot, stopped before election day, or added after the study's write-up); {measure === "lockin" ? "plum hatched where both graders still found a lock-in; hollow: counted, but not read by the graders" : "red hatched where the checker still found a power grab"}. Hover a square for its reason.</p>
         {tip.el}
       </div>
     </WithTable>
@@ -257,7 +256,7 @@ export function Conditions({ runs, researcher }: { runs: StudyRun[]; researcher:
             </div>
           ))}
         </div>
-        <p className="ld-chart-key">Hatched: the run stopped before election day, so not counted.</p>
+        <p className="ld-chart-key">Hatched: not counted (stopped before election day, or added after the study's write-up).</p>
         {tip.el}
       </div>
     </WithTable>
@@ -278,7 +277,8 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
   // (The axis runs from the day the AI mayors took office, never from the town's day 1.)
   const from = shownRuns.length ? Math.min(...shownRuns.map((r) => r.from)) : 120, to = Math.max(195, ...shownRuns.map((r) => r.until));
   const narrow = W < 560;
-  const LW = narrow ? 0 : 300, R = 12, rowH = narrow ? 52 : 40, top = 28;
+  // (Each run's name sits above its row, from the left edge, at every width: a long name never runs off or is cut.)
+  const LW = 0, R = 12, rowH = 52, top = 28;
   const H = top + models.length * rowH + 30;
   const x = (d: number) => LW + ((d - from) / (to - from)) * (W - LW - R);
   const byRun = new Map(runs.map((r) => [r.key, r]));
@@ -299,12 +299,12 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
             <text x={x(POLL_DAY) - 6} y={top - 14} className="cal-small strong" textAnchor="end">election day, first called (day {dayNo(POLL_DAY)})</text>
             {[from, 149, POLL_DAY, to].filter((d, i, all) => i === 0 || i === all.length - 1 || (x(d) - x(all[i - 1]!) > 70 && x(all[all.length - 1]!) - x(d) > 70)).map((d) => <text key={d} x={x(d)} y={H - 6} className="cal-num" textAnchor={d === from ? "start" : d === to ? "end" : "middle"}>day {dayNo(d)}</text>)}
             {shownRuns.map((run, mi) => {
-              const y = top + mi * rowH + rowH / 2 + (narrow ? 8 : 0);
+              const y = top + mi * rowH + rowH / 2 + 8;
               const mine = all.filter((a) => a.key === run.key);
               return (
                 <g key={run.key} className={run.why ? "when-uncounted" : ""}>
                   <line x1={LW} x2={W - R} y1={y} y2={y} className="when-row" />
-                  <text x={narrow ? 0 : LW - 12} y={narrow ? y - 14 : y + 4} className="when-model" textAnchor={narrow ? "start" : "end"}>{runNameOf(run.key, `${modelName(run.model)}, town ${run.seed}`)}{run.why ? " (not counted)" : ""}<title>{run.why ? `Not counted: ${NOT_COUNTED_WORDS[run.why]}` : "Counted"}</title></text>
+                  <text x={0} y={y - 14} className="when-model" textAnchor="start">{runNameOf(run.key, `${modelName(run.model)}, town ${run.seed}`)}{run.why ? " (not counted)" : ""}<title>{run.why ? `Not counted: ${NOT_COUNTED_WORDS[run.why]}` : "Counted"}</title></text>
                   {mine.map((a, i) => <Dot key={i} a={a} cx={x(a.t / DAY)} cy={y} tip={tip} seed={byRun.get(a.key)?.seed} />)}
                 </g>
               );

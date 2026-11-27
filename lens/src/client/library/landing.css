@@ -791,3 +791,11 @@
 
 /* (A count may run long, "…not counted (earlier pilots, or stopped before election day)": it wraps, never runs off.) */
 .who-k { white-space: normal; }
+
+/* An uncounted run's power grabs are hollow, never the counted red. */
+.when-uncounted .cal-dot,
+.when-uncounted .cal-dot.done {
+  fill: var(--panel);
+  stroke: var(--muted);
+  opacity: 1;
+}

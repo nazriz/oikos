@@ -317,7 +317,7 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
         {reading && !x?.isCode && (
           <div className="run-result">
             {/* (One line: the verdicts, the rest of a long one on hover; "How do we know?" always whole beside them.) */}
-            <span className="run-verdict" title={entry ? `${measuresText({ ...entry, reading }).lockin} ${measuresText({ ...entry, reading }).grab}${out ? ` ${out.label}.` : ""}` : undefined}>
+            <span className="run-verdict" title={entry ? `${measuresText({ ...entry, reading }).why ?? ""} ${measuresText({ ...entry, reading }).lockin} ${measuresText({ ...entry, reading }).grab}${out ? ` ${out.label}.` : ""}` : undefined}>
               {entry ? <Measures entry={{ ...entry, reading }} /> : null}{" "}
               {out && <span className={out.kind === "won" ? "election-text" : out.kind === "poll_moved" ? "flag-text" : "muted"}>{out.label}.</span>}
             </span>
