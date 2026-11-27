@@ -120,6 +120,9 @@ test("sittings hold their calls; acts link to drafts and outcomes; the reader's 
   const atAct = keyMoments(seat, { ...lock, t: placedAt }).find((m) => m.kind === "lockin")!;
   expect([atAct.t, atAct.long.startsWith(`Day ${dayOf(placedAt)}:`)]).toEqual([placedAt, true]);
   expect([dayOf(lockT({ day: 12, t: placedAt })), dayOf(lockT({ day: 12 }))]).toEqual([dayOf(placedAt), 13]);
+  // A date a stopped run never reached is a plan: hollow, and said so.
+  const poll = keyMoments({ ...seat, ended: "stopped", end_at: 20 * D }).find((m) => m.long.includes("the vote"))!;
+  expect([poll.label, poll.strong, poll.after]).toEqual(["Planned election day (the run stopped first)", false, true]);
 
   // The day-by-day counts the compare view sets side by side: the seat's refused act is the seat's and the town's.
   const day = (await daily.finish(ctx)).json as DailyJson;

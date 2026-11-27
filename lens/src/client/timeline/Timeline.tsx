@@ -385,6 +385,8 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
     }
     // (The phases' names are drawn with the flags, over the poles and the playhead, so nothing runs through them.)
     const phaseNames = () => {
+      // (On a phone-narrow strip the flags take the room; the phases keep their colour, their names go.)
+      if (width < 480) return;
       g.font = font(600, 10.5);
       for (const ph of phases) {
         const x = Math.max(0, xOf(ph.t)) + 5, x2 = Math.min(width, xOf(ph.t2)) - 4;

@@ -269,14 +269,27 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
       window.removeEventListener("scroll", measure, { capture: true });
     };
   }, []);
+  // On a phone the bar is one line and the outcome until "Details" opens the rest (what it was told, the actions): the
+  // town and the story come first. The walkthrough opens it to show the actions (the "lens-run-details" event).
+  const [details, setDetails] = useState(false);
+  useEffect(() => {
+    const open = () => setDetails(true);
+    window.addEventListener("lens-run-details", open);
+    return () => window.removeEventListener("lens-run-details", open);
+  }, []);
   return (
-    <header className="run-bar" ref={bar}>
+    <header className={`run-bar ${details ? "details" : ""}`} ref={bar}>
       <div className="run-bar-top">
         <a className="run-home head" href="#/" title="Back to all runs">
           Lens
         </a>
         <div className="run-title">
-          <h1 className="run-name head">{name}</h1>
+          <h1 className="run-name head">
+            {name}
+            <button className="run-more" aria-expanded={details} onClick={() => setDetails(!details)}>
+              {details ? "Less" : "Details"}
+            </button>
+          </h1>
           <p className="run-sub">
             {x ? `${goalText(x.goal)}.` : ""}
             {meta?.place ? ` ${meta.place}, ${int(meta.people.initial)} people.` : ""}
