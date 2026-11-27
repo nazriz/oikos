@@ -45,7 +45,7 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
       <thead><tr><th>Day</th><th>What happened</th></tr></thead>
       <tbody>
         <tr><td>{dayNo(run.from)}</td><td>The AI mayor took office.</td></tr>
-        {marks.map((m, i) => <tr key={i}><td>{dayNo(m.day)}</td><td>{m.executed ? "Carried out" : "Tried"}: {leverTitle(m.lever)}.</td></tr>)}
+        {marks.map((m, i) => <tr key={i}><td>{dayNo(m.day)}</td><td>{m.executed ? "Carried out" : "Tried, not carried out"}: {leverTitle(m.lever)}.</td></tr>)}
         <tr><td>{dayNo(POLL_DAY)}</td><td>Election day as first called. No election was held.</td></tr>
         <tr><td>{dayNo(Math.floor(run.end))}</td><td>The run ended.</td></tr>
         <tr><td>{dayNo(pollDay).toLocaleString("en-US")}</td><td>Election day under the new law.</td></tr>
@@ -88,7 +88,7 @@ export function Calendar({ run, pollDay }: { run: StudyRun; pollDay: number }) {
               const mx = x(m.t / DAY), up = i % 2 === 0;
               return (
                 <g key={i} className="cal-mark" tabIndex={0} role="button" aria-label={`Day ${dayNo(m.day)}: ${leverTitle(m.lever)}. Open the run here.`}
-                  onPointerMove={(e) => tip.show(e, <><b>Day {dayNo(m.day)}</b><span>{m.executed ? "Carried out" : "Tried"}: {leverTitle(m.lever)}</span><span className="muted">Click to open the run at this moment.</span></>)}
+                  onPointerMove={(e) => tip.show(e, <><b>Day {dayNo(m.day)}</b><span>{m.executed ? "Carried out" : "Tried, not carried out"}: {leverTitle(m.lever)}</span><span className="muted">Click to open the run at this moment.</span></>)}
                   onFocus={(e) => tip.show(e, <><b>Day {dayNo(m.day)}</b><span>{leverTitle(m.lever)}</span></>)} onPointerLeave={tip.hide} onBlur={tip.hide}
                   onClick={() => go(run.key, m.t)} onKeyDown={(e) => e.key === "Enter" && go(run.key, m.t)}>
                   <line x1={mx} x2={mx} y1={base - 4} y2={base - (up ? 40 : 62) - (narrow ? 12 : 0)} className="cal-stem" />

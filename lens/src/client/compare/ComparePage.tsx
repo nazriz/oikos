@@ -88,7 +88,7 @@ function Compare({ A, B }: { A: Arm; B: Arm }) {
         <div>
           <PageAnswer page="compare" />
           <h1 className="cp-title">{armName(A.seat)} and {armName(B.seat)} as mayor of the same town</h1>
-          <p className="st-sub">Both runs are the same town, seed {A.seat.seed ?? "?"}{sameSeed ? "" : ` and ${B.seat.seed ?? "?"} (not the same seed)`}, until day {dayOf(fork)}. After that only the mayor differs.{A.seat.goal ? ` The AI mayor was ${goalText(A.seat.goal).replace(/^Told/, "told").toLowerCase()}.` : ""} Differences are the first minus the second; neither is called better.</p>
+          <p className="st-sub">Both runs are the same town (town {A.seat.seed ?? "?"}{sameSeed ? "" : `; the other is town ${B.seat.seed ?? "?"}`}) until day {dayOf(fork)}. After that only the mayor differs.{A.seat.goal ? ` The AI mayor was ${goalText(A.seat.goal).replace(/^Told/, "told").toLowerCase()}.` : ""} Differences are the first minus the second; neither is called better.</p>
           {uneven && <div className="cp-uneven">The two runs ended on different days ({armName(A.seat)} to day {dayOf(A.seat.end_at)}, {armName(B.seat)} to day {dayOf(B.seat.end_at)}): the town's counts below are compared to day {until}, where both had run.</div>}
         </div>
       </div>
@@ -146,7 +146,7 @@ function Glance({ A, B, until }: { A: Arm; B: Arm; until: number }) {
 
 /** The seat's decisions by day: each arm's sittings that day, side by side. */
 function Decisions({ A, B, onOpen }: { A: Arm; B: Arm; onOpen: (run: string) => void }) {
-  const plain = usePlain(false);
+  const plain = usePlain(true, A.key);
   const select = useLens((s) => s.select), setT = useLens((s) => s.setT), setRun = useLens((s) => s.setRun);
   const days = useMemo(() => {
     const m = new Map<number, { a: number[]; b: number[] }>();

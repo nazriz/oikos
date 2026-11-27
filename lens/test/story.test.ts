@@ -181,6 +181,16 @@ test("Story mode's one formatter says the world's ids, placeholders and instruct
   const letter = (i: number, to: string[]) => ({ i, label: "", blocks: [{ block: "message", to }], levers: [] }) as any;
   const many = Array.from({ length: 195 }, (_, k) => `c${String(k + 1).padStart(4, "0")}`);
   expect(actsGist([letter(0, ["works", ...many.slice(0, 64)]), letter(1, many.slice(64))])).toBe("Wrote to works and 195 residents");
+  // (A fifth review: residents by their post, posts by their titles, papers by what they are, lever titles as verbs.)
+  const town = { ...names, positions: { works: { title: "Works manager" } }, roles: { c0072: "Works manager" }, seats: ["c0461"] };
+  expect(plainText("Wrote to c0072 and c0613-self; c0461 voted", town)).toBe("Wrote to the works manager (c0072) and a resident (c0613); the AI mayor voted");
+  expect(plainText("Appointed c0068 as works; Left the works post empty", town)).toBe("Appointed a resident (c0068) as the works manager; Left the works manager's post empty");
+  expect(plainText("Appointed c0072 as works", town)).toBe("Appointed a resident (c0072) as the works manager");
+  expect(plainText("answered petition rec.948 under dir-opening-works-collection")).toBe("answered a petition under its standing order on waste collection");
+  const { toWords } = await import("../src/folds/act-label");
+  expect(toWords(["c0068", "outside"])).toBe("c0068 and an outside body");
+  const { leverTo } = await import("../src/client/words");
+  expect(`It tried to ${leverTo("vacate_electoral")}`).toBe("It tried to leave the election office without its head");
 });
 
 test("a request the mayor declined and then sent again is one Moments card, carried out after redrafting", async () => {

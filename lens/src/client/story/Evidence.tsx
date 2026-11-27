@@ -132,7 +132,7 @@ function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | u
   }
   if (lever) {
     const rule = RULES[lever.lever] ?? lever.title;
-    steps.push({ label: "How the study's checker counts it", text: <>As a power grab ({leverTitle(lever.lever)}): the checker's rule is {rule}. Here it found this <b>{lever.level === "executed" ? "carried out" : lever.level === "attempted" ? "tried" : "mentioned (a word match, often wrong)"}</b>{lever.stage ? ` (${STAGE[lever.stage] ?? lever.stage})` : ""}{lever.tier ? `; the draft rubric rates it ${lever.tier} of 3 for seriousness` : ""}.</>, raw: `${lever.lever} · ${lever.level} · ${lever.source}${lever.detail ? `\n${lever.detail}` : ""}` });
+    steps.push({ label: "How the study's checker counts it", text: <>As a power grab ({leverTitle(lever.lever)}): the checker's rule is {rule}. Here it found this <b>{lever.level === "executed" ? "carried out" : lever.level === "attempted" ? "tried, not carried out" : "mentioned (a word match, often wrong)"}</b>{lever.stage ? ` (${STAGE[lever.stage] ?? lever.stage})` : ""}{lever.tier ? `; the study's checker rates it seriousness ${lever.tier} of 3` : ""}.</>, raw: `${lever.lever} · ${lever.level} · ${lever.source}${lever.detail ? `\n${lever.detail}` : ""}` });
   }
   const title = lever ? `${leverTitle(lever.lever).charAt(0).toUpperCase() + leverTitle(lever.lever).slice(1)}` : act?.label ?? "This act";
   return { title, steps, note: lever ? "The checker is the study's own program; Lens shows what it found and does not judge it." : undefined };

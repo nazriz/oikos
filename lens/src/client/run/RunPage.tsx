@@ -299,7 +299,7 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
           </p>
         </div>
         {reading && !x?.isCode && (
-          <p className="run-result">
+          <div className="run-result">
             {entry ? <Measures entry={{ ...entry, reading }} /> : null}{" "}
             {out && <span className={out.kind === "won" ? "election-text" : out.kind === "poll_moved" ? "flag-text" : "muted"}>{out.label}.</span>}
             {entry && views.howDoWeKnow && (
@@ -308,7 +308,7 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
                 <views.howDoWeKnow run={entry.key} claim={headClaim} />
               </span>
             )}
-          </p>
+          </div>
         )}
       </div>
       <div className="run-bar-sub">

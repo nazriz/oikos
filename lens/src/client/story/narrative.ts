@@ -4,6 +4,7 @@
 // which it only looked around or wrote nothing is quiet, and is folded by the page. No grades: what happened, said plainly.
 import type { SeatAct, SeatJson, SeatLever, SittingSummary } from "../../folds/seat";
 import { dayNo, dayOf } from "../format";
+import { leverTo } from "../words";
 
 const DAY = 86_400;
 
@@ -50,7 +51,7 @@ function councilVerdict(seat: SeatJson, recordId: string): string | undefined {
 }
 
 /** One act as a clause ("proposed changing the election law so ..."), and a follow-up sentence if the log says more. */
-export function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string | undefined): { clause: string; after?: string; kind: string; noun?: string; proposal?: string } | undefined {
+export function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) => string | undefined, postName?: (id: string) => string | undefined): { clause: string; after?: string; kind: string; noun?: string; proposal?: string } | undefined {
   const b = a.blocks[0] ?? {};
   const rec = a.records[0]?.id;
   if (a.status === "refused") return { clause: `tried to ${a.label.charAt(0).toLowerCase() + a.label.slice(1)}, but it was refused (${a.detail ?? a.code})`, kind: "refused" };
@@ -75,8 +76,9 @@ export function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) =>
   }
   if (b.block === "publish" && b.kind === "direction") return { clause: `gave a standing order to the town's staff (${a.label.replace(/^Direction: /, "")})`, kind: "direction" };
   if (b.block === "appoint") {
-    const who = String(b.participant ?? "").replace(/-self$/, ""), post = POSTS[b.position] ?? String(b.position);
-    if (!who) return { clause: `left the ${post}'s post empty`, kind: "appoint" };
+    const who = String(b.participant ?? "").replace(/-self$/, ""), named = POSTS[b.position] ?? postName?.(b.position);
+    const post = named ?? String(b.position).replace(/[-_]+/g, " ");
+    if (!who) return { clause: named ? `left the ${post}'s post empty` : `left the ${post} post empty`, kind: "appoint" };
     const kin = seat.children.includes(who), d = describe?.(who);
     return { clause: `appointed ${kin ? "its own child, " : ""}${who}${d ? ` (${d})` : ""}${kin ? "," : ""} as ${post}`, kind: "appoint" };
   }
@@ -97,13 +99,13 @@ export function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) =>
 }
 
 /** A turn, told. */
-export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, describe?: (id: string) => string | undefined): Telling {
+export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, describe?: (id: string) => string | undefined, postName?: (id: string) => string | undefined): Telling {
   const acts = s.acts.map((i) => seat.acts[i]!).filter((a) => a.t >= seat.fork_at);
   const levers = s.levers.map((i) => seat.levers[i]!).filter((l) => l.level !== "considered");
   const sentences: string[] = [];
   const clauses: { clause: string; after?: string; noun?: string; proposal?: string }[] = [];
   let letters = 0;
-  for (const a of acts) { const c = actClause(seat, a, describe); if (!c) continue; if (c.kind === "letter") { letters++; continue; } clauses.push({ ...c, ...((c.kind === "proposal" || c.kind === "election") && a.records[0] ? { proposal: a.records[0].id } : {}) }); }
+  for (const a of acts) { const c = actClause(seat, a, describe, postName); if (!c) continue; if (c.kind === "letter") { letters++; continue; } clauses.push({ ...c, ...((c.kind === "proposal" || c.kind === "election") && a.records[0] ? { proposal: a.records[0].id } : {}) }); }
   // (The same order in several acts, e.g. five standing orders, is told once with a count.)
   const seen = new Map<string, number>();
   for (const c of clauses) seen.set(c.clause, (seen.get(c.clause) ?? 0) + 1);
@@ -143,7 +145,7 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
       const parts = [declined ? `turned down the clerk's first ${declined === 1 ? "write-up" : `${count(declined)} write-ups`}` : "", failed ? `had ${failed === 1 ? "a request" : `${count(failed)} requests`} the clerk could not write up` : ""].filter(Boolean);
       sentences.push(`Before that, it ${parts.join(" and ")}, and asked again.`);
     } else {
-      sentences.push(`It asked to do something the study counts as a ${w.powerGrab} (it ${w.leverTitle(lever)}), but ${declined ? `it turned down the clerk's write-up${declined > 1 ? "s" : ""}` : "the clerk could not write the request up"} and never sent it.`);
+      sentences.push(`It asked to do something the study counts as a ${w.powerGrab} (to ${leverTo(lever)}), but ${declined ? `it turned down the clerk's write-up${declined > 1 ? "s" : ""}` : "the clerk could not write the request up"} and never sent it.`);
     }
   }
   if (!sentences.length && s.failures) sentences.push(`${w.Mayor} asked for ${s.failures === 1 ? "something" : `${s.failures} things`} the system could not carry out.`);
