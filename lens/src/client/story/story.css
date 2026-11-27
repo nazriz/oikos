@@ -318,6 +318,9 @@ mark.st-lever.muted { border-bottom-style: dashed; border-bottom-color: color-mi
 .st-row-grab { margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--st-flag); line-height: 1.4; }
 .st-h3 { font-size: 13px; font-weight: 800; margin: 0 0 2px; }
 .st-sub { margin: 4px 0 0; line-height: 1.5; }
+/* A caption as a short lead sentence, then its details on their own line, quieter. */
+.st-sub-lead { display: block; flex-basis: 100%; font-size: 13.5px; font-weight: 600; color: var(--st-text); }
+.st-sub-more { display: block; flex-basis: 100%; }
 .st-turn-head .u { font-family: var(--st-sans); font-size: 11px; }
 .st-rbar p.meta { margin: 3px 0 0; }
 @media (max-width: 900px) { .st-rbar { align-items: flex-start; } .st-rbar .group { margin-top: 0; } }

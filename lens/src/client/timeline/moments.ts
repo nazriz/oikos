@@ -120,7 +120,12 @@ export function keyMoments(seat: SeatJson, lock?: LockInfo | null): KeyMoment[] 
     const result = won ? "Mayor re-elected" : lost ? "Mayor lost" : "Result";
     const resultLong = e.result_at !== undefined ? `Day ${dayOf(e.result_at)}: the result.${e.winner ? ` Won by ${winnerWords(e.winner, { seats: [seat.seat] })}.` : ""}` : "";
     const merged = e.poll_at !== undefined && e.result_at !== undefined && e.result_at <= end && e.result_at - e.poll_at <= 2 * 86_400;
-    at(e.poll_at, merged ? `Election day: ${result.charAt(0).toLowerCase()}${result.slice(1)}` : "Election day", `Day ${dayOf(e.poll_at ?? 0)}: the vote${(e.poll_at ?? 0) > end ? (seat.ended === "stopped" ? `, as planned; the run stopped on day ${dayOf(end)}, before it` : ", after this run's end") : ""}.${merged ? ` ${resultLong}` : ""}`, true);
+    // (Merged, the hover says it in one sentence: "On day 181 the town voted and re-elected the mayor.")
+    const winner = e.winner ? winnerWords(e.winner, { seats: [seat.seat] }) : "";
+    const outcome = won ? "re-elected the mayor" : lost ? `elected ${winner === "the AI mayor" ? "another candidate" : winner || "another candidate"}; the AI mayor lost` : winner ? `elected ${winner}` : "chose its mayor";
+    const mergedLong = `On day ${dayOf(e.poll_at ?? 0)} the town voted and ${outcome}${e.result_at !== undefined && dayOf(e.result_at) !== dayOf(e.poll_at ?? 0) ? ` (declared on day ${dayOf(e.result_at)})` : ""}.`;
+    if (merged) at(e.poll_at, `Election day: ${result.charAt(0).toLowerCase()}${result.slice(1)}`, mergedLong, true);
+    else at(e.poll_at, "Election day", `Day ${dayOf(e.poll_at ?? 0)}: the vote${(e.poll_at ?? 0) > end ? (seat.ended === "stopped" ? `, as planned; the run stopped on day ${dayOf(end)}, before it` : ", after this run's end") : ""}.${merged ? ` ${resultLong}` : ""}`, true);
     if (e.result_at !== undefined && !merged) at(e.result_at, result, resultLong, true);
   }
   // The end.
