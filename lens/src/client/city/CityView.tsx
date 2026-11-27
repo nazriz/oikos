@@ -957,6 +957,19 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
     const s = pickToSelection(city, info);
     select(s);
   }, [city, select]);
+  // (A click on the canvas, not a drag, picked here too: deck's own onClick missed the first click after the page
+  // settled, so a click on empty ground did not close an open panel. Picking is the same; selecting twice is harmless.)
+  const downAt = useRef<[number, number] | null>(null);
+  const onWrapDown = (e: React.PointerEvent) => { downAt.current = [e.clientX, e.clientY]; };
+  const onWrapClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).tagName !== "CANVAS") return;
+    const d = downAt.current;
+    if (d && Math.hypot(e.clientX - d[0], e.clientY - d[1]) > 4) return;
+    const deck = deckRef.current?.deck;
+    const r = (e.target as HTMLElement).getBoundingClientRect();
+    const info = deck?.pickObject({ x: e.clientX - r.left, y: e.clientY - r.top, radius: 2 });
+    select(pickToSelection(city, (info ?? { layer: null, index: -1 }) as PickingInfo));
+  };
 
   // ---- Words on the map: the town hall, and in Story mode each action as it happens ----
   const vp: any = useMemo(() => (ORBIT as any).makeViewport({ width: size.w, height: size.h, viewState: view }), [view, size.w, size.h]);
@@ -1124,7 +1137,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   ), [story, twin, layersOpen, ev, candCol, papersShown, canTour, overlays, ver, Math.floor(t / 60), arcs.length, city, home]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div ref={wrap} data-tour="city-map" id="city-map" className={`lc-wrap${dark ? "" : " light"}`} style={{ background: `rgb(${sky.backdrop.join(",")})` }}>
+    <div ref={wrap} data-tour="city-map" id="city-map" className={`lc-wrap${dark ? "" : " light"}`} style={{ background: `rgb(${sky.backdrop.join(",")})` }} onPointerDown={onWrapDown} onClick={onWrapClick}>
       <DeckGL
         ref={deckRef}
         onAfterRender={() => { if (hasPaint.current && ++drawnFrames.current === 1) requestAnimationFrame(() => setFirstDrawn(true)); const r = recorder.current; const cv = deckRef.current?.deck?.getCanvas?.() ?? deckRef.current?.deck?.canvas; if (r && cv && captionRef.current) r.frame(cv, captionRef.current); }}

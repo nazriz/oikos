@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Catalogue, RunEntry } from "../../shared/api";
 import { fetchCatalogue } from "../api";
-import { nameRuns, runName } from "../run-names";
+import { nameRuns, runName, runShortName } from "../run-names";
 import { dayOf } from "../format";
 import { readingOutcome } from "../outcome";
 import { runHref, selToken } from "../router";
@@ -34,11 +34,11 @@ export function Crumbs({ run, entry }: { run: string; entry?: RunEntry }) {
       </a>
       <Sep />
       {trail.length ? (
-        <button className="crumb" onClick={closeAll} title="Close what is open and see the whole run">
-          {runLabel(entry) || "This run"}
+        <button className="crumb" onClick={closeAll} title={`${runLabel(entry)}: close what is open and see the whole run`}>
+          {runShortName(entry) || "This run"}
         </button>
       ) : (
-        <span className="crumb here">{runLabel(entry) || "This run"}</span>
+        <span className="crumb here" title={runLabel(entry)}>{runShortName(entry) || "This run"}</span>
       )}
       <Switcher run={run} entry={entry} />
       <Sep />
@@ -185,6 +185,8 @@ function Switcher({ run, entry }: { run: string; entry?: RunEntry }) {
       {open && (
         <div className="switcher-pop" role="menu" data-esc-own="">
           <p className="switcher-lead">Open the same day in this town under another mayor.</p>
+          {/* (The small line beside each run says what it is: the run from the AI mayor's first day to its end.) */}
+          <p className="switcher-key">Each line is that run, from the AI mayor's first day to its end: <svg width={10} height={10} aria-hidden><rect x={2} y={2} width={6} height={6} className="pr-poll" /></svg> its election day (filled where the AI mayor won), <svg width={10} height={10} aria-hidden><circle cx={5} cy={5} r={3} className="pr-mark done" /></svg> a power grab.</p>
           <PeerList title="Same town, same instructions" peers={peers.same} href={href} go={go} />
           <PeerList title={`${modelName(entry.experiment.model)}, other instructions`} peers={peers.other} href={href} go={go} />
           {researcher && <PeerList title="Test mayors (scripted controls, not AI models)" peers={peers.controls} href={href} go={go} />}

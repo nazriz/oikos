@@ -487,3 +487,13 @@ button.crumb:hover {
     overflow: visible;
   }
 }
+/* A person named in a building's panel opens their life (nav/PersonLinks.tsx). */
+.lc-person { justify-self: start; text-align: left; }
+
+/* The trail's ends never shrink ("Libr…", "Day …"): the middle steps give way first. */
+.crumbs > .crumb:first-child,
+.crumbs > .crumb.here:last-child {
+  flex-shrink: 0;
+}
+.switcher-key { margin: 0 12px 6px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+.switcher-key svg { vertical-align: -1px; }
