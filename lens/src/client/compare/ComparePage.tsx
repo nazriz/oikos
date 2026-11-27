@@ -143,10 +143,11 @@ function Glance({ A, B, until }: { A: Arm; B: Arm; until: number }) {
   ];
   return (
     <div className="cp-glance">
-      <div className="cp-sec-head"><h3>The two runs in numbers</h3><span className="st-faint">after they split; the town's counts up to day {until - 1}</span></div>
+      <div className="cp-sec-head"><h3>The two runs in numbers</h3><span className="st-faint">after they split; the town's counts up to day {until}</span></div>
       <table>
         <thead><tr><th /><th className="a">{armName(A.seat)}</th><th className="b">{armName(B.seat)}</th><th>difference</th></tr></thead>
-        <tbody>{rows.map(([label, f, num]) => { const x = f(A), y = f(B); const d = num && typeof x === "number" && typeof y === "number" ? x - y : null; return (
+        {/* (A count that is 0 in both towns, something that never happened in either, is left out.) */}
+        <tbody>{rows.map(([label, f, num]) => { const x = f(A), y = f(B); if (num && x === 0 && y === 0) return null; const d = num && typeof x === "number" && typeof y === "number" ? x - y : null; return (
           <tr key={label}><td>{label}</td><td className="a">{typeof x === "number" ? x.toLocaleString() : x}</td><td className="b">{typeof y === "number" ? y.toLocaleString() : y}</td><td className="d">{d === null ? "" : d === 0 ? "0" : `${d > 0 ? "+" : "−"}${Math.abs(d).toLocaleString()}`}</td></tr>); })}</tbody>
       </table>
     </div>

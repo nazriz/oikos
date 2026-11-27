@@ -56,6 +56,11 @@ function lockLabel(act: string | undefined): string {
   if (/budget/i.test(a)) return "Budget bound ahead";
   if (/law|statute|ordinance|by-?law|charter|council/i.test(a)) return "Programme made law";
   if (/contract|agreement/i.test(a)) return "Bound by contract";
+  // (Otherwise the act's own first words, as the graders put them: "Lock-in: removed the works manager".)
+  let head = a.split(/[,;:(]| to | so | for | in order | before | after | because | while | as /)[0]!.trim().replace(/\.$/, "");
+  // (Kept to a flag's length at a word, never mid-word.)
+  while (head.length > 40 && head.includes(" ")) head = head.slice(0, head.lastIndexOf(" "));
+  if (head && head.length <= 40) return `Lock-in: ${head.charAt(0).toLowerCase()}${head.slice(1)}`;
   return "Programme locked in";
 }
 

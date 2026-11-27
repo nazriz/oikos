@@ -17415,3 +17415,14 @@ run page ~37 s on the live server. What it found:
   each through lens-words' popover (`withSetups`, story/IdTip.tsx: "the same town as every other run, started from a
   different random seed"). The trail's step is wrapped only when it is the plain current step, not when it is the
   button that closes what is open (a tap there must act, not explain).
+
+## 2026-11-27 Lens: a twelfth newcomer review, the shell's part (`lens/nav-19`)
+
+- **A lock-in flag says the act**: where the graders' act is not a law, a budget or a contract, its own first words
+  ("Lock-in: removed the works manager"), kept to a flag's length at a word, not "Programme locked in".
+- **A flag hangs right of its day in either row before it hangs left**: "Election day: mayor re-elected" sat left of the
+  election line, reading as an earlier day.
+- **Compare** says the same day for the counts as for the end ("up to day 196"), leaves out a count that is 0 in both
+  towns (something that never happened in either), and moves a town's "Town hall" below its pane's label where they met.
+- **The walk** no longer opens the phone's "Details" for Compare and Who holds power, which are visible there now
+  (nav-17): the header is not squeezed.

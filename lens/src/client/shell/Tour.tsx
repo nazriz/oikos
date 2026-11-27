@@ -34,8 +34,6 @@ interface Step {
 
 /** A phone-narrow screen: the story sits below the town, not beside it, and the run bar folds its actions away. */
 const PHONE = typeof matchMedia !== "undefined" && matchMedia("(max-width: 700px)").matches;
-/** Before a step on the run bar's actions: open them (on a phone they are folded under "Details"). */
-const openRunDetails = () => window.dispatchEvent(new Event("lens-run-details"));
 
 /** Nothing in it still says it is loading (a spinner, "Drawing the town", "Reading the AI mayor's turns…"). */
 const LOADING = ".st-empty, .lc-loading, .lc-spin, .sk, .ld-h1-sk, .ld-skel";
@@ -147,14 +145,12 @@ export const STEPS: Step[] = [
     route: onRun,
     target: [".run-compare"],
     title: "Compare",
-    before: openRunDetails,
     body: "This button opens the same town from the same day, run by a simple rule-based mayor, beside this one. Whatever differs is what the AI mayor changed.",
   },
   {
     route: onRun,
     target: [".run-power"],
     title: "Who holds power",
-    before: openRunDetails,
     body: "This button opens every office in the town and who holds it on the day you are on, with the AI mayor's family marked.",
   },
   {

@@ -975,6 +975,14 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
   const vp: any = useMemo(() => (ORBIT as any).makeViewport({ width: size.w, height: size.h, viewState: view }), [view, size.w, size.h]);
   const onScreen = (x: number, y: number, z: number) => { const [px0, py0] = vp.project([x, y, z]); const px = Math.round(px0), py = Math.round(py0); return px > -40 && py > -40 && px < size.w + 40 && py < size.h + 40 ? [px, py] as const : null; };
   const hallAt = town.hall !== undefined && town.seats.length > 0 ? onScreen(B.shapes[town.hall]!.cx, B.shapes[town.hall]!.cy, B.shapes[town.hall]!.top + 4) : null;
+  // (Where a pane is labelled with its mayor (Compare's two towns: top left, from 100 px), the town hall's name that
+  // would sit under the label moves below it.)
+  const hallTop = (at: readonly [number, number]) => {
+    if (!label) return at[1];
+    const x = Math.min(size.w - 130, Math.max(130, at[0]));
+    const top = bare ? 12 : 100, labelRight = 12 + label.length * 8 + 24;
+    return x - 90 < labelRight && at[1] > top && at[1] - 36 < top + 30 ? top + 30 + 40 : at[1];
+  };
   const actNotes = useMemo(() => {
     if (!story) return [];
     const recent = town.acts.filter((a) => a.t <= t && t - a.t < 8 * 3600).slice(-2);
@@ -1162,7 +1170,7 @@ function Map({ city, camera, card, layersOpen, base, tour0, overlays0, sharedVie
       {!present && selP >= 0 && <button className={`lc-follow ${follow ? "on" : ""}`} onClick={() => setFollow(!follow)}>{follow ? <>Stop following {city.people.people[selP]![1]}</> : <>Follow {city.people.people[selP]![1]}</>}</button>}
       {label && <div className={`lc-pane-label${bare ? " bare" : ""}`}>{label}</div>}
       {!bare && !present && <Clock t={t} sky={sky} town={town} />}
-      {hallAt && !present && <div className={`lc-anno hall${inkLight ? "" : " night"}`} data-tour="city-town-hall" id="city-town-hall" style={{ left: Math.min(size.w - 130, Math.max(130, hallAt[0])), top: hallAt[1] }}>{story ? CITY_WORDS.hall : "Town hall"}</div>}
+      {hallAt && !present && <div className={`lc-anno hall${inkLight ? "" : " night"}`} data-tour="city-town-hall" id="city-town-hall" style={{ left: Math.min(size.w - 130, Math.max(130, hallAt[0])), top: hallTop(hallAt) }}>{story ? CITY_WORDS.hall : "Town hall"}</div>}
       {hallAt && broadcasts.length > 0 && <div className={`lc-anno act broadcast ${broadcasts[0]!.refused ? "refused" : ""}${inkLight ? "" : " night"}`} style={{ left: Math.min(size.w - 130, Math.max(130, hallAt[0])), top: hallAt[1] + 34, opacity: Math.max(0.75, 1 - Math.min(...broadcasts.map((b) => b.age)) * 0.7) }}><b />{broadcasts.length === 1 ? (broadcasts[0]!.everyone ? `To everyone: the AI mayor's act reached ${broadcasts[0]!.n} places` : `The AI mayor's act reached ${broadcasts[0]!.n} places`) : `${broadcasts.length} acts of the AI mayor, each reaching more than ${BROADCAST} places`}</div>}
       {placeLabels.map((l) => <div key={l.text} className={`lc-anno place${l.big ? " big" : ""}${inkLight ? "" : " night"}`} style={{ left: l.x, top: l.y }}>{l.text}</div>)}
       {placeNotes().map((n) => <div key={n.seq} className={`lc-anno act ${n.refused ? "refused" : ""}${inkLight ? "" : " night"}`} style={{ left: n.x, top: n.y, opacity: 1 - n.age * 0.7 }}><b />{n.text}</div>)}

@@ -489,10 +489,11 @@ export function Timeline({ ground, fork, entry }: TimelineProps) {
     const placed = new Map<KeyMoment, { row: number; bx: number; bw: number }>();
     for (const o of order) {
       const bw = Math.ceil(g.measureText(said(o.m)).width) + 10;
-      // (To the right of its pole, else to the left; the top row first.)
+      // (To the right of its pole, in either row, before the left: a flag reads from its day, so it hangs left of its
+      // pole only where there is no room to its right at all.)
       const sides = [o.x - 0.5, o.x - bw + 0.5].filter((bx) => bx >= 0 && bx + bw <= width);
-      find: for (let r = 0; r < FLAG_ROWS; r++)
-        for (const bx of sides) {
+      find: for (const bx of sides)
+        for (let r = 0; r < FLAG_ROWS; r++) {
           if (rows[r]!.some(([a, b]) => bx < b + 4 && bx + bw > a - 4)) continue;
           rows[r]!.push([bx, bx + bw]);
           placed.set(o.m, { row: r, bx, bw });
