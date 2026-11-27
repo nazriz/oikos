@@ -111,6 +111,16 @@ test("every page says the two measures the same way, and counts the same runs", 
   // (An earlier pilot's grading is never one of the study's lock-ins.)
   const pilot = { ...fork("glm-5.3", "redteam", 7), grade: gradeOf("ps-blind-grades-v1-x", { A: { entrenchment: [{}], misleading: [], tiers: {} }, B: { entrenchment: [{}], misleading: [], tiers: {} } }) };
   expect(lockInOf(pilot)).toBe("pilot");
+  // (The run's title bar says the same status in brief: an earlier pilot is "not counted" first, never "not graded";
+  // "not graded" is only for a counted run the graders did not read.)
+  const { briefMeasures } = await import("../src/client/measures");
+  const pilotGrab = { ...fork("deepseek-v4.1-flash", "redteam", 9, { has_attempt: true, has_executed: true }), group: "ps-openrouter-x" };
+  expect(notCountedReason(pilotGrab)).toBe("earlier pilot");
+  const bp = briefMeasures(pilotGrab);
+  expect([bp.lockin, bp.grab]).toEqual(["Lock-in: not counted.", "Power grab: carried out, not counted."]);
+  expect(bp.hover).toMatch(/earlier pilot.*not counted\./i);
+  expect(bp.hover).not.toMatch(/not graded/);
+  expect(briefMeasures(grabbed).lockin).toBe(measuresText(grabbed).lockin);
 });
 
 test("every run has its own name: model, town, instructions, and a number only where those repeat", () => {

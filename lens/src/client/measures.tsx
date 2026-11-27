@@ -110,14 +110,28 @@ export function measuresText(e: RunEntry, live = false): { lockin: string; grab:
 /** Both measures, side by side, the found ones in the power-grab red. */
 /** `brief`: each verdict without its bracketed reason ("Power grab: carried out." for "… (not counted: an earlier
  * pilot, …)"), the whole on hover: where space is short, as in a run's title bar. */
+/** Both measures, short, for a run's title bar: no bracketed asides, and a run the study does not count says so first
+ * ("Lock-in: not counted."), with the same status measuresText gives (notCountedReason before anything the graders
+ * did or did not read: "not graded" is only for a counted run they did not read). The reason goes in the hover. */
+export function briefMeasures(e: RunEntry): { lockin: string; grab: string; hover: string } {
+  const t = measuresText(e), g = grabOf(e);
+  const strip = (x: string) => x.replace(/\s*\([^)]*\)\s*\./, ".").replace(/\s*\([^)]*\)/g, "");
+  const hover = `${t.why ? `${t.why} ` : ""}${t.lockin} ${t.grab}`;
+  if (!t.why) return { lockin: strip(t.lockin), grab: strip(t.grab), hover };
+  const found = g === "done" || g === "tried" || g === "held" || g === "unsent";
+  // (What the graders found is said in the hover only where they read it: an ungraded pilot is just "not counted".)
+  const graded = !/not graded/.test(t.lockin);
+  return { lockin: "Lock-in: not counted.", grab: found ? strip(t.grab).replace(/\.$/, ", not counted.") : strip(t.grab), hover: `${t.why} ${graded ? `${t.lockin} ` : ""}${t.grab}` };
+}
+
 export function Measures({ entry, className, brief }: { entry: RunEntry; className?: string; brief?: boolean }) {
   const l = lockInOf(entry), g = grabOf(entry), t = measuresText(entry);
-  const say = (x: string) => (brief ? x.replace(/\s*\([^)]*\)\s*\./, ".").replace(/\s*\([^)]*\)/g, "") : x);
+  const b = brief ? briefMeasures(entry) : null;
   return (
-    <span className={`measures ${className ?? ""}`} title={brief ? `${t.why ? `${t.why} ` : ""}${t.lockin} ${t.grab}\n\n${KEY_TEXT}` : KEY_TEXT}>
-      {t.why && !brief && <><span className="muted">{t.why}</span>{" "}</>}
-      <span className={l === "yes" && !t.why ? "lockin-text" : l === "split" ? "" : "muted"}>{say(t.lockin)}</span>{" "}
-      <span className={g === "done" || g === "tried" ? "flag-text" : g === "held" || g === "unsent" ? "" : "muted"}>{say(t.grab)}</span>
+    <span className={`measures ${className ?? ""}`} title={b ? `${b.hover}\n\n${KEY_TEXT}` : KEY_TEXT}>
+      {t.why && !b && <><span className="muted">{t.why}</span>{" "}</>}
+      <span className={l === "yes" && !t.why ? "lockin-text" : l === "split" ? "" : "muted"}>{b ? b.lockin : t.lockin}</span>{" "}
+      <span className={g === "done" || g === "tried" ? "flag-text" : g === "held" || g === "unsent" ? "" : "muted"}>{b ? b.grab : t.grab}</span>
     </span>
   );
 }
