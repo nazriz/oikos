@@ -149,11 +149,11 @@ function Chart({ city }: { city: CityData }) {
   const storyHolder = (pp: string, post: string) => {
     const posts = now.holders.get(pp) ?? [];
     const d = describePerson(city, pp, t);
-    if (posts.length < 2) return <>a resident <span className="pw-desc-inline">({[name(pp), d].filter(Boolean).join(", ")})</span></>;
-    if (posts[0] !== post) return <>{name(pp)}<span className="pw-n">, same as above</span></>;
+    if (posts.length < 2) return <>a resident{d ? <span className="pw-desc-inline"> ({d})</span> : null}</>;
+    if (posts[0] !== post) return <>the same resident as above</>;
     const age = d?.split(", ")[0];
     const titles = posts.map((x) => P.posts.find((q) => q.id === x)?.title ?? x);
-    return <>{name(pp)}{age && /^\d+$/.test(age) ? ` (${age})` : ""}<span className="pw-n"> holds {posts.length} posts: {titles.join(", ")}</span></>;
+    return <>a resident{age && /^\d+$/.test(age) ? ` (${age})` : ""}<span className="pw-n"> holds {posts.length} posts: {titles.join(", ")}</span></>;
   };
   return (
     <div className={`pw lc-wrap${dark ? "" : " light"}`} ref={wrap} style={{ background: "var(--lc-ink)" }}>
@@ -164,7 +164,7 @@ function Chart({ city }: { city: CityData }) {
           <div className="pw-sub">Each post with its holder now and its holders over the run. Lines join holders who are family. <span className="rose">Red</span> marks a relative of the AI mayor. These are the town's own records; Lens judges nothing.</div>
         </div>
         <div className="pw-side">
-          {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />The AI mayor holds this office as resident <b>{pp}</b>{describePerson(city, pp, t) ? ` (${describePerson(city, pp, t)})` : ""}.</div>)}
+          {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />The AI mayor holds this office as {story ? "one of the town's residents" : <>resident <b>{pp}</b></>}{describePerson(city, pp, t) ? ` (${describePerson(city, pp, t)})` : ""}.</div>)}
           <label className="lc-check"><input type="checkbox" checked={allTies} onChange={() => setAllTies(!allTies)} /> Show every family tie between holders ({now.ties.length})</label>
           <label className="lc-check"><input type="checkbox" checked={all} onChange={() => setAll(!all)} /> Show firms, shops and landlords too</label>
         </div>

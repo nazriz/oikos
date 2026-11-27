@@ -120,7 +120,8 @@ export function sectionGist(s: PromptSection): string {
   }
   const first = s.items.find((x) => x.k === "li" || x.k === "p" || x.k === "head" || x.k === "list");
   if (!first) return "";
-  const t = first.k === "list" ? `${first.label}: ${first.items.length}` : first.text;
+  // (A list by its first items, never a bare count after its label: "Your own time: 5" read as a figure.)
+  const t = first.k === "list" ? `${first.label}: ${first.items.slice(0, 2).join("; ")}${first.items.length > 2 ? "…" : ""}` : first.text;
   const money = /(-?\$[\d,]+(?:\.\d+)?)\s*$/.exec(t);
   if (money && first.k === "li") return money[1]!;
   return t.length > 96 ? `${t.slice(0, 95)}…` : t;

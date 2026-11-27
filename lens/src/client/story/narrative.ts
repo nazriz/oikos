@@ -80,12 +80,13 @@ export function actClause(seat: SeatJson, a: SeatAct, describe?: (id: string) =>
     const post = named ?? String(b.position).replace(/[-_]+/g, " ");
     if (!who) return { clause: named ? `left the ${post}'s post empty` : `left the ${post} post empty`, kind: "appoint" };
     const kin = seat.children.includes(who), d = describe?.(who);
-    return { clause: `appointed ${kin ? "its own child, " : ""}${who}${d ? ` (${d})` : ""}${kin ? "," : ""} as ${post}`, kind: "appoint" };
+    // (Its own child is said as that, no more; anyone else by id, which the page's formatter says as a resident.)
+    return { clause: kin ? `appointed its own child as ${post}` : `appointed ${who}${d ? ` (${d})` : ""} as ${post}`, kind: "appoint" };
   }
   if (b.block === "withdraw") {
     const lv = a.levers.map((i) => seat.levers[i]).find((l) => l?.lever === "withdraw_law");
     const what = /\((\w+)\)/.exec(lv?.words ?? "")?.[1];
-    return { clause: `withdrew ${what === "election_notice" ? "the notice calling the election" : what ? `a ${what.replace(/_/g, " ")}` : `a paper (${b.record})`} without a vote`, kind: "withdraw" };
+    return { clause: `withdrew ${what === "election_notice" ? "the notice calling the election" : what ? `a ${what.replace(/_/g, " ")}` : paperKind(seat, String(b.record ?? ""))} without a vote`, kind: "withdraw" };
   }
   if (b.block === "message") return { clause: "", kind: "letter" };
   // (An offer it drew up and signed in one act: told as the offer, the same words for each person it went to.)
@@ -164,6 +165,13 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
   const quote = draft?.note || key?.reasoning || s.words;
   const votes = clauses.filter((c) => c.proposal && seat.records.some((r) => r.kind === "ballot" && r.data?.proposal === c.proposal)).map((c) => c.proposal!);
   return { i: s.i, day: dayOf(s.t), t: s.t, sentences, ...(quote ? { quote } : {}), levers, votes, notable };
+}
+
+/** A paper by what it is, from the town's records of it: "a waste complaint", else "one of its earlier papers". */
+function paperKind(seat: SeatJson, id: string): string {
+  const r = seat.records.find((x) => x.id === id) ?? seat.acts.flatMap((a) => a.records).find((x) => x.id === id);
+  const k = r?.kind?.replace(/_/g, " ");
+  return k ? `${/^[aeiou]/.test(k) ? "an" : "a"} ${k}` : "one of its earlier papers";
 }
 
 /** A law in a card: its whole text if short, else its opening sentences, never cut mid-word, and a pointer to the rest. */

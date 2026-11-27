@@ -16,6 +16,12 @@ export interface PlainNames {
   /** A resident's post, by person id ("c0072" → "Works manager"): a resident in Lens's own sentences is named by the
    * post they hold ("the works manager (c0072)"), else as "a resident (c0613)". Absent: person ids are left as they are. */
   roles?: Record<string, string>;
+  /** What a reader may know of a resident without their id: their age, and whether they are the AI mayor's child. */
+  people?: Record<string, { age?: number; kin?: "son" | "daughter" | "child" }>;
+  /** A record's kind by id ("rec.109426" → "complaint"), so Lens says "a complaint", not "a record". */
+  records?: Record<string, string>;
+  /** Leave person ids as they are (a resident's own words in their life panel). */
+  keepPeople?: boolean;
 }
 
 const SEAT_WORDS = "the AI mayor";
@@ -46,7 +52,7 @@ export function plainId(id: string, names?: PlainNames): string | undefined {
   const slash = id.indexOf("/");
   if (slash > 0) return structure(id.slice(0, slash), names) ?? plainId(id.slice(0, slash), names) ?? words(id.slice(0, slash));
   const rec = /^(rec|draft|msg|act)\.[\w.-]*\d$/.exec(id);
-  if (rec) return RECORD_KIND[rec[1]!];
+  if (rec) { const k = rec[1] === "rec" ? names?.records?.[id]?.replace(/_/g, " ") : undefined; return k ? `${/^[aeiou]/.test(k) ? "an" : "a"} ${k}` : RECORD_KIND[rec[1]!]; }
   const post = names?.positions?.[id];
   if (post) return /^councillor-\d+$/.test(id) || /\d$/.test(post.title) ? post.title : `the ${post.title.charAt(0).toLowerCase()}${post.title.slice(1)}`;
   const ent = names?.entities?.[id];
@@ -57,7 +63,7 @@ export function plainId(id: string, names?: PlainNames): string | undefined {
   if (ent) {
     // ("Trading from home (c0804)" reads in a sentence as "c0804's home business"; a group as "the Millbrook
     // congregation", so "what religious-group-1 teaches" becomes "what the Millbrook congregation teaches".)
-    if ((m = /^Trading from home \((c\d+)\)$/.exec(ent.name))) return `${m[1]}'s home business`;
+    if ((m = /^Trading from home \((c\d+)\)$/.exec(ent.name))) return names?.keepPeople ? `${m[1]}'s home business` : "a resident's home business";
     if (/-group-\d+$/.test(id) && !/^the /i.test(ent.name)) return `the ${ent.name}`;
     return ent.name;
   }
@@ -67,7 +73,7 @@ export function plainId(id: string, names?: PlainNames): string | undefined {
   if (/^ent\.\d+$/.test(id)) return "a home business";
   if ((m = /^form-([a-z][a-z-]*[a-z])$/.exec(id))) return `the ${words(m[1]!)} form`;
   if (/^ask-\d+$/.test(id)) return "the clerk's draft";
-  if ((m = /^job-(c\d+)(-wages)?$/.exec(id))) return m[2] ? `the wages for ${m[1]}'s job` : `${m[1]}'s job agreement`;
+  if ((m = /^job-(c\d+)(-wages)?$/.exec(id))) { const who = names?.keepPeople ? `${m[1]}'s` : "a"; return m[2] ? `the wages for ${who} job` : `${who} job agreement`; }
   return structure(id, names);
 }
 
@@ -127,7 +133,9 @@ function plainPart(s: string, names?: PlainNames): string {
       .replace(/\bthe ([a-z][a-z -]*?) post\b/g, (hit, w: string) => { const t = title(w); return t ? `${lower(t)}'s post` : hit; });
   }
   // (The one being appointed is named as a resident: the post the sentence gives them is the one they end up holding.)
-  if (names?.roles) s = s.replace(/(?<![\w.(/-])(c\d{4,})(?:-self)?\b(?! \()(?!'s)/g, (hit: string, id: string, at: number, all: string) => (all.startsWith(" as ", at + hit.length) && !new Set(names.seats ?? []).has(id) ? `a resident (${id})` : personWords(id, names)));
+  // (Story mode names no resident by id: by their post, as the mayor's child, else "a resident (age 24)". A description
+  // in brackets after the id, "(24, works at Shop 11)" or "(the AI mayor)", is taken into it.)
+  if (!names?.keepPeople) s = s.replace(/(?<![\w.(/-])(c\d{4,})(?:-self)?\b(?: \((?:the AI mayor|\d+[^)]*)\))?(?!'s)/g, (hit: string, id: string, at: number, all: string) => personWords(id, names, all.startsWith(" as ", at + hit.length)));
   return replaceIds(s, names)
     .replace(/\bstanding direction(s?)\b/gi, "standing order$1 to a town office")
     .replace(/\b[Dd]irection: /g, "Standing order to a town office: ")
@@ -142,11 +150,15 @@ function plainPart(s: string, names?: PlainNames): string {
 const lower = (t: string) => (/^[A-Z][a-z]+(?: [a-z][\w']*)*$/.test(t) ? `the ${t.charAt(0).toLowerCase()}${t.slice(1)}` : t);
 /** A resident in Lens's own sentence: the AI mayor, by the post they hold ("the works manager (c0072)"), else "a
  * resident (c0613)". */
-export function personWords(id: string, names?: PlainNames): string {
+export function personWords(id: string, names?: PlainNames, beingAppointed = false): string {
   const seats = names?.seats ? new Set(names.seats) : undefined;
   if (seats?.has(id)) return SEAT_WORDS;
-  const role = names?.roles?.[id];
-  return role ? `${lower(role)} (${id})` : `a resident (${id})`;
+  const p = names?.people?.[id];
+  if (p?.kin) return `the mayor's ${p.kin}`;
+  // (Someone being appointed is not named by the post the sentence gives them.)
+  const role = beingAppointed ? undefined : names?.roles?.[id];
+  if (role) return lower(role);
+  return p?.age !== undefined ? `a resident (age ${p.age})` : "a resident";
 }
 
 /** Who won an election, in words: the AI mayor when it is the seat, else the winner as the world names them. */
