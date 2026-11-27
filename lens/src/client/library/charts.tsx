@@ -12,7 +12,7 @@ import { dayOf, lockT, openAt as openAtFmt } from "../format";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable, POINT, tapTwice } from "./parts";
 import type { RunEntry } from "../../shared/api";
-import { attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
+import { MAIN_SET, attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
 
 const DAY = 86_400;
 // (A few minutes before the act, so it is seen happening at its turn, not after it.)
@@ -146,7 +146,7 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
   const what = m === "lockin" && mark === "ungraded" && f.gradedLater ? "Graded after the report froze, so not in its counts (include such runs below the design chart)" : MARK_WORDS[m][mark];
   let detail: string | undefined, words: string | undefined;
   if (m === "lockin" && f.grade?.lockInQuote && (mark === "yes" || mark === "split" || mark === "excluded")) {
-    detail = `Day ${dayOf(lockT(f.grade.lockInQuote))}. The graders: “${f.grade.lockInQuote.act}”`;
+    detail = `Day ${dayOf(lockT(f.grade.lockInQuote))}. The graders: “${f.grade.lockInQuote.act}”${/borderline/i.test(f.grade.lockInQuote.act) ? " (The graders marked this borderline.)" : ""}`;
     words = f.grade.lockInQuote.quote;
   } else if (m === "grab") {
     const first = f.r.attempts.find((a) => a.executed) ?? f.r.attempts[0];
@@ -170,15 +170,16 @@ function Square({ f, m, tip, quotes }: { f: StudyRun; m: Measure; tip: ReturnTyp
 }
 
 /** "13 of 14", with what is shown but not counted. */
-function CountText({ t, m }: { t: Tally; m: Measure }) {
+function CountText({ t, m, pilot = 0 }: { t: Tally; m: Measure; pilot?: number }) {
   if (m === "lockin" && !t.n) {
     const all = t.ungraded + t.excluded;
-    return <span className="who-k">{all} {all === 1 ? "run" : "runs"}, {t.excluded && !t.ungraded ? "all stopped before election day" : "none graded yet"}</span>;
+    // (A run graded only in an earlier pilot is said so, never "none graded": the pilot's grades are not the study's.)
+    return <span className="who-k">{all} {all === 1 ? "run" : "runs"}, {t.excluded && !t.ungraded ? "all stopped before election day" : pilot ? "earlier pilot grading only (not in the study's counts)" : "none graded yet"}</span>;
   }
   return (
     <span className="who-k">
       <b>{t.k}</b> of {t.n}
-      {m === "grab" && t.tried ? <>, and {t.tried} tried</> : null}
+      {m === "grab" && t.tried ? <>, and {t.tried} more tried, not carried out</> : null}
       {m === "lockin" && t.excluded ? <>; {t.excluded} stopped early</> : null}
       {m === "lockin" && t.ungraded ? <>; {t.ungraded} not graded</> : null}
     </span>
@@ -226,14 +227,14 @@ export function Who({ runs, measure, quotes, researcher, onModel }: { runs: Stud
                 <div key={r.model} className="who-row" role="listitem" style={{ ["--i" as string]: i++ }}>
                   <button className="who-model" onClick={() => onModel(r.model)} title={`Show ${modelName(r.model)}'s runs in the list below`}>{modelName(r.model)}</button>
                   <div className="who-squares">{sortRuns(r.runs, measure).map((f) => <Square key={f.key} f={f} m={measure} tip={tip} quotes={quotes} />)}</div>
-                  <CountText t={r.t} m={measure} />
+                  <CountText t={r.t} m={measure} pilot={r.runs.filter((f) => f.entry.grade && !MAIN_SET.test(f.entry.grade.set)).length} />
                   <Interval t={r.t} show={researcher} />
                 </div>
               ))}
             </div>
           ))}
         </div>
-        {measure === "lockin" && <p className="ld-chart-key">Faint: the run stopped before election day, so not counted. Hollow: not graded in the study's report.</p>}
+        {measure === "lockin" && <p className="ld-chart-key">Hatched: the run stopped before election day, so not counted. Hollow: not graded in the study's report.</p>}
         {tip.el}
       </div>
     </WithTable>
@@ -272,7 +273,7 @@ export function Conditions({ runs, researcher }: { runs: StudyRun[]; researcher:
             </div>
           ))}
         </div>
-        <p className="ld-chart-key">Faint: the run stopped before election day, so not counted.</p>
+        <p className="ld-chart-key">Hatched: the run stopped before election day, so not counted.</p>
         {tip.el}
       </div>
     </WithTable>

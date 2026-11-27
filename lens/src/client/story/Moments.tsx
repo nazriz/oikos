@@ -22,7 +22,7 @@ import "./moments.css";
 import { dayNo, dayOf, lockT, openAt } from "../format";
 
 const DAY = 86_400;
-const LEVEL: { [k: string]: string } = { executed: "carried out", attempted: "tried", considered: "mentioned (unreliable)" };
+const LEVEL: { [k: string]: string } = { executed: "carried out", attempted: "tried, not carried out", considered: "mentioned (unreliable)" };
 export { momentsOf, citation, type Moment };
 interface RunEntry { key: string; indexed?: boolean }
 
@@ -139,6 +139,7 @@ function LockCard({ f }: { f: StudyRun }) {
       <div className="mo-card-top"><span className="mo-lever lk">Locked its programme in</span><span className="mo-level lk">both graders</span></div>
       <blockquote className="mo-quote lk">{q.quote}</blockquote>
       <div className="mo-sub"><span className="k">the graders' description</span>“{q.act}”</div>
+      {/borderline/i.test(q.act) && <p className="mo-graders">The graders marked this borderline; it is their verdict, kept as they gave it.</p>}
       <p className="mo-when">Day {dayOf(lockT(q))}.</p>
       <div className="mo-foot">
         <span className="mo-who"><b>{modelName(f.model)}</b>, {goalText(f.goal).toLowerCase()}, town {f.seed}. <Measures entry={f.entry} /></span>
@@ -157,7 +158,7 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
   const heldBack = l.level === "attempted" && l.stage === "seat_declined" && !m.redrafted;
   return (
     <article className={`mo-card ${weak ? "weak" : ""} ${l.level} ${(l.tier ?? 2) === 1 ? "favour" : ""}`}>
-      <div className="mo-card-top"><span className="mo-lever">{(l.tier ?? 2) === 1 ? "Election-season favour: " : ""}{(l.tier ?? 2) === 1 ? leverTitle(l.lever) : leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`} title={heldBack ? "The mayor declined the clerk's write-up and sent nothing. The study's checker counts this as tried." : undefined}>{heldBack ? "drafted, then held back" : l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried" : "mentioned (unreliable)"}{m.redrafted ? " (after redrafting)" : ""}</span></div>
+      <div className="mo-card-top"><span className="mo-lever">{(l.tier ?? 2) === 1 ? "Election-season favour: " : ""}{(l.tier ?? 2) === 1 ? leverTitle(l.lever) : leverTitle(l.lever).charAt(0).toUpperCase() + leverTitle(l.lever).slice(1)}</span><span className={`mo-level ${l.level}`} title={heldBack ? "The mayor declined the clerk's write-up and sent nothing. The study's checker counts this as tried." : undefined}>{heldBack ? "drafted, then held back" : l.level === "executed" ? "carried out" : l.level === "attempted" ? "tried, not carried out" : "mentioned (unreliable)"}{m.redrafted ? " (after redrafting)" : ""}</span></div>
       {/* (Lens's one sentence of what it did first, then the mayor's own words, verbatim, smaller.) */}
       {m.said && <p className="mo-said">{plain(m.said)}</p>}
       {m.said && <div className="mo-sub-k">its words</div>}
@@ -167,7 +168,7 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
       {more && <Around m={m} />}
       <p className="mo-when">Day {dayNo(l.day)}{m.daysBefore !== undefined ? (m.daysBefore >= 0 ? `, ${m.daysBefore} days before the election was due` : `, ${-m.daysBefore} days after the election was due`) : ""}.</p>
       <div className="mo-out"><span className={`st-pill ${m.outcomeTone}`}>{m.outcome}</span></div>
-      {(l.tier ?? 2) >= 2 && entry?.grade && <p className="mo-graders">The blind graders, for seriousness {l.tier ?? 2} of 3: {GRADER_TIER[entry.grade.tiers[(l.tier ?? 2) as 2 | 3]]}.</p>}
+      {(l.tier ?? 2) >= 2 && entry?.grade && <p className="mo-graders">The blind graders also rated each act the checker flagged. The blind graders, for seriousness {l.tier ?? 2} of 3: {GRADER_TIER[entry.grade.tiers[(l.tier ?? 2) as 2 | 3]]}.</p>}
       <div className="mo-foot">
         <span className="mo-who"><b>{m.model}</b>, {m.goal ? goalText(m.goal).toLowerCase() : "no special instructions"}{m.seed !== undefined ? `, town ${m.seed}` : ""}. <span className="st-faint">{m.election.charAt(0).toUpperCase() + m.election.slice(1)}.</span>{entry && <> <Measures entry={entry} /></>}</span>
         <span style={{ flex: 1 }} />

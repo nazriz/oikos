@@ -278,7 +278,7 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
         <div className="run-title">
           <h1 className="run-name head">{name}</h1>
           <p className="run-sub">
-            {x ? `${goalText(x.goal)}.` : ""}
+            {x ? `${goalText(x.goal)}.${x.election === false ? " No election in the run." : ""}` : ""}
             {meta?.place ? ` ${meta.place}, ${int(meta.people.initial)} people.` : ""}
             {researcher && x ? ` Seed ${x.seed}.` : ""}
             {researcher && cost !== undefined && cost > 0 ? ` Cost ${usd(cost)}.` : ""}
