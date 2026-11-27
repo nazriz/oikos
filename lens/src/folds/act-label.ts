@@ -35,8 +35,10 @@ export function blockLabel(b: any, act: any[] = []): string {
         return f.startsWith("amend-") ? `Proposed changing the rules on ${human(f.slice(6))}` : `Proposed: ${human(f)}`;
       }
       if (b.kind === "direction" && typeof basis === "string" && basis.startsWith("form-")) return `Direction: ${human(basis.slice(5))} (${Object.entries(b.data ?? {}).map(([k, v]) => `${human(k)} ${typeof v === "number" && v >= DAY && v % DAY === 0 ? `${v / DAY} days` : v}`).join(", ")})`;
-      const to = Array.isArray(b.addressed_to) ? b.addressed_to.join(", ") : b.addressed_to;
-      return `Published ${kind || "a statement"}${to ? ` to ${to}` : ""}`;
+      // ("Published an approval to the town": an article, and the town for its own id.)
+      const to = toWords([].concat(b.addressed_to ?? []));
+      const what = kind ? `${/^[aeiou]/.test(kind) ? "an" : "a"} ${kind}` : "a statement";
+      return `Published ${what}${to ? ` to ${to}` : ""}`;
     }
     case "appoint": return b.participant ? `Appointed ${String(b.participant).replace(/-self$/, "")} as ${human(String(b.position))}` : `Left the ${human(String(b.position))} post empty`;
     case "withdraw": return `Withdrew ${b.record}`;
@@ -66,7 +68,7 @@ export function toWords(to: string[]): string {
   const people = to.filter((x) => PERSON.test(x)), councillors = to.filter((x) => /^councillor-\d+$/.test(x));
   const others = to.filter((x) => !PERSON.test(x) && !(councillors.length > 1 && councillors.includes(x)));
   // ("outside" is the world beyond the town: an outside body, not a place.)
-  const say = (x: string) => (x === "outside" ? "an outside body" : x.replace(/-self$/, ""));
+  const say = (x: string) => (x === "outside" ? "an outside body" : x === "city" ? "the town" : x.replace(/-self$/, ""));
   const and = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
   if (people.length <= 1 && councillors.length <= 1) return and(to.map(say));
   const parts = [...others.map(say), ...(councillors.length > 1 ? [`${councillors.length} councillors`] : []), ...(people.length > 1 ? [`${people.length} residents`] : people)];
@@ -86,6 +88,12 @@ export function actsGist(acts: SeatAct[]): string {
   return labels.length > 3 ? `${labels.slice(0, 3).join("; ")} and ${labels.length - 3} more` : labels.join("; ");
 }
 
+/** A draft's line from a copy prepared before the labels said what the council was asked ("Proposed: amend
+ * elections" → "Proposed changing the rules on elections"; "Proposed: council proposal" → "Proposed a council proposal"). */
+function oldLabel(l: string): string {
+  return l.replace(/\bProposed: amend ([\w ]+)/g, "Proposed changing the rules on $1").replace(/\bProposed: council proposal\b/g, "Proposed a council proposal").replace(/\bPublished ([aeiou]\w*)( to|;|$)/g, "Published an $1$2");
+}
+
 /** A copy prepared before actLabel filled "$ref"s, brought up to it where it is read (the client), so no prepared copy
  * needs making again: each act's label from its blocks, and the drafts and turn lines that carried the old one. */
 export function relabel(seat: SeatJson): SeatJson {
@@ -100,7 +108,7 @@ export function relabel(seat: SeatJson): SeatJson {
   const sent = new Map(seat.acts.filter((a) => a.draft).map((a) => [a.draft!, a.label]));
   for (const d of seat.drafts) {
     if (sent.has(d.id)) d.label = sent.get(d.id)!;
-    else if (d.label?.includes("$")) d.label = swap(d.label);
+    else if (d.label) d.label = oldLabel(d.label.includes("$") ? swap(d.label) : d.label);
   }
   for (const s of seat.sittings) {
     const own = s.acts.map((i) => seat.acts[i]!).filter(Boolean);

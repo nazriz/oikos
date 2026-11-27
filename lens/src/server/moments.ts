@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import type { SeatJson } from "../folds/seat";
+import { relabel } from "../folds/act-label";
 import { momentsOf, voiceOf, type MomentsResponse } from "../client/story/moments-data";
 import type { Lens } from "./service";
 
@@ -29,7 +30,7 @@ export async function momentsResponse(lens: Lens, req: Request): Promise<Respons
     const dir = lens.bundlePath(e);
     if (!cache.has(dir)) {
       try {
-        const seat = readSeat(dir);
+        const raw = readSeat(dir), seat = raw && Array.isArray(raw.acts) ? relabel(raw) : raw;
         cache.set(dir, seat ? { key: e.key, group: e.group, id: `${seat.run_id}|${seat.arm}`, moments: momentsOf(e.key, seat, true), ...(seat.model ? { model: seat.model } : {}), ...(voiceOf(seat) ? { voice: voiceOf(seat)! } : {}) } : null);
       } catch { cache.set(dir, null); }
     }

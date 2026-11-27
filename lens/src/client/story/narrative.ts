@@ -126,10 +126,17 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
     const seenNoun = new Map<string, number>(), total = new Map<string, number>();
     for (const c of afters) total.set(c.noun ?? "", (total.get(c.noun ?? "") ?? 0) + 1);
     for (const c of afters) if ((total.get(c.noun ?? "") ?? 0) > 1) { const k = seenNoun.get(c.noun ?? "") ?? 0; seenNoun.set(c.noun ?? "", k + 1); c.noun = (c.noun ?? "the proposal").replace(/^the /, `the ${ORD[k] ?? `${k + 1}th`} `); }
-    const parts = afters.map((c) => { const m = /^The council (passed|voted) it( down)?(.*)\.$/.exec(c.after!); return m ? { verb: m[1] === "passed" ? "passed" : "voted down", rest: `${c.noun ?? "the proposal"}${m[3]}`.replace(/, and the election was moved$/, "") } : { verb: "", rest: `${c.noun ?? "the proposal"}: ${c.after!.replace(/\.$/, "")}` }; });
-    const same = parts.every((x) => x.verb && x.verb === parts[0]!.verb);
-    const items = same ? parts.map((x) => x.rest) : parts.map((x) => (x.verb ? `${x.verb} ${x.rest}` : x.rest));
-    sentences.push(`The council ${same ? `${parts[0]!.verb} ` : ""}${items.slice(0, -1).join(", ")}, and ${items.at(-1)}.`);
+    const all = afters.map((c) => { const m = /^The council (passed|voted) it( down)?(.*)\.$/.exec(c.after!); return m ? { verb: m[1] === "passed" ? "passed" : "voted down", rest: `${c.noun ?? "the proposal"}${m[3]}`.replace(/, and the election was moved$/, "") } : { verb: "", rest: c.noun ?? "the proposal", after: c.after! }; });
+    // (Votes that ended are told together; any still open, or otherwise left, get a sentence of their own.)
+    const parts = all.filter((x) => x.verb), open = all.filter((x) => !x.verb && /still open/.test(x.after ?? "")), other = all.filter((x) => !x.verb && !/still open/.test(x.after ?? ""));
+    const and = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+    if (parts.length) {
+      const same = parts.every((x) => x.verb === parts[0]!.verb);
+      const items = same ? parts.map((x) => x.rest) : parts.map((x) => `${x.verb} ${x.rest}`);
+      sentences.push(`The council ${same ? `${parts[0]!.verb} ` : ""}${items.length > 1 ? `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}` : items[0]}.`);
+    }
+    if (open.length) sentences.push(`The council's ${open.length > 1 ? "votes" : "vote"} on ${and(open.map((x) => x.rest))} ${open.length > 1 ? "were" : "was"} still open when the run ended.`);
+    for (const x of other) sentences.push(`On ${x.rest}: ${x.after!.charAt(0).toLowerCase()}${x.after!.slice(1)}`);
   }
 
   // Requests for a power grab that were never sent (the clerk could not write them up, or the mayor turned the

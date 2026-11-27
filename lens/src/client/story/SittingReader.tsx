@@ -348,7 +348,7 @@ function Tool({ c, result, seat }: { c: any; result?: string; seat: SeatJson }) 
   const raw = TOOL[c.name]?.(input) ?? { what: human(String(c.name)), rest: [] };
   // (Story mode says the office's ids as words: "Signed the clerk's draft", "Wrote to Councillor 1".)
   // (A look in the who's-who: "Looked up who holds the mayor's office and Councillor 1, and resident c0094".)
-  const who = c.name === "look" && input.named && /(^|\/)who$/.test(String(input.report ?? "")) ? lookedUpWho([].concat(input.named), names) : undefined;
+  const who = c.name === "look" && input.named && /(^|\/)who$/.test(String(input.report ?? "")) ? lookedUpWho([].concat(input.named), names) : c.name === "look" && Array.isArray(input.find) && input.find.length ? lookedFor(input) : undefined;
   const shape = researcher ? raw : { ...raw, what: who ?? (c.name === "confirm" ? (raw.what.startsWith("Declined") ? "Declined the clerk's draft" : "Signed the clerk's draft") : plain(raw.what)) };
   const extra = Object.entries(input).filter(([k]) => !(shape.rest ?? []).includes(k));
   const kids = seat.children.filter((ch) => JSON.stringify(input).includes(ch));
@@ -517,6 +517,23 @@ const lower = (x: string) => x.charAt(0).toLowerCase() + x.slice(1);
 function place(report: unknown): string {
   const r = String(report ?? "").replace(/^[\w-]+\//, "").replace(/[-_]/g, " ");
   return r ? `its ${r}` : "its papers";
+}
+
+/** A search of its papers, in words: "Looked at its files for complaints about waste", not "where kind = complaint,
+ * detail.about = waste". The fields' values are the office's own words, kept. */
+export function lookedFor(input: { report?: unknown; find: { field: string; value: unknown }[]; words?: string }): string {
+  const plural = (k: string) => (/s$/.test(k) ? k : /y$/.test(k) && !/[aeiou]y$/.test(k) ? `${k.slice(0, -1)}ies` : `${k}s`);
+  const kinds: string[] = [], rest: string[] = [];
+  for (const f of input.find) {
+    const field = String(f.field).replace(/^detail\./, ""), v = String(f.value).replace(/[_-]+/g, " ");
+    if (field === "kind") kinds.push(plural(v));
+    else if (field === "about") rest.push(`about ${v}`);
+    else if (field === "office") rest.push(`for the ${v} office`);
+    else if (field === "from" || field === "to") rest.push(`${field} ${v === "city" ? "the town" : v}`);
+    else rest.push(`with ${field.replace(/[_.]+/g, " ")} ${v}`);
+  }
+  const and = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} or ${xs.at(-1)}`);
+  return `Looked at ${place(input.report)} for ${kinds.length ? and(kinds) : "papers"}${rest.length ? ` ${rest.join(" ")}` : ""}${input.words ? ` mentioning “${input.words}”` : ""}`;
 }
 
 /** A look in the who's-who, in words: the posts and organisations it asked about, then the residents. */

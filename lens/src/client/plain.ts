@@ -52,6 +52,7 @@ export function plainId(id: string, names?: PlainNames): string | undefined {
   const ent = names?.entities?.[id];
   let m: RegExpExecArray | null;
   // (A standing order by its id, "dir-opening-works-collection": the order on what it covers.)
+  if ((m = /^proc-([a-z][a-z-]*[a-z])$/.exec(id))) return `the ${words(m[1]!.replace(/s$/, ""))}s procedure`.replace(/ss procedure$/, "s procedure");
   if ((m = /^dir-(?:opening-)?([a-z][a-z-]*[a-z])$/.exec(id))) return `its standing order on ${DIRECTIONS[m[1]!] ?? words(m[1]!)}`;
   if (ent) {
     // ("Trading from home (c0804)" reads in a sentence as "c0804's home business"; a group as "the Millbrook
@@ -85,6 +86,7 @@ const IDS = [
   "form-[a-z][a-z-]*[a-z]",
   "ask-\\d+",
   "dir-[a-z][a-z-]*[a-z]", // a standing order: dir-opening-works-collection
+  "proc-[a-z][a-z-]*[a-z]", // a procedure: proc-petitions
   "job-c\\d+(?:-[a-z]+)*", // a job agreement, or its standing payment: job-c0068, job-c0068-wages
 ];
 const ID_RE = new RegExp(`(?<![\\w.$/-])(?:the )?(?:${IDS.join("|")})(?![\\w/-]|\\.\\w)`, "g");
@@ -113,6 +115,10 @@ export function replaceIds(s: string, names?: PlainNames, render: (id: string, s
 }
 function plainPart(s: string, names?: PlainNames): string {
   // (A paper named with its record id says what it is: "petition rec.948" → "a petition".)
+  // (A council proposal by its form and fields: "form-council-proposal: kind budget, year 1, affects neither" → "a council
+  // proposal for the budget".)
+  s = s.replace(/\b(?:the |a |on )?form-council-proposal:? kind (\w+)(?:, year \d+)?(?:, affects \w+)?/g, (_, k: string) => (k === "budget" ? "a council proposal for the budget" : k === "law" ? "a council proposal for a law" : `a council proposal (${k})`));
+  s = s.replace(/\bProposed: (a council proposal)/g, "Proposed $1");
   s = s.replace(/\b(?:the |a )?(petition|ballot|notice|proposal|law|nomination) (?:rec|draft)\.[\w.-]*\d\b/g, "a $1");
   // (A post by its id after "as" or in "the … post": "Appointed c0068 as works" → "as the works manager".)
   if (names?.positions) {

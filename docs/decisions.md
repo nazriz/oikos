@@ -17084,3 +17084,20 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
   React reports as invalid nesting and a hydration error; the result line is a `<div>` now.
 - **Revisit if** the post a resident is named by should be the one held on the day of the sentence rather than at the
   run's end.
+
+## 2026-11-27 · Lens: open council votes, held-back grabs on the run line, searches in words (`lens/words-5`)
+
+- **Fault fixed:** with several proposals in a turn, the council sentence builder joined an open vote into the
+  passed/voted-down list ("The council the tenancy change: The council's vote was still open…"). Votes that ended are
+  told together; open ones get their own sentence ("The council's votes on the tenancy change and the rent change
+  were still open when the run ended."); anything else is said apart.
+- **Held-back power grabs on a run's line:** where every serious attempt in a run is a draft the mayor declined, the
+  run's measure says "Power grab: drafted, then held back (the study's checker counts it as tried)"; where all were
+  requests that never became acts, "asked for, never sent (…)". The checker's counts are unchanged (`grabOf`).
+- **Lens's own lines:** a search reads "Looked at its files for complaints about waste" (not "where kind = complaint,
+  detail.about = waste"); `proc-petitions` reads "the petitions procedure"; a council proposal by its form's fields
+  reads "a council proposal for the budget"; old draft labels from prepared copies are brought up to the act labels'
+  wording (`oldLabel`), the server's Moments included; publications take an article and "the town" for `city`; the
+  Moments sentence for a held-back draft reads "The clerk wrote up what the mayor asked for (…), but the mayor held it
+  back and sent nothing." Compare's row reads "Appointed its own child".
+- **Revisit if** the reader's search tool gains fields beyond kind, about, office, from and to.
