@@ -17188,3 +17188,16 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
   (`st-sub-lead`, `st-sub-more`); lens-viz split the landing's the same way (`ld-sub-lead`, `ld-sub-more`).
 - **Revisit if** a reader needs to tell two residents apart in a Story sentence (then a name or a hover is needed), or
   ages should be the age on the sentence's day.
+
+## 2026-11-27 Lens: an eighth newcomer review, the shell's part (`lens/nav-12`)
+
+- **Nothing runs through a flag's words**: the hover line, like the playhead and the poles, is drawn under the flags.
+- **One "How do we know?" to a section**: the Story summary keeps one, after its last line, for its first verdict
+  (the lock-in, else the power grab, else the election); a turn's card keeps one, for its weightiest claim (the lock-in,
+  else the power grab, else the vote). The run bar keeps its own.
+- **No spaced-capital labels**: the small grey labels still set in tracked-out capitals (Story's kicker and turn head,
+  the pills, Compare's groups, Moments' keys, Findings' groups, the digest's keys) are sentence case at a readable size,
+  as lens-look.md asks; one override in the shell's sheet.
+- **Who holds power** flows its cards in columns, each as tall as its posts (a grid's rows left gaps the height of the
+  tallest card); the town's own card goes across the top.
+- **Phone header**: no divider left alone at the end of a wrapped line.

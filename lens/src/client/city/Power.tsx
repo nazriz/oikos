@@ -219,9 +219,11 @@ const POWER_CSS = `
 .lens-city .pw-side { display: grid; gap: 8px; align-content: start; }
 .lens-city .pw-seat { display: block; line-height: 1.4; }
 .lens-city .pw-seat .dot { display: inline-block; width: 10px; height: 10px; margin-right: 7px; background: var(--lc-seat); }
-.lens-city .pw-grid { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 22px 22px; align-items: start; }
-.lens-city .pw-card { position: relative; z-index: 1; background: var(--lc-ink); border-top: 2px solid var(--lc-text); padding: 6px 0 4px; }
-.lens-city .pw-card.gov { grid-column: span 2; border-top-color: var(--lc-seat); columns: 2 240px; column-gap: 22px; }
+/* The cards flow in columns, each as tall as its posts, so a short card does not leave a row's worth of empty space
+   below it (a grid's rows took the tallest card's height); the town's own card goes across the top. */
+.lens-city .pw-grid { position: relative; columns: 260px; column-gap: 22px; }
+.lens-city .pw-card { position: relative; z-index: 1; background: var(--lc-ink); border-top: 2px solid var(--lc-text); padding: 6px 0 4px; break-inside: avoid; margin: 0 0 22px; display: inline-block; width: 100%; }
+.lens-city .pw-card.gov { column-span: all; display: block; border-top-color: var(--lc-seat); columns: 240px; column-gap: 22px; }
 .lens-city .pw-card-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 800; font-size: 15px; padding-bottom: 6px; margin-bottom: 2px; column-span: all; }
 .lens-city .pw-card-head .muted { font-weight: 400; font-size: 12px; align-self: center; }
 .lens-city .pw-post { break-inside: avoid; padding: 4px 0; border-bottom: 1px solid var(--lc-hair); }
@@ -251,6 +253,6 @@ const POWER_CSS = `
 .lens-city .pw-lines path.same { stroke: var(--lc-inst); stroke-dasharray: 2 3; }
 .lens-city .pw-lines path.seat { stroke: var(--lc-flag); stroke-opacity: 1; stroke-width: 2.5; }
 .lens-city .pw-lines path.focus { stroke: var(--lc-text); stroke-opacity: .9; stroke-width: 1.6; }
-@media (max-width: 640px) { .lens-city .pw { padding: 14px 12px 30px; } .lens-city .pw-card.gov { grid-column: auto; columns: 1; } }
+@media (max-width: 640px) { .lens-city .pw { padding: 14px 12px 30px; } .lens-city .pw-card.gov { columns: 1; } }
 `;
 

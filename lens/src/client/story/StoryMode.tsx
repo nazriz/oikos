@@ -88,8 +88,9 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
           <article key={b.t.i} data-turns={String(b.t.i)} data-peek={`sitting:${b.t.i}`} className={`sm-card ${b.t.levers.length ? "grab" : ""} ${b.t.i === lock?.sitting ? "lockin" : ""}`} data-tour={k === 0 ? "turn" : undefined}>
             <h3>Day {b.t.day}</h3>
             {b.t.sentences.map((x, i) => <p key={i} className={i === 0 ? "sm-lead" : undefined}>{plain(x)}</p>)}
-            {b.t.votes.length > 0 && run && <div className="sm-ev"><HowDoWeKnow run={run} claim={{ kind: "vote", proposal: b.t.votes[0]! }} label={b.t.votes.length > 1 ? "How the first vote went" : "How the vote went"} /></div>}
-            {b.t.levers.length > 0 && <div className="sm-grab">The study counts this as a {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}. {run && <HowDoWeKnow run={run} claim={{ kind: "lever", index: (b.t.levers.find((l) => l.level === "executed") ?? b.t.levers[0]!).i }} />}</div>}
+            {/* (One "How do we know?" to a card, for its weightiest claim: the lock-in, else the power grab, else the vote.) */}
+            {b.t.votes.length > 0 && run && b.t.levers.length === 0 && !(lock && b.t.i === lock.sitting) && <div className="sm-ev"><HowDoWeKnow run={run} claim={{ kind: "vote", proposal: b.t.votes[0]! }} label={b.t.votes.length > 1 ? "How the first vote went" : "How the vote went"} /></div>}
+            {b.t.levers.length > 0 && <div className="sm-grab">The study counts this as a {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}. {run && !(lock && b.t.i === lock.sitting) && <HowDoWeKnow run={run} claim={{ kind: "lever", index: (b.t.levers.find((l) => l.level === "executed") ?? b.t.levers[0]!).i }} />}</div>}
             {lock && b.t.i === lock.sitting && <div className="sm-lockin">Lock-in, as {graders(lock)} found it{lock.act ? <>: {lowerFirst(plain(lock.act))}</> : "."} {run && <HowDoWeKnow run={run} claim={{ kind: "lockin", lock }} />}</div>}
             {b.t.quote && <blockquote className="sm-quote"><Hi text={`“${b.t.quote.length > 280 ? b.t.quote.slice(0, 279) + "…" : b.t.quote}”`} /></blockquote>}
             <button className="st-btn" onClick={() => open(b.t)}>Read this turn in full</button>
@@ -136,10 +137,12 @@ function OneMinute({ seat, run, model, turns, lock }: { seat: SeatJson; run: str
       <button className="sm-minute-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>This run in one minute{open ? "" : " (show)"}</button>
       {open && <>
         <p>An AI model, {model}, held the office of mayor from day {dayOf(seat.fork_at)} {end}. {seat.goal ? `${goalText(seat.goal)}.` : ""}</p>
-        {lock && <div className="sm-p sm-lock">{lockDay(lock) !== undefined ? `On day ${lockDay(lock)}` : "In this run"} ({graders(lock)}: a lock-in){lock.act ? `: ${lowerFirst(plain(lock.act))}` : "."} <HowDoWeKnow run={run} claim={{ kind: "lockin", lock }} /></div>}
+        {lock && <div className="sm-p sm-lock">{lockDay(lock) !== undefined ? `On day ${lockDay(lock)}` : "In this run"} ({graders(lock)}: a lock-in){lock.act ? `: ${lowerFirst(plain(lock.act))}` : "."}</div>}
         <div className="sm-p">{lv.done ? <>It carried out {lv.done === 1 ? "a power grab" : `${lv.done} kinds of power grab`}: {kinds(executed).join("; ")}{first ? `, first on day ${dayNo(first.day)}` : ""}. </> : lv.tried ? <>It tried to {[...new Set(tried.map((l) => leverTo(l.lever)))].join(", and to ")}, but did not carry it out. </> : lock ? <>The study's checker found no power grab against the election. </> : <>It made no power grab; in {turns} turns its {seat.acts.length} acts were the town's ordinary business. </>}
-          {first && <HowDoWeKnow run={run} claim={{ kind: "lever", index: first.i }} />}</div>
-        <div className={`sm-p sm-out ${out.css}`}>{out.label}. <HowDoWeKnow run={run} claim={{ kind: "outcome" }} /></div>
+</div>
+        {/* (One "How do we know?" for the summary, after its last line, for its first verdict: the lock-in, else the power
+            grab, else the election; each turn's card has its own.) */}
+        <div className={`sm-p sm-out ${out.css}`}>{out.label}. <HowDoWeKnow run={run} claim={lock ? { kind: "lockin", lock } : first ? { kind: "lever", index: first.i } : { kind: "outcome" }} /></div>
         {twinSeat && (() => {
           // (Said so it cannot be misread: the rule-based mayor's result, and its acts beside this AI mayor's.)
           const twinOut = seatOutcome(twinSeat), mine = seatOutcome(seat);
