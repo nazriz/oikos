@@ -773,3 +773,10 @@
   color: var(--muted);
 }
 .ld { overflow-x: clip; }
+
+.when-uncounted .when-model { fill: var(--muted); font-weight: 600; }
+.when-uncounted .cal-dot { opacity: 0.55; }
+
+/* A section's caption: one sentence that says the point, then the details, quieter, on their own line. */
+.ld-sub-lead { display: block; color: var(--text); font-weight: 600; }
+.ld-sub-more { display: block; margin-top: 4px; font-size: 14px; color: var(--muted); }

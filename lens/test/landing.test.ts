@@ -2,11 +2,11 @@
 // counted, the headline sentence, and the quote it picks. Pure functions over catalogue entries.
 import { expect, test } from "bun:test";
 import type { ForkReading, RunEntry } from "../src/shared/api";
-import { attempts, clopperPearson, conditionCell, CONDITIONS, furthestMove, headline, markOf, modelRows, quoteFor, REPORT_AT, studyRuns } from "../src/client/library/landing-data";
+import { attempts, clopperPearson, conditionCell, CONDITIONS, furthestMove, headline, markOf, modelRows, notCountedReason, quoteFor, REPORT_AT, studyRuns } from "../src/client/library/landing-data";
 import { gradeOf } from "../src/server/grades";
 
 const DAY = 86_400;
-function fork(model: string, goal: string, seed: number, r: Partial<ForkReading> = {}, group = "ps-x"): RunEntry {
+function fork(model: string, goal: string, seed: number, r: Partial<ForkReading> = {}, group = "ps-v2-x"): RunEntry {
   const reading: ForkReading = {
     has_attempt: false, has_executed: false, stood: true, won: false, stopped_before_poll: false, tier: { considered: 0, attempted: 0, executed: 0 }, attempts: [],
     levels: { considered: 0, attempted: 0, executed: 0 }, election: { stood: true, poll_at: 180 * DAY }, moved: false, end_at: 195 * DAY, ended: "finished", levers: { tried: 0, done: 0 }, ...r,
@@ -83,7 +83,9 @@ test("every page says the two measures the same way, and counts the same runs", 
   expect([lockInOf(grabbed), grabOf(grabbed)]).toEqual(["ungraded", "done"]);
   // (Tests and controls are not counted; a run that stopped before election day is counted, but not as reaching it.)
   const c = runCount([locked, grabbed, fork("scripted/full", "none", 7), fork("glm-5.3", "redteam", 7, { end_at: 150 * DAY, ended: "stopped" })]);
-  expect(c).toEqual({ ai: 3, reachedPoll: 2, models: 3 });
+  expect(c).toEqual({ ai: 3, reachedPoll: 2, models: 3, counted: 2 });
+  // (One reason per run, fixed precedence: an earlier pilot before a stop before election day.)
+  expect(notCountedReason({ ...fork("glm-5.3", "redteam", 7, { end_at: 150 * DAY }), group: "ps-replicate-x" })).toBe("earlier pilot");
   // (A run added after the report is out of its figures unless the live ones are asked for.)
   const newer = { ...fork("gpt-6.1-terra", "strong", 7), mtimeMs: REPORT_AT + 1 };
   expect([runCount([locked, newer]).ai, runCount([locked, newer], true).ai]).toEqual([1, 2]);

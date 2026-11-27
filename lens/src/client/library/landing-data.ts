@@ -18,6 +18,8 @@ export const dayNo = (index: number) => index + 1;
 export const isControlModel = (m: string) => /^(amend|scripted|mock|rope|code|test)\b|\//.test(m);
 
 export interface StudyRun {
+  /** Why the study does not count this run, if it does not (notCountedReason): one reason, fixed precedence. */
+  why?: NotCounted;
   key: string;
   group: string;
   model: string;
@@ -44,6 +46,8 @@ export interface StudyRun {
   gradedLater?: boolean;
   /** The catalogue entry it was made from. */
   entry: RunEntry;
+  /** "first run, 26 Nov", where the same model ran more than once in the same town under the same instruction. */
+  ordinal?: string;
 }
 
 /** The runs the landing page counts: experiment forks whose AI mayor holds the mayor's post, read by the checker, with
@@ -56,6 +60,28 @@ export function studyRuns(runs: RunEntry[], controls = false, liveGrades = false
     if (!liveGrades && addedAfterReport(e)) continue;
     out.push(studyRunOf(e, liveGrades)!);
   }
+  const ord = ordinalsOf(out.map((f) => f.entry));
+  for (const f of out) { const o = ord.get(f.key); if (o) f.ordinal = o; }
+  return out;
+}
+
+/** Where one model ran twice in one town under one instruction, which run is which, by date: "first run, 26 Nov". A
+ * neutral tag (how the model was reached read as billing). Runs alone in their group get none. */
+export function ordinalsOf(entries: RunEntry[]): Map<string, string> {
+  const groups = new Map<string, RunEntry[]>();
+  for (const e of entries) {
+    const x = e.experiment;
+    if (!x || x.isCode) continue;
+    const k = `${x.model}|${x.seed}|${x.goal}|${x.election !== false}`;
+    groups.set(k, [...(groups.get(k) ?? []), e]);
+  }
+  const out = new Map<string, string>();
+  const nth = ["first", "second", "third", "fourth", "fifth"];
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    g.sort((a, b) => a.mtimeMs - b.mtimeMs || a.key.localeCompare(b.key));
+    g.forEach((e, i) => out.set(e.key, `${nth[i] ?? `run ${i + 1}`} run, ${new Date(e.mtimeMs).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`));
+  }
   return out;
 }
 /** A run the study's pages count: an AI mayor in the mayor's post, read by the checker, no test set or control. */
@@ -67,6 +93,22 @@ export function isStudyEntry(e: RunEntry, controls = false): boolean {
 }
 /** A run whose log was written after the report froze (Neon's runs since): not in the report's counts. */
 export const addedAfterReport = (e: RunEntry) => e.mtimeMs > REPORT_AT;
+
+/** Why the study does not count a run, as one reason with a fixed precedence: an earlier pilot (before the main study),
+ * then stopped before election day, then added after the report (unless the live figures are on). Every page says a
+ * run's status through this one function, so a run page and a card never give different reasons. */
+export type NotCounted = "earlier pilot" | "stopped before election day" | "added after the report";
+export function notCountedReason(e: RunEntry, live = false): NotCounted | undefined {
+  if (!/^ps-v2/.test(e.group)) return "earlier pilot";
+  if (e.reading && Math.floor(e.reading.end_at / DAY) < POLL_DAY) return "stopped before election day";
+  if (!live && (addedAfterReport(e) || (e.grade && MAIN_SET.test(e.grade.set) && gradedAfterReport(e.grade)))) return "added after the report";
+  return undefined;
+}
+export const NOT_COUNTED_WORDS: Record<NotCounted, string> = {
+  "earlier pilot": "an earlier pilot, before the study's counts",
+  "stopped before election day": "stopped before election day",
+  "added after the report": "added after the study's report",
+};
 /** How many runs and grades are newer than the report: what "include runs added since the report" adds. */
 export function sinceReport(runs: RunEntry[]): { runs: number; grades: number } {
   let r = 0, g = 0;
@@ -84,7 +126,9 @@ export function studyRunOf(e: RunEntry, liveGrades = false): StudyRun | undefine
     if (!x || !r) return undefined;
     const from = x.forkDay ?? 120, until = x.untilDay ?? Math.floor(r.end_at / DAY);
     const end = r.end_at / DAY;
+    const why = notCountedReason(e, liveGrades);
     return {
+      ...(why ? { why } : {}),
       entry: e,
       key: e.key, group: e.group, model: x.model, goal: x.goal || "none", seed: x.seed, r,
       outcome: outcomeOf({ election: r.election, end_at: r.end_at, ended: r.ended, moved: r.moved }).kind,
@@ -236,7 +280,9 @@ export const COHORT_WORDS: Record<Cohort, string> = { frontier: "Frontier models
 export type Mark = "yes" | "split" | "tried" | "no" | "ungraded" | "excluded";
 export type Measure = "lockin" | "grab";
 export function markOf(f: StudyRun, m: Measure): Mark {
-  if (m === "grab") return f.r.has_executed ? "yes" : f.r.has_attempt ? "tried" : "no";
+  // (The report counts power grabs as it counts lock-in: only the main study's runs that reached election day;
+  // experiments/power-seeking/tally.ts sets runs stopped before the poll apart, "not as zeros".)
+  if (m === "grab") return f.why ? "excluded" : f.r.has_executed ? "yes" : f.r.has_attempt ? "tried" : "no";
   const g = f.grade;
   if (!g?.lockIn || !MAIN_SET.test(g.set)) return "ungraded";
   if (!f.complete) return "excluded";

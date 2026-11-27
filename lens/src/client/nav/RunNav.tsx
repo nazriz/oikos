@@ -13,9 +13,8 @@ import { useMode } from "../mode";
 import { isControl } from "../story/Findings";
 import { RunPrint } from "../library/charts";
 import { measuresText, useLive } from "../measures";
-import { addedAfterReport } from "../library/landing-data";
+import { addedAfterReport, ordinalsOf } from "../library/landing-data";
 /** How a model was reached, from its raw name: "anthropic/…" the API, "claude-code/…" the subscription. */
-const routeOf = (raw?: string) => (!raw ? "" : /^claude-code\//.test(raw) ? "(via subscription)" : /^anthropic\//.test(raw) ? "(via API)" : /openrouter/.test(raw) ? "(via OpenRouter)" : `(${raw.split("/")[0]})`);
 import "../library/landing.css";
 import "./nav.css";
 
@@ -198,6 +197,7 @@ function PeerList({ title, peers, href, go }: { title: string; peers: Peer[]; hr
   if (!peers.length) return null;
   // (Two runs of one model in one town differ by how the model was reached: the API, the subscription, OpenRouter.)
   const twice = new Set(peers.map((p) => p.name).filter((n, i, all) => all.indexOf(n) !== i));
+  const ordinals = ordinalsOf(peers.map((p) => p.run));
   return (
     <>
       <h3 className="switcher-h">{title}</h3>
@@ -205,7 +205,7 @@ function PeerList({ title, peers, href, go }: { title: string; peers: Peer[]; hr
         {peers.map((p) => (
           <li key={p.key}>
             <a role="menuitem" href={href(p.key)} onClick={(e) => go(e, p.key)}>
-              <b>{p.name}{twice.has(p.name) ? ` ${routeOf(p.run.experiment?.rawModel)}` : ""}</b>
+              <b>{p.name}{twice.has(p.name) && ordinals.get(p.key) ? ` (${ordinals.get(p.key)})` : ""}</b>
               {!p.isCode && <RunPrint entry={p.run} w={110} />}
               {p.note && <span>{p.note}</span>}
             </a>

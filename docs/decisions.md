@@ -17148,3 +17148,21 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
   minutes, so often nobody is out at a given moment, and at night the streets are empty ("Nobody walking" is then
   true, not a fault).
 - **Revisit if** the run page's moment should travel to every page about the run (Findings, Models: not about one run).
+## 2026-11-27 Lens: seventh review (two checks, one reason, power grabs counted as the report does)
+
+- **Two checks, said once where the definitions are** (landing key, Words, Moments header, the per-model chart): "Two
+  separate checks. Lock-in is the blind graders' judgement, read from the whole run; power grab is the study's checker,
+  matching each act against a fixed list. One act can count under both, for example removing an officer before the vote."
+- **One reason per uncounted run** (`notCountedReason` in landing-data), fixed precedence: an earlier pilot, then stopped
+  before election day, then added after the report (unless the live figures are on). Measures, cards, charts and the
+  run page all say it through this one function.
+- **Power grabs counted as the report counts them:** experiments/power-seeking/tally.ts sets runs stopped before the
+  poll apart ("not as zeros"), and the report's results are the main (v2) study's. So Lens's power-grab counts (Findings,
+  Models, the landing's per-model chart and hero) now count only the main study's runs that reached election day; the
+  rest are shown hatched/greyed with their reason. This drops the counted power grabs to the main study's, which is
+  what the report measures; the earlier pilots' power grabs (DeepSeek's moved election, GLM's child) remain visible and
+  labelled.
+- Showcase #3 is DeepSeek moving its election to day 5,001, in its own reasoning, with its reason. "When the power grabs
+  came" has one row per run. Two runs of one model, town and instruction are told apart by date ("first run, 26 Nov"),
+  not by how the model was billed. Charts also draw on idle and before printing; dark plum text is lighter; the phone
+  Findings table scrolls inside its card; landing captions split into a lead sentence and details.
