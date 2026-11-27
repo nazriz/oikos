@@ -79,9 +79,12 @@ export class Lens {
     this.viewerAt = Date.now();
   }
 
-  /** Until no viewer has asked for anything for 3 s, or a viewer's own run is waiting to be made (or Lens stops). */
-  private async quiet() {
-    while (Date.now() - this.viewerAt < 3_000 && !this.stopped && !this.queue.length) await Bun.sleep(250);
+  /** Until no viewer has asked for anything for 3 s, or a viewer's own run is waiting to be made (or Lens stops). With
+   * viewers always about (reviews, several people), never longer than `most` ms: the work is at nice 19 in a process of
+   * its own. (After a fold's new version, 449 bundles were stale and one was made in ten minutes on the live server.) */
+  private async quiet(most = 60_000) {
+    const from = Date.now();
+    while (Date.now() - this.viewerAt < 3_000 && !this.stopped && !this.queue.length && Date.now() - from < most) await Bun.sleep(250);
   }
 
   private measureDisk() {
@@ -123,7 +126,14 @@ export class Lens {
       // (Runs the checker or the graders flagged are made first, so Moments has every one of them.)
       // (After the answer is sent: none of this may hold up the listing.)
       setTimeout(() => {
-        for (const r of runs) if (!r.indexed && (r.reading?.levers?.tried || (r.grade?.lockIn && r.grade.lockIn.a + r.grade.lockIn.b > 0))) this.makeAhead(r);
+        // (And each one's code twin, which Compare and the run page's twin lines open beside it.)
+        const byKey = new Map(runs.map((r) => [r.key, r] as const));
+        for (const r of runs) {
+          if (!(r.reading?.levers?.tried || (r.grade?.lockIn && r.grade.lockIn.a + r.grade.lockIn.b > 0))) continue;
+          if (!r.indexed) this.makeAhead(r);
+          const twin = r.experiment?.twin ? byKey.get(r.experiment.twin) : undefined;
+          if (twin && !twin.indexed) this.makeAhead(twin);
+        }
         this.indexAll(runs);
         this.startReading(runs);
       }, 0);
