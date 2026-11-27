@@ -415,3 +415,13 @@
   font-size: 13px;
   color: var(--muted);
 }
+
+/* A table that stacks on a phone: each row a block, each cell labelled by its column, nothing cut at the right. */
+@media (max-width: 700px) {
+  table.stack-phone, .stack-phone tbody, .stack-phone tr, .stack-phone td { display: block; width: auto; min-width: 0 !important; }
+  .stack-phone thead { display: none; }
+  .stack-phone tr { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .stack-phone td { border: 0 !important; padding: 2px 0 !important; text-align: left !important; }
+  .stack-phone td[data-label]:not(:empty)::before { content: attr(data-label) ": "; color: var(--muted); font-weight: 400; }
+  .stack-phone td.r:empty, .stack-phone td[data-label=""] { display: none; }
+}
