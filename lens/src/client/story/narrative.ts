@@ -154,7 +154,7 @@ export function tell(seat: SeatJson, s: SittingSummary, w: TellWords = PLAIN, de
       const parts = [declined ? `turned down the clerk's first ${declined === 1 ? "write-up" : `${count(declined)} write-ups`}` : "", failed ? `had ${failed === 1 ? "a request" : `${count(failed)} requests`} the clerk could not write up` : ""].filter(Boolean);
       sentences.push(`Before that, it ${parts.join(" and ")}, and asked again.`);
     } else {
-      sentences.push(`It asked to do something the study counts as a ${w.powerGrab} (to ${leverTo(lever)}), but ${declined ? `it turned down the clerk's write-up${declined > 1 ? "s" : ""}` : "the clerk could not write the request up"} and never sent it.`);
+      sentences.push(`It asked to do something the study's checker flags as a ${w.powerGrab} (to ${leverTo(lever)}), but ${declined ? `it turned down the clerk's write-up${declined > 1 ? "s" : ""}` : "the clerk could not write the request up"} and never sent it.`);
     }
   }
   if (!sentences.length && s.failures) sentences.push(`${w.Mayor} asked for ${s.failures === 1 ? "something" : `${s.failures} things`} the system could not carry out.`);
@@ -184,6 +184,6 @@ function lawLead(what: string): string {
   for (const x of sentences) { if ((out + x).length > 160 && out) break; out += x; }
   out = out.trim();
   if (!out || out.length > 200) { const cut = what.slice(0, 160); out = `${cut.slice(0, cut.lastIndexOf(" "))}…`; }
-  return `“${out}” (the law goes on; read it in this turn)`;
+  return `“${out}” (the law continues — open this turn to read it all)`;
 }
 function joinAnd(xs: string[]): string { return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`; }

@@ -17415,3 +17415,21 @@ run page ~37 s on the live server. What it found:
   each through lens-words' popover (`withSetups`, story/IdTip.tsx: "the same town as every other run, started from a
   different random seed"). The trail's step is wrapped only when it is the plain current step, not when it is the
   button that closes what is open (a tap there must act, not explain).
+
+## 2026-11-27 · Lens: "the study counts" only for counted runs; the law in full where a card cites it (`lens/words-11`)
+
+- **Counted or flagged:** a turn card says "The study counts this as a power grab" only for a run in the study's counts
+  (`notCountedReason` undefined); elsewhere "The study's checker flags this as a power grab". The story's sentence for
+  a request never sent says "the study's checker flags as".
+- **"Was due"** only when the election did not happen in the run: "5 days after the election" where a result is in the
+  log (Moments, the digest, the turn reader's header, which also says "after" for a turn past the vote).
+- **Finance cards:** the note on why the checker counts the finance officer's removal stays on removal cards; an
+  appointment card says the checker counts appointing a new finance officer after a removal as part of the same change.
+- **The law in full:** on a lock-in's "How do we know?", the mayor's request and the record are shown whole in a
+  scrolling block, with the clause the card quotes marked where its words appear.
+- **Who holds power (Story mode):** a holder of several posts reads "a resident (50); also Rates officer, Council clerk
+  and Complaints officer" at each post, and the separate list goes; the red-relative key line shows only when a
+  relative of the AI mayor holds a post.
+- **Residents:** "A 30-year-old man (c0613)" heads a resident's panel and the map's hover in Story mode; a long law in
+  a card ends "(the law continues — open this turn to read it all)".
+- **Revisit if** the cited clause is often not found word for word in the law (then mark by sentence similarity).

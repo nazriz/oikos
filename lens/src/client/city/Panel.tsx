@@ -234,7 +234,7 @@ export function PersonBody({ c, q, t, name, full }: { c: CityData; q: number; t:
   return (
     <>
       <div className="lc-tip-title" data-peek={`person:${p[0]}`}>{isSeatPerson(c, p[0]) ? `The AI mayor (${p[0]})` : p[1]}</div>
-      <div className="lc-tip-sub">{p[2] === "f" ? "A woman" : p[2] === "m" ? "A man" : "A person"}, {ageAt(c, q, t)} years old{describePerson(c, p[0], t)?.replace(/^\d+,?\s*/, "") ? `, ${describePerson(c, p[0], t)!.replace(/^\d+,?\s*/, "")}` : ""}.</div>
+      <div className="lc-tip-sub">A {ageAt(c, q, t)}-year-old {p[2] === "f" ? "woman" : p[2] === "m" ? "man" : "person"}{describePerson(c, p[0], t)?.replace(/^\d+,?\s*/, "") ? `, ${describePerson(c, p[0], t)!.replace(/^\d+,?\s*/, "")}` : ""}.</div>
       <dl className="lc-dl">
         <dt>Now</dt><dd>{where}</dd>
         {home >= 0 && <><dt>First home</dt><dd>{name(home)}</dd></>}

@@ -30,6 +30,8 @@ export interface Moment {
   /** Days before the election as first called (the reader counts to the date then in force, which a moved
    * election pushes thousands of days out). */
   daysBefore?: number;
+  /** Whether the vote took place in the run (a result is in the log): then the day is "after the election", not "after it was due". */
+  pollHeld?: boolean;
 }
 
 /** Moments ordered by how near each came to its run's own election day, before or after it (a moment 10 days after
@@ -87,7 +89,7 @@ export function momentsOf(key: string, seat: SeatJson, withConsidered = false): 
     const outcome = act ? (act.status === "applied" ? (top.stage && top.stage !== "applied" ? STAGE[top.stage] ?? top.stage : "took effect") : act.status === "refused" ? `refused by the town: ${(act.code ?? "").replace(/_/g, " ")}` : "sent, no outcome in the log") : top.stage ? STAGE[top.stage] ?? top.stage : top.level === "considered" ? "words only" : "—";
     const tone: Moment["outcomeTone"] = top.level === "executed" || outcome === "took effect" ? "ok" : /refused|held back|could not|rejected|asked back/.test(outcome) ? "no" : "wait";
     return { key, model: modelOf(seat), ...(seat.goal ? { goal: seat.goal } : {}), ...(seat.seed !== undefined ? { seed: seat.seed } : {}), lever: top, words, said,
-      ...(draft?.note ? { note: draft.note } : {}), ...(act?.reasoning ? { reason: act.reasoning } : {}), outcome, outcomeTone: tone, also: all.filter((x) => x !== top), ...(redrafted.has(gk) ? { redrafted: true } : {}), election, ...(poll !== undefined ? { daysBefore: Math.floor(poll / 86_400) - Math.floor(top.t / 86_400) } : {}) };
+      ...(draft?.note ? { note: draft.note } : {}), ...(act?.reasoning ? { reason: act.reasoning } : {}), outcome, outcomeTone: tone, ...(seat.election.result_at !== undefined ? { pollHeld: true } : {}), also: all.filter((x) => x !== top), ...(redrafted.has(gk) ? { redrafted: true } : {}), election, ...(poll !== undefined ? { daysBefore: Math.floor(poll / 86_400) - Math.floor(top.t / 86_400) } : {}) };
   });
 }
 

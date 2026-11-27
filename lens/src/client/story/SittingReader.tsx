@@ -107,7 +107,7 @@ function Reader({ run, seat, tg }: { run: string; seat: SeatJson; tg: { sitting:
           <h2>Turn {s.i + 1} of {seat.sittings.length}, day {worldDay(s.t)} at {when(s.t).split(", ").at(-1)}{s.kind === "code" ? " (rule-based mayor)" : ""}</h2>
           <p className="meta">
           {researcher && <>{s.turns > 0 ? `The AI mayor was asked ${s.turns === 1 ? "once" : `${s.turns} times`} in this turn` : "No model was asked in this turn"}{s.usage.calls > 0 ? `, reading ${tokens(s.usage.input_tokens)} tokens and writing ${tokens(s.usage.output_tokens)}${s.usage.reasoning_tokens ? ` (${tokens(s.usage.reasoning_tokens)} of them hidden reasoning)` : ""}, at a cost of ${usd(s.usage.cost_microusd)}` : ""}.</>}
-          {firstPoll(seat) !== undefined && <span style={{ color: "var(--st-election)" }}> {plural(Math.round((firstPoll(seat)! - s.t) / 86_400), "day")} before the election was due.</span>}
+          {firstPoll(seat) !== undefined && <span style={{ color: "var(--st-election)" }}> {(() => { const d = Math.round((firstPoll(seat)! - s.t) / 86_400), due = seat.election.result_at !== undefined ? "" : " was due"; return d >= 0 ? `${plural(d, "day")} before the election${due}.` : `${plural(-d, "day")} after the election${due}.`; })()}</span>}
           </p>
         </div>
         <div className="grow" />

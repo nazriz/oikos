@@ -12,6 +12,7 @@ import { HowDoWeKnow } from "./Evidence";
 import { Hi, openPerson, usePlain, usePlainNames } from "./text";
 import { fetchRun } from "../api";
 import { lockInfo, lockDay, graders, type LockInfo } from "./lockin";
+import { notCountedReason } from "../library/landing-data";
 import { electionCard, type ElectionCard } from "./election-card";
 import { leverCounts } from "../../shared/outcome";
 import { loadSeat, useAsync } from "./data";
@@ -36,6 +37,8 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
   const grabs = tellings.filter((t) => t.levers.length);
   // (The study's blind grades, from the catalogue: a lock-in is placed on its turn and said in the summary.)
   const entry = useAsync(() => (run ? fetchRun(run).catch(() => null) : null), [run]);
+  // (Only a run in the study's counts has acts "the study counts"; elsewhere the checker only flags them.)
+  const counted = !!entry && !(entry instanceof Error) && notCountedReason(entry) === undefined;
   const lock = useMemo(() => lockInfo(seat, entry instanceof Error ? null : entry), [seat, entry]);
   // Notable turns as cards; runs of quiet turns between them as one folded line.
   const blocks: ({ kind: "card"; t: Telling } | { kind: "quiet"; ts: Telling[] } | { kind: "election"; e: ElectionCard })[] = [];
@@ -91,7 +94,7 @@ export function StoryAccount({ seat }: { seat: SeatJson }) {
             {b.t.sentences.map((x, i) => <p key={i} className={i === 0 ? "sm-lead" : undefined}>{plain(x)}</p>)}
             {/* (One "How do we know?" to a card, for its weightiest claim: the lock-in, else the power grab, else the vote.) */}
             {b.t.votes.length > 0 && run && b.t.levers.length === 0 && !(lock && b.t.i === lock.sitting) && <div className="sm-ev"><HowDoWeKnow run={run} claim={{ kind: "vote", proposal: b.t.votes[0]! }} label={b.t.votes.length > 1 ? "How the first vote went" : "How the vote went"} /></div>}
-            {b.t.levers.length > 0 && <div className="sm-grab">The study counts this as a {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}. {run && !(lock && b.t.i === lock.sitting) && <HowDoWeKnow run={run} claim={{ kind: "lever", index: (b.t.levers.find((l) => l.level === "executed") ?? b.t.levers[0]!).i }} />}</div>}
+            {b.t.levers.length > 0 && <div className="sm-grab">{counted ? "The study counts this as a" : "The study's checker flags this as a"} {W.lever}: {[...new Set(b.t.levers.map((l) => leverTitle(l.lever)))].join("; ")}. {run && !(lock && b.t.i === lock.sitting) && <HowDoWeKnow run={run} claim={{ kind: "lever", index: (b.t.levers.find((l) => l.level === "executed") ?? b.t.levers[0]!).i }} />}</div>}
             {lock && b.t.i === lock.sitting && <div className="sm-lockin">Lock-in, as {graders(lock)} found it{lock.act ? <>: {lowerFirst(plain(lock.act))}</> : "."} {run && <HowDoWeKnow run={run} claim={{ kind: "lockin", lock }} />}</div>}
             {b.t.quote && <blockquote className="sm-quote"><Hi text={`“${clip(b.t.quote, 280)}”`} /></blockquote>}
             <button className="st-btn" onClick={() => open(b.t)}>Read this turn in full</button>
