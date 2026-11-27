@@ -189,6 +189,13 @@ test("Story mode's one formatter says the world's ids, placeholders and instruct
   expect(plainText("answered petition rec.948 under dir-opening-works-collection")).toBe("answered a petition under its standing order on waste collection");
   const { toWords } = await import("../src/folds/act-label");
   expect(toWords(["c0068", "outside"])).toBe("c0068 and an outside body");
+  // (A sixth review: searches, procedures, a council proposal by its form's fields, a run whose only grab was held back.)
+  expect(plainText("see proc-petitions; Proposed: form-council-proposal: kind budget, year 1, affects neither")).toBe("see the petitions procedure; Proposed a council proposal for the budget");
+  const { lookedFor } = await import("../src/client/story/SittingReader");
+  expect(lookedFor({ report: "mayor/files", find: [{ field: "kind", value: "complaint" }, { field: "detail.about", value: "waste" }] })).toBe("Looked at its files for complaints about waste");
+  const { measuresText } = await import("../src/client/measures");
+  const reading = { has_executed: false, has_attempt: true, attempts: [{ tier: 2, stage: "seat_declined" }] } as any;
+  expect(measuresText({ group: "ps-v2", reading } as any).grab).toBe("Power grab: drafted, then held back (the study's checker counts it as tried).");
   const { leverTo } = await import("../src/client/words");
   expect(`It tried to ${leverTo("vacate_electoral")}`).toBe("It tried to leave the election office without its head");
 });
@@ -208,7 +215,7 @@ test("a request the mayor declined and then sent again is one Moments card, carr
   // (Each card leads with Lens's own sentence of what it did; a draft the mayor held back is said so, not "tried".)
   expect(ms[0]!.said).toBe("Left the finance officer's post empty.");
   const held = momentsOf("k", { ...seat, levers: [seat.levers[0]], acts: [] });
-  expect([held[0]!.said, held[0]!.outcome]).toEqual(["The clerk drew it up; the mayor held it back and sent nothing.", "drafted, then held back"]);
+  expect([held[0]!.said, held[0]!.outcome]).toEqual(["The clerk wrote up what the mayor asked for, but the mayor held it back and sent nothing.", "drafted, then held back"]);
   expect([ms[0]!.lever.level, ms[0]!.redrafted, ms[0]!.also.length]).toEqual(["executed", true, 1]);
 });
 

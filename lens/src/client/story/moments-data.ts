@@ -100,8 +100,8 @@ function saidOf(seat: SeatJson, act: SeatAct | undefined, draft: SeatDraft | und
     const clause = c?.clause || (act.label ? act.label.charAt(0).toLowerCase() + act.label.slice(1) : "acted");
     return `${cap(clause)}.${c?.after ? ` ${c.after}` : ""}`;
   }
-  const what = draft?.label ? `: ${draft.label.charAt(0).toLowerCase()}${draft.label.slice(1)}` : "";
-  if (top.stage === "seat_declined") return `The clerk drew it up${what}; the mayor held it back and sent nothing.`;
+  const what = draft?.label ? ` (${draft.label.charAt(0).toLowerCase()}${draft.label.slice(1)})` : "";
+  if (top.stage === "seat_declined") return `The clerk wrote up what the mayor asked for${what}, but the mayor held it back and sent nothing.`;
   if (top.stage === "translator_failed") return "It asked the clerk for this, but the clerk could not write it up; nothing was sent.";
   if (top.stage === "asked_back") return "It asked the clerk for this; the clerk asked back, and nothing was sent.";
   if (top.level === "considered") return "The idea came up in its thinking; it did nothing about it here.";

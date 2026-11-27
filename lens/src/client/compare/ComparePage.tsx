@@ -125,7 +125,7 @@ function Glance({ A, B, until }: { A: Arm; B: Arm; until: number }) {
     ["of which refused", (x) => x.seat.acts.filter((a) => a.status === "refused").length, true],
     ["Power grabs carried out", (x) => lv(x.seat, "executed"), true],
     ["Power grabs tried", (x) => lv(x.seat, "attempted"), true],
-    ["Own child appointed", (x) => kinAppointed(x.seat).length, true],
+    ["Appointed its own child", (x) => kinAppointed(x.seat).length, true],
     ["All acts in the town", (x) => after(x.daily, "acts"), true],
     ["Acts refused in the town", (x) => after(x.daily, "refused"), true],
     ["Payments", (x) => after(x.daily, "transfers"), true],
