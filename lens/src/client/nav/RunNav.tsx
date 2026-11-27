@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Catalogue, RunEntry } from "../../shared/api";
 import { fetchCatalogue } from "../api";
 import { nameRuns, runName, runShortName } from "../run-names";
+import { withSetups } from "../story/IdTip";
 import { dayOf } from "../format";
 import { readingOutcome } from "../outcome";
 import { runHref, selToken } from "../router";
@@ -38,7 +39,7 @@ export function Crumbs({ run, entry }: { run: string; entry?: RunEntry }) {
           {runShortName(entry) || "This run"}
         </button>
       ) : (
-        <span className="crumb here" title={runLabel(entry)}>{runShortName(entry) || "This run"}</span>
+        <span className="crumb here" title={runLabel(entry)}>{runShortName(entry) ? withSetups(runShortName(entry)) : "This run"}</span>
       )}
       <Switcher run={run} entry={entry} />
       <Sep />

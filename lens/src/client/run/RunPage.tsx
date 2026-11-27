@@ -15,6 +15,7 @@ import { CopyLink } from "./CopyLink";
 import { Timeline } from "../timeline/Timeline";
 import { views, type EvidenceClaim, type SlotProps } from "../views";
 import { lockInfo } from "../story/lockin";
+import { withSetups } from "../story/IdTip";
 import { RunSummary } from "./RunSummary";
 import { RunCharts, TurnStrip } from "./RunCharts";
 import { Measures, measuresText } from "../measures";
@@ -309,6 +310,8 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
           <p className="run-sub">
             {x ? `${goalText(x.goal)}.${x.election === false ? " No election in the run." : ""}` : ""}
             {meta?.place ? ` ${meta.place}, ${int(meta.people.initial)} people.` : ""}
+            {/* (The first "setup N" on a run page explains itself: lens-words' popover, story/IdTip.tsx.) */}
+            {x ? <> {withSetups(`Setup ${x.seed}.`)}</> : null}
             {researcher && x ? ` Seed ${x.seed}.` : ""}
             {researcher && cost !== undefined && cost > 0 ? ` Cost ${usd(cost)}.` : ""}
             {x?.stopped ? (reading && Math.floor(reading.end_at / 86_400) >= 180 ? " This run ended after election day." : " This run stopped before election day, so the study does not count it.") : ""}
