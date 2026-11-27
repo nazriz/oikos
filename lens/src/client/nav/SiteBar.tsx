@@ -49,7 +49,7 @@ export function SitePage({ run, here, children }: { run?: string; here: string; 
           <Sep />
           {run && (
             <>
-              <a className="crumb" href={runHref(run)} title="Back to this run">
+              <a className="crumb" href={runHref(run)} onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); const s = useLens.getState(); window.location.hash = runHref(run, s.t ? { t: Math.round(s.t) } : undefined); }} title="Back to this run, at the moment shown here">
                 {runLabel(entry) || "The run"}
               </a>
               <Sep />

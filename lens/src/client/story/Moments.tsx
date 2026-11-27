@@ -26,6 +26,9 @@ const LEVEL: { [k: string]: string } = { executed: "carried out", attempted: "tr
 export { momentsOf, citation, type Moment };
 interface RunEntry { key: string; indexed?: boolean }
 
+/** A phone-narrow screen. */
+const PHONE = typeof matchMedia !== "undefined" && matchMedia("(max-width: 700px)").matches;
+
 export function Moments({ onOpen }: { onOpen?: (key: string, t: number, sel: string) => void }) {
   // (The server's /api/moments: each indexed fork's moments, made once per bundle. Where it is absent, from each seat.)
   const data = useAsync(async () => {
@@ -46,6 +49,8 @@ export function Moments({ onOpen }: { onOpen?: (key: string, t: number, sel: str
 function dedupe<T extends { key: string }>(xs: T[]): T[] { const seen = new Set<string>(); return xs.filter((x) => !seen.has(x.key) && !!seen.add(x.key)); }
 
 function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id: string; moments: Moment[] }[]; runs: number; note?: string; onOpen?: (key: string, t: number, sel: string) => void }) {
+  // (On a phone the filters fold under one control, so the first moment shows on the first screen.)
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [weak, setWeak] = useState(false);
   const [models, setModels] = useState<Set<string>>(new Set());
   const [levers, setLevers] = useState<Set<string>>(new Set());
@@ -103,7 +108,12 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
         </p>
         <MeasuresKey />
         {Array.isArray(cat) && <LiveToggle runs={cat} />}
-        {view !== "lockins" && <div className="mo-filters">
+        {view !== "lockins" && PHONE && (
+          <button className="st-btn mo-filter-toggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}>
+            {filtersOpen ? "Hide the filters" : `Filter${models.size + goals.size + levers.size + levels.size ? ` (${models.size + goals.size + levers.size + levels.size} on)` : ""}`}
+          </button>
+        )}
+        {view !== "lockins" && (!PHONE || filtersOpen) && <div className="mo-filters">
           <Facet label="Model" items={count((m) => m.model)} set={setModels} on={models} />
           <Facet label="Instructions" items={count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
           <Facet label={view === "favours" ? "Favour" : "Power grab"} items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />

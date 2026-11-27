@@ -4,6 +4,7 @@
 // little before the fork. Raw counts with what each counts; the difference is a number, never a verdict.
 import { useEffect, useMemo, useState } from "react";
 import { useLens } from "../state";
+import { parseHash } from "../router";
 import { loadSeat, useAsync, usd, worldDay, human, seatOutcome, type SeatJson } from "../story/data";
 import { SittingReader } from "../story/SittingReader";
 import { kinAppointed } from "../story/StoryRail";
@@ -64,7 +65,9 @@ export function ComparePage({ a, b }: { a: string; b: string }) {
     if (!data || data instanceof Error) return;
     const [sa, , sb] = data;
     setSpan([Math.min(sa.fork_at, sb.fork_at), Math.max(sa.end_at, sb.end_at)]);
-    setT(firstDifference(sa, sb));
+    // (Opened from a run at a moment (`?t=`): that moment; else where the towns first differ.)
+    const at = Number(parseHash(window.location.hash).q.get("t"));
+    setT(parseHash(window.location.hash).q.has("t") && Number.isFinite(at) ? at : firstDifference(sa, sb));
   }, [data, setSpan, setT]);
   if (data === undefined) return <div className="cp" data-tour="compare"><div className="st-empty">Reading both runs…</div></div>;
   if (data instanceof Error) return <div className="cp"><div className="st-empty">Could not read both runs.<br /><span className="st-mono st-faint">{data.message}</span></div></div>;

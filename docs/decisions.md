@@ -17133,3 +17133,18 @@ after viz-8's checker fix (one reader per run, two at once) and the re-making of
   is ready (a window event, "lens-world-ready", sent on ready and on failure; with lens-smooth).
 - **Revisit if** the 3D town builds in under a second (then the line is noise), or a step's thing is slow for a reason
   a few seconds will not cover (then say it in its `waiting`).
+
+## 2026-11-27 Lens: a seventh newcomer review, the shell's part (`lens/nav-11`)
+
+- **Pages about a run open at the reader's moment**: Compare and Who holds power, opened from the run, carry `?t=`
+  and open there (Compare's first difference only when no moment is given); the trail back to the run carries it too.
+  Opened from a showcase at day 155, Who holds power listed day 122's holders and Compare showed day 137.
+- **The walk's note never sits over its step's heading**: a thing taller than most of the screen is scrolled to its
+  start and the note goes to the foot of the screen; step 4 lights the first of the three moments, the one it opens.
+- **Moments on a phone**: the filters fold under one "Filter" control, so the first moment is on the first screen.
+- **`#/words`** opens the words over the library (and closing them leaves the library's own link); the first-visit
+  walk does not start over them.
+- **The 3D town says what its walkers are**: people show walking only while they go between places, which takes
+  minutes, so often nobody is out at a given moment, and at night the streets are empty ("Nobody walking" is then
+  true, not a fault).
+- **Revisit if** the run page's moment should travel to every page about the run (Findings, Models: not about one run).

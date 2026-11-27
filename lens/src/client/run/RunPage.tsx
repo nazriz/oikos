@@ -239,6 +239,14 @@ function OpenRun({ runKey, q, entry, meta }: { runKey: string; q: URLSearchParam
 
 /** The run's title bar: what this run is and how it came out, in a sentence; below it, what the page answers and what
  * can be done here. */
+/** A link from the run to another page about it (Compare, Who holds power) opens at the moment the reader is on: the
+ * link's own href is the page, and the click adds `?t=` for now. */
+function atNow(e: React.MouseEvent<HTMLAnchorElement>) {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+  e.preventDefault();
+  window.location.hash = `${e.currentTarget.getAttribute("href")}?t=${Math.round(useLens.getState().t)}`;
+}
+
 export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; run?: string }) {
   const x = entry?.experiment;
   const reading = meta?.reading ?? entry?.reading;
@@ -329,12 +337,12 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
             </button>
           )}
           {x?.twin && entry && (
-            <a className="btn ghost run-compare" href={`#/compare/${encodeURIComponent(entry.key)}/${encodeURIComponent(x.twin)}`} title="This run beside the same town with a rule-based mayor">
+            <a className="btn ghost run-compare" href={`#/compare/${encodeURIComponent(entry.key)}/${encodeURIComponent(x.twin)}`} onClick={atNow} title="This run beside the same town with a rule-based mayor">
               Compare
             </a>
           )}
           {entry && views.power && (
-            <a className="btn ghost run-power" href={`#/power/${encodeURIComponent(entry.key)}`} title="Who holds each office in the town, over the run">
+            <a className="btn ghost run-power" href={`#/power/${encodeURIComponent(entry.key)}`} onClick={atNow} title="Who holds each office in the town, over the run">
               Who holds power
             </a>
           )}
