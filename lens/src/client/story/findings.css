@@ -61,3 +61,7 @@
    scrolls inside it.) */
 .fi-lt { min-width: 0; max-width: 100%; overflow: hidden; }
 .fi-lt .ld-table-wrap { max-width: 100%; overflow-x: auto; }
+
+/* The study track picker, above the lock-in table: aligned with the head. */
+.fi-track { padding: 14px 32px 0; }
+@media (max-width: 700px) { .fi-track { padding: 12px 16px 0; } }

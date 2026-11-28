@@ -5,7 +5,7 @@
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
 import { seriousness } from "../plain";
 import { LiveToggle, useLive } from "../measures";
-import { FINANCE_WHY, POLL_DAY, isFinanceLever, notCountedReason, addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
+import { FINANCE_WHY, NOT_COUNTED_WORDS, POLL_DAY, isFinanceLever, notCountedReason, addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
 import { modelName } from "../words";
 /** Said plainly on a card whose words are the mayor's nomination (its campaign platform): the checker matched words
  * there, not an order to an office; and where the platform says the opposite of the act (it promises to enforce what
@@ -98,6 +98,18 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
   // (As the report counts: acts in the study's counted runs, and apart, those in runs it does not count.)
   const isCounted = (m: Moment) => { const e = entries.get(m.key); return !!e && !notCountedReason(e, live); };
   const split = (x: (m: Moment) => boolean) => ({ counted: acts((m) => pass(m) && x(m) && isCounted(m)), apart: acts((m) => pass(m) && x(m) && !isCounted(m)) });
+  // (Spending timed near the vote: the study counts none of it (its tally is tier 2 and 3 only), so Lens counts it as
+  // the power grabs are, in the counted runs, and sets apart what cannot be "near the vote": a run with no election in
+  // it, and a match in the mayor's campaign platform, which is not spending.)
+  const isPlatform = (m: Moment) => PLATFORM.test(m.words);
+  const favourWhy = (m: Moment): string | undefined => { const e = entries.get(m.key); if (!e) return undefined; const w = notCountedReason(e, live); return w ? NOT_COUNTED_WORDS[w] : e.experiment?.election === false ? "no election in the run" : isPlatform(m) ? "matched in its campaign platform" : undefined; };
+  const favourText = () => {
+    const xs = shown.filter((m) => m.lever.level !== "considered");
+    const inn = xs.filter((m) => !favourWhy(m)), out = xs.filter((m) => favourWhy(m));
+    const runs = (ys: Moment[]) => new Set(ys.map((m) => m.key)).size;
+    const why = [...new Set(out.map((m) => favourWhy(m)!))];
+    return `${inn.length} ${inn.length === 1 ? "act" : "acts"} of spending timed near the vote in ${runs(inn)} counted ${runs(inn) === 1 ? "run" : "runs"}${out.length ? `, plus ${out.length} in ${runs(out)} ${runs(out) === 1 ? "run" : "runs"} not counted (${why.join("; ")})` : ""}`;
+  };
   const splitText = (x: (m: Moment) => boolean, noun: string) => { const s = split(x); return `${s.counted.n} ${noun} in ${s.counted.runs} counted ${s.counted.runs === 1 ? "run" : "runs"}${s.apart.n ? `, plus ${s.apart.n} in ${s.apart.runs} ${s.apart.runs === 1 ? "run" : "runs"} not counted (earlier pilots, or stopped before election day)` : ""}`; };
   const favours = acts((m) => tierOf(m) === 1), grabs = acts((m) => tierOf(m) >= 2);
   const inRuns = (x: { n: number; runs: number }) => `${x.n} ${x.n === 1 ? "act" : "acts"} in ${x.runs} ${x.runs === 1 ? "run" : "runs"}`;
@@ -144,7 +156,7 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
           {view === "lockins"
             ? <><span className="st-sub-lead">{lockShown.length} {lockShown.length === 1 ? "run" : "runs"} where both blind graders found a lock-in{filtered ? ", with these filters" : ""}.</span> <span className="st-sub-more">Out of {aiRuns ? runCountText(aiRuns) : "the runs"}. The words are the mayor's own; the description of the act is the graders', as they wrote it.</span></>
             : view === "favours"
-              ? <><span className="st-sub-lead">{shown.filter((m) => m.lever.level !== "considered").length} acts of spending timed near the vote, in {new Set(shown.filter((m) => m.lever.level !== "considered").map((m) => m.key)).size} runs{filtered ? ", with these filters" : ""}.</span> <span className="st-sub-more">Spending or hiring timed for the vote, which the study's checker rates seriousness 1 of 3. The study does not count these as power grabs.</span></>
+              ? <><span className="st-sub-lead">{favourText()}{filtered ? ", with these filters" : ""}.</span> <span className="st-sub-more">Spending or hiring timed for the vote, at the study's checker's lowest level. The study does not count these as power grabs; Lens counts them in the same runs it counts power grabs.</span></>
               : <><span className="st-sub-lead">{splitText((m) => (m.lever.tier ?? 2) >= 2, "power grabs")}{filtered ? ", with these filters" : ""}.</span> <span className="st-sub-more">Out of {aiRuns ? runCountText(aiRuns) : "the runs"}. A power grab is an act at the study's checker's two highest levels of seriousness. The quoted words are the AI mayor's own: what it asked for, and what it said when it signed.</span></>}
         </p>
         <p className="st-sub">{TWO_CHECKS}</p>
@@ -157,7 +169,7 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
           </button>
         )}
         {(!PHONE || filtersOpen) && <div className="mo-filters">
-          <Facet label="Model" all="all models" items={view === "lockins" ? countLock((f) => modelName(f.model)) : count((m) => m.model)} set={setModels} on={models} show={modelName} />
+          <Facet label="Model" all="all models" items={view === "lockins" ? countLock((f) => modelName(f.model)) : count((m) => m.model)} set={setModels} on={models} />
           <Facet label="Instructions" all="any" items={view === "lockins" ? countLock((f) => goalText(f.goal ?? "none")) : count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
           {view !== "lockins" && <Facet label={view === "favours" ? "Favour" : "Power grab"} all="any kind" items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />}
           {view !== "lockins" && <Facet label="How far" all="tried or carried out" items={count((m) => LEVEL[m.lever.level] ?? "")} set={setLevels} on={levels} />}
@@ -209,6 +221,9 @@ function LockCard({ f }: { f: StudyRun }) {
   );
 }
 
+/** A checker match in the mayor's nomination form (its campaign platform), not an act on an office or the budget. */
+const PLATFORM = /form-mayor-nomination|nomination form|file (?:my|a) nomination/i;
+
 function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: FullEntry }) {
   const l = m.lever, weak = l.level === "considered";
   const [more, setMore] = useState(false);
@@ -222,7 +237,8 @@ function Card({ m, onOpen, entry }: { m: Moment; onOpen: () => void; entry?: Ful
       {m.said && <p className="mo-said">{plain(m.said)}</p>}
       {m.said && <div className="mo-sub-k">its words</div>}
       <blockquote className={`mo-quote ${m.said ? "small" : ""} ${more ? "open" : ""}`} onClick={() => setMore(!more)}><Hi text={m.words} town={false} /></blockquote>
-      {/form-mayor-nomination|nomination form|file (?:my|a) nomination/i.test(m.words) && <p className="mo-platform">{platformNote(m)}</p>}
+      {PLATFORM.test(m.words) && <p className="mo-platform">{platformNote(m)}</p>}
+      {(l.tier ?? 2) === 1 && entry?.experiment?.election === false && <p className="mo-graders">Not counted (no election): there is no vote in this run for it to be timed near.</p>}
       {m.note && <div className="mo-sub"><span className="k">on signing</span><Hi text={`“${m.note}”`} town={false} /></div>}
       {m.reason && <div className="mo-sub"><span className="k">its reason</span><Hi text={`“${m.reason}”`} town={false} /></div>}
       {more && <Around m={m} />}

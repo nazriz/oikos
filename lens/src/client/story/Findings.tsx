@@ -9,10 +9,11 @@
 //   outcome     how each run's election went, by model (Lens's one rule, src/shared/outcome.ts)
 //   cost        dollars per run, by model
 import { LiveToggle, useLive } from "../measures";
+import { TrackPicker, trackCounts } from "../library/parts";
 import { notCountedReason, clopperPearson, cohortOf, COHORT_WORDS, conditionsSentence, CONDITIONS, inCondition, markOf, tally, type Cohort, type StudyRun } from "../library/landing-data";
 import { Conditions } from "../library/charts";
 import "../library/landing.css";
-import { studyRuns } from "../library/landing-data";
+import { studyRuns, lockCell, cellHover, CORRIGIBLE, TRACKS, trackOf, type Track, type Tally, type Condition } from "../library/landing-data";
 import { MeasuresKey } from "../measures";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { RunEntry, ForkReading } from "../../shared/api";
@@ -82,8 +83,14 @@ export function Findings() {
   return <Page all={forks} lockRuns={studyRuns(runs, false, live)} entries={runs} />;
 }
 
-function Page({ all, lockRuns, entries }: { all: Fork[]; lockRuns: StudyRun[]; entries: RunEntry[] }) {
-  const groups = useMemo(() => [...new Set(all.map((f) => f.group))].sort(), [all]);
+function Page({ all: every, lockRuns: everyLock, entries }: { all: Fork[]; lockRuns: StudyRun[]; entries: RunEntry[] }) {
+  // (The study's tracks, as on the landing: every figure on the page is for the chosen one, pre-election by default.)
+  const [track, setTrack] = useState<Track>(() => { const t = /[?&]track=([a-z-]+)/.exec(location.hash)?.[1]; return TRACKS.some((x) => x.id === t) ? (t as Track) : "pre-election"; });
+  const trackByKey = useMemo(() => new Map(entries.map((e) => [e.key, trackOf(e)])), [entries]);
+  const all = useMemo(() => every.filter((f) => trackByKey.get(f.key) === track), [every, trackByKey, track]);
+  const lockRuns = useMemo(() => everyLock.filter((f) => f.track === track), [everyLock, track]);
+  const counts = trackCounts(everyLock);
+  const groups = useMemo(() => [...new Set(every.map((f) => f.group))].sort(), [every]);
   const [on, setOn] = useState<Set<string>>(() => new Set(groups.filter((g) => /^ps-/.test(g) && !/mock|levercheck/.test(g))));
   const [drill, setDrill] = useState<{ title: string; forks: Fork[] } | null>(null);
   const forks = all.filter((f) => on.has(f.group));
@@ -106,6 +113,7 @@ function Page({ all, lockRuns, entries }: { all: Fork[]; lockRuns: StudyRun[]; e
         {researcher && <div className="fi-groups"><span className="lbl">Test runs</span><button className={`st-btn ${controls ? "on" : ""}`} onClick={() => setControls(!controls)} title="Rope tests and scripted controls, which are not AI models">{controls ? "Test mayors shown below the models" : "Test mayors hidden"} <span className="n">{[...new Set(all.filter((f) => on.has(f.group) && isControl(f.model)).map((f) => f.model))].join(", ") || "none"}</span></button></div>}
         {researcher && <div className="fi-groups"><span className="lbl">Run sets</span>{groups.map((g) => <button key={g} className={`st-btn ${on.has(g) ? "on" : ""}`} onClick={() => { const n = new Set(on); n.has(g) ? n.delete(g) : n.add(g); setOn(n); }}>{g} <span className="n">{all.filter((f) => f.group === g).length}</span></button>)}</div>}
       </div>
+      <div className="fi-track"><TrackPicker track={track} setTrack={setTrack} counts={counts} /></div>
       <LockTable runs={lockRuns} entries={entries} researcher={researcher} />
       {researcher ? (
         <div className="fi-grid">
@@ -496,32 +504,37 @@ function StoryFindings({ forks: all, models, pal, lockRuns, entries }: { forks: 
 /** Lock-in by model and instruction, the report's measure, as a table with exact (Clopper-Pearson) 95% intervals: the
  * figures behind the landing's chart, one model to a row, frontier and smaller apart. */
 function LockTable({ runs, entries, researcher }: { runs: StudyRun[]; entries: RunEntry[]; researcher: boolean }) {
-  const graded = runs.filter((f) => markOf(f, "lockin") !== "ungraded");
-  const models = orderModels([...new Set(graded.map((f) => f.model))]);
-  const cell = (rs: StudyRun[], label = "") => {
-    const t = tally(rs, "lockin");
-    if (!t.n) return <td className="r st-faint" data-label={label}>{t.excluded ? `${t.excluded} stopped` : ""}</td>;
+  // (Every cell from the landing's own statuses, lockCell: counted with its result, counted but not graded, or not
+  // counted with its reason; each cell's hover accounts for every run in it.)
+  const models = orderModels([...new Set(runs.map((f) => f.model))]);
+  const show = ({ runs: rs, t }: { runs: StudyRun[]; t: Tally }, label = "") => {
+    const hover = cellHover(rs, t);
+    if (!rs.length) return <td className="r st-faint" data-label={label} />;
+    if (!t.n) return <td className="r st-faint" data-label={label} title={hover}>{t.ungraded ? `${t.ungraded} not graded` : "none counted"}</td>;
     const [lo, hi] = clopperPearson(t.k, t.n);
-    return <td className="r" data-label={label} title={`${t.k} of ${t.n}; exact 95% interval ${Math.round(lo * 100)}% to ${Math.round(hi * 100)}%${t.excluded ? `; ${t.excluded} stopped before election day, not counted` : ""}`}>{t.k ? <b className="lockin-text">{t.k}</b> : "0"} of {t.n}{researcher && <span className="st-faint"> ({Math.round(lo * 100)}–{Math.round(hi * 100)}%)</span>}</td>;
+    return <td className="r" data-label={label} title={`${hover}${researcher ? ` Exact 95% interval ${Math.round(lo * 100)}% to ${Math.round(hi * 100)}%.` : ""}`}>{t.k ? <b className="lockin-text">{t.k}</b> : "0"} of {t.n}{researcher && <span className="st-faint"> ({Math.round(lo * 100)}–{Math.round(hi * 100)}%)</span>}</td>;
   };
-  const rows = (["frontier", "smaller"] as Cohort[]).flatMap((co) => [
-    <tr key={co} className="fi-lt-group"><th colSpan={CONDITIONS.length + 2}>{COHORT_WORDS[co]}</th></tr>,
+  const cell = (m: string, c?: Condition, label = "") => show(lockCell(runs, m, c), label);
+  const cols = [...CONDITIONS, CORRIGIBLE].filter((c) => runs.some((f) => inCondition(f, c)));
+  const group = (co: Cohort, c?: Condition, label = "") => { const rs = runs.filter((f) => cohortOf(f.model) === co && (!c || (inCondition(f, c) && f.why !== "earlier pilot"))); return show({ runs: rs, t: tally(rs, "lockin") }, label); };
+  const rows = (["frontier", "smaller", "claude"] as Cohort[]).filter((co) => models.some((m) => cohortOf(m) === co)).flatMap((co) => [
+    <tr key={co} className="fi-lt-group"><th colSpan={cols.length + 2}>{COHORT_WORDS[co]}</th></tr>,
     ...models.filter((m) => cohortOf(m) === co).map((m) => (
-      <tr key={m}><td>{modelName(m)}</td>{CONDITIONS.map((c) => <Fragment key={c.id}>{cell(graded.filter((f) => f.model === m && inCondition(f, c)), c.label)}</Fragment>)}{cell(graded.filter((f) => f.model === m), "All")}</tr>
+      <tr key={m}><td>{modelName(m)}</td>{cols.map((c) => <Fragment key={c.id}>{cell(m, c, c.label)}</Fragment>)}{cell(m, undefined, "All")}</tr>
     )),
-    <tr key={co + "-all"} className="fi-lt-total"><td>All {COHORT_WORDS[co].toLowerCase()}</td>{CONDITIONS.map((c) => <Fragment key={c.id}>{cell(graded.filter((f) => cohortOf(f.model) === co && inCondition(f, c)), c.label)}</Fragment>)}{cell(graded.filter((f) => cohortOf(f.model) === co), "All")}</tr>,
+    <tr key={co + "-all"} className="fi-lt-total"><td>{co === "claude" ? "All these Claude models" : `All ${COHORT_WORDS[co].toLowerCase()}`}</td>{cols.map((c) => <Fragment key={c.id}>{group(co, c, c.label)}</Fragment>)}{group(co, undefined, "All")}</tr>,
   ]);
   return (
     <section className="fi-card wide fi-lt">
       <div className="fi-card-head"><div>
         <h2>Lock-in, by model and instruction</h2>
-        <p className="fi-takeaway">{conditionsSentence(runs)}</p>
-        <div className="st-faint">{researcher ? `Runs where both blind graders found a lock-in, of the graded runs that reached election day, with exact 95% intervals; ${POINT.hoverL} a cell for the runs that stopped early.` : `Runs where both blind graders found a lock-in, out of the runs that reached election day. ${POINT.hover} a number to see how many runs stopped early.`} <MeasuresKey /></div>
+        {runs.some((f) => f.track === "pre-election") && <p className="fi-takeaway">{conditionsSentence(runs)}</p>}
+        <div className="st-faint">{researcher ? `Runs where both blind graders found a lock-in, of the counted runs, with exact 95% intervals; ${POINT.hoverL} a cell for every run in it, counted or not.` : `Runs where both blind graders found a lock-in, out of the counted runs. ${POINT.hover} a number for every run in it, counted or not.`} <MeasuresKey /></div>
         <LiveToggle runs={entries} />
       </div></div>
       <div className="ld-table-wrap">
         <table className="ld-table stack-phone">
-          <thead><tr><th>AI model</th>{CONDITIONS.map((c) => <th key={c.id} className="r">{c.label}</th>)}<th className="r">All</th></tr></thead>
+          <thead><tr><th>AI model</th>{cols.map((c) => <th key={c.id} className="r">{c.label}</th>)}<th className="r">All</th></tr></thead>
           <tbody>{rows}</tbody>
         </table>
       </div>

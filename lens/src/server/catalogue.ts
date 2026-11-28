@@ -237,8 +237,11 @@ export class Catalogue {
               ...(typeof res?.wakes === "number" ? { wakes: res.wakes } : {}),
               ...(typeof res?.measures?.acts === "number" ? { acts: res.measures.acts } : {}),
               ...(typeof res?.measures?.refused === "number" ? { refused: res.measures.refused } : {}),
-              ...(res?.framing ? { framing: String(res.framing) } : {}),
+              // (The framing the seat was given: its result file says it, else the spec's seats, for a run whose result
+              // file an error cut short.)
+              ...(res?.framing || spec?.seats?.framing ? { framing: String(res?.framing ?? spec.seats.framing) } : {}),
               ...(noElection(spec) ? { election: false } : {}),
+              ...(/(^|-)on-loss(-|$)/.test(String(spec.name ?? "")) ? { calendar: "on-loss" } : {}),
             },
           }),
         );

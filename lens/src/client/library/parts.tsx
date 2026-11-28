@@ -1,6 +1,7 @@
 // The landing page's small parts: a section with its own link, the width a chart has, a reveal that runs once as a
 // section comes into view (never under reduced motion), and one tooltip per chart (hover and keyboard focus alike).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { TRACKS, type Track } from "./landing-data";
 
 /** A screen you touch rather than point at (a phone, a tablet; or as narrow as one): the words say "Tap", not "Hover". */
 export const TOUCH = typeof matchMedia !== "undefined" && matchMedia("(hover: none), (pointer: coarse), (max-width: 760px)").matches;
@@ -105,3 +106,25 @@ export function WithTable({ table, children, label }: { table: ReactNode; childr
     </div>
   );
 }
+
+/** The study's tracks as one row of buttons, each with its run count; the chosen track's one line under it. */
+export function TrackPicker({ track, setTrack, counts }: { track: Track; setTrack: (t: Track) => void; counts: Record<Track, number> }) {
+  const long = TRACKS.find((t) => t.id === track)!.long;
+  return (
+    <div className="ld-track">
+      <div className="seg" role="group" aria-label="Which track of the study">
+        {TRACKS.map((t) => (
+          <button key={t.id} aria-pressed={track === t.id} onClick={() => setTrack(t.id)} disabled={!counts[t.id]}>
+            {t.label} <span className="n">{counts[t.id]}</span>
+          </button>
+        ))}
+      </div>
+      <p className="ld-chart-key">Runs {long}.</p>
+    </div>
+  );
+}
+export const trackCounts = (runs: { track: Track }[]): Record<Track, number> => {
+  const c = { "pre-election": 0, "after-losing": 0, corrigible: 0, simulation: 0 } as Record<Track, number>;
+  for (const f of runs) c[f.track]++;
+  return c;
+};

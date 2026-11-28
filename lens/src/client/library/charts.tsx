@@ -13,7 +13,7 @@ import { dayOf, lockT, openAt as openAtFmt } from "../format";
 import { goalText, leverTitle, modelName } from "../words";
 import { useReveal, useTip, useWidth, WithTable, POINT, tapTwice } from "./parts";
 import type { RunEntry } from "../../shared/api";
-import { MAIN_SET, NOT_COUNTED_WORDS, actTitle, squareClass, squareText, attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
+import { COHORTS, MAIN_SET, NOT_COUNTED_WORDS, actTitle, squareClass, squareText, attempts, studyRunOf, clopperPearson, cohortOf, COHORT_WORDS, conditionCell, CONDITIONS, dayNo, fingerprint, markOf, POLL_DAY, tally, type Attempt, type Cohort, type Mark, type Measure, type StudyRun, type Tally } from "./landing-data";
 
 const DAY = 86_400;
 // (A few minutes before the act, so it is seen happening at its turn, not after it.)
@@ -189,7 +189,7 @@ export function Who({ runs, measure, quotes, researcher, onModel }: { runs: Stud
     const rows = [...by.entries()].map(([model, rs]) => ({ model, runs: rs, t: tally(rs, measure) }));
     const rate = (t: Tally) => (t.n ? t.k / t.n : -1);
     rows.sort((a, b) => rate(b.t) - rate(a.t) || b.t.k - a.t.k || b.t.n - a.t.n || a.model.localeCompare(b.model));
-    return (["frontier", "smaller", "other"] as Cohort[]).map((c) => ({ cohort: c, rows: rows.filter((r) => cohortOf(r.model) === c) })).filter((g) => g.rows.length);
+    return COHORTS.map((c) => ({ cohort: c, rows: rows.filter((r) => cohortOf(r.model) === c) })).filter((g) => g.rows.length);
   }, [runs, measure]);
   const head = measure === "lockin" ? "Locked in" : "Carried out";
   const table = (
@@ -274,8 +274,11 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
   // (One row per run, labelled with its model and town, counted runs first; a run the study does not count says why.)
   const shownRuns = runs.filter((r) => all.some((a) => a.key === r.key)).sort((a, b) => Number(!!a.why) - Number(!!b.why) || order.indexOf(a.model) - order.indexOf(b.model) || a.seed - b.seed);
   const models = shownRuns.map((r) => r.key);
+  // (The election day the shown runs were given: their median; day 180 on the default calendar.)
+  const polls = shownRuns.map((r) => r.pollDay).sort((a, b) => a - b);
+  const POLL = polls.length ? polls[Math.floor(polls.length / 2)]! : POLL_DAY;
   // (The axis runs from the day the AI mayors took office, never from the town's day 1.)
-  const from = shownRuns.length ? Math.min(...shownRuns.map((r) => r.from)) : 120, to = Math.max(195, ...shownRuns.map((r) => r.until));
+  const from = shownRuns.length ? Math.min(...shownRuns.map((r) => r.from)) : 120, to = Math.max(POLL + 15, ...shownRuns.map((r) => r.until));
   const narrow = W < 560;
   // (Each run's name sits above its row, from the left edge, at every width: a long name never runs off or is cut.)
   const LW = 0, R = 12, rowH = 52, top = 28;
@@ -295,10 +298,10 @@ export function When({ runs, order }: { runs: StudyRun[]; order: string[] }) {
         <div ref={tip.box} className="ld-box">
           <svg width={W} height={H} role="img" aria-label="Every serious power grab by day of the term, by model">
             <defs><pattern id="when-hatch" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="3" className="when-hatch-bg" /><line x1="0" y1="0" x2="0" y2="3" className="when-hatch-ln" /></pattern></defs>
-            <rect x={x(POLL_DAY)} y={top - 8} width={Math.max(0, x(to) - x(POLL_DAY))} height={H - top - 22} className="when-after" />
-            <line x1={x(POLL_DAY)} x2={x(POLL_DAY)} y1={top - 8} y2={H - 22} className="when-poll" />
-            <text x={x(POLL_DAY) - 6} y={top - 14} className="cal-small strong" textAnchor="end">election day, first called (day {dayNo(POLL_DAY)})</text>
-            {[from, 149, POLL_DAY, to].filter((d, i, all) => i === 0 || i === all.length - 1 || (x(d) - x(all[i - 1]!) > 70 && x(all[all.length - 1]!) - x(d) > 70)).map((d) => <text key={d} x={x(d)} y={H - 6} className="cal-num" textAnchor={d === from ? "start" : d === to ? "end" : "middle"}>day {dayNo(d)}</text>)}
+            <rect x={x(POLL)} y={top - 8} width={Math.max(0, x(to) - x(POLL))} height={H - top - 22} className="when-after" />
+            <line x1={x(POLL)} x2={x(POLL)} y1={top - 8} y2={H - 22} className="when-poll" />
+            <text x={x(POLL) - 6} y={top - 14} className="cal-small strong" textAnchor="end">election day, first called (day {dayNo(POLL)})</text>
+            {[from, Math.round((from + POLL) / 2), POLL, to].filter((d, i, all) => i === 0 || i === all.length - 1 || (x(d) - x(all[i - 1]!) > 70 && x(all[all.length - 1]!) - x(d) > 70)).map((d) => <text key={d} x={x(d)} y={H - 6} className="cal-num" textAnchor={d === from ? "start" : d === to ? "end" : "middle"}>day {dayNo(d)}</text>)}
             {shownRuns.map((run, mi) => {
               const y = top + mi * rowH + rowH / 2 + 8;
               const mine = all.filter((a) => a.key === run.key);

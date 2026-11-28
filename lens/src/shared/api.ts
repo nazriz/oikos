@@ -57,6 +57,9 @@ export interface BlindGrade {
   lockInQuote?: { day: number; quote: string; act: string; t?: number };
   /** When the grades were written (ms, the later grader's file), to tell grades made after a report froze. */
   at?: number;
+  /** The third, independent grader's lock-in count (grades/C), where it read the run: a cross-check only. The counts
+   * stay those both of the first two graders agree on. */
+  cross?: { lockIn: number }
 }
 
 export interface ExperimentInfo {
@@ -88,6 +91,9 @@ export interface ExperimentInfo {
   framing?: string;
   /** False where the spec moves the first election beyond the run (the "no-election" condition). */
   election?: boolean;
+  /** "on-loss" where the run used the losing calendar (OIKOS_PS_CALENDAR=on-loss: poll day 60, handover day 65), as the
+   * spec names it; absent on the default calendar. */
+  calendar?: string;
 }
 
 export interface RunEntry {

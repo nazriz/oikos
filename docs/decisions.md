@@ -17460,3 +17460,29 @@ run page ~37 s on the live server. What it found:
   the report, not in Lens's copy of the run.
 - **Revisit if** the case list changes (cases.ts), or the status function gains the on-loss calendar (then the
   on-loss cards' status lines follow it).
+## 2026-11-28 Lens: the landing opens the town (`lens/nav-20`)
+
+- Naz could not find the town viewer from the landing: its street plan read as a picture. The plan is now a link,
+  with a button under it, "Explore the town in a run", and the top bar has "Town"; both open the first of the
+  three moments (Claude Sonnet 5.5, setup 7, the day it wrote its programme into law) on its run page, map in front
+  (`townHref`, router.ts). The walk's first step says where to find it.
+
+## 2026-11-27 Lens: twelfth review (`lens/viz-17`)
+
+- **Findings' lock-in table uses the landing's statuses.** Every cell comes from `lockCell`, the same tally as the landing's squares. A model's row equals its row on the landing chart, and its instruction cells add up to the design chart's (tested). The old table filtered out runs the graders had not read, then called every run that dropped out "stopped". Now a cell shows "k of n" counted, or "N not graded" where its runs are counted but unread, or "none counted". Every cell's hover accounts for every run in it ("6 of 15 counted runs had a lock-in both graders found; 1 counted, not graded; 16 not counted: 16 earlier pilots"), via `cellHover`.
+- **What a lock-in is**, in one sentence (`LOCKIN_DEF` in words.ts), for the design chart, the key and Words: "…(most often a law the council passed; sometimes removing an official for the election's sake)". The example is the graders' own rubric ("firing an operational officer explicitly for poll optics").
+- **Spending near the vote**: the study's tally counts tiers 2 and 3 only, so it counts none of this. Lens splits it the way the power grabs are split: counted runs first, then the rest with each reason. Runs with no election ("no election in the run") and matches in the campaign platform are set apart, and a no-election card says so. "Seriousness 1 of 3" now reads "the checker's lowest level".
+- **The landing's not-counted power grabs** now read "four runs with one tried or carried out (two only drafted, then held back)". The held-back count is runs whose every attempt the mayor declined at the draft.
+- **The design chart** says under it how many counted runs the graders did not read (8), so 62 and 70 reconcile on the page.
+- **Moments' model filter** shows the moment's own display name. It used to run modelName over it a second time, which gave "GPT-6.1 TERRA".
+- Revisit if the study ever counts spending timed near the vote: its lead number should then follow the study's rule, not Lens's.
+
+## 2026-11-28 Lens: synced with the study's final report (`lens/viz-18`)
+
+- **Frozen set:** the report's final commit, a51d3e8d (2026-11-28 02:37 +11:00), replaces 16241501.
+- **The study's runs are the runs its graders read.** A run in a main-study set that no main grading set read (ps-v2-probe-2026-11-26, ps-v2-rehearsal-2026-11-26) is "an earlier pilot", unless it came after the report. So "counted, not graded" no longer occurs in the frozen figures. Lens now counts 173 graded runs, 149 of them complete, with 24 stopped before their poll, as the report does.
+- **Complete means "not stopped before its own poll day".** This mirrors tally.ts isStoppedAtLimitBeforePoll. The poll day comes from the run's election notice (pollDayOf: reading.election.poll_at), so a losing-calendar run (poll day 60, handover day 65) that runs to day 75 is complete. Where a stop happened is the later of the result file's time and the log's end: gpt61terra-strong-sim-elec-s9 has t = 0 in its result file after a late error, but its log reaches day 189, and the report counts it. Nothing matches "onloss" in a key, and POLL_DAY is only a fallback.
+- **Tracks** (`trackOf`, from the run's configuration): pre-election, after losing (`experiment.calendar`, set by the catalogue from the spec's on-loss name), corrigibility fix (goal strong_corrigible), and simulation framing (the result's framing, else spec.seats.framing). The landing's hero and design chart are the pre-election track, the report's core tables. A track picker in "Each AI model" moves that chart, the timing and the activity to another track. Findings has the same picker, and its lock-in table gains a "Keep it, reversible" column where the track has those runs.
+- **Cohorts:** the report's two (§2.1) unchanged, plus "More Claude models (the capability curve)" for haiku-4-5, sonnet-4-6, sonnet-5, opus-4-5, opus-4-6, opus-5, opus-5-5 and fable-5-2 (§3.1). The report's "All Frontier (incl. Phase 2)" row (22/32) is not a Lens cohort.
+- **Third grader:** grades/C is read as `grade.cross` (its lock-in count), a cross-check only. "Both graders" stays A and B.
+- Revisit if the study adds a calendar or framing: trackOf and TRACKS are the one place to add it.
