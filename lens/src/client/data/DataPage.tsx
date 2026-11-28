@@ -14,8 +14,10 @@ interface DataRow { key: string; values: Record<string, DataValue> }
 interface DataRuns { columns: DataColumn[]; rows: DataRow[]; builtAt: number; gradeSet: string }
 
 /** The columns shown before anyone chooses: who and what the run was, how it ended, and the graders' main fields. */
-const DEFAULT_COLS = ["run", "seed", "model", "goal", "framing", "first_election_days", "day", "stopped_why", "poll_day", "cost_usd", "graded",
+const DEFAULT_COLS = ["run", "model", "goal", "spec_name", "seed", "framing", "first_election_days", "day", "stopped_why", "poll_day", "cost_usd", "graded",
   "A_t1", "A_t2", "A_t3", "A_entrenchment", "B_t1", "B_t2", "B_t3", "B_entrenchment", "C_entrenchment", "rec_law", "rec_budget", "budget_years"];
+/** The columns that say which run a row is: kept at the left while the table scrolls sideways, at these widths. */
+const PINNED: Record<string, number> = { run: 250, model: 170, goal: 96 };
 /** A column with this many distinct values or fewer filters by picking a value. */
 const PICK = 14;
 
@@ -44,19 +46,27 @@ export function DataPage({ q }: { q: URLSearchParams }) {
   const [filters, setFilters] = useState<Record<string, string>>(() => Object.fromEntries([...q.entries()].filter(([k]) => k.startsWith("f.")).map(([k, v]) => [k.slice(2), v])));
   const [cols, setCols] = useState<string[]>(() => (q.get("cols") ? q.get("cols")!.split(",") : DEFAULT_COLS));
   const [picking, setPicking] = useState(false);
+  // (The rule-based twins, steward kind "code", are rows too, shown only when asked for.)
+  const [twins, setTwins] = useState(q.get("twins") === "1");
 
   // (The view in the URL, so it can be shared.)
   useEffect(() => {
-    const set: Record<string, string | undefined> = { sort: sort ? `${sort.dir < 0 ? "-" : ""}${sort.id}` : undefined, cols: cols.join(",") === DEFAULT_COLS.join(",") ? undefined : cols.join(",") };
+    const set: Record<string, string | undefined> = { twins: twins ? "1" : undefined, sort: sort ? `${sort.dir < 0 ? "-" : ""}${sort.id}` : undefined, cols: cols.join(",") === DEFAULT_COLS.join(",") ? undefined : cols.join(",") };
     for (const k of [...new URLSearchParams(location.hash.split("?")[1] ?? "").keys()]) if (k.startsWith("f.")) set[k] = undefined;
     for (const [k, v] of Object.entries(filters)) if (v) set[`f.${k}`] = v;
     replaceQuery(set);
-  }, [sort, filters, cols]);
+  }, [sort, filters, cols, twins]);
 
   const columns = data && !(data instanceof Error) ? data.columns : [];
   const byId = useMemo(() => new Map(columns.map((c) => [c.id, c])), [columns]);
-  const shown = cols.map((id) => byId.get(id)).filter((c): c is DataColumn => !!c);
-  const rows = data && !(data instanceof Error) ? data.rows : [];
+  // (The identifying columns first, pinned; then the rest in the order chosen.)
+  const chosen = cols.map((id) => byId.get(id)).filter((c): c is DataColumn => !!c);
+  const shown = [...chosen.filter((c) => c.id in PINNED), ...chosen.filter((c) => !(c.id in PINNED))];
+  const lefts = new Map<string, number>();
+  { let x = 0; for (const c of shown) { if (!(c.id in PINNED)) break; lefts.set(c.id, x); x += PINNED[c.id]!; } }
+  const pin = (c: DataColumn) => (lefts.has(c.id) ? { "data-col": c.id, className: "dt-pin", style: { left: lefts.get(c.id), width: PINNED[c.id], minWidth: PINNED[c.id], maxWidth: PINNED[c.id] } } : {});
+  const all = data && !(data instanceof Error) ? data.rows : [];
+  const rows = useMemo(() => (twins ? all : all.filter((r) => r.values.steward_kind !== "code")), [all, twins]);
   const picks = useMemo(() => {
     const m = new Map<string, string[]>();
     for (const c of columns) {
@@ -99,12 +109,13 @@ export function DataPage({ q }: { q: URLSearchParams }) {
     <div className="dt">
       <div className="dt-head">
         <h1 className="dt-title">Data: every run, as its files record it</h1>
-        <p className="dt-note">One row per model run under runs/ps-v2-*, with its fields as written in the run's files and the grade files of {data.gradeSet}. Hover a column's name for the file and field it comes from. Click a row for the run's raw data.</p>
+        <p className="dt-note">One row per model run under runs/ps-v2-* (and, when asked for, its rule-based twin), with its fields as written in the run's files and the grade files of {data.gradeSet}. Hover a column's name for the file and field it comes from. Click a row for the run's raw data.</p>
         <div className="dt-bar">
           <b className="dt-count">{filtered.length} of {rows.length} runs</b>
           <button className="btn ghost" onClick={() => setPicking(!picking)} aria-expanded={picking}>Columns ({shown.length} of {columns.length})</button>
           {anyFilter && <button className="btn ghost" onClick={() => setFilters({})}>Clear filters</button>}
           {sort && <button className="btn ghost" onClick={() => setSort(null)}>Clear sort</button>}
+          <label className="dt-twins"><input type="checkbox" checked={twins} onChange={(e) => setTwins(e.target.checked)} /> Show rule-based runs</label>
           <button className="btn ghost" onClick={download}>Download CSV ({filtered.length} rows, {shown.length} columns)</button>
         </div>
         {picking && (
@@ -131,7 +142,7 @@ export function DataPage({ q }: { q: URLSearchParams }) {
           <thead>
             <tr>
               {shown.map((c) => (
-                <th key={c.id} className={c.type === "number" ? "r" : ""} title={`${c.id}: ${c.source}`} aria-sort={sort?.id === c.id ? (sort.dir > 0 ? "ascending" : "descending") : "none"}>
+                <th key={c.id} {...pin(c)} className={`${c.type === "number" ? "r" : ""} ${lefts.has(c.id) ? "dt-pin" : ""}`} title={`${c.id}: ${c.source}`} aria-sort={sort?.id === c.id ? (sort.dir > 0 ? "ascending" : "descending") : "none"}>
                   <button className="dt-sort" onClick={() => setSort(sort?.id === c.id ? (sort.dir > 0 ? { id: c.id, dir: -1 } : null) : { id: c.id, dir: 1 })}>
                     {c.label}{sort?.id === c.id ? (sort.dir > 0 ? " ▲" : " ▼") : ""}
                   </button>
@@ -143,7 +154,7 @@ export function DataPage({ q }: { q: URLSearchParams }) {
                 const f = filters[c.id] ?? "";
                 const pick = picks.get(c.id);
                 if (pick) return (
-                  <th key={c.id}>
+                  <th key={c.id} {...pin(c)}>
                     <select value={f.startsWith("=") ? f.slice(1) : ""} onChange={(e) => setFilter(c.id, e.target.value === "" ? "" : `=${e.target.value}`)} aria-label={`Filter ${c.label}`}>
                       <option value="">any</option>
                       {pick.map((v) => <option key={v} value={v}>{v === "" ? "(empty)" : v}</option>)}
@@ -153,20 +164,20 @@ export function DataPage({ q }: { q: URLSearchParams }) {
                 if (c.type === "number") {
                   const [a = "", b = ""] = f.includes("..") ? f.split("..") : ["", ""];
                   return (
-                    <th key={c.id} className="dt-range">
+                    <th key={c.id} {...pin(c)} className={`dt-range ${lefts.has(c.id) ? "dt-pin" : ""}`}>
                       <input inputMode="decimal" placeholder="min" value={a} onChange={(e) => setFilter(c.id, e.target.value || b ? `${e.target.value}..${b}` : "")} aria-label={`${c.label} at least`} />
                       <input inputMode="decimal" placeholder="max" value={b} onChange={(e) => setFilter(c.id, a || e.target.value ? `${a}..${e.target.value}` : "")} aria-label={`${c.label} at most`} />
                     </th>
                   );
                 }
-                return <th key={c.id}><input placeholder="contains" value={f} onChange={(e) => setFilter(c.id, e.target.value)} aria-label={`Filter ${c.label}`} /></th>;
+                return <th key={c.id} {...pin(c)}><input placeholder="contains" value={f} onChange={(e) => setFilter(c.id, e.target.value)} aria-label={`Filter ${c.label}`} /></th>;
               })}
             </tr>
           </thead>
           <tbody>
             {filtered.map((r) => (
               <tr key={r.key} onClick={() => (location.hash = `#/data/${encodeURIComponent(r.key)}`)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && (location.hash = `#/data/${encodeURIComponent(r.key)}`)}>
-                {shown.map((c) => <td key={c.id} className={c.type === "number" ? "r" : ""}>{show(r.values[c.id] ?? null)}</td>)}
+                {shown.map((c) => <td key={c.id} {...pin(c)} className={`${c.type === "number" ? "r" : ""} ${lefts.has(c.id) ? "dt-pin" : ""}`} title={lefts.has(c.id) ? show(r.values[c.id] ?? null) : undefined}>{show(r.values[c.id] ?? null)}</td>)}
               </tr>
             ))}
           </tbody>

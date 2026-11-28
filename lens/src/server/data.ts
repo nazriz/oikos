@@ -1,4 +1,5 @@
-// The Data page's run table (/api/data/runs): the study's raw fields, one row per model arm of every run under
+// The Data page's run table (/api/data/runs): the study's raw fields, one row per arm (the model's, and the rule-based
+// twin's, steward kind "code") of every run under
 // runs/ps-v2-*, read from the files as they are. Nothing here judges or labels: no "counted", no "lock-in", no status
 // from Lens's own functions. Every column names the file and field it comes from (`source`), and its value is that
 // field as written, or a count of things as written (records by kind, grade entries), or a day from a time in seconds
@@ -18,6 +19,8 @@ import { parseGoal } from "../../../experiments/power-seeking/tally";
 
 export const GRADE_SET = "ps-blind-grades-v2-2026-11-26";
 const DAY = 86_400;
+/** The table's shape: raised when its columns or rows change, so a cached table of the old shape is built again. */
+const DATA_VERSION = 2;
 
 export type DataType = "text" | "number" | "bool";
 export interface DataColumn { id: string; label: string; source: string; type: DataType; group: string }
@@ -36,6 +39,7 @@ export const DATA_COLUMNS: DataColumn[] = [
   col("Run", "seed", "Seed", "spec.json seeds; seed-<n>/", "number"),
   col("Run", "arm", "Arm", "spec.json arms[].name"),
   col("Run", "model", "Model", "spec.json arms[].steward.model"),
+  col("Run", "steward_kind", "Steward kind", "spec.json arms[].steward.kind"),
   col("Spec", "spec_name", "Spec name", "spec.json name"),
   col("Spec", "goal", "Goal", "spec.json goal, else parsed from name (experiments/power-seeking/tally.ts parseGoal)"),
   col("Spec", "framing", "Framing", "spec.json seats.framing"),
@@ -112,7 +116,7 @@ function stampOf(runs: string, views: string, dirs: string[]): string {
   add(mtime(join(gs, "key.json")));
   for (const g of GRADERS) add(mtime(join(gs, "grades", g)));
   add(mtime(join(views, "bundles")));
-  return `${dirs.length}:${h}`;
+  return `v${DATA_VERSION}:${dirs.length}:${h}`;
 }
 
 /** The newest made bundle for each run key (bundles/<key>.<stamp>), for its seat.json. */
@@ -194,7 +198,7 @@ export function buildDataRuns(runs: string, views: string, dirs = experimentDirs
     const rel = relative(runs, dir);
     const seeds: number[] = Array.isArray(spec.seeds) ? spec.seeds.map(Number) : [];
     for (const arm of spec.arms ?? []) {
-      if (!arm?.name || arm.name === "code" || arm.steward?.kind === "code") continue;
+      if (!arm?.name) continue;
       for (const seed of seeds) {
         const sd = join(dir, `seed-${seed}`);
         const log = join(sd, `${arm.name}.oklog`);
@@ -203,7 +207,7 @@ export function buildDataRuns(runs: string, views: string, dirs = experimentDirs
         const k = keyOf(`${rel}/seed-${seed}/${arm.name}.oklog`);
         const packet = packetOf.get(`${rel}|${seed}|${arm.name}`);
         const v: Record<string, DataValue> = {
-          run: rel, group: rel.split("/")[0]!, seed, arm: String(arm.name), model: raw(arm.steward?.model),
+          run: rel, group: rel.split("/")[0]!, seed, arm: String(arm.name), model: raw(arm.steward?.model), steward_kind: raw(arm.steward?.kind),
           spec_name: raw(spec.name), goal: parseGoal(spec), framing: raw(spec.seats?.framing),
           first_election_days: setOf(spec, "first_election_days") !== undefined ? Number(setOf(spec, "first_election_days")) : null,
           election_guard: raw(setOf(spec, "election_guard")), fork_day: raw(spec.forkDay), until_day: raw(spec.untilDay),
