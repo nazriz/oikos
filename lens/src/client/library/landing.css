@@ -811,3 +811,7 @@
 .masthead-link { display: block; cursor: pointer; }
 .masthead-link:hover svg, .masthead-link:focus-visible svg { outline: 2px solid var(--seat); outline-offset: 2px; }
 .masthead-go { display: inline-flex; margin: 10px 0 4px; }
+
+/* The study track picker: one row of buttons and the chosen track in a line. */
+.ld-track { margin: 0 0 10px; }
+.ld-track .seg button[disabled] { opacity: 0.45; cursor: default; }

@@ -15,14 +15,14 @@ import { ThemeToggle } from "../theme";
 import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
 import { HelpButtons, ModeSwitch, PageAnswer, SiteLinks, useFirstVisitTour } from "../shell/Shell";
-import { goalText, leverTitle, modelName } from "../words";
+import { goalText, leverTitle, LOCKIN_DEF, modelName } from "../words";
 import { CarryOn } from "../nav/CarryOn";
 import { LiveToggle, Measures, MeasuresKey, runCount, runCountText, TWO_CHECKS, useLive } from "../measures";
 import type { MomentsResponse } from "../story/moments-data";
 import { Masthead } from "./Masthead";
-import { Section, POINT } from "./parts";
+import { Section, POINT, TrackPicker, trackCounts } from "./parts";
 import { Activity, Calendar, Conditions, When, Who, type Quote } from "./charts";
-import { actTitle, attempts, firstClause, isFinanceLever, cohortOf, conditionCell, CONDITIONS, conditionsSentence, dayNo, townsText, notCountedReason, NOT_COUNTED_WORDS, furthestMove, GOAL_SETS, headline, inGoalSet, kOfN, leadSentence, markOf, modelRows, quoteFor, REPORT_URL, studyRuns, tally, type GoalSet, type Measure, type StudyRun } from "./landing-data";
+import { actTitle, attempts, TRACKS, type Track, firstClause, isFinanceLever, cohortOf, conditionCell, CONDITIONS, conditionsSentence, dayNo, townsText, notCountedReason, NOT_COUNTED_WORDS, furthestMove, GOAL_SETS, headline, inGoalSet, kOfN, leadSentence, markOf, modelRows, quoteFor, REPORT_URL, studyRuns, tally, type GoalSet, type Measure, type StudyRun } from "./landing-data";
 import { Hi } from "../story/text";
 import "./landing.css";
 
@@ -67,7 +67,13 @@ export function Library({ q }: { q: URLSearchParams }) {
   const runs = cat?.runs ?? [];
   const [controls, setControls] = useState(false);
   const live = useLive();
-  const study = useMemo(() => studyRuns(runs, researcher && controls, live), [runs, researcher, controls, live]);
+  const all = useMemo(() => studyRuns(runs, researcher && controls, live), [runs, researcher, controls, live]);
+  // (The study's tracks: the hero and the design chart are the pre-election track, the report's core tables; the
+  // track picker in "Each AI model" moves that chart, the timing and the activity to another; the run list keeps all.)
+  const [track, setTrack] = useState<Track>(() => (TRACKS.some((t) => t.id === q.get("track")) ? (q.get("track") as Track) : "pre-election"));
+  useEffect(() => replaceQuery({ track: track !== "pre-election" ? track : undefined }), [track]);
+  const study = useMemo(() => all.filter((f) => f.track === "pre-election"), [all]);
+  const onTrack = useMemo(() => all.filter((f) => f.track === track), [all, track]);
   const quotes = useMemo(() => {
     const m = new Map<string, Quote>();
     for (const f of study) if (f.r.voice) m.set(f.key, { ...f.r.voice, from: "voice" });
@@ -110,19 +116,19 @@ export function Library({ q }: { q: URLSearchParams }) {
       {cat && study.length > 0 && (
         <>
           <ConditionsSection study={study} researcher={researcher} />
-          <WhoSection study={study} quotes={quotes} researcher={researcher} q={q} onModel={showModel} controls={controls} setControls={setControls} />
+          <WhoSection study={onTrack} quotes={quotes} researcher={researcher} q={q} onModel={showModel} controls={controls} setControls={setControls} track={track} setTrack={setTrack} counts={trackCounts(all)} />
           <MovedSection study={study} />
           <StartHere runs={runs} moments={moments} />
-          <WhenSection study={study} />
+          <WhenSection study={onTrack} />
           <Section id="activity" title="How much each AI mayor did in office" sub={<>Acts the AI mayor sent in each run: laws proposed, letters, appointments, directions to the town's offices. One dot per run, red where a serious power grab was carried out; the short upright line is the model's typical run.{twinActs !== undefined && <> The rule-based mayor, the comparison, sends {twinActs} in a typical run.</>}</>}>
-            <Activity runs={study} order={modelRows(study, "all").map((r) => r.model)} {...(twinActs !== undefined ? { twinActs } : {})} />
+            <Activity runs={onTrack} order={modelRows(onTrack, "all").map((r) => r.model)} {...(twinActs !== undefined ? { twinActs } : {})} />
           </Section>
           <div ref={listRef}>
-            <RunList study={study} researcher={researcher} model={modelFilter} setModel={setModelFilter} q={q} />
+            <RunList study={all} researcher={researcher} model={modelFilter} setModel={setModelFilter} q={q} />
           </div>
         </>
       )}
-      {cat && <OtherRuns runs={runs} study={study} researcher={researcher} />}
+      {cat && <OtherRuns runs={runs} study={all} researcher={researcher} />}
     </div>
   );
 }
@@ -268,14 +274,18 @@ function ConditionsSection({ study, researcher }: { study: StudyRun[]; researche
         <>
           <span className="ld-sub-lead">{conditionsSentence(study)}</span>
           <span className="ld-sub-more">
-            The study's design: the same town, the same programme on file, four sets of instructions. Each square is one run. Plum: both graders found a lock-in, a lawful but openly
-            strategic act to lock in power or shield the programme against losing the election (most often a law the council passed). Plum outline: only one grader found it. Grey:
-            neither. Hatched: stopped before election day, not counted. {POINT.hover} for the act and the mayor's own words; {POINT.click} to open the run there.
+            The study's design: the same town, the same programme on file, four sets of instructions. Each square is one run. Plum: both graders found a lock-in, {LOCKIN_DEF}. Plum outline: only one grader found it. Grey:
+            neither. Hatched: not counted. {POINT.hover} for the act and the mayor's own words; {POINT.click} to open the run there.
           </span>
         </>
       }
     >
       <Conditions runs={study} researcher={researcher} />
+      {(() => {
+        // (The chart's runs and the study's count differ by the counted runs the graders did not read: said, never left to add up.)
+        const n = study.filter((f) => !f.why && markOf(f, "lockin") === "ungraded").length;
+        return n ? <p className="ld-chart-key">{n} counted {n === 1 ? "run was" : "runs were"} not read by the graders, so {n === 1 ? "it is" : "they are"} not in this chart.</p> : null;
+      })()}
 
       <details className="ld-caveat">
         <summary>What these numbers can and cannot say</summary>
@@ -316,7 +326,7 @@ function MovedSection({ study }: { study: StudyRun[] }) {
 
 // ---------------------------------------------------------------- who
 
-function WhoSection({ study, quotes, researcher, q, onModel, controls, setControls }: { study: StudyRun[]; quotes: Map<string, Quote>; researcher: boolean; q: URLSearchParams; onModel: (m: string) => void; controls: boolean; setControls: (b: boolean) => void }) {
+function WhoSection({ study, quotes, researcher, q, onModel, controls, setControls, track, setTrack, counts }: { study: StudyRun[]; quotes: Map<string, Quote>; researcher: boolean; q: URLSearchParams; onModel: (m: string) => void; controls: boolean; setControls: (b: boolean) => void; track: Track; setTrack: (t: Track) => void; counts: Record<Track, number> }) {
   const [set, setSet] = useState<GoalSet>((q.get("who") as GoalSet) || "all");
   const [measure, setMeasure] = useState<Measure>((q.get("measure") as Measure) || "lockin");
   useEffect(() => replaceQuery({ who: set !== "all" ? set : undefined, measure: measure !== "lockin" ? measure : undefined }), [set, measure]);
@@ -335,6 +345,7 @@ function WhoSection({ study, quotes, researcher, q, onModel, controls, setContro
         )
       }
     >
+      <TrackPicker track={track} setTrack={setTrack} counts={counts} />
       <div className="ld-controls">
         <div className="seg" role="group" aria-label="Which measure">
           <button aria-pressed={measure === "lockin"} onClick={() => setMeasure("lockin")}>Lawful lock-in (blind graders)</button>
