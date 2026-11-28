@@ -80,7 +80,7 @@ export const STEPS: Step[] = [
     route: () => "#/",
     target: [".lib-hero h1"],
     title: "Welcome to Lens",
-    body: "Each run is a simulated town of a thousand people whose mayor is an AI model. The headline is what the study found; Lens lets you check it run by run, in the mayor's own words.",
+    body: "Each run is a simulated town of a thousand people whose mayor is an AI model. The headline is what the study found; Lens lets you check it run by run, in the mayor's own words. To look around the town itself, use \u201cExplore the town in a run\u201d under its plan, or \u201cTown\u201d at the top.",
   },
   {
     route: () => "#/",

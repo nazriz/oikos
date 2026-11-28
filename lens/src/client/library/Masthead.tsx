@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import type { TownBundle } from "../../folds/town";
 import { fetchFold } from "../api";
+import { townHref } from "../router";
 
 const COVER: Record<string, string> = { woodland: "var(--plan-wood)", farmland: "var(--plan-farm)", wetland: "var(--plan-wet)", riverbank: "var(--plan-wet)", scrub: "var(--plan-scrub)" };
 
@@ -31,7 +32,9 @@ export function Masthead({ run }: { run: string }) {
   const w = Math.min(town.ground.w, x1 + m) - vx, h = Math.min(town.ground.h, y1 + m) - vy;
   return (
     <figure className="masthead">
-      <svg viewBox={`${vx} ${vy} ${w} ${h}`} role="img" aria-label={`Street plan of ${town.name ?? "the town"}`} shapeRendering="crispEdges">
+      {/* (The plan opens the town: a run's map, where it can be explored. A picture alone did not say so.) */}
+      <a href={townHref()} className="masthead-link" title="Explore the town in a run">
+      <svg viewBox={`${vx} ${vy} ${w} ${h}`} role="img" aria-label={`Street plan of ${town.name ?? "the town"}: explore it in a run`} shapeRendering="crispEdges">
         <rect x={vx} y={vy} width={w} height={h} className="plan-ground" />
         {town.terrain.map((c, i) => (COVER[c.cover] ? <rect key={i} x={c.x} y={c.y} width={c.w} height={c.h} fill={COVER[c.cover]} /> : null))}
         {town.river.map((chain, i) => (
@@ -54,6 +57,10 @@ export function Masthead({ run }: { run: string }) {
           </g>
         )}
       </svg>
+      </a>
+      <a href={townHref()} className="btn primary masthead-go">
+        Explore the town in a run
+      </a>
       <figcaption>
         {town.name ?? "The town"}, the town in these runs: about a thousand people. The town hall, where the AI mayor works, is marked in yellow.
       </figcaption>
