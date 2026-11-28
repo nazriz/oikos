@@ -10,7 +10,11 @@ const repo = join(import.meta.dir, "..");
 const runner = join(import.meta.dir, "test.ts");
 const list = (...a: string[]) => {
   const p = Bun.spawnSync(["bun", runner, "--list", "--no-build", ...a], { cwd: repo, stdout: "pipe", stderr: "pipe", env: { ...process.env, OIKOS_SLOTS: "off" } });
-  return p.stdout.toString().split("\n").filter((l) => /\.test\.ts$/.test(l));
+  const files = p.stdout.toString().split("\n").filter((l) => /\.test\.ts$/.test(l));
+  // (A listing that fails says how: twice on 2026-11-28 a busy gate got nothing back from one of these and the test
+  // could only say "received 0". Every tier lists at least one file, so nothing listed is the runner's failure.)
+  if (p.exitCode !== 0 || !files.length) throw new Error(`the runner listed nothing for ${a.join(" ")}: exit ${p.exitCode}, signal ${p.signalCode ?? "none"}; stderr: ${p.stderr.toString().slice(0, 600) || "(empty)"}; stdout: ${p.stdout.toString().slice(0, 300) || "(empty)"}`);
+  return files;
 };
 const tiers = JSON.parse(readFileSync(join(import.meta.dir, "test-tiers.json"), "utf8")) as { slow: Record<string, string>; canary: Record<string, { why: string; kernel?: boolean }> };
 const times = JSON.parse(readFileSync(join(import.meta.dir, "test-times.json"), "utf8")) as Record<string, number>;
