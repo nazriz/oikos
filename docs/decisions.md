@@ -17486,3 +17486,5 @@ run page ~37 s on the live server. What it found:
 - **Cohorts:** the report's two (§2.1) unchanged, plus "More Claude models (the capability curve)" for haiku-4-5, sonnet-4-6, sonnet-5, opus-4-5, opus-4-6, opus-5, opus-5-5 and fable-5-2 (§3.1). The report's "All Frontier (incl. Phase 2)" row (22/32) is not a Lens cohort.
 - **Third grader:** grades/C is read as `grade.cross` (its lock-in count), a cross-check only. "Both graders" stays A and B.
 - Revisit if the study adds a calendar or framing: trackOf and TRACKS are the one place to add it.
+
+- **Track filter (Moments):** a "Track" facet (Pre-election / After losing / Corrigibility fix / Simulation framing) filters the power grabs, the spending and the lock-ins, using lens-viz's `trackOf` and `TRACKS` (landing-data.ts, lens/viz-18) on each run's catalogue entry; no track logic of its own.

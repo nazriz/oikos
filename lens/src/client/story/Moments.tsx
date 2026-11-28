@@ -5,7 +5,7 @@
 // unreliable) is left out unless asked for, and shown muted. Nothing here grades: the flags are the reader's, labelled.
 import { seriousness } from "../plain";
 import { LiveToggle, useLive } from "../measures";
-import { FINANCE_WHY, NOT_COUNTED_WORDS, POLL_DAY, isFinanceLever, notCountedReason, addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
+import { FINANCE_WHY, NOT_COUNTED_WORDS, TRACKS, trackOf, POLL_DAY, isFinanceLever, notCountedReason, addedAfterReport, isStudyEntry, markOf, studyRuns, type StudyRun } from "../library/landing-data";
 import { modelName } from "../words";
 /** Said plainly on a card whose words are the mayor's nomination (its campaign platform): the checker matched words
  * there, not an order to an office; and where the platform says the opposite of the act (it promises to enforce what
@@ -73,6 +73,8 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
   const [models, setModels] = useState<Set<string>>(new Set());
   const [levers, setLevers] = useState<Set<string>>(new Set());
   const [goals, setGoals] = useState<Set<string>>(new Set());
+  // (The study's tracks, as the landing and Findings name them: lens-viz's trackOf, read from each run's catalogue entry.)
+  const [tracks, setTracks] = useState<Set<string>>(new Set());
   const [levels, setLevels] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<"poll" | "day" | "model">("poll");
   // (#/moments?run=<key>: one run's cards, as the landing links its one counted case.)
@@ -112,13 +114,15 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
   };
   const splitText = (x: (m: Moment) => boolean, noun: string) => { const s = split(x); return `${s.counted.n} ${noun} in ${s.counted.runs} counted ${s.counted.runs === 1 ? "run" : "runs"}${s.apart.n ? `, plus ${s.apart.n} in ${s.apart.runs} ${s.apart.runs === 1 ? "run" : "runs"} not counted (earlier pilots, or stopped before election day)` : ""}`; };
   const favours = acts((m) => tierOf(m) === 1), grabs = acts((m) => tierOf(m) >= 2);
+  const entryByKey = useMemo(() => new Map((Array.isArray(cat) ? cat : []).map((e) => [e.key, e])), [cat]);
   const inRuns = (x: { n: number; runs: number }) => `${x.n} ${x.n === 1 ? "act" : "acts"} in ${x.runs} ${x.runs === 1 ? "run" : "runs"}`;
   const lockins = useMemo(() => (Array.isArray(cat) ? studyRuns(cat, false, live).filter((f) => markOf(f, "lockin") === "yes" && f.grade?.lockInQuote) : []), [cat, live]);
-  const pass = (m: Moment) => (!onlyRun || m.key === onlyRun) && (!models.size || models.has(m.model)) && (!levers.size || levers.has(leverTitle(m.lever.lever))) && (!goals.size || goals.has(goalText(m.goal ?? "none"))) && (!levels.size || levels.has(LEVEL[m.lever.level] ?? ""));
-  const filtered = !!onlyRun || models.size + levers.size + goals.size + levels.size > 0;
+  const trackWords = (key: string) => { const e = entryByKey.get(key); return e ? TRACKS.find((x) => x.id === trackOf(e))?.label ?? "" : ""; };
+  const pass = (m: Moment) => (!onlyRun || m.key === onlyRun) && (!tracks.size || tracks.has(trackWords(m.key))) && (!models.size || models.has(m.model)) && (!levers.size || levers.has(leverTitle(m.lever.lever))) && (!goals.size || goals.has(goalText(m.goal ?? "none"))) && (!levels.size || levels.has(LEVEL[m.lever.level] ?? ""));
+  const filtered = !!onlyRun || models.size + levers.size + goals.size + levels.size + tracks.size > 0;
   // (The lock-ins take the same model and instruction filters, and the same orders, by the day the graders quoted.)
   const lockDay = (f: StudyRun) => Math.floor(lockT(f.grade!.lockInQuote!) / 86_400);
-  const lockShown = lockins.filter((f) => (!onlyRun || f.key === onlyRun) && (!models.size || models.has(modelName(f.model)) || models.has(f.model)) && (!goals.size || goals.has(goalText(f.goal ?? "none"))))
+  const lockShown = lockins.filter((f) => (!onlyRun || f.key === onlyRun) && (!tracks.size || tracks.has(trackWords(f.key))) && (!models.size || models.has(modelName(f.model)) || models.has(f.model)) && (!goals.size || goals.has(goalText(f.goal ?? "none"))))
     .sort((a, b) => sort === "model" ? modelName(a.model).localeCompare(modelName(b.model)) || lockDay(a) - lockDay(b) : sort === "day" ? lockDay(a) - lockDay(b) : Math.abs(lockDay(a) - POLL_DAY) - Math.abs(lockDay(b) - POLL_DAY) || lockDay(a) - lockDay(b));
   const countLock = (f: (x: StudyRun) => string) => { const c = new Map<string, number>(); for (const x of lockins) c.set(f(x), (c.get(f(x)) ?? 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); };
   const count = (f: (m: Moment) => string) => { const c = new Map<string, number>(); for (const m of all) c.set(f(m), (c.get(f(m)) ?? 0) + 1); return [...c].sort((a, b) => b[1] - a[1]); };
@@ -165,10 +169,11 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
         {onlyRun && <p className="st-sub"><b>One run's moments.</b> <button className="st-btn" onClick={() => { setOnlyRun(null); history.replaceState(null, "", "#/moments"); }}>Show every run</button></p>}
         {PHONE && (
           <button className="st-btn mo-filter-toggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}>
-            {filtersOpen ? "Hide the filters" : `Filter${models.size + goals.size + levers.size + levels.size ? ` (${models.size + goals.size + levers.size + levels.size} on)` : ""}`}
+            {filtersOpen ? "Hide the filters" : `Filter${models.size + goals.size + levers.size + levels.size + tracks.size ? ` (${models.size + goals.size + levers.size + levels.size + tracks.size} on)` : ""}`}
           </button>
         )}
         {(!PHONE || filtersOpen) && <div className="mo-filters">
+          <Facet label="Track" all="every track" items={view === "lockins" ? countLock((f) => trackWords(f.key)) : count((m) => trackWords(m.key))} set={setTracks} on={tracks} />
           <Facet label="Model" all="all models" items={view === "lockins" ? countLock((f) => modelName(f.model)) : count((m) => m.model)} set={setModels} on={models} />
           <Facet label="Instructions" all="any" items={view === "lockins" ? countLock((f) => goalText(f.goal ?? "none")) : count((m) => goalText(m.goal ?? "none"))} set={setGoals} on={goals} />
           {view !== "lockins" && <Facet label={view === "favours" ? "Favour" : "Power grab"} all="any kind" items={count((m) => leverTitle(m.lever.lever))} set={setLevers} on={levers} />}
