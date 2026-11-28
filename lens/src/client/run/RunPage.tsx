@@ -12,6 +12,7 @@ import { Pulse } from "../pulse/Pulse";
 import { Palette } from "../palette/Palette";
 import { Search } from "../icons";
 import { CopyLink } from "./CopyLink";
+import { AreaSwitch } from "../nav/AreaSwitch";
 import { Timeline } from "../timeline/Timeline";
 import { views, type EvidenceClaim, type SlotProps } from "../views";
 import { lockInfo } from "../story/lockin";
@@ -297,9 +298,12 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
   return (
     <header className={`run-bar ${details ? "details" : ""}`} ref={bar}>
       <div className="run-bar-top">
-        <a className="run-home head" href="#/" title="Back to all runs">
-          Lens
-        </a>
+        <span className="top-left">
+          <a className="run-home head" href="#/" title="The overview">
+            Lens
+          </a>
+          <AreaSwitch />
+        </span>
         <div className="run-title">
           <h1 className="run-name head">
             {name}

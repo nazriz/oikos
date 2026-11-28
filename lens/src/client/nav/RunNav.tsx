@@ -31,7 +31,7 @@ export function Crumbs({ run, entry }: { run: string; entry?: RunEntry }) {
   return (
     <nav className="crumbs" aria-label="Where you are">
       <a className="crumb" href="#/" title="All runs (g then l)">
-        Library
+        Overview
       </a>
       <Sep />
       {trail.length ? (

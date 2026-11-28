@@ -3,8 +3,7 @@
 import { useEffect } from "react";
 import { useMode, toured } from "../mode";
 import { COLOURS, PAGE_ANSWERS, WORDS, type PageKey } from "../words";
-import { views } from "../views";
-import { townHref, useHash } from "../router";
+import { useHash } from "../router";
 import "./shell.css";
 
 export function ModeSwitch() {
@@ -19,27 +18,6 @@ export function ModeSwitch() {
         Researcher
       </button>
     </div>
-  );
-}
-
-/** The pages across all runs, where they are registered: models, findings, moments. */
-export function SiteLinks() {
-  const links = [
-    // (The town itself, a run's map: the first thing a newcomer looks for, and the landing's plan looks like a picture.)
-    { href: townHref(), label: "Town" },
-    views.models ? { href: "#/models", label: "Models" } : null,
-    views.findings ? { href: "#/findings", label: "Findings" } : null,
-    views.moments ? { href: "#/moments", label: "Moments" } : null,
-  ].filter((x): x is { href: string; label: string } => x !== null);
-  if (!links.length) return null;
-  return (
-    <span className="site-links">
-      {links.map((l) => (
-        <a key={l.href} className="btn ghost help-btn" href={l.href}>
-          {l.label}
-        </a>
-      ))}
-    </span>
   );
 }
 

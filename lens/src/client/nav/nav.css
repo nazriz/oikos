@@ -497,3 +497,114 @@ button.crumb:hover {
 }
 .switcher-key { margin: 0 12px 6px; font-size: 12px; line-height: 1.4; color: var(--muted); }
 .switcher-key svg { vertical-align: -1px; }
+
+/* The three parts of Lens (nav/AreaSwitch.tsx): Lens, then Overview | Town | Data, at the top left of every page; the
+   help and the Story / Researcher switch smaller at the right; the Overview's own tabs, or the trail, on the row below. */
+.top-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: none;
+}
+.area-switch a {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.area-switch a:first-child {
+  border-left: 0;
+}
+.area-switch a:hover {
+  color: var(--text);
+}
+.area-switch a[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--ink);
+}
+.top-help .btn.ghost,
+.top-help .seg button {
+  font-size: 12.5px;
+}
+.top-help .seg button {
+  height: 26px;
+  padding: 0 8px;
+}
+.overview-tabs {
+  display: flex;
+  gap: 18px;
+  padding: 8px 0 6px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.overview-tabs a {
+  color: var(--text-2);
+  text-decoration: none;
+  padding-bottom: 3px;
+  border-bottom: 2px solid transparent;
+}
+.overview-tabs a:hover {
+  color: var(--text);
+}
+.overview-tabs a[aria-current="page"] {
+  color: var(--text);
+  font-weight: 700;
+  border-bottom-color: var(--text);
+}
+/* The site bar in two rows: the top line, then the Overview's tabs or the trail. */
+.site-bar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+.site-bar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.site-bar .overview-tabs {
+  border-bottom: 0;
+  padding: 4px 0 2px;
+}
+.lib-top + .overview-tabs {
+  margin-bottom: 4px;
+}
+/* A phone: the switch stays whole on one line, the help on the next. */
+@media (max-width: 760px) {
+  .top-left {
+    gap: 10px;
+  }
+  .area-switch a {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 13.5px;
+  }
+  .site-bar-top {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .top-left,
+  .run-bar-top > .top-left {
+    flex: 1 1 100%;
+  }
+  .overview-tabs {
+    gap: 14px;
+    font-size: 13.5px;
+  }
+}
+@media (max-width: 760px) {
+  .site-bar .crumbs {
+    flex-basis: auto;
+  }
+}
