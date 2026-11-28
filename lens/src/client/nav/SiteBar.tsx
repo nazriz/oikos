@@ -1,10 +1,11 @@
 // The header of every page that is not the library or an open run: the Lens mark (home), the trail back
-// (Library > the run > this page), and the same help and mode buttons as everywhere. The page fills what is below it.
+// (Overview > the run > this page), and the same help and mode buttons as everywhere. The page fills what is below it.
 import { useEffect, useState, type ReactNode } from "react";
 import type { RunEntry } from "../../shared/api";
-import { runHref } from "../router";
+import { runHref, useRoute } from "../router";
 import { ThemeToggle } from "../theme";
-import { HelpButtons, ModeSwitch, SiteLinks } from "../shell/Shell";
+import { HelpButtons, ModeSwitch } from "../shell/Shell";
+import { AreaSwitch, OverviewTabs, areaOf } from "./AreaSwitch";
 import { getCatalogue } from "./RunNav";
 import { useLens } from "../state";
 import { runLabel } from "./nav";
@@ -27,6 +28,7 @@ export function useEntry(key: string | undefined): RunEntry | undefined {
 /** The page under a site bar: `run` is the run the page is about (a link back to it), `here` names the page. */
 export function SitePage({ run, here, children }: { run?: string; here: string; children: ReactNode }) {
   const entry = useEntry(run);
+  const area = areaOf(useRoute());
   // (The run the page is about is the open one, where the page has not said otherwise: the hover cards name its people
   // and buildings from it.)
   useEffect(() => {
@@ -39,12 +41,25 @@ export function SitePage({ run, here, children }: { run?: string; here: string; 
   return (
     <div className="site-page">
       <header className="site-bar">
-        <a className="site-home head" href="#/" title="Back to all runs">
-          Lens
-        </a>
+        <div className="site-bar-top">
+          <span className="top-left">
+            <a className="site-home head" href="#/" title="The overview">
+              Lens
+            </a>
+            <AreaSwitch />
+          </span>
+          <span className="site-bar-actions top-help">
+            <span className="help-btns">
+              <HelpButtons />
+            </span>
+            <ModeSwitch />
+            <ThemeToggle />
+          </span>
+        </div>
+        {area === "overview" ? <OverviewTabs /> : (
         <nav className="crumbs" aria-label="Where you are">
           <a className="crumb" href="#/" title="All runs">
-            Library
+            Overview
           </a>
           <Sep />
           {run && (
@@ -57,14 +72,7 @@ export function SitePage({ run, here, children }: { run?: string; here: string; 
           )}
           <span className="crumb here">{here}</span>
         </nav>
-        <span className="site-bar-actions">
-          <SiteLinks />
-          <span className="help-btns">
-            <HelpButtons />
-          </span>
-          <ModeSwitch />
-          <ThemeToggle />
-        </span>
+        )}
       </header>
       <div className="site-body">{children}</div>
     </div>

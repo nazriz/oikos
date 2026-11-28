@@ -14,7 +14,8 @@ import { replaceQuery, runHref } from "../router";
 import { ThemeToggle } from "../theme";
 import { readingOutcome } from "../outcome";
 import { useMode } from "../mode";
-import { HelpButtons, ModeSwitch, PageAnswer, SiteLinks, useFirstVisitTour } from "../shell/Shell";
+import { HelpButtons, ModeSwitch, PageAnswer, useFirstVisitTour } from "../shell/Shell";
+import { AreaSwitch, OverviewTabs } from "../nav/AreaSwitch";
 import { goalText, leverTitle, LOCKIN_DEF, modelName } from "../words";
 import { CarryOn } from "../nav/CarryOn";
 import { LiveToggle, Measures, MeasuresKey, runCount, runCountText, TWO_CHECKS, useLive } from "../measures";
@@ -95,11 +96,13 @@ export function Library({ q }: { q: URLSearchParams }) {
   return (
     <div className="lib ld">
       <header className="lib-top">
-        <a className="lib-brand head" href="#/">
-          Lens
-        </a>
-        <nav className="lib-nav">
-          <SiteLinks />
+        <span className="top-left">
+          <a className="lib-brand head" href="#/">
+            Lens
+          </a>
+          <AreaSwitch />
+        </span>
+        <nav className="lib-nav top-help">
           <span className="help-btns">
             <HelpButtons />
           </span>
@@ -107,6 +110,7 @@ export function Library({ q }: { q: URLSearchParams }) {
           <ThemeToggle />
         </nav>
       </header>
+      <OverviewTabs />
 
       <Hero cat={cat} study={study} moments={moments} />
 

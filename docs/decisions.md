@@ -17526,3 +17526,14 @@ run page ~37 s on the live server. What it found:
   world's day, author or speaks_for, and words (`/api/data/run/:key/records`). The first look at a run takes some
   seconds (8 s for 167,312 records), the rest are instant. Replaces nav-21's view through the folds.
 - **Revisit if** a run's records are too many to hold in memory (then page from the cache file, not the array).
+
+## 2026-11-28 Lens: Overview | Town | Data at the top of every page (`lens/nav-22`)
+
+- Naz could not find the Data page and asked for "selectors at the top of the page". Every page's header now starts with
+  Lens and a three-way switch, Overview | Town | Data, the part you are in selected (`nav/AreaSwitch.tsx`). Overview
+  is the landing, with The finding, Models, Findings and Moments as a row of tabs under it; Town is a run's page with
+  the map in front (the last run looked at in this browser, at its moment, else the featured run), with the run picker
+  in its trail; Data is `#/data` and `#/data/<key>`. Help (How to read this, Words) and Story / Researcher sit smaller
+  at the right; the trail stays below, its first step now called Overview. The old row of page links (`SiteLinks`) is
+  gone: the switch and the tabs replace it. On a phone the switch keeps one line and the help wraps below it.
+- **Revisit if** a fourth part appears (a fourth switch item will not fit a phone's line beside Lens).
