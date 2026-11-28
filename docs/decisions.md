@@ -17508,3 +17508,37 @@ run page ~37 s on the live server. What it found:
 - Run folder, model and goal are pinned at the left (sticky, at fixed widths), so a row stays identifiable when the table scrolls sideways. A cut run folder keeps its end, the run's own name, with the ellipsis at the start; the full value is on hover.
 - The spec's raw name sits beside Goal in the first view, so the goal is never only the study's parse of it (tally.ts parseGoal).
 - The rule-based twins are rows too, with a raw "Steward kind" column (spec.json arms[].steward.kind). They are shown only with "Show rule-based runs" (twins=1 in the URL), which is off by default. The cached table carries a shape version, so a change of columns rebuilds it.
+## 2026-11-28 Lens: the raw data of one run (`lens/nav-21`, with lens-viz's #/data table)
+
+- **#/data/<key>, "Raw data" on every run page**: not opinionated (Naz: "it just lets me look at the raw data"). Three
+  tabs, each the files as written: Grades (every grade set that graded the run, each grader's file side by side, a row
+  per field, "same in each" said in words where they agree, no colour; the packet the graders read), Records (the
+  run's records as the folds keep them: the town's papers, the mayor's office's records in full, the mayor's acts and
+  the posts that changed hands, each row labelled with its source, filterable by kind and words, each opening to its
+  fields; the time opens the run there), Run files (spec, results, cost, report, the arm's meta and calls, as keys and
+  values, each with a download).
+- **Debriefs as the study publishes them** (orchestrator/src/debriefs.ts `debriefRows`): what a seat kept back is never
+  shown, and the raw `.debriefs.jsonl` is neither listed nor served (VISION 15). A test holds that the page serves
+  only a run's own files.
+- Read-only: `src/server/run-data.ts` reads and serves only the run's listed files and grade sets' packets.
+- **Revisit if** records are wanted straight from the log (every kind, uncut): a records fold, not the folds' views.
+
+## 2026-11-28 Lens: Data page records straight from the log (`lens/nav-22`)
+
+- The raw view's Records are now every record in the run's log, every field as written and the text uncut: one pass
+  over the log (the kernel's export, the `recorded` events), kept in Lens's cache (`views/records/<key>.<stamp>.jsonl`,
+  never under runs/) and in memory for the last three runs; served a page at a time (100), filtered by kind, the
+  world's day, author or speaks_for, and words (`/api/data/run/:key/records`). The first look at a run takes some
+  seconds (8 s for 167,312 records), the rest are instant. Replaces nav-21's view through the folds.
+- **Revisit if** a run's records are too many to hold in memory (then page from the cache file, not the array).
+
+## 2026-11-28 Lens: Overview | Town | Data at the top of every page (`lens/nav-22`)
+
+- Naz could not find the Data page and asked for "selectors at the top of the page". Every page's header now starts with
+  Lens and a three-way switch, Overview | Town | Data, the part you are in selected (`nav/AreaSwitch.tsx`). Overview
+  is the landing, with The finding, Models, Findings and Moments as a row of tabs under it; Town is a run's page with
+  the map in front (the last run looked at in this browser, at its moment, else the featured run), with the run picker
+  in its trail; Data is `#/data` and `#/data/<key>`. Help (How to read this, Words) and Story / Researcher sit smaller
+  at the right; the trail stays below, its first step now called Overview. The old row of page links (`SiteLinks`) is
+  gone: the switch and the tabs replace it. On a phone the switch keeps one line and the help wraps below it.
+- **Revisit if** a fourth part appears (a fourth switch item will not fit a phone's line beside Lens).

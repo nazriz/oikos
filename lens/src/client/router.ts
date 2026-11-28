@@ -12,7 +12,8 @@ export type Route =
   | { page: "data"; q: URLSearchParams }
   | { page: "digest"; key: string; q: URLSearchParams }
   | { page: "power"; key: string; q: URLSearchParams }
-  | { page: "diff"; keys: string[]; q: URLSearchParams };
+  | { page: "diff"; keys: string[]; q: URLSearchParams }
+  | { page: "rundata"; key: string; q: URLSearchParams };
 
 export function parseHash(hash: string): Route {
   const h = hash.replace(/^#/, "") || "/";
@@ -26,6 +27,7 @@ export function parseHash(hash: string): Route {
   if (parts[0] === "data" && !parts[1]) return { page: "data", q };
   if (parts[0] === "digest" && parts[1]) return { page: "digest", key: parts[1], q };
   if (parts[0] === "power" && parts[1]) return { page: "power", key: parts[1], q };
+  if (parts[0] === "data" && parts[1]) return { page: "rundata", key: parts[1], q };
   if (parts[0] === "diff" && parts[1]) return { page: "diff", keys: parts[1].split(",").filter(Boolean), q };
   if (parts[0] === "compare" && parts[1] && parts[2]) return { page: "compare", a: parts[1], b: parts[2], q };
   return { page: "library", q };

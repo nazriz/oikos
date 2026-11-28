@@ -89,3 +89,30 @@ test("Lens refuses a views folder inside the runs folder, and deletes nothing ou
   expect(() => removeOwn(views, views)).toThrow(/refuses to delete/);
   expect(() => removeOwn(views, join(views, "..", "guard-runs"))).toThrow(/refuses to delete/);
 });
+
+test("the Data page serves only a run's own files, never its debriefs file nor anything outside the run", async () => {
+  const { runFiles, servableFile } = await import("../src/server/run-data");
+  const runs = join(base, "data-runs"), seed = join(runs, "exp", "x", "seed-1");
+  mkdirSync(seed, { recursive: true });
+  writeFileSync(join(runs, "exp", "x", "spec.json"), "{}");
+  for (const f of ["arm.oklog", "arm.json", "arm.debriefs.jsonl"]) writeFileSync(join(seed, f), "{}");
+  writeFileSync(join(runs, "secret.json"), "{}");
+  const e = { key: "k", log: "exp/x/seed-1/arm.oklog", experiment: { dir: "exp/x" } } as any;
+  const listed = runFiles(runs, e).map((f) => f.path);
+  expect(listed).toContain("exp/x/spec.json");
+  expect(listed.some((p) => p.includes("debriefs"))).toBe(false);
+  expect(servableFile(runs, e, "exp/x/spec.json")).toBeTruthy();
+  for (const p of ["exp/x/seed-1/arm.debriefs.jsonl", "secret.json", "../secret.json", "/etc/passwd"]) expect(servableFile(runs, e, p)).toBeUndefined();
+  // (Records are paged and filtered as written: kind, the world's day, author or speaks_for, and words; never cut.)
+  const { recordsPage } = await import("../src/server/run-data");
+  const long = "x".repeat(5000);
+  const all = [
+    { t: 86_400 * 121 + 10, record: { id: "rec.1", kind: "law", author: "c0060-self", speaks_for: "city", text: long } },
+    { t: 86_400 * 122, record: { id: "rec.2", kind: "budget", author: "c0060-self", text: "Budget for year 2" } },
+    { t: 5, record: { id: "rec.3", kind: "price_list", author: "outside", text: "Sold from outside" } },
+  ];
+  const pg = (q: Record<string, string>) => recordsPage(all, new URLSearchParams(q));
+  expect([pg({ kind: "law" }).matched, pg({ day: "122" }).matched, pg({ author: "city" }).matched, pg({ q: "outside" }).matched]).toEqual([1, 1, 1, 1]);
+  expect((pg({ kind: "law" }).rows[0]!.record.text as string).length).toBe(5000);
+  expect(pg({ limit: "2", offset: "2" }).rows.map((r) => r.record.id)).toEqual(["rec.3"]);
+});

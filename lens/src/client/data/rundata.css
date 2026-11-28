@@ -1,0 +1,40 @@
+/* The Data page's raw view of one run: plain, dense, no colour that judges. */
+.rd { max-width: 1400px; margin: 0 auto; padding: 18px 24px 60px; font-size: 13px; color: var(--text); }
+.rd-head h1 { margin: 0 0 2px; font-size: 22px; }
+.rd-key { margin: 0 0 10px; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; color: var(--muted); word-break: break-all; }
+.rd-sec { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 10px; }
+.rd-sec h2 { margin: 0 0 4px; font-size: 15px; }
+.rd-note { margin: 4px 0 8px; color: var(--muted); }
+.rd-mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; word-break: break-all; }
+.rd-null { color: var(--faint); }
+.rd-num { font-variant-numeric: tabular-nums; }
+.rd-str { white-space: pre-wrap; }
+.rd-kv { margin: 0; display: grid; gap: 2px; }
+.rd-kv-row { display: grid; grid-template-columns: minmax(80px, max-content) minmax(0, 1fr); gap: 8px; }
+.rd-kv dt { color: var(--muted); font-weight: 600; }
+.rd-kv dd { margin: 0; min-width: 0; }
+.rd-arr { margin: 0; padding-left: 22px; }
+.rd-arr > li { margin: 2px 0; }
+.rd-grid { display: grid; border-top: 1px solid var(--line); }
+.rd-grid > div { padding: 6px 8px; border-bottom: 1px solid var(--line); min-width: 0; overflow-wrap: anywhere; }
+.rd-gh { font-weight: 700; }
+.rd-gl { font-weight: 600; color: var(--muted); }
+.rd-same { font-weight: 400; }
+.rd-filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.rd-filters input, .rd-filters select { font: inherit; padding: 3px 6px; }
+.rd-count { color: var(--muted); }
+.rd-table { width: 100%; border-collapse: collapse; }
+.rd-table th, .rd-table td { text-align: left; vertical-align: top; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.rd-table th { color: var(--muted); font-weight: 600; }
+.rd-rec { cursor: pointer; }
+.rd-rec:hover { background: var(--panel-2); }
+.rd-text { white-space: pre-wrap; }
+.rd-full td { background: var(--panel); }
+.rd-pre { white-space: pre-wrap; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; }
+@media (max-width: 700px) {
+  .rd { padding: 12px; }
+  .rd-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .rd-gh:first-child { display: none; }
+  .rd-table { display: block; overflow-x: auto; }
+}
+.rd-day { width: 60px; }

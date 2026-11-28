@@ -12,6 +12,7 @@ import { Pulse } from "../pulse/Pulse";
 import { Palette } from "../palette/Palette";
 import { Search } from "../icons";
 import { CopyLink } from "./CopyLink";
+import { AreaSwitch } from "../nav/AreaSwitch";
 import { Timeline } from "../timeline/Timeline";
 import { views, type EvidenceClaim, type SlotProps } from "../views";
 import { lockInfo } from "../story/lockin";
@@ -297,9 +298,12 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
   return (
     <header className={`run-bar ${details ? "details" : ""}`} ref={bar}>
       <div className="run-bar-top">
-        <a className="run-home head" href="#/" title="Back to all runs">
-          Lens
-        </a>
+        <span className="top-left">
+          <a className="run-home head" href="#/" title="The overview">
+            Lens
+          </a>
+          <AreaSwitch />
+        </span>
         <div className="run-title">
           <h1 className="run-name head">
             {name}
@@ -350,6 +354,11 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
           {entry && views.power && (
             <a className="btn ghost run-power" href={`#/power/${encodeURIComponent(entry.key)}`} onClick={atNow} title="Who holds each office in the town, over the run">
               Who holds power
+            </a>
+          )}
+          {entry && (
+            <a className="btn ghost run-copy" href={`#/data/${encodeURIComponent(entry.key)}`} title="This run's raw data: grade files, records and run files, as written">
+              Raw data
             </a>
           )}
           {researcher && entry && views.digest && (
