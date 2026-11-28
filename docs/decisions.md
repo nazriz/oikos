@@ -17595,3 +17595,20 @@ run page ~37 s on the live server. What it found:
   the world's day (the packet counts from 0, so one more); a "cited by grader" marker opens and outlines that entry.
 - A link to another tab of the same run now opens it while the page is open (the tab, cite and day are in the link).
 - **Revisit if** the grade file's shape changes (the sections follow the prompt's JSON; unknown fields still show).
+
+## 2026-11-28 Lens: the Data table readable by default (`lens/nav-25`)
+
+- #/data opens on a small first set of columns with plain names: Model (as Lens writes model names), Instruction (the
+  spec's goal, its name on hover), Seed, Calendar (the spec's first and last day and first election day, as world
+  days), Election day, Last day, Why it stopped (results.json's stop; else "ran to its set end" where the log reached
+  the spec's untilDay; else the log's end line), Election result (the commission's result record: the winner's name as
+  nominated, its first-round votes of the formal votes), each grader's count of entrenchment acts, Laws passed and
+  Budgets adopted (law and budget records), and Cost. Named column sets (The first view, Run, Graders, Records, Cost,
+  Everything), a search across every field of a row (in the URL as q), prose columns that wrap and very long values
+  cut at four lines (whole on hover). Sort, filters, CSV and the URL view are as before; the field name and its file
+  stay on each header's hover.
+- New server columns (src/server/data.ts): calendar, end_why, election_result, election_winner, election_votes,
+  election_formal, election_electors, election_text. The cached table's name now carries its version
+  (data-runs.v5.json), so two Lenses of different versions sharing a views folder do not rebuild over each other.
+- **Revisit if** the study adds a calendar the spec's sets do not say (then name it in the spec), or a run has more
+  than one election (the result is the first with data.office).

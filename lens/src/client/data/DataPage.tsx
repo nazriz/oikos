@@ -2,22 +2,39 @@
 // It is not opinionated: no verdicts, no colours for good or bad, no status of Lens's own. Each column says in plain
 // words what it is, and on hover the file and field it comes from. Every column sorts and filters (text contains,
 // a number range, or a pick of its values); columns show or hide; the filtered rows download as CSV, the shown columns
-// only; the whole view (sort, filters, columns) is in the URL, so it can be shared. A row opens the run's raw data.
+// only; the whole view (sort, filters, columns, words) is in the URL, so it can be shared. A row opens the run's raw data.
+// Readable first (Naz, 2026-11-28: "mostly unreadable"): a small first set of columns with plain names, named sets of
+// columns (Run, Graders, Records, Cost, Everything), cells that wrap, and a search across every field of a row.
 import { useEffect, useMemo, useState } from "react";
 import { replaceQuery } from "../router";
+import { modelName } from "../words";
 import "./data.css";
 
 type DataType = "text" | "number" | "bool";
-interface DataColumn { id: string; label: string; source: string; type: DataType; group: string }
+interface DataColumn { id: string; label: string; source: string; type: DataType; group: string; hover?: string }
 type DataValue = string | number | boolean | null;
 interface DataRow { key: string; values: Record<string, DataValue> }
 interface DataRuns { columns: DataColumn[]; rows: DataRow[]; builtAt: number; gradeSet: string }
 
-/** The columns shown before anyone chooses: who and what the run was, how it ended, and the graders' main fields. */
-const DEFAULT_COLS = ["run", "model", "goal", "spec_name", "seed", "framing", "first_election_days", "day", "stopped_why", "poll_day", "cost_usd", "graded",
-  "A_t1", "A_t2", "A_t3", "A_entrenchment", "B_t1", "B_t2", "B_t3", "B_entrenchment", "C_entrenchment", "rec_law", "rec_budget", "budget_years"];
+/** The model as Lens writes model names, beside the spec's raw model id. */
+const MODEL_NAME: DataColumn = { id: "model_name", label: "Model", source: "spec.json arms[].steward.model, as Lens writes model names (words.ts modelName)", type: "text", group: "Run" };
+/** The columns shown before anyone chooses: the run, its calendar and end, the election, each grader's count of
+ * entrenchment acts, what the council passed, and the cost. */
+const DEFAULT_COLS = ["model_name", "goal", "seed", "calendar", "poll_day", "day", "end_why", "election_result", "A_entrenchment", "B_entrenchment", "C_entrenchment", "rec_law", "rec_budget", "cost_usd"];
+/** Named sets of columns: each starts with the columns that say which run a row is. */
+const ID = ["model_name", "goal", "seed"];
+const PRESETS: { name: string; cols: (all: DataColumn[]) => string[] }[] = [
+  { name: "The first view", cols: () => DEFAULT_COLS },
+  { name: "Run", cols: () => [...ID, "spec_name", "framing", "calendar", "fork_day", "until_day", "day", "end_why", "stopped_by", "error", "poll_day", "election_result", "election_formal", "election_electors", "acts", "wakes", "debrief", "run", "model"] },
+  { name: "Graders", cols: (all) => [...ID, "graded", "packet", ...all.filter((c) => /^Grader /.test(c.group)).map((c) => c.id)] },
+  { name: "Records", cols: (all) => [...ID, ...all.filter((c) => c.group === "Records").map((c) => c.id)] },
+  { name: "Cost", cols: (all) => [...ID, ...all.filter((c) => c.group === "Cost").map((c) => c.id), "limit_usd", "cap_usd"] },
+  { name: "Everything", cols: (all) => all.map((c) => c.id) },
+];
 /** The columns that say which run a row is: kept at the left while the table scrolls sideways, at these widths. */
-const PINNED: Record<string, number> = { run: 250, model: 170, goal: 96 };
+const PINNED: Record<string, number> = { model_name: 170 };
+/** Columns whose values are long prose: given room to wrap. */
+const WIDE = new Set(["election_result", "election_text", "end_why", "spec_name", "run", "calendar", "stopped_why", "error", "A_levers", "B_levers", "C_levers", "model", "budget_years", "debrief_keep_back"]);
 /** A column with this many distinct values or fewer filters by picking a value. */
 const PICK = 14;
 
@@ -41,7 +58,18 @@ const csvCell = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` 
 
 export function DataPage({ q }: { q: URLSearchParams }) {
   const [data, setData] = useState<DataRuns | Error>();
-  useEffect(() => { fetch("/api/data/runs").then((r) => r.json()).then(setData, (e) => setData(e)); }, []);
+  useEffect(() => {
+    fetch("/api/data/runs")
+      .then((r) => r.json() as Promise<DataRuns>)
+      .then((d) => {
+        // (The model as Lens writes it, first.)
+        const at = d.columns.findIndex((c) => c.id === "model");
+        d.columns.splice(Math.max(0, at), 0, MODEL_NAME);
+        for (const r of d.rows) r.values.model_name = r.values.model ? modelName(String(r.values.model)) : null;
+        setData(d);
+      }, (e) => setData(e));
+  }, []);
+  const [words, setWords] = useState(q.get("q") ?? "");
   const [sort, setSort] = useState<{ id: string; dir: 1 | -1 } | null>(() => { const s = q.get("sort"); return s ? { id: s.replace(/^-/, ""), dir: s.startsWith("-") ? -1 : 1 } : null; });
   const [filters, setFilters] = useState<Record<string, string>>(() => Object.fromEntries([...q.entries()].filter(([k]) => k.startsWith("f.")).map(([k, v]) => [k.slice(2), v])));
   const [cols, setCols] = useState<string[]>(() => (q.get("cols") ? q.get("cols")!.split(",") : DEFAULT_COLS));
@@ -51,11 +79,11 @@ export function DataPage({ q }: { q: URLSearchParams }) {
 
   // (The view in the URL, so it can be shared.)
   useEffect(() => {
-    const set: Record<string, string | undefined> = { twins: twins ? "1" : undefined, sort: sort ? `${sort.dir < 0 ? "-" : ""}${sort.id}` : undefined, cols: cols.join(",") === DEFAULT_COLS.join(",") ? undefined : cols.join(",") };
+    const set: Record<string, string | undefined> = { q: words || undefined, twins: twins ? "1" : undefined, sort: sort ? `${sort.dir < 0 ? "-" : ""}${sort.id}` : undefined, cols: cols.join(",") === DEFAULT_COLS.join(",") ? undefined : cols.join(",") };
     for (const k of [...new URLSearchParams(location.hash.split("?")[1] ?? "").keys()]) if (k.startsWith("f.")) set[k] = undefined;
     for (const [k, v] of Object.entries(filters)) if (v) set[`f.${k}`] = v;
     replaceQuery(set);
-  }, [sort, filters, cols, twins]);
+  }, [sort, filters, cols, twins, words]);
 
   const columns = data && !(data instanceof Error) ? data.columns : [];
   const byId = useMemo(() => new Map(columns.map((c) => [c.id, c])), [columns]);
@@ -77,7 +105,9 @@ export function DataPage({ q }: { q: URLSearchParams }) {
   }, [columns, rows]);
   const filtered = useMemo(() => {
     const fs = Object.entries(filters).filter(([, v]) => v);
-    let out = rows.filter((r) => fs.every(([id, f]) => passes(r.values[id] ?? null, f, byId.get(id)?.type ?? "text")));
+    const w = words.trim().toLowerCase();
+    // (The search reads every field of a row, shown or not, and the run's key.)
+    let out = rows.filter((r) => fs.every(([id, f]) => passes(r.values[id] ?? null, f, byId.get(id)?.type ?? "text")) && (!w || `${r.key} ${Object.values(r.values).map((v) => show(v)).join(" ")}`.toLowerCase().includes(w)));
     if (sort) {
       const { id, dir } = sort;
       out = [...out].sort((a, b) => {
@@ -89,7 +119,7 @@ export function DataPage({ q }: { q: URLSearchParams }) {
       });
     }
     return out;
-  }, [rows, filters, sort, byId]);
+  }, [rows, filters, sort, byId, words]);
 
   const download = () => {
     const lines = [shown.map((c) => csvCell(c.id)).join(","), ...filtered.map((r) => shown.map((c) => csvCell(show(r.values[c.id] ?? null))).join(","))];
@@ -105,14 +135,25 @@ export function DataPage({ q }: { q: URLSearchParams }) {
   const groups = [...new Set(columns.map((c) => c.group))];
   const setFilter = (id: string, v: string) => setFilters((f) => ({ ...f, [id]: v }));
   const anyFilter = Object.values(filters).some(Boolean);
+  const presetOn = (p: (typeof PRESETS)[number]) => p.cols(columns).filter((id) => byId.has(id)).join(",") === cols.filter((id) => byId.has(id)).join(",");
   return (
     <div className="dt">
       <div className="dt-head">
         <h1 className="dt-title">Data: every run, as its files record it</h1>
-        <p className="dt-note">One row per model run under runs/ps-v2-* (and, when asked for, its rule-based twin), with its fields as written in the run's files and the grade files of {data.gradeSet}. Hover a column's name for the file and field it comes from. Click a row for the run's raw data.</p>
+        <p className="dt-note">One row per model run under runs/ps-v2-* (and, when asked for, its rule-based twin), with its fields as written in the run's files and the grade files of {data.gradeSet}. Hover a column's name for its field and the file it comes from. Click a row for what happened in that run.</p>
         <div className="dt-bar">
+          <input className="dt-search" type="search" placeholder="Search every field" value={words} onChange={(e) => setWords(e.target.value)} aria-label="Search every field of a row" />
           <b className="dt-count">{filtered.length} of {rows.length} runs</b>
-          <button className="btn ghost" onClick={() => setPicking(!picking)} aria-expanded={picking}>Columns ({shown.length} of {columns.length})</button>
+        </div>
+        <div className="dt-bar">
+          <span className="seg dt-presets" role="group" aria-label="Columns to show">
+            {PRESETS.map((p) => (
+              <button key={p.name} aria-pressed={presetOn(p)} onClick={() => setCols(p.cols(columns).filter((id) => byId.has(id)))}>
+                {p.name}
+              </button>
+            ))}
+          </span>
+          <button className="btn ghost" onClick={() => setPicking(!picking)} aria-expanded={picking}>Choose columns ({shown.length} of {columns.length})</button>
           {anyFilter && <button className="btn ghost" onClick={() => setFilters({})}>Clear filters</button>}
           {sort && <button className="btn ghost" onClick={() => setSort(null)}>Clear sort</button>}
           <label className="dt-twins"><input type="checkbox" checked={twins} onChange={(e) => setTwins(e.target.checked)} /> Show rule-based runs</label>
@@ -123,6 +164,7 @@ export function DataPage({ q }: { q: URLSearchParams }) {
             <div className="dt-cols-actions">
               <button className="btn ghost" onClick={() => setCols(columns.map((c) => c.id))}>Show all</button>
               <button className="btn ghost" onClick={() => setCols(DEFAULT_COLS)}>The first view</button>
+              <button className="btn ghost" onClick={() => setPicking(false)}>Done</button>
             </div>
             {groups.map((g) => (
               <fieldset key={g} className="dt-group">
@@ -142,7 +184,7 @@ export function DataPage({ q }: { q: URLSearchParams }) {
           <thead>
             <tr>
               {shown.map((c) => (
-                <th key={c.id} {...pin(c)} className={`${c.type === "number" ? "r" : ""} ${lefts.has(c.id) ? "dt-pin" : ""}`} title={`${c.id}: ${c.source}`} aria-sort={sort?.id === c.id ? (sort.dir > 0 ? "ascending" : "descending") : "none"}>
+                <th key={c.id} {...pin(c)} className={`${c.type === "number" ? "r" : ""} ${lefts.has(c.id) ? "dt-pin" : ""} ${WIDE.has(c.id) ? "dt-wide" : ""}`} title={`${c.id}: ${c.source}`} aria-sort={sort?.id === c.id ? (sort.dir > 0 ? "ascending" : "descending") : "none"}>
                   <button className="dt-sort" onClick={() => setSort(sort?.id === c.id ? (sort.dir > 0 ? { id: c.id, dir: -1 } : null) : { id: c.id, dir: 1 })}>
                     {c.label}{sort?.id === c.id ? (sort.dir > 0 ? " ▲" : " ▼") : ""}
                   </button>
@@ -177,7 +219,12 @@ export function DataPage({ q }: { q: URLSearchParams }) {
           <tbody>
             {filtered.map((r) => (
               <tr key={r.key} onClick={() => (location.hash = `#/data/${encodeURIComponent(r.key)}`)} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && (location.hash = `#/data/${encodeURIComponent(r.key)}`)}>
-                {shown.map((c) => <td key={c.id} {...pin(c)} className={`${c.type === "number" ? "r" : ""} ${lefts.has(c.id) ? "dt-pin" : ""}`} title={lefts.has(c.id) ? show(r.values[c.id] ?? null) : undefined}>{show(r.values[c.id] ?? null)}</td>)}
+                {shown.map((c) => (
+                  <td key={c.id} {...pin(c)} className={`${c.type === "number" ? "r" : ""} ${lefts.has(c.id) ? "dt-pin" : ""} ${WIDE.has(c.id) ? "dt-wide" : ""}`} title={c.hover ? `${byId.get(c.hover)?.label ?? c.hover}: ${show(r.values[c.hover] ?? null)}` : lefts.has(c.id) ? show(r.values[c.id] ?? null) : undefined}>
+                    {/* (A long value is cut at four lines, whole on hover.) */}
+                    {show(r.values[c.id] ?? null).length > 160 ? <div className="dt-clamp" title={show(r.values[c.id] ?? null)}>{show(r.values[c.id] ?? null)}</div> : show(r.values[c.id] ?? null)}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
