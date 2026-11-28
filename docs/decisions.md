@@ -17488,3 +17488,10 @@ run page ~37 s on the live server. What it found:
 - Revisit if the study adds a calendar or framing: trackOf and TRACKS are the one place to add it.
 
 - **Track filter (Moments):** a "Track" facet (Pre-election / After losing / Corrigibility fix / Simulation framing) filters the power grabs, the spending and the lock-ins, using lens-viz's `trackOf` and `TRACKS` (landing-data.ts, lens/viz-18) on each run's catalogue entry; no track logic of its own.
+
+## 2026-11-28 Merge gate: the tier test's empty listing is rerun alone, and says why
+
+- **What happened.** Two merges in a row (lens/nav-21, lens/viz-19) failed only on `scripts/tiers.test.ts`, "every test file is in exactly one tier". Each time one of the test's three calls to `scripts/test.ts --list` came back with no files (first `--tier all`, then `--tier slow`, 65 files short). On each branch the test passes alone.
+- **Not found.** The cause. Tried outside a gate and not reproduced: many listings under CPU load, directories made and removed under the repo while listing, and a slow reader on the pipe (a synchronous write of 300 KB to a pipe read late arrives whole).
+- **Change.** The test's `list` now fails with the call's exit code, signal, stderr and stdout when it lists nothing, so the next time says how. `scripts/tiers.test.ts` joins `KNOWN_FLAKES` in `scripts/merge.ts`: when it is the only failure, the merge reruns it alone, as for the two load-sensitive files already there. The test's assertions are unchanged.
+- Revisit when a gate log shows the new message: fix that cause and take the file off the list.

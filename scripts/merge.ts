@@ -31,7 +31,9 @@ export const KEEP_BOTH_FILES = ["docs/decisions.md", "docs/research/references.m
 export const KEEP_OURS_FILES = ["scripts/test-times.json"];
 /** What the merge asks of scripts/test.ts (scripts/test-runner.test.ts runs the selection with exactly these). */
 export const GATE_ARGS = ["--gate", "--merge"];
-export const KNOWN_FLAKES = ["scripts/slots.test.ts", "orchestrator/test/pilot-wave.test.ts"];
+// (scripts/tiers.test.ts: it asks the runner for its file lists, and on a busy gate one of those calls has come back
+// empty, 2026-11-28 twice in a row; alone it passes. The test now says how the call failed, to find the cause.)
+export const KNOWN_FLAKES = ["scripts/slots.test.ts", "orchestrator/test/pilot-wave.test.ts", "scripts/tiers.test.ts"];
 export const TRAILER = "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>";
 
 /** Resolve conflict markers by keeping both sides (ours, then theirs). Handles diff3 `|||||||` base sections too. */
