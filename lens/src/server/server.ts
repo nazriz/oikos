@@ -1,5 +1,6 @@
 // Lens's server: the client (built at start and served compressed, ./client.ts) and the API
 // (src/shared/api.ts). Bound to 127.0.0.1; reached from elsewhere through `tailscale serve` (docs/design/lens.md).
+import { dataRuns } from "./data";
 import { loadGrades } from "./grades";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -62,6 +63,14 @@ export function startServer(o: ServeOptions = {}) {
         return new Response(body, { headers });
       },
       "/api/moments": (req) => (lens.noteViewer(), momentsResponse(lens, req)),
+      // (The Data page's run table: the study's raw fields, from the files as they are; src/server/data.ts.)
+      "/api/data/runs": (req) => {
+        lens.noteViewer();
+        const body = JSON.stringify(dataRuns(lens.paths.runs, lens.paths.views));
+        const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", vary: "accept-encoding" };
+        if ((req.headers.get("accept-encoding") ?? "").includes("gzip")) return new Response(Bun.gzipSync(Buffer.from(body)), { headers: { ...headers, "content-encoding": "gzip" } });
+        return new Response(body, { headers });
+      },
       "/api/run/:key": async (req) => {
         lens.noteViewer();
         const e = await lens.catalogue.find(req.params.key);

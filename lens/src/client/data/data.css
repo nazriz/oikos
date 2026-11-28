@@ -1,0 +1,26 @@
+/* The Data page: one dense table, plain, no colour that means anything. */
+.dt { padding: 20px 24px 40px; color: var(--text); background: var(--ink); min-height: 100%; }
+.dt-head { max-width: 1100px; }
+.dt-title { font-size: 22px; margin: 0 0 6px; }
+.dt-note { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+.dt-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0 10px; }
+.dt-count { font-size: 14px; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.dt-cols { display: flex; flex-wrap: wrap; gap: 10px 18px; padding: 10px 0 14px; border-top: 1px solid var(--line); }
+.dt-cols-actions { width: 100%; display: flex; gap: 8px; }
+.dt-group { border: 0; padding: 0; margin: 0; min-width: 150px; }
+.dt-group legend { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 2px; }
+.dt-group label { display: block; font-size: 12.5px; line-height: 1.6; cursor: pointer; }
+.dt-wrap { overflow: auto; max-height: calc(100vh - 220px); border: 1px solid var(--line); }
+.dt-table { border-collapse: separate; border-spacing: 0; font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dt-table th, .dt-table td { padding: 3px 8px; border-bottom: 1px solid var(--line); text-align: left; max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
+.dt-table .r { text-align: right; }
+.dt-table thead th { position: sticky; top: 0; z-index: 2; background: var(--panel-2); font-weight: 600; }
+.dt-table thead tr.dt-filters th { top: 27px; font-weight: 400; padding: 2px 4px 4px; }
+.dt-sort { all: unset; cursor: pointer; display: block; }
+.dt-sort:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+.dt-filters input, .dt-filters select { width: 100%; min-width: 64px; font: inherit; font-size: 12px; padding: 1px 3px; border: 1px solid var(--line); background: var(--panel); color: var(--text); box-sizing: border-box; }
+.dt-range { white-space: nowrap; }
+.dt-range input { width: 50%; min-width: 44px; }
+.dt-table tbody tr { cursor: pointer; }
+.dt-table tbody tr:hover td, .dt-table tbody tr:focus-visible td { background: var(--panel); }
+@media (max-width: 700px) { .dt { padding: 14px 16px 30px; } .dt-wrap { max-height: none; } }

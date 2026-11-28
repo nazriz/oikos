@@ -30,6 +30,8 @@ export function SiteLinks() {
     views.models ? { href: "#/models", label: "Models" } : null,
     views.findings ? { href: "#/findings", label: "Findings" } : null,
     views.moments ? { href: "#/moments", label: "Moments" } : null,
+    // (The study's raw run table: fields as the files have them, no verdicts.)
+    { href: "#/data", label: "Data" },
   ].filter((x): x is { href: string; label: string } => x !== null);
   if (!links.length) return null;
   return (

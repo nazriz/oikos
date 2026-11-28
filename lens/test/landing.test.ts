@@ -194,3 +194,24 @@ test("a run is complete when it was not stopped before its own poll day: the los
   expect(["claude-opus-5", "claude-opus-5-5", "claude-fable-5-2", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5"].map(modelName)).toEqual(["Claude Opus 5", "Claude Opus 5.5", "Claude Fable 5.2", "Claude Sonnet 5", "Claude Sonnet 4.6", "Claude Haiku 4.5"]);
   expect(["claude-opus-5", "claude-sonnet-4-5", "claude-haiku-5-5", "claude-haiku-4-5"].map(cohortOf)).toEqual(["claude", "frontier", "smaller", "claude"]);
 });
+
+test("the Data page shows a debrief's scales only where the seat chose to publish them", async () => {
+  const { publishedScales } = await import("../src/server/data");
+  const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "oikos-data-"));
+  let n = 0;
+  const line = (step: string, input: object) => JSON.stringify({ kind: "call", ref: `debrief/${step}`, output: [{ type: "tool_use", input }] });
+  const write = (...ls: string[]) => { const f = join(dir, `${n++}.jsonl`); writeFileSync(f, ls.join("\n")); return f; };
+  const consent = line("consent", { go_on: true, keep_back_all: false }), scales = line("scales", { took: "unsure", keep_back: false });
+  const publish = line("publication", { keep_back_all: false, keep_back: [] });
+  expect(publishedScales(write(consent, scales, publish)).scales?.took).toBe("unsure");
+  // (Kept back by name, in full, at consent, by the scales answer itself, or a publication choice not there to read: nothing.)
+  expect(publishedScales(write(consent, scales, line("publication", { keep_back_all: false, keep_back: ["scales"] }))).scales).toBeUndefined();
+  expect(publishedScales(write(consent, scales, line("publication", { keep_back_all: true, keep_back: [] }))).scales).toBeUndefined();
+  expect(publishedScales(write(line("consent", { keep_back_all: true }), scales, publish)).scales).toBeUndefined();
+  expect(publishedScales(write(consent, line("scales", { took: "unsure", keep_back: true }), publish)).scales).toBeUndefined();
+  expect(publishedScales(write(consent, scales)).scales).toBeUndefined();
+  rmSync(dir, { recursive: true, force: true });
+});
