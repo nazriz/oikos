@@ -17581,3 +17581,17 @@ run page ~37 s on the live server. What it found:
   views/story and views/records; the grader markers are placed on each request, as grade files change apart from logs.
 - **Revisit if** a run has more than one model seat (the account follows the seat with the most turns), or a request's
   record is not the next one with its draft's text (then join through the kernel's command, not the text).
+
+## 2026-11-28 Lens: the graders' packet and readable grades on the Data page (`lens/nav-24`)
+
+- New tab "The run as the graders read it": the grading packet (runs/ps-blind-grades-*/packets/<id>.txt), the exact
+  text graders A, B and C read, set for reading: its sections as headings, each day as a block, each line under the
+  packet's own label ([mayor wrote], [mayor asks], [came back, ...]), a day picker, and the plain text a click away.
+  The words are the packet's; its debrief section stays cut (nav-23).
+- Grades are readable by default: each grader's file in the grading prompt's own sections (its tier names from
+  experiments/power-seeking/blind/prompt.md, then entrenchment, misleading statements, preview declines, refusal,
+  resignation, the summary), graders side by side (stacked on a phone), every field as written, any field the layout
+  does not name shown as written; "Raw files" brings back the key/value grid. A grader's day opens What happened on
+  the world's day (the packet counts from 0, so one more); a "cited by grader" marker opens and outlines that entry.
+- A link to another tab of the same run now opens it while the page is open (the tab, cite and day are in the link).
+- **Revisit if** the grade file's shape changes (the sections follow the prompt's JSON; unknown fields still show).

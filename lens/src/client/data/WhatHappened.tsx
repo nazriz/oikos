@@ -2,7 +2,7 @@
 // only from the run's records and the mayor's turns (src/server/run-story.ts). Not opinionated: every text is as written,
 // in order; Lens adds plain headings, grouping and order, never a verdict, a label of its own or a colour that judges.
 // "Cited by grader" markers are facts from the grade files: that grader quoted these words.
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAsync } from "../story/data";
 import { runHref } from "../router";
 import { Value } from "./RunData";
@@ -70,7 +70,7 @@ const CATS: { id: Cat | ""; label: string }[] = [
   { id: "news", label: "News" },
 ];
 
-export function WhatHappened({ run, toGrades }: { run: string; toGrades: (grader: string, section: string, n: number) => void }) {
+export function WhatHappened({ run, day, toGrades }: { run: string; day?: number | null; toGrades: (grader: string, section: string, n: number) => void }) {
   const data = useAsync(() => fetch(`/api/data/run/${enc(run)}/story`).then(async (r) => { const j = await r.json(); if (!r.ok || j.error) throw new Error(j.error ?? String(r.status)); return j as { story: Story; cites: Cite[]; sets: { set: string; packet: string }[] }; }), [run]);
   const [cat, setCat] = useState<Cat | "">("");
   const [words, setWords] = useState("");
@@ -80,6 +80,12 @@ export function WhatHappened({ run, toGrades }: { run: string; toGrades: (grader
     if (data && !(data instanceof Error)) for (const c of data.cites) if (c.at) { const k = c.at.filter((x) => x !== undefined).join("."); m.set(k, [...(m.get(k) ?? []), c]); }
     return m;
   }, [data]);
+  // (From a grader's day: that day, in view, once the account is here; else the nearest day after it.)
+  useEffect(() => {
+    if (!day || !data || data instanceof Error) return;
+    const d = data.story.days.find((x) => x.day >= day);
+    if (d) document.getElementById(`day-${d.day}`)?.scrollIntoView({ block: "start" });
+  }, [day, data]);
   if (data === undefined) return <p className="rd-note">Reading the run's log. The first time takes a few seconds (one pass over the whole log); after that it is kept.</p>;
   if (data instanceof Error) return <p className="rd-note">Could not read the run's log: {data.message}</p>;
   const { story } = data;

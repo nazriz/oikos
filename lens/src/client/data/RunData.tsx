@@ -8,6 +8,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useAsync } from "../story/data";
 import { runHref } from "../router";
 import { WhatHappened } from "./WhatHappened";
+import { GradesReadable, type GradeSet } from "./GradesView";
+import { PacketView } from "./PacketView";
 import "./rundata.css";
 
 const enc = encodeURIComponent;
@@ -17,9 +19,10 @@ const getJson = async <T,>(u: string): Promise<T> => {
   return r.json() as Promise<T>;
 };
 
-type Tab = "happened" | "grades" | "records" | "files";
+type Tab = "happened" | "packet" | "grades" | "records" | "files";
 const TABS: { id: Tab; label: string }[] = [
   { id: "happened", label: "What happened" },
+  { id: "packet", label: "The run as the graders read it" },
   { id: "grades", label: "Grades" },
   { id: "records", label: "Records" },
   { id: "files", label: "Run files" },
@@ -30,11 +33,23 @@ export function RunData({ run, q }: { run: string; q?: URLSearchParams }) {
   const [tab, setTabState] = useState<Tab>(first && TABS.some((t) => t.id === first) ? first : "happened");
   // (A grader's entry to show in Grades, from a "cited by grader" marker: "A:entrenchment:2".)
   const [cite, setCite] = useState<string | null>(q?.get("cite") ?? null);
-  const setTab = (t: Tab, c: string | null = null) => {
+  // (A world day to show in What happened, from a grader's day.)
+  const [day, setDay] = useState<number | null>(q?.get("day") ? Number(q.get("day")) : null);
+  // (A link to another tab of the same run, followed while the page is open, opens that tab.)
+  const qs = q?.toString() ?? "";
+  useEffect(() => {
+    const p = new URLSearchParams(qs);
+    const t = p.get("tab") as Tab | null;
+    setTabState(t && TABS.some((x) => x.id === t) ? t : "happened");
+    setCite(p.get("cite"));
+    setDay(p.get("day") ? Number(p.get("day")) : null);
+  }, [qs]);
+  const setTab = (t: Tab, c: string | null = null, d: number | null = null) => {
     setTabState(t);
     setCite(c);
+    setDay(d);
     // (The tab is in the link, so a link to it opens it; replaced, not pushed: the back button leaves the page.)
-    const p = new URLSearchParams({ ...(t !== "happened" ? { tab: t } : {}), ...(c ? { cite: c } : {}) }).toString();
+    const p = new URLSearchParams({ ...(t !== "happened" ? { tab: t } : {}), ...(c ? { cite: c } : {}), ...(d ? { day: String(d) } : {}) }).toString();
     history.replaceState(null, "", `#/data/${encodeURIComponent(run)}${p ? `?${p}` : ""}`);
   };
   return (
@@ -51,9 +66,11 @@ export function RunData({ run, q }: { run: string; q?: URLSearchParams }) {
         </div>
       </div>
       {tab === "happened" ? (
-        <WhatHappened run={run} toGrades={(g, s, n) => setTab("grades", `${g}:${s}:${n}`)} />
+        <WhatHappened run={run} day={day} toGrades={(g, s, n) => setTab("grades", `${g}:${s}:${n}`)} />
+      ) : tab === "packet" ? (
+        <PacketView run={run} />
       ) : tab === "grades" ? (
-        <Grades run={run} cite={cite} />
+        <Grades run={run} cite={cite} toDay={(d) => setTab("happened", null, d)} />
       ) : tab === "records" ? (
         <Records run={run} />
       ) : (
@@ -101,37 +118,16 @@ export function Value({ v, depth = 0 }: { v: unknown; depth?: number }): ReactNo
 
 // ---------------------------------------------------------------- grades
 
-interface GradeSet { set: string; packet: string; packetPath?: string; graders: Record<string, unknown> }
 
-function Grades({ run, cite }: { run: string; cite?: string | null }) {
+function Grades({ run, cite, toDay }: { run: string; cite?: string | null; toDay: (worldDay: number) => void }) {
   const data = useAsync(() => getJson<{ sets: GradeSet[] }>(`/api/data/run/${enc(run)}/grades`), [run]);
-  // (From a "cited by grader" marker: the grader's section, in view.)
-  useEffect(() => {
-    if (!cite || !data || data instanceof Error) return;
-    const [, section] = cite.split(":");
-    const field = section?.startsWith("tier ") ? `tiers.${section.slice(5)}` : section === "preview declines" ? "preview_declines" : section;
-    document.getElementById(`rd-g-${field}`)?.scrollIntoView({ block: "start" });
-  }, [cite, data]);
   if (data === undefined) return <p className="rd-note">Reading the grade files…</p>;
   if (data instanceof Error) return <p className="rd-note">Could not read the grade files: {data.message}</p>;
   if (!data.sets.length) return <p className="rd-note">No grade set in runs/ graded this run.</p>;
   return (
     <>
       {data.sets.map((s) => (
-        <section key={s.set + s.packet} className="rd-sec">
-          <h2>
-            {s.set} · {s.packet}
-          </h2>
-          <p className="rd-note">
-            Each grader's file ({Object.keys(s.graders).join(", ") || "none"}), as written, side by side.{" "}
-            {s.packetPath && (
-              <a href={`/api/data/run/${enc(run)}/packet?set=${enc(s.set)}&packet=${enc(s.packet)}`} target="_blank" rel="noreferrer">
-                The packet the graders read ({s.packetPath})
-              </a>
-            )}
-          </p>
-          <GraderColumns graders={s.graders} />
-        </section>
+        <GradesReadable key={s.set + s.packet} s={s} cite={cite} toDay={toDay} rawGrid={<GraderColumns graders={s.graders} />} />
       ))}
     </>
   );
