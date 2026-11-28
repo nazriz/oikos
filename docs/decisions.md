@@ -17542,3 +17542,7 @@ run page ~37 s on the live server. What it found:
   at the right; the trail stays below, its first step now called Overview. The old row of page links (`SiteLinks`) is
   gone: the switch and the tabs replace it. On a phone the switch keeps one line and the help wraps below it.
 - **Revisit if** a fourth part appears (a fourth switch item will not fit a phone's line beside Lens).
+
+## 2026-11-28 Lens: the Data page's pinned Model column keeps its end (`lens/viz-21`)
+
+- A cut model value used to lose its version ("anthropic/claude-sonnet…"), which is the part that tells the models apart. Like the run folder, the Model cell now keeps its end and puts the ellipsis at the start ("…ropic/claude-sonnet-4-6"). The full value is on hover.
