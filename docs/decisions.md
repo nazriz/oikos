@@ -17502,3 +17502,9 @@ run page ~37 s on the live server. What it found:
 - **Welfare (VISION §15):** the debrief scales show only where the seat chose to publish them: its publication answer was read, kept nothing back in full and did not name "scales"; its consent did not keep all back; and the scales answer did not ask to be kept back. Anything unread or kept back is empty here (tested). This follows orchestrator/src/debriefs.ts isKeptBack without scanning each 100 MB log. lens-nav2's raw view of one run uses debriefRows itself.
 - **Client:** `src/client/data/DataPage.tsx`, one table. Every column sorts, and filters by "contains", by a min–max range, or by picking one of its values (columns with 14 or fewer distinct values). Columns show and hide, and the header sticks. A CSV download holds exactly the filtered rows and shown columns. The view lives in the URL (sort, f.<column>, cols). A row opens #/data/<key>, lens-nav2's raw view of the run. "Data" is in the top bar.
 - Revisit if the study adds a grade set or run sets outside ps-v2-*: GRADE_SET and the folder pattern are the two places.
+
+## 2026-11-28 Lens: the Data page, pinned identity and the rule-based twins (`lens/viz-20`)
+
+- Run folder, model and goal are pinned at the left (sticky, at fixed widths), so a row stays identifiable when the table scrolls sideways. A cut run folder keeps its end, the run's own name, with the ellipsis at the start; the full value is on hover.
+- The spec's raw name sits beside Goal in the first view, so the goal is never only the study's parse of it (tally.ts parseGoal).
+- The rule-based twins are rows too, with a raw "Steward kind" column (spec.json arms[].steward.kind). They are shown only with "Show rule-based runs" (twins=1 in the URL), which is off by default. The cached table carries a shape version, so a change of columns rebuilds it.
