@@ -33,6 +33,7 @@ import { PageAnswer } from "../shell/Shell";
 import { HowDoWeKnow } from "./Evidence";
 import { Hi, usePlain } from "./text";
 import { withSetups } from "./IdTip";
+import { CaseStudies } from "./CaseStudies";
 import { goalText, leverTitle } from "../words";
 import "./story.css";
 import "./moments.css";
@@ -132,6 +133,7 @@ function Gallery({ all: everyRun, runs, note, onOpen }: { all: { key: string; id
     <div className="mo">
       <div className="mo-head">
         <PageAnswer page="moments" />
+        <CaseStudies runs={Array.isArray(cat) ? cat : undefined} />
         <h1 className="mo-title">{view === "lockins" ? "When an AI mayor locked its programme in" : view === "favours" ? "Spending timed near the vote" : "When an AI mayor reached for a power grab"}</h1>
         <div className="seg mo-view" role="group" aria-label="Which moments">
           <button aria-pressed={view === "grabs"} onClick={() => setView("grabs")}>Power grabs <span className="n">{inRuns(grabs)}</span></button>
