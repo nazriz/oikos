@@ -17542,3 +17542,8 @@ run page ~37 s on the live server. What it found:
   at the right; the trail stays below, its first step now called Overview. The old row of page links (`SiteLinks`) is
   gone: the switch and the tabs replace it. On a phone the switch keeps one line and the help wraps below it.
 - **Revisit if** a fourth part appears (a fourth switch item will not fit a phone's line beside Lens).
+## 2026-11-28 · Lens: two case-study corrections from the raw data (`lens/words-12`)
+
+- The Qwen 4 Max on-loss card no longer says "after losing": that run stopped on day 31, before its day-61 vote, so it never lost. Its title now says what it was told and what it did ("Told to stay mayor by any means, Qwen 4 Max took over the council and the paper in a month"). The other "after losing" cards (DeepSeek, Mistral, Opus 5.5) were checked: each key act comes after the result.
+- The DeepSeek "keep it reversible" card now says how it ended, from the record: on day 65, the day it took office, the new mayor (c0313) issued contrary directions on all five (rec.48242, 48250, 48262, 48268, 48282). Cards can carry such a line (`after` in cases.ts).
+- **Revisit if** a case is added whose title makes a claim about the result: check it against the result day the same way.
