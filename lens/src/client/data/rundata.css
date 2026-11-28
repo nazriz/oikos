@@ -37,3 +37,4 @@
   .rd-gh:first-child { display: none; }
   .rd-table { display: block; overflow-x: auto; }
 }
+.rd-day { width: 60px; }

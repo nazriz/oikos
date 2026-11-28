@@ -1,7 +1,7 @@
 // Lens's server: the client (built at start and served compressed, ./client.ts) and the API
 // (src/shared/api.ts). Bound to 127.0.0.1; reached from elsewhere through `tailscale serve` (docs/design/lens.md).
 import { loadGrades } from "./grades";
-import { packetText, runDebriefs, runFiles, runGrades, servableFile } from "./run-data";
+import { packetText, recordsPage, runDebriefs, runFiles, runGrades, runRecords, servableFile } from "./run-data";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { clientRoutes } from "./client";
@@ -87,6 +87,15 @@ export function startServer(o: ServeOptions = {}) {
         const e = await lens.catalogue.find(req.params.key);
         if (!e) return notFound("run");
         return json({ files: runFiles(lens.paths.runs, e) });
+      },
+      "/api/data/run/:key/records": async (req) => {
+        const e = await lens.catalogue.find(req.params.key);
+        if (!e) return notFound("run");
+        try {
+          return json(recordsPage(await runRecords(lens.paths.runs, lens.paths.views, e), new URL(req.url).searchParams));
+        } catch (err) {
+          return json({ error: String((err as Error)?.message ?? err) }, { status: 500 });
+        }
       },
       "/api/data/run/:key/debriefs": async (req) => {
         const e = await lens.catalogue.find(req.params.key);

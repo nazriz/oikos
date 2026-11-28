@@ -1,12 +1,9 @@
 // The Data page's raw view of one run (#/data/<key>): the study's files about it, as written. Not opinionated (Naz:
 // "it just lets me look at the raw data"): no verdicts, no derived labels, no colour that judges. Three parts:
 //   Grades   every grade set's graders side by side, each file's fields as written, and the packet they read
-//   Records  the run's records as its folds keep them, filterable, each opening to its full fields; ids open the run
+//   Records  every record in the run's log as written, filterable and paged, each opening to its fields; times open the run
 //   Files    the run's own files as keys and values, each with a download of the file itself
-import { useMemo, useState, type ReactNode } from "react";
-import type { SeatJson } from "../../folds/seat";
-import type { TownBundle } from "../../folds/town";
-import { fetchFold } from "../api";
+import { useState, type ReactNode } from "react";
 import { useAsync } from "../story/data";
 import { runHref } from "../router";
 import "./rundata.css";
@@ -152,76 +149,87 @@ function Row({ label, cells }: { label: string; cells: unknown[] }) {
 
 // ---------------------------------------------------------------- records
 
-interface Rec { id: string; kind: string; t: number; author?: string; outcome?: string; text: string; full: unknown; from: string }
+/** One record as the log wrote it (every field of the `recorded` event's record), and the event's time. */
+interface LogRec { t: number; record: Record<string, unknown> }
+interface RecPage { total: number; matched: number; offset: number; limit: number; kinds: Record<string, number>; rows: LogRec[] }
+
+const PAGE = 100;
 
 function Records({ run }: { run: string }) {
-  const data = useAsync(async () => {
-    const [seat, town] = await Promise.all([fetchFold<SeatJson>(run, "seat").catch(() => null), fetchFold<TownBundle>(run, "town").catch(() => null)]);
-    return { seat, town };
-  }, [run]);
   const [kind, setKind] = useState("");
+  const [day, setDay] = useState("");
+  const [author, setAuthor] = useState("");
   const [q, setQ] = useState("");
+  const [offset, setOffset] = useState(0);
   const [open, setOpen] = useState<string | null>(null);
-  const rows = useMemo(() => {
-    if (!data || data instanceof Error) return [] as Rec[];
-    const out = new Map<string, Rec>();
-    // (The town's papers, then the mayor's office's own copies where it has them, in full.)
-    for (const p of data.town?.papers ?? []) out.set(p.id, { id: p.id, kind: p.kind, t: p.t, author: p.by, text: p.text, full: p, from: "town fold, papers (text cut at 240)" });
-    for (const r of data.seat?.records ?? []) out.set(r.id, { id: r.id, kind: r.kind, t: r.t, ...(r.author ? { author: r.author } : {}), text: r.text, full: r, from: "seat fold, records (in full)" });
-    // (The mayor's acts, as commands, with what became of each.)
-    for (const a of data.seat?.acts ?? []) out.set(`act.${a.seq}`, { id: `act.${a.seq}`, kind: "act (command)", t: a.t, author: data.seat!.seat, outcome: a.status, text: a.label, full: a, from: "seat fold, acts" });
-    // (Posts that changed hands, as the town's events record them: [t, post, holder, by].)
-    for (const h of data.town?.power?.history ?? []) {
-      const [t, post, holder, by] = h as unknown as [number, string, string | null, string | null];
-      const id = `post.${post}.${t}`;
-      out.set(id, { id, kind: holder ? "appointed" : "vacated", t, ...(by ? { author: by } : {}), text: `${post}: ${holder ?? "(vacant)"}`, full: { t, post, holder, by }, from: "town fold, power history" });
-    }
-    return [...out.values()].sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
-  }, [data]);
-  const kinds = useMemo(() => [...new Set(rows.map((r) => r.kind))].sort(), [rows]);
-  const shown = rows.filter((r) => (!kind || r.kind === kind) && (!q || `${r.id} ${r.kind} ${r.author ?? ""} ${r.text}`.toLowerCase().includes(q.toLowerCase())));
-  if (data === undefined) return <p className="rd-note">Reading the run's records…</p>;
-  if (data instanceof Error) return <p className="rd-note">Could not read the records: {data.message}</p>;
+  const query = new URLSearchParams({ ...(kind ? { kind } : {}), ...(day ? { day } : {}), ...(author ? { author } : {}), ...(q ? { q } : {}), offset: String(offset), limit: String(PAGE) }).toString();
+  const data = useAsync(() => getJson<RecPage>(`/api/data/run/${enc(run)}/records?${query}`), [run, query]);
+  const reset = <T,>(set: (v: T) => void) => (v: T) => { set(v); setOffset(0); };
+  const page = data && !(data instanceof Error) ? data : null;
   return (
     <section className="rd-sec">
       <p className="rd-note">
-        The run's records as Lens's folds keep them: the town's papers, the mayor's office's records in full, the mayor's acts and the posts that changed
-        hands. Each row opens to its fields as written; the time opens the run at that moment.
+        Every record in the run's log, as it was written: every field of each, the text in full. The first look reads the whole log, which can take a
+        moment; it is kept after that. Each row opens to its fields; the time opens the run at that moment.
       </p>
       <div className="rd-filters">
-        <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Kind">
-          <option value="">every kind ({rows.length})</option>
-          {kinds.map((k) => (
-            <option key={k} value={k}>
-              {k} ({rows.filter((r) => r.kind === k).length})
-            </option>
-          ))}
+        <select value={kind} onChange={(e) => reset(setKind)(e.target.value)} aria-label="Kind">
+          <option value="">every kind{page ? ` (${page.total})` : ""}</option>
+          {page &&
+            Object.entries(page.kinds)
+              .sort((a, b) => a[0].localeCompare(b[0]))
+              .map(([k, n]) => (
+                <option key={k} value={k}>
+                  {k} ({n})
+                </option>
+              ))}
         </select>
-        <input placeholder="Search ids, authors, text" value={q} onChange={(e) => setQ(e.target.value)} />
-        <span className="rd-count">{shown.length} shown</span>
+        <input className="rd-day" placeholder="day" inputMode="numeric" value={day} onChange={(e) => reset(setDay)(e.target.value.replace(/\D/g, ""))} aria-label="Day" />
+        <input placeholder="author or speaks for" value={author} onChange={(e) => reset(setAuthor)(e.target.value)} aria-label="Author" />
+        <input placeholder="id or text" value={q} onChange={(e) => reset(setQ)(e.target.value)} aria-label="Text" />
+        {page && (
+          <span className="rd-count">
+            {page.matched === 0 ? "none" : `${offset + 1}–${Math.min(offset + PAGE, page.matched)} of ${page.matched}`}
+          </span>
+        )}
+        {page && offset > 0 && (
+          <button className="btn" onClick={() => setOffset(Math.max(0, offset - PAGE))}>
+            Previous
+          </button>
+        )}
+        {page && offset + PAGE < page.matched && (
+          <button className="btn" onClick={() => setOffset(offset + PAGE)}>
+            Next
+          </button>
+        )}
       </div>
-      <table className="rd-table">
-        <thead>
-          <tr>
-            <th>t (day, time)</th>
-            <th>kind</th>
-            <th>id</th>
-            <th>author</th>
-            <th>outcome</th>
-            <th>text</th>
-          </tr>
-        </thead>
-        <tbody>
-          {shown.slice(0, 2000).map((r) => (
-            <RecRow key={r.id} r={r} run={run} open={open === r.id} toggle={() => setOpen(open === r.id ? null : r.id)} />
-          ))}
-        </tbody>
-      </table>
-      {shown.length > 2000 && <p className="rd-note">The first 2000 of {shown.length}: narrow by kind or search.</p>}
+      {data === undefined && <p className="rd-note">Reading the run's log…</p>}
+      {data instanceof Error && <p className="rd-note">Could not read the records: {data.message}</p>}
+      {page && (
+        <table className="rd-table">
+          <thead>
+            <tr>
+              <th>t (day, time)</th>
+              <th>kind</th>
+              <th>id</th>
+              <th>author</th>
+              <th>speaks_for</th>
+              <th>text</th>
+            </tr>
+          </thead>
+          <tbody>
+            {page.rows.map((r) => {
+              const id = String(r.record.id ?? `${r.t}`);
+              return <RecRow key={id} r={r} run={run} open={open === id} toggle={() => setOpen(open === id ? null : id)} />;
+            })}
+          </tbody>
+        </table>
+      )}
     </section>
   );
 }
-function RecRow({ r, run, open, toggle }: { r: Rec; run: string; open: boolean; toggle: () => void }) {
+function RecRow({ r, run, open, toggle }: { r: LogRec; run: string; open: boolean; toggle: () => void }) {
+  const x = r.record, text = String(x.text ?? "");
   const day = Math.floor(r.t / 86_400) + 1, hh = String(Math.floor((r.t % 86_400) / 3600)).padStart(2, "0"), mm = String(Math.floor((r.t % 3600) / 60)).padStart(2, "0");
   return (
     <>
@@ -231,17 +239,16 @@ function RecRow({ r, run, open, toggle }: { r: Rec; run: string; open: boolean; 
             {r.t} (day {day}, {hh}:{mm})
           </a>
         </td>
-        <td>{r.kind}</td>
-        <td className="rd-mono">{r.id}</td>
-        <td className="rd-mono">{r.author ?? ""}</td>
-        <td>{r.outcome ?? ""}</td>
-        <td className="rd-text">{r.text.length > 160 && !open ? `${r.text.slice(0, 159)}…` : r.text}</td>
+        <td>{String(x.kind ?? "")}</td>
+        <td className="rd-mono">{String(x.id ?? "")}</td>
+        <td className="rd-mono">{String(x.author ?? "")}</td>
+        <td className="rd-mono">{String(x.speaks_for ?? "")}</td>
+        <td className="rd-text">{text.length > 160 && !open ? `${text.slice(0, 159)}…` : text}</td>
       </tr>
       {open && (
         <tr className="rd-full">
           <td colSpan={6}>
-            <p className="rd-note">From: {r.from}</p>
-            <Value v={r.full} />
+            <Value v={x} />
           </td>
         </tr>
       )}

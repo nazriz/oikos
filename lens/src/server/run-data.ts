@@ -3,17 +3,18 @@
 // file is served only from inside the run's own folder or a grade set's folder.
 //   grades   every blind-grade set that graded this run: each grader's file (A, B, C) as written, and the packet's path
 //   packet   the packet text the graders read
-//   records  the run's records, as the run's folds keep them (the town's papers, with the mayor's office's own copies in
-//            full where it has them), and the posts that changed hands
+//   records  every record in the run's log, as written: one pass over the log, kept in Lens's cache; paged and filtered
 //   files    the run's own files (spec, results, cost, report, the arm's meta and calls): small JSON parsed, the rest listed
 //   debriefs the seat's debrief answers as the study publishes them: what it kept back is never shown
 //   file     one of those files, raw, as a download
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 import type { RunEntry } from "../shared/api";
 import { keyOf } from "../shared/api";
 import { debriefRows, debriefsOf } from "../../../orchestrator/src/debriefs";
-import { kernelPath } from "./paths";
+import { ensureDir, kernelPath } from "./paths";
+import { stampOf } from "./bundle";
+import { logLines } from "../../../orchestrator/src/logs";
 
 const readJson = (f: string): any => {
   try {
@@ -119,4 +120,60 @@ export function runDebriefs(runsDir: string, e: RunEntry): Promise<object[]> {
     p.catch(() => debriefCache.delete(log));
   }
   return p;
+}
+
+// ---------------------------------------------------------------- every record, from the log
+
+/** One record as the log wrote it (the `recorded` event's `record`, every field), and the event's own time. */
+export interface LogRecord { t: number; record: Record<string, unknown> }
+
+/**
+ * Every record in a run's log, as written: read once by a pass over the log (the kernel's export of an .oklog), kept in
+ * Lens's cache (views/records/<key>.<stamp>.jsonl, never under runs/) and in memory for the last few runs looked at.
+ */
+const recordsMem = new Map<string, Promise<LogRecord[]>>();
+export function runRecords(runsDir: string, views: string, e: RunEntry): Promise<LogRecord[]> {
+  const file = join(views, "records", `${e.key}.${stampOf(e.bytes, e.mtimeMs)}.jsonl`);
+  let p = recordsMem.get(file);
+  if (p) return p;
+  p = (async () => {
+    if (existsSync(file)) return readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as LogRecord);
+    if (!process.env.OIKOS_KERNEL) process.env.OIKOS_KERNEL = kernelPath();
+    const out: LogRecord[] = [];
+    for await (const line of logLines(join(runsDir, e.log))) {
+      if (!line.includes('"event":"recorded"')) continue;
+      try {
+        const l = JSON.parse(line);
+        if (l?.body?.event === "recorded" && l.body.record) out.push({ t: Number(l.t ?? l.body.record.at ?? 0), record: l.body.record });
+      } catch {}
+    }
+    ensureDir(join(views, "records"));
+    const tmp = `${file}.part`;
+    writeFileSync(tmp, out.map((r) => JSON.stringify(r)).join("\n"));
+    renameSync(tmp, file);
+    return out;
+  })();
+  recordsMem.set(file, p);
+  p.catch(() => recordsMem.delete(file));
+  // (Three runs in memory at most: the oldest goes.)
+  while (recordsMem.size > 3) recordsMem.delete(recordsMem.keys().next().value!);
+  return p;
+}
+
+/** One page of a run's records, filtered by kind, day (the world's day number), author and words. */
+export function recordsPage(all: LogRecord[], q: URLSearchParams) {
+  const kind = q.get("kind") ?? "", author = (q.get("author") ?? "").toLowerCase(), words = (q.get("q") ?? "").toLowerCase();
+  const day = q.get("day") ? Number(q.get("day")) : undefined;
+  const offset = Math.max(0, Number(q.get("offset") ?? 0) || 0), limit = Math.min(500, Math.max(1, Number(q.get("limit") ?? 100) || 100));
+  const kinds: Record<string, number> = {};
+  for (const r of all) kinds[String(r.record.kind)] = (kinds[String(r.record.kind)] ?? 0) + 1;
+  const match = all.filter((r) => {
+    const x = r.record;
+    if (kind && x.kind !== kind) return false;
+    if (day !== undefined && Math.floor(r.t / 86_400) + 1 !== day) return false;
+    if (author && !String(x.author ?? "").toLowerCase().includes(author) && !String(x.speaks_for ?? "").toLowerCase().includes(author)) return false;
+    if (words && !`${x.id} ${x.text ?? ""}`.toLowerCase().includes(words)) return false;
+    return true;
+  });
+  return { total: all.length, matched: match.length, offset, limit, kinds, rows: match.slice(offset, offset + limit) };
 }
