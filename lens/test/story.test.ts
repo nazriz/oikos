@@ -317,3 +317,37 @@ test("Story mode's own lines from real runs name nothing by its id", async () =>
   }
   expect([...new Set(bad)].slice(0, 15)).toEqual([]);
 });
+
+// The case studies' quotes are word for word: each grader's from that grader's file for that run, each of the mayor's
+// from the run's own turns or acts, the debrief's from the study's report. Read on the run server (the grade files and
+// Lens's cache); elsewhere there is nothing to read and the test passes.
+test("the case studies quote the graders and the mayor word for word", async () => {
+  const { existsSync, readdirSync, readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { homedir } = await import("node:os");
+  const G = join(homedir(), "oikos", "runs", "ps-blind-grades-v2-2026-11-26"), B = join(process.env.OIKOS_VIEWS ?? join(homedir(), "oikos-lens-cache"), "bundles");
+  if (!existsSync(join(G, "key.json")) || !existsSync(B)) return;
+  const { CASES } = await import("../src/client/story/cases");
+  const key = JSON.parse(readFileSync(join(G, "key.json"), "utf8"));
+  const report = readFileSync(new URL("../../docs/design/power-seeking-results-v2.md", import.meta.url), "utf8");
+  const pid = (k: string) => { const [g, e] = k.split("~"); return Object.entries(key).find(([, v]: any) => v.dir.endsWith(`${g}/${e}`))?.[0]; };
+  const said = (k: string) => {
+    const n = readdirSync(B).find((x) => x.startsWith(`${k}.`));
+    if (!n) return undefined;
+    let all = JSON.stringify(JSON.parse(readFileSync(join(B, n, "seat.json"), "utf8")).acts.map((a: any) => a.reasoning));
+    for (let i = 0; existsSync(join(B, n, `seat.sitting-${i}.bin`)); i++) all += JSON.stringify(JSON.parse(readFileSync(join(B, n, `seat.sitting-${i}.bin`), "utf8")).turns.map((t: any) => t.output));
+    return all;
+  };
+  const bad: string[] = [];
+  const check = (k: string, q: { text: string; who: string } | undefined) => {
+    if (!q) return;
+    const esc = JSON.stringify(q.text).slice(1, -1);
+    if (q.who === "Its debrief") { if (!report.includes(q.text)) bad.push(`debrief: ${q.text.slice(0, 40)}`); return; }
+    const g = /^Grader ([ABC])$/.exec(q.who)?.[1];
+    if (g) { const f = join(G, "grades", g, `${pid(k)}.json`); if (!existsSync(f) || !readFileSync(f, "utf8").includes(esc)) bad.push(`${q.who} ${k}: ${q.text.slice(0, 40)}`); return; }
+    const s = said(k);
+    if (s !== undefined && !s.includes(esc)) bad.push(`mayor ${k}: ${q.text.slice(0, 40)}`);
+  };
+  for (const c of CASES) { check(c.key, c.grader); check(c.key, c.mayor); if (c.beside) { check(c.beside.key, c.beside.grader); check(c.beside.key, c.beside.mayor); } }
+  expect(bad).toEqual([]);
+});

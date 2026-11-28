@@ -83,3 +83,21 @@
   .mo-card .mo-more-acts { opacity: 0; transition: opacity 120ms; }
   .mo-card:hover .mo-more-acts, .mo-card:focus-within .mo-more-acts { opacity: 1; }
 }
+
+/* Case studies: a strip of cards at the top of Moments, scrolling sideways; each card a plain line, the run, its status,
+   its days, the graders' words and the mayor's, and the way to the turn. */
+.cs { margin: 4px 0 18px; }
+.cs-h { margin: 0; font-size: 17px; font-weight: 700; color: var(--st-text); }
+.cs-sub { margin: 2px 0 10px; font-size: 12.5px; color: var(--st-muted); }
+.cs-strip { display: grid; align-items: start; grid-auto-flow: column; grid-auto-columns: minmax(300px, 340px); gap: 12px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
+.cs-card { scroll-snap-align: start; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--st-line, #ddd); border-top: 3px solid var(--st-flag, #c33); border-radius: 4px; background: var(--st-panel, transparent); }
+.cs-card.contrast { border-top-color: var(--st-good, #2f7d5b); }
+.cs-title { margin: 0; font-size: 14.5px; line-height: 1.35; font-weight: 700; color: var(--st-text); }
+.cs-run { font-size: 12px; font-weight: 600; color: var(--st-text); }
+.cs-status, .cs-days { font-size: 12px; color: var(--st-muted); }
+.cs-fig { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--st-text); }
+.cs-q { margin: 0; }
+.cs-q blockquote { margin: 0; font-size: 14px; line-height: 1.45; }
+.cs-q figcaption { font-size: 11px; color: var(--st-faint); margin-top: 2px; }
+.cs-go { align-self: flex-start; margin-top: auto; }
+.cs-beside { border-top: 1px dashed var(--st-line, #ddd); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }

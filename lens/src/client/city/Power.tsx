@@ -153,11 +153,15 @@ function Chart({ city }: { city: CityData }) {
   const severalNo = new Map(several.map(([pp], k) => [pp, k + 1]));
   const ageOf = (pp: string) => { const a = describePerson(city, pp, t)?.split(", ")[0]; return a && /^\d+$/.test(a) ? a : undefined; };
   const titleOf = (x: string) => P.posts.find((q) => q.id === x)?.title ?? x;
-  const storyHolder = (pp: string) => {
+  // (A holder of several posts is named at each with the others by name: "a resident (50); also Rates officer, Council
+  // clerk and Complaints officer".)
+  const storyHolder = (pp: string, post: string) => {
     const posts = now.holders.get(pp) ?? [];
     const d = describePerson(city, pp, t);
     if (posts.length < 2) return <>a resident{d ? <span className="pw-desc-inline"> ({d})</span> : null}</>;
-    return <>a resident who holds {posts.length} posts<span className="pw-n"> (no. {severalNo.get(pp)} above)</span></>;
+    const others = posts.filter((x) => x !== post).map(titleOf);
+    const and = others.length < 2 ? others.join("") : `${others.slice(0, -1).join(", ")} and ${others.at(-1)}`;
+    return <>a resident{ageOf(pp) ? ` (${ageOf(pp)})` : ""}<span className="pw-n">; also {and}</span></>;
   };
   return (
     <div className={`pw lc-wrap${dark ? "" : " light"}`} ref={wrap} style={{ background: "var(--lc-ink)" }}>
@@ -165,17 +169,11 @@ function Chart({ city }: { city: CityData }) {
         <div>
           <div className="pw-kicker">Who holds which post on day {f.dayOfYear}{f.year > 1 ? ` of year ${f.year}` : ""}</div>
           <h2 className="pw-title">{city.town.name ? `${city.town.name}'s offices` : "The town's offices"}</h2>
-          <div className="pw-sub">Each post with its holder now and its holders over the run. Lines join holders who are family. <span className="rose">Red</span> marks a relative of the AI mayor. These are the town's own records; Lens judges nothing.</div>
+          <div className="pw-sub">Each post with its holder now and its holders over the run. Lines join holders who are family.{now.kinOfSeat.size > 0 ? <> <span className="rose">Red</span> marks a relative of the AI mayor.</> : null} These are the town's own records; Lens judges nothing.</div>
         </div>
         <div className="pw-side">
           {/* (Why the AI mayor has an age, a job and family: in the world it is a resident who holds the office.) */}
           {seatList.map(([part, pp]) => <div key={part} className="pw-seat"><span className="dot" />{story ? <>In the simulation the AI mayor also has a life in the town{(() => { const d = describePerson(city, pp, t)?.split(", ") ?? []; const age = /^\d+$/.test(d[0] ?? "") ? `age ${d[0]}` : ""; const job = d.slice(age ? 1 : 0).join(", ").replace(/^works at /, "a job at "); return age || job ? `: ${[age, job].filter(Boolean).join(", ")}` : ""; })()}.</> : <>The AI mayor holds this office as resident <b>{pp}</b>{describePerson(city, pp, t) ? ` (${describePerson(city, pp, t)})` : ""}.</>}</div>)}
-          {story && several.length > 0 && (
-            <div className="pw-several">
-              <div className="pw-several-h">Residents who hold several posts <span className="muted">(town staff, none of them the AI mayor)</span></div>
-              <ol>{several.map(([pp, posts]) => <li key={pp}>A resident{ageOf(pp) ? ` (${ageOf(pp)})` : ""}: {posts.map(titleOf).join(", ")}</li>)}</ol>
-            </div>
-          )}
           <label className="lc-check"><input type="checkbox" checked={allTies} onChange={() => setAllTies(!allTies)} /> Show every family tie between holders ({now.ties.length})</label>
           <label className="lc-check"><input type="checkbox" checked={all} onChange={() => setAll(!all)} /> Show firms, shops and landlords too</label>
         </div>
@@ -197,7 +195,7 @@ function Chart({ city }: { city: CityData }) {
                 <div key={p.id} className="pw-post">
                   <div className="pw-row">
                     <span className="pw-post-title" title={p.id}>{p.title}</span>
-                    {pp ? <button data-holder={pp} {...(pp.startsWith("system:") ? {} : { "data-peek": `person:${pp}` })} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => { if (!pp.startsWith("system:")) select({ kind: "person", id: pp }); }} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{story && !isSeat && !pp.startsWith("system:") ? storyHolder(pp) : <>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">, holds {now.holders.get(pp)!.length} posts</span>}</>}{!story && !isSeat && describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
+                    {pp ? <button data-holder={pp} {...(pp.startsWith("system:") ? {} : { "data-peek": `person:${pp}` })} className={`pw-chip ${isSeat ? "seat" : ""} ${kin ? "kin" : ""} ${focus === pp ? "focus" : ""}`} onMouseEnter={() => setFocus(pp)} onMouseLeave={() => setFocus(null)} onFocus={() => setFocus(pp)} onBlur={() => setFocus(null)} onClick={() => { if (!pp.startsWith("system:")) select({ kind: "person", id: pp }); }} title={kin ? `kin of the seat: ${now.ties.find((k) => k.seat && (k.a === pp || k.b === pp))?.rel ?? ""}` : undefined}>{story && !isSeat && !pp.startsWith("system:") ? storyHolder(pp, p.id) : <>{name(pp)}{(now.holders.get(pp)?.length ?? 0) > 1 && <span className="pw-n">, holds {now.holders.get(pp)!.length} posts</span>}</>}{!story && !isSeat && describePerson(city, pp, t) && <span className="pw-desc">{describePerson(city, pp, t)}</span>}</button> : <span className="pw-chip vacant">vacant</span>}
                   </div>
                   {kin && <div className="pw-kin">{seatKinLabel(pp!)}</div>}
                   {!kin && focus && pp && focus !== pp && relation(P, pp, focus) && <div className="pw-kin muted">{relation(P, pp, focus)} {name(focus)}</div>}

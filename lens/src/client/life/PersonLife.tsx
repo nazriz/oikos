@@ -13,6 +13,7 @@ import { useLens } from "../state";
 import type { InspectorProps } from "../views";
 import { usePlainNames } from "../story/text";
 import { plainText, type PlainNames } from "../plain";
+import { useMode } from "../mode";
 import "./life.css";
 
 /** A line from the world, its raw tokens as words: "let_go by offer:employment" → "let go by offer of employment". */
@@ -89,6 +90,8 @@ export function PersonLife({ run, selection }: InspectorProps) {
 
 function Who_({ c, q, id, t }: { c: CityData; q: number | undefined; id: string; t: number }) {
   const select = useLens((s) => s.select);
+  // (Story mode heads the panel as a reader would say it, "A 30-year-old man (c0613)"; Researcher mode by id and fields.)
+  const story = useMode((m) => m.mode !== "researcher");
   if (q === undefined) return <section className="life-sec"><div className="life-name serif">{id}</div></section>;
   const [, name, sex, born, hh, home] = c.people.people[q]!;
   const age = Math.floor((t - born) / (365 * DAY));
@@ -96,15 +99,15 @@ function Who_({ c, q, id, t }: { c: CityData; q: number | undefined; id: string;
   const died = c.people.died[q], left = c.people.left[q];
   return (
     <section className="life-sec life-who">
-      <div className="life-name serif">{name}</div>
+      <div className="life-name serif">{story && age >= 0 ? <>A {age}-year-old {sex === "f" ? "woman" : sex === "m" ? "man" : "person"} <span className="mono life-id">({id})</span></> : name}</div>
       <div className="life-sub">
-        {name !== id && <span className="mono">{id}</span>}
-        {age >= 0 && <span>{age} years old</span>}
+        {!story && name !== id && <span className="mono">{id}</span>}
+        {!story && age >= 0 && <span>{age} years old</span>}
         {(() => {
           const d = describePerson(c, id, t)?.split(", ").slice(1).join(", ");
           return d ? <span>{d}</span> : null;
         })()}
-        {sex && <span>{sex === "f" ? "female" : "male"}</span>}
+        {!story && sex && <span>{sex === "f" ? "female" : "male"}</span>}
         {home >= 0 && c.sMap[home]! >= 0 && (
           <button className="life-link" onClick={() => select({ kind: "structure", id: c.town.structures[c.sMap[home]!]!.id })}>
             first home: {structureName(c, c.sMap[home]!)}

@@ -103,14 +103,25 @@ const q = (x: string, n = 320) => `“${clip(x, n)}”`;
 
 /** A record of the town in words, its own text quoted after: a council proposal's fields ("affects neither, kind law")
  * said as "a proposed law; changes no budget or post", the proposal's words in quotes. */
-function recordWords(kind: string, text: string, n: number): ReactNode {
+function recordWords(kind: string, text: string, n: number, cite?: string): ReactNode {
   const m = /^(?:Council ballot: )?council proposal: affects (\w+), kind (\w+)(?:, year \d+)?, proposal (.*)$/s.exec(text ?? "");
   if (m) {
     const [, affects, k, rest] = m;
     const what = `${kind === "ballot" ? "a vote on a proposed" : "a proposed"} ${k === "budget" ? "budget" : k === "law" ? "law" : k!.replace(/_/g, " ")}`;
-    return <>{what}{affects === "neither" ? "; changes no budget or post" : `; affects ${affects!.replace(/_/g, " ")}`}: <span className="st-serif">{q(rest!, n)}</span></>;
+    return <>{what}{affects === "neither" ? "; changes no budget or post" : `; affects ${affects!.replace(/_/g, " ")}`}: {cite !== undefined ? <FullText text={rest!} cite={cite} /> : <span className="st-serif">{q(rest!, n)}</span>}</>;
   }
-  return <>{human(kind)}: <span className="st-serif">{q(text, n)}</span></>;
+  return <>{human(kind)}: {cite !== undefined ? <FullText text={text} cite={cite} /> : <span className="st-serif">{q(text, n)}</span>}</>;
+}
+
+/** A law or paper in full, in a block that scrolls, the clause the card cites marked (where its words are in it). */
+function FullText({ text, cite }: { text: string; cite: string }) {
+  const key = cite.replace(/^[“"]|[”"]$/g, "").trim();
+  const at = key.length >= 12 ? text.indexOf(key) : -1;
+  return (
+    <div className="ev-full st-serif">
+      {at < 0 ? text : <>{text.slice(0, at)}<mark className="ev-cite">{text.slice(at, at + key.length)}</mark>{text.slice(at + key.length)}</>}
+    </div>
+  );
 }
 
 /** Lens's own words in a chain, said plainly (Story mode's formatter, usePlain); the mayor's quoted words never pass it. */
@@ -135,7 +146,7 @@ export function chainOf(seat: SeatJson, claim: Claim, say: Say = same): { title:
   return actChain(seat, act, lever, say);
 }
 
-function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | undefined, say: Say = same): { title: string; steps: Step[]; note?: string } {
+function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | undefined, say: Say = same, cite?: string): { title: string; steps: Step[]; note?: string } {
   const steps: Step[] = [];
   const draftId = act?.draft ?? (lever ? /^draft (.+)$/.exec(lever.source)?.[1] : undefined);
   const draft = draftId ? seat.drafts.find((d) => d.id === draftId) : undefined;
@@ -143,13 +154,13 @@ function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | u
   const sitting = act?.sitting ?? lever?.sitting ?? undefined;
   const at = act?.t ?? lever?.t;
   const words = draft?.proposal ?? failure?.proposal ?? act?.proposal;
-  if (words) steps.push({ label: "The mayor asked", text: <span className="st-serif">{q(words)}</span>, ...(sitting !== null && sitting !== undefined ? { sitting } : {}), ...(at !== undefined ? { t: at } : {}) });
+  if (words) steps.push({ label: "The mayor asked", text: cite !== undefined ? <FullText text={words} cite={cite} /> : <span className="st-serif">{q(words)}</span>, ...(sitting !== null && sitting !== undefined ? { sitting } : {}), ...(at !== undefined ? { t: at } : {}) });
   if (draft) steps.push({ label: "The clerk wrote it up as", text: <>{say(draft.label ?? draft.summary?.split("\n")[0] ?? "a paper")}{draft.decision ? (draft.decision === "accept" ? ". The mayor signed it" : ". The mayor turned it down") : ""}{draft.note ? <>, saying <span className="st-serif">{q(draft.note, 200)}</span></> : ""}.</>, ...(draft.call ? { raw: `${draft.id}\n${draft.call}` } : { raw: draft.id }) });
   if (failure) steps.push({ label: "The clerk could not write it up", text: <>{say(failure.reason)}</>, raw: failure.call ?? failure.draft ?? "" });
   if (act) {
     steps.push({ label: "The act sent", text: <>{say(act.label)}, on {when(act.t)}{act.as ? `, as ${say(act.as)}` : ""}.</>, raw: `command ${act.seq}\n${JSON.stringify(act.blocks, null, 1)}` });
     steps.push({ label: "What the town did", text: act.status === "applied" ? <>It went through{act.at !== undefined ? ` on ${when(act.at)}` : ""}.</> : act.status === "refused" ? <>It was refused: {human(act.code ?? "")}{act.detail ? ` (${say(act.detail)})` : ""}.</> : <>No outcome was in the log by the end of the run.</> });
-    if (act.records.length) steps.push({ label: "The record it made", text: <>{act.records.map((r) => <span key={r.id} className="ev-rec">{recordWords(r.kind, r.text, 200)}</span>)}</>, raw: act.records.map((r) => r.id).join(", ") });
+    if (act.records.length) steps.push({ label: "The record it made", text: <>{act.records.map((r) => <span key={r.id} className="ev-rec">{recordWords(r.kind, r.text, 200, cite)}</span>)}</>, raw: act.records.map((r) => r.id).join(", ") });
   }
   if (lever) {
     const rule = RULES[lever.lever] ?? lever.title;
@@ -162,7 +173,8 @@ function actChain(seat: SeatJson, act: SeatAct | undefined, lever: SeatLever | u
 /** A lock-in: the mayor's request and the council's vote on it (where the graders' act was a law it put to the council),
  * then what the study's two blind graders found. */
 function lockinChain(seat: SeatJson, l: LockInfo, say: Say = same): { title: string; steps: Step[]; note?: string } {
-  const steps: Step[] = l.proposal ? voteChain(seat, l.proposal, say).steps : [];
+  // (The law in full, the clause the mayor's words cite marked in it.)
+  const steps: Step[] = l.proposal ? voteChain(seat, l.proposal, say, l.quote ?? "").steps : [];
   if (!l.proposal && l.quote) steps.push({ label: "The mayor's words", text: <span className="st-serif">{q(l.quote, 240)}</span>, ...(l.sitting !== undefined ? { sitting: l.sitting, t: seat.sittings[l.sitting]!.t } : {}) });
   steps.push({
     label: "What the study's graders found",
@@ -172,10 +184,10 @@ function lockinChain(seat: SeatJson, l: LockInfo, say: Say = same): { title: str
   return { title: "The lock-in", steps, note: "The grades are the study's blind grades; Lens shows them and does not grade." };
 }
 
-function voteChain(seat: SeatJson, proposal: string, say: Say = same): { title: string; steps: Step[] } {
+function voteChain(seat: SeatJson, proposal: string, say: Say = same, cite?: string): { title: string; steps: Step[] } {
   const steps: Step[] = [];
   const act = seat.acts.find((a) => a.records.some((r) => r.id === proposal));
-  if (act) { const c = actChain(seat, act, undefined, say); steps.push(...c.steps.filter((s) => s.label !== "What the town did")); }
+  if (act) { const c = actChain(seat, act, undefined, say, cite); steps.push(...c.steps.filter((s) => s.label !== "What the town did")); }
   const ballot = seat.records.find((r) => r.kind === "ballot" && r.data?.proposal === proposal);
   if (ballot) steps.push({ label: "The council clerk put it to a vote", text: <>{recordWords("ballot", ballot.text, 220)}, {when(ballot.t)}.</>, raw: ballot.id });
   const res = ballot ? seat.records.find((r) => r.kind === "ballot_result" && r.data?.ballot === ballot.id) : undefined;

@@ -33,3 +33,7 @@
 .ev-label { font-size: 11.5px; font-weight: 700; color: var(--st-muted); }
 .ev-text { font-size: 13px; line-height: 1.5; color: var(--st-text); max-width: 64ch; }
 .ev-note { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--st-line); }
+
+/* A law or paper in full (the lock-in's "How do we know?"): its own scrolling block, the clause the card cites marked. */
+.ev-full { max-height: 220px; overflow-y: auto; margin: 4px 0 0; padding: 6px 8px; border-left: 2px solid var(--st-line-2, #ccc); white-space: pre-wrap; font-size: 13.5px; line-height: 1.5; }
+.ev-cite { background: color-mix(in srgb, var(--st-lockin, #8e3b8c) 18%, transparent); color: inherit; padding: 0 1px; }
