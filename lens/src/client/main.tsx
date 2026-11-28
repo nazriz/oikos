@@ -84,7 +84,7 @@ function App() {
   if (route.page === "rundata")
     return (
       <SitePage run={route.key} here="Raw data">
-        <RunData run={route.key} />
+        <RunData key={route.key} run={route.key} q={route.q} />
       </SitePage>
     );
   if (route.page === "diff" && views.diff) {

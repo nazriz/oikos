@@ -17558,3 +17558,26 @@ run page ~37 s on the live server. What it found:
 - **Likely cause, not shown.** Two tests in it read Lens's cache (`~/oikos-lens-cache`) and the grade files under `runs/`. Their comments said CI has nothing to read, but CI runs on the run server with the same home folder, beside a live Lens that rewrites that cache.
 - **Change.** Both tests return at once when `CI` is set, as their comments meant, and a cache copy that cannot be read whole is passed over. They still run in the merge gate and by hand on the run server, where the data is.
 - Revisit if a CI log shows why the file died: fix that, and consider running these two against a fixed sample kept with the tests.
+
+## 2026-11-28 Lens: "What happened", a run's account from its own log (`lens/nav-23`)
+
+- Naz: the Data tab was "mostly unreadable", and he should be able to work out what happened in a run from it without
+  asking. #/data/<key> now opens on "What happened": the run by world day, built only from the run's log
+  (`src/server/run-story.ts`): the mayor's sittings (what it was shown, what came back, what it wrote, each request in
+  its own words with its reason), each request joined to its draft, its sign-off and the record it became (the draft's
+  proposal is the request's words; the record is the mayor's next record with the draft's text), a proposal to its
+  ballot, the result with each councillor's vote, and the law or budget made; the council's, the election's and the
+  paper's records; appointments to the town's posts; the end of the run. At the top, plain facts: the instructions as
+  sent (the opening, the whole system prompt, and each later change as lines added and taken out), sittings, fork,
+  nominations and polling day, requests, the end (the log's end event and results.json as written), counts by record
+  kind, and the election count by candidate. Filters by kind and words. "Cited by grader" markers are placed where a
+  grade file's quote is found in the account (nearest day first; the packet counts days from 0) and open Grades.
+- Not opinionated: every text as written; Lens adds headings, grouping and order only. Records the account leaves out
+  (job-posting withdrawals, signatures, union ballots, the rest of the town's paperwork) are all in the Records tab.
+- Welfare (VISION section 15): the debrief annotation and debrief transcripts are not read for the account, and the
+  grading packet's debrief section is now cut when the packet is served (the Debriefs part shows what the study
+  publishes).
+- One pass over the log makes both the account and the Records list (about 6 s for a 4.6-million-line log), cached in
+  views/story and views/records; the grader markers are placed on each request, as grade files change apart from logs.
+- **Revisit if** a run has more than one model seat (the account follows the seat with the most turns), or a request's
+  record is not the next one with its draft's text (then join through the kernel's command, not the text).

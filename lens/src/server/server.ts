@@ -2,7 +2,8 @@
 // (src/shared/api.ts). Bound to 127.0.0.1; reached from elsewhere through `tailscale serve` (docs/design/lens.md).
 import { dataRuns } from "./data";
 import { loadGrades } from "./grades";
-import { packetText, recordsPage, runDebriefs, runFiles, runGrades, runRecords, servableFile } from "./run-data";
+import { packetText, recordsPage, runDebriefs, runFiles, runGrades, runRecords, servableFile, storyExtra } from "./run-data";
+import { placeCites, runStory } from "./run-story";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { clientRoutes } from "./client";
@@ -102,6 +103,19 @@ export function startServer(o: ServeOptions = {}) {
         if (!e) return notFound("run");
         try {
           return json(recordsPage(await runRecords(lens.paths.runs, lens.paths.views, e), new URL(req.url).searchParams));
+        } catch (err) {
+          return json({ error: String((err as Error)?.message ?? err) }, { status: 500 });
+        }
+      },
+      "/api/data/run/:key/story": async (req) => {
+        const e = await lens.catalogue.find(req.params.key);
+        if (!e) return notFound("run");
+        try {
+          const runs = lens.paths.runs;
+          const story = await runStory(runs, lens.paths.views, e, () => storyExtra(runs, e));
+          const sets = runGrades(runs, e.key);
+          const grades = sets.flatMap((s) => Object.entries(s.graders).map(([grader, f]) => ({ grader, set: s.set, grade: (f as any)?.grade ?? {} })));
+          return json({ story, cites: placeCites(story, grades), sets: sets.map((s) => ({ set: s.set, packet: s.packet })) });
         } catch (err) {
           return json({ error: String((err as Error)?.message ?? err) }, { status: 500 });
         }

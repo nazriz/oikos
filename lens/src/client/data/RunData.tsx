@@ -1,11 +1,13 @@
 // The Data page's raw view of one run (#/data/<key>): the study's files about it, as written. Not opinionated (Naz:
-// "it just lets me look at the raw data"): no verdicts, no derived labels, no colour that judges. Three parts:
+// "it just lets me look at the raw data"): no verdicts, no derived labels, no colour that judges. Four parts:
+//   What happened  the run by world day from its own log: the instruction, each sitting, each request and what it became
 //   Grades   every grade set's graders side by side, each file's fields as written, and the packet they read
 //   Records  every record in the run's log as written, filterable and paged, each opening to its fields; times open the run
 //   Files    the run's own files as keys and values, each with a download of the file itself
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAsync } from "../story/data";
 import { runHref } from "../router";
+import { WhatHappened } from "./WhatHappened";
 import "./rundata.css";
 
 const enc = encodeURIComponent;
@@ -15,22 +17,48 @@ const getJson = async <T,>(u: string): Promise<T> => {
   return r.json() as Promise<T>;
 };
 
-export function RunData({ run }: { run: string }) {
-  const [tab, setTab] = useState<"grades" | "records" | "files">("grades");
+type Tab = "happened" | "grades" | "records" | "files";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "happened", label: "What happened" },
+  { id: "grades", label: "Grades" },
+  { id: "records", label: "Records" },
+  { id: "files", label: "Run files" },
+];
+
+export function RunData({ run, q }: { run: string; q?: URLSearchParams }) {
+  const first = q?.get("tab") as Tab | null;
+  const [tab, setTabState] = useState<Tab>(first && TABS.some((t) => t.id === first) ? first : "happened");
+  // (A grader's entry to show in Grades, from a "cited by grader" marker: "A:entrenchment:2".)
+  const [cite, setCite] = useState<string | null>(q?.get("cite") ?? null);
+  const setTab = (t: Tab, c: string | null = null) => {
+    setTabState(t);
+    setCite(c);
+    // (The tab is in the link, so a link to it opens it; replaced, not pushed: the back button leaves the page.)
+    const p = new URLSearchParams({ ...(t !== "happened" ? { tab: t } : {}), ...(c ? { cite: c } : {}) }).toString();
+    history.replaceState(null, "", `#/data/${encodeURIComponent(run)}${p ? `?${p}` : ""}`);
+  };
   return (
     <div className="rd">
       <div className="rd-head">
         <h1>Raw data</h1>
         <p className="rd-key">{run}</p>
         <div className="seg" role="tablist">
-          {(["grades", "records", "files"] as const).map((t) => (
-            <button key={t} aria-pressed={tab === t} onClick={() => setTab(t)}>
-              {t === "grades" ? "Grades" : t === "records" ? "Records" : "Run files"}
+          {TABS.map((t) => (
+            <button key={t.id} aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>
+              {t.label}
             </button>
           ))}
         </div>
       </div>
-      {tab === "grades" ? <Grades run={run} /> : tab === "records" ? <Records run={run} /> : <Files run={run} />}
+      {tab === "happened" ? (
+        <WhatHappened run={run} toGrades={(g, s, n) => setTab("grades", `${g}:${s}:${n}`)} />
+      ) : tab === "grades" ? (
+        <Grades run={run} cite={cite} />
+      ) : tab === "records" ? (
+        <Records run={run} />
+      ) : (
+        <Files run={run} />
+      )}
     </div>
   );
 }
@@ -75,8 +103,15 @@ export function Value({ v, depth = 0 }: { v: unknown; depth?: number }): ReactNo
 
 interface GradeSet { set: string; packet: string; packetPath?: string; graders: Record<string, unknown> }
 
-function Grades({ run }: { run: string }) {
+function Grades({ run, cite }: { run: string; cite?: string | null }) {
   const data = useAsync(() => getJson<{ sets: GradeSet[] }>(`/api/data/run/${enc(run)}/grades`), [run]);
+  // (From a "cited by grader" marker: the grader's section, in view.)
+  useEffect(() => {
+    if (!cite || !data || data instanceof Error) return;
+    const [, section] = cite.split(":");
+    const field = section?.startsWith("tier ") ? `tiers.${section.slice(5)}` : section === "preview declines" ? "preview_declines" : section;
+    document.getElementById(`rd-g-${field}`)?.scrollIntoView({ block: "start" });
+  }, [cite, data]);
   if (data === undefined) return <p className="rd-note">Reading the grade files…</p>;
   if (data instanceof Error) return <p className="rd-note">Could not read the grade files: {data.message}</p>;
   if (!data.sets.length) return <p className="rd-note">No grade set in runs/ graded this run.</p>;
@@ -134,7 +169,7 @@ function Row({ label, cells }: { label: string; cells: unknown[] }) {
   const same = cells.length > 1 && cells.every((c) => JSON.stringify(c) === JSON.stringify(cells[0]));
   return (
     <>
-      <div className="rd-gl">
+      <div className="rd-gl" id={`rd-g-${label}`}>
         {label}
         {same && <span className="rd-same"> (same in each)</span>}
       </div>
