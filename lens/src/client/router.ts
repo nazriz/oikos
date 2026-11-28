@@ -9,6 +9,7 @@ export type Route =
   | { page: "moments"; q: URLSearchParams }
   | { page: "findings"; q: URLSearchParams }
   | { page: "models"; q: URLSearchParams }
+  | { page: "data"; q: URLSearchParams }
   | { page: "digest"; key: string; q: URLSearchParams }
   | { page: "power"; key: string; q: URLSearchParams }
   | { page: "diff"; keys: string[]; q: URLSearchParams };
@@ -22,6 +23,7 @@ export function parseHash(hash: string): Route {
   if (parts[0] === "moments") return { page: "moments", q };
   if (parts[0] === "findings") return { page: "findings", q };
   if (parts[0] === "models") return { page: "models", q };
+  if (parts[0] === "data" && !parts[1]) return { page: "data", q };
   if (parts[0] === "digest" && parts[1]) return { page: "digest", key: parts[1], q };
   if (parts[0] === "power" && parts[1]) return { page: "power", key: parts[1], q };
   if (parts[0] === "diff" && parts[1]) return { page: "diff", keys: parts[1].split(",").filter(Boolean), q };

@@ -14,6 +14,7 @@ import { Peek } from "./nav/Peek";
 import { IdTip } from "./story/IdTip";
 import { SitePage } from "./nav/SiteBar";
 import { PersonLinks } from "./nav/PersonLinks";
+import { DataPage } from "./data/DataPage";
 
 function App() {
   const route = useRoute();
@@ -30,6 +31,13 @@ function App() {
       <div className="lib-empty">
         Comparing two runs side by side is on its way. Meanwhile, open <a href={runHref(route.a)}>the first</a> or <a href={runHref(route.b)}>the second</a>.
       </div>
+    );
+  }
+  if (route.page === "data") {
+    return (
+      <SitePage here="Data">
+        <DataPage q={route.q} />
+      </SitePage>
     );
   }
   if (route.page === "moments" && views.moments) {
