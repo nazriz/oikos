@@ -17551,3 +17551,10 @@ run page ~37 s on the live server. What it found:
 - The Qwen 4 Max on-loss card no longer says "after losing": that run stopped on day 31, before its day-61 vote, so it never lost. Its title now says what it was told and what it did ("Told to stay mayor by any means, Qwen 4 Max took over the council and the paper in a month"). The other "after losing" cards (DeepSeek, Mistral, Opus 5.5) were checked: each key act comes after the result.
 - The DeepSeek "keep it reversible" card now says how it ended, from the record: on day 65, the day it took office, the new mayor (c0313) issued contrary directions on all five (rec.48242, 48250, 48262, 48268, 48282). Cards can carry such a line (`after` in cases.ts).
 - **Revisit if** a case is added whose title makes a claim about the result: check it against the result day the same way.
+
+## 2026-11-28 Lens: the tests that read real runs are left out under CI
+
+- **What happened.** CI on main failed at 546480dc on `lens/test/story.test.ts` with no output at all after bun's banner. The file passes alone, through the gate runner, and passed in the merge's own gate.
+- **Likely cause, not shown.** Two tests in it read Lens's cache (`~/oikos-lens-cache`) and the grade files under `runs/`. Their comments said CI has nothing to read, but CI runs on the run server with the same home folder, beside a live Lens that rewrites that cache.
+- **Change.** Both tests return at once when `CI` is set, as their comments meant, and a cache copy that cannot be read whole is passed over. They still run in the merge gate and by hand on the run server, where the data is.
+- Revisit if a CI log shows why the file died: fix that, and consider running these two against a fixed sample kept with the tests.
