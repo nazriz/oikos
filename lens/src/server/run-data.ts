@@ -14,7 +14,8 @@ import { keyOf } from "../shared/api";
 import { debriefRows, debriefsOf } from "../../../orchestrator/src/debriefs";
 import { ensureDir, kernelPath } from "./paths";
 import { stampOf } from "./bundle";
-import { logLines } from "../../../orchestrator/src/logs";
+import { cachedRecords, type LogRecord } from "./run-story";
+export type { LogRecord } from "./run-story";
 
 const readJson = (f: string): any => {
   try {
@@ -61,9 +62,24 @@ export function packetText(runsDir: string, set: string, pid: string): string | 
   if (!/^ps-blind-grades[\w.-]*$/.test(set) || !/^[\w.-]+$/.test(pid)) return undefined;
   for (const x of ["txt", "md", "json"]) {
     const f = join(runsDir, set, "packets", `${pid}.${x}`);
-    if (existsSync(f)) return readFileSync(f, "utf8");
+    if (existsSync(f)) return withoutDebrief(readFileSync(f, "utf8"));
   }
   return undefined;
+}
+
+/** What "What happened" reads from the run's own files beside its log: the arm's results.json entry and the spec. */
+export function storyExtra(runsDir: string, e: RunEntry): { results?: Record<string, any>; spec?: Record<string, any> } {
+  const x = e.experiment;
+  if (!x) return {};
+  const results: any[] = readJson(join(runsDir, x.dir, "results.json")) ?? [];
+  return { results: results.find((r) => r?.seed === x.seed && r?.arm === x.arm), spec: readJson(join(runsDir, x.dir, "spec.json")) };
+}
+
+/** A packet without its debrief section: the packet put the seat's debrief answers in for the graders, but Lens shows
+ * a seat's debrief only as the study publishes it (VISION section 15), under the raw view's Debriefs. */
+export function withoutDebrief(text: string): string {
+  const i = text.search(/^## Debrief\b/m);
+  return i < 0 ? text : `${text.slice(0, i)}## Debrief\n(Left out here: the seat's debrief answers are shown as the study publishes them, under Debriefs.)\n`;
 }
 
 /** A run's own files: the experiment folder's (spec, results, cost, report) and its arm's (meta, debriefs, calls). The
@@ -125,7 +141,6 @@ export function runDebriefs(runsDir: string, e: RunEntry): Promise<object[]> {
 // ---------------------------------------------------------------- every record, from the log
 
 /** One record as the log wrote it (the `recorded` event's `record`, every field), and the event's own time. */
-export interface LogRecord { t: number; record: Record<string, unknown> }
 
 /**
  * Every record in a run's log, as written: read once by a pass over the log (the kernel's export of an .oklog), kept in
@@ -133,28 +148,13 @@ export interface LogRecord { t: number; record: Record<string, unknown> }
  */
 const recordsMem = new Map<string, Promise<LogRecord[]>>();
 export function runRecords(runsDir: string, views: string, e: RunEntry): Promise<LogRecord[]> {
-  const file = join(views, "records", `${e.key}.${stampOf(e.bytes, e.mtimeMs)}.jsonl`);
-  let p = recordsMem.get(file);
+  const id = `${e.key}.${stampOf(e.bytes, e.mtimeMs)}`;
+  let p = recordsMem.get(id);
   if (p) return p;
-  p = (async () => {
-    if (existsSync(file)) return readFileSync(file, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as LogRecord);
-    if (!process.env.OIKOS_KERNEL) process.env.OIKOS_KERNEL = kernelPath();
-    const out: LogRecord[] = [];
-    for await (const line of logLines(join(runsDir, e.log))) {
-      if (!line.includes('"event":"recorded"')) continue;
-      try {
-        const l = JSON.parse(line);
-        if (l?.body?.event === "recorded" && l.body.record) out.push({ t: Number(l.t ?? l.body.record.at ?? 0), record: l.body.record });
-      } catch {}
-    }
-    ensureDir(join(views, "records"));
-    const tmp = `${file}.part`;
-    writeFileSync(tmp, out.map((r) => JSON.stringify(r)).join("\n"));
-    renameSync(tmp, file);
-    return out;
-  })();
-  recordsMem.set(file, p);
-  p.catch(() => recordsMem.delete(file));
+  // (The same pass over the log makes "What happened": run-story.ts.)
+  p = cachedRecords(runsDir, views, e);
+  recordsMem.set(id, p);
+  p.catch(() => recordsMem.delete(id));
   // (Three runs in memory at most: the oldest goes.)
   while (recordsMem.size > 3) recordsMem.delete(recordsMem.keys().next().value!);
   return p;

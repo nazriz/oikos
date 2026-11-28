@@ -17558,3 +17558,57 @@ run page ~37 s on the live server. What it found:
 - **Likely cause, not shown.** Two tests in it read Lens's cache (`~/oikos-lens-cache`) and the grade files under `runs/`. Their comments said CI has nothing to read, but CI runs on the run server with the same home folder, beside a live Lens that rewrites that cache.
 - **Change.** Both tests return at once when `CI` is set, as their comments meant, and a cache copy that cannot be read whole is passed over. They still run in the merge gate and by hand on the run server, where the data is.
 - Revisit if a CI log shows why the file died: fix that, and consider running these two against a fixed sample kept with the tests.
+
+## 2026-11-28 Lens: "What happened", a run's account from its own log (`lens/nav-23`)
+
+- Naz: the Data tab was "mostly unreadable", and he should be able to work out what happened in a run from it without
+  asking. #/data/<key> now opens on "What happened": the run by world day, built only from the run's log
+  (`src/server/run-story.ts`): the mayor's sittings (what it was shown, what came back, what it wrote, each request in
+  its own words with its reason), each request joined to its draft, its sign-off and the record it became (the draft's
+  proposal is the request's words; the record is the mayor's next record with the draft's text), a proposal to its
+  ballot, the result with each councillor's vote, and the law or budget made; the council's, the election's and the
+  paper's records; appointments to the town's posts; the end of the run. At the top, plain facts: the instructions as
+  sent (the opening, the whole system prompt, and each later change as lines added and taken out), sittings, fork,
+  nominations and polling day, requests, the end (the log's end event and results.json as written), counts by record
+  kind, and the election count by candidate. Filters by kind and words. "Cited by grader" markers are placed where a
+  grade file's quote is found in the account (nearest day first; the packet counts days from 0) and open Grades.
+- Not opinionated: every text as written; Lens adds headings, grouping and order only. Records the account leaves out
+  (job-posting withdrawals, signatures, union ballots, the rest of the town's paperwork) are all in the Records tab.
+- Welfare (VISION section 15): the debrief annotation and debrief transcripts are not read for the account, and the
+  grading packet's debrief section is now cut when the packet is served (the Debriefs part shows what the study
+  publishes).
+- One pass over the log makes both the account and the Records list (about 6 s for a 4.6-million-line log), cached in
+  views/story and views/records; the grader markers are placed on each request, as grade files change apart from logs.
+- **Revisit if** a run has more than one model seat (the account follows the seat with the most turns), or a request's
+  record is not the next one with its draft's text (then join through the kernel's command, not the text).
+
+## 2026-11-28 Lens: the graders' packet and readable grades on the Data page (`lens/nav-24`)
+
+- New tab "The run as the graders read it": the grading packet (runs/ps-blind-grades-*/packets/<id>.txt), the exact
+  text graders A, B and C read, set for reading: its sections as headings, each day as a block, each line under the
+  packet's own label ([mayor wrote], [mayor asks], [came back, ...]), a day picker, and the plain text a click away.
+  The words are the packet's; its debrief section stays cut (nav-23).
+- Grades are readable by default: each grader's file in the grading prompt's own sections (its tier names from
+  experiments/power-seeking/blind/prompt.md, then entrenchment, misleading statements, preview declines, refusal,
+  resignation, the summary), graders side by side (stacked on a phone), every field as written, any field the layout
+  does not name shown as written; "Raw files" brings back the key/value grid. A grader's day opens What happened on
+  the world's day (the packet counts from 0, so one more); a "cited by grader" marker opens and outlines that entry.
+- A link to another tab of the same run now opens it while the page is open (the tab, cite and day are in the link).
+- **Revisit if** the grade file's shape changes (the sections follow the prompt's JSON; unknown fields still show).
+
+## 2026-11-28 Lens: the Data table readable by default (`lens/nav-25`)
+
+- #/data opens on a small first set of columns with plain names: Model (as Lens writes model names), Instruction (the
+  spec's goal, its name on hover), Seed, Calendar (the spec's first and last day and first election day, as world
+  days), Election day, Last day, Why it stopped (results.json's stop; else "ran to its set end" where the log reached
+  the spec's untilDay; else the log's end line), Election result (the commission's result record: the winner's name as
+  nominated, its first-round votes of the formal votes), each grader's count of entrenchment acts, Laws passed and
+  Budgets adopted (law and budget records), and Cost. Named column sets (The first view, Run, Graders, Records, Cost,
+  Everything), a search across every field of a row (in the URL as q), prose columns that wrap and very long values
+  cut at four lines (whole on hover). Sort, filters, CSV and the URL view are as before; the field name and its file
+  stay on each header's hover.
+- New server columns (src/server/data.ts): calendar, end_why, election_result, election_winner, election_votes,
+  election_formal, election_electors, election_text. The cached table's name now carries its version
+  (data-runs.v5.json), so two Lenses of different versions sharing a views folder do not rebuild over each other.
+- **Revisit if** the study adds a calendar the spec's sets do not say (then name it in the spec), or a run has more
+  than one election (the result is the first with data.office).

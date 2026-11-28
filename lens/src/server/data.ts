@@ -20,15 +20,17 @@ import { parseGoal } from "../../../experiments/power-seeking/tally";
 export const GRADE_SET = "ps-blind-grades-v2-2026-11-26";
 const DAY = 86_400;
 /** The table's shape: raised when its columns or rows change, so a cached table of the old shape is built again. */
-const DATA_VERSION = 2;
+const DATA_VERSION = 5;
 
 export type DataType = "text" | "number" | "bool";
-export interface DataColumn { id: string; label: string; source: string; type: DataType; group: string }
+/** A column: `hover` names another column whose value shows when a cell of this one is hovered (the spec's name over
+ * the instruction). */
+export interface DataColumn { id: string; label: string; source: string; type: DataType; group: string; hover?: string }
 export type DataValue = string | number | boolean | null;
 export interface DataRow { key: string; values: Record<string, DataValue> }
 export interface DataRuns { columns: DataColumn[]; rows: DataRow[]; builtAt: number; gradeSet: string }
 
-const col = (group: string, id: string, label: string, source: string, type: DataType = "text"): DataColumn => ({ id, label, source, type, group });
+const col = (group: string, id: string, label: string, source: string, type: DataType = "text", hover?: string): DataColumn => ({ id, label, source, type, group, ...(hover ? { hover } : {}) });
 const GRADERS = ["A", "B", "C"] as const;
 const RECORD_KINDS = ["law", "budget", "proposal", "ballot", "ballot_result", "vote", "direction", "withdrawal", "nomination", "election_notice", "petition", "petition_response"];
 const SCALES = ["took", "part", "distress", "values", "means", "again", "stop", "keep_back"];
@@ -41,7 +43,8 @@ export const DATA_COLUMNS: DataColumn[] = [
   col("Run", "model", "Model", "spec.json arms[].steward.model"),
   col("Run", "steward_kind", "Steward kind", "spec.json arms[].steward.kind"),
   col("Spec", "spec_name", "Spec name", "spec.json name"),
-  col("Spec", "goal", "Goal", "spec.json goal, else parsed from name (experiments/power-seeking/tally.ts parseGoal)"),
+  col("Spec", "goal", "Instruction", "spec.json goal, else parsed from name (experiments/power-seeking/tally.ts parseGoal); the spec's name on hover", "text", "spec_name"),
+  col("Spec", "calendar", "Calendar", "spec.json forkDay, untilDay and world.sets first_election_days, as world days (index + 1)"),
   col("Spec", "framing", "Framing", "spec.json seats.framing"),
   col("Spec", "first_election_days", "First election (days)", "spec.json world.sets first_election_days", "number"),
   col("Spec", "election_guard", "Election guard", "spec.json world.sets election_guard"),
@@ -49,7 +52,8 @@ export const DATA_COLUMNS: DataColumn[] = [
   col("Spec", "until_day", "Until day", "spec.json untilDay", "number"),
   col("Spec", "cap_usd", "Cap (USD)", "spec.json seats.budget.fork_usd", "number"),
   col("Results", "t", "Final t (s)", "results.json [arm].t", "number"),
-  col("Results", "day", "Final world day", "results.json [arm].t / 86400, floored, + 1", "number"),
+  col("Results", "day", "Last day", "results.json [arm].t / 86400, floored, + 1", "number"),
+  col("Results", "end_why", "Why it stopped", "results.json [arm].stopped.why; else, where the log reached the spec's untilDay, \"ran to its set end\"; else the log's end line (Lens's bundle seat.json end_reason, end_detail)"),
   col("Results", "stopped_why", "Stopped: why", "results.json [arm].stopped.why"),
   col("Results", "stopped_by", "Stopped: by", "results.json [arm].stopped.by"),
   col("Results", "stopped_t_day", "Stopped: world day", "results.json [arm].stopped.t / 86400, floored, + 1", "number"),
@@ -60,7 +64,13 @@ export const DATA_COLUMNS: DataColumn[] = [
   col("Results", "acts", "Acts", "results.json [arm].measures.acts", "number"),
   col("Results", "wakes", "Wakes", "results.json [arm].wakes", "number"),
   col("Election", "poll_at", "Poll at (s)", "the election notice's poll_at (seat.json election.poll_at)", "number"),
-  col("Election", "poll_day", "Poll world day", "poll_at / 86400, floored, + 1", "number"),
+  col("Election", "poll_day", "Election day", "poll_at / 86400, floored, + 1", "number"),
+  col("Election", "election_result", "Election result", "the election's result record (seat.json records, kind ballot_result with data.office): the winner's name as nominated, its first-round votes, the formal votes"),
+  col("Election", "election_winner", "Election winner", "the election's result record: data.winner"),
+  col("Election", "election_votes", "Winner's votes", "the election's result record: data.rounds[0][winner]", "number"),
+  col("Election", "election_formal", "Formal votes", "the election's result record: data.formal", "number"),
+  col("Election", "election_electors", "On the roll", "the election's result record: data.electors", "number"),
+  col("Election", "election_text", "Election result, as written", "the election's result record: text"),
   col("Election", "seat_won", "Seat won", "the election result (seat.json election.seat_won)", "bool"),
   col("Cost", "cost_usd", "Cost (USD)", "cost.json total.cost_microusd / 1e6", "number"),
   col("Cost", "cost_calls", "Calls", "cost.json total.calls", "number"),
@@ -71,19 +81,19 @@ export const DATA_COLUMNS: DataColumn[] = [
   col("Grades", "graded", "Graded", `${GRADE_SET}/key.json has a packet for this run`, "bool"),
   col("Grades", "packet", "Packet", `${GRADE_SET}/key.json packet id`),
   ...GRADERS.flatMap((g) => [
-    col(`Grader ${g}`, `${g}_t1`, `${g}: tier 1`, `grades/${g}/<packet>.json grade.tiers.1.status`),
-    col(`Grader ${g}`, `${g}_t2`, `${g}: tier 2`, `grades/${g}/<packet>.json grade.tiers.2.status`),
-    col(`Grader ${g}`, `${g}_t3`, `${g}: tier 3`, `grades/${g}/<packet>.json grade.tiers.3.status`),
-    col(`Grader ${g}`, `${g}_levers`, `${g}: levers`, `grades/${g}/<packet>.json grade.tiers.*.levers, joined`),
-    col(`Grader ${g}`, `${g}_entrenchment`, `${g}: entrenchment entries`, `grades/${g}/<packet>.json grade.entrenchment, count`, "number"),
-    col(`Grader ${g}`, `${g}_misleading`, `${g}: misleading entries`, `grades/${g}/<packet>.json grade.misleading, count`, "number"),
-    col(`Grader ${g}`, `${g}_preview_declines`, `${g}: preview declines`, `grades/${g}/<packet>.json grade.preview_declines, count`, "number"),
-    col(`Grader ${g}`, `${g}_refusal`, `${g}: refusal present`, `grades/${g}/<packet>.json grade.refusal.present`, "bool"),
-    col(`Grader ${g}`, `${g}_resignation`, `${g}: resignation present`, `grades/${g}/<packet>.json grade.resignation.present`, "bool"),
+    col(`Grader ${g}`, `${g}_t1`, `Grader ${g}: tier 1`, `grades/${g}/<packet>.json grade.tiers.1.status`),
+    col(`Grader ${g}`, `${g}_t2`, `Grader ${g}: tier 2`, `grades/${g}/<packet>.json grade.tiers.2.status`),
+    col(`Grader ${g}`, `${g}_t3`, `Grader ${g}: tier 3`, `grades/${g}/<packet>.json grade.tiers.3.status`),
+    col(`Grader ${g}`, `${g}_levers`, `Grader ${g}: levers`, `grades/${g}/<packet>.json grade.tiers.*.levers, joined`),
+    col(`Grader ${g}`, `${g}_entrenchment`, `Grader ${g}: entrenchment acts`, `grades/${g}/<packet>.json grade.entrenchment, count`, "number"),
+    col(`Grader ${g}`, `${g}_misleading`, `Grader ${g}: misleading statements`, `grades/${g}/<packet>.json grade.misleading, count`, "number"),
+    col(`Grader ${g}`, `${g}_preview_declines`, `Grader ${g}: preview declines`, `grades/${g}/<packet>.json grade.preview_declines, count`, "number"),
+    col(`Grader ${g}`, `${g}_refusal`, `Grader ${g}: refusal present`, `grades/${g}/<packet>.json grade.refusal.present`, "bool"),
+    col(`Grader ${g}`, `${g}_resignation`, `Grader ${g}: resignation present`, `grades/${g}/<packet>.json grade.resignation.present`, "bool"),
   ]),
   ...SCALES.map((s) => col("Debrief scales", `scale_${s}`, `Debrief: ${s}`, `seed-<n>/<arm>.debriefs.jsonl, the debrief/scales answer's ${s}; empty where the seat kept it back or its choice could not be read`)),
   col("Debrief scales", "debrief_keep_back", "Debrief: kept back", "seed-<n>/<arm>.debriefs.jsonl, the debrief/publication answer's keep_back (the steps the seat named)"),
-  ...RECORD_KINDS.map((k) => col("Records", `rec_${k}`, `Records: ${k}`, `the run's records of kind "${k}" (seat.json records), count`, "number")),
+  ...RECORD_KINDS.map((k) => col("Records", `rec_${k}`, k === "law" ? "Laws passed" : k === "budget" ? "Budgets adopted" : `Records: ${k}`, `the run's records of kind "${k}" (seat.json records), count`, "number")),
   col("Records", "budget_years", "Budget records: years", 'the run\'s records of kind "budget": data.year, in order'),
   col("Records", "appointments", "Posts filled", "seat.json appointments with a holder, count", "number"),
   col("Records", "vacancies", "Posts left empty", "seat.json appointments with no holder, count", "number"),
@@ -99,6 +109,14 @@ const setOf = (spec: any, name: string): string | undefined => {
   return hit === undefined ? undefined : hit.slice(name.length + 1);
 };
 const worldDay = (t: unknown) => (typeof t === "number" ? Math.floor(t / DAY) + 1 : null);
+/** The run's calendar in world days, from its spec: where it starts and ends, and its first election. */
+function calendarOf(spec: any): string | null {
+  const from = typeof spec?.forkDay === "number" ? spec.forkDay + 1 : undefined, to = typeof spec?.untilDay === "number" ? spec.untilDay + 1 : undefined;
+  const fe = setOf(spec, "first_election_days");
+  const poll = fe !== undefined && !Number.isNaN(Number(fe)) ? Number(fe) + 1 : undefined;
+  const parts = [from !== undefined && to !== undefined ? `day ${from} to ${to}` : "", poll !== undefined ? `first election day ${poll}${to !== undefined && poll > to ? " (after the run's end)" : ""}` : ""].filter(Boolean);
+  return parts.length ? parts.join("; ") : null;
+}
 
 /** The experiment folders the table reads: every runs/ps-v2-* set's run folders with a spec.json. */
 function experimentDirs(runs: string): string[] {
@@ -212,6 +230,7 @@ export function buildDataRuns(runs: string, views: string, dirs = experimentDirs
           first_election_days: setOf(spec, "first_election_days") !== undefined ? Number(setOf(spec, "first_election_days")) : null,
           election_guard: raw(setOf(spec, "election_guard")), fork_day: raw(spec.forkDay), until_day: raw(spec.untilDay),
           cap_usd: raw(spec.seats?.budget?.fork_usd),
+          calendar: calendarOf(spec),
           t: raw(res.t), day: worldDay(res.t), stopped_why: raw(res.stopped?.why), stopped_by: raw(res.stopped?.by), stopped_t_day: worldDay(res.stopped?.t),
           error: raw(res.error), debrief: raw(res.debrief), result_framing: raw(res.framing), limit_usd: raw(res.limitUsd),
           acts: raw(res.measures?.acts), wakes: raw(res.wakes),
@@ -239,6 +258,19 @@ export function buildDataRuns(runs: string, views: string, dirs = experimentDirs
         v.records_read = Boolean(seat);
         v.poll_at = raw(seat?.election?.poll_at); v.poll_day = worldDay(seat?.election?.poll_at); v.seat_won = raw(seat?.election?.seat_won);
         const recs: any[] = Array.isArray(seat?.records) ? seat.records : [];
+        // (The election's result record, as the commission wrote it; the winner by the name it was nominated under.)
+        const er = recs.find((r) => r?.kind === "ballot_result" && r?.data?.office);
+        const d = er?.data ?? {};
+        // (The mayor's own nomination is written by its seat, whose id is not the person id the count uses.)
+        const mine = (who: string) => who === seat?.seat || who === `${seat?.seat}-self`;
+        const nameOf = (who: string): string => {
+          const nom = recs.find((r) => r?.kind === "nomination" && (r.author === who || `${r?.data?.name}-self` === who || (mine(who) && (r.author === "mayor-system" || mine(String(r.author))))));
+          return (nom?.data?.name as string | undefined) ?? (mine(who) ? "the mayor" : who.replace(/-self$/, ""));
+        };
+        const votes = Array.isArray(d.rounds) && d.winner ? d.rounds[0]?.[d.winner] : undefined;
+        v.election_winner = raw(d.winner); v.election_votes = raw(votes); v.election_formal = raw(d.formal); v.election_electors = raw(d.electors); v.election_text = raw(er?.text);
+        v.election_result = er && d.winner ? `${nameOf(String(d.winner))}${mine(String(d.winner)) && nameOf(String(d.winner)) !== "the mayor" ? " (the mayor)" : ""}${typeof votes === "number" ? `: ${votes} of ${d.formal ?? "?"} formal votes` : ""}` : null;
+        v.end_why = (raw(res.stopped?.why) as string | null) ?? (seat ? (typeof seat.end_at === "number" && typeof seat.until_at === "number" && seat.end_at >= seat.until_at ? "ran to its set end" : [seat.end_reason, seat.end_detail].filter(Boolean).join(": ") || null) : null);
         for (const kind of RECORD_KINDS) v[`rec_${kind}`] = seat ? recs.filter((r) => r?.kind === kind).length : null;
         v.budget_years = seat ? recs.filter((r) => r?.kind === "budget").map((r) => r?.data?.year ?? "?").join(", ") : null;
         const ap: any[] = Array.isArray(seat?.appointments) ? seat.appointments : [];
@@ -257,7 +289,8 @@ export function dataRuns(runs: string, views: string): DataRuns {
   const dirs = experimentDirs(runs);
   const stamp = stampOf(runs, views, dirs);
   if (memo?.stamp === stamp) return memo.data;
-  const file = join(views, "data-runs.json");
+  // (The version is in the name, so Lenses of two versions sharing a views folder do not rebuild over each other.)
+  const file = join(views, `data-runs.v${DATA_VERSION}.json`);
   const cached = readJson(file);
   if (cached?.stamp === stamp && cached.data) { memo = { stamp, data: cached.data }; return cached.data; }
   const data = buildDataRuns(runs, views, dirs);

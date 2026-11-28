@@ -38,3 +38,45 @@
   .rd-table { display: block; overflow-x: auto; }
 }
 .rd-day { width: 60px; }
+
+/* Grades, readable (GradesView.tsx): the grading prompt's sections as rows, the graders side by side. */
+.gr-head { display: flex; align-items: center; gap: 12px; justify-content: space-between; flex-wrap: wrap; }
+.gr-row { margin: 14px 0 0; }
+.gr-label { margin: 0 0 4px; font-size: 14.5px; }
+.gr-note { font-weight: 400; color: var(--muted); font-size: 12.5px; }
+.gr-cells { display: grid; gap: 14px; }
+.gr-cell { min-width: 0; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-1); font-size: 13.5px; line-height: 1.5; }
+.gr-who { color: var(--muted); font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+.gr-p { margin: 3px 0; }
+.gr-k { color: var(--muted); font-weight: 600; }
+.gr-q { font-style: italic; }
+.gr-list { margin: 4px 0; padding-left: 20px; }
+.gr-list > li { margin: 5px 0; }
+.gr-none { margin: 0; color: var(--faint); }
+.gr-rest { margin-top: 2px; font-size: 12.5px; }
+.gr-day { font: inherit; font-size: 12.5px; font-weight: 600; padding: 0 5px; border: 1px solid var(--line-2); border-radius: 3px; background: var(--ink); color: var(--text-2); cursor: pointer; }
+.gr-hit { outline: 2px solid var(--text); outline-offset: 2px; }
+@media (max-width: 760px) {
+  .gr-cells { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
+/* The packet, set for reading (PacketView.tsx). */
+.pk { max-width: 980px; }
+.pk-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.pk-head select { font: inherit; padding: 3px 6px; }
+.pk-h { margin: 20px 0 6px; font-size: 16px; }
+.pk-p { margin: 6px 0; font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+.pk-day { margin: 14px 0; padding-top: 6px; border-top: 1px solid var(--line); }
+.pk-day h3 { margin: 0 0 4px; font-size: 15px; }
+.pk-line { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 10px; padding: 3px 0; font-size: 13.5px; line-height: 1.5; }
+.pk-lbl { color: var(--muted); font-size: 12px; font-weight: 600; padding-top: 1px; }
+.pk-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pk-own .pk-text { font-size: 14px; }
+@media (max-width: 760px) {
+  .pk-line { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+
+/* The raw view's five tabs wrap on a narrow screen rather than widen the page. */
+.rd { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.rd-head .seg { flex-wrap: wrap; max-width: 100%; }
+.rd-head .seg button { flex: 1 1 auto; }

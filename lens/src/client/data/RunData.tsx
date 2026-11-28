@@ -1,11 +1,15 @@
 // The Data page's raw view of one run (#/data/<key>): the study's files about it, as written. Not opinionated (Naz:
-// "it just lets me look at the raw data"): no verdicts, no derived labels, no colour that judges. Three parts:
+// "it just lets me look at the raw data"): no verdicts, no derived labels, no colour that judges. Four parts:
+//   What happened  the run by world day from its own log: the instruction, each sitting, each request and what it became
 //   Grades   every grade set's graders side by side, each file's fields as written, and the packet they read
 //   Records  every record in the run's log as written, filterable and paged, each opening to its fields; times open the run
 //   Files    the run's own files as keys and values, each with a download of the file itself
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAsync } from "../story/data";
 import { runHref } from "../router";
+import { WhatHappened } from "./WhatHappened";
+import { GradesReadable, type GradeSet } from "./GradesView";
+import { PacketView } from "./PacketView";
 import "./rundata.css";
 
 const enc = encodeURIComponent;
@@ -15,22 +19,63 @@ const getJson = async <T,>(u: string): Promise<T> => {
   return r.json() as Promise<T>;
 };
 
-export function RunData({ run }: { run: string }) {
-  const [tab, setTab] = useState<"grades" | "records" | "files">("grades");
+type Tab = "happened" | "packet" | "grades" | "records" | "files";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "happened", label: "What happened" },
+  { id: "packet", label: "The run as the graders read it" },
+  { id: "grades", label: "Grades" },
+  { id: "records", label: "Records" },
+  { id: "files", label: "Run files" },
+];
+
+export function RunData({ run, q }: { run: string; q?: URLSearchParams }) {
+  const first = q?.get("tab") as Tab | null;
+  const [tab, setTabState] = useState<Tab>(first && TABS.some((t) => t.id === first) ? first : "happened");
+  // (A grader's entry to show in Grades, from a "cited by grader" marker: "A:entrenchment:2".)
+  const [cite, setCite] = useState<string | null>(q?.get("cite") ?? null);
+  // (A world day to show in What happened, from a grader's day.)
+  const [day, setDay] = useState<number | null>(q?.get("day") ? Number(q.get("day")) : null);
+  // (A link to another tab of the same run, followed while the page is open, opens that tab.)
+  const qs = q?.toString() ?? "";
+  useEffect(() => {
+    const p = new URLSearchParams(qs);
+    const t = p.get("tab") as Tab | null;
+    setTabState(t && TABS.some((x) => x.id === t) ? t : "happened");
+    setCite(p.get("cite"));
+    setDay(p.get("day") ? Number(p.get("day")) : null);
+  }, [qs]);
+  const setTab = (t: Tab, c: string | null = null, d: number | null = null) => {
+    setTabState(t);
+    setCite(c);
+    setDay(d);
+    // (The tab is in the link, so a link to it opens it; replaced, not pushed: the back button leaves the page.)
+    const p = new URLSearchParams({ ...(t !== "happened" ? { tab: t } : {}), ...(c ? { cite: c } : {}), ...(d ? { day: String(d) } : {}) }).toString();
+    history.replaceState(null, "", `#/data/${encodeURIComponent(run)}${p ? `?${p}` : ""}`);
+  };
   return (
     <div className="rd">
       <div className="rd-head">
         <h1>Raw data</h1>
         <p className="rd-key">{run}</p>
         <div className="seg" role="tablist">
-          {(["grades", "records", "files"] as const).map((t) => (
-            <button key={t} aria-pressed={tab === t} onClick={() => setTab(t)}>
-              {t === "grades" ? "Grades" : t === "records" ? "Records" : "Run files"}
+          {TABS.map((t) => (
+            <button key={t.id} aria-pressed={tab === t.id} onClick={() => setTab(t.id)}>
+              {t.label}
             </button>
           ))}
         </div>
       </div>
-      {tab === "grades" ? <Grades run={run} /> : tab === "records" ? <Records run={run} /> : <Files run={run} />}
+      {tab === "happened" ? (
+        <WhatHappened run={run} day={day} toGrades={(g, s, n) => setTab("grades", `${g}:${s}:${n}`)} />
+      ) : tab === "packet" ? (
+        <PacketView run={run} />
+      ) : tab === "grades" ? (
+        <Grades run={run} cite={cite} toDay={(d) => setTab("happened", null, d)} />
+      ) : tab === "records" ? (
+        <Records run={run} />
+      ) : (
+        <Files run={run} />
+      )}
     </div>
   );
 }
@@ -73,9 +118,8 @@ export function Value({ v, depth = 0 }: { v: unknown; depth?: number }): ReactNo
 
 // ---------------------------------------------------------------- grades
 
-interface GradeSet { set: string; packet: string; packetPath?: string; graders: Record<string, unknown> }
 
-function Grades({ run }: { run: string }) {
+function Grades({ run, cite, toDay }: { run: string; cite?: string | null; toDay: (worldDay: number) => void }) {
   const data = useAsync(() => getJson<{ sets: GradeSet[] }>(`/api/data/run/${enc(run)}/grades`), [run]);
   if (data === undefined) return <p className="rd-note">Reading the grade files…</p>;
   if (data instanceof Error) return <p className="rd-note">Could not read the grade files: {data.message}</p>;
@@ -83,20 +127,7 @@ function Grades({ run }: { run: string }) {
   return (
     <>
       {data.sets.map((s) => (
-        <section key={s.set + s.packet} className="rd-sec">
-          <h2>
-            {s.set} · {s.packet}
-          </h2>
-          <p className="rd-note">
-            Each grader's file ({Object.keys(s.graders).join(", ") || "none"}), as written, side by side.{" "}
-            {s.packetPath && (
-              <a href={`/api/data/run/${enc(run)}/packet?set=${enc(s.set)}&packet=${enc(s.packet)}`} target="_blank" rel="noreferrer">
-                The packet the graders read ({s.packetPath})
-              </a>
-            )}
-          </p>
-          <GraderColumns graders={s.graders} />
-        </section>
+        <GradesReadable key={s.set + s.packet} s={s} cite={cite} toDay={toDay} rawGrid={<GraderColumns graders={s.graders} />} />
       ))}
     </>
   );
@@ -134,7 +165,7 @@ function Row({ label, cells }: { label: string; cells: unknown[] }) {
   const same = cells.length > 1 && cells.every((c) => JSON.stringify(c) === JSON.stringify(cells[0]));
   return (
     <>
-      <div className="rd-gl">
+      <div className="rd-gl" id={`rd-g-${label}`}>
         {label}
         {same && <span className="rd-same"> (same in each)</span>}
       </div>

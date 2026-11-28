@@ -36,3 +36,18 @@
 /* The run folder and the model keep their ends (the run's own name; the model's version) when cut: the ellipsis goes at the start. */
 .dt-table td.dt-pin[data-col="run"], .dt-table td.dt-pin[data-col="model"] { direction: rtl; text-align: left; }
 .dt-table td.dt-pin[data-col="run"] > *, .dt-table td.dt-pin[data-col="model"] > * { direction: ltr; }
+
+/* Readable by default: body cells wrap (numbers do not), prose columns get room; the header stays on one line so the
+   filter row below it keeps its place. */
+.dt-table td { line-height: 1.4; padding-top: 5px; padding-bottom: 5px; vertical-align: top; }
+.dt-table td.r { min-width: 0; }
+.dt-table td.dt-wide { white-space: normal; overflow-wrap: break-word; min-width: 200px; max-width: 340px; }
+.dt-table td.dt-pin { white-space: normal; font-weight: 600; }
+.dt-table { font-size: 13px; }
+.dt-search { font: inherit; font-size: 14px; padding: 5px 10px; min-width: 280px; border: 1px solid var(--line-2); border-radius: var(--r-1); background: var(--panel); color: var(--text); }
+.dt-presets button { height: 28px; }
+@media (max-width: 700px) { .dt-search { min-width: 0; flex: 1 1 100%; } .dt-presets { flex-wrap: wrap; } }
+.dt-clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+@media (max-width: 700px) {
+  .dt-table .dt-pin[data-col="model_name"] { width: 118px !important; min-width: 118px !important; max-width: 118px !important; }
+}
