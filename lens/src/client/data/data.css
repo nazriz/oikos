@@ -33,6 +33,6 @@
 .dt-table td.dt-pin:last-of-type, .dt-table .dt-pin + :not(.dt-pin) { border-left: 1px solid var(--line); }
 .dt-twins { font-size: 13px; display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
 
-/* The run folder keeps its end (the run's own name) when cut: the ellipsis goes at the start. */
-.dt-table td.dt-pin[data-col="run"] { direction: rtl; text-align: left; }
-.dt-table .dt-pin[data-col="run"] > * { direction: ltr; }
+/* The run folder and the model keep their ends (the run's own name; the model's version) when cut: the ellipsis goes at the start. */
+.dt-table td.dt-pin[data-col="run"], .dt-table td.dt-pin[data-col="model"] { direction: rtl; text-align: left; }
+.dt-table td.dt-pin[data-col="run"] > *, .dt-table td.dt-pin[data-col="model"] > * { direction: ltr; }
