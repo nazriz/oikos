@@ -42,6 +42,7 @@ export function CaseStudies({ runs }: { runs: RunEntry[] | undefined }) {
               {c.figure && <p className="cs-fig">{c.figure}</p>}
               <Quote q={c.grader} />
               {c.mayor && <Quote q={c.mayor} />}
+              {c.after && <p className="cs-fig cs-after">{c.after}</p>}
               <a className="st-btn cs-go" href={runHref(c.key, { t: c.t, sel: `sitting:${c.sitting}` })}>Open the key turn</a>
               {c.beside && (
                 <div className="cs-beside">
