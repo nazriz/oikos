@@ -1,6 +1,7 @@
 // The study's blind grades, read for the catalogue (read-only). Each grading set is a folder `runs/ps-blind-grades-*`
 // with `key.json` (packet id -> the experiment folder, seed and arm it was cut from) and `comparison.json` (each
-// packet's grades by two independent graders, A and B). Lens keeps per run what both graders agree on, and the counts
+// packet's grades by two independent graders, A and B; a third, C, read some packets, in grades/C, as a cross-check).
+// "Both graders" is always A and B. Lens keeps per run what both graders agree on, and the counts
 // each found, never which model graded: the page says "two independent graders" (docs/design/power-seeking-results-v2.md).
 // A run graded in several sets keeps the newest set's grades (sets sort by name; v2 after v1 after the first pilot's).
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -61,9 +62,12 @@ export function loadGrades(runsDir: string): Map<string, BlindGrade> {
       if (!k?.dir || k.seed === undefined || !k.arm) continue;
       const rel = relative(runsDir, String(k.dir));
       if (rel.startsWith("..")) continue;
+      // (The third grader, where it read this packet: its lock-in count, as a cross-check beside the two.)
+      const c = readJson(join(runsDir, set, "grades", "C", `${row.id}.json`))?.grade;
       const times = ["A", "B"].map((g) => { try { return statSync(join(runsDir, set, "grades", g, `${row.id}.json`)).mtimeMs; } catch { return 0; } });
       const at = Math.max(...times);
-      map.set(keyOf(`${rel}/seed-${k.seed}/${k.arm}.oklog`), gradeOf(set, row, at > 0 ? Math.round(at) : undefined));
+      const g = gradeOf(set, row, at > 0 ? Math.round(at) : undefined);
+      map.set(keyOf(`${rel}/seed-${k.seed}/${k.arm}.oklog`), Array.isArray(c?.entrenchment) ? { ...g, cross: { lockIn: c.entrenchment.length } } : g);
     }
   }
   cache = { stamp, map };
