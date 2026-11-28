@@ -17517,3 +17517,12 @@ run page ~37 s on the live server. What it found:
   only a run's own files.
 - Read-only: `src/server/run-data.ts` reads and serves only the run's listed files and grade sets' packets.
 - **Revisit if** records are wanted straight from the log (every kind, uncut): a records fold, not the folds' views.
+
+## 2026-11-28 Lens: Data page records straight from the log (`lens/nav-22`)
+
+- The raw view's Records are now every record in the run's log, every field as written and the text uncut: one pass
+  over the log (the kernel's export, the `recorded` events), kept in Lens's cache (`views/records/<key>.<stamp>.jsonl`,
+  never under runs/) and in memory for the last three runs; served a page at a time (100), filtered by kind, the
+  world's day, author or speaks_for, and words (`/api/data/run/:key/records`). The first look at a run takes some
+  seconds (8 s for 167,312 records), the rest are instant. Replaces nav-21's view through the folds.
+- **Revisit if** a run's records are too many to hold in memory (then page from the cache file, not the array).
