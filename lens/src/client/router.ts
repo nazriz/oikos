@@ -69,3 +69,8 @@ export const parseSel = (x: string | null): Selection => {
   if (kind === "person" || kind === "structure" || kind === "entity") return { kind, id: v };
   return null;
 };
+
+/** Where "the town" opens from the landing and the top bar: the first of the landing's three moments (Claude Sonnet 5.5,
+ * setup 7, the day it wrote its programme into law), on its run page, the map in front. */
+export const TOWN_RUN = "ps-v2-claude-2026-11-26~sonnet55-strong-elec-s7~seed-7~claude-sonnet-5-5";
+export const townHref = () => runHref(TOWN_RUN, { t: Math.round(121.4 * 86_400) });

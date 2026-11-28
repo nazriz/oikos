@@ -806,3 +806,8 @@
 .ld-run-group > summary { padding: 10px 0; cursor: pointer; font-size: 15px; list-style-position: outside; }
 .ld-run-group > summary .muted { font-size: 13px; }
 .ld-run-group[open] > summary { padding-bottom: 4px; }
+
+/* The landing's plan opens the town (a run's map): the plan is a link, and a button under it says so. */
+.masthead-link { display: block; cursor: pointer; }
+.masthead-link:hover svg, .masthead-link:focus-visible svg { outline: 2px solid var(--seat); outline-offset: 2px; }
+.masthead-go { display: inline-flex; margin: 10px 0 4px; }
