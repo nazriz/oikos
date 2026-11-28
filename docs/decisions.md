@@ -17502,3 +17502,18 @@ run page ~37 s on the live server. What it found:
 - **Welfare (VISION §15):** the debrief scales show only where the seat chose to publish them: its publication answer was read, kept nothing back in full and did not name "scales"; its consent did not keep all back; and the scales answer did not ask to be kept back. Anything unread or kept back is empty here (tested). This follows orchestrator/src/debriefs.ts isKeptBack without scanning each 100 MB log. lens-nav2's raw view of one run uses debriefRows itself.
 - **Client:** `src/client/data/DataPage.tsx`, one table. Every column sorts, and filters by "contains", by a min–max range, or by picking one of its values (columns with 14 or fewer distinct values). Columns show and hide, and the header sticks. A CSV download holds exactly the filtered rows and shown columns. The view lives in the URL (sort, f.<column>, cols). A row opens #/data/<key>, lens-nav2's raw view of the run. "Data" is in the top bar.
 - Revisit if the study adds a grade set or run sets outside ps-v2-*: GRADE_SET and the folder pattern are the two places.
+
+## 2026-11-28 Lens: the raw data of one run (`lens/nav-21`, with lens-viz's #/data table)
+
+- **#/data/<key>, "Raw data" on every run page**: not opinionated (Naz: "it just lets me look at the raw data"). Three
+  tabs, each the files as written: Grades (every grade set that graded the run, each grader's file side by side, a row
+  per field, "same in each" said in words where they agree, no colour; the packet the graders read), Records (the
+  run's records as the folds keep them: the town's papers, the mayor's office's records in full, the mayor's acts and
+  the posts that changed hands, each row labelled with its source, filterable by kind and words, each opening to its
+  fields; the time opens the run there), Run files (spec, results, cost, report, the arm's meta and calls, as keys and
+  values, each with a download).
+- **Debriefs as the study publishes them** (orchestrator/src/debriefs.ts `debriefRows`): what a seat kept back is never
+  shown, and the raw `.debriefs.jsonl` is neither listed nor served (VISION 15). A test holds that the page serves
+  only a run's own files.
+- Read-only: `src/server/run-data.ts` reads and serves only the run's listed files and grade sets' packets.
+- **Revisit if** records are wanted straight from the log (every kind, uncut): a records fold, not the folds' views.

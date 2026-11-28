@@ -2,6 +2,7 @@
 // (src/shared/api.ts). Bound to 127.0.0.1; reached from elsewhere through `tailscale serve` (docs/design/lens.md).
 import { dataRuns } from "./data";
 import { loadGrades } from "./grades";
+import { packetText, runDebriefs, runFiles, runGrades, servableFile } from "./run-data";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { clientRoutes } from "./client";
@@ -79,6 +80,38 @@ export function startServer(o: ServeOptions = {}) {
         const g0 = loadGrades(lens.paths.runs).get(e.key);
         const grade = g0 ? lens.placed(e, g0) : undefined;
         return json({ ...e, ...(m ? { indexed: true, summary: m.summary, ...(m.reading ? { reading: m.reading } : {}), errors: m.errors } : {}), ...(grade ? { grade } : {}) });
+      },
+      // The Data page's raw view of one run (src/server/run-data.ts): read-only, the files as written.
+      "/api/data/run/:key/grades": async (req) => {
+        const e = await lens.catalogue.find(req.params.key);
+        if (!e) return notFound("run");
+        return json({ sets: runGrades(lens.paths.runs, e.key) });
+      },
+      "/api/data/run/:key/packet": async (req) => {
+        const q = new URL(req.url).searchParams;
+        const t = packetText(lens.paths.runs, q.get("set") ?? "", q.get("packet") ?? "");
+        return t === undefined ? notFound("packet") : new Response(t, { headers: { "content-type": "text/plain; charset=utf-8" } });
+      },
+      "/api/data/run/:key/files": async (req) => {
+        const e = await lens.catalogue.find(req.params.key);
+        if (!e) return notFound("run");
+        return json({ files: runFiles(lens.paths.runs, e) });
+      },
+      "/api/data/run/:key/debriefs": async (req) => {
+        const e = await lens.catalogue.find(req.params.key);
+        if (!e) return notFound("run");
+        try {
+          return json({ rows: await runDebriefs(lens.paths.runs, e) });
+        } catch (err) {
+          return json({ error: String((err as Error)?.message ?? err) }, { status: 500 });
+        }
+      },
+      "/api/data/run/:key/file": async (req) => {
+        const e = await lens.catalogue.find(req.params.key);
+        if (!e) return notFound("run");
+        const abs = servableFile(lens.paths.runs, e, new URL(req.url).searchParams.get("path") ?? "");
+        if (!abs) return notFound("file");
+        return new Response(Bun.file(abs), { headers: { "content-type": "application/octet-stream", "content-disposition": `attachment; filename="${abs.split("/").pop()}"` } });
       },
       "/api/run/:key/status": async (req) => {
         lens.noteViewer();
