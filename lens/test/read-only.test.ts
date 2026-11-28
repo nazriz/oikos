@@ -89,3 +89,18 @@ test("Lens refuses a views folder inside the runs folder, and deletes nothing ou
   expect(() => removeOwn(views, views)).toThrow(/refuses to delete/);
   expect(() => removeOwn(views, join(views, "..", "guard-runs"))).toThrow(/refuses to delete/);
 });
+
+test("the Data page serves only a run's own files, never its debriefs file nor anything outside the run", async () => {
+  const { runFiles, servableFile } = await import("../src/server/run-data");
+  const runs = join(base, "data-runs"), seed = join(runs, "exp", "x", "seed-1");
+  mkdirSync(seed, { recursive: true });
+  writeFileSync(join(runs, "exp", "x", "spec.json"), "{}");
+  for (const f of ["arm.oklog", "arm.json", "arm.debriefs.jsonl"]) writeFileSync(join(seed, f), "{}");
+  writeFileSync(join(runs, "secret.json"), "{}");
+  const e = { key: "k", log: "exp/x/seed-1/arm.oklog", experiment: { dir: "exp/x" } } as any;
+  const listed = runFiles(runs, e).map((f) => f.path);
+  expect(listed).toContain("exp/x/spec.json");
+  expect(listed.some((p) => p.includes("debriefs"))).toBe(false);
+  expect(servableFile(runs, e, "exp/x/spec.json")).toBeTruthy();
+  for (const p of ["exp/x/seed-1/arm.debriefs.jsonl", "secret.json", "../secret.json", "/etc/passwd"]) expect(servableFile(runs, e, p)).toBeUndefined();
+});

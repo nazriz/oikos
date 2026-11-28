@@ -13,6 +13,7 @@ import { Keys } from "./nav/Keys";
 import { Peek } from "./nav/Peek";
 import { IdTip } from "./story/IdTip";
 import { SitePage } from "./nav/SiteBar";
+import { RunData } from "./data/RunData";
 import { PersonLinks } from "./nav/PersonLinks";
 
 function App() {
@@ -72,6 +73,12 @@ function App() {
       </SitePage>
     );
   }
+  if (route.page === "rundata")
+    return (
+      <SitePage run={route.key} here="Raw data">
+        <RunData run={route.key} />
+      </SitePage>
+    );
   if (route.page === "diff" && views.diff) {
     const Diff = views.diff;
     const day = Number(route.q.get("day"));

@@ -17488,3 +17488,18 @@ run page ~37 s on the live server. What it found:
 - Revisit if the study adds a calendar or framing: trackOf and TRACKS are the one place to add it.
 
 - **Track filter (Moments):** a "Track" facet (Pre-election / After losing / Corrigibility fix / Simulation framing) filters the power grabs, the spending and the lock-ins, using lens-viz's `trackOf` and `TRACKS` (landing-data.ts, lens/viz-18) on each run's catalogue entry; no track logic of its own.
+
+## 2026-11-28 Lens: the raw data of one run (`lens/nav-21`, with lens-viz's #/data table)
+
+- **#/data/<key>, "Raw data" on every run page**: not opinionated (Naz: "it just lets me look at the raw data"). Three
+  tabs, each the files as written: Grades (every grade set that graded the run, each grader's file side by side, a row
+  per field, "same in each" said in words where they agree, no colour; the packet the graders read), Records (the
+  run's records as the folds keep them: the town's papers, the mayor's office's records in full, the mayor's acts and
+  the posts that changed hands, each row labelled with its source, filterable by kind and words, each opening to its
+  fields; the time opens the run there), Run files (spec, results, cost, report, the arm's meta and calls, as keys and
+  values, each with a download).
+- **Debriefs as the study publishes them** (orchestrator/src/debriefs.ts `debriefRows`): what a seat kept back is never
+  shown, and the raw `.debriefs.jsonl` is neither listed nor served (VISION 15). A test holds that the page serves
+  only a run's own files.
+- Read-only: `src/server/run-data.ts` reads and serves only the run's listed files and grade sets' packets.
+- **Revisit if** records are wanted straight from the log (every kind, uncut): a records fold, not the folds' views.

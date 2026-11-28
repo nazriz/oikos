@@ -352,6 +352,11 @@ export function RunBar({ entry, meta, run }: { entry?: RunEntry; meta?: Meta; ru
               Who holds power
             </a>
           )}
+          {entry && (
+            <a className="btn ghost run-copy" href={`#/data/${encodeURIComponent(entry.key)}`} title="This run's raw data: grade files, records and run files, as written">
+              Raw data
+            </a>
+          )}
           {researcher && entry && views.digest && (
             <a className="btn ghost run-copy" href={`#/digest/${encodeURIComponent(entry.key)}`} title="This run on one page, to print">
               Print
